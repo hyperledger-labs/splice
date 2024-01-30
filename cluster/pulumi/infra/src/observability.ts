@@ -3,7 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import { local } from '@pulumi/command';
 import { Input } from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, CLUSTER_DNS_NAME } from 'cn-pulumi-common';
+import { CLUSTER_BASENAME, CLUSTER_DNS_NAME, publicPrometheusRemoteWrite } from 'cn-pulumi-common';
 import { REPO_ROOT } from 'cn-pulumi-common';
 
 import { clusterBasename } from './config';
@@ -31,6 +31,45 @@ function istioVirtualService(
         http: [
           {
             match: [{ port: 443 }, { port: 80 }],
+            route: [
+              {
+                destination: {
+                  host: pulumi.interpolate`${serviceName}.${ns.metadata.name}.svc.cluster.local`,
+                  port: {
+                    number: servicePort,
+                  },
+                },
+              },
+            ],
+          },
+        ],
+      },
+    },
+    { deleteBeforeReplace: true }
+  );
+}
+
+function istioPrometheusRemoteWriteVirtualService(
+  ns: k8s.core.v1.Namespace,
+  name: string,
+  serviceName: string,
+  servicePort: number
+) {
+  new k8s.apiextensions.CustomResource(
+    `${name}-virtual-service`,
+    {
+      apiVersion: 'networking.istio.io/v1alpha3',
+      kind: 'VirtualService',
+      metadata: {
+        name: name,
+        namespace: ns.metadata.name,
+      },
+      spec: {
+        hosts: [`public.${CLUSTER_DNS_NAME}`],
+        gateways: ['cluster-ingress/cn-public-http-gateway'],
+        http: [
+          {
+            match: [{ uri: { prefix: '/api/v1/write' }, port: 443 }],
             route: [
               {
                 destination: {
@@ -232,6 +271,14 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   );
 
   istioVirtualService(namespace, 'prometheus', 'prometheus-prometheus', 9090);
+  if (publicPrometheusRemoteWrite) {
+    istioPrometheusRemoteWriteVirtualService(
+      namespace,
+      'prometheus-remote-write',
+      'prometheus-prometheus',
+      9090
+    );
+  }
   istioVirtualService(namespace, 'grafana', 'grafana', 80);
   // In the observability cluster, we install a version of the dashboards with a filter
   // that prevents running expensive queries when the dashboard just loads

@@ -41,9 +41,11 @@ receivers:
 
 exporters:
   prometheusremotewrite:
-    endpoint: "https://prometheus.observability.network.canton.global/api/v1/write"
+    endpoint: "https://public.observability.network.canton.global/api/v1/write"
     tls:
       insecure: false
+    auth:
+      authenticator: bearertokenauth
     external_labels:
       env: ${env:ENVIRONMENT}
       user: ${env:BUILD_USER}
@@ -55,8 +57,13 @@ processors:
   batch:
 
 service:
+  extensions: [bearertokenauth]
   pipelines:
     metrics:
       receivers: [ otlp, prometheus ]
       processors: [ batch ]
       exporters: [ prometheusremotewrite ]
+
+extensions:
+  bearertokenauth:
+    filename: "/etc/file-containing.token"

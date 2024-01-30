@@ -59,6 +59,7 @@ export function envFlag(flagName: string, defaultFlag = false): boolean {
 
 export const isDevNet = envFlag('IS_DEVNET', true);
 export const clusterLargeDisk = envFlag('CLUSTER_LARGE_DISK', false);
+export const publicPrometheusRemoteWrite = envFlag('PUBLIC_PROMETHEUS_REMOTE_WRITE', false);
 
 const enableSequencerPruning = envFlag('ENABLE_SEQUENCER_PRUNING', false);
 export const sequencerPruningConfig = enableSequencerPruning

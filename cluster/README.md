@@ -803,9 +803,14 @@ To access Grafana on a given cluster, browse to `grafana.<CLUSTER_DNS>` and logi
 
 ##### The Observability Cluster
 
-In addition to the per-cluster observability stacks, we maintain also an `observability` cluster which collects metrics data from CircleCI runs. You can access Grafana on that cluster at `https://grafana.observability.network.canton.global`.
+In addition to the per-cluster observability stacks, we maintain also an `observability` cluster which collects metrics data from CircleCI runs. You can access Grafana on that cluster at `https://grafana.observability.network.canton.global`. The observability cluster is a regular CN cluster but it only deploys the `infra` stack.
 
-In that cluster, we add an ad hoc filter using the `build_num` label with
+Note that contrary to our other clusters, the `observability` cluster
+exposes the prometheus remote write endpoint to the public internet
+(but protected through JWT auth). This avoids the need to run
+literally every job on CI through VPN.
+
+In the observability cluster, we add an ad hoc filter using the `build_num` label with
 a default value of `non_existing`.
 The main reason is to prevent loading a lot of metric series when first opening the dashboard (as all the metrics are
 labeled for each CI run job with a different `build_num`, this would load a lot of series in prometheus leading to

@@ -74,10 +74,14 @@ function configureIstiod(
   return istiodRelease;
 }
 
-function ingressPort(
-  name: string,
-  port: number
-): { name: string; port: number; targetPort: number; protocol: string } {
+type IngressPort = {
+  name: string;
+  port: number;
+  targetPort: number;
+  protocol: string;
+};
+
+function ingressPort(name: string, port: number): IngressPort {
   return {
     name: name,
     port: port,
@@ -89,7 +93,7 @@ function ingressPort(
 // Note that despite the helm chart name being "gateway", this does not actually
 // deploy an istio "gateway" resource, but rather the istio-ingress LoadBalancer
 // service and the istio-ingress pod.
-function configureGatewayService(
+function configureInternalGatewayService(
   ingressNs: k8s.core.v1.Namespace,
   ingressIp: pulumi.Output<string>,
   istiod: k8s.helm.v3.Release
@@ -101,10 +105,104 @@ function configureGatewayService(
       return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
     });
   });
+  return configureGatewayService(
+    ingressNs,
+    ingressIp,
+    externalIPRanges,
+    [
+      ingressPort('grpc-cd-pub-api', 5008),
+      ingressPort('grpc-svcp-adm', 5002),
+      ingressPort('grpc-svcp-lg', 5001),
+      ingressPort('svcp-metrics', 10013),
+      ingressPort('grpc-val1-adm', 5102),
+      ingressPort('grpc-val1-lg', 5101),
+      ingressPort('val1-metrics', 10113),
+      ingressPort('val1-lg-gw', 6101),
+      ingressPort('grpc-swd-pub', 5108),
+      ingressPort('grpc-swd-adm', 5109),
+      ingressPort('swd-metrics', 10413),
+      ingressPort('grpc-sw-adm', 5202),
+      ingressPort('grpc-sw-lg', 5201),
+      ingressPort('sw-metrics', 10213),
+      ingressPort('sw-lg-gw', 6201),
+    ].concat(cometBftIngressPorts),
+    istiod,
+    ''
+  );
+}
+
+function configurePublicGatewayService(
+  ingressNs: k8s.core.v1.Namespace,
+  ingressIp: pulumi.Output<string>,
+  istiod: k8s.helm.v3.Release
+) {
+  new k8s.apiextensions.CustomResource(`public-request-authentication`, {
+    apiVersion: 'security.istio.io/v1',
+    kind: 'RequestAuthentication',
+    metadata: {
+      name: 'public-request-authentication',
+      namespace: ingressNs.metadata.name,
+    },
+    spec: {
+      selector: {
+        matchLabels: {
+          istio: 'ingress-public',
+        },
+      },
+      jwtRules: [
+        {
+          issuer: 'https://canton-network-ci.example.com',
+          // Find details on the keys here https://docs.google.com/document/d/1ajR8_SsSybl6GSrhGggOHEZPfCF0hzk0MDJMyziV7Vc/edit#heading=h.h81kh9iplwtp
+          jwks: '{"keys": [{"kty":"RSA","n":"rX_TFg7BFsaQ4st9NrPiN4gc_sZmhifgEczn6CCedKKOTYouO7ik9KTg0eTfQN2qSU-2L4KYX4KbK2T3e6CYsWDB6UjZYdhEtfj_X_QyIQ8hBVKGoNpL6WJFvzALPR5ILokzp9kDy0oV9-SqC91lS-ai2sHED14uS4NVfw9xk9toZG1stOm4JmfzOyAB3ksBrTfefKaIyKguINOJi2lGCqK9hnWbGJM2OHFmzEle4djrJub9qRCEkHBejPWmHrdN1zB2FZlWVA_Ze8tqBf5K9xx1cIn0cTWETEIWPhLu8pk_hFan1YmMOiBpjsOlg2e6f_m0dvhBSkqqieVFQBka6iocfLGWJFRBHTwgFw9-PIMTtb0l42uIGzKTo1XrvwMSqy4rff028ZLkbxu6OmFHCm4gRR6wlXF4ha6pTkS-vjFVdn2pL09-6jLD7CbNf5Di8RwvdO3puSp_ZExGb8UapgjW3sonlXiMxz1VAYTOYb4YIRSWGKafyBrNB5MGVuqgvK_ZjBzBvax6wSAU6ldcuHiGfS786FH2QwA47Smo2ewPfKpO2ePOmkvNpleT817BStbFtZD8K9y7Pf0QiX1Hk4DA7N_oQp3hrgW7U9Dy0hIh2OflMnFFEdN51fV-89tdIAKTd1rn3NwTqRcTDH1-GvmLfZTWH2-ZOgjizWFPsqE","e":"AQAB","ext":true,"kid":"eb3d58621c3c7fc606386139a","alg":"RS256","use":"sig"}]}',
+        },
+      ],
+    },
+  });
+  new k8s.apiextensions.CustomResource(`public-request-authorization`, {
+    apiVersion: 'security.istio.io/v1beta1',
+    kind: 'AuthorizationPolicy',
+    metadata: {
+      name: 'public-request-authorization',
+      namespace: ingressNs.metadata.name,
+    },
+    spec: {
+      selector: {
+        matchLabels: {
+          istio: 'ingress-public',
+        },
+      },
+      action: 'ALLOW',
+      rules: [
+        {
+          from: [
+            {
+              source: {
+                requestPrincipals: ['https://canton-network-ci.example.com/canton-network-ci'],
+              },
+            },
+          ],
+        },
+      ],
+    },
+  });
+  return configureGatewayService(ingressNs, ingressIp, ['0.0.0.0/0'], [], istiod, '-public');
+}
+
+// Note that despite the helm chart name being "gateway", this does not actually
+// deploy an istio "gateway" resource, but rather the istio-ingress LoadBalancer
+// service and the istio-ingress pod.
+function configureGatewayService(
+  ingressNs: k8s.core.v1.Namespace,
+  ingressIp: pulumi.Output<string>,
+  externalIPRanges: string[],
+  ingressPorts: IngressPort[],
+  istiod: k8s.helm.v3.Release,
+  suffix: string
+) {
   const gateway = new k8s.helm.v3.Release(
-    'istio-ingress',
+    `istio-ingress${suffix}`,
     {
-      name: 'istio-ingress',
+      name: `istio-ingress${suffix}`,
       chart: 'gateway',
       version: istioVersion.istio,
       namespace: ingressNs.metadata.name,
@@ -119,22 +217,7 @@ function configureGatewayService(
             ingressPort('status-port', 15021), // istio default
             ingressPort('http2', 80),
             ingressPort('https', 443),
-            ingressPort('grpc-cd-pub-api', 5008),
-            ingressPort('grpc-svcp-adm', 5002),
-            ingressPort('grpc-svcp-lg', 5001),
-            ingressPort('svcp-metrics', 10013),
-            ingressPort('grpc-val1-adm', 5102),
-            ingressPort('grpc-val1-lg', 5101),
-            ingressPort('val1-metrics', 10113),
-            ingressPort('val1-lg-gw', 6101),
-            ingressPort('grpc-swd-pub', 5108),
-            ingressPort('grpc-swd-adm', 5109),
-            ingressPort('swd-metrics', 10413),
-            ingressPort('grpc-sw-adm', 5202),
-            ingressPort('grpc-sw-lg', 5201),
-            ingressPort('sw-metrics', 10213),
-            ingressPort('sw-lg-gw', 6201),
-          ].concat(cometBftIngressPorts),
+          ].concat(ingressPorts),
         },
       },
     },
@@ -143,7 +226,7 @@ function configureGatewayService(
     }
   );
   new PodMonitor(
-    'istio-sidecar-monitor',
+    `istio-sidecar-monitor${suffix}`,
     {
       'security.istio.io/tlsMode': 'istio',
     },
@@ -154,7 +237,7 @@ function configureGatewayService(
     }
   );
   new PodMonitor(
-    'istio-gateway-monitor',
+    `istio-gateway-monitor${suffix}`,
     {
       istio: 'ingress',
     },
@@ -169,7 +252,8 @@ function configureGatewayService(
 
 function configureGateway(
   ingressNs: k8s.core.v1.Namespace,
-  gwSvc: k8s.helm.v3.Release
+  gwSvc: k8s.helm.v3.Release,
+  publicGwSvc?: k8s.helm.v3.Release
 ): k8s.helm.v3.Release {
   const repo_root = process.env.REPO_ROOT;
   return new k8s.helm.v3.Release(
@@ -183,17 +267,19 @@ function configureGateway(
           hostname: `${clusterBasename}.network.canton.global`,
           basename: clusterBasename,
         },
+        enablePublicGateway: !!publicGwSvc,
       },
     },
     {
-      dependsOn: [gwSvc],
+      dependsOn: [gwSvc].concat(publicGwSvc ? [publicGwSvc] : []),
     }
   );
 }
 
 export function configureIstio(
   ingressNs: k8s.core.v1.Namespace,
-  ingressIp: pulumi.Output<string>
+  ingressIp: pulumi.Output<string>,
+  publicIngressIp?: pulumi.Output<string>
 ): k8s.helm.v3.Release {
   const nsName = 'istio-system';
   const istioSystemNs = new k8s.core.v1.Namespace(nsName, {
@@ -203,7 +289,10 @@ export function configureIstio(
   });
   const base = configureIstioBase(istioSystemNs);
   const istiod = configureIstiod(ingressNs, base);
-  const gwSvc = configureGatewayService(ingressNs, ingressIp, istiod);
-  const gw = configureGateway(ingressNs, gwSvc);
+  const gwSvc = configureInternalGatewayService(ingressNs, ingressIp, istiod);
+  const publicGwSvc = publicIngressIp
+    ? configurePublicGatewayService(ingressNs, publicIngressIp, istiod)
+    : undefined;
+  const gw = configureGateway(ingressNs, gwSvc, publicGwSvc);
   return gw;
 }

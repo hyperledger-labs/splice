@@ -2,7 +2,7 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as certmanager from '@pulumi/kubernetes-cert-manager';
 import * as pulumi from '@pulumi/pulumi';
-import { btoa, requireEnv } from 'cn-pulumi-common';
+import { btoa, publicPrometheusRemoteWrite, requireEnv } from 'cn-pulumi-common';
 
 function ipAddress(addressName: string): gcp.compute.Address {
   return new gcp.compute.Address(addressName, {
@@ -14,7 +14,8 @@ function ipAddress(addressName: string): gcp.compute.Address {
 function clusterDnsEntries(
   clusterName: string,
   dnsName: string,
-  ingressIp: gcp.compute.Address
+  ingressIp: gcp.compute.Address,
+  publicIngressIp?: gcp.compute.Address
 ): gcp.dns.RecordSet[] {
   return [
     new gcp.dns.RecordSet(dnsName, {
@@ -33,7 +34,20 @@ function clusterDnsEntries(
       managedZone: 'canton-global',
       rrdatas: [ingressIp.address],
     }),
-  ];
+  ].concat(
+    publicIngressIp
+      ? [
+          new gcp.dns.RecordSet(dnsName + '-public', {
+            name: `public.${dnsName}.`,
+            ttl: 60,
+            type: 'A',
+            project: process.env.GCP_DNS_PROJECT,
+            managedZone: 'canton-global',
+            rrdatas: [publicIngressIp.address],
+          }),
+        ]
+      : []
+  );
 }
 
 function certManager(certManagerNamespaceName: string): certmanager.CertManager {
@@ -212,6 +226,7 @@ function natGateway(
 
 class CantonNetwork extends pulumi.ComponentResource {
   ingressIp: gcp.compute.Address;
+  publicIngressIp: gcp.compute.Address | undefined;
   egressIp: gcp.compute.Address;
   ingressNs: k8s.core.v1.Namespace;
 
@@ -222,11 +237,15 @@ class CantonNetwork extends pulumi.ComponentResource {
 
     const ingressIp = ipAddress(`cn-${clusterName}net-ip`);
 
+    const publicIngressIp = publicPrometheusRemoteWrite
+      ? ipAddress(`cn-${clusterName}net-pub-ip`)
+      : undefined;
+
     const egressIp = ipAddress(`cn-${clusterName}-out`);
 
     const certManagerDeployment = certManager('cert-manager');
 
-    const dnsEntries = clusterDnsEntries(clusterName, dnsName, ingressIp);
+    const dnsEntries = clusterDnsEntries(clusterName, dnsName, ingressIp, publicIngressIp);
 
     const ingressNs = new k8s.core.v1.Namespace('cluster-ingress', {
       metadata: {
@@ -239,6 +258,7 @@ class CantonNetwork extends pulumi.ComponentResource {
     clusterCertificate(clusterName, dnsName, ingressNs, certManagerDeployment, dnsEntries);
 
     this.ingressIp = ingressIp;
+    this.publicIngressIp = publicIngressIp;
     this.egressIp = egressIp;
     this.ingressNs = ingressNs;
 

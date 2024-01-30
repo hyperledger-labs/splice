@@ -173,3 +173,33 @@ spec:
       - "*"
   {{- end }}
   {{- end }}
+---
+{{- if .Values.enablePublicGateway }}
+apiVersion: networking.istio.io/v1alpha3
+kind: Gateway
+metadata:
+  name: cn-public-http-gateway
+  namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: istio-ingress-public
+    istio: ingress-public
+  servers:
+  - hosts:
+    - "public.{{ (.Values.cluster).hostname }}"
+    port:
+      name: http
+      number: 80
+      protocol: HTTP
+    tls:
+      httpsRedirect: true
+  - port:
+      number: 443
+      name: https
+      protocol: HTTPS
+    tls:
+      mode: SIMPLE
+      credentialName: cn-{{ (.Values.cluster).basename }}net-tls
+    hosts:
+    - "public.{{ (.Values.cluster).hostname }}"
+{{- end }}

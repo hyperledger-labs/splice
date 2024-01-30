@@ -94,7 +94,8 @@
         "cluster": {
           "basename": "test-stack",
           "hostname": "test-stack.network.canton.global"
-        }
+        },
+        "enablePublicGateway": false
       }
     },
     "name": "cluster-gateway",

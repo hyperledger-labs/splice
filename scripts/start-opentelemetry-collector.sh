@@ -22,5 +22,11 @@ mkdir -p "$LOGS_PATH"
 compose_file="$REPO_ROOT"/build-tools/observability/opentelemetry-collector.yml
 docker compose -f "${compose_file}" create
 docker compose -f "${compose_file}" cp "${REPO_ROOT}"/build-tools/observability/otel-collector-config.yaml otel-collector:/etc/otel-collector-config.yaml
+JWT=$(mktemp)
+trap 'rm -rf $JWT' EXIT
+# For some reason `docker compose cp` does not like a <() substitution so we use a temp file.
+echo -n "$PROMETHEUS_REMOTE_WRITE_JWT" > "$JWT"
+chmod 755 "$JWT"
+docker compose -f "${compose_file}" cp "$JWT" otel-collector:/etc/file-containing.token
 docker compose -f "${compose_file}" start
 docker compose -f "${compose_file}" logs -f > "$LOGS_PATH"/otel_collector.log &
