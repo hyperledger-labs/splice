@@ -115,6 +115,7 @@ cluster-parameter: &cluster-parameter
         "observability",
         "none",
       ]
+    default: "none"
 
 commands:
   checkout_with_retry:
@@ -562,10 +563,6 @@ commands:
         type: string
         default: ""
       <<: *cluster-parameter
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
-        default: "none"
     steps:
       - run_bash_command_in_nix:
           cmd_name: Executing "sbt << parameters.cmd >>"
@@ -687,10 +684,7 @@ commands:
       gce_authenticate:
         type: boolean
         default: false
-      cluster:
-        type: enum
-        enum: ["scratchneta", "scratchnetb", "scratchnetc", "scratchnetd", "scratchnete", "cimain", "cidaily", "cidaily-testnet", "cilr", "devnet", "testnet", "testnet-preview", "none", "observability"]
-        default: "none"
+      <<: *cluster-parameter
       additional_nix_args:
         type: string
         default: ""
@@ -3324,7 +3318,7 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/cidaily
+                - deployment/cidaily-testnet
           context:
             - artifactory
             - slack-context

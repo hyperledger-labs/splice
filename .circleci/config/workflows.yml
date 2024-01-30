@@ -822,7 +822,7 @@ workflows:
           filters:
             branches:
               only:
-                - deployment/cidaily
+                - deployment/cidaily-testnet
           context:
             - artifactory
             - slack-context

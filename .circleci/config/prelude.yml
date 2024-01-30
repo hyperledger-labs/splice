@@ -109,3 +109,4 @@ cluster-parameter: &cluster-parameter
         "observability",
         "none",
       ]
+    default: "none"
