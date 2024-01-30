@@ -53,7 +53,6 @@ class SvNamespaceMembershipTrigger(
         .filter(svcMemberParty =>
           !decentralizedNamespace.mapping.owners.contains(svcMemberParty.uid.namespace)
         )
-      // TODO(#9256): enforce the following statement during onboarding
       // Parties are only hosted on participants with the same namespace which is also the namespace that is used in the decentralized namespace.
       // Therefore we remove the namespace from the decentralized namespace only if
       // a namespace is present in the offboardedMembers list and not present in the members list

@@ -61,7 +61,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.circe.Json
 import io.grpc.Status
@@ -1198,6 +1198,11 @@ object SvApp {
       .get(party.toProtoPrimitive)
       .map(_.name == name)
       .getOrElse(false)
+
+  private[sv] def validateSvNamespace(
+      candidateParty: PartyId,
+      candidateParticipantId: ParticipantId,
+  ): Boolean = candidateParty.uid.namespace == candidateParticipantId.uid.namespace
 
   private[sv] def validateCandidateSv(
       candidateParty: PartyId,

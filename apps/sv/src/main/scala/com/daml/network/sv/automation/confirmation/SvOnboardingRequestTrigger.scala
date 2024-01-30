@@ -1,19 +1,18 @@
 package com.daml.network.sv.automation.confirmation
 
-import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
 }
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules,
   SvcRules_ConfirmSvOnboarding,
 }
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
@@ -26,6 +25,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -103,7 +103,11 @@ class SvOnboardingRequestTrigger(
             )
           )
         } else {
-          SvApp.validateCandidateSv(party, name, svcRules) match {
+          SvApp.validateCandidateSv(
+            party,
+            name,
+            svcRules,
+          ) match {
             case Left(err) =>
               Future.failed(err.asRuntimeException())
             case Right(_) =>

@@ -3,8 +3,8 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.CNParticipantClientReference
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
+import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
 
 class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
 
@@ -47,13 +47,21 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
   "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
     implicit env =>
       clue("Starting SVC app and SV1 app") {
-        startAllSync(sv1ScanBackend, sv1Backend, sv1ValidatorBackend)
+        startAllSync(sv1ScanBackend, sv1Backend, sv4Backend, sv1ValidatorBackend)
       }
 
       val svcParty = sv1Backend.getSvcInfo().svcParty
       val svcPartyStr: String = svcParty.toProtoPrimitive
       val sv1Participant = sv1Backend.participantClient
       val sv4Participant = sv4Backend.participantClient
+
+      val sv1Party = sv1Backend.getSvcInfo().svParty
+      val sv4Party = sv4Backend.getSvcInfo().svParty
+
+      val publicKey =
+        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA=="
+      val privateKey =
+        "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgxED/gH8AeSwNujZAVLhBRSN55Hx0ntC6FKKhgn+7h92hRANCAARkw2wMmvW5PAxMgiXNRmlR7FMupUYywPtxHhjyyphgViGV1Ux4cbnNK5t/6n5ZlssTIxQJPmcEIIGHSiJRj1ys"
 
       clue(
         "SVC party hosting authorization request with party which is not confirmed will be rejected by sponsor SV"
@@ -70,29 +78,52 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         )
       }
 
-      val sv1Party = sv1Backend.getSvcInfo().svParty
       clue(
         "SVC party hosting authorization request with party which is not hosted on the target participant"
       ) {
-        val publicKey =
-          "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEmeNnFncZa2O0wNLaoq3KNrlF5GpbpF4ZfIXcvqPFxtSMm5rL3sxjf6NY1GnHncrT9MZgfWuU161Y2FM1pEZ1Zg=="
-        val privateKey =
-          "MIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgtYbz4yBUZofTNVGjwg+QR6M3Ku1LP7RZJAPfokjDbWWhRANCAASZ42cWdxlrY7TA0tqirco2uUXkalukXhl8hdy+o8XG1IybmsvezGN/o1jUacedytP0xmB9a5TXrVjYUzWkRnVm"
+        val unAuthorizedParty =
+          PartyId(UniqueIdentifier(id = sv1Party.uid.id, namespace = sv4Party.uid.namespace))
         assertThrowsAndLogsCommandFailures(
           sv1Backend.startSvOnboarding(
             SvOnboardingToken(
               "Canton-Foundation-1",
               publicKey,
-              sv1Party,
+              unAuthorizedParty,
               sv4Backend.participantClient.id,
               svcParty,
             ).signAndEncode(SvUtil.parsePrivateKey(privateKey).value).value
           ),
           _.errorMessage should include(
-            s"Candidate party ${sv1Party} is not authorized by participant "
+            s"Candidate party ${unAuthorizedParty} is not authorized by participant "
           ),
         )
+      }
 
+      clue(
+        "SV party namespace matches the namespace of its participant."
+      ) {
+        val sv4PartyWithWrongNamespace =
+          PartyId(UniqueIdentifier(id = sv4Party.uid.id, namespace = sv1Party.uid.namespace))
+        assertThrowsAndLogsCommandFailures(
+          sv4Backend.startSvOnboarding(
+            SvOnboardingToken(
+              "Canton-Foundation-4",
+              publicKey,
+              sv4PartyWithWrongNamespace,
+              sv4Backend.participantClient.id,
+              svcParty,
+            ).signAndEncode(
+              SvUtil
+                .parsePrivateKey(
+                  privateKey
+                )
+                .value
+            ).value
+          ),
+          _.errorMessage should include(
+            s"Party $sv4PartyWithWrongNamespace does not have the same namespace than its participant"
+          ),
+        )
       }
 
       sv1WalletClient.tap(1.0)

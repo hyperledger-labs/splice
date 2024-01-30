@@ -120,7 +120,13 @@ class HttpSvHandler(
               )
               .map(_.nonEmpty)
             res <-
-              if (!isCandidatePartyHostedOnParticipant)
+              if (!SvApp.validateSvNamespace(token.candidateParty, token.candidateParticipantId)) {
+                Future.failed(
+                  HttpErrorHandler.badRequest(
+                    s"Party ${token.candidateParty} does not have the same namespace than its participant ${token.candidateParticipantId}."
+                  )
+                )
+              } else if (!isCandidatePartyHostedOnParticipant)
                 Future.failed(
                   HttpErrorHandler.unauthorized(
                     s"Candidate party ${token.candidateParty} is not authorized by participant ${token.candidateParticipantId}"
@@ -752,7 +758,11 @@ class HttpSvHandler(
           case QueryResult(offset, None) =>
             EitherT
               .fromEither[Future](
-                SvApp.validateCandidateSv(candidateParty, candidateName, svcRules)
+                SvApp.validateCandidateSv(
+                  candidateParty,
+                  candidateName,
+                  svcRules,
+                )
               )
               .leftMap(_.getDescription)
               .semiflatMap { _ =>
