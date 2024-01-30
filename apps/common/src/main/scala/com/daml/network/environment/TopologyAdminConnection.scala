@@ -1151,6 +1151,7 @@ abstract class TopologyAdminConnection(
       previous => Right(previous.copy(parameters = parametersBuilder(previous.parameters))),
       signedBy = signedBy,
       retryFor = RetryFor.ClientCalls,
+      isProposal = true,
     )
 
   def getDomainParametersState(
