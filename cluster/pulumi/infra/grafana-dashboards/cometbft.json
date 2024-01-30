@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 12,
+  "id": 85,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -274,7 +274,6 @@
       "hideTimeOverride": true,
       "id": 65,
       "links": [],
-      "maxDataPoints": 100,
       "options": {
         "legend": {
           "calcs": [],
@@ -302,7 +301,6 @@
           "refId": "A"
         }
       ],
-      "timeFrom": "1h",
       "title": "Avg State Block Processing",
       "type": "timeseries"
     },
@@ -345,7 +343,6 @@
       "hideTimeOverride": false,
       "id": 47,
       "links": [],
-      "maxDataPoints": 100,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -530,7 +527,6 @@
       "hideTimeOverride": true,
       "id": 39,
       "links": [],
-      "maxDataPoints": 100,
       "options": {
         "colorMode": "value",
         "graphMode": "area",
@@ -560,7 +556,6 @@
           "refId": "A"
         }
       ],
-      "timeFrom": "1h",
       "title": "Avg Block Time",
       "type": "stat"
     },
@@ -1824,8 +1819,8 @@
       {
         "current": {
           "selected": false,
-          "text": "dev-0.1.1-snapshot.20240111.4526.0.v552e1828",
-          "value": "dev-0.1.1-snapshot.20240111.4526.0.v552e1828"
+          "text": "cimain-0.1.1-snapshot.20240129.4677.0.v69fb2f3c",
+          "value": "cimain-0.1.1-snapshot.20240129.4677.0.v69fb2f3c"
         },
         "datasource": {
           "type": "prometheus",
@@ -1882,7 +1877,7 @@
     ]
   },
   "time": {
-    "from": "now-12h",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {
@@ -1913,6 +1908,6 @@
   "timezone": "",
   "title": "CometBFT",
   "uid": "UJyurCTWz",
-  "version": 10,
+  "version": 2,
   "weekStart": ""
 }
