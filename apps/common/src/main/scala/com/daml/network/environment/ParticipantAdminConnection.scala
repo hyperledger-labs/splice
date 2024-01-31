@@ -250,6 +250,15 @@ class ParticipantAdminConnection(
       previous.flatMap(_ => uploadDarFile(dar, retryFor))
     )
 
+  def uploadDarFileLocally(
+      pkg: UploadablePackage,
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    uploadDarLocally(
+      pkg.resourcePath,
+      ByteString.readFrom(pkg.inputStream()),
+      retryFor,
+    )
   def uploadDarFile(
       pkg: UploadablePackage,
       retryFor: RetryFor,
@@ -284,6 +293,34 @@ class ParticipantAdminConnection(
     runCmd(
       ParticipantAdminCommands.Package.ListDars(limit)
     )
+  private def uploadDarLocally(
+      path: String,
+      darFile: => ByteString,
+      retryFor: RetryFor,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    val darHash = hashOps.digest(HashPurpose.DarIdentifier, darFile)
+    for {
+      _ <- retryProvider
+        .ensureThatO(
+          retryFor,
+          s"DAR file $path with hash $darHash has been uploaded.",
+          lookupDar(darHash).map(_.map(_ => ())),
+          runCmd(
+            ParticipantAdminCommands.Package
+              .UploadDar(
+                Some(path),
+                vetAllPackages = true,
+                synchronizeVetting = false,
+                logger,
+                Some(darFile),
+              )
+          ).map(_ => ()),
+          logger,
+        )
+    } yield ()
+  }
 
   private def uploadDarFileInternal(
       packageId: String,
@@ -303,7 +340,13 @@ class ParticipantAdminConnection(
           lookupDar(darHash).map(_.map(_ => ())),
           runCmd(
             ParticipantAdminCommands.Package
-              .UploadDar(Some(path), true, true, logger, Some(darFile))
+              .UploadDar(
+                Some(path),
+                vetAllPackages = true,
+                synchronizeVetting = true,
+                logger,
+                Some(darFile),
+              )
           ).map(_ => ()),
           logger,
         )

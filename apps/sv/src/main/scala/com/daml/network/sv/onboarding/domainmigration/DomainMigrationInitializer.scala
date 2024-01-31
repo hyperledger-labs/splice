@@ -155,60 +155,32 @@ class DomainMigrationInitializer(
     )
     val domainAlias = domainMigrationDump.domainAlias
     def importDarsAndAcs() = {
-
-      val dars = domainMigrationDump.dars.map { dar =>
-        UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
-      }
       for {
-        _ <- retryProvider.waitUntil(
-          RetryFor.Automation,
-          "participant caught up with the domain state topology",
-          participantAdminConnection
-            .getDomainParametersState(
-              domainMigrationDump.domainId
-            )
-            .map { domainParameters =>
-              if (
-                domainParameters.base.serial < domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction.serial
-              ) {
-                throw Status.FAILED_PRECONDITION
-                  .withDescription(
-                    s"Domain state topology is not yet up to date with the dump. Dump state is ${domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction} and current state is $domainParameters"
-                  )
-                  .asRuntimeException()
-              }
-            },
-          loggerFactory.getTracedLogger(getClass),
-        )
-        _ <- participantAdminConnection
-          .ensureDomainParameters(
-            domainMigrationDump.domainId,
-            // TODO(#8761) hard code for now
-            _.tryUpdate(maxRatePerParticipant =
-              DynamicDomainParameters.defaultMaxRatePerParticipant
-            ),
-            signedBy = domainMigrationDump.nodeIdentities.participant.id.uid.namespace.fingerprint,
-          )
-        _ = logger.info("resumed domain")
-        _ <- participantAdminConnection.uploadDarFiles(
-          dars,
-          RetryFor.WaitingOnInitDependency,
-        )
-        _ = logger.info("uploaded all dars to the participant.")
-
         _ <- participantAdminConnection.disconnectFromAllDomains()
         _ = logger.info("Disconnected from all domains")
+        // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
+        _ <- MonadUtil.sequentialTraverse(domainMigrationDump.dars.map { dar =>
+          UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
+        }) { dar =>
+          participantAdminConnection.uploadDarFileLocally(
+            dar,
+            RetryFor.WaitingOnInitDependency,
+          )
+        }
+        _ = logger.info("uploaded all dars to the participant.")
 
         _ <- participantAdminConnection.uploadAcsSnapshot(domainMigrationDump.acsSnapshot)
         _ = logger.info("Acs snapshot is restored")
 
         _ <- participantAdminConnection.reconnectDomain(domainAlias)
+
         _ <- participantAdminConnection.modifyDomainConnectionConfig(
           domainAlias,
           c =>
             Some(
               c.copy(
-                initializeFromTrustedDomain = false
+                initializeFromTrustedDomain = false,
+                manualConnect = false,
               )
             ),
         )
@@ -228,9 +200,7 @@ class DomainMigrationInitializer(
         )
         .flatMap {
           case Some(config) if config.initializeFromTrustedDomain =>
-            participantAdminConnection.reconnectAllDomains().flatMap { _ =>
-              importDarsAndAcs()
-            }
+            importDarsAndAcs()
           case None =>
             participantAdminConnection
               .ensureDomainRegistered(
@@ -240,13 +210,41 @@ class DomainMigrationInitializer(
                   sequencerConnections =
                     SequencerConnections.single(localDomainNode.sequencerConnection),
                   initializeFromTrustedDomain = true,
+                  manualConnect = true,
                 ),
                 RetryFor.ClientCalls,
               )
               .flatMap(_ => importDarsAndAcs())
           case Some(_) => Future.unit
         }
-
+      _ <- retryProvider.waitUntil(
+        RetryFor.Automation,
+        "participant caught up with the domain state topology",
+        participantAdminConnection
+          .getDomainParametersState(
+            domainMigrationDump.domainId
+          )
+          .map { domainParameters =>
+            if (
+              domainParameters.base.serial < domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction.serial
+            ) {
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Domain state topology is not yet up to date with the dump. Dump state is ${domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction} and current state is $domainParameters"
+                )
+                .asRuntimeException()
+            }
+          },
+        loggerFactory.getTracedLogger(getClass),
+      )
+      _ <- participantAdminConnection
+        .ensureDomainParameters(
+          domainMigrationDump.domainId,
+          // TODO(#8761) hard code for now
+          _.tryUpdate(maxRatePerParticipant = DynamicDomainParameters.defaultMaxRatePerParticipant),
+          signedBy = domainMigrationDump.nodeIdentities.participant.id.uid.namespace.fingerprint,
+        )
+      _ = logger.info("resumed domain")
       _ <- svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
         domainMigrationDump.domainId,
         ParticipantId(domainMigrationDump.nodeIdentities.participant.id.uid),
