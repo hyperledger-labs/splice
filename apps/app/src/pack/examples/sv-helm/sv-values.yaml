@@ -31,3 +31,7 @@ domain:
 # Make sure your cluster's ingress is correctly configured for Scan and can be accessed through the provided URL.
 scan:
   publicUrl: "https://scan.sv.svc.YOUR_HOSTNAME"
+
+persistence:
+  host: apps-pg
+  secretName: apps-pg-secret

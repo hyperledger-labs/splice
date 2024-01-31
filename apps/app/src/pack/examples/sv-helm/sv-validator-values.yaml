@@ -1,3 +1,6 @@
 svValidator: true
 useSequencerConnectionsFromScan: false
 
+persistence:
+  host: apps-pg
+  secretName: apps-pg-secret

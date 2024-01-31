@@ -1,0 +1,5 @@
+persistence:
+  secretName: participant-pg-secret
+
+db:
+  volumeSize: 48Gi

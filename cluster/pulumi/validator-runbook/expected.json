@@ -183,7 +183,8 @@
         },
         "persistence": {
           "host": "postgres",
-          "schema": "sv_participant"
+          "schema": "participant",
+          "secretName": "postgres-secrets"
         }
       }
     },
@@ -263,6 +264,10 @@
           }
         },
         "participantAddress": "participant",
+        "persistence": {
+          "host": "postgres",
+          "secretName": "postgres-secrets"
+        },
         "scanAddress": "https://scan.sv-1.svc.validatorrun.network.com.network.canton.global",
         "svSponsorAddress": "https://sv.sv-1.svc.validatorrun.network.canton.global",
         "topup": {

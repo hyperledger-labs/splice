@@ -1,1 +1,5 @@
 clusterUrl: "TARGET_CLUSTER.network.canton.global"
+
+persistence:
+  host: apps-pg
+  secretName: apps-pg-secret

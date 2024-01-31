@@ -1,6 +1,5 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import * as random from '@pulumi/random';
 import {
   Auth0Client,
   BackupConfig,
@@ -30,12 +29,12 @@ import {
   installLoopback,
   imagePullSecret,
   CnInput,
-  installPostgresPasswordSecret,
   sequencerPruningConfig,
 } from 'cn-pulumi-common';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installGlobalDomainNode } from './globalDomain';
+import { installPostgres } from './postgres';
 import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
 
 if (!isDevNet) {
@@ -97,13 +96,6 @@ export async function installNode(
 
   const imagePullDeps = localCharts ? [] : imagePullSecret(xns);
 
-  const password = new random.RandomPassword(`${xns.logicalName}-postgres-passwd`, {
-    length: 16,
-    overrideSpecial: '_%@',
-    special: true,
-  }).result;
-  const passwordSecret = installPostgresPasswordSecret(xns, password, 'postgres-secrets');
-
   const svKey = svKeyFromSecret('sv');
 
   const topupConfig: ValidatorTopupConfig = {
@@ -124,7 +116,6 @@ export async function installNode(
     onboardingName: svAppConfig.onboardingName,
     cometBftConnectionUri: svAppConfig.cometBftConnectionUri,
     validatorWalletUserName: validatorAppConfig.walletUserName,
-    otherDeps: [passwordSecret],
   });
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
@@ -152,7 +143,6 @@ type SvConfig = {
   participantBootstrapDumpSecret?: pulumi.Resource;
   topupConfig?: ValidatorTopupConfig;
   imagePullDeps: CnInput<pulumi.Resource>[];
-  otherDeps: pulumi.Resource[];
   loopback: k8s.helm.v3.Release | null;
   backupConfigSecret?: pulumi.Resource;
   svKey: CnInput<SvIdKey>;
@@ -168,7 +158,6 @@ async function installSvAndValidator(config: SvConfig) {
     topupConfig,
     auth0Client,
     imagePullDeps,
-    otherDeps,
     loopback,
     backupConfigSecret,
     backupConfig,
@@ -178,21 +167,7 @@ async function installSvAndValidator(config: SvConfig) {
     validatorWalletUserName,
   } = config;
 
-  const postgres = installCNRunbookHelmChart(
-    xns,
-    'postgres',
-    'cn-postgres',
-    {},
-    localCharts,
-    version,
-    otherDeps
-  );
-
-  const globalDomain = installGlobalDomainNode(
-    xns,
-    onboardingName,
-    imagePullDeps.concat([postgres])
-  );
+  const globalDomain = installGlobalDomainNode(xns, onboardingName, imagePullDeps);
 
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
@@ -225,6 +200,11 @@ async function installSvAndValidator(config: SvConfig) {
     svUiClientId
   );
 
+  const participantPgValues = loadYamlFromFile(
+    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-participant.yaml`
+  );
+  const participantPg = installPostgres(xns, 'participant-pg', participantPgValues);
+
   const participant = installCNRunbookHelmChart(
     xns,
     'participant',
@@ -233,9 +213,14 @@ async function installSvAndValidator(config: SvConfig) {
     localCharts,
     version,
     imagePullDeps
-      .concat([postgres, svAppSecret, svKeySecret(xns, svKey)])
+      .concat([participantPg, svAppSecret, svKeySecret(xns, svKey)])
       .concat(loopback !== null ? loopback : [])
   );
+
+  const appsPgValues = loadYamlFromFile(
+    `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-apps.yaml`
+  );
+  const appsPg = installPostgres(xns, 'apps-pg', appsPgValues);
 
   const sv234NameSet = new Set<string>([
     'Canton-Foundation-2',
@@ -321,7 +306,7 @@ async function installSvAndValidator(config: SvConfig) {
     version,
     imagePullDeps
       .concat([participant, globalDomain])
-      .concat([svAppSecret, svAppUISecret])
+      .concat([svAppSecret, svAppUISecret, appsPg])
       .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
   );
 
@@ -343,7 +328,7 @@ async function installSvAndValidator(config: SvConfig) {
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
     localCharts,
     version,
-    imagePullDeps.concat([sv, participant]).concat(svAppSecret)
+    imagePullDeps.concat([sv, participant, svAppSecret, appsPg])
   );
 
   const validatorValues = {
@@ -392,6 +377,7 @@ async function installSvAndValidator(config: SvConfig) {
       .concat([svValidatorAppSecret, svValidatorUISecret])
       .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
       .concat(backupConfigSecret ? [backupConfigSecret] : [])
+      .concat([appsPg])
   );
 
   return { sv, validator };

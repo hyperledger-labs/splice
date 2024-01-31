@@ -1,10 +1,12 @@
 sequencer:
   persistence:
-    host: postgres
+    host: sequencer-pg
+    secretName: sequencer-pg-secret
   driver:
     type: "cometbft"
     host: "cometbft-cometbft-rpc"
     port: 26657
 mediator:
   persistence:
-    host: postgres
+    host: mediator-pg
+    secretName: mediator-pg-secret

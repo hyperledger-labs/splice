@@ -14,7 +14,9 @@ Release Notes
 
 * Deployment
 
-  * Increased postgres PVC size to 480GB to support longer running clusters.
+  * The postgres instance has been split into four different instances: sequencer-pg, mediator-pg, participant-pg, apps-pg.
+    Please see the new section on installing and configuring Postgres: :ref:`Installing Postgres instances <helm-sv-postgres>`
+  * postgres PVC size are new set to 480GB for the sequencer, and 48GB for each of the other three instances.
   * The default database names for the different components have been changed to `cantonnet_<componentName>`.
     They are all created automatically in init containers attached to the respective app pods.
 
@@ -133,7 +135,7 @@ Release Notes
 * The party representing the supervalidator collective is renamed from ``svc::...`` to ``SVC::...``, for consistency with SV party names.
 
 * The password for the PostgreSQL database is now set in Kubernetes secrets as opposed to Helm values files.
-  Please refer to the updated documentation on ``Configuring PostgreSQL authentication`` for :ref:`SV operators <sv-postgres-auth>` and :ref:`Validator operators <validator-postgres-auth>`.
+  Please refer to the updated documentation on ``Configuring PostgreSQL authentication`` for SV operators and :ref:`Validator operators <validator-postgres-auth>`.
 
 * Documentation:
 

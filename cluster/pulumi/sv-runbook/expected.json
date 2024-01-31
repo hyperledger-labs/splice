@@ -3,6 +3,29 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "apps-pg",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "db": {
+          "volumeSize": "48Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "secretName": "apps-pg-secret"
+        }
+      }
+    },
+    "name": "apps-pg",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
@@ -144,6 +167,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "apps-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-apps-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "private": "c3YtaWQtcHJpdmF0ZS1rZXk=",
           "public": "c3YtaWQtcHVibGljLWtleQ=="
         }
@@ -172,12 +217,56 @@
       },
       "kind": "Secret",
       "metadata": {
-        "name": "postgres-secrets",
+        "name": "mediator-pg-secret",
         "namespace": "sv"
       },
       "type": "Opaque"
     },
-    "name": "cn-app-sv-postgres-secrets",
+    "name": "cn-app-sv-mediator-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-participant-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sequencer-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-sequencer-pg-secret",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -263,7 +352,8 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "mediator": {
           "persistence": {
-            "host": "postgres"
+            "host": "mediator-pg",
+            "secretName": "mediator-pg-secret"
           }
         },
         "sequencer": {
@@ -273,12 +363,36 @@
             "type": "cometbft"
           },
           "persistence": {
-            "host": "postgres"
+            "host": "sequencer-pg",
+            "secretName": "sequencer-pg-secret"
           }
         }
       }
     },
     "name": "global-domain",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "mediator-pg",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "db": {
+          "volumeSize": "48Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "secretName": "mediator-pg-secret"
+        }
+      }
+    },
+    "name": "mediator-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -291,6 +405,29 @@
     "name": "organization/infra/infra.svrun",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "participant-pg",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "db": {
+          "volumeSize": "48Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "secretName": "participant-pg-secret"
+        }
+      }
+    },
+    "name": "participant-pg",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,
@@ -314,29 +451,13 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "host": "postgres",
-          "schema": "sv_participant"
+          "host": "participant-pg",
+          "schema": "sv_participant",
+          "secretName": "participant-pg-secret"
         }
       }
     },
     "name": "participant",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "postgres",
-      "namespace": "sv",
-      "timeout": 480,
-      "values": {
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
-      }
-    },
-    "name": "postgres",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -351,12 +472,51 @@
       "timeout": 480,
       "values": {
         "clusterUrl": "svrun.network.com.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "host": "apps-pg",
+          "secretName": "apps-pg-secret"
+        }
       }
     },
     "name": "scan",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "sequencer-pg",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "db": {
+          "volumeSize": "480Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "secretName": "sequencer-pg-secret"
+        }
+      }
+    },
+    "name": "sequencer-pg",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-apps-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
   },
   {
     "custom": true,
@@ -443,6 +603,10 @@
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
         },
         "onboardingName": "DA-Helm-Test-Node",
+        "persistence": {
+          "host": "apps-pg",
+          "secretName": "apps-pg-secret"
+        },
         "scan": {
           "publicUrl": "https://scan.sv.svc.svrun.network.canton.global"
         }
@@ -460,7 +624,31 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-postgres-passwd",
+    "name": "sv-mediator-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-participant-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-sequencer-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -500,6 +688,10 @@
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "participantAddress": "participant",
+        "persistence": {
+          "host": "apps-pg",
+          "secretName": "apps-pg-secret"
+        },
         "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global",
         "svValidator": true,
         "topup": {

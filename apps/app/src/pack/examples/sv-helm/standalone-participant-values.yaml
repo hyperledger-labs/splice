@@ -3,3 +3,8 @@ participantAdminUserNameFrom:
     key: ledger-api-user
     name: cn-app-validator-ledger-api-auth
     optional: false
+
+persistence:
+  secretName: postgres-secrets
+  host: postgres
+  schema: participant

@@ -6,3 +6,8 @@ onboardingSecretFrom:
     key: secret
     optional: false
 validatorPartyHint: validator_validator_service_user
+
+persistence:
+  secretName: postgres-secrets
+  host: postgres
+

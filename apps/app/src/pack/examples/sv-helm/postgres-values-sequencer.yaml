@@ -1,0 +1,5 @@
+persistence:
+  secretName: sequencer-pg-secret
+
+db:
+  volumeSize: 480Gi

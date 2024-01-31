@@ -117,21 +117,6 @@ Create the application namespace within Kubernetes and ensure it has image pull 
     kubectl patch serviceaccount default -n sv \
         -p '{"imagePullSecrets": [{"name": "docker-reg-cred"}]}'
 
-.. _sv-postgres-auth:
-
-Configuring PostgreSQL authentication
--------------------------------------
-
-The PostgreSQL instance that the helm charts create, and all apps that depend on it, require the user's password to be set through Kubernetes secrets.
-Currently, all apps use the Postgres user ``cnadmin``.
-The password can be setup with the following command, assuming you set the environment variable ``POSTGRES_PASSWORD`` to a secure value:
-
-.. code-block:: bash
-
-    kubectl create secret generic postgres-secrets \
-        --from-literal=postgresPassword=${POSTGRES_PASSWORD} \
-        -n sv
-
 .. _helm-sv-auth:
 
 Configuring Authentication
@@ -446,6 +431,89 @@ The snapshots are fetched from the founding SV node which exposes its CometBft R
 This can be changed by setting `stateSync.rpcServers` accordingly. The `trust_height` and `trust_hash` are computed dynamically via an initialization script
 and setting them explicitly should not be required and is not currently supported.
 
+.. _helm-sv-postgres:
+
+Installing Postgres instances
+-----------------------------
+
+The SV node requires 4 Postgres instances: one for the sequencer, one for the mediator,
+one for the participant, and one for the CN apps. While they can all use the same instance,
+we recommend splitting them up into 4 separate instances for better operational flexibility,
+and also for better control over backup processes.
+
+We support both Cloud-hosted Postgres instances and Postgres instances running in the cluster.
+
+Creating k8s Secrets for Postgres Passwords
++++++++++++++++++++++++++++++++++++++++++++
+
+All apps support reading the Postgres password from a Kubernetes secret.
+Currently, all apps use the Postgres user ``cnadmin``.
+The password can be setup with the following command, assuming you set the environment variables ``POSTGRES_PASSWORD_XXX`` to secure values:
+
+.. code-block:: bash
+
+    kubectl create secret generic sequencer-pg-secret \
+        --from-literal=postgresPassword=${POSTGRES_PASSWORD_SEQUENCER} \
+        -n sv
+    kubectl create secret generic mediator-pg-secret \
+        --from-literal=postgresPassword=${POSTGRES_PASSWORD_MEDIATOR} \
+        -n sv
+    kubectl create secret generic participant-pg-secret \
+        --from-literal=postgresPassword=${POSTGRES_PASSWORD_PARTICIPANT} \
+        -n sv
+    kubectl create secret generic apps-pg-secret \
+        --from-literal=postgresPassword=${POSTGRES_PASSWORD_APPS} \
+        -n sv
+
+
+Postgres in the Cluster
++++++++++++++++++++++++
+
+If you wish to run the Postgres instances as pods in your cluster, you can use the `cn-postgres` Helm chart to install them:
+
+.. code-block:: bash
+
+    helm install sequencer-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-sequencer.yaml --wait
+    helm install mediator-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-mediator.yaml --wait
+    helm install participant-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-participant.yaml --wait
+    helm install apps-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-apps.yaml --wait
+
+
+Cloud-Hosted Postgres
++++++++++++++++++++++
+
+If you wish to use cloud-hosted Postgres instances, please configure and initialize each of them as follows:
+
+- Use Postgres version 14
+- Create a database called ``cantonnet``
+- Create a user called ``cnadmin`` with the password as configured in the kubernetes secrets above
+
+Note that the default Helm values files used below assume that the Postgres instances are deployed using the Helm charts above,
+thus are accessible at hostname sequencer-pg, mediator-pg, etc. If you are using cloud-hosted Postgres instances,
+please override the hostnames under `persistence.host` with the IP addresses of the Postgres instances.
+
+Storage Backups
+---------------
+
+Backup of Postgres Instances
+++++++++++++++++++++++++++++
+
+Please make sure your Postgres instances are backed up at least every 4 hours. We will provide guidelines on retention of older backups
+at a later point in time.
+
+While most backups can be taken independently, there is one strict ordering requirement between them:
+The backup of the apps postgres instance must be taken at a point in time strictly earlier than that of the participant.
+Please make sure the apps instance backup is completed before starting the participant one.
+
+If you are running your own Postgres instances in the cluster, backups can be taken either using tools like `pgdump`, or through snapshots of the underlying Persistent Volume.
+Similarly, if you are using Cloud-hosted Postgres, you can either use tools like `pgdump` or backup tools provided by the Cloud provider.
+
+Backup of CometBFT
+++++++++++++++++++
+
+In addition to the Postgres instances, the storage used by CometBFT should also be backed up every 4 hours.
+Since CometBFT does not use Postgres, the only reliable way to backup its storage is through snapshots of the underlying Persistent Volume.
+
 .. _helm-sv-install:
 
 Installing the Software
@@ -570,7 +638,6 @@ reaches a stable state prior to moving on to the next step.
 .. code-block:: bash
 
     helm repo update
-    helm install postgres canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} --wait
     helm install cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml --wait
     helm install global-domain canton-network-helm/cn-global-domain -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml --wait
     helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait

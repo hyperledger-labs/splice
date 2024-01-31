@@ -1,5 +1,6 @@
 persistence:
-  host: postgres
+  host: participant-pg
+  secretName: participant-pg-secret
   schema: sv_participant
 globalDomain:
   alias: global
