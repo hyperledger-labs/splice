@@ -3563,7 +3563,7 @@ workflows:
             - deployment_test
             - docker_images_push
       - hold:
-          name: sv_runbook_hold
+          name: runbooks_hold
           <<: *main-branch-never
           type: approval
       - deploy_sv_runbook:
@@ -3574,7 +3574,7 @@ workflows:
           cluster: "scratchneta"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -3583,7 +3583,7 @@ workflows:
           cluster: "scratchneta"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -3602,7 +3602,7 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -3611,7 +3611,7 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - hold:
           name: back_up_hold
           <<: *main-branch-never
@@ -3703,6 +3703,7 @@ workflows:
             - canton-network-vpn
           requires:
             - preflight_check
+            - preflight_sv_check
             - preflight_validator_check
             - reset_hold
 
@@ -3742,7 +3743,7 @@ workflows:
             - deployment_test
             - docker_images_push
       - hold:
-          name: sv_runbook_hold
+          name: runbooks_hold
           <<: *main-branch-never
           type: approval
       - deploy_sv_runbook:
@@ -3753,7 +3754,7 @@ workflows:
           cluster: "scratchnetb"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -3762,7 +3763,7 @@ workflows:
           cluster: "scratchnetb"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -3781,7 +3782,7 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -3790,7 +3791,7 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - hold:
           name: back_up_hold
           <<: *main-branch-never
@@ -3882,6 +3883,7 @@ workflows:
             - canton-network-vpn
           requires:
             - preflight_check
+            - preflight_sv_check
             - preflight_validator_check
             - reset_hold
 
@@ -3921,7 +3923,7 @@ workflows:
             - deployment_test
             - docker_images_push
       - hold:
-          name: sv_runbook_hold
+          name: runbooks_hold
           <<: *main-branch-never
           type: approval
       - deploy_sv_runbook:
@@ -3932,7 +3934,7 @@ workflows:
           cluster: "scratchnetc"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -3941,7 +3943,7 @@ workflows:
           cluster: "scratchnetc"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -3960,7 +3962,7 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -3969,7 +3971,7 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - hold:
           name: back_up_hold
           <<: *main-branch-never
@@ -4061,6 +4063,7 @@ workflows:
             - canton-network-vpn
           requires:
             - preflight_check
+            - preflight_sv_check
             - preflight_validator_check
             - reset_hold
 
@@ -4100,7 +4103,7 @@ workflows:
             - deployment_test
             - docker_images_push
       - hold:
-          name: sv_runbook_hold
+          name: runbooks_hold
           <<: *main-branch-never
           type: approval
       - deploy_sv_runbook:
@@ -4111,7 +4114,7 @@ workflows:
           cluster: "scratchnetd"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -4120,7 +4123,7 @@ workflows:
           cluster: "scratchnetd"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -4139,7 +4142,7 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -4148,7 +4151,7 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - hold:
           name: back_up_hold
           <<: *main-branch-never
@@ -4240,6 +4243,7 @@ workflows:
             - canton-network-vpn
           requires:
             - preflight_check
+            - preflight_sv_check
             - preflight_validator_check
             - reset_hold
 
@@ -4279,7 +4283,7 @@ workflows:
             - deployment_test
             - docker_images_push
       - hold:
-          name: sv_runbook_hold
+          name: runbooks_hold
           <<: *main-branch-never
           type: approval
       - deploy_sv_runbook:
@@ -4290,7 +4294,7 @@ workflows:
           cluster: "scratchnete"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -4299,7 +4303,7 @@ workflows:
           cluster: "scratchnete"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -4318,7 +4322,7 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -4327,7 +4331,7 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - hold:
           name: back_up_hold
           <<: *main-branch-never
@@ -4419,5 +4423,6 @@ workflows:
             - canton-network-vpn
           requires:
             - preflight_check
+            - preflight_sv_check
             - preflight_validator_check
             - reset_hold

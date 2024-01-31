@@ -35,7 +35,7 @@
             - deployment_test
             - docker_images_push
       - hold:
-          name: sv_runbook_hold
+          name: runbooks_hold
           <<: *main-branch-never
           type: approval
       - deploy_sv_runbook:
@@ -46,7 +46,7 @@
           cluster: "_CLUSTERNAME_"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -55,7 +55,7 @@
           cluster: "_CLUSTERNAME_"
           requires:
             - deploy_cluster
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -74,7 +74,7 @@
             - slack-context
           cluster: "_CLUSTERNAME_"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - preflight_validator_check:
           <<: *main-branch-never
           context:
@@ -83,7 +83,7 @@
             - slack-context
           cluster: "_CLUSTERNAME_"
           requires:
-            - sv_runbook_hold
+            - runbooks_hold
       - hold:
           name: back_up_hold
           <<: *main-branch-never
@@ -175,5 +175,6 @@
             - canton-network-vpn
           requires:
             - preflight_check
+            - preflight_sv_check
             - preflight_validator_check
             - reset_hold
