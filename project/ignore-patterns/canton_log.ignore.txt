@@ -105,5 +105,6 @@ ACS_COMMITMENT_MISMATCH
 
 # TODO(#9500) Remove this once Canton fixes the bug
 INVALID_ACKNOWLEDGEMENT_SIGNATURE.*sequencer
+INVALID_SUBMISSION_REQUEST_SIGNATURE.*sequencer
 
 # Make sure to have a trailing newline
