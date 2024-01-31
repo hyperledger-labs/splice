@@ -1989,7 +1989,7 @@ function subcmd_restore_node() {
     case "$node" in
         sv-1|sv-2|sv-3|sv-4)
             _info "Restoring sv node $node"
-            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" cometbft-0 sequencer-0 participant-0 mediator-0 sv-app-0 scan validator
+            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" cometbft-0 sequencer-0 participant-0 mediator-0 sv-app-0 scan-0 validator
             ;;
         validator1|splitwell)
             _info "Restoring validator node $node"
