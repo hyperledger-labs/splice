@@ -22,7 +22,6 @@ jobs:
         default: true
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_nix
       - when:
           condition: << parameters.deploy_version >>
@@ -64,7 +63,6 @@ jobs:
           steps:
             - notify-cluster-deployment:
                 cluster: << parameters.cluster >>
-      - collect_test_timings_and_send_to_datadog
 
   deploy_validator_runbook:
     circleci_ip_ranges: true
@@ -86,7 +84,6 @@ jobs:
         default: false
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_nix
       - when:
           condition: << parameters.deploy_version >>
@@ -122,7 +119,6 @@ jobs:
             cncluster ci_apply_validator $VERSION
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
-      - collect_test_timings_and_send_to_datadog
 
   deploy_cluster:
     circleci_ip_ranges: true
@@ -164,7 +160,6 @@ jobs:
 
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_nix
       - when:
           condition: << parameters.deploy_version >>
@@ -258,7 +253,6 @@ jobs:
           steps:
             - notify-cluster-deployment:
                 cluster: << parameters.cluster >>
-      - collect_test_timings_and_send_to_datadog
 
   reset_cluster:
     parameters:
@@ -275,7 +269,6 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_vpn
       # Needs to occur before setup_vpn_routes
       - setup_nix
@@ -289,4 +282,3 @@ jobs:
           cmd: |
             cncluster activate
             cncluster ci_reset_unlock
-      - collect_test_timings_and_send_to_datadog

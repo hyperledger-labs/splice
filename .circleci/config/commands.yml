@@ -384,7 +384,6 @@ commands:
               cncluster ci_reset_unlock
             fi
 
-
   # Largely copied from Canton's CI definition
   execute_sbt_command:
     description: |
@@ -510,34 +509,6 @@ commands:
           cmd_retry_wait: << parameters.cmd_retry_wait >>
           cmd_retry_condition: << parameters.cmd_retry_condition >>
           cmd_before_retry: << parameters.cmd_before_retry >>
-
-  collect_failing_test_data_and_send_to_datadog:
-    steps:
-      - run_bash_command_in_nix:
-          when: always
-          additional_nix_args: "--keep DATADOG_API_KEY --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_URL --keep CIRCLE_NODE_INDEX --keep CIRCLE_JOB"
-          cmd_name: Send name of each failing test to datadog
-          cmd: |
-            python3 .circleci/canton-scripts/collect_failing_tests_and_send_to_datadog.py
-          cmd_retry_count: 5
-
-  collect_test_timings_and_send_to_datadog:
-    steps:
-      - run_bash_command_in_nix:
-          when: always
-          additional_nix_args: "--keep DATADOG_API_KEY --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_URL --keep CIRCLE_NODE_INDEX --keep CIRCLE_JOB"
-          cmd_name: Send time duration of each test to datadog
-          cmd: |
-            python3 .circleci/canton-scripts/collect_test_timings_and_send_to_datadog.py
-          cmd_retry_count: 5
-
-  # Writes the job time to a file. For accurate reporting, assumes this is the first step in the job,
-  # and "collect_test_timings..." is the last step
-  record_job_start_time:
-    steps:
-      - run:
-          name: Write job starting time to file
-          command: date +%s > ~/job_start_time.txt
 
   run_bash_command_in_nix:
     parameters:

@@ -21,12 +21,10 @@ workflows:
           <<: *notify-fail
           context:
             - artifactory
-            - datadog
             - slack-context
       - publish_public_release:
           context:
             - artifactory
-            - datadog
             - slack-context
           requires:
             - docker_images_push
@@ -50,7 +48,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
         requires:
           - cancel_previous_pipelines
@@ -59,7 +56,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
         requires:
           - cancel_previous_pipelines
@@ -68,7 +64,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
           - canton-network-vpn
         name: "scala_test wall clock time"
@@ -82,7 +77,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
           - canton-network-vpn
         name: "scala_test sim time"
@@ -96,7 +90,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
           - canton-network-vpn
         name: "scala_test frontend wall clock time"
@@ -112,7 +105,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
           - canton-network-vpn
         name: "scala_test frontend sim time"
@@ -128,7 +120,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
           - canton-network-vpn
         name: "scala_test frontend app manager"
@@ -144,7 +135,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
           - canton-network-vpn
         name: "scala_test global upgrade sim time"
@@ -158,7 +148,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
         requires:
           - cancel_previous_pipelines
@@ -166,7 +155,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
         requires:
           - cancel_previous_pipelines
@@ -183,7 +171,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
         requires:
           - cancel_previous_pipelines
@@ -191,7 +178,6 @@ workflows:
         <<: *notify-fail
         context:
           - artifactory
-          - datadog
           - slack-context
         requires:
           - cancel_previous_pipelines
@@ -205,7 +191,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
@@ -218,7 +203,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cimain"
         send_deployment_notification: false
@@ -231,7 +215,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cimain"
         send_deployment_notification: false
@@ -241,7 +224,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cimain"
         requires:
@@ -252,7 +234,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         requires:
           - wait_for_previous_pipeline
@@ -262,7 +243,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         requires:
           - wait_for_previous_pipeline
@@ -272,7 +252,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         requires:
           - wait_for_previous_pipeline
@@ -304,7 +283,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
         requires:
@@ -316,7 +294,6 @@ workflows:
         name: "upgrade cluster"
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cimain"
         send_deployment_notification: false
@@ -336,7 +313,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
@@ -350,7 +326,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cidaily"
         requires:
@@ -361,7 +336,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cidaily-testnet"
         restore_cluster: true
@@ -375,7 +349,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         wait_for_sv: false
         # Order: deploy_cluster->preflight_check->publish_public_release->deploy_sv_runbook->preflight_sv_check
@@ -390,7 +363,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         # require deploy_cluster and deploy_sv_runbook for stability and reliability
         requires:
@@ -400,7 +372,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         requires:
           - preflight_check_devnet
@@ -410,7 +381,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cidaily"
         use_published_artifacts: true
@@ -422,7 +392,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cidaily-testnet"
         restore_cluster: true
@@ -433,7 +402,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cidaily"
         use_published_artifacts: true
@@ -445,7 +413,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cidaily-testnet"
         use_published_artifacts: true
@@ -458,7 +425,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         cluster: "cidaily"
         requires:
@@ -469,7 +435,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         cluster: "cidaily-testnet"
         requires:
@@ -480,7 +445,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         cluster: "cidaily"
         requires:
@@ -495,7 +459,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
     - wait_for_previous_pipeline:
         <<: *notify-fail
@@ -508,7 +471,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cilr"
         requires:
@@ -518,7 +480,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cilr"
         requires:
@@ -527,7 +488,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "cilr"
         requires:
@@ -538,7 +498,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         # require deploy_cluster and deploy_sv_runbook for stability and reliability
         requires:
@@ -551,14 +510,12 @@ workflows:
           - preflight_check
         context:
           - artifactory
-          - datadog
           - slack-context
     - preflight_sv_check:
         <<: *main-branch-only
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         cluster: "cilr"
         requires:
@@ -568,7 +525,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         cluster: "cilr"
         requires:
@@ -589,7 +545,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "devnet"
         deploy_version: "devnet-next"
@@ -600,7 +555,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "devnet"
         deploy_version: "devnet-next"
@@ -611,7 +565,6 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "devnet"
         deploy_version: "devnet-next"
@@ -623,7 +576,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         cluster: "devnet"
         cluster_version: "devnet-next"
@@ -636,7 +588,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         cluster: "devnet"
         cluster_version: "devnet-next"
@@ -648,7 +599,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         cluster: "devnet"
         cluster_version: "devnet-next"
@@ -665,14 +615,12 @@ workflows:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         workflow_names: "deploy_testnet testnet_health_check"
     - deploy_cluster:
         <<: *main-branch-only
         context:
           - artifactory
-          - datadog
           - slack-context
         cluster: "testnet"
         deploy_version: "testnet-next"
@@ -686,7 +634,6 @@ workflows:
         context:
           - artifactory
           - canton-network-vpn
-          - datadog
           - slack-context
         cluster: "testnet"
         cluster_version: "testnet-next"
@@ -719,7 +666,6 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
-            - datadog
             - slack-context
           requires:
             - cancel_if_previous_pipeline
@@ -749,7 +695,6 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
-            - datadog
             - slack-context
           requires:
              - cancel_if_previous_pipeline
@@ -806,7 +751,6 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
-            - datadog
             - slack-context
           requires:
             - wait_for_previous_pipeline
@@ -850,7 +794,6 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
-            - datadog
             - slack-context
           requires:
             - wait_for_previous_pipeline
@@ -892,7 +835,6 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
-            - datadog
             - slack-context
           requires:
              - wait_for_previous_pipeline
@@ -916,7 +858,6 @@ workflows:
           <<: *notify-fail
           context:
             - artifactory
-            - datadog
             - slack-context
           skip_if_exists: true
       - deploy_sv_runbook:
@@ -926,7 +867,6 @@ workflows:
                 - deployment/cidaily
           context:
             - artifactory
-            - datadog
             - slack-context
           cluster: "cidaily"
           use_published_artifacts: false
@@ -941,7 +881,6 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
-            - datadog
             - slack-context
           cluster: "cidaily"
           requires:
@@ -965,7 +904,6 @@ workflows:
           <<: *notify-fail
           context:
             - artifactory
-            - datadog
             - slack-context
           skip_if_exists: true
       - deploy_sv_runbook:
@@ -975,7 +913,6 @@ workflows:
                 - deployment/cilr
           context:
             - artifactory
-            - datadog
             - slack-context
           cluster: "cilr"
           use_published_artifacts: false
@@ -990,7 +927,6 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
-            - datadog
             - slack-context
           cluster: "cilr"
           requires:
@@ -1014,7 +950,6 @@ workflows:
           <<: *notify-fail
           context:
             - artifactory
-            - datadog
             - slack-context
           skip_if_exists: true
       - deploy_sv_runbook:
@@ -1024,7 +959,6 @@ workflows:
                 - deployment/devnet
           context:
             - artifactory
-            - datadog
             - slack-context
           cluster: "devnet"
           use_published_artifacts: false
@@ -1039,7 +973,6 @@ workflows:
           context:
             - artifactory
             - canton-network-vpn
-            - datadog
             - slack-context
           cluster: "devnet"
           requires:

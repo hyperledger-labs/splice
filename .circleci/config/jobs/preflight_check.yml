@@ -27,7 +27,6 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - run:
           # necessary for npm/webpack dev server launched in start-frontends.sh later
           # https://webpack.js.org/configuration/watch/#not-enough-watchers
@@ -130,7 +129,6 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
-      - collect_test_timings_and_send_to_datadog
       - store_artifacts:
           name: Upload vpn log
           path: /var/log/vpn.log
@@ -153,7 +151,6 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_vpn
       # Needs to occur before setup_vpn_routes
       - setup_nix
@@ -229,7 +226,6 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
-      - collect_test_timings_and_send_to_datadog
       - store_artifacts:
           name: Upload vpn log
           path: /var/log/vpn.log
@@ -252,7 +248,6 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_vpn
       # Needs to occur before setup_vpn_routes
       - setup_nix
@@ -327,7 +322,6 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>
-      - collect_test_timings_and_send_to_datadog
       - store_artifacts:
           name: Upload vpn log
           path: /var/log/vpn.log

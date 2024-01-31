@@ -9,7 +9,6 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - run:
           name: Verify config.yml is up to date with source.
           command: |
@@ -24,7 +23,6 @@ jobs:
           cmd: "Test/compile lint"
           cmd_retry_count: 3
       - cleanup_sbt_test_job
-      - collect_test_timings_and_send_to_datadog
 
   # We put our Daml tests in their own job for more parallelization
   daml_test:
@@ -34,13 +32,11 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "damlTest"
           timeout: "10m"
           extra_env_vars: DAML_DEBUG=1
-      - collect_test_timings_and_send_to_datadog
 
   # Run UI unit tests
   ui_test:
@@ -50,13 +46,11 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "apps-common-frontend/npmTest"
           fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
       - cleanup_sbt_test_job
-      - collect_test_timings_and_send_to_datadog
 
   # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
   # work on anything but the Scala tests is duplicated across all parallel runs of this job
@@ -93,7 +87,6 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_sbt_test_job
       # Used to pull docker images for cometbft
       - docker_login_artifactory
@@ -114,8 +107,6 @@ jobs:
           start_canton_options: << parameters.start_canton_options >>
       - stop_canton
       - cleanup_sbt_test_job
-      - collect_failing_test_data_and_send_to_datadog
-      - collect_test_timings_and_send_to_datadog
 
   bundle:
     docker:
@@ -125,7 +116,6 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_sbt_test_job
       - execute_sbt_command:
           # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
@@ -159,7 +149,6 @@ jobs:
          # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - cleanup_sbt_test_job:
           upload_caches: true
-      - collect_test_timings_and_send_to_datadog
 
   deployment_test:
     docker:
@@ -168,7 +157,6 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_nix
       - run_bash_command_in_nix:
          cmd_name: Deployment Test
@@ -177,7 +165,6 @@ jobs:
       - run_bash_command_in_nix:
          cmd_name: Check Pulumi deployment
          cmd: make --keep-going cluster/pulumi/test
-      - collect_test_timings_and_send_to_datadog
 
   auth0_user_cleanup:
     docker:
@@ -273,7 +260,6 @@ jobs:
         default: false
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - restore_frontend_builds
       - setup_sbt_test_job
       - docker_login_artifactory
@@ -326,7 +312,6 @@ jobs:
          cmd_retry_count: 5
       - save_frontend_builds
       - cleanup_sbt_test_job
-      - collect_test_timings_and_send_to_datadog
 
   publish_public_release:
     machine:
@@ -335,7 +320,6 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - setup_sbt_test_job
       - docker_login_artifactory
       - run_bash_command_in_nix:
@@ -404,7 +388,6 @@ jobs:
                 event: pass
                 custom: |
                   { "text": "*✅Job '${CIRCLE_JOB}' marked the commit for devnet*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
-      - collect_test_timings_and_send_to_datadog
 
   docker_images_build:
     machine:
@@ -414,7 +397,6 @@ jobs:
       <<: *env
     steps:
       - checkout_with_retry
-      - record_job_start_time
       - restore_frontend_builds
       - setup_sbt_test_job
       - run_bash_command_in_nix:
@@ -427,7 +409,6 @@ jobs:
       - docker_build
       - save_frontend_builds
       - cleanup_sbt_test_job
-      - collect_test_timings_and_send_to_datadog
 
   wait_for_previous_pipeline:
     docker:
