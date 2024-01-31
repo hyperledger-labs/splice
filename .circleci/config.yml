@@ -2081,6 +2081,8 @@ jobs:
               cncluster wait $ns validator-app
             done
             cncluster backup_nodes $(cat tests-to-run.txt)
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
 
   restore_node:
     parameters:
@@ -2113,6 +2115,8 @@ jobs:
                 cncluster wait << parameters.namespace_name >> scan-app
                 cncluster wait << parameters.namespace_name >> sv-app-0
             esac
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
 
   preflight_check:
     parameters:
