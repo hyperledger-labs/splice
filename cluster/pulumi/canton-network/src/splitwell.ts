@@ -71,6 +71,8 @@ export async function installSplitwell(
     ? postgres.installPostgres(xns, 'sw-pg', true)
     : domainPostgres;
 
+  const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
+  const scanAddress = `http://scan-app-${svActiveDomain}.sv-1:5012`;
   installCNHelmChart(
     xns,
     'splitwell-app',
@@ -80,6 +82,7 @@ export async function installSplitwell(
       metrics: {
         enable: true,
       },
+      scanAddress: scanAddress,
     },
     [],
     { dependsOn: [svc, participant] }
@@ -129,6 +132,8 @@ export async function installSplitwell(
       user: pulumi.Output.create('cnadmin'),
       port: pulumi.Output.create(5432),
     },
+    scanAddress: scanAddress,
+    globalDomainUrl: globalDomainUrl,
     validatorDb,
   });
 }

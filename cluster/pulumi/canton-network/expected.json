@@ -1515,7 +1515,8 @@
             "cpu": "1",
             "memory": "1536Mi"
           }
-        }
+        },
+        "scanAddress": "http://scan-app-0.sv-1:5012"
       }
     },
     "name": "splitwell-splitwell-app",
@@ -1602,6 +1603,7 @@
             "memory": "4Gi"
           }
         },
+        "scanAddress": "http://scan-app-0.sv-1:5012",
         "svSponsorAddress": "http://sv-app-0.sv-1:5014",
         "svValidator": false,
         "topup": {
@@ -1816,7 +1818,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-sequencer-global-domain-0",
+      "name": "ingress-domain-0",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -1839,7 +1841,7 @@
             "activeGlobalDomainId": "",
             "globalDomainId": "0"
           },
-          "scan": false,
+          "scan": true,
           "sequencer": true,
           "sv": true,
           "wallet": false
@@ -1847,7 +1849,7 @@
         "withSvIngress": true
       }
     },
-    "name": "sv-1-ingress-sequencer-global-domain-0",
+    "name": "sv-1-ingress-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2066,7 +2068,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-scan-sv-1-e",
+      "name": "postgres-scan-sv-1-0-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2080,14 +2082,14 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "databaseName": "scan_sv_1",
+          "databaseName": "scan_sv_1_0",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "sv-1-postgres-scan-sv-1-e",
+    "name": "sv-1-postgres-scan-sv-1-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2179,7 +2181,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan",
+      "name": "scan-0",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2193,6 +2195,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -2204,10 +2207,10 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "scan_sv_1",
+          "databaseName": "scan_sv_1_0",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "schema": "scan_sv_1",
+          "schema": "scan_sv_1_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -2223,7 +2226,7 @@
         "sequencerAddress": "global-domain-0-sequencer"
       }
     },
-    "name": "sv-1-scan",
+    "name": "sv-1-scan-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2473,7 +2476,7 @@
           }
         },
         "scan": {
-          "publicUrl": "https://scan.sv-1.svc.mock.network.canton.global"
+          "publicUrl": "https://scan-0.sv-1.svc.mock.network.canton.global"
         }
       }
     },
@@ -2533,6 +2536,7 @@
             "memory": "4Gi"
           }
         },
+        "scanAddress": "http://scan-app-0.sv-1:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -2741,7 +2745,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-sequencer-global-domain-0",
+      "name": "ingress-domain-0",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -2764,7 +2768,7 @@
             "activeGlobalDomainId": "",
             "globalDomainId": "0"
           },
-          "scan": false,
+          "scan": true,
           "sequencer": true,
           "sv": true,
           "wallet": false
@@ -2772,7 +2776,7 @@
         "withSvIngress": true
       }
     },
-    "name": "sv-2-ingress-sequencer-global-domain-0",
+    "name": "sv-2-ingress-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2991,7 +2995,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-scan-sv-2-e",
+      "name": "postgres-scan-sv-2-0-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -3005,14 +3009,14 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "databaseName": "scan_sv_2",
+          "databaseName": "scan_sv_2_0",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "sv-2-postgres-scan-sv-2-e",
+    "name": "sv-2-postgres-scan-sv-2-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3104,7 +3108,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan",
+      "name": "scan-0",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -3118,6 +3122,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -3129,10 +3134,10 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "scan_sv_2",
+          "databaseName": "scan_sv_2_0",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
-          "schema": "scan_sv_2",
+          "schema": "scan_sv_2_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -3148,7 +3153,7 @@
         "sequencerAddress": "global-domain-0-sequencer"
       }
     },
-    "name": "sv-2-scan",
+    "name": "sv-2-scan-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3370,7 +3375,7 @@
           }
         },
         "scan": {
-          "publicUrl": "https://scan.sv-2.svc.mock.network.canton.global"
+          "publicUrl": "https://scan-0.sv-2.svc.mock.network.canton.global"
         }
       }
     },
@@ -3430,6 +3435,7 @@
             "memory": "4Gi"
           }
         },
+        "scanAddress": "http://scan-app-0.sv-1:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -3638,7 +3644,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-sequencer-global-domain-0",
+      "name": "ingress-domain-0",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -3661,7 +3667,7 @@
             "activeGlobalDomainId": "",
             "globalDomainId": "0"
           },
-          "scan": false,
+          "scan": true,
           "sequencer": true,
           "sv": true,
           "wallet": false
@@ -3669,7 +3675,7 @@
         "withSvIngress": true
       }
     },
-    "name": "sv-3-ingress-sequencer-global-domain-0",
+    "name": "sv-3-ingress-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3888,7 +3894,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-scan-sv-3-e",
+      "name": "postgres-scan-sv-3-0-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -3902,14 +3908,14 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "databaseName": "scan_sv_3",
+          "databaseName": "scan_sv_3_0",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "sv-3-postgres-scan-sv-3-e",
+    "name": "sv-3-postgres-scan-sv-3-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4001,7 +4007,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan",
+      "name": "scan-0",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -4015,6 +4021,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -4026,10 +4033,10 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "scan_sv_3",
+          "databaseName": "scan_sv_3_0",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
-          "schema": "scan_sv_3",
+          "schema": "scan_sv_3_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -4045,7 +4052,7 @@
         "sequencerAddress": "global-domain-0-sequencer"
       }
     },
-    "name": "sv-3-scan",
+    "name": "sv-3-scan-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4267,7 +4274,7 @@
           }
         },
         "scan": {
-          "publicUrl": "https://scan.sv-3.svc.mock.network.canton.global"
+          "publicUrl": "https://scan-0.sv-3.svc.mock.network.canton.global"
         }
       }
     },
@@ -4327,6 +4334,7 @@
             "memory": "4Gi"
           }
         },
+        "scanAddress": "http://scan-app-0.sv-1:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -4535,7 +4543,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-sequencer-global-domain-0",
+      "name": "ingress-domain-0",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -4558,7 +4566,7 @@
             "activeGlobalDomainId": "",
             "globalDomainId": "0"
           },
-          "scan": false,
+          "scan": true,
           "sequencer": true,
           "sv": true,
           "wallet": false
@@ -4566,7 +4574,7 @@
         "withSvIngress": true
       }
     },
-    "name": "sv-4-ingress-sequencer-global-domain-0",
+    "name": "sv-4-ingress-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4785,7 +4793,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-scan-sv-4-e",
+      "name": "postgres-scan-sv-4-0-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -4799,14 +4807,14 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "databaseName": "scan_sv_4",
+          "databaseName": "scan_sv_4_0",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "sv-4-postgres-scan-sv-4-e",
+    "name": "sv-4-postgres-scan-sv-4-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4898,7 +4906,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan",
+      "name": "scan-0",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -4912,6 +4920,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "init": {
           "initDb": "cantonnet"
@@ -4923,10 +4932,10 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "scan_sv_4",
+          "databaseName": "scan_sv_4_0",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
-          "schema": "scan_sv_4",
+          "schema": "scan_sv_4_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -4942,7 +4951,7 @@
         "sequencerAddress": "global-domain-0-sequencer"
       }
     },
-    "name": "sv-4-scan",
+    "name": "sv-4-scan-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5164,7 +5173,7 @@
           }
         },
         "scan": {
-          "publicUrl": "https://scan.sv-4.svc.mock.network.canton.global"
+          "publicUrl": "https://scan-0.sv-4.svc.mock.network.canton.global"
         }
       }
     },
@@ -5224,6 +5233,7 @@
             "memory": "4Gi"
           }
         },
+        "scanAddress": "http://scan-app-0.sv-1:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -5570,6 +5580,7 @@
             "memory": "4Gi"
           }
         },
+        "scanAddress": "http://scan-app-0.sv-1:5012",
         "svSponsorAddress": "http://sv-app-0.sv-1:5014",
         "svValidator": false,
         "topup": {

@@ -186,8 +186,6 @@ export async function installSvNode(
 
   const participantAddress = domainSpecificComponents.participant.name;
 
-  const initDb = initDatabase();
-
   installCNHelmChart(
     xns,
     'ingress-sv',
@@ -208,27 +206,10 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
-  const scanAppPostgres = defaultPostgres || postgres.installPostgres(xns, 'scan-pg', true);
-  const scanDbName = `scan_${sanitizedForPostgres(config.nodename)}`;
-  const scanDb = scanAppPostgres.createDatabase(scanDbName);
-  const scanValues = {
-    clusterUrl,
-    metrics: {
-      enable: true,
-    },
-    persistence: persistenceConfig(scanAppPostgres, scanDbName),
-    additionalJvmOptions: jmxOptions(),
-    sequencerAddress: domainSpecificComponents.globalDomain.namespaceInternalSequencerAddress,
-    init: initDb && { initDb },
-    participantAddress,
-  };
-  installCNHelmChart(xns, 'scan', 'cn-scan', scanValues, [scanDb], {
-    dependsOn: [domainSpecificComponents.svApp, domainSpecificComponents.globalDomain],
-  });
-
   const validatorPostgres = defaultPostgres || postgres.installPostgres(xns, 'validator-pg', true);
   const validatorDbName = `validator_${sanitizedForPostgres(config.nodename)}`;
   const validatorDb = validatorPostgres.createDatabase(validatorDbName);
+  const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
 
   await installValidatorApp({
     auth0Client: config.auth0Client,
@@ -246,10 +227,16 @@ export async function installSvNode(
           }
         : undefined,
     persistenceConfig: persistenceConfig(validatorPostgres, validatorDbName),
-    extraDependsOn: [domainSpecificComponents.svApp, validatorPostgres],
+    extraDependsOn: [
+      domainSpecificComponents.svApp,
+      validatorPostgres,
+      domainSpecificComponents.scan,
+    ],
     svValidator: true,
     participantAddress,
     validatorDb,
+    globalDomainUrl: globalDomainUrl,
+    scanAddress: pulumi.interpolate`http://scan-app-${domainSpecificComponents.globalDomain.id}.sv-1:5012`,
   });
 
   return { svApp: domainSpecificComponents.svApp };
@@ -316,6 +303,29 @@ function installDomainSpecificComponents(
         },
       };
     }
+    installCNHelmChart(
+      xns,
+      'ingress-domain-' + id,
+      'cn-cluster-ingress-runbook',
+      {
+        ingress: {
+          wallet: false,
+          cns: false,
+          scan: true,
+          sequencer: true,
+          sv: true,
+          globalDomain: {
+            globalDomainId: id.toString(),
+          },
+        },
+        cluster: {
+          hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+          svNamespace: xns.logicalName,
+        },
+      },
+      [],
+      { dependsOn: [xns.ns] }
+    );
     const svApp = installSvApp(
       id,
       { ...svConfig, ...svAppConfigOverrides },
@@ -323,13 +333,25 @@ function installDomainSpecificComponents(
       dependsOn,
       participant,
       globalDomainNode,
-      globalDomainUpgradeConfig.prepareForUpgrade,
+      globalDomainUpgradeConfig.prepareUpgrade ||
+        globalDomainUpgradeConfig.upgradeGlobalDomainId != undefined,
       svConfig.backupConfig
     );
+    const scan = installScan(
+      xns,
+      id,
+      svConfig.nodename,
+      globalDomainNode,
+      svApp,
+      participant,
+      defaultPostgres
+    );
+
     return {
       globalDomain: globalDomainNode,
       participant: participant,
       svApp: svApp,
+      scan: scan,
     };
   });
 }
@@ -371,7 +393,7 @@ function installSvApp(
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     scan: {
-      publicUrl: `https://scan.${config.nodename}.svc.${clusterUrl}`,
+      publicUrl: `https://scan-${domainId}.${config.nodename}.svc.${clusterUrl}`,
     },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
       expiresIn: onboarding.expiresIn,
@@ -416,5 +438,36 @@ function installSvApp(
 
   return installCNHelmChart(xns, `sv-app-${domainId}`, 'cn-sv-node', svValues, [svDb], {
     dependsOn: dependsOn.concat([participant, svAppPostgres, globalDomain]),
+  });
+}
+
+function installScan(
+  xns: ExactNamespace,
+  domainId: DomainIndex,
+  nodename: string,
+  globalDomainNode: GlobalDomainNode,
+  svApp: Release,
+  participant: Release,
+  defaultPostgres?: Postgres
+) {
+  const initDb = initDatabase();
+  const scanAppPostgres =
+    defaultPostgres || postgres.installPostgres(xns, `scan-${domainId}-pg`, true);
+  const scanDbName = `scan_${sanitizedForPostgres(nodename)}_${domainId}`;
+  const scanDb = scanAppPostgres.createDatabase(scanDbName);
+  const scanValues = {
+    clusterUrl,
+    metrics: {
+      enable: true,
+    },
+    persistence: persistenceConfig(scanAppPostgres, scanDbName),
+    additionalJvmOptions: jmxOptions(),
+    sequencerAddress: globalDomainNode.namespaceInternalSequencerAddress,
+    init: initDb && { initDb },
+    participantAddress: participant.name,
+    domainId: domainId.toString(),
+  };
+  return installCNHelmChart(xns, `scan-${domainId}`, 'cn-scan', scanValues, [scanDb], {
+    dependsOn: [svApp, globalDomainNode],
   });
 }

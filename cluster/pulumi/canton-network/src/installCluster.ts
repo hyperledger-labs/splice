@@ -64,7 +64,7 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   : undefined;
 
 const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = {
-  prepareForUpgrade: process.env.GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE === 'true',
+  prepareUpgrade: process.env.GLOBAL_DOMAIN_PREPARE_UPGRADE === 'true',
   legacyGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_LEGACY_ID),
   activeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_ACTIVE_ID) || DefaultGlobalDomainId,
   upgradeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_UPGRADE_ID),

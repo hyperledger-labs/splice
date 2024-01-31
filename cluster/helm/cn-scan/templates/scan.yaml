@@ -1,21 +1,23 @@
+{{- $scanAppLabel := include "appLabel" (list .Values "scan-app") }}
+{{- $scanWebUiAppLabel := include "appLabel" (list .Values "scan-web-ui") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: scan-app
+  name: {{ $scanAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: scan-app
+    app: {{ $scanAppLabel }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: scan-app
+      app: {{ $scanAppLabel }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: scan-app
+        app: {{ $scanAppLabel }}
     spec:
       containers:
       - name: scan-app
@@ -103,13 +105,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: scan-app
+  name: {{ $scanAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: scan-app
+    app: {{ $scanAppLabel }}
 spec:
   selector:
-    app: scan-app
+    app: {{ $scanAppLabel }}
   ports:
   - name: scan-api
     port: 5012
@@ -121,21 +123,21 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: scan-web-ui
+  name: {{ $scanWebUiAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: scan-web-ui
+    app: {{ $scanWebUiAppLabel }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: scan-web-ui
+      app: {{ $scanWebUiAppLabel }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: scan-web-ui
+        app: {{ $scanWebUiAppLabel }}
     spec:
       containers:
       - env:
@@ -158,11 +160,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: scan-web-ui
+  name: {{ $scanWebUiAppLabel }}
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: scan-web-ui
+    app: {{ $scanWebUiAppLabel }}
   ports:
   - name: scan-ui
     port: 80

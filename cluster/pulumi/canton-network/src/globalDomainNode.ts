@@ -2,14 +2,14 @@ import * as pulumi from '@pulumi/pulumi';
 import { Service } from '@pulumi/kubernetes/core/v1';
 import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ComponentResource } from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
+import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { installCometBftNode } from './cometbft';
 import { initDatabase, Postgres } from './postgres';
 
 export type GlobalDomainUpgradeConfig = {
-  prepareForUpgrade: boolean;
+  prepareUpgrade: boolean;
   legacyGlobalDomainId?: DomainIndex;
   activeGlobalDomainId: DomainIndex;
   upgradeGlobalDomainId?: DomainIndex;
@@ -90,7 +90,7 @@ export class GlobalDomainNode extends ComponentResource {
 
     const initDb = initDatabase();
 
-    const domainNodeRelease = installCNHelmChart(
+    installCNHelmChart(
       xns,
       this.name,
       'cn-global-domain',
@@ -123,30 +123,6 @@ export class GlobalDomainNode extends ComponentResource {
       },
       [mediatorDb, sequencerDb],
       { dependsOn: [cometBftService], parent: this }
-    );
-    installCNHelmChart(
-      xns,
-      'ingress-sequencer-' + this.name,
-      'cn-cluster-ingress-runbook',
-      {
-        withSvIngress: true,
-        ingress: {
-          wallet: false,
-          cns: false,
-          scan: false,
-          sequencer: true,
-          sv: true,
-          globalDomain: {
-            globalDomainId: domainId.toString(),
-          },
-        },
-        cluster: {
-          hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-          svNamespace: xns.logicalName,
-        },
-      },
-      [],
-      { dependsOn: [xns.ns, domainNodeRelease], parent: this }
     );
   }
 

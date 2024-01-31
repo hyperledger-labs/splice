@@ -147,7 +147,7 @@ jobs:
       upgrade_global_domain_prepare:
         type: boolean
         default: false
-        description: "If true, it will set the env GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE to true, and the deployment will attach the required PVC for the global domain migration dump to the sv app"
+        description: "If true, it will set the env GLOBAL_DOMAIN_PREPARE_UPGRADE to true, and the deployment will attach the required PVC for the global domain migration dump to the sv app"
       upgrade_global_domain_active_id:
         type: integer
         default: 0
@@ -213,11 +213,11 @@ jobs:
               VERSION=$(get-snapshot-version)
             fi
             if [[ << parameters.upgrade_global_domain_prepare >> == true ]]; then
-              export GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE="true"
+              export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
             fi
             export GLOBAL_DOMAIN_ACTIVE_ID=<< parameters.upgrade_global_domain_active_id >>
             if [[ << parameters.upgrade_global_domain_upgrade_id >> -ne 0 ]]; then
-              export GLOBAL_DOMAIN_PREPARE_FOR_UPGRADE="true"
+              export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
               export GLOBAL_DOMAIN_UPGRADE_ID=<< parameters.upgrade_global_domain_upgrade_id >>
               if [[ << parameters.upgrade_global_domain_legacy_id >> -ne 0 ]]; then
                 export GLOBAL_DOMAIN_LEGACY_ID=<< parameters.upgrade_global_domain_legacy_id >>

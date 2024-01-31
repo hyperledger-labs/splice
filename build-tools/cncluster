@@ -485,7 +485,7 @@ function subcmd_logs() {
 function k8s_labels_for_app() {
     local non_domain_specific_namespaces=("sv" "validator1" "splitwell" "validator")
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
-    local domain_specific_apps=("participant" "sv-app")
+    local domain_specific_apps=("participant" "sv-app" "scan-app")
 
     # shellcheck disable=SC2076
     if [[ " ${global_domain_specific_apps[*]} " =~ " ${app} " && ! " ${non_domain_specific_namespaces[*]} " =~ " ${namespace} " ]]; then

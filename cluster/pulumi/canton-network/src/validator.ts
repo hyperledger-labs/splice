@@ -59,6 +59,8 @@ export type ValidatorConfig = {
   svValidator?: boolean;
   participantAddress: Output<string> | string;
   validatorDb: Database;
+  globalDomainUrl: string;
+  scanAddress: Output<string> | string;
 };
 
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
@@ -108,7 +110,8 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
-      globalDomainUrl: `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
+      globalDomainUrl: config.globalDomainUrl,
+      scanAddress: config.scanAddress,
       extraDomains: config.extraDomains,
       validatorWalletUser: config.validatorWalletUser,
       svSponsorAddress: config.svSponsorAddress,

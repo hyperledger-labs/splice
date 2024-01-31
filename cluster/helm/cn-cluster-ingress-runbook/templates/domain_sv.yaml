@@ -50,6 +50,36 @@ spec:
             host: sv-web-ui-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
+  {{- if .Values.ingress.scan }}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: scan-sv-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.globalDomainId }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+    - "scan-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+  gateways:
+    - cluster-ingress/cn-http-gateway
+  http:
+    - match:
+        - port: 443
+          uri:
+            prefix: "/api/scan/"
+      route:
+        - destination:
+            port:
+              number: 5012
+            host: scan-app-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+    - match:
+        - port: 443
+      route:
+        - destination:
+            port:
+              number: 80
+            host: scan-web-ui-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+---
+  {{- end }}
 {{- end }}
 {{- if ((.Values.ingress).globalDomain).activeGlobalDomainId }}
   {{- if .Values.ingress.sequencer }}
@@ -101,6 +131,36 @@ spec:
             port:
               number: 80
             host: sv-web-ui-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+---
+  {{- end }}
+  {{- if .Values.ingress.scan }}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: scan-sv-{{ (.Values.cluster).svNamespace }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+    - "scan.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+  gateways:
+    - cluster-ingress/cn-http-gateway
+  http:
+    - match:
+        - port: 443
+          uri:
+            prefix: "/api/scan/"
+      route:
+        - destination:
+            port:
+              number: 5012
+            host: scan-app-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+    - match:
+        - port: 443
+      route:
+        - destination:
+            port:
+              number: 80
+            host: scan-web-ui-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
 {{- end }}

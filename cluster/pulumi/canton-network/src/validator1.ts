@@ -71,6 +71,8 @@ export async function installValidator1(
   const validatorDb = validatorPostgres.createDatabase(validatorDbName);
 
   const extraDependsOn: pulumi.Resource[] = [svc, participantPostgres, validatorPostgres];
+  const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
+  const scanAddress = `http://scan-app-${svActiveDomain}.sv-1:5012`;
 
   return installValidatorApp({
     auth0Client,
@@ -98,5 +100,7 @@ export async function installValidator1(
     topupConfig,
     svValidator: false,
     validatorDb,
+    globalDomainUrl,
+    scanAddress,
   });
 }
