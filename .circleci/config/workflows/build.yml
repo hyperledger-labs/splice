@@ -1,0 +1,170 @@
+workflow:
+
+  publish_public_artifacts:
+    when:
+      equal: [ publish-public-artifacts, << pipeline.parameters.run-job >> ]
+    jobs:
+      - docker_images_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+      - publish_public_release:
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - docker_images_push
+
+  build:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - cancel_previous_pipelines:
+          <<: *notify-fail
+          context:
+            - slack-context
+          workflow_names: "build"
+          branch_filter: "$CIRCLE_BRANCH"
+          # cannot use a simple CCI branch filter for the job since this job is a dependency for all the other jobs in this workflow
+          # and cannot be skipped
+          branch_ignores: "^(main|deployment/.*)$"
+          max_pipeline_age_secs: 0  # no pipeline age limit
+      # Linting and formatting
+      - static_tests:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - cancel_previous_pipelines
+      # Daml
+      - daml_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - cancel_previous_pipelines
+      # Scala
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test wall clock time"
+          test_names_file: "test-full-class-names.log"
+          start_canton_options: "-w -f -m"
+          resource_class: "xlarge"
+          parallelism: 8
+          requires:
+            - cancel_previous_pipelines
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test sim time"
+          test_names_file: "test-full-class-names-sim-time.log"
+          start_canton_options: "-s"
+          resource_class: "xlarge"
+          parallelism: 5
+          requires:
+            - cancel_previous_pipelines
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test frontend wall clock time"
+          test_names_file: "test-full-class-names-frontend.log"
+          start_canton_options: "-w"
+          pre_sbt_cmd: "./start-frontends.sh -d -s"
+          post_sbt_cmd: "./stop-frontends.sh"
+          resource_class: "2xlarge"
+          parallelism: 4
+          requires:
+            - cancel_previous_pipelines
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test frontend sim time"
+          test_names_file: "test-full-class-names-frontend-sim-time.log"
+          start_canton_options: "-s"
+          pre_sbt_cmd: "./start-frontends.sh -d -s"
+          post_sbt_cmd: "./stop-frontends.sh"
+          resource_class: "xlarge"
+          parallelism: 1
+          requires:
+            - cancel_previous_pipelines
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test frontend app manager"
+          test_names_file: "test-full-class-names-frontend-app-manager.log"
+          start_canton_options: "-w"
+          pre_sbt_cmd: "./start-frontends.sh -d -s -m"
+          post_sbt_cmd: "./stop-frontends.sh"
+          resource_class: "xlarge"
+          parallelism: 1
+          requires:
+            - cancel_previous_pipelines
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test global upgrade sim time"
+          test_names_file: "test-full-class-names-global-upgrade-sim-time.log"
+          start_canton_options: "-s -g"
+          resource_class: "xlarge"
+          parallelism: 1
+          requires:
+            - cancel_previous_pipelines
+      - ui_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - cancel_previous_pipelines
+      - bundle:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - cancel_previous_pipelines
+      # Ops
+      - update_pipeline_schedule:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - cancel_previous_pipelines
+      - deployment_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - cancel_previous_pipelines
+      - docker_images_build:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - cancel_previous_pipelines

@@ -110,3 +110,15 @@ cluster-parameter: &cluster-parameter
         "none",
       ]
     default: "none"
+
+main-branch-only: &main-branch-only
+  filters:
+    branches:
+      only:
+        - main
+
+main-branch-never: &main-branch-never
+  filters:
+    branches:
+      ignore:
+        - main

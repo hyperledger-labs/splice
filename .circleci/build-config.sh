@@ -36,7 +36,12 @@ fi
         sed '1d' "${file}"
         echo
     done
-    cat "${REPO_ROOT}/.circleci/config/workflows.yml"
+    echo "workflows:"
+    echo "  version: 2"
+    for file in "${REPO_ROOT}"/.circleci/config/workflows/*.yml; do
+        sed '1d' "${file}"
+        echo
+    done
 } > "${OUTPUT_CONF}"
 
 for clustername in scratchneta scratchnetb scratchnetc scratchnetd scratchnete

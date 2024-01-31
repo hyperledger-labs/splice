@@ -1,0 +1,408 @@
+workflow:
+  deploy_cidaily_and_cidaily_testnet:
+    when:
+      equal: [ deploy-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - docker_images_push:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check cidaily_testnet_health_check redeploy_sv_runbook_cidaily backup_cidaily restore_sv_cidaily backup_cidaily_testnet restore_validator_cidaily_testnet"
+      - deploy_cluster:
+          name: deploy_cluster_cidaily
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cidaily"
+          requires:
+            - docker_images_push
+            - wait_for_previous_pipeline
+      - deploy_cluster:
+          name: deploy_cluster_cidaily_testnet
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cidaily-testnet"
+          restore_cluster: true
+          requires:
+            - docker_images_push
+            - wait_for_previous_pipeline
+      - preflight_check:
+          name: preflight_check_devnet
+          cluster: "cidaily"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          wait_for_sv: false
+          # Order: deploy_cluster->preflight_check->publish_public_release->deploy_sv_runbook->preflight_sv_check
+          requires:
+            - docker_images_push
+            - deploy_cluster_cidaily
+      - preflight_check:
+          name: preflight_check_testnet
+          cluster: "cidaily-testnet"
+          <<: *non_devnet_preflight_params
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          # require deploy_cluster and deploy_sv_runbook for stability and reliability
+          requires:
+            - docker_images_push
+            - deploy_cluster_cidaily_testnet
+      - publish_public_release:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - preflight_check_devnet
+            - preflight_check_testnet
+      - deploy_sv_runbook:
+          name: deploy_sv_runbook_devnet
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cidaily"
+          use_published_artifacts: true
+          requires:
+            - deploy_cluster_cidaily
+            - publish_public_release
+      - deploy_sv_runbook:
+          name: deploy_sv_runbook_testnet
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cidaily-testnet"
+          restore_cluster: true
+          requires:
+            - deploy_cluster_cidaily_testnet
+      - deploy_validator_runbook:
+          name: deploy_validator_runbook_devnet
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cidaily"
+          use_published_artifacts: true
+          requires:
+            - deploy_cluster_cidaily
+            - publish_public_release
+      - deploy_validator_runbook:
+          name: deploy_validator_runbook_testnet
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cidaily-testnet"
+          use_published_artifacts: true
+          requires:
+            - deploy_cluster_cidaily_testnet
+            - publish_public_release
+      - preflight_sv_check:
+          name: preflight_sv_check_devnet
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cidaily"
+          requires:
+            - deploy_sv_runbook_devnet
+      - preflight_sv_check:
+          name: preflight_sv_check_testnet
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cidaily-testnet"
+          requires:
+            - deploy_sv_runbook_testnet
+      - preflight_validator_check:
+          name: preflight_validator_check_devnet
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cidaily"
+          requires:
+            - deploy_validator_runbook_devnet
+
+  cidaily_health_check:
+    when:
+      equal: [ healthcheck-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for sv runbook deployments and for backup-recovery, concurrent preflight checks are fine.
+          workflow_names: "redeploy_sv_runbook_cidaily"
+      - cancel_if_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
+          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+      - cancel_if_previous_pipeline:
+          name: skip_during_catchup
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          # Skip healthchecks for ~1.5 hour after starting an sv node restore from backup.
+          # ATM, some tests are expected to fail while an SV is catching up, others are prone to failure.
+          # TODO(#9438): once we parallelize the restore, we can probably reduce the time to 1 hour.
+          max_pipeline_age_secs: 5400
+          workflow_names: "restore_sv_cidaily"
+          only_if_running: false
+      - preflight_check:
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          cluster: "cidaily"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+            - cancel_if_previous_pipeline
+            - skip_during_catchup
+
+  cidaily_testnet_health_check:
+    when:
+      equal: [ healthcheck-cidaily-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
+          context:
+            - artifactory
+            - slack-context
+          # Only wait for backup-recovery, concurrent preflight checks are fine.
+          workflow_names: "restore_validator_cidaily_testnet"
+      - cancel_if_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
+          context:
+            - artifactory
+            - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
+          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+      - preflight_check:
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
+          cluster: "cidaily-testnet"
+          <<: *non_devnet_preflight_params
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+            - cancel_if_previous_pipeline
+
+  redeploy_sv_runbook_cidaily:
+    when:
+      equal: [ redeploy-sv-runbook-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet redeploy_sv_runbook_cidaily cidaily_health_check"
+      - docker_images_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          skip_if_exists: true
+      - deploy_sv_runbook:
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cidaily"
+          use_published_artifacts: false
+          requires:
+            - wait_for_previous_pipeline
+            - docker_images_push
+      - preflight_sv_check:
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cidaily"
+          requires:
+            - deploy_sv_runbook
+
+  backup_cidaily:
+    when:
+      equal: [ backup-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+      - backup_cluster:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          cluster: "cidaily"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+
+  restore_sv_cidaily:
+    when:
+      equal: [ restore-sv-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check"
+      - restore_node:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          cluster: "cidaily"
+          # sv-3 chosen quite arbitrarily as one SV to restore from backup
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+
+  # on cidaily-testnet we have only one SV, so restoring validator1 instead
+  backup_cidaily_testnet:
+    when:
+      equal: [ backup-cidaily-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet"
+      - backup_cluster:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
+          cluster: "cidaily-testnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+
+  restore_validator_cidaily_testnet:
+    when:
+      equal: [ restore-validator-cidaily-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_testnet_health_check"
+      - restore_node:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily-testnet
+          cluster: "cidaily-testnet"
+          namespace_name: "validator1"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline

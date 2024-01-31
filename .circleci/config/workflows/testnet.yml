@@ -1,0 +1,74 @@
+workflow:
+  deploy_testnet:
+    when:
+      equal: [ deploy-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_testnet testnet_health_check"
+      - deploy_cluster:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "testnet"
+          deploy_version: "testnet-next"
+          restore_cluster: true
+          use_published_artifacts: true
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_check:
+          <<: *main-branch-only
+          <<: *non_devnet_preflight_params
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "testnet"
+          cluster_version: "testnet-next"
+          requires:
+            - deploy_cluster
+
+  testnet_health_check:
+    when:
+      equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - cancel_if_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/testnet
+          context:
+            - artifactory
+            - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
+          workflow_names: "deploy_testnet"
+      - preflight_check:
+          <<: *non_devnet_preflight_params
+          filters:
+            branches:
+              only:
+                - deployment/testnet
+          cluster: "testnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - cancel_if_previous_pipeline
+
+  mark_for_testnet:
+    when:
+      equal: [ mark-for-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - mark_for_testnet:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context

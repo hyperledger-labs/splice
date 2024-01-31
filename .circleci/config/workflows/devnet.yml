@@ -1,0 +1,149 @@
+workflow:
+  deploy_devnet:
+    when:
+      equal: [ deploy-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_devnet devnet_health_check"
+      - deploy_cluster:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "devnet"
+          deploy_version: "devnet-next"
+          use_published_artifacts: true
+          requires:
+            - wait_for_previous_pipeline
+      - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "devnet"
+          deploy_version: "devnet-next"
+          use_published_artifacts: true
+          requires:
+            - deploy_cluster
+      - deploy_validator_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "devnet"
+          deploy_version: "devnet-next"
+          use_published_artifacts: true
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "devnet"
+          cluster_version: "devnet-next"
+          # require deploy_cluster and deploy_sv_runbook for stability and reliability
+          requires:
+            - deploy_cluster
+            - deploy_sv_runbook
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "devnet"
+          cluster_version: "devnet-next"
+          requires:
+            - deploy_sv_runbook
+            - preflight_check
+      - preflight_validator_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "devnet"
+          cluster_version: "devnet-next"
+          requires:
+            - deploy_validator_runbook
+  devnet_health_check:
+    when:
+      equal: [ healthcheck-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - cancel_if_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
+          workflow_names: "deploy_devnet"
+      - preflight_check:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          cluster: "devnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - cancel_if_previous_pipeline
+
+  redeploy_sv_runbook_devnet:
+    when:
+      equal: [ redeploy-sv-runbook-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_devnet redeploy_sv_runbook_devnet devnet_health_check"
+      - docker_images_push:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+          skip_if_exists: true
+      - deploy_sv_runbook:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          cluster: "devnet"
+          use_published_artifacts: false
+          requires:
+            - wait_for_previous_pipeline
+            - docker_images_push
+      - preflight_sv_check:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "devnet"
+          requires:
+            - deploy_sv_runbook

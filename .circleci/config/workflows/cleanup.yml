@@ -1,0 +1,21 @@
+workflow:
+
+  auth0_user_cleanup:
+    when:
+      equal: [ auth0-user-cleanup, << pipeline.parameters.run-job >> ]
+    jobs:
+      - auth0_user_cleanup:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+
+  cluster_lock_reaper:
+    when:
+      equal: [ cluster-lock-reaper, << pipeline.parameters.run-job >> ]
+    jobs:
+      - cluster_lock_reaper:
+          <<: *main-branch-only
+          context:
+            - canton-network-vpn
+            - slack-context

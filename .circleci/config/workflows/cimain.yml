@@ -1,0 +1,122 @@
+workflow:
+  deploy_cimain:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - docker_images_push:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cimain"
+      - deploy_cluster:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          send_deployment_notification: false
+          update_deployment_branch: false  # No need to create a deployment branch for cimain
+          upgrade_global_domain_prepare: true
+          requires:
+            - docker_images_push
+            - wait_for_previous_pipeline
+      - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          send_deployment_notification: false
+          requires:
+            - deploy_cluster
+      - deploy_validator_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - deploy_cluster
+      - preflight_check:
+          cluster: "cimain"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_sv_check:
+          <<: *main-branch-only
+          cluster: "cimain"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_validator_check:
+          <<: *main-branch-only
+          cluster: "cimain"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+      - backup_cluster:
+          <<: *main-branch-only
+          cluster: "cimain"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
+      - restore_node:
+          <<: *main-branch-only
+          cluster: "cimain"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - backup_cluster
+            - preflight_check
+
+      - preflight_check:
+          name: "trigger_global_domain_upgrade_dump"
+          cluster: "cimain"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          requires:
+            - preflight_check
+            - preflight_sv_check
+            - preflight_validator_check
+      - deploy_cluster:
+          <<: *main-branch-only
+          name: "upgrade cluster"
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          send_deployment_notification: false
+          update_deployment_branch: false  # No need to create a deployment branch for cimain
+          upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_upgrade_dump
+            - docker_images_push
+            - wait_for_previous_pipeline
