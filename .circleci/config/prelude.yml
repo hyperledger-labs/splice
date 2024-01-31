@@ -10,8 +10,6 @@ env: &env
   TERM: dumb
   CI: "true"
   USER: circleci
-  # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
-  PROTOCBRIDGE_NO_CLEANUP: "1"
 
 non_devnet_preflight_params: &non_devnet_preflight_params
   parallelism: 1

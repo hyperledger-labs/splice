@@ -12,6 +12,7 @@ import wartremover.WartRemover.autoImport.*
 import sbtprotoc.ProtocPlugin.autoImport.PB
 import DamlPlugin.autoImport.*
 import Wartremover.cnWarts
+import protocbridge.ProtocRunner
 import sbt.internal.util.ManagedLogger
 import xsbti.compile.CompileAnalysis
 
@@ -220,6 +221,30 @@ object BuildCommon {
     Test / definedTests := Seq.empty,
   )
 
+  // TODO(#8146): Remove once #8146 is confirmed as fixed
+  private[this] def schemasTask(key: TaskKey[_]): Def.Initialize[Task[Set[File]]] = Def.task {
+    val toInclude = (key / includeFilter).value
+    val toExclude = (key / excludeFilter).value
+    val processManifests = (key / PB.manifestProcessing).value
+    val dependencies = (key / PB.unpackDependencies).value
+    val sources = (key / PB.protoSources).value
+
+    sources
+      .toSet[File]
+      .flatMap(srcDir =>
+        (srcDir ** (toInclude -- toExclude)).get
+          .map(_.getAbsoluteFile)
+      ) match {
+      case protos if protos.nonEmpty =>
+        if (!processManifests) protos
+        else {
+          val optionProtos = dependencies.mappedFiles.values.flatMap(_.optionProtos)
+          protos ++ optionProtos
+        }
+      case _ => Set.empty[File]
+    }
+  }
+
   // applies to all Canton-based sub-projects (descendants of community-common)
   lazy val sharedCantonSettings = Seq(
     // Enable logging of begin and end of test cases, test suites, and test runs.
@@ -235,6 +260,32 @@ object BuildCommon {
     //      """
     //    ),
     scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    // TODO(#8146): Remove once #8146 is confirmed as fixed and we do not need the debugging logs that this provides
+    Compile / PB.runProtoc := Def.taskDyn {
+      val s = streams.value
+      if (
+        (Compile / PB.targets).value.isEmpty || schemasTask(Compile / PB.generate).value.isEmpty
+      ) {
+        Def.task {
+          // return a dummy instance that should never be evaluated
+          ProtocRunner.fromFunction[Int] { (_, _) =>
+            throw new RuntimeException("protoc was not resolved")
+          }
+        }
+      } else
+        Def.task {
+          val envVar = sys.env.getOrElse("PROTOCBRIDGE_NO_CLEANUP", "")
+          s.log.info(s"PROTOCBRIDGE_NO_CLEANUP set to ${envVar}")
+          val exec = (Compile / PB.protocExecutable).value.getAbsolutePath.toString
+          s.log.info(s"Path to protoc executable: ${exec}")
+          (ProtocRunner.fromFunction { (args, extraEnv) =>
+            s.log.info(
+              s"Executing protoc with ${args.mkString("[", ", ", "]")} and extraEnv=$extraEnv"
+            )
+            ()
+          } zip ProtocRunner(exec)).map(_._2)
+        }
+    }.value,
   )
 
   // Project for utilities that are also used outside of the Canton repo

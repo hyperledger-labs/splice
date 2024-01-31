@@ -16,8 +16,6 @@ env: &env
   TERM: dumb
   CI: "true"
   USER: circleci
-  # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
-  PROTOCBRIDGE_NO_CLEANUP: "1"
 
 non_devnet_preflight_params: &non_devnet_preflight_params
   parallelism: 1
@@ -608,11 +606,13 @@ commands:
             # Necessary for tests of the REPL
             export TERM=dumb
 
+            # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
+            export PROTOCBRIDGE_NO_CLEANUP="1"
+
             run_sbt() {
                export << parameters.extra_env_vars >>
                # Define sbt command
                SBT_CMD=(sbt -verbose)
-
 
                # Add extra parameters
                SBT_CMD+=(<< parameters.extra_parameters >>)
