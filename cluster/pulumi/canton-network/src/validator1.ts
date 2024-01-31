@@ -86,6 +86,7 @@ export async function installValidator1(
     onboardingSecret,
     persistenceConfig: {
       host: validatorPostgres.address,
+      createDb: !postgres.enableCloudSql,
       databaseName: pulumi.Output.create(validatorDbName),
       secretName: validatorPostgres.secretName,
       schema: pulumi.Output.create(validatorDbName),

@@ -24,7 +24,6 @@ import {
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { PersistenceConfig } from '../../common';
-import { initDatabase } from './postgres';
 
 export type ExtraDomain = {
   alias: string;
@@ -100,8 +99,6 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
     .concat(config.extraDependsOn || []);
 
-  const initDb = initDatabase();
-
   return installCNHelmChart(
     config.xns,
     'validator-' + config.xns.logicalName,
@@ -138,7 +135,6 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
         enable: true,
       },
       participantAddress: config.participantAddress,
-      init: initDb && { initDb },
       additionalJvmOptions: jmxOptions(),
     },
     [config.validatorDb],

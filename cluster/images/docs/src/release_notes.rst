@@ -8,9 +8,13 @@ Release Notes
 
 * The wallet of non-SV validators now execute all reads through a Scan proxy in the validator,
   thus executing them in a BFT fashion.
-* Increased postgres PVC size to 480GB to support longer running clusters.
 * You might see some ``ACS_COMMITMENT_MISMATCH`` warning logs in the participant. These can be ignored.
 * Add `enableHealthProbes` to the global domain helm chart, providing the ability to disable gRPC readiness and liveness probes for the sequencer and mediator.
+
+* Deployment
+  * Increased postgres PVC size to 480GB to support longer running clusters.
+  * The default database names for the SV, Validator and Scan apps have been changed to `cantonnet_sv`, `cantonnet_validator` and `cantonnet_scan` respectively.
+
 
 2024-01-29
 ----------

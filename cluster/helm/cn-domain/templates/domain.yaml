@@ -74,7 +74,7 @@ spec:
             port: cd-pub-api
           timeoutSeconds: 1
       restartPolicy: Always
-      {{- if .Values.init }}
+      {{- if .Values.sequencer.persistence.createDb }}
       initContainers:
         - name: {{ .Release.Name }}-init-sequencer
           image: postgres:14
@@ -88,7 +88,7 @@ spec:
             - 'bash'
             - '-c'
             - |
-              until errmsg=$(psql -h {{ .Values.sequencer.persistence.host }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.sequencer.persistence.databaseName }}' 2>&1); do
+              until errmsg=$(psql -h {{ .Values.sequencer.persistence.host }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.sequencer.persistence.databaseName }}' 2>&1); do
                 if [[ $errmsg == *"already exists"* ]]; then
                   echo "Database {{ .Values.sequencer.persistence.databaseName }} already exists. Done."
                   break
@@ -97,6 +97,8 @@ spec:
                 echo "trying to create postgres database {{ .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
+      {{- end}}
+      {{- if .Values.mediator.persistence.createDb }}
         - name: {{ .Release.Name }}-init-mediator
           image: postgres:14
           env:
@@ -109,7 +111,7 @@ spec:
             - 'sh'
             - '-c'
             - |
-              until errmsg=$(psql -h {{ .Values.mediator.persistence.host }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.mediator.persistence.databaseName }}' 2>&1); do
+              until errmsg=$(psql -h {{ .Values.mediator.persistence.host }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.mediator.persistence.databaseName }}' 2>&1); do
                 if [[ $errmsg == *"already exists"* ]]; then
                   echo "Database {{ .Values.mediator.persistence.databaseName }} already exists. Done."
                   break

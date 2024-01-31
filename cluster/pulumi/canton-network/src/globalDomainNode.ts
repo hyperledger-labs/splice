@@ -6,7 +6,7 @@ import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { installCometBftNode } from './cometbft';
-import { initDatabase, Postgres } from './postgres';
+import { Postgres, enableCloudSql } from './postgres';
 
 export type GlobalDomainUpgradeConfig = {
   prepareUpgrade: boolean;
@@ -88,8 +88,6 @@ export class GlobalDomainNode extends ComponentResource {
 
     this.cometbftRpcService = cometBftService;
 
-    const initDb = initDatabase();
-
     installCNHelmChart(
       xns,
       this.name,
@@ -97,6 +95,7 @@ export class GlobalDomainNode extends ComponentResource {
       {
         sequencer: {
           persistence: {
+            createDb: !enableCloudSql,
             databaseName: sequencerDbName,
             secretName: sequencerPostgres.secretName,
             host: sequencerPostgres.address,
@@ -109,6 +108,7 @@ export class GlobalDomainNode extends ComponentResource {
         },
         mediator: {
           persistence: {
+            createDb: !enableCloudSql,
             databaseName: mediatorDbName,
             secretName: mediatorPostgres.secretName,
             host: mediatorPostgres.address,
@@ -119,7 +119,6 @@ export class GlobalDomainNode extends ComponentResource {
         },
         additionalJvmOptions: jmxOptions(),
         disableAutoInit: disableAutoInit,
-        init: initDb && { initDb },
       },
       [mediatorDb, sequencerDb],
       { dependsOn: [cometBftService], parent: this }

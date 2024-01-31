@@ -19,7 +19,8 @@ metrics:
   interval: 30s
 
 persistence:
-  databaseName: cantonnet
+  createDb: true
+  databaseName: cantonnet_sv
   schema: sv
   host: postgres
   port: 5432

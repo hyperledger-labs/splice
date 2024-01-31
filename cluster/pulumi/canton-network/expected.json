@@ -1167,11 +1167,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "mediator": {
           "persistence": {
+            "createDb": true,
             "databaseName": "domain_mediator",
             "host": "postgres.splitwell.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -1188,6 +1186,7 @@
         },
         "sequencer": {
           "persistence": {
+            "createDb": true,
             "databaseName": "domain_sequencer",
             "host": "postgres.splitwell.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -1257,9 +1256,6 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -1273,6 +1269,7 @@
           }
         },
         "persistence": {
+          "createDb": true,
           "databaseName": "participant",
           "host": "postgres.splitwell.svc.cluster.local",
           "schema": "participant",
@@ -1570,9 +1567,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -1587,6 +1581,7 @@
         },
         "participantAddress": "participant",
         "persistence": {
+          "createDb": true,
           "databaseName": "val_splitwell",
           "host": "postgres.splitwell.svc.cluster.local",
           "port": 5432,
@@ -1770,11 +1765,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "mediator": {
           "persistence": {
+            "createDb": true,
             "databaseName": "global_domain_0_mediator",
             "host": "postgres.sv-1.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -1801,6 +1794,7 @@
             "type": "cometbft"
           },
           "persistence": {
+            "createDb": true,
             "databaseName": "global_domain_0_sequencer",
             "host": "postgres.sv-1.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -1921,9 +1915,6 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -1937,6 +1928,7 @@
           }
         },
         "persistence": {
+          "createDb": true,
           "databaseName": "participant_0",
           "host": "postgres.sv-1.svc.cluster.local",
           "schema": "participant_0",
@@ -2197,9 +2189,6 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -2207,6 +2196,7 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "scan_sv_1_0",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
@@ -2446,9 +2436,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "isDevNet": true,
         "metrics": {
           "enable": true,
@@ -2459,6 +2446,7 @@
         "onboardingType": "found-collective",
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "sv_1_0",
           "host": "sv-app-0-pg.sv-1.svc.cluster.local",
           "port": 5432,
@@ -2510,9 +2498,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -2520,6 +2505,7 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "validator_sv_1",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
@@ -2697,11 +2683,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "mediator": {
           "persistence": {
+            "createDb": true,
             "databaseName": "global_domain_0_mediator",
             "host": "postgres.sv-2.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -2728,6 +2712,7 @@
             "type": "cometbft"
           },
           "persistence": {
+            "createDb": true,
             "databaseName": "global_domain_0_sequencer",
             "host": "postgres.sv-2.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -2848,9 +2833,6 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -2864,6 +2846,7 @@
           }
         },
         "persistence": {
+          "createDb": true,
           "databaseName": "participant_0",
           "host": "postgres.sv-2.svc.cluster.local",
           "schema": "participant_0",
@@ -3124,9 +3107,6 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3134,6 +3114,7 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "scan_sv_2_0",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
@@ -3342,9 +3323,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app-0.sv-1:5014"
@@ -3358,6 +3336,7 @@
         "onboardingType": "join-with-key",
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "sv_2_0",
           "host": "sv-app-0-pg.sv-2.svc.cluster.local",
           "port": 5432,
@@ -3409,9 +3388,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3419,6 +3395,7 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "validator_sv_2",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
@@ -3596,11 +3573,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "mediator": {
           "persistence": {
+            "createDb": true,
             "databaseName": "global_domain_0_mediator",
             "host": "postgres.sv-3.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -3627,6 +3602,7 @@
             "type": "cometbft"
           },
           "persistence": {
+            "createDb": true,
             "databaseName": "global_domain_0_sequencer",
             "host": "postgres.sv-3.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -3747,9 +3723,6 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3763,6 +3736,7 @@
           }
         },
         "persistence": {
+          "createDb": true,
           "databaseName": "participant_0",
           "host": "postgres.sv-3.svc.cluster.local",
           "schema": "participant_0",
@@ -4023,9 +3997,6 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -4033,6 +4004,7 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "scan_sv_3_0",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
@@ -4241,9 +4213,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app-0.sv-1:5014"
@@ -4257,6 +4226,7 @@
         "onboardingType": "join-with-key",
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "sv_3_0",
           "host": "sv-app-0-pg.sv-3.svc.cluster.local",
           "port": 5432,
@@ -4308,9 +4278,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -4318,6 +4285,7 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "validator_sv_3",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
@@ -4495,11 +4463,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "mediator": {
           "persistence": {
+            "createDb": true,
             "databaseName": "global_domain_0_mediator",
             "host": "postgres.sv-4.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -4526,6 +4492,7 @@
             "type": "cometbft"
           },
           "persistence": {
+            "createDb": true,
             "databaseName": "global_domain_0_sequencer",
             "host": "postgres.sv-4.svc.cluster.local",
             "secretName": "postgres-secrets"
@@ -4646,9 +4613,6 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -4662,6 +4626,7 @@
           }
         },
         "persistence": {
+          "createDb": true,
           "databaseName": "participant_0",
           "host": "postgres.sv-4.svc.cluster.local",
           "schema": "participant_0",
@@ -4922,9 +4887,6 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -4932,6 +4894,7 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "scan_sv_4_0",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
@@ -5140,9 +5103,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "isDevNet": true,
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "http://sv-app-0.sv-1:5014"
@@ -5156,6 +5116,7 @@
         "onboardingType": "join-with-key",
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "sv_4_0",
           "host": "sv-app-0-pg.sv-4.svc.cluster.local",
           "port": 5432,
@@ -5207,9 +5168,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -5217,6 +5175,7 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
+          "createDb": true,
           "databaseName": "validator_sv_4",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
@@ -5321,9 +5280,6 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -5337,6 +5293,7 @@
           }
         },
         "persistence": {
+          "createDb": true,
           "databaseName": "participant",
           "host": "postgres.validator1.svc.cluster.local",
           "schema": "participant",
@@ -5547,9 +5504,6 @@
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "init": {
-          "initDb": "cantonnet"
-        },
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -5564,6 +5518,7 @@
         },
         "participantAddress": "participant",
         "persistence": {
+          "createDb": true,
           "databaseName": "validator1",
           "host": "postgres.validator1.svc.cluster.local",
           "port": 5432,

@@ -75,7 +75,7 @@ spec:
           timeoutSeconds: 10
         {{- end }}
       restartPolicy: Always
-      {{- if .Values.init }}
+      {{- if .Values.mediator.persistence.createDb }}
       initContainers:
         - name: pg-init
           image: postgres:14
@@ -89,7 +89,7 @@ spec:
             - 'bash'
             - '-c'
             - |
-              until errmsg=$(psql -h {{ .Values.mediator.persistence.host }} --username=cnadmin --dbname={{ .Values.init.initDb }} -c 'create database {{ .Values.mediator.persistence.databaseName }}' 2>&1); do
+              until errmsg=$(psql -h {{ .Values.mediator.persistence.host }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.mediator.persistence.databaseName }}' 2>&1); do
                 if [[ $errmsg == *"already exists"* ]]; then
                   echo "Database {{ .Values.mediator.persistence.databaseName }} already exists. Done."
                   break

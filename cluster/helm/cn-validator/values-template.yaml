@@ -18,7 +18,8 @@ metrics:
   interval: 30s
 
 persistence:
-  databaseName: cantonnet
+  createDb: true
+  databaseName: cantonnet_validator
   schema: validator
   host: postgres
   port: 5432

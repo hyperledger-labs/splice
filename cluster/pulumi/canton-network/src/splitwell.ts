@@ -16,7 +16,7 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import * as postgres from './postgres';
 import { DomainIndex } from './globalDomainNode';
 import { installParticipant } from './ledger';
-import { initDatabase, Postgres } from './postgres';
+import { enableCloudSql, Postgres } from './postgres';
 import { installValidatorApp } from './validator';
 
 export async function installSplitwell(
@@ -126,6 +126,7 @@ export async function installSplitwell(
     svValidator: false,
     persistenceConfig: {
       host: validatorPostgres.address,
+      createDb: !postgres.enableCloudSql,
       databaseName: pulumi.Output.create(validatorDbName),
       secretName: validatorPostgres.secretName,
       schema: pulumi.Output.create(validatorDbName),
@@ -147,8 +148,6 @@ function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): p
   const sequencerDbName = `${sanitizedName}_sequencer`;
   const sequencerDb = postgres.createDatabase(sequencerDbName);
 
-  const initDb = initDatabase();
-
   return installCNHelmChart(
     xns,
     name,
@@ -156,6 +155,7 @@ function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): p
     {
       mediator: {
         persistence: {
+          createDb: !enableCloudSql,
           databaseName: mediatorDbName,
           host: postgres.address,
           secretName: postgres.secretName,
@@ -163,13 +163,13 @@ function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): p
       },
       sequencer: {
         persistence: {
+          createDb: !enableCloudSql,
           databaseName: sequencerDbName,
           host: postgres.address,
           secretName: postgres.secretName,
         },
       },
       additionalJvmOptions: jmxOptions(),
-      init: initDb && { initDb },
     },
     [mediatorDb, sequencerDb]
   );

@@ -38,7 +38,7 @@ import {
   installDomainSpecificComponent,
 } from './globalDomainNode';
 import { installParticipant } from './ledger';
-import { initDatabase, Postgres } from './postgres';
+import { enableCloudSql, Postgres } from './postgres';
 import { installValidatorApp } from './validator';
 
 export function installSvKeySecret(
@@ -246,6 +246,7 @@ function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): Persi
   const dbNameO = pulumi.Output.create(dbName);
   return {
     host: postgresDb.address,
+    createDb: !enableCloudSql,
     databaseName: dbNameO,
     secretName: postgresDb.secretName,
     schema: dbNameO,
@@ -421,7 +422,6 @@ function installSvApp(
     },
     additionalJvmOptions: jmxOptions(),
     participantAddress: participant.name,
-    init: initDatabase() && { initDb: initDatabase() },
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {
@@ -450,7 +450,6 @@ function installScan(
   participant: Release,
   defaultPostgres?: Postgres
 ) {
-  const initDb = initDatabase();
   const scanAppPostgres =
     defaultPostgres || postgres.installPostgres(xns, `scan-${domainId}-pg`, true);
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}_${domainId}`;
@@ -463,7 +462,6 @@ function installScan(
     persistence: persistenceConfig(scanAppPostgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
     sequencerAddress: globalDomainNode.namespaceInternalSequencerAddress,
-    init: initDb && { initDb },
     participantAddress: participant.name,
     domainId: domainId.toString(),
   };

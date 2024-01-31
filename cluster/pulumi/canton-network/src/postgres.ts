@@ -13,15 +13,7 @@ import {
   sanitizedForHelm,
 } from 'cn-pulumi-common';
 
-const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
-
-export function initDatabase(): string | undefined {
-  if (enableCloudSql) {
-    return undefined;
-  } else {
-    return process.env['POSTGRES_DB'] || 'cantonnet';
-  }
-}
+export const enableCloudSql = envFlag('ENABLE_CLOUD_SQL', false);
 
 const cluster = process.env['GCP_CLUSTER_BASENAME'] || 'GCP_CLUSTER_BASENAME not set';
 
@@ -183,7 +175,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
     const password = generatePassword(`${logicalName}-passwd`, { parent: this }).result;
     const passwordSecret = installPostgresPasswordSecret(xns, password, this.secretName);
 
-    // there's an "implicit" creation of a database named with the value of the env var POSTGRES_DB
+    // an initial database named cantonnet is created automatically (configured in the Helm chart).
     const pg = installCNHelmChart(
       xns,
       name,
