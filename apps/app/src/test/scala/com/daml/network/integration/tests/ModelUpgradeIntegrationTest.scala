@@ -5,12 +5,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.util.FutureInstances.*
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
-  ARC_CoinRules,
-  ARC_SvcRules,
-}
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
-import com.daml.network.codegen.java.cn.svcrules.SvcRules_SetConfig
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{ARC_CoinRules}
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
 import com.daml.network.environment.{CNNodeEnvironmentImpl, DarResources}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -88,7 +83,7 @@ class ModelUpgradeIntegrationTest
       )
 
       actAndCheck(
-        "Voting on an SvcRules config change for upgraded packages", {
+        "Voting on a CoinRules config change for upgraded packages", {
           val (_, voteRequest) = actAndCheck(
             "Creating vote request",
             eventuallySucceeds() {
@@ -144,18 +139,27 @@ class ModelUpgradeIntegrationTest
         .unwrap
         .futureValue
 
-      // Vote on a dummy change on svc rules to ensure it is archived and recreated
+      // Vote on a dummy change on coin rules to ensure it is archived and recreated
       // which indicates the new choice is being used.
-      val newConfig = sv1Backend.getSvcInfo().svcRules.payload.config
-      val action = new ARC_SvcRules(new SRARC_SetConfig(new SvcRules_SetConfig(newConfig)))
+      val dummyUpgradeAction = new ARC_CoinRules(
+        new CRARC_AddFutureCoinConfigSchedule(
+          new CoinRules_AddFutureCoinConfigSchedule(
+            new com.daml.network.codegen.java.da.types.Tuple2(
+              Instant.now().plus(1, ChronoUnit.HOURS),
+              coinConfig,
+            )
+          )
+        )
+      )
+
       actAndCheck(
-        "Voting on an SvcRules config change", {
+        "Voting on a CoinRules config change for upgraded packages", {
           val (_, voteRequest) = actAndCheck(
             "Creating vote request",
             eventuallySucceeds() {
               sv1Backend.createVoteRequest(
                 sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
-                action,
+                dummyUpgradeAction,
                 "url",
                 "description",
                 sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
@@ -168,7 +172,6 @@ class ModelUpgradeIntegrationTest
                 sv.listVoteRequests().loneElement
               }
               svVoteRequest.contractId shouldBe voteRequest.contractId
-              // We need an eventually to ensure that the SV has ingested the coin rules change.
               eventuallySucceeds() {
                 sv.castVote(
                   svVoteRequest.contractId,
@@ -181,10 +184,10 @@ class ModelUpgradeIntegrationTest
           }
         },
       )(
-        "observing SvcRules with new package id",
+        "observing CoinRules with new package id",
         _ => {
-          val newSvcRules = sv1Backend.getSvcInfo().svcRules
-          newSvcRules.identifier.getPackageId shouldBe DarResources.svcGovernance_0_2_0.packageId
+          val newCoinRules = sv1Backend.getSvcInfo().coinRules
+          newCoinRules.identifier.getPackageId shouldBe DarResources.cantonCoin_0_2_0.packageId
         },
       )
 
