@@ -682,7 +682,8 @@ object DbSequencerStateManagerStore {
           case v30.AggregatedSignaturesOfSender.SignaturesForEnvelope(sigsForEnvelope) =>
             sigsForEnvelope.traverse(Signature.fromProtoV30)
         }
-      } yield AggregatedSignaturesOfSender(sigs)(protocolVersionRepresentativeFor(ProtoVersion(0)))
+        rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
+      } yield AggregatedSignaturesOfSender(sigs)(rpv)
     }
   }
 

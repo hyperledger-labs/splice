@@ -1,12 +1,27 @@
 package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.Identifier
+import com.daml.network.environment.DarResources
 
 /** To support upgrading templates are addressed
   * using their qualified name, ignoring the package id.
   */
 final case class QualifiedName(moduleName: String, entityName: String) {
   override def toString = s"$moduleName:$entityName"
+}
+
+final case class PackageQualifiedName(packageName: String, qualifiedName: QualifiedName)
+
+object PackageQualifiedName {
+  def apply(identifier: Identifier): PackageQualifiedName = {
+    val resource = DarResources
+      .lookupPackageId(identifier.getPackageId)
+      .getOrElse(throw new IllegalArgumentException(s"No package found for template $identifier"))
+    PackageQualifiedName(
+      resource.metadata.name,
+      QualifiedName(identifier),
+    )
+  }
 }
 
 object QualifiedName {

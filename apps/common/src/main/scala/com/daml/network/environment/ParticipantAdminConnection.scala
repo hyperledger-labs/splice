@@ -61,7 +61,7 @@ class ParticipantAdminConnection(
   }
 
   private val participantStatusCommand =
-    new StatusAdminCommands.GetStatus(ParticipantStatus.fromProtoV0)
+    new StatusAdminCommands.GetStatus(ParticipantStatus.fromProtoV30)
 
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean] =
     runCmd(participantStatusCommand).map {

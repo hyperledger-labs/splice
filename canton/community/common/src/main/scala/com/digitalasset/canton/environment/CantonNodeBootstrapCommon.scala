@@ -28,7 +28,7 @@ import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPubl
 import com.digitalasset.canton.environment.CantonNodeBootstrap.HealthDumpFunction
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.health.admin.grpc.GrpcStatusService
-import com.digitalasset.canton.health.admin.v0.StatusServiceGrpc
+import com.digitalasset.canton.health.admin.v30.StatusServiceGrpc
 import com.digitalasset.canton.health.{
   GrpcHealthReporter,
   GrpcHealthServer,

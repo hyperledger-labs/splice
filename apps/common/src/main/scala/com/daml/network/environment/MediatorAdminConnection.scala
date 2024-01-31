@@ -34,7 +34,7 @@ class MediatorAdminConnection(
   override val serviceName = "Canton Mediator Admin API"
 
   private val mediatorStatusCommand =
-    new StatusAdminCommands.GetStatus(MediatorNodeStatus.fromProtoV0)
+    new StatusAdminCommands.GetStatus(MediatorNodeStatus.fromProtoV30)
 
   def getStatus(implicit traceContext: TraceContext): Future[NodeStatus[MediatorNodeStatus]] =
     runCmd(

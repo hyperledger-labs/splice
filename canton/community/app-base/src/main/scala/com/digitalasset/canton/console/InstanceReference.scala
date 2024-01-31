@@ -671,7 +671,7 @@ abstract class SequencerNodeReferenceX(
     new HealthAdministrationX[SequencerNodeStatus](
       this,
       consoleEnvironment,
-      SequencerNodeStatus.fromProtoV0,
+      SequencerNodeStatus.fromProtoV30,
     )
 
   private lazy val sequencerXTrafficControl = new TrafficControlSequencerAdministrationGroup(
@@ -942,7 +942,7 @@ abstract class MediatorReferenceX(val consoleEnvironment: ConsoleEnvironment, na
     new HealthAdministrationX[MediatorNodeStatus](
       this,
       consoleEnvironment,
-      MediatorNodeStatus.fromProtoV0,
+      MediatorNodeStatus.fromProtoV30,
     )
 
   private lazy val topology_ =

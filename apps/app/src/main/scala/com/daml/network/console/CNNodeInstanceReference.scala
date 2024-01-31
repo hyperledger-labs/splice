@@ -60,7 +60,7 @@ trait CNNodeAppReference extends InstanceReferenceCommon {
     new HealthAdministrationX[SimpleStatus](
       this,
       consoleEnvironment,
-      SimpleStatus.fromProtoV0,
+      SimpleStatus.fromProtoV30,
     )
 
   // clear_cache exists to invalidate topology caches which we don't have in our apps.

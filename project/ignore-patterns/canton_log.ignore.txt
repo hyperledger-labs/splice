@@ -107,4 +107,8 @@ ACS_COMMITMENT_MISMATCH
 INVALID_ACKNOWLEDGEMENT_SIGNATURE.*sequencer
 INVALID_SUBMISSION_REQUEST_SIGNATURE.*sequencer
 
+# TODO(#9694) Remove this once Canton fixes their metrics
+has recorded multiple values for the same attributes
+Too many log messages detected..*AsynchronousMetricStorage
+
 # Make sure to have a trailing newline

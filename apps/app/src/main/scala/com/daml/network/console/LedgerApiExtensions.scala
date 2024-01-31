@@ -9,7 +9,7 @@ import com.daml.ledger.javaapi
 import com.daml.ledger.javaapi.data.TransactionTreeV2 as JavaTransactionTree
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver}
-import com.daml.network.util.{Contract, JavaDecodeUtil}
+import com.daml.network.util.{Contract, JavaDecodeUtil, PackageQualifiedName}
 import com.digitalasset.canton.admin.api.client.commands.{LedgerApiCommands, LedgerApiV2Commands}
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -251,11 +251,11 @@ trait LedgerApiExtensions {
             partyId: PartyId,
             predicate: TC => Boolean = (_: TC) => true,
         ): Seq[TC] = {
-          val javaTemplateId = templateCompanion.TEMPLATE_ID
+          val filterIdentifier = PackageQualifiedName(templateCompanion.TEMPLATE_ID)
           val templateId = TemplateId(
-            "",
-            javaTemplateId.getModuleName,
-            javaTemplateId.getEntityName,
+            s"#${filterIdentifier.packageName}",
+            filterIdentifier.qualifiedName.moduleName,
+            filterIdentifier.qualifiedName.entityName,
           )
           ledgerApi.ledger_api.acs
             .of_party(partyId, filterTemplates = Seq(templateId))

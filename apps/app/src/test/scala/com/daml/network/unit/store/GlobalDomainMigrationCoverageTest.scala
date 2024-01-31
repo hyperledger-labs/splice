@@ -4,7 +4,7 @@ package unit.store
 import store.MultiDomainAcsStore.ContractFilter
 import com.daml.ledger.javaapi.data.codegen.ContractTypeCompanion
 import com.daml.network.store.db.AcsRowData
-import com.daml.network.util.QualifiedName
+import com.daml.network.util.PackageQualifiedName
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.AppendedClues
 import org.scalatest.matchers.should.Matchers
@@ -25,7 +25,7 @@ class GlobalDomainMigrationCoverageTest
 
   filtersAndMoveLists.foreach { case (label, filtered, rawHandled) =>
     s"${label.getClass.getSimpleName}" should {
-      val handled = rawHandled.view.map(t => QualifiedName(t.TEMPLATE_ID)).toSet
+      val handled = rawHandled.view.map(t => PackageQualifiedName(t.TEMPLATE_ID)).toSet
 
       "handle every listened-to contract type not handled elsewhere" in {
         filtered.ingestionFilter.templateIds should contain allElementsOf handled
@@ -60,7 +60,7 @@ class GlobalDomainMigrationCoverageTest
 
   "knownNotHandled" should {
     val allHandled = filtersAndMoveLists.view
-      .flatMap(_._3.map(i => QualifiedName(i.TEMPLATE_ID)))
+      .flatMap(_._3.map(i => PackageQualifiedName(i.TEMPLATE_ID)))
       .toSet
 
     "not list any handled contracts" in {
@@ -160,7 +160,7 @@ object GlobalDomainMigrationCoverageTest {
       trafficRequestCodegen.BuyTrafficRequest.COMPANION ->
         reason("tied to a specific domainId, never migrated", UserWalletStore),
     ).view.map { case (c, reason) =>
-      (QualifiedName(c.TEMPLATE_ID), reason)
+      (PackageQualifiedName(c.TEMPLATE_ID), reason)
     }.toMap
   }
 

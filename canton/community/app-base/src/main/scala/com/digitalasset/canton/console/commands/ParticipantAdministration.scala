@@ -1616,7 +1616,7 @@ class ParticipantHealthAdministrationX(
 ) extends HealthAdministrationX(
       runner,
       consoleEnvironment,
-      ParticipantStatus.fromProtoV0,
+      ParticipantStatus.fromProtoV30,
     )
     with FeatureFlagFilter
     with ParticipantHealthAdministrationCommon

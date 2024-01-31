@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.util.{CoinConfigSchedule, Contract, DarUtil, QualifiedName}
+import com.daml.network.util.{CoinConfigSchedule, Contract, QualifiedName}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -137,8 +137,8 @@ object PackageIdResolver {
         .get(name.moduleName)
         .getOrElse(throw new IllegalArgumentException(s"Unknown template $name"))
       val version = readPackageVersion(config.packageConfig, pkg)
-      packageMap
-        .get((pkg.packageName, version))
+      DarResources
+        .lookupPackageMetadata(pkg.packageName, version)
         .fold(
           throw new IllegalArgumentException(
             s"No package with name ${pkg.packageName} and version ${version} is known"
@@ -161,26 +161,6 @@ object PackageIdResolver {
     }
   }
 
-  def lookupPackage(pkg: Package, version: PackageVersion): Option[DarResource] =
-    packageMap.get((pkg.packageName, version))
-
-  // Map from (pkgName, pkgVersion) -> DarResource
-  private lazy val packageMap =
-    packageResources
-      .flatMap(pkgResource => pkgResource.all)
-      .map { darResource =>
-        val mainDalf =
-          scala.util.Using.resource(getClass.getClassLoader.getResourceAsStream(darResource.path)) {
-            inputStream =>
-              DarUtil.readDar(darResource.path, inputStream).main
-          }
-        val metadata = mainDalf._2.metadata.getOrElse(
-          throw new AssertionError(s"Package is missing metadata which is mandatory in LF >= 1.8")
-        )
-        ((metadata.name, metadata.version) -> darResource)
-      }
-      .toMap
-
   def readPackageVersion(
       packageConfig: cc.coinconfig.PackageConfig,
       pkg: Package,
@@ -196,16 +176,6 @@ object PackageIdResolver {
     }
     PackageVersion.assertFromString(version)
   }
-
-  private val packageResources: Seq[PackageResource] =
-    Seq(
-      DarResources.cantonCoin,
-      DarResources.cantonNameService,
-      DarResources.svcGovernance,
-      DarResources.validatorLifecycle,
-      DarResources.wallet,
-      DarResources.walletPayments,
-    )
 
   // Map from module name to package containing that module
   private val modulePackages: Map[String, Package] = Map(

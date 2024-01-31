@@ -43,7 +43,7 @@ class SequencerAdminConnection(
   override val serviceName = "Canton Sequencer Admin API"
 
   private val sequencerStatusCommand =
-    new StatusAdminCommands.GetStatus(SequencerNodeStatus.fromProtoV0)
+    new StatusAdminCommands.GetStatus(SequencerNodeStatus.fromProtoV30)
 
   def getStatus(implicit traceContext: TraceContext): Future[NodeStatus[SequencerNodeStatus]] =
     runCmd(

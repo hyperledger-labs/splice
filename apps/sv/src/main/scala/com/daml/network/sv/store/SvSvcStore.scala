@@ -969,7 +969,7 @@ object SvSvcStore {
     val svc = svcParty.toProtoPrimitive
     val sv = svParty.toProtoPrimitive
 
-    val svcFilters = Map[QualifiedName, TemplateFilter[?, ?, SvcAcsStoreRowData]](
+    val svcFilters = Map[PackageQualifiedName, TemplateFilter[?, ?, SvcAcsStoreRowData]](
       mkFilter(cn.svc.coinprice.CoinPriceVote.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,

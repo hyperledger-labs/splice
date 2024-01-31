@@ -57,7 +57,7 @@ object InitializeMediatorRequest {
         .required("domain_parameters", domainParametersP)
         .flatMap(StaticDomainParameters.fromProtoV30)
       sequencerConnection <- ProtoConverter.parseRequired(
-        SequencerConnection.fromProtoV0,
+        SequencerConnection.fromProtoV30,
         "sequencer_connection",
         sequencerConnectionP,
       )

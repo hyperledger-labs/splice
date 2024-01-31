@@ -89,7 +89,7 @@ object StaticDomainParameters
     extends HasProtocolVersionedCompanion[StaticDomainParameters]
     with ProtocolVersionedCompanionDbHelpers[StaticDomainParameters] {
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(1) -> VersionedProtoConverter(ProtocolVersion.v30)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(
       v30.StaticDomainParameters
     )(
       supportedProtoVersion(_)(fromProtoV30),
@@ -427,7 +427,7 @@ final case class DynamicDomainParameters(
 object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDomainParameters] {
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(2) -> VersionedProtoConverter(ProtocolVersion.v30)(
+    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(
       v30.DynamicDomainParameters
     )(
       supportedProtoVersion(_)(fromProtoV30),
@@ -704,6 +704,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       trafficControlConfig <- trafficControlConfigP.traverse(TrafficControlParameters.fromProtoV30)
 
       onboardingRestriction <- OnboardingRestriction.fromProtoV30(onboardingRestrictionP)
+      rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
 
       domainParameters <-
         create(
@@ -719,8 +720,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
           sequencerAggregateSubmissionTimeout = sequencerAggregateSubmissionTimeout,
           trafficControlConfig = trafficControlConfig,
           onboardingRestriction = onboardingRestriction,
-        )(protocolVersionRepresentativeFor(ProtoVersion(2)))
-          .leftMap(_.toProtoDeserializationError)
+        )(rpv).leftMap(_.toProtoDeserializationError)
     } yield domainParameters
   }
 

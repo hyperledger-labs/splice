@@ -283,7 +283,7 @@ object ValidatorStore {
 
     MultiDomainAcsStore.SimpleContractFilter(
       key.validatorParty,
-      Map[QualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]](
+      Map[PackageQualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]](
         mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
           co.payload.validatorParty == validator &&
             co.payload.svcParty == svc
@@ -342,7 +342,7 @@ object ValidatorStore {
             co.payload.owner == validator
         )(ValidatorAcsStoreRowData(_)),
       ) ++ (if (key.appManagerEnabled)
-              Map[QualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]](
+              Map[PackageQualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]](
                 mkFilter(appManagerCodegen.AppConfiguration.COMPANION)(co =>
                   co.payload.validatorOperator == validator
                 ) { contract =>
@@ -397,7 +397,7 @@ object ValidatorStore {
                   )
                 },
               )
-            else Map.empty[QualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]]),
+            else Map.empty[PackageQualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]]),
     )
   }
 

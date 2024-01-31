@@ -23,6 +23,7 @@ import com.daml.network.util.{
   AssignedContract,
   Contract,
   ContractWithState,
+  PackageQualifiedName,
   QualifiedName,
   TemplateJsonDecoder,
 }
@@ -305,10 +306,17 @@ object MultiDomainAcsStore {
   case class SimpleContractFilter[R <: AcsRowData](
       primaryParty: PartyId,
       templateFilters: Map[
-        QualifiedName,
+        PackageQualifiedName,
         TemplateFilter[?, ?, R],
       ],
   ) extends ContractFilter[R] {
+
+    // TODO(#9197) Drop this once the ledger API exposes package names
+    // on the read path.
+    private val templateFiltersWithoutPackageNames =
+      templateFilters.view.map { case (name, filter) =>
+        name.qualifiedName -> filter
+      }.toMap
 
     override val ingestionFilter =
       IngestionFilter(
@@ -317,24 +325,24 @@ object MultiDomainAcsStore {
       )
 
     override def contains(ev: CreatedEvent): Boolean =
-      templateFilters
+      templateFiltersWithoutPackageNames
         .get(QualifiedName(ev.getTemplateId))
         .exists(_.evPredicate(ev))
 
     override def mightContain[TC, TCid, T](
         templateCompanion: JavaContractCompanion[TC, TCid, T]
     ): Boolean =
-      templateFilters.contains(QualifiedName(templateCompanion.TEMPLATE_ID))
+      templateFilters.contains(PackageQualifiedName(templateCompanion.TEMPLATE_ID))
 
     override def mightContain(identifier: Identifier): Boolean = {
-      templateFilters.contains(QualifiedName(identifier))
+      templateFiltersWithoutPackageNames.contains(QualifiedName(identifier))
     }
 
     override def decodeMatchingContract(
         ev: CreatedEvent
     ): Option[Contract[?, ?]] = {
       for {
-        templateFilter <- templateFilters.get(QualifiedName(ev.getTemplateId))
+        templateFilter <- templateFiltersWithoutPackageNames.get(QualifiedName(ev.getTemplateId))
         contract <- templateFilter.decodeFromCreatedEvent(ev)
       } yield contract
     }
@@ -343,7 +351,7 @@ object MultiDomainAcsStore {
         ev: CreatedEvent
     ): Option[R] = {
       for {
-        templateFilter <- templateFilters.get(QualifiedName(ev.getTemplateId))
+        templateFilter <- templateFiltersWithoutPackageNames.get(QualifiedName(ev.getTemplateId))
         row <- templateFilter.matchingContractToRow(ev)
       } yield row
     }
@@ -352,7 +360,7 @@ object MultiDomainAcsStore {
         row: SelectFromAcsTableResult
     )(implicit templateJsonDecoder: TemplateJsonDecoder): Option[Contract[?, ?]] = {
       for {
-        templateFilter <- templateFilters.get(row.templateIdQualifiedName)
+        templateFilter <- templateFiltersWithoutPackageNames.get(row.templateIdQualifiedName)
       } yield templateFilter.decodeFromRow(row, templateJsonDecoder)
     }
 
@@ -372,11 +380,11 @@ object MultiDomainAcsStore {
   )(implicit
       companionClass: ContractCompanion[Contract.Companion.Template[TCid, T], TCid, T]
   ): (
-      QualifiedName,
+      PackageQualifiedName,
       TemplateFilter[TCid, T, R],
   ) =
     (
-      QualifiedName(templateCompanion.TEMPLATE_ID),
+      PackageQualifiedName(templateCompanion.TEMPLATE_ID),
       TemplateFilter(
         ev => {
           val c = Contract.fromCreatedEvent(templateCompanion)(ev)
@@ -394,7 +402,7 @@ object MultiDomainAcsStore {
     */
   final case class IngestionFilter(
       primaryParty: PartyId,
-      templateIds: Set[QualifiedName],
+      templateIds: Set[PackageQualifiedName],
   ) {
 
     def toTransactionFilter: LapiTransactionFilter =
@@ -408,8 +416,9 @@ object MultiDomainAcsStore {
                     com.daml.ledger.api.v1.transaction_filter.TemplateFilter(
                       templateId = Some(
                         com.daml.ledger.api.v1.value.Identifier(
-                          moduleName = tmpl.moduleName,
-                          entityName = tmpl.entityName,
+                          packageId = s"#${tmpl.packageName}",
+                          moduleName = tmpl.qualifiedName.moduleName,
+                          entityName = tmpl.qualifiedName.entityName,
                         )
                       ),
                       includeCreatedEventBlob = true,

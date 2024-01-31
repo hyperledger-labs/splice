@@ -1,5 +1,7 @@
 package com.daml.network.environment
 
+import com.daml.lf.data.Ref.{PackageName, PackageVersion}
+import com.daml.lf.language.Ast.PackageMetadata
 import com.daml.network.util.DarUtil
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashOps, HashPurpose}
 import com.google.protobuf.ByteString
@@ -65,6 +67,36 @@ object DarResources {
     svLocal_0_1_0,
     Seq.empty,
   )
+
+  private val packageResources: Seq[PackageResource] =
+    Seq(
+      DarResources.appManager,
+      DarResources.cantonCoin,
+      DarResources.cantonNameService,
+      DarResources.splitwell,
+      DarResources.svcGovernance,
+      DarResources.svLocal,
+      DarResources.validatorLifecycle,
+      DarResources.wallet,
+      DarResources.walletPayments,
+    )
+
+  private val pkgIdToDarResource: Map[String, DarResource] =
+    packageResources.view.flatMap(_.all).map(resource => resource.packageId -> resource).toMap
+
+  // We don't index the map by PackageMetadata because that type contains some additional
+  // fields that don't matter.
+  private val pkgMetadataToDarResource: Map[(PackageName, PackageVersion), DarResource] =
+    packageResources.view
+      .flatMap(_.all)
+      .map(resource => (resource.metadata.name, resource.metadata.version) -> resource)
+      .toMap
+
+  def lookupPackageId(packageId: String): Option[DarResource] =
+    pkgIdToDarResource.get(packageId)
+
+  def lookupPackageMetadata(name: PackageName, version: PackageVersion): Option[DarResource] =
+    pkgMetadataToDarResource.get((name, version))
 }
 
 /** All DARs for a given package
@@ -80,6 +112,7 @@ final case class DarResource(
     path: String,
     packageId: String,
     darHash: Hash,
+    metadata: PackageMetadata,
 )
 
 object DarResource {
@@ -90,13 +123,18 @@ object DarResource {
   def apply(file: String): DarResource = {
     val path = s"dar/$file"
     val pkgId = DarUtil.readPackageId(path)
-    val darBytes =
-      Using.resource(getClass.getClassLoader.getResourceAsStream(path))(ByteString.readFrom(_))
+    val (darBytes, metadata) =
+      Using.resource(getClass.getClassLoader.getResourceAsStream(path)) { resourceStream =>
+        val bytes = ByteString.readFrom(resourceStream)
+        val metadata = Using.resource(bytes.newInput())(DarUtil.readDarMetadata(path, _))
+        (bytes, metadata)
+      }
     val hash = hashOps.digest(HashPurpose.DarIdentifier, darBytes)
     DarResource(
       path,
       pkgId,
       hash,
+      metadata,
     )
   }
 }

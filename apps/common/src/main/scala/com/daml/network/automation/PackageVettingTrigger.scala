@@ -4,6 +4,7 @@ import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.{
   DarResource,
+  DarResources,
   PackageIdResolver,
   ParticipantAdminConnection,
   RetryFor,
@@ -53,7 +54,7 @@ abstract class PackageVettingTrigger extends PollingTrigger with PackageIdResolv
   )(implicit tc: TraceContext): Future[Unit] =
     packages.toSeq.traverse_ { pkg =>
       val version = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
-      val darResource = PackageIdResolver.lookupPackage(pkg, version)
+      val darResource = DarResources.lookupPackageMetadata(pkg.packageName, version)
       darResource match {
         case None =>
           logger.error(
@@ -72,7 +73,7 @@ abstract class PackageVettingTrigger extends PollingTrigger with PackageIdResolv
   )(implicit tc: TraceContext): Future[Unit] =
     packages.toSeq.traverse_ { pkg =>
       val version = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
-      val darResource = PackageIdResolver.lookupPackage(pkg, version)
+      val darResource = DarResources.lookupPackageMetadata(pkg.packageName, version)
       if (darResource.isEmpty) {
         logger.warn(
           show"Package ${pkg.packageName} is required in version ${version.toString} after $time according to CoinConfig but this version is not part of the deployed release, upgrade before $time to avoid any issues"
