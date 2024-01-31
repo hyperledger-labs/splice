@@ -3,7 +3,7 @@ FROM openjdk:11-jdk-slim
 
 # Install screen for running the console in a headless server
 RUN apt-get update \
-   && DEBIAN_FRONTEND=noninteractive apt-get install -y screen \
+   && DEBIAN_FRONTEND=noninteractive apt-get install -y screen tini \
    && apt-get clean \
    && rm -rf /var/cache/apt/archives
 
@@ -19,4 +19,4 @@ COPY target/metrics.conf target/entrypoint.sh target/bootstrap-entrypoint.sc tar
 RUN ln -s bin/canton cn-image-bin
 
 # point entrypoint to the coin executable
-ENTRYPOINT /app/entrypoint.sh
+ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]
