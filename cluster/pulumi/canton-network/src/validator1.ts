@@ -14,6 +14,7 @@ import type { Auth0Client } from 'cn-pulumi-common';
 import * as postgres from './postgres';
 import { DomainIndex } from './globalDomainNode';
 import { installParticipant } from './ledger';
+import { installPostgresMetrics } from './postgres';
 import { installValidatorApp } from './validator';
 
 export async function installValidator1(
@@ -45,7 +46,6 @@ export async function installValidator1(
         basename: CLUSTER_BASENAME,
       },
     },
-    [],
     { dependsOn: [xns.ns] }
   );
 
@@ -59,22 +59,27 @@ export async function installValidator1(
     [loopback]
   );
 
-  installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, [], {
-    dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
-  });
+  installCNHelmChart(
+    xns,
+    'splitwell-web-ui',
+    'cn-splitwell-web-ui',
+    {},
+    {
+      dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
+    }
+  );
 
   const validatorPostgres = splitPostgresInstances
     ? postgres.installPostgres(xns, 'validator-pg', true)
     : participantPostgres;
 
   const validatorDbName = 'validator1';
-  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
 
   const extraDependsOn: pulumi.Resource[] = [svc, participantPostgres, validatorPostgres];
   const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
   const scanAddress = `http://scan-app-${svActiveDomain}.sv-1:5012`;
 
-  return installValidatorApp({
+  const validator = installValidatorApp({
     auth0Client,
     validatorWalletUser,
     xns,
@@ -86,7 +91,6 @@ export async function installValidator1(
     onboardingSecret,
     persistenceConfig: {
       host: validatorPostgres.address,
-      createDb: !postgres.enableCloudSql,
       databaseName: pulumi.Output.create(validatorDbName),
       secretName: validatorPostgres.secretName,
       schema: pulumi.Output.create(validatorDbName),
@@ -100,8 +104,11 @@ export async function installValidator1(
     participantAddress: 'participant',
     topupConfig,
     svValidator: false,
-    validatorDb,
     globalDomainUrl,
     scanAddress,
   });
+
+  installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
+
+  return validator;
 }

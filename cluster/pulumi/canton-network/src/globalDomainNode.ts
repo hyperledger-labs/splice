@@ -6,7 +6,7 @@ import { ExactNamespace, installCNHelmChart } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { installCometBftNode } from './cometbft';
-import { Postgres, enableCloudSql } from './postgres';
+import { Postgres, installPostgresMetrics } from './postgres';
 
 export type GlobalDomainUpgradeConfig = {
   prepareUpgrade: boolean;
@@ -67,16 +67,9 @@ export class GlobalDomainNode extends ComponentResource {
     this.active = active;
 
     const sanitizedName = this.name.replaceAll('-', '_');
-
     const mediatorDbName = `${sanitizedName}_mediator`;
-    const mediatorDb = mediatorPostgres.createDatabase(mediatorDbName, {
-      parent: this,
-    });
-
     const sequencerDbName = `${sanitizedName}_sequencer`;
-    const sequencerDb = sequencerPostgres.createDatabase(sequencerDbName, {
-      parent: this,
-    });
+
     const cometBftService = installCometBftNode(
       xns,
       cometbft.name,
@@ -88,14 +81,13 @@ export class GlobalDomainNode extends ComponentResource {
 
     this.cometbftRpcService = cometBftService;
 
-    installCNHelmChart(
+    const domainNodeRelease = installCNHelmChart(
       xns,
       this.name,
       'cn-global-domain',
       {
         sequencer: {
           persistence: {
-            createDb: !enableCloudSql,
             databaseName: sequencerDbName,
             secretName: sequencerPostgres.secretName,
             host: sequencerPostgres.address,
@@ -108,7 +100,6 @@ export class GlobalDomainNode extends ComponentResource {
         },
         mediator: {
           persistence: {
-            createDb: !enableCloudSql,
             databaseName: mediatorDbName,
             secretName: mediatorPostgres.secretName,
             host: mediatorPostgres.address,
@@ -120,9 +111,11 @@ export class GlobalDomainNode extends ComponentResource {
         additionalJvmOptions: jmxOptions(),
         disableAutoInit: disableAutoInit,
       },
-      [mediatorDb, sequencerDb],
       { dependsOn: [cometBftService], parent: this }
     );
+
+    installPostgresMetrics(mediatorPostgres, mediatorDbName, [domainNodeRelease]);
+    installPostgresMetrics(sequencerPostgres, sequencerDbName, [domainNodeRelease]);
   }
 
   get namespaceInternalSequencerAddress(): string {

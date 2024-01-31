@@ -16,10 +16,13 @@ sequencer:
   persistence:
     host: postgres.sv-1.svc.cluster.local
     secretName: "postgres-secrets"
+    databaseName: cantonnet_sequencer
+
 mediator:
   persistence:
     host: postgres.sv-1.svc.cluster.local
     secretName: "postgres-secrets"
+    databaseName: cantonnet_mediator
 
 metrics:
   enable: false

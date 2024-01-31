@@ -38,7 +38,7 @@ import {
   installDomainSpecificComponent,
 } from './globalDomainNode';
 import { installParticipant } from './ledger';
-import { enableCloudSql, Postgres } from './postgres';
+import { installPostgresMetrics, Postgres } from './postgres';
 import { installValidatorApp } from './validator';
 
 export function installSvKeySecret(
@@ -202,16 +202,14 @@ export async function installSvNode(
         svNamespace: xns.logicalName,
       },
     },
-    [],
     { dependsOn: [xns.ns] }
   );
 
   const validatorPostgres = defaultPostgres || postgres.installPostgres(xns, 'validator-pg', true);
   const validatorDbName = `validator_${sanitizedForPostgres(config.nodename)}`;
-  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
   const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
 
-  await installValidatorApp({
+  const validator = await installValidatorApp({
     auth0Client: config.auth0Client,
     xns,
     validatorWalletUser: config.validatorWalletUser,
@@ -234,10 +232,11 @@ export async function installSvNode(
     ],
     svValidator: true,
     participantAddress,
-    validatorDb,
     globalDomainUrl: globalDomainUrl,
     scanAddress: pulumi.interpolate`http://scan-app-${domainSpecificComponents.globalDomain.id}.sv-1:5012`,
   });
+
+  installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
 
   return { svApp: domainSpecificComponents.svApp };
 }
@@ -246,7 +245,6 @@ function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): Persi
   const dbNameO = pulumi.Output.create(dbName);
   return {
     host: postgresDb.address,
-    createDb: !enableCloudSql,
     databaseName: dbNameO,
     secretName: postgresDb.secretName,
     schema: dbNameO,
@@ -324,7 +322,6 @@ function installDomainSpecificComponents(
           svNamespace: xns.logicalName,
         },
       },
-      [],
       { dependsOn: [xns.ns] }
     );
     const svApp = installSvApp(
@@ -371,7 +368,6 @@ function installSvApp(
   const svAppPostgres =
     defaultPostgres || postgres.installPostgres(xns, `sv-app-${domainId}-pg`, true);
   const svAppName = sanitizedForPostgres(`${config.nodename}-${domainId}`);
-  const svDb = svAppPostgres.createDatabase(svAppName);
 
   const svValues = {
     domainId: domainId.toString(),
@@ -436,9 +432,13 @@ function installSvApp(
     };
   }
 
-  return installCNHelmChart(xns, `sv-app-${domainId}`, 'cn-sv-node', svValues, [svDb], {
+  const svApp = installCNHelmChart(xns, `sv-app-${domainId}`, 'cn-sv-node', svValues, {
     dependsOn: dependsOn.concat([participant, svAppPostgres, globalDomain]),
   });
+
+  installPostgresMetrics(svAppPostgres, svAppName, [svApp]);
+
+  return svApp;
 }
 
 function installScan(
@@ -453,7 +453,7 @@ function installScan(
   const scanAppPostgres =
     defaultPostgres || postgres.installPostgres(xns, `scan-${domainId}-pg`, true);
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}_${domainId}`;
-  const scanDb = scanAppPostgres.createDatabase(scanDbName);
+  // const scanDb = scanAppPostgres.createDatabase(scanDbName);
   const scanValues = {
     clusterUrl,
     metrics: {
@@ -465,7 +465,9 @@ function installScan(
     participantAddress: participant.name,
     domainId: domainId.toString(),
   };
-  return installCNHelmChart(xns, `scan-${domainId}`, 'cn-scan', scanValues, [scanDb], {
+  const scanApp = installCNHelmChart(xns, `scan-${domainId}`, 'cn-scan', scanValues, {
     dependsOn: [svApp, globalDomainNode],
   });
+  installPostgresMetrics(scanAppPostgres, scanDbName, [scanApp]);
+  return scanApp;
 }

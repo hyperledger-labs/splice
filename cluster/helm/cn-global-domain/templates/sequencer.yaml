@@ -85,7 +85,6 @@ spec:
             timeoutSeconds: 10
         {{- end }}
       restartPolicy: Always
-      {{- if .Values.sequencer.persistence.createDb }}
       initContainers:
         - name: pg-init
           image: postgres:14
@@ -108,7 +107,6 @@ spec:
                 echo "trying to create postgres database {{ .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
-      {{- end }}
 ---
 apiVersion: v1
 kind: Service

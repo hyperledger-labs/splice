@@ -74,7 +74,6 @@ spec:
             port: cd-pub-api
           timeoutSeconds: 1
       restartPolicy: Always
-      {{- if .Values.sequencer.persistence.createDb }}
       initContainers:
         - name: {{ .Release.Name }}-init-sequencer
           image: postgres:14
@@ -97,8 +96,6 @@ spec:
                 echo "trying to create postgres database {{ .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
-      {{- end}}
-      {{- if .Values.mediator.persistence.createDb }}
         - name: {{ .Release.Name }}-init-mediator
           image: postgres:14
           env:
@@ -120,7 +117,6 @@ spec:
                 echo "trying to create postgres database {{ .Values.mediator.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
-      {{- end}}
 ---
 apiVersion: v1
 kind: Service

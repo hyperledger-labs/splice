@@ -89,7 +89,6 @@ export function installCometBftNode(
         volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
       },
     },
-    [],
     {
       ...opts,
       ...{ dependsOn: syncSource ? [syncSource] : [] },

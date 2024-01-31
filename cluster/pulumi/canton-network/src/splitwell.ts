@@ -16,7 +16,7 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import * as postgres from './postgres';
 import { DomainIndex } from './globalDomainNode';
 import { installParticipant } from './ledger';
-import { enableCloudSql, Postgres } from './postgres';
+import { Postgres, installPostgresMetrics } from './postgres';
 import { installValidatorApp } from './validator';
 
 export async function installSplitwell(
@@ -49,7 +49,6 @@ export async function installSplitwell(
         basename: CLUSTER_BASENAME,
       },
     },
-    [],
     { dependsOn: [xns.ns] }
   );
 
@@ -84,7 +83,6 @@ export async function installSplitwell(
       },
       scanAddress: scanAddress,
     },
-    [],
     { dependsOn: [svc, participant] }
   );
 
@@ -92,14 +90,13 @@ export async function installSplitwell(
     ? postgres.installPostgres(xns, 'validator-pg', true)
     : domainPostgres;
   const validatorDbName = 'val_splitwell';
-  const validatorDb = validatorPostgres.createDatabase(validatorDbName);
 
   const extraDependsOn = [
     svc,
     await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
   ];
 
-  return installValidatorApp({
+  const validator = installValidatorApp({
     auth0Client,
     xns,
     extraDependsOn,
@@ -126,7 +123,6 @@ export async function installSplitwell(
     svValidator: false,
     persistenceConfig: {
       host: validatorPostgres.address,
-      createDb: !postgres.enableCloudSql,
       databaseName: pulumi.Output.create(validatorDbName),
       secretName: validatorPostgres.secretName,
       schema: pulumi.Output.create(validatorDbName),
@@ -135,42 +131,38 @@ export async function installSplitwell(
     },
     scanAddress: scanAddress,
     globalDomainUrl: globalDomainUrl,
-    validatorDb,
   });
+
+  installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
+
+  return validator;
 }
 
 function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): pulumi.Resource {
   const sanitizedName = sanitizedForPostgres(name);
-
   const mediatorDbName = `${sanitizedName}_mediator`;
-  const mediatorDb = postgres.createDatabase(mediatorDbName);
-
   const sequencerDbName = `${sanitizedName}_sequencer`;
-  const sequencerDb = postgres.createDatabase(sequencerDbName);
 
-  return installCNHelmChart(
-    xns,
-    name,
-    'cn-domain',
-    {
-      mediator: {
-        persistence: {
-          createDb: !enableCloudSql,
-          databaseName: mediatorDbName,
-          host: postgres.address,
-          secretName: postgres.secretName,
-        },
+  const domain = installCNHelmChart(xns, name, 'cn-domain', {
+    mediator: {
+      persistence: {
+        databaseName: mediatorDbName,
+        host: postgres.address,
+        secretName: postgres.secretName,
       },
-      sequencer: {
-        persistence: {
-          createDb: !enableCloudSql,
-          databaseName: sequencerDbName,
-          host: postgres.address,
-          secretName: postgres.secretName,
-        },
-      },
-      additionalJvmOptions: jmxOptions(),
     },
-    [mediatorDb, sequencerDb]
-  );
+    sequencer: {
+      persistence: {
+        databaseName: sequencerDbName,
+        host: postgres.address,
+        secretName: postgres.secretName,
+      },
+    },
+    additionalJvmOptions: jmxOptions(),
+  });
+
+  installPostgresMetrics(postgres, mediatorDbName, [domain]);
+  installPostgresMetrics(postgres, sequencerDbName, [domain]);
+
+  return domain;
 }

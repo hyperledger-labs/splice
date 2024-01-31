@@ -294,7 +294,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     'cluster-ingress',
     'cn-cluster-ingress-full',
     {},
-    [],
     { dependsOn: [validator, splitwell, docs].flatMap(value => (value ? [value] : [])) }
   );
 }

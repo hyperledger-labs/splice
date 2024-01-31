@@ -90,7 +90,6 @@ spec:
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
         {{- end }}
-      {{- if .Values.persistence.createDb }}
       initContainers:
         - name: pg-init
           image: postgres:14
@@ -113,7 +112,6 @@ spec:
                 echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
-      {{- end }}
 ---
 apiVersion: v1
 kind: Service

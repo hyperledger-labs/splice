@@ -4,7 +4,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import { ExactNamespace, installCNHelmChart, sanitizedForPostgres } from 'cn-pulumi-common';
 
 import { jmxOptions } from '../../common/src/jmx';
-import { enableCloudSql, Postgres } from './postgres';
+import { Postgres, installPostgresMetrics } from './postgres';
 
 export function installParticipant(
   xns: ExactNamespace,
@@ -15,15 +15,13 @@ export function installParticipant(
   dependsOn: pulumi.Resource[] = []
 ): Release {
   const pgName = sanitizedForPostgres(name);
-  const postgresDb = postgres.createDatabase(pgName);
 
-  return installCNHelmChart(
+  const participant = installCNHelmChart(
     xns,
     name,
     'cn-participant',
     {
       persistence: {
-        createDb: !enableCloudSql,
         databaseName: pgName,
         schema: pgName,
         host: postgres.address,
@@ -36,9 +34,12 @@ export function installParticipant(
       },
       additionalJvmOptions: jmxOptions(),
     },
-    [postgresDb],
     {
       dependsOn,
     }
   );
+
+  installPostgresMetrics(postgres, pgName, [participant]);
+
+  return participant;
 }

@@ -252,7 +252,6 @@ spec:
           {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
           {{- end }}
-      {{- if .Values.persistence.createDb }}
       initContainers:
         - name: {{ .Release.Name }}-init
           image: postgres:14
@@ -275,7 +274,6 @@ spec:
                 echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
-      {{- end }}
       volumes:
       {{- with .Values.participantIdentitiesDumpImport }}
         - name: participant-bootstrapping-dump-volume

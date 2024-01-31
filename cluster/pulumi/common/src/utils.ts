@@ -203,17 +203,6 @@ export function cnChartValues(chartPath: string, overrideValues: ChartValues = {
   return values;
 }
 
-// The way our databases are setup, they usually require some knottying, e.g.,
-// the scan helm chart requires the postgres db server to be available
-// but the postgres exporter requires the scan init container to create the db.
-// So we have the dependency chain "db server -> scan helm chart -> db exporter".
-// We want to make it impossible to avoid installing the metrics so we special case
-// db dependencies in installCNHelmChart.
-export type Database = {
-  db: pulumi.Resource;
-  installMetrics: (dependsOn: pulumi.Input<pulumi.Resource>[]) => pulumi.Resource;
-};
-
 // The default type of dependsOn is an unworkable abonimation.
 export type CNCustomResourceOptions = Omit<CustomResourceOptions, 'dependsOn'> & {
   dependsOn?: pulumi.Input<pulumi.Resource>[];
@@ -225,13 +214,8 @@ export function installCNHelmChartByNamespaceName(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  dbDependsOn?: Database[],
   opts?: CNCustomResourceOptions
 ): Release {
-  const dbs: pulumi.Resource[] = (dbDependsOn || []).map(x => x.db);
-  const dependsOn: pulumi.Input<pulumi.Resource>[] = opts?.dependsOn
-    ? [...opts.dependsOn, ...dbs]
-    : dbs;
   const release = new k8s.helm.v3.Release(
     `${prefix}-${name}`,
     {
@@ -241,11 +225,8 @@ export function installCNHelmChartByNamespaceName(
       values: cnChartValues(chartName, values),
       timeout: HELM_CHART_TIMEOUT_SEC,
     },
-    { ...opts, dependsOn }
+    opts
   );
-  (dbDependsOn || []).forEach(({ installMetrics }) => {
-    installMetrics([release]);
-  });
   return release;
 }
 
@@ -254,7 +235,6 @@ export function installCNHelmChart(
   name: string,
   chartName: string,
   values: ChartValues = {},
-  dbDependsOn: Database[],
   opts?: CNCustomResourceOptions
 ): Release {
   return installCNHelmChartByNamespaceName(
@@ -263,7 +243,6 @@ export function installCNHelmChart(
     name,
     chartName,
     values,
-    dbDependsOn,
     opts
   );
 }

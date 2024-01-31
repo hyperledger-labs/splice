@@ -29,3 +29,4 @@ metrics:
 
 persistence:
   secretName: "postgres-secrets"
+  databaseName: cantonnet_participant

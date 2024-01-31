@@ -19,7 +19,6 @@ metrics:
   interval: 30s
 
 persistence:
-  createDb: true
   databaseName: cantonnet_sv
   schema: sv
   host: postgres

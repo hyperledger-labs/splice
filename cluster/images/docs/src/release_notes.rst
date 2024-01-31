@@ -13,8 +13,10 @@ Release Notes
 * Containers now use tini as the entrypoint to ensure proper signal handling.
 
 * Deployment
+
   * Increased postgres PVC size to 480GB to support longer running clusters.
-  * The default database names for the SV, Validator and Scan apps have been changed to `cantonnet_sv`, `cantonnet_validator` and `cantonnet_scan` respectively.
+  * The default database names for the different components have been changed to `cantonnet_<componentName>`.
+    They are all created automatically in init containers attached to the respective app pods.
 
 
 2024-01-29

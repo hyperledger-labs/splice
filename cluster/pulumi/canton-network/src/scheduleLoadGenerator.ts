@@ -24,7 +24,6 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client): void {
           basename: CLUSTER_BASENAME,
         },
       },
-      [],
       { dependsOn: [xns.ns] }
     );
 
@@ -75,7 +74,6 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client): void {
           },
         }),
       },
-      [],
       { dependsOn: [loopback] }
     );
   } else {

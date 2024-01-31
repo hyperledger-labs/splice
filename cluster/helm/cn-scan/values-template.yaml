@@ -16,7 +16,6 @@ metrics:
   interval: 30s
 
 persistence:
-  createDb: true
   databaseName: cantonnet_scan
   schema: scan
   host: postgres
