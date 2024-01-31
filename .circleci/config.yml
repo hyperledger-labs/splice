@@ -3282,34 +3282,6 @@ workflows:
             - backup_cluster
             - preflight_check
 
-      - preflight_check:
-          name: "trigger_global_domain_upgrade_dump"
-          cluster: "cimain"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          requires:
-            - preflight_check
-            - preflight_sv_check
-            - preflight_validator_check
-      - deploy_cluster:
-          <<: *main-branch-only
-          name: "upgrade cluster"
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cimain"
-          send_deployment_notification: false
-          update_deployment_branch: false  # No need to create a deployment branch for cimain
-          upgrade_global_domain_upgrade_id: 1
-          requires:
-            - trigger_global_domain_upgrade_dump
-            - docker_images_push
-            - wait_for_previous_pipeline
-
 
   auth0_user_cleanup:
     when:
