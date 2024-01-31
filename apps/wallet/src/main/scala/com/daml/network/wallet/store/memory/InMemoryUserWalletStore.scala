@@ -46,6 +46,7 @@ class InMemoryUserWalletStore(
         coinCodegen.ValidatorRewardCoupon.COMPANION
       )
     } yield applyLimit(
+      "listSortedValidatorRewards",
       limit,
       rewards.view
         .filter(rw => filterActiveRounds(rw.payload.round.number))
@@ -68,6 +69,7 @@ class InMemoryUserWalletStore(
       coinCodegen.AppRewardCoupon.COMPANION
     )
   } yield applyLimit(
+    "listSortedAppRewards",
     limit,
     rewards
       .flatMap { rw =>

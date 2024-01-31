@@ -215,7 +215,7 @@ class InMemoryScanStore(
       (entry: Contract[?, CnsEntry]) => entry.payload.name.startsWith(namePrefix),
       limit,
     )
-  } yield applyLimit(limit, list)
+  } yield applyLimit("listEntries", limit, list)
 
   override def lookupEntryByParty(
       partyId: PartyId

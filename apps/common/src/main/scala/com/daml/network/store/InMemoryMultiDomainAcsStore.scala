@@ -165,6 +165,7 @@ class InMemoryMultiDomainAcsStore[TXE](
     requireInScope(companion)
     offsetAndStateAfterIngestingAcs().map { case (_, st) =>
       applyLimit(
+        s"filterContracts:${companionClass.typeId(companion).getEntityName}",
         limit,
         st.createEvents.values
           .collect(Function.unlift { ev =>

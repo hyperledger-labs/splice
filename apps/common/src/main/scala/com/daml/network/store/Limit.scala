@@ -58,6 +58,7 @@ object PageLimit {
 trait LimitHelpers { _: NamedLogging =>
 
   protected def applyLimit[T, S[A] <: scala.collection.IterableOps[A, S, S[A]]](
+      name: String,
       limit: Limit,
       result: S[T],
   )(implicit
@@ -70,7 +71,8 @@ trait LimitHelpers { _: NamedLogging =>
         val resultSize = result.size
         if (resultSize > limit) {
           logger.warn(
-            "Size of the result exceeded the limit. Result size: {}. Limit: {}",
+            s"Size of the result exceeded the limit in {}. Result size: {}. Limit: {}",
+            name,
             resultSize.toLong,
             limit.toLong,
           )

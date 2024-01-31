@@ -197,7 +197,7 @@ class DbScanStore(
           ),
           "listEntries",
         )
-    } yield applyLimit(limit, rows).map(
+    } yield applyLimit("listEntries", limit, rows).map(
       contractWithStateFromRow(CnsEntry.COMPANION)(_)
     )
   }
@@ -550,7 +550,7 @@ class DbScanStore(
             ),
             "listImportCrates",
           )
-        limited = applyLimit(limit, rows)
+        limited = applyLimit("listImportCrates", limit, rows)
         withState = limited.map(
           contractWithStateFromRow(ImportCrate.COMPANION)(_)
         )

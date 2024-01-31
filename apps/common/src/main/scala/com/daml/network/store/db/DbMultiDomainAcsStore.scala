@@ -171,6 +171,7 @@ class DbMultiDomainAcsStore[TXE](
       traceContext: TraceContext,
   ): Future[Seq[ContractWithState[TCid, T]]] = waitUntilAcsIngested {
     val templateId = companionClass.typeId(companion)
+    val opName = s"listContracts:${templateId.getEntityName}"
     for {
       result <- storage.query( // index: acs_store_template_sid_tid_en
         selectFromAcsTableWithState(
@@ -179,9 +180,9 @@ class DbMultiDomainAcsStore[TXE](
           where = sql"""template_id_qualified_name = ${QualifiedName(templateId)}""",
           orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
         ),
-        "listContracts",
+        opName,
       )
-      limited = applyLimit(limit, result)
+      limited = applyLimit(opName, limit, result)
       withState = limited.map(contractWithStateFromRow(companion)(_))
     } yield withState
   }
@@ -206,7 +207,7 @@ class DbMultiDomainAcsStore[TXE](
         ),
         "listAssignedContracts",
       )
-      limited = applyLimit(limit, result)
+      limited = applyLimit("listAssignedContracts", limit, result)
       assigned = limited.map(assignedContractFromRow(companion)(_))
     } yield assigned
   }
@@ -233,7 +234,7 @@ class DbMultiDomainAcsStore[TXE](
           ),
           "listExpiredFromPayloadExpiry",
         )
-      limited = applyLimit(limit, result)
+      limited = applyLimit("listExpiredFromPayloadExpiry", limit, result)
       assigned = limited.map(assignedContractFromRow(companion)(_))
     } yield assigned
   }
@@ -259,7 +260,7 @@ class DbMultiDomainAcsStore[TXE](
         ),
         "listContractsOnDomain",
       )
-      limited = applyLimit(limit, result)
+      limited = applyLimit("listContractsOnDomain", limit, result)
       contracts = limited.map(row => contractFromRow(companion)(row.acsRow))
     } yield contracts
   }

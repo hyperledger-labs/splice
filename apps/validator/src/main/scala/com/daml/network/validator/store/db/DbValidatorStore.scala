@@ -434,7 +434,7 @@ class DbValidatorStore(
           ),
           "listApprovedReleaseConfigurations",
         )
-      result = applyLimit(limit, rows).map(
+      result = applyLimit("listApprovedReleaseConfigurations", limit, rows).map(
         contractWithStateFromRow(
           appManagerCodegen.ApprovedReleaseConfiguration.COMPANION
         )(_)

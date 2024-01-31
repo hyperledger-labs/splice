@@ -70,6 +70,7 @@ class DbUserWalletStore(
       coinCodegen.ValidatorRewardCoupon.COMPANION
     )
   } yield applyLimit(
+    "listSortedValidatorRewards",
     limit,
     // TODO(#6119) Perform filter, sort, and limit in the database query
     rewards.view
@@ -98,6 +99,7 @@ class DbUserWalletStore(
       coinCodegen.AppRewardCoupon.COMPANION
     )
   } yield applyLimit(
+    "listSortedAppRewards",
     limit,
     rewards
       // TODO(#6119) Perform filter, sort, and limit in the database query

@@ -215,8 +215,8 @@ abstract class MultiDomainAcsStoreTest[
         resultHard <- loggerFactory.assertLogs(
           store.listContracts(AppRewardCoupon.COMPANION, limit = HardLimit.tryCreate(1)),
           _.warningMessage should include(
-            "Size of the result exceeded the limit. Result size: 2. Limit: 1"
-          ),
+            "Size of the result exceeded the limit"
+          ).and(include("Result size: 2. Limit: 1")),
         )
         resultPage <- store.listContracts(AppRewardCoupon.COMPANION, limit = PageLimit.tryCreate(1))
       } yield {

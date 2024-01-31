@@ -117,10 +117,11 @@ class DbSvSvcStore(
           """.as[(SelectFromAcsTableResult, SelectFromAcsTableResult)],
           "listExpiredCnsSubscriptions",
         )
-    } yield applyLimit(limit, joinedRows).map { case (idleRow, ctxRow) =>
-      val idleContract = contractFromRow(SubscriptionIdleState.COMPANION)(idleRow)
-      val ctxContract = contractFromRow(CnsEntryContext.COMPANION)(ctxRow)
-      SvSvcStore.IdleCnsSubscription(idleContract, ctxContract)
+    } yield applyLimit("listExpiredCnsSubscriptions", limit, joinedRows).map {
+      case (idleRow, ctxRow) =>
+        val idleContract = contractFromRow(SubscriptionIdleState.COMPANION)(idleRow)
+        val ctxContract = contractFromRow(CnsEntryContext.COMPANION)(ctxRow)
+        SvSvcStore.IdleCnsSubscription(idleContract, ctxContract)
     }
   }
 
@@ -139,7 +140,7 @@ class DbSvSvcStore(
                 )}""").toActionBuilder.as[SelectFromAcsTableResult],
             "listSvOnboardingConfirmed",
           )
-        limited = applyLimit(limit, result)
+        limited = applyLimit("listSvOnboardingConfirmed", limit, result)
       } yield limited.map(contractFromRow(SvOnboardingConfirmed.COMPANION)(_))
     }
 
@@ -180,7 +181,7 @@ class DbSvSvcStore(
                """).toActionBuilder.as[SelectFromAcsTableResult],
           "listConfirmations",
         )
-      limited = applyLimit(limit, result)
+      limited = applyLimit("listConfirmations", limit, result)
     } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
   }
 
@@ -209,6 +210,7 @@ class DbSvSvcStore(
       tc: TraceContext,
   ): Future[Seq[Contract[TCId, T]]] = {
     val templateId = companionClass.typeId(companion)
+    val opName = s"list${templateId.getEntityName}OnDomain"
     waitUntilAcsIngested {
       for {
         result <- storage
@@ -222,9 +224,9 @@ class DbSvSvcStore(
                      and reward_party is not null -- otherwise index is not used
                    limit ${sqlLimit(limit)}
                  """).toActionBuilder.as[SelectFromAcsTableResult],
-            s"list${templateId.getEntityName}OnDomain",
+            opName,
           )
-        limited = applyLimit(limit, result)
+        limited = applyLimit(opName, limit, result)
       } yield limited.map(contractFromRow(companion)(_))
     }
   }
@@ -277,6 +279,7 @@ class DbSvSvcStore(
       tc: TraceContext,
   ): Future[Seq[Seq[TCId]]] = {
     val templateId = companionClass.typeId(companion)
+    val opName = s"list${templateId.getEntityName}GroupedByCounterparty"
     waitUntilAcsIngested {
       for {
         result <- storage
@@ -292,9 +295,9 @@ class DbSvSvcStore(
                 group by reward_party
                 limit ${sqlLimit(totalCouponsLimit)}
                """.as[(PartyId, Array[ContractId[ValidatorRewardCoupon]])],
-            s"list${templateId.getEntityName}GroupedByCounterparty",
+            opName,
           )
-      } yield applyLimit(totalCouponsLimit, result).map(
+      } yield applyLimit(opName, totalCouponsLimit, result).map(
         _._2.map(cid => companionClass.toContractId(companion, cid.contractId)).toSeq
       )
     }
@@ -473,7 +476,7 @@ class DbSvSvcStore(
                         """).toActionBuilder.as[SelectFromAcsTableResult],
             "listInitialPaymentConfirmationByCnsName",
           )
-        limited = applyLimit(limit, result)
+        limited = applyLimit("listInitialPaymentConfirmationByCnsName", limit, result)
       } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
     }
 
@@ -534,7 +537,7 @@ class DbSvSvcStore(
                """).toActionBuilder.as[SelectFromAcsTableResult],
             "listSvOnboardingRequestsBySvcMembers",
           )
-        limited = applyLimit(limit, result)
+        limited = applyLimit("listSvOnboardingRequestsBySvcMembers", limit, result)
       } yield limited.map(contractFromRow(SvOnboardingRequest.COMPANION)(_))
     }
 
@@ -584,7 +587,9 @@ class DbSvSvcStore(
                """).toActionBuilder.as[SelectFromAcsTableResult],
           "listMemberTrafficContracts",
         )
-    } yield applyLimit(limit, result).map(contractFromRow(MemberTraffic.COMPANION)(_))
+    } yield applyLimit("listMemberTrafficContracts", limit, result).map(
+      contractFromRow(MemberTraffic.COMPANION)(_)
+    )
   }
 
   override def listMemberCoinPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
@@ -610,7 +615,7 @@ class DbSvSvcStore(
              """).toActionBuilder.as[SelectFromAcsTableResult],
           "listMemberCoinPriceVotes",
         )
-      limited = applyLimit(limit, result)
+      limited = applyLimit("listMemberCoinPriceVotes", limit, result)
     } yield limited.map(contractFromRow(CoinPriceVote.COMPANION)(_)).distinctBy(_.payload.sv)
   }
 
@@ -706,7 +711,7 @@ class DbSvSvcStore(
                """).toActionBuilder.as[SelectFromAcsTableResult],
           "listVotesByVoteRequests",
         )
-      limited = applyLimit(limit, result)
+      limited = applyLimit("listVotesByVoteRequests", limit, result)
     } yield limited.map(contractFromRow(Vote.COMPANION)(_))
   }
 
@@ -779,7 +784,7 @@ class DbSvSvcStore(
                  """).toActionBuilder.as[SelectFromAcsTableResult],
           "listEligibleVotes",
         )
-      limited = applyLimit(limit, result)
+      limited = applyLimit("listEligibleVotes", limit, result)
     } yield limited.map(contractFromRow(Vote.COMPANION)(_))
   }
 
@@ -880,7 +885,7 @@ class DbSvSvcStore(
                    """).toActionBuilder.as[SelectFromAcsTableResult],
           "listElectionRequests",
         )
-      limited = applyLimit(limit, result)
+      limited = applyLimit("listElectionRequests", limit, result)
     } yield limited.map(contractFromRow(ElectionRequest.COMPANION)(_))
   }
 
@@ -933,7 +938,7 @@ class DbSvSvcStore(
                      """).toActionBuilder.as[SelectFromAcsTableResult],
           "listExpiredElectionRequests",
         )
-      limited = applyLimit(limit, result)
+      limited = applyLimit("listExpiredElectionRequests", limit, result)
     } yield limited.map(contractFromRow(ElectionRequest.COMPANION)(_))
   }
 
@@ -953,7 +958,7 @@ class DbSvSvcStore(
           ),
           "getImportShipmentFor",
         )
-      limited = applyLimit(Limit.DefaultLimit, result)
+      limited = applyLimit("getImportShipmentFor", Limit.DefaultLimit, result)
       withState = limited.map(
         contractWithStateFromRow(ImportCrate.COMPANION)(_)
       )
@@ -1096,7 +1101,7 @@ class DbSvSvcStore(
         ),
         "listVoteResults",
       )
-      recentVoteResults = applyLimit(limit, rows).map(
+      recentVoteResults = applyLimit("listVoteResults", limit, rows).map(
         txLogEntryFromRow[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry](txLogConfig)
       )
     } yield recentVoteResults

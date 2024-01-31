@@ -101,7 +101,7 @@ class InMemorySvSvcStore(
           case _ => None
         }
       }
-    } yield applyLimit(limit, records)
+    } yield applyLimit("listVoteResults", limit, records)
   }
 
   override protected def listExpiredRoundBased[Id <: ContractId[T], T <: Template](
@@ -502,6 +502,7 @@ class InMemorySvSvcStore(
       }
     // Only deliver the ones referencing an active cns entry context
     result = applyLimit(
+      "listExpiredCnsSubscriptions",
       limit,
       subscriptionsWithContext
         .sortBy(_._1.payload.nextPaymentDueAt)
