@@ -472,10 +472,7 @@ function subcmd_logs() {
                           -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
                           2> /dev/null); then
 
-        LOGFILE=$(mktemp cnlogXXXXXXX.clog)
-        # shellcheck disable=SC2086
-        (kubectl logs ${POD_SPEC} "${app_container}" -f >> "${LOGFILE}" & lnav "${LOGFILE}")
-        rm "${LOGFILE}"
+        kubectl lnav "${POD_SPEC}" "${app_container}"
     else
         _error "No pod for app found: ${app}"
     fi
