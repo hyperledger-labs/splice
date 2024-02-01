@@ -1781,6 +1781,7 @@ function subcmd_participant_console() {
     _cluster_must_exist
 
     namespace="${1-}"
+    domain=${2:-0}
 
     if [ -z "${namespace}" ]; then
         _error "Usage: $SCRIPTNAME participant_console <namespace-name>"
@@ -1811,10 +1812,10 @@ function subcmd_participant_console() {
       else
         _info "Getting Ledger API Auth0 credentials from '$sv_app_pod'..."
         if \
-          client_id=$(_get_env_value "$namespace" "$sv_app_pod" CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID) && \
-          client_secret=$(_get_env_value "$namespace" "$sv_app_pod" CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET) && \
-          url=$(_get_env_value "$namespace" "$sv_app_pod" CN_APP_SV_LEDGER_API_AUTH_URL) && \
-          audience=$(_get_env_value "$namespace" "$participant_pod" AUTH_TARGET_AUDIENCE)
+          client_id=$(_get_env_value "$namespace" "$sv_app_pod" sv-app CN_APP_SV_LEDGER_API_AUTH_CLIENT_ID) && \
+          client_secret=$(_get_env_value "$namespace" "$sv_app_pod" sv-app CN_APP_SV_LEDGER_API_AUTH_CLIENT_SECRET) && \
+          url=$(_get_env_value "$namespace" "$sv_app_pod" sv-app CN_APP_SV_LEDGER_API_AUTH_URL) && \
+          audience=$(_get_env_value "$namespace" "$participant_pod" sv-app AUTH_TARGET_AUDIENCE)
         then
           _info "Getting Ledger API auth token from Auth0 using Ledger API Auth0 credentials from '$sv_app_pod'..."
           LEDGER_API_AUTH_TOKEN=$(_get_ledger_api_auth_token_from_auth0 "$client_id" "$client_secret" "$url" "$audience")
@@ -1828,10 +1829,10 @@ function subcmd_participant_console() {
       else
         _info "Getting Ledger API Auth0 credentials from '$validator_app_pod'..."
         if \
-          client_id=$(_get_env_value "$namespace" "$validator_app_pod" CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID) && \
-          client_secret=$(_get_env_value "$namespace" "$validator_app_pod" CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET) && \
-          url=$(_get_env_value "$namespace" "$validator_app_pod" CN_APP_VALIDATOR_LEDGER_API_AUTH_URL) && \
-          audience=$(_get_env_value "$namespace" "$participant_pod" AUTH_TARGET_AUDIENCE)
+          client_id=$(_get_env_value "$namespace" "$validator_app_pod" validator-app CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID) && \
+          client_secret=$(_get_env_value "$namespace" "$validator_app_pod" validator-app CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET) && \
+          url=$(_get_env_value "$namespace" "$validator_app_pod" validator-app CN_APP_VALIDATOR_LEDGER_API_AUTH_URL) && \
+          audience=$(_get_env_value "$namespace" "$participant_pod" validator-app AUTH_TARGET_AUDIENCE)
         then
           _info "Getting Ledger API auth token from Auth0 using Ledger API Auth0 credentials from '$validator_app_pod'..."
           LEDGER_API_AUTH_TOKEN=$(_get_ledger_api_auth_token_from_auth0 "$client_id" "$client_secret" "$url" "$audience")
@@ -1876,8 +1877,9 @@ function _get_env_value() {
     namespace=$1
     pod_name=$2
     env_name=$3
+    container=$4
 
-    if output=$(kubectl exec -n "$namespace" "$pod_name" -- printenv "$env_name" 2>&1); then
+    if output=$(kubectl exec -n "$namespace" "$pod_name" -c "$container" -- printenv "$env_name" 2>&1); then
       echo "$output"
     else
       return 1
