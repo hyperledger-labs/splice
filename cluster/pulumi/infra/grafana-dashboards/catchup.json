@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 91,
+  "id": 96,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -109,7 +109,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "sequencer_canton_sequencer_sequencer_client_delay{namespace=~\"$namespace\"}",
+          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"sequencer\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -209,7 +209,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "mediator_canton_mediator_sequencer_client_delay{namespace=~\"$namespace\"}",
+          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\", component=\"mediator\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -309,7 +309,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "participant_canton_global_sequencer_client_delay{namespace=~\"$namespace\"}",
+          "expr": "daml_sequencer_client_handler_delay{namespace=~\"$namespace\",component=\"participant\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -546,17 +546,17 @@
         "current": {
           "selected": true,
           "text": [
-            "sv-3"
+            "All"
           ],
           "value": [
-            "sv-3"
+            "$__all"
           ]
         },
         "datasource": {
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(participant_canton_global_sequencer_client_delay,namespace)",
+        "definition": "label_values(daml_sequencer_client_handler_delay,namespace)",
         "hide": 0,
         "includeAll": true,
         "label": "Namespace",
@@ -564,7 +564,7 @@
         "name": "namespace",
         "options": [],
         "query": {
-          "query": "label_values(participant_canton_global_sequencer_client_delay,namespace)",
+          "query": "label_values(daml_sequencer_client_handler_delay,namespace)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 1,
@@ -576,13 +576,13 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-12h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Global Domain Catchup",
   "uid": "ca9df344-c699-4efe-83c2-5fb2639d96c9",
-  "version": 6,
+  "version": 1,
   "weekStart": ""
 }
