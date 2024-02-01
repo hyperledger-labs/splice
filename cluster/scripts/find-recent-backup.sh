@@ -31,7 +31,9 @@ function main() {
   elif [ "$type" == "canton:cloud:postgres" ]; then
     # Since we assume that the latest backup was a full one, we just find the latest backup on the validator's db.
     cloudsql_id=$(get_cloudsql_id "$full_instance")
-    backup_run_id=$(gcloud sql backups list --instance "$cloudsql_id" --filter=type="ON_DEMAND" --format=json | jq -r '.[].description' | sort -n | tail -1)
+    # We always create backups with a description field while this field could be missing for automated backups done by Google Cloud.
+    # So we filter those out while looking for the most recent backup.
+    backup_run_id=$(gcloud sql backups list --instance "$cloudsql_id" --filter=type="ON_DEMAND" --format=json | jq -r '.[] | select(has("description")) | .description' | sort -n | tail -1)
     echo "$backup_run_id"
   elif [ -z "$type" ]; then
     _error "No postgres instance $full_instance found. Is the cluster deployed with split DB instances?"
