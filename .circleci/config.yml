@@ -2748,6 +2748,26 @@ workflows:
           cluster: "cidaily"
           requires:
             - deploy_validator_runbook_devnet
+      - backup_cluster:
+          name: backup_cidaily
+          <<: *main-branch-only
+          cluster: "cidaily"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster_cidaily
+      - backup_cluster:
+          name: backup_cidaily_testnet
+          <<: *main-branch-only
+          cluster: "cidaily-testnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster_cidaily_testnet
 
   cidaily_health_check:
     when:
@@ -2910,7 +2930,6 @@ workflows:
             - slack-context
           workflow_names: "deploy_cidaily_and_cidaily_testnet"
       - backup_cluster:
-          <<: *notify-fail
           filters:
             branches:
               only:
@@ -2938,7 +2957,6 @@ workflows:
             - slack-context
           workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check"
       - restore_node:
-          <<: *notify-fail
           filters:
             branches:
               only:
@@ -2968,7 +2986,6 @@ workflows:
             - slack-context
           workflow_names: "deploy_cidaily_and_cidaily_testnet"
       - backup_cluster:
-          <<: *notify-fail
           filters:
             branches:
               only:
@@ -2997,7 +3014,6 @@ workflows:
             - slack-context
           workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_testnet_health_check"
       - restore_node:
-          <<: *notify-fail
           filters:
             branches:
               only:
