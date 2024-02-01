@@ -156,6 +156,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
         networkConfig,
         dummySvcDomainId,
         logger,
+        addNonce = false,
       )
       .requests
     val expectedRequests =

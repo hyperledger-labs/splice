@@ -13,7 +13,9 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import scalapb.UnknownFieldSet
 
+import java.time.Instant
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -151,9 +153,20 @@ object CometBftNode {
       currentNetworkConfig: proto.cometbft.GetNetworkConfigResponse,
       domainId: DomainId,
       logger: TracedLogger,
+      addNonce: Boolean = true,
   ): NetworkConfigDiff = {
     val targetConfig = memberInfosToNetworkConfig(targetMemberInfos, domainId)
     val actualOrPendingConfig = getActualOrPendingConfig(owningSvNode, currentNetworkConfig, logger)
+
+    // TODO(#9617): set the timestamp to the expected field in the governance proto
+    val timestamp = Instant.now().toEpochMilli
+    val nonce = UnknownFieldSet(
+      Map(
+        99999 ->
+          UnknownFieldSet.Field(varint = Vector(timestamp))
+      )
+    )
+    val extraFields = if (addNonce) nonce else UnknownFieldSet.empty
 
     def mkChangeRequest(
         svNodeId: String,
@@ -165,10 +178,13 @@ object CometBftNode {
         currentConfigRevision = currentConfigRevision,
         change = Some(proto.cometbft.SvNodeConfigChange(kind = change)),
       )
+
       proto.cometbft.NetworkConfigChangeRequest(
         chainId = currentNetworkConfig.chainId,
         submitterSvNodeId = owningSvNode,
-        kind = proto.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest(changeRequest),
+        kind =
+          proto.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest(changeRequest),
+        unknownFields = extraFields,
       )
     }
 
