@@ -93,4 +93,7 @@ You are using an unreleased and unstable version of daml-script intended for dam
 # auth0_user_cleanup job retrying auth0 API calls
 Auth0 exception raised, triggering retry
 
+# canton unused proto imports
+com/digitalasset/canton/.*.proto.* warning: Import .* is unused.
+
 # Make sure to have a trailing newline
