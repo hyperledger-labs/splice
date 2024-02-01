@@ -1,12 +1,17 @@
 package com.daml.network.sv
 
 import cats.syntax.traverse.*
-import com.daml.network.sv.DomainMigrationDump.{Dar, DomainMigrationDumpNodeIdentities}
 import com.daml.network.http.v0.definitions as http
 import cats.syntax.either.*
 import com.daml.network.environment.{ParticipantAdminConnection, TopologyAdminConnection}
 import com.daml.network.identities.{NodeIdentitiesDump, NodeIdentitiesStore}
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.DomainMigrationDump.Dar
+import com.daml.network.sv.DomainNodeIdentitiesDump.{
+  DomainNodeIdentities,
+  tryFromMediatorIdProtoPrimitive,
+  tryFromSequencerIdProtoPrimitive,
+}
 import com.daml.network.util.Codec
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.crypto.Hash
@@ -15,7 +20,7 @@ import com.digitalasset.canton.protocol.v30.TopologyTransactions
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
-import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.circe.Json
@@ -30,7 +35,7 @@ case class DomainMigrationDump(
     svcPartyId: PartyId,
     domainAlias: DomainAlias,
     domainId: DomainId,
-    nodeIdentities: DomainMigrationDumpNodeIdentities,
+    nodeIdentities: DomainNodeIdentities,
     topologySnapshot: GenericStoredTopologyTransactionsX,
     acsSnapshot: ByteString,
     dars: Seq[Dar],
@@ -41,7 +46,7 @@ case class DomainMigrationDump(
     svcPartyId.toProtoPrimitive,
     domainAlias.toProtoPrimitive,
     domainId.toProtoPrimitive,
-    http.DomainMigrationIdentities(
+    http.DomainNodeIdentities(
       nodeIdentities.participant.toHttp,
       nodeIdentities.sequencer.toHttp,
       nodeIdentities.mediator.toHttp,
@@ -102,7 +107,7 @@ object DomainMigrationDump {
     svcPartyId,
     domainAlias,
     domainId,
-    nodeIdentities = DomainMigrationDumpNodeIdentities(
+    nodeIdentities = DomainNodeIdentities(
       participantIdentities,
       sequencerIdentities,
       mediatorIdentities,
@@ -112,27 +117,7 @@ object DomainMigrationDump {
     dars = dars,
   )
 
-  final case class DomainMigrationDumpNodeIdentities(
-      participant: NodeIdentitiesDump,
-      sequencer: NodeIdentitiesDump,
-      mediator: NodeIdentitiesDump,
-  )
-
   final case class Dar(hash: Hash, content: ByteString)
-
-  private def tryFromSequencerIdProtoPrimitive(sequencerId: String) = SequencerId
-    .fromProtoPrimitive(sequencerId, "sequencerId")
-    .fold(
-      err => throw new IllegalArgumentException(err.message),
-      identity,
-    )
-
-  private def tryFromMediatorIdProtoPrimitive(mediatorId: String) = MediatorId
-    .fromProtoPrimitive(mediatorId, "mediatorId")
-    .fold(
-      err => throw new IllegalArgumentException(err.message),
-      identity,
-    )
 
   def getDomainMigrationDump(
       domainAlias: DomainAlias,
@@ -179,7 +164,7 @@ object DomainMigrationDump {
       svcStore.key.svcParty,
       domainAlias,
       globalDomain,
-      DomainMigrationDumpNodeIdentities(
+      DomainNodeIdentities(
         participantIdentities,
         sequencerIdentities,
         mediatorIdentities,

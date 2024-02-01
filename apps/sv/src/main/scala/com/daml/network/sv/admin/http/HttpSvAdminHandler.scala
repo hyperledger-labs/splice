@@ -16,7 +16,7 @@ import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.db.AcsJdbcTypes
-import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode, SvApp}
+import com.daml.network.sv.{DomainMigrationDump, DomainNodeIdentitiesDump, LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
@@ -569,6 +569,35 @@ class HttpSvAdminHandler(
           Future.failed(
             HttpErrorHandler.internalServerError(
               s"Could not prepare DomainMigrationDump because domain node is not configured"
+            )
+          )
+      }
+    }(traceContext, tracer)
+  }
+
+  override def getDomainNodeIdentitiesDump(
+      respond: v0.SvAdminResource.GetDomainNodeIdentitiesDumpResponse.type
+  )()(tuser: TracedUser): Future[v0.SvAdminResource.GetDomainNodeIdentitiesDumpResponse] = {
+    val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.getDomainNodeIdentitiesDump") { implicit tc => _ =>
+      localDomainNode match {
+        case Some(domainNode) =>
+          DomainNodeIdentitiesDump
+            .getDomainNodeIdentitiesDump(
+              participantAdminConnection,
+              domainNode,
+              clock,
+              loggerFactory,
+            )
+            .map { response =>
+              v0.SvAdminResource.GetDomainNodeIdentitiesDumpResponse.OK(
+                DomainNodeIdentitiesDump(response).toHttp
+              )
+            }
+        case None =>
+          Future.failed(
+            HttpErrorHandler.internalServerError(
+              s"Could not prepare DomainNodeIdentitiesDump because domain node is not configured"
             )
           )
       }

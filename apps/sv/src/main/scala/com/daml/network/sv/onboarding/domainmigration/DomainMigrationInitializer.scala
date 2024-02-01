@@ -16,12 +16,12 @@ import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
-  loadDomainMigrationDump,
   DomainNodeInitializer,
   DomainTopologyTransactions,
+  loadDomainMigrationDump,
 }
-import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
-import com.daml.network.sv.DomainMigrationDump.DomainMigrationDumpNodeIdentities
+import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
+import com.daml.network.sv.DomainNodeIdentitiesDump.DomainNodeIdentities
 import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -34,8 +34,8 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.topology.processing.SequencedTime
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionsX,
   StoredTopologyTransactionX,
+  StoredTopologyTransactionsX,
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionX.GenericStoredTopologyTransactionX
@@ -260,7 +260,7 @@ class DomainMigrationInitializer(
 
   private def initializeDomainNode(
       domainId: DomainId,
-      nodeIdentities: DomainMigrationDumpNodeIdentities,
+      nodeIdentities: DomainNodeIdentities,
       domainTopologyTransactions: DomainTopologyTransactions,
   ): Future[Unit] = {
     val domainNodeInitiaizer = DomainNodeInitializer(

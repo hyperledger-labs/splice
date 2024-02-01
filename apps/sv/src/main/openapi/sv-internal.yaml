@@ -186,6 +186,20 @@ paths:
           description: ok
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/domain/identities-dump:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "getDomainNodeIdentitiesDump"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDomainNodeIdentitiesDumpResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -1126,7 +1140,7 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
-    DomainMigrationIdentities:
+    DomainNodeIdentities:
       type: object
       required:
         - participant
@@ -1178,7 +1192,7 @@ components:
         domain_id:
           type: string
         identities:
-          $ref: "#/components/schemas/DomainMigrationIdentities"
+          $ref: "#/components/schemas/DomainNodeIdentities"
         topology_snapshot:
           description: |
             base64 encoded string of topology snapshot
@@ -1191,3 +1205,11 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/Dar"
+
+    GetDomainNodeIdentitiesDumpResponse:
+      type: object
+      required:
+        - identities
+      properties:
+        identities:
+          $ref: "#/components/schemas/DomainNodeIdentities"
