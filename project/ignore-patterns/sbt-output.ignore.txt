@@ -62,6 +62,7 @@ protoc-jar: caught exception, retrying: java\.io\.IOException: Cannot run progra
 .*The value \(generator's option\) must be either boolean or string. Default to `false`\..*
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/apis/exception.ts
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/external-openapi-ts-client/models/ErrorResponse.ts
+.*o.o.codegen.TemplateManager - writing file .*/apps/.*/scan-proxy-openapi-ts-client/models/ErrorResponse.ts
 .*o.o.codegen.TemplateManager - writing file .*/apps/.*/openapi-ts-client/models/.*Error.*.ts
 
 # Output by guardrail if the yaml file changes because we cache the previous generated code
@@ -95,5 +96,8 @@ Auth0 exception raised, triggering retry
 
 # canton unused proto imports
 com/digitalasset/canton/.*.proto.* warning: Import .* is unused.
+
+# TODO(#9659) Fix the underlying cause
+o.o.codegen.DefaultCodegen - 'oneOf' is intended to include only the additional optional OAS extension discriminator object.
 
 # Make sure to have a trailing newline

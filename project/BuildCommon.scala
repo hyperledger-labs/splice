@@ -115,7 +115,18 @@ object BuildCommon {
   }
 
   lazy val removeCompileFlagsForDaml =
-    Seq("-Xsource:3", "-deprecation", "-Xfatal-warnings", "-Ywarn-unused", "-Ywarn-value-discard")
+    Seq(
+      "-Xsource:3",
+      "-deprecation",
+      "-Xfatal-warnings",
+      "-Wunused:implicits",
+      "-Wunused:imports",
+      "-Wunused:locals",
+      "-Wunused:nowarn",
+      "-Ywarn-value-discard",
+      "-Wnonunit-statement",
+      "-Xlint:_,-unused",
+    )
 
   lazy val sbtSettings: Seq[Def.Setting[_]] = {
 
@@ -1174,6 +1185,7 @@ object BuildCommon {
       )
       .settings(
         scalacOptions --= removeCompileFlagsForDaml,
+        scalacOptions += "-Wconf:cat=deprecation:s",
         sharedSettings,
         Compile / PB.targets := Seq(
           // build java codegen too
