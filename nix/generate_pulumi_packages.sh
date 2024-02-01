@@ -2,6 +2,7 @@
 # shellcheck shell=bash
 # Bash 3 compatible for Darwin
 # Based on https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/admin/pulumi-bin/update.sh
+set -euo pipefail
 
 SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
 
@@ -10,7 +11,12 @@ plugins=(
   "auth0=3.1.0"
   "command=0.9.2"
   "kubernetes-cert-manager=0.0.5"
-  "random=4.13.2"
+  # latest update
+  "gcp=6.67.0"
+  "kubernetes=4.5.4"
+  # currently used
+  "kubernetes=4.7.1"
+  "random=4.14.0"
 )
 
 function genSrc() {
@@ -43,7 +49,7 @@ function genSrcs() {
     # url as defined here
     # https://github.com/pulumi/pulumi/blob/06d4dde8898b2a0de2c3c7ff8e45f97495b89d82/pkg/workspace/plugins.go#L197
     local url="https://api.pulumi.com/releases/plugins/pulumi-resource-${plug}-v${version}-${1}-${2}.tar.gz"
-    genSrc "${url}" "${plug}" "${tmpdir}" &
+    genSrc "${url}" "${plug}-${version}" "${tmpdir}" &
   done
 
   wait

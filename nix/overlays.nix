@@ -30,7 +30,7 @@
     cargoDeps = old.cargoDeps.overrideAttrs {
       inherit version;
       inherit src;
-      outputHash = "sha256-WFqeOKNlkKcVb/Pj2NqVE4pllALYDTx4GbiaaoPjV10=";
+      outputHash = "sha256-4on4aBkRI9PiPgNcxVktTDX28qRy3hvV9+glNB6hT1k=";
     };
   });
   jsonnet = super.callPackage ./jsonnet.nix {};
@@ -38,10 +38,6 @@
     let
       inherit (super.lib.strings) hasPrefix;
       extraPackages = import ./extra-pulumi-packages.nix {};
-
-      # Note: remove once https://github.com/pulumi/pulumi-kubernetes/issues/2481 is resolved
-      #       and available in a release
-      pulumi-resource-kubernetes = super.callPackage ./pulumi-kubernetes { };
 
       neededResourcePlugins = builtins.map (p: "pulumi-resource-" + p) [
         "auth0" "gcp" "google-native" "postgresql" "random" "tls" "vault" "command"
@@ -60,6 +56,7 @@
         for src in $srcs; do
           # remove file type, the nix prefix path, the platform suffix
           stripped_name=$(basename $src .tar.gz | cut -d'-' -f2- | sed 's/\(.*\)-.*-.*$/\1/')
+          echo "Unpacking $src to $stripped_name"
           mkdir -p $stripped_name
           tar xzf $src -C $stripped_name
         done
@@ -93,8 +90,6 @@
             ./pulumi plugin install resource "$type" "$version" -f "$plugin/pulumi-resource-$type"
             rm -r $plugin
         done
-        # installed patched kubernetes plugin
-        ./pulumi plugin install resource kubernetes 4.5.4 -f "${pulumi-resource-kubernetes}/bin/pulumi-resource-kubernetes"
 
         # remove unneeded language plugins
         rm -v pulumi-language-{dotnet,go,java,python,python-exec}

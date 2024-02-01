@@ -26,7 +26,8 @@ To disable this behaviour we have set `PULUMI_HOME` to the nix pulumi path. The 
 
 The `extra-pulumi-packages.nix` defines a list of plugins that will be installed on top of the ones comes with the nix version.
 The file is based on the default [pulumi setup](https://github.com/NixOS/nixpkgs/blob/master/pkgs/tools/admin/pulumi-bin/data.nix) and is generated using `generate_pulumi_packages.sh`.
-To add a new one use the same format for the urls, changing the version and populate the sha checksums from the github release page. Eg for kubernetes https://github.com/pulumi/pulumi-kubernetes/releases/tag/v3.30.1
 
 We have a number of older plugins in our extra packages. These are either plugins that are not yet in the official nix package (eg: command) or packages
 that require multiple versions while we upgrade the pulumi stack to the latest version.
+
+The version of a pulumi plugin must exactly match the javascript version of the pulumi package used for the same plugin.

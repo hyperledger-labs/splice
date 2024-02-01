@@ -183,7 +183,7 @@ function natGateway(
 ): gcp.compute.RouterNat {
   const privateNetwork = gcp.compute.Network.get(
     'default',
-    `https://www.googleapis.com/compute/v1/projects/${project}/global/networks/default`
+    `projects/${project}/global/networks/default`
   );
 
   const subnet = gcp.compute.getSubnetworkOutput({

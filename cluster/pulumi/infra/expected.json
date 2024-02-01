@@ -140,7 +140,7 @@
   },
   {
     "custom": false,
-    "id": "https://www.googleapis.com/compute/v1/projects/da-cn-scratchnet/global/networks/default",
+    "id": "projects/da-cn-scratchnet/global/networks/default",
     "inputs": {},
     "name": "default",
     "provider": "",
@@ -1029,7 +1029,7 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "network": "https://www.googleapis.com/compute/v1/projects/da-cn-scratchnet/global/networks/default"
+      "network": "projects/da-cn-scratchnet/global/networks/default"
     },
     "name": "router-test-stack",
     "provider": "",

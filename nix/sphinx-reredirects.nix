@@ -2,6 +2,7 @@
 , buildPythonPackage
 , fetchPypi
 , sphinx
+, setuptools
 }:
 
 buildPythonPackage rec {
@@ -17,6 +18,7 @@ buildPythonPackage rec {
 
   propagatedBuildInputs = [
     sphinx
+    setuptools
   ];
 
   pythonImportsCheck = [

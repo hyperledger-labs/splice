@@ -21,7 +21,7 @@ const project = gcp.organizations.getProjectOutput({});
 // use existing default network (needs to have a private vpc connection)
 const privateNetwork = gcp.compute.Network.get(
   'default',
-  pulumi.interpolate`https://www.googleapis.com/compute/v1/projects/${project.name}/global/networks/default`
+  pulumi.interpolate`projects/${project.name}/global/networks/default`
 );
 
 function generatePassword(name: string, opts?: pulumi.ResourceOptions): random.RandomPassword {

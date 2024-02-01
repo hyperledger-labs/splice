@@ -1072,7 +1072,7 @@
   },
   {
     "custom": false,
-    "id": "https://www.googleapis.com/compute/v1/projects/test-project/global/networks/default",
+    "id": "projects/test-project/global/networks/default",
     "inputs": {},
     "name": "default",
     "provider": "",
