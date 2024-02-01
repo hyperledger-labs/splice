@@ -652,12 +652,6 @@ components:
       oneOf:
         - $ref: "#/components/schemas/SubscriptionIdleState"
         - $ref: "#/components/schemas/SubscriptionPaymentState"
-      type: object
-      properties:
-        idle:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        payment:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
     SubscriptionIdleState:
       type: object
       required:

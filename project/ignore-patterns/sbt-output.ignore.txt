@@ -97,7 +97,4 @@ Auth0 exception raised, triggering retry
 # canton unused proto imports
 com/digitalasset/canton/.*.proto.* warning: Import .* is unused.
 
-# TODO(#9659) Fix the underlying cause
-o.o.codegen.DefaultCodegen - 'oneOf' is intended to include only the additional optional OAS extension discriminator object.
-
 # Make sure to have a trailing newline
