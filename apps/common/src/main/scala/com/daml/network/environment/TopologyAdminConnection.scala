@@ -819,6 +819,7 @@ abstract class TopologyAdminConnection(
     }
 
     ensureSequencerDomainState(
+      s"Add sequencer $newActiveSequencer",
       domainId,
       sequencerChange,
       signedBy,
@@ -839,6 +840,7 @@ abstract class TopologyAdminConnection(
     }
 
     ensureSequencerDomainState(
+      s"Remove sequencer $sequencerToRemove",
       domainId,
       sequencerChange,
       signedBy,
@@ -847,6 +849,7 @@ abstract class TopologyAdminConnection(
   }
 
   private def ensureSequencerDomainState(
+      description: String,
       domainId: DomainId,
       sequencerChange: Seq[SequencerId] => Seq[SequencerId],
       signedBy: Fingerprint,
@@ -856,15 +859,22 @@ abstract class TopologyAdminConnection(
   ): Future[TopologyResult[SequencerDomainStateX]] = {
     ensureTopologyMapping[SequencerDomainStateX](
       TopologyStoreId.DomainStore(domainId),
-      s"New sequencers ${getSequencerDomainState(domainId).map(result => sequencerChange(result.mapping.active))} are now active in SequencerDomainState",
+      description,
       EitherT(
         getSequencerDomainState(domainId).map(result =>
           Either
-            .cond(result.mapping.active == sequencerChange(result.mapping.active), result, result)
+            .cond(
+              result.mapping.active.forgetNE == sequencerChange(result.mapping.active),
+              result,
+              result,
+            )
         )
       ),
       previous => {
         val newSequencers = sequencerChange(previous.active)
+        logger.debug(
+          s"Applying sequencer change: previous [${previous.active}], wanted [$newSequencers]"
+        )
         // The threshold in here does not matter for anything at this point.
         // It is purely on the read side through the sequencer trust threshold.
         SequencerDomainStateX.create(
@@ -916,6 +926,7 @@ abstract class TopologyAdminConnection(
       newMediators.distinct
     }
     ensureMediatorDomainState(
+      s"Add mediator $newActiveMediator",
       domainId,
       mediatorChange,
       signedBy,
@@ -935,6 +946,7 @@ abstract class TopologyAdminConnection(
       mediators.filterNot(_ == mediatorToRemove)
     }
     ensureMediatorDomainState(
+      s"Remove mediator $mediatorToRemove",
       domainId,
       mediatorChange,
       signedBy,
@@ -943,6 +955,7 @@ abstract class TopologyAdminConnection(
   }
 
   private def ensureMediatorDomainState(
+      description: String,
       domainId: DomainId,
       mediatorChange: Seq[MediatorId] => Seq[MediatorId],
       signedBy: Fingerprint,
@@ -952,15 +965,22 @@ abstract class TopologyAdminConnection(
   ): Future[TopologyResult[MediatorDomainStateX]] =
     ensureTopologyMapping[MediatorDomainStateX](
       TopologyStoreId.DomainStore(domainId),
-      show"New mediators are now active in MediatorDomainState",
+      description,
       EitherT(
         getMediatorDomainState(domainId).map(result =>
           Either
-            .cond(result.mapping.active == mediatorChange(result.mapping.active), result, result)
+            .cond(
+              result.mapping.active.forgetNE == mediatorChange(result.mapping.active),
+              result,
+              result,
+            )
         )
       ),
       previous => {
         val newMediators = mediatorChange(previous.active)
+        logger.debug(
+          s"Applying mediator change: previous [${previous.active}], wanted [$newMediators]"
+        )
         // constructor is not exposed so no copy
         MediatorDomainStateX.create(
           previous.domain,
