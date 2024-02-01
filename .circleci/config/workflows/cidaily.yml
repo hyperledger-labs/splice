@@ -349,7 +349,6 @@ workflow:
           requires:
             - wait_for_previous_pipeline
 
-  # on cidaily-testnet we have only one SV, so restoring validator1 instead
   backup_cidaily_testnet:
     when:
       equal: [ backup-cidaily-testnet, << pipeline.parameters.run-job >> ]
@@ -378,6 +377,7 @@ workflow:
           requires:
             - wait_for_previous_pipeline
 
+  # on cidaily-testnet we have only one SV, so restoring validator1 instead
   restore_validator_cidaily_testnet:
     when:
       equal: [ restore-validator-cidaily-testnet, << pipeline.parameters.run-job >> ]

@@ -1982,7 +1982,7 @@ function subcmd_restore_node() {
     if [ -z "$backup_run_id" ]; then
         _info "No backup run_id given, looking for the latest backup"
         backup_run_id=$("$REPO_ROOT"/cluster/scripts/find-recent-backup.sh "$node")
-        if [ -z "$backup_run_id" ]; then
+        if [[ -z "$backup_run_id" || "$backup_run_id" == "null" ]]; then
             _error "No recent backup found for $node"
         fi
         _info "Found latest backup run ID: $backup_run_id"
