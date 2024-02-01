@@ -360,10 +360,10 @@ data SvcRulesConfig = SvcRulesConfig with
     initialTrafficGrant: Int -- ^ Extra traffic granted to SVs at the time of joining
     svChallengeDeadline : RelTime -- ^ Deadline for each stage of the two-stage SV challenging protocol
     globalDomain : SvcGlobalDomainConfig
-    nextScheduledHardDomainMigration: Optional HardDomainMigrationSchedule
+    nextScheduledDomainUpgrade: Optional DomainUpgradeSchedule
   deriving (Eq, Show)
 
-data HardDomainMigrationSchedule = HardDomainMigrationSchedule with
+data DomainUpgradeSchedule = DomainUpgradeSchedule with
     time : Time
     -- ^ The time at which the migration is scheduled to start.
     migrationId : Int

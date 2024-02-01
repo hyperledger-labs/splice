@@ -68,7 +68,7 @@ initCollective initialRoundNumber isDevNet = do
         initialTrafficGrant = 1_000_000
         svChallengeDeadline = minutes 30
         globalDomain = initialSvcGlobalDomainConfig
-        nextScheduledHardDomainMigration = None
+        nextScheduledDomainUpgrade = None
   let coinConfig = defaultCoinConfig
   let cnsRulesConfig = defaultCnsRulesConfig
 

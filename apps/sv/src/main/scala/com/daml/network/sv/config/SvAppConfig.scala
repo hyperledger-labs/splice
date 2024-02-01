@@ -176,6 +176,7 @@ case class SvAppBackendConfig(
     migrateSvParty: Option[MigrateSvPartyConfig] = None,
     acsStoreDump: Option[BackupDumpConfig] = None,
     domainMigrationDumpPath: Option[Path] = None,
+    domainMigrationId: Option[Long] = None,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
 ) extends CNNodeBackendConfig {

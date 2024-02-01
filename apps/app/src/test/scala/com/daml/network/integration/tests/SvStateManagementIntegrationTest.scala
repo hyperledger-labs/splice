@@ -189,7 +189,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           sv1Backend.getSvcInfo().svcRules.payload.config.initialTrafficGrant,
           sv1Backend.getSvcInfo().svcRules.payload.config.svChallengeDeadline,
           sv1Backend.getSvcInfo().svcRules.payload.config.globalDomain,
-          sv1Backend.getSvcInfo().svcRules.payload.config.nextScheduledHardDomainMigration,
+          sv1Backend.getSvcInfo().svcRules.payload.config.nextScheduledDomainUpgrade,
         )
 
         val action: ActionRequiringConfirmation =

@@ -9,10 +9,6 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.automation.SvSvcAutomationService.{
-  LocalSequencerClientConfig,
-  LocalSequencerClientContext,
-}
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.{
   CometBftClient,
@@ -20,7 +16,7 @@ import com.daml.network.sv.cometbft.{
   CometBftHttpRpcClient,
   CometBftNode,
 }
-import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState.{Onboarded, Onboarding}
 import com.daml.network.sv.onboarding.{DomainNodeReconciler, SetupUtil, SvcPartyHosting}
@@ -568,24 +564,7 @@ class JoiningNodeInitializer(
         participantAdminConnection,
         retryProvider,
         cometBftNode,
-        localDomainNode.map(cfg =>
-          LocalSequencerClientContext(
-            cfg.sequencerAdminConnection,
-            cfg.mediatorAdminConnection,
-            Some(
-              LocalSequencerClientConfig(
-                cfg.sequencerInternalConfig,
-                config.domains.global.alias,
-              )
-            ),
-            cfg.sequencerPruningConfig.map(pruningConfig =>
-              SequencerPruningConfig(
-                pruningConfig.pruningInterval,
-                pruningConfig.retentionPeriod,
-              )
-            ),
-          )
-        ),
+        localDomainNode,
         loggerFactory,
       )
   }
@@ -637,24 +616,7 @@ class JoiningNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      localDomainNode.map(cfg =>
-        LocalSequencerClientContext(
-          cfg.sequencerAdminConnection,
-          cfg.mediatorAdminConnection,
-          Some(
-            LocalSequencerClientConfig(
-              cfg.sequencerInternalConfig,
-              config.domains.global.alias,
-            )
-          ),
-          cfg.sequencerPruningConfig.map(pruningConfig =>
-            SequencerPruningConfig(
-              pruningConfig.pruningInterval,
-              pruningConfig.retentionPeriod,
-            )
-          ),
-        )
-      ),
+      localDomainNode,
       loggerFactory,
     )
 

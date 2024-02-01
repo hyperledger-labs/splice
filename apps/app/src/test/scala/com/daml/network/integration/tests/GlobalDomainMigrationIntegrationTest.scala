@@ -2,11 +2,21 @@ package com.daml.network.integration.tests
 
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.network.sv.automation.singlesv.SvRewardTrigger
+import com.daml.network.sv.automation.singlesv.{DomainUpgradeTrigger, SvRewardTrigger}
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
-import com.daml.network.codegen.java.cn.svcrules.SvcRules_AddMember
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
+  SRARC_AddMember,
+  SRARC_SetConfig,
+}
+import com.daml.network.codegen.java.cn.svcrules.{
+  DomainUpgradeSchedule,
+  SvcRules,
+  SvcRulesConfig,
+  SvcRules_AddMember,
+  SvcRules_SetConfig,
+  VoteRequest,
+}
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
 import com.daml.network.environment.{
@@ -21,18 +31,18 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.{
-  migrationDumpDir,
   UpgradeDomainNode,
+  migrationDumpDir,
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
-import com.daml.network.util.ProcessTestUtil
+import com.daml.network.util.{Contract, ProcessTestUtil}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
+import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -43,10 +53,14 @@ import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
 
+import java.io.File
 import java.nio.file.{Path, Paths}
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
+import scala.jdk.OptionConverters.*
 
 // TODO(#9076) Create fresh database instances within the test to support running it multiple times.
 class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with ProcessTestUtil {
@@ -162,25 +176,51 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
         val majorityUpgradeNodes = Seq(upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
 
         val sv1Party = sv1Backend.appState.svStore.key.svParty
+
         bracket(
           withClueAndLog(
-            s"Freeze the existing domain from ${domainDynamicParams.maxRatePerParticipant}"
+            s"schedule domain migration"
           ) {
-            allNodes.parTraverse(n => Future(n.oldBackend.pauseGlobalDomain())).futureValue.discard
+            // Ideally we'd like the config to take effect immediately. However, we
+            // can only schedule configs in the future and this is enforced at the Daml level.
+            // So we pick a date that is far enough in the future that we can complete the voting process
+            // before it is reached but close enough that we don't need to wait for long.
+            // 12 seconds seems to work well empirically.
+            val scheduledTime = Instant.now().plus(12, ChronoUnit.SECONDS)
+            scheduleDomainMigration(
+              sv1Backend,
+              Seq(sv2Backend, sv3Backend),
+              Some(new DomainUpgradeSchedule(scheduledTime, 1L)),
+            )
           },
           // reset to not crash other tests
-          changeDomainRatePerParticipant(
-            allNodes.map(_.oldBackend.appState.participantAdminConnection),
-            domainDynamicParams.maxRatePerParticipant,
-          ),
+          {
+            allNodes.foreach { node =>
+              node.oldBackend.svcAutomation
+                .trigger[DomainUpgradeTrigger]
+                .pause()
+                .futureValue
+            }
+            clue(
+              s"reset maxRatePerParticipant to ${domainDynamicParams.maxRatePerParticipant} to not crash other tests"
+            ) {
+              changeDomainRatePerParticipant(
+                allNodes.map(_.oldBackend.appState.participantAdminConnection),
+                domainDynamicParams.maxRatePerParticipant,
+              )
+            }
+            deleteDirectoryRecursively(migrationDumpDir.toFile)
+          },
         ) {
-          // TODO(#8761) wait until it's safe, based on params described in the design
-          // also consider(from Martin): If a node was offline and joins the (old) domain a bit later, how will it know that it has caught up to the final ACS state so it's safe to take the snapshot?
-          Threading.sleep(
-            domainDynamicParams.mediatorReactionTimeout.duration.toMillis + domainDynamicParams.participantResponseTimeout.duration.toMillis
-          )
-          majorityUpgradeNodes.foreach { node =>
-            node.oldBackend.triggerGlobalDomainMigrationDump()
+
+          withClueAndLog("dump has be written in the configured location.") {
+            eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
+              allNodes.foreach { node =>
+                (migrationDumpDir(
+                  node.oldBackend.name
+                ) / "domain_migration_dump.json").path.exists shouldBe true
+              }
+            }
           }
 
           startAllSync(
@@ -319,6 +359,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
               sv1LocalBackend.stop()
               sv1LocalBackend.startSync()
             }
+
             withClueAndLog("sv1 restarts without any onboarding type") {
               sv1LocalBackend.stop()
               svb("sv1LocalOnboarded").startSync()
@@ -451,21 +492,125 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
     }
   }
 
+  private def getSvcRulesConfig(
+      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      domainUpgradeSchedule: Option[DomainUpgradeSchedule],
+  ) = new SvcRulesConfig(
+    svcRules.payload.config.numUnclaimedRewardsThreshold,
+    svcRules.payload.config.numMemberTrafficContractsThreshold,
+    svcRules.payload.config.actionConfirmationTimeout,
+    svcRules.payload.config.svOnboardingRequestTimeout,
+    svcRules.payload.config.svOnboardingConfirmedTimeout,
+    svcRules.payload.config.voteRequestTimeout,
+    svcRules.payload.config.leaderInactiveTimeout,
+    svcRules.payload.config.domainNodeConfigLimits,
+    svcRules.payload.config.maxTextLength,
+    svcRules.payload.config.initialTrafficGrant,
+    svcRules.payload.config.svChallengeDeadline,
+    svcRules.payload.config.globalDomain,
+    domainUpgradeSchedule.toJava,
+  )
+
+  private def scheduleDomainMigration(
+      svToCreateVoteRequest: SvAppBackendReference,
+      svsToCastVotes: Seq[SvAppBackendReference],
+      domainUpgradeSchedule: Option[DomainUpgradeSchedule],
+  )(implicit
+      ec: ExecutionContextExecutor
+  ): Unit = {
+    val svcRules = svToCreateVoteRequest.getSvcInfo().svcRules
+    val action = new ARC_SvcRules(
+      new SRARC_SetConfig(
+        new SvcRules_SetConfig(
+          getSvcRulesConfig(svcRules, domainUpgradeSchedule)
+        )
+      )
+    )
+
+    actAndCheck(
+      "Voting on an SvcRules config change for scheduled migration", {
+        def onlySetConfigVoteRequests(
+            voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
+        ) =
+          voteRequests.filter {
+            _.payload.action match {
+              case action: ARC_SvcRules =>
+                action.svcAction match {
+                  case _: SRARC_SetConfig => true
+                  case _ => false
+                }
+              case _ => false
+            }
+          }
+
+        val (_, voteRequest) = actAndCheck(
+          "Creating vote request",
+          eventuallySucceeds() {
+            svToCreateVoteRequest.createVoteRequest(
+              svToCreateVoteRequest.getSvcInfo().svParty.toProtoPrimitive,
+              action,
+              "url",
+              "description",
+              svToCreateVoteRequest.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+            )
+          },
+        )(
+          "vote request has been created",
+          _ => onlySetConfigVoteRequests(svToCreateVoteRequest.listVoteRequests()).loneElement,
+        )
+
+        svsToCastVotes.parTraverse { sv =>
+          Future {
+            clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
+              val svVoteRequest = eventually() {
+                onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
+              }
+              svVoteRequest.contractId shouldBe voteRequest.contractId
+            }
+            clue(s"${sv.name} accepts vote") {
+              eventuallySucceeds() {
+                sv.castVote(
+                  voteRequest.contractId,
+                  true,
+                  "url",
+                  "description",
+                )
+              }
+            }
+          }
+        }.futureValue
+      },
+    )(
+      "observing SvcRules with changed config",
+      _ => {
+        val newSvcRules = svToCreateVoteRequest.getSvcInfo().svcRules
+        newSvcRules.payload.config.nextScheduledDomainUpgrade.toScala shouldBe domainUpgradeSchedule
+      },
+    )
+  }
+
   private def withClueAndLog[T](clueMessage: String)(fun: => T) = withClue(clueMessage) {
     clue(clueMessage)(fun)
+  }
+
+  private def deleteDirectoryRecursively(directoryToBeDeleted: File): Unit = {
+    val allContents = Option(directoryToBeDeleted.listFiles)
+    // listFiles return null if directoryToBeDeleted is not a directory
+    allContents.foreach(_.foreach(deleteDirectoryRecursively))
+    directoryToBeDeleted.delete
   }
 }
 
 object GlobalDomainMigrationIntegrationTest extends OptionValues {
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
-
+  val migrationDumpDir: Path = testDumpDir.resolve(s"domain-migration-dump")
   // Not using temp-files so test-generated outputs are easy to inspect.
   def migrationDumpDir(node: String): Path = {
-    val migrationDumpDir = testDumpDir.resolve(s"domain-migration-dump/$node")
-    if (!migrationDumpDir.toFile.exists()) {
-      migrationDumpDir.toFile.mkdirs()
+    val dumpDir = migrationDumpDir.resolve(s"$node")
+    if (!dumpDir.toFile.exists()) {
+      dumpDir.toFile.mkdirs()
     }
-    migrationDumpDir
+    dumpDir
   }
 
   case class UpgradeDomainNode(

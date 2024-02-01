@@ -14,15 +14,9 @@ import com.daml.network.http.v0.definitions as http
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.automation.SvSvcAutomationService.LocalSequencerClientContext
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.{
-  SequencerPruningConfig,
-  SvAppBackendConfig,
-  SvBootstrapDumpConfig,
-  SvOnboardingConfig,
-}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
 import com.daml.network.sv.onboarding.{DomainNodeReconciler, SetupUtil, SvcPartyHosting}
@@ -657,22 +651,7 @@ class FoundingNodeInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      Some(
-        LocalSequencerClientContext(
-          localDomainNode.sequencerAdminConnection,
-          localDomainNode.mediatorAdminConnection,
-          // Founding SV should have already connected to its sequencer.
-          // We put None here to indicate automation service not to create LocalSequencerConnectionsTrigger
-          // which is responsible for reconnecting to its own sequencer
-          internalClientConfig = None,
-          localDomainNode.sequencerPruningConfig.map(pruningConfig =>
-            SequencerPruningConfig(
-              pruningConfig.pruningInterval,
-              pruningConfig.retentionPeriod,
-            )
-          ),
-        )
-      ),
+      Some(localDomainNode),
       loggerFactory,
     )
 

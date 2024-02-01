@@ -12,12 +12,8 @@ import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.setup.NodeInitializer
 import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode}
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
-import com.daml.network.sv.automation.SvSvcAutomationService.{
-  LocalSequencerClientConfig,
-  LocalSequencerClientContext,
-}
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
   loadDomainMigrationDump,
@@ -93,6 +89,12 @@ class DomainMigrationInitializer(
     )
   ] = {
     val migrationDump = loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
+    if (!config.domainMigrationId.contains(migrationDump.migrationId))
+      throw Status.INVALID_ARGUMENT
+        .withDescription(
+          "Migration id from the dump does not match the configured migration id in ths SV. Please check if the SV app is configured with the correct migration id"
+        )
+        .asRuntimeException()
     val storeKey = SvStore.Key(migrationDump.svPartyId, migrationDump.svcPartyId)
     val svcPartyHosting = newSvcPartyHosting(
       storeKey,
@@ -455,24 +457,7 @@ class DomainMigrationInitializer(
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      localDomainNode.map(cfg =>
-        LocalSequencerClientContext(
-          cfg.sequencerAdminConnection,
-          cfg.mediatorAdminConnection,
-          Some(
-            LocalSequencerClientConfig(
-              cfg.sequencerInternalConfig,
-              config.domains.global.alias,
-            )
-          ),
-          cfg.sequencerPruningConfig.map(pruningConfig =>
-            SequencerPruningConfig(
-              pruningConfig.pruningInterval,
-              pruningConfig.retentionPeriod,
-            )
-          ),
-        )
-      ),
+      localDomainNode,
       loggerFactory,
     )
 

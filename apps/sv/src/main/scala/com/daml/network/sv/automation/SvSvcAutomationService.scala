@@ -14,7 +14,11 @@ import com.daml.network.environment.{
   RetryProvider,
   SequencerAdminConnection,
 }
-import com.daml.network.sv.automation.SvSvcAutomationService.LocalSequencerClientContext
+import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.automation.SvSvcAutomationService.{
+  LocalSequencerClientConfig,
+  LocalSequencerClientContext,
+}
 import com.daml.network.sv.automation.confirmation.{
   ArchiveClosedMiningRoundsTrigger,
   CnsSubscriptionInitialPaymentTrigger,
@@ -47,6 +51,7 @@ import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
 import org.apache.pekko.stream.Materializer
 
+import java.nio.file.Path
 import scala.concurrent.{ExecutionContext, Future}
 
 class SvSvcAutomationService(
@@ -58,7 +63,7 @@ class SvSvcAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
-    localSequencerClientContext: Option[LocalSequencerClientContext],
+    localDomainNode: Option[LocalDomainNode],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -252,7 +257,42 @@ class SvSvcAutomationService(
         participantAdminConnection,
       )
     )
+
+    (localDomainNode, config.domainMigrationDumpPath) match {
+      case (Some(domainNode), Some(dumpPath)) =>
+        registerTrigger(
+          new DomainUpgradeTrigger(
+            triggerContext,
+            config.domains.global.alias,
+            domainNode,
+            svcStore,
+            participantAdminConnection,
+            dumpPath: Path,
+            config.domainMigrationId,
+          )
+        )
+      case _ => ()
+    }
   }
+
+  val localSequencerClientContext: Option[LocalSequencerClientContext] = localDomainNode.map(cfg =>
+    LocalSequencerClientContext(
+      cfg.sequencerAdminConnection,
+      cfg.mediatorAdminConnection,
+      Some(
+        LocalSequencerClientConfig(
+          cfg.sequencerInternalConfig,
+          config.domains.global.alias,
+        )
+      ),
+      cfg.sequencerPruningConfig.map(pruningConfig =>
+        SequencerPruningConfig(
+          pruningConfig.pruningInterval,
+          pruningConfig.retentionPeriod,
+        )
+      ),
+    )
+  )
 
   localSequencerClientContext.flatMap(_.internalClientConfig).foreach { internalClientConfig =>
     registerTrigger(

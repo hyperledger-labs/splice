@@ -1156,6 +1156,7 @@ components:
     GetDomainMigrationDumpResponse:
       type: object
       required:
+        - migration_id
         - sv_party_id
         - svc_party_id
         - domain_alias
@@ -1165,6 +1166,9 @@ components:
         - acs_snapshot
         - dars
       properties:
+        migration_id:
+          type: integer
+          format: int64
         sv_party_id:
           type: string
         svc_party_id:

@@ -1,23 +1,31 @@
 package com.daml.network.sv
 
+import cats.syntax.traverse.*
 import com.daml.network.sv.DomainMigrationDump.{Dar, DomainMigrationDumpNodeIdentities}
 import com.daml.network.http.v0.definitions as http
 import cats.syntax.either.*
-import com.daml.network.identities.NodeIdentitiesDump
+import com.daml.network.environment.{ParticipantAdminConnection, TopologyAdminConnection}
+import com.daml.network.identities.{NodeIdentitiesDump, NodeIdentitiesStore}
+import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Codec
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.v30.TopologyTransactions
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 import io.circe.Json
 import io.circe.syntax.*
 
 import java.util.Base64
+import scala.concurrent.{ExecutionContext, Future}
 
 case class DomainMigrationDump(
+    migrationId: Long,
     svPartyId: PartyId,
     svcPartyId: PartyId,
     domainAlias: DomainAlias,
@@ -28,6 +36,7 @@ case class DomainMigrationDump(
     dars: Seq[Dar],
 ) {
   def toHttp: http.GetDomainMigrationDumpResponse = http.GetDomainMigrationDumpResponse(
+    migrationId,
     svPartyId.toProtoPrimitive,
     svcPartyId.toProtoPrimitive,
     domainAlias.toProtoPrimitive,
@@ -88,6 +97,7 @@ object DomainMigrationDump {
       }
     }
   } yield DomainMigrationDump(
+    response.migrationId,
     svPartyId,
     svcPartyId,
     domainAlias,
@@ -123,4 +133,60 @@ object DomainMigrationDump {
       err => throw new IllegalArgumentException(err.message),
       identity,
     )
+
+  def getDomainMigrationDump(
+      domainAlias: DomainAlias,
+      participantAdminConnection: ParticipantAdminConnection,
+      domainNode: LocalDomainNode,
+      loggerFactory: NamedLoggerFactory,
+      svcStore: SvSvcStore,
+      clock: Clock,
+      migrationId: Long,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[DomainMigrationDump] = {
+    def newNodeIdentitiesStore(adminConnection: TopologyAdminConnection) =
+      new NodeIdentitiesStore(
+        adminConnection,
+        None,
+        clock,
+        loggerFactory,
+      )
+
+    for {
+      participantIdentities <- newNodeIdentitiesStore(participantAdminConnection)
+        .getNodeIdentitiesDump()
+      sequencerIdentities <- newNodeIdentitiesStore(domainNode.sequencerAdminConnection)
+        .getNodeIdentitiesDump()
+      mediatorIdentities <- newNodeIdentitiesStore(domainNode.mediatorAdminConnection)
+        .getNodeIdentitiesDump()
+      globalDomain <- svcStore.getSvcRules().map(_.domain)
+      topologySnapshot <- domainNode.sequencerAdminConnection.getTopologySnapshot(
+        globalDomain
+      )
+      acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
+        Set(svcStore.key.svParty, svcStore.key.svcParty)
+      )
+      darDescriptions <- participantAdminConnection.listDars()
+      dars <- darDescriptions.traverse { dar =>
+        val hash = Hash.tryFromHexString(dar.hash)
+        participantAdminConnection.lookupDar(hash).map(_.map(Dar(hash, _)))
+      }
+    } yield DomainMigrationDump(
+      migrationId,
+      svcStore.key.svParty,
+      svcStore.key.svcParty,
+      domainAlias,
+      globalDomain,
+      DomainMigrationDumpNodeIdentities(
+        participantIdentities,
+        sequencerIdentities,
+        mediatorIdentities,
+      ),
+      topologySnapshot = topologySnapshot,
+      acsSnapshot = acsSnapshot,
+      dars.flatten,
+    )
+  }
 }

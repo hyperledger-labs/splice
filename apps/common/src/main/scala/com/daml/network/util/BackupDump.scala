@@ -37,4 +37,9 @@ object BackupDump {
     file.write(content)
     file
   }
+
+  def fileExists(path: Path): Boolean = {
+    import better.files.File
+    File(path).exists
+  }
 }

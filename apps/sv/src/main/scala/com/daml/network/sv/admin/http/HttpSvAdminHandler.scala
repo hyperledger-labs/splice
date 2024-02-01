@@ -1,7 +1,6 @@
 package com.daml.network.sv.admin.http
 
 import cats.implicits.catsSyntaxApplicativeId
-import cats.syntax.traverse.*
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
@@ -12,24 +11,20 @@ import com.daml.network.environment.{
   MediatorAdminConnection,
   ParticipantAdminConnection,
   SequencerAdminConnection,
-  TopologyAdminConnection,
 }
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.http.v0.sv_admin.SvAdminResource
-import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
-import com.daml.network.sv.DomainMigrationDump.{Dar, DomainMigrationDumpNodeIdentities}
 import com.daml.network.util.{BackupDump, Codec, JsonUtil, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
@@ -42,6 +37,7 @@ import java.nio.file.Path
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 class HttpSvAdminHandler(
     config: SvAppBackendConfig,
@@ -545,8 +541,29 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.getDomainMigrationDump") { implicit tc => _ =>
       localDomainNode match {
         case Some(domainNode) =>
-          internalGetDomainMigrationDump(domainNode).map { response =>
-            v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(response.toHttp)
+          svcStore.getSvcRules().flatMap { svcRules =>
+            svcRules.payload.config.nextScheduledDomainUpgrade.toScala match {
+              case Some(scheduled) =>
+                DomainMigrationDump
+                  .getDomainMigrationDump(
+                    config.domains.global.alias,
+                    participantAdminConnection,
+                    domainNode,
+                    loggerFactory,
+                    svcStore,
+                    clock,
+                    scheduled.migrationId,
+                  )
+                  .map { response =>
+                    v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(response.toHttp)
+                  }
+              case None =>
+                Future.failed(
+                  HttpErrorHandler.internalServerError(
+                    s"Could not trigger DomainMigrationDump because migration is not scheduled"
+                  )
+                )
+            }
           }
         case None =>
           Future.failed(
@@ -556,52 +573,6 @@ class HttpSvAdminHandler(
           )
       }
     }(traceContext, tracer)
-  }
-
-  private def internalGetDomainMigrationDump(
-      domainNode: LocalDomainNode
-  )(implicit tc: TraceContext) = {
-    def newNodeIdentitiesStore(adminConnection: TopologyAdminConnection) =
-      new NodeIdentitiesStore(
-        adminConnection,
-        None,
-        clock,
-        loggerFactory,
-      )
-
-    for {
-      participantIdentities <- newNodeIdentitiesStore(participantAdminConnection)
-        .getNodeIdentitiesDump()
-      sequencerIdentities <- newNodeIdentitiesStore(domainNode.sequencerAdminConnection)
-        .getNodeIdentitiesDump()
-      mediatorIdentities <- newNodeIdentitiesStore(domainNode.mediatorAdminConnection)
-        .getNodeIdentitiesDump()
-      globalDomain <- svcStore.getSvcRules().map(_.domain)
-      topologySnapshot <- domainNode.sequencerAdminConnection.getTopologySnapshot(
-        globalDomain
-      )
-      acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
-        Set(svcStore.key.svParty, svcStore.key.svcParty)
-      )
-      darDescriptions <- participantAdminConnection.listDars()
-      dars <- darDescriptions.traverse { dar =>
-        val hash = Hash.tryFromHexString(dar.hash)
-        participantAdminConnection.lookupDar(hash).map(_.map(Dar(hash, _)))
-      }
-    } yield DomainMigrationDump(
-      svcStore.key.svParty,
-      svcStore.key.svcParty,
-      config.domains.global.alias,
-      globalDomain,
-      DomainMigrationDumpNodeIdentities(
-        participantIdentities,
-        sequencerIdentities,
-        mediatorIdentities,
-      ),
-      topologySnapshot = topologySnapshot,
-      acsSnapshot = acsSnapshot,
-      dars.flatten,
-    )
   }
 
   private def withClientOrNotFound[T](
@@ -650,13 +621,34 @@ class HttpSvAdminHandler(
         case Some(domainNode) =>
           optDomainMigrationDumpConfig match {
             case Some(dumpPath) =>
-              internalGetDomainMigrationDump(domainNode).map { dump =>
-                val path = BackupDump.writeToPath(
-                  dumpPath,
-                  dump.toJson.noSpaces,
-                )
-                logger.info(s"Wrote domain migration dump at path $path")
-                SvAdminResource.TriggerDomainMigrationDumpResponseOK
+              svcStore.getSvcRules().flatMap { svcRules =>
+                svcRules.payload.config.nextScheduledDomainUpgrade.toScala match {
+                  case Some(scheduled) =>
+                    DomainMigrationDump
+                      .getDomainMigrationDump(
+                        config.domains.global.alias,
+                        participantAdminConnection,
+                        domainNode,
+                        loggerFactory,
+                        svcStore,
+                        clock,
+                        scheduled.migrationId,
+                      )
+                      .map { dump =>
+                        val path = BackupDump.writeToPath(
+                          dumpPath,
+                          dump.toJson.noSpaces,
+                        )
+                        logger.info(s"Wrote domain migration dump at path $path")
+                        SvAdminResource.TriggerDomainMigrationDumpResponseOK
+                      }
+                  case None =>
+                    Future.failed(
+                      HttpErrorHandler.internalServerError(
+                        s"Could not trigger DomainMigrationDump because migration is not scheduled"
+                      )
+                    )
+                }
               }
             case None =>
               Future.failed(
