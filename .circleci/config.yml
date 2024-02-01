@@ -961,10 +961,6 @@ commands:
       post_sbt_cmd:
         type: string
         default: ""
-      cmd_retry_count:
-        description: Number of times to retry the command
-        type: integer
-        default: 0
       start_canton_options:
         type: string
     steps:
@@ -986,7 +982,6 @@ commands:
           # TODO(#8608): reduce `timeout` to at least 25m again
           timeout: "35m"
           no_output_timeout: "20m"
-          cmd_retry_count: << parameters.cmd_retry_count >>
       - execute_sbt_command:
           cmd: "checkErrors"
 
@@ -1550,7 +1545,6 @@ jobs:
       - run_todo_script
       - execute_sbt_command:
           cmd: "Test/compile lint"
-          cmd_retry_count: 3
       - cleanup_sbt_test_job
 
   # We put our Daml tests in their own job for more parallelization
@@ -1601,10 +1595,6 @@ jobs:
         type: integer
       resource_class:
         type: string
-      cmd_retry_count:
-        description: Number of times to retry the command
-        type: integer
-        default: 0
     resource_class: << parameters.resource_class >>
     environment:
       <<: *env
@@ -1632,7 +1622,6 @@ jobs:
       - run_splitted_scala_tests:
           pre_sbt_cmd: << parameters.pre_sbt_cmd >>
           post_sbt_cmd: << parameters.post_sbt_cmd >>
-          cmd_retry_count: << parameters.cmd_retry_count >>
           start_canton_options: << parameters.start_canton_options >>
       - stop_canton
       - cleanup_sbt_test_job
@@ -1649,7 +1638,6 @@ jobs:
       - execute_sbt_command:
           # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
           cmd: "Test/compile bundle"
-          cmd_retry_count: 3
       - run:
           name: Copy bundle
           command: |
@@ -2182,7 +2170,6 @@ jobs:
           # TODO(#6153): we bumped this up to allow nix to rebuild everything if needed.
           # Instead, we should fetch the correct nix cache and avoid those rebuilds
           no_output_timeout: "20m"
-          cmd_retry_count: 3
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_bash_command_in_nix:
@@ -2390,7 +2377,6 @@ jobs:
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
-          cmd_retry_count: 3
       - run_bash_command_in_nix:
           cmd_name: wait for validator-runbook deployment to finish
           cluster: << parameters.cluster >>

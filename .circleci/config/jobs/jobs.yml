@@ -21,7 +21,6 @@ jobs:
       - run_todo_script
       - execute_sbt_command:
           cmd: "Test/compile lint"
-          cmd_retry_count: 3
       - cleanup_sbt_test_job
 
   # We put our Daml tests in their own job for more parallelization
@@ -72,10 +71,6 @@ jobs:
         type: integer
       resource_class:
         type: string
-      cmd_retry_count:
-        description: Number of times to retry the command
-        type: integer
-        default: 0
     resource_class: << parameters.resource_class >>
     environment:
       <<: *env
@@ -103,7 +98,6 @@ jobs:
       - run_splitted_scala_tests:
           pre_sbt_cmd: << parameters.pre_sbt_cmd >>
           post_sbt_cmd: << parameters.post_sbt_cmd >>
-          cmd_retry_count: << parameters.cmd_retry_count >>
           start_canton_options: << parameters.start_canton_options >>
       - stop_canton
       - cleanup_sbt_test_job
@@ -120,7 +114,6 @@ jobs:
       - execute_sbt_command:
           # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
           cmd: "Test/compile bundle"
-          cmd_retry_count: 3
       - run:
           name: Copy bundle
           command: |

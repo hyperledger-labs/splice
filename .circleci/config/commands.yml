@@ -832,10 +832,6 @@ commands:
       post_sbt_cmd:
         type: string
         default: ""
-      cmd_retry_count:
-        description: Number of times to retry the command
-        type: integer
-        default: 0
       start_canton_options:
         type: string
     steps:
@@ -857,7 +853,6 @@ commands:
           # TODO(#8608): reduce `timeout` to at least 25m again
           timeout: "35m"
           no_output_timeout: "20m"
-          cmd_retry_count: << parameters.cmd_retry_count >>
       - execute_sbt_command:
           cmd: "checkErrors"
 

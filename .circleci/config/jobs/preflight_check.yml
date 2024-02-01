@@ -63,7 +63,6 @@ jobs:
           # TODO(#6153): we bumped this up to allow nix to rebuild everything if needed.
           # Instead, we should fetch the correct nix cache and avoid those rebuilds
           no_output_timeout: "20m"
-          cmd_retry_count: 3
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_bash_command_in_nix:
@@ -271,7 +270,6 @@ jobs:
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
-          cmd_retry_count: 3
       - run_bash_command_in_nix:
           cmd_name: wait for validator-runbook deployment to finish
           cluster: << parameters.cluster >>
