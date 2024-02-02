@@ -9,4 +9,4 @@ PID=$!
 lnav "${LOGFILE}"
 
 rm "${LOGFILE}"
-kill $PID
+kill $PID >/dev/null 2>&1
