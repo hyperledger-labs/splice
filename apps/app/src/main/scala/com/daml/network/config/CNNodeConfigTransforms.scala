@@ -223,6 +223,14 @@ object CNNodeConfigTransforms {
         .focus(_.scanApps)
         .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
 
+  private def updateAllValidatorAppConfigs(
+      update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
+  ): CNNodeConfigTransform =
+    cantonConfig =>
+      cantonConfig
+        .focus(_.validatorApps)
+        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
+
   def updateAllSvAppConfigs(
       update: (String, SvAppBackendConfig) => SvAppBackendConfig
   ): CNNodeConfigTransform =
@@ -372,6 +380,52 @@ object CNNodeConfigTransforms {
 
   }
 
+  def bumpSomeSvAppPortsBy(bump: Int, svApps: Seq[String]): CNNodeConfigTransform = {
+    updateAllSvAppConfigs((name, config) => {
+      if (svApps.contains(name)) {
+        config
+          .focus(_.participantClient)
+          .modify(portTransform(bump, _))
+          .focus(_.localDomainNode)
+          .modify(_.map(portTransform(bump, _)))
+          .focus(_.adminApi)
+          .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    })
+  }
+
+  def bumpSomeScanAppPortsBy(bump: Int, scanApps: Seq[String]): CNNodeConfigTransform = {
+    updateAllScanAppConfigs((name, config) => {
+      if (scanApps.contains(name)) {
+        config
+          .focus(_.participantClient)
+          .modify(portTransform(bump, _))
+          .focus(_.adminApi)
+          .modify(portTransform(bump, _))
+          .focus(_.sequencerAdminClient)
+          .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    })
+  }
+
+  def bumpSomeValidatorAppPortsBy(bump: Int, validatorApps: Seq[String]): CNNodeConfigTransform = {
+    updateAllValidatorAppConfigs((name, config) => {
+      if (validatorApps.contains(name)) {
+        config
+          .focus(_.participantClient)
+          .modify(portTransform(bump, _))
+          .focus(_.adminApi)
+          .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    })
+  }
+
   def bumpRemoteSplitwellPortsBy(bump: Int): CNNodeConfigTransform = {
     updateAllRemoteSplitwellAppConfigs_(
       _.focus(_.participantClient).modify(portTransform(bump, _))
@@ -388,6 +442,9 @@ object CNNodeConfigTransforms {
     )
     transforms.foldLeft((c: CNNodeConfig) => c)((f, tf) => f compose tf)
   }
+
+  private def portTransform(bump: Int, c: CommunityAdminServerConfig): CommunityAdminServerConfig =
+    c.copy(internalPort = c.internalPort.map(_ + bump))
 
   private def portTransform(bump: Int, c: ClientConfig): ClientConfig =
     c.copy(port = c.port + bump)

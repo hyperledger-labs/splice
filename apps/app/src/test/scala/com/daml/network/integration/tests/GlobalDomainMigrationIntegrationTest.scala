@@ -17,7 +17,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
   SvcRules_SetConfig,
   VoteRequest,
 }
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.{CNDbConfig, CNNodeConfigTransforms}
 import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
 import com.daml.network.environment.{
   CNNodeEnvironmentImpl,
@@ -37,12 +37,17 @@ import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.{
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
+import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
+import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
+import com.daml.network.validator.config.{ValidatorGlobalDomainConfig, ValidatorDomainConfig}
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.{Contract, ProcessTestUtil}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -72,12 +77,90 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .fromResources(Seq("global-upgrade-topology.conf"), this.getClass.getSimpleName)
-      .withAllocatedUsers()
-      .withTrafficTopupsEnabled
-      .withResettedDecentralizedNamespace()
+      .simpleTopology4Svs(this.getClass.getSimpleName)
       .withZeroSequencerAvailabilityDelay
-      .withManualStart
+      .addConfigTransforms((_, config) => {
+        config.copy(
+          svApps = config.svApps ++
+            Seq(1, 2, 3, 4).map(sv =>
+              (
+                InstanceName.tryCreate(s"sv${sv}Local") ->
+                  config
+                    .svApps(InstanceName.tryCreate(s"sv${sv}"))
+                    .copy(
+                      onboarding = Some(
+                        DomainMigration(
+                          name = s"Canton-Foundation-${sv}",
+                          dumpFilePath = Path.of(""),
+                        )
+                      ),
+                      domains = SvDomainConfig(global =
+                        SvGlobalDomainConfig(
+                          alias = DomainAlias.tryCreate("global"),
+                          // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
+                          url = s"http://localhost:27${mapSvPort(sv)}08",
+                        )
+                      ),
+                      domainMigrationId = Some(1L),
+                    )
+              )
+            ) + (
+              InstanceName.tryCreate(s"sv1LocalOnboarded") ->
+                config
+                  .svApps(InstanceName.tryCreate(s"sv1"))
+                  .copy(
+                    onboarding = None,
+                    domainMigrationId = Some(1L),
+                    domains = SvDomainConfig(global =
+                      SvGlobalDomainConfig(
+                        alias = DomainAlias.tryCreate("global"),
+                        url = s"http://localhost:27008",
+                      )
+                    ),
+                  )
+            ),
+          scanApps = config.scanApps + (
+            InstanceName.tryCreate("sv1ScanLocal") ->
+              config
+                .scanApps(InstanceName.tryCreate("sv1Scan"))
+                .copy()
+          ),
+          validatorApps = config.validatorApps + (
+            InstanceName.tryCreate("sv1ValidatorLocal") ->
+              config
+                .validatorApps(InstanceName.tryCreate("sv1Validator"))
+                .copy(
+                  storage = CNDbConfig.Memory(),
+                  scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
+                  domains = ValidatorDomainConfig(global =
+                    ValidatorGlobalDomainConfig(
+                      alias = DomainAlias.tryCreate("global"),
+                      url = Some("http://localhost:27009"),
+                    )
+                  ),
+                )
+          ),
+          walletAppClients = config.walletAppClients + (
+            InstanceName.tryCreate("sv1WalletLocal") ->
+              config
+                .walletAppClients(InstanceName.tryCreate("sv1Wallet"))
+                .copy(
+                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27003")
+                )
+          ),
+        )
+      })
+      .addConfigTransforms((_, conf) =>
+        (CNNodeConfigTransforms
+          .bumpSomeSvAppPortsBy(
+            22_000,
+            Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
+          ) compose
+          CNNodeConfigTransforms
+            .bumpSomeScanAppPortsBy(22_000, Seq("sv1ScanLocal")) compose
+          CNNodeConfigTransforms
+            .bumpSomeValidatorAppPortsBy(22_000, Seq("sv1ValidatorLocal")))(conf)
+      )
       .addConfigTransforms(
         (_, conf) =>
           CNNodeConfigTransforms.updateAllSvAppConfigs((name, c) =>
@@ -106,6 +189,7 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
             _.withPausedTrigger[SvRewardTrigger]
           )(conf),
       )
+      .withManualStart
 
   "migrate global domain to new nodes with downtime" in { implicit env =>
     import env.environment.scheduler
@@ -391,6 +475,15 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
       .discard
   }
 
+  // TODO(#9757): might want to replace this function
+  private def mapSvPort(sv: Int): Int = {
+    if (sv == 1) {
+      0
+    } else {
+      sv + 4
+    }
+  }
+
   private def createUpgradeNode(
       sv: Int,
       backend: SvAppBackendReference,
@@ -399,11 +492,10 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
   )(implicit
       ec: ExecutionContextExecutor
   ) = {
-    val svOffset = sv * 100
     val loggerFactoryWithKey = loggerFactory.append("updateNode", sv.toString)
     UpgradeDomainNode(
       new ParticipantAdminConnection(
-        ClientConfig(port = Port.tryCreate(27002 + svOffset)),
+        ClientConfig(port = Port.tryCreate(27002 + mapSvPort(sv) * 100)),
         loggerFactoryWithKey,
         retryProvider,
         wallClock,
