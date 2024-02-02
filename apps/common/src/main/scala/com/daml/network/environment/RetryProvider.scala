@@ -34,6 +34,7 @@ import org.apache.pekko.Done
 import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import org.apache.pekko.stream.StreamTcpException
 
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.Collections
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -596,6 +597,13 @@ object RetryProvider {
                 "The http server closed the connection unexpectedly before delivering responses"
               )
             ) =>
+          val msg =
+            s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+          logger.info(msg)
+          TransientErrorKind
+        // IOExceptions are checked exceptions that are typically raised when external systems or devices are acting up.
+        // We add this default retry, as that is more likely to be helpful than failing fatally.
+        case Failure(ex: IOException) =>
           val msg =
             s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
           logger.info(msg)
