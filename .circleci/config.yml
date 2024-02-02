@@ -3305,6 +3305,7 @@ workflows:
     jobs:
       - cluster_lock_reaper:
           <<: *main-branch-only
+          <<: *notify-fail
           context:
             - canton-network-vpn
             - slack-context
