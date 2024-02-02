@@ -19,6 +19,9 @@
         sphinx-reredirects = pySelf.callPackage ./sphinx-reredirects.nix { };
     };
   };
+  pre-commit = super.pre-commit.overrideAttrs (old: {
+    doCheck = false;
+  });
   geckodriver = super.geckodriver.overrideAttrs (old: rec {
     version = "0.34.0";
     src = super.fetchFromGitHub {
