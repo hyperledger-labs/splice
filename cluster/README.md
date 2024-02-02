@@ -1503,15 +1503,17 @@ Rarely, there may be a need to configure a new GCP project for Canton
 Network. Steps to do this are as follows:
 
 
-1. Request that a project be created by sending a mail to
-   `help@digitalasset.com`. The project should be derived from an
-   existing CN project, and given the organization "'no
-   organization'." Rights to this project should also be granted to
-   `team-canton-network@digitalasset.com`.
-2. Within the new project, create a Google Cloud Storage bucket named
-   `da-cn-pulumi-${PROJECT_BASE}-stacks`, to be used as the Pulumi
-   back end for the clusters in the project.
-3. Create a `deployment` directory for a cluster in the new
+1. Request that a project be created by sending a mail to `help@digitalasset.com`.
+    * The project should be derived from an existing CN project, and given the organization "'no
+   organization'."
+    * Rights to this project should also be granted to `team-canton-network@digitalasset.com`.
+    * The team group should be granted (at minimum) the following IAM roles:
+      - Editor
+      - Project IAM Admin
+      - Secret Manager Admin (* optional: with IAM Admin, we can grant this to ourselves if needed)
+      - Compute Network Admin (* optional: with IAM Admin, we can grant this to ourselves if needed)
+      - Kubernetes Engine Admin (* optional: with IAM Admin, we can grant this to ourselves if needed)
+2. Create a `deployment` directory for a cluster in the new
    project. This directory can be populated with `.envrc` and
    `.envrc.vars` from another deployment directory, but environment
    specific configuration should be updated in `.envrc.var`. A few
@@ -1519,43 +1521,14 @@ Network. Steps to do this are as follows:
       * `CLOUDSDK_CORE_PROJECT` - This should be the name of the newly
         created GCP project.
       * `PULUMI_BACKEND_URL` - This should be the `gs` URI for the
-        Pulumi backend bucket created above.
-4. Change into the new deployment directory, and run `cncluster
-   activate` to authenticate to the project.
-5. Enable the required GCE services with the following command: `gcloud
-   services enable container.googleapis.com`.
-6. Create a new GCPKMS keyring for pulumi:
-   `gcloud kms keyrings create "pulumi" --location "$CLOUDSDK_COMPUTE_REGION"`
-7. Give CircleCI account permissions to use keys in this keyring:
-   `gcloud projects add-iam-policy-binding ${CLOUDSDK_CORE_PROJECT} \
-      --member serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com \
-      --role "roles/cloudkms.cryptoKeyEncrypterDecrypter" \
-      --condition=expression='resource.type == "cloudkms.googleapis.com/CryptoKey" &&
-         resource.name.startsWith("projects/'${CLOUDSDK_CORE_PROJECT}'/locations/'${CLOUDSDK_COMPUTE_REGION}'/keyRings/pulumi")',title="pulumi kms"`
-8. Copy relevant keys from another project:
-   - Change directory to a cluster that belongs to a working project.
-   - Fetch all relevant secrets into local json files:
-     `for secret in sv2-id sv3-id sv4-id sv-id; do gcloud secrets versions access 1 --secret $secret > $secret.json; done`
-   - Move the files to the new deployment directory, and cd into it
-   - Upload all relevant secrets to the new project:
-     `for secret in sv2-id sv3-id sv4-id sv-id; do gcloud secrets create $secret --data-file $secret.json; done`
-   - Delete the local json files holding the secrets.
-
-9. Grant CircleCI's account permissions to read these secrets:
-   `gcloud projects add-iam-policy-binding ${CLOUDSDK_CORE_PROJECT} \
-      --member serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com \
-      --role "roles/secretmanager.secretAccessor" \
-      --condition=title="SV IDs",expression='
-        resource.name.endsWith("secrets/sv2-id/versions/latest") ||
-        resource.name.endsWith("secrets/sv3-id/versions/latest") ||
-        resource.name.endsWith("secrets/sv4-id/versions/latest") ||
-        resource.name.endsWith("secrets/sv-id/versions/latest")'`
-
-10. Start creating a new cluster with `cncluster create`. Once this
+        Pulumi backend bucket
+3. Change into the new deployment directory, and run `cncluster gcp_up` to configure the GCP project.
+4. Start creating a new cluster with `cncluster create`. Once this
    command starts working, you'll see in the GCE web UI that a new
    default service account has been created. It'll have a principal of
    the following form: '816347582626-compute@developer.gserviceaccount.com'.
-11. Add a role binding to enable the new default service account to
+5. Run `cncluster activate` to authenticate to the project.
+6. Add a role binding to enable the new default service account to
    have access to `da-cn-shared. The command to do this will look like
    this:
 
@@ -1564,45 +1537,12 @@ Network. Steps to do this are as follows:
       --member='serviceAccount:816347582626-compute@developer.gserviceaccount.com' \
       --role='roles/artifactregistry.serviceAgent'
    ```
-12. Ensure the CCI Service account to be used for the project has the correct
-   IAM role bindings:
-
    ```
-   for ii in roles/compute.viewer roles/container.serviceAgent roles/logging.privateLogViewer roles/storage.objectAdmin roles/viewer roles/cloudsql.admin
-   do
-     gcloud projects add-iam-policy-binding da-cn-scratchnet2 \
-        --member='serviceAccount:circleci@da-cn-scratchnet.iam.gserviceaccount.com' \
-        --role="${ii}"
-   done
+   gcloud projects add-iam-policy-binding da-cn-shared \
+      --member='serviceAccount:816347582626-compute@developer.gserviceaccount.com' \
+      --role='roles/storage.objectViewer'
    ```
-13. Grant CircleCI's account permissions to read the `gcp-bucket-sa-key-secret` secret:
-
-   ```
-   gcloud projects add-iam-policy-binding ${CLOUDSDK_CORE_PROJECT} \
-      --member serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com \
-      --role "roles/secretmanager.secretAccessor" \
-      --condition=title="SA key secret",expression='resource.name.endsWith("secrets/gcp-bucket-sa-key-secret/versions/1")'
-   ```
-14. Enable the Service Networking API:
-   ```
-   gcloud services enable servicenetworking.googleapis.com
-   ```
-15. Configure a network path for Google Services (CloudSQL only at the time of writing)
-    to access private networks within the project.
-    ```
-    gcloud compute addresses create google-managed-services-default \
-           --global \
-           --purpose=VPC_PEERING \
-           --prefix-length=20 \
-           --network=projects/${CLOUDSDK_CORE_PROJECT}/global/networks/default
-
-     gcloud services vpc-peerings connect \
-        --service=servicenetworking.googleapis.com \
-        --ranges=google-managed-services-default \
-        --network=default \
-        --project=${CLOUDSDK_CORE_PROJECT}
-     ```
-
+   TODO(#9679) -- once pulumi fully manages the cluster creation, these IAM bindings can be automated.
 
 ## Cluster Data Dumps
 

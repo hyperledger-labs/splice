@@ -35,6 +35,7 @@
     "workspaces": [
         "common",
         "canton-network",
+        "gcp",
         "infra",
         "sv-runbook",
         "observability",

@@ -10,6 +10,7 @@
     "./cluster/pulumi/canton-network",
     "./cluster/pulumi/canton-network-gateway",
     "./cluster/pulumi/common",
+    "./cluster/pulumi/gcp",
     "./cluster/pulumi/infra",
     "./cluster/pulumi/sv-runbook",
     "./cluster/pulumi/validator-runbook"
