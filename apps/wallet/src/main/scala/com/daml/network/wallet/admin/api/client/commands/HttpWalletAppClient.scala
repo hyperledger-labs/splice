@@ -7,6 +7,7 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   payment as walletCodegen,
@@ -799,6 +800,33 @@ object HttpWalletAppClient {
     ) = { case http.ListValidatorRewardCouponsResponse.OK(response) =>
       response.validatorRewardCoupons
         .traverse(req => Contract.fromHttp(coinCodegen.ValidatorRewardCoupon.COMPANION)(req))
+        .leftMap(_.toString)
+    }
+  }
+
+  case object ListValidatorFaucetCoupons
+      extends InternalBaseCommand[
+        http.ListValidatorFaucetCouponsResponse,
+        Seq[
+          Contract[
+            validatorLicenseCodegen.ValidatorFaucetCoupon.ContractId,
+            validatorLicenseCodegen.ValidatorFaucetCoupon,
+          ]
+        ],
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListValidatorFaucetCouponsResponse] =
+      client.listValidatorFaucetCoupons(headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListValidatorFaucetCouponsResponse.OK(response) =>
+      response.validatorFaucetCoupons
+        .traverse(req =>
+          Contract.fromHttp(validatorLicenseCodegen.ValidatorFaucetCoupon.COMPANION)(req)
+        )
         .leftMap(_.toString)
     }
   }

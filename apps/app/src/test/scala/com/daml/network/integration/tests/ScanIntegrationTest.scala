@@ -22,6 +22,7 @@ import com.daml.network.store.Limit
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.http.v0.definitions.BalanceChange
+import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 
 class InMemoryScanIntegrationTest extends ScanIntegrationTest {
   registerPlugin(new UseInMemoryStores(loggerFactory))
@@ -43,6 +44,12 @@ class ScanIntegrationTest
       .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.withPausedTrigger[CollectRewardsAndMergeCoinsTrigger]
+        )(config)
+      )
+      // TODO (#9647): re-enable trigger and check the values.
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
       .addConfigTransforms((_, config) =>

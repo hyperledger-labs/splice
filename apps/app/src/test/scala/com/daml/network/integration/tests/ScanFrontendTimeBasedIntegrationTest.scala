@@ -1,9 +1,11 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.*
+import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.{Duration, Instant}
@@ -24,6 +26,11 @@ class ScanFrontendTimeBasedIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withCoinPrice(coinPrice)
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.withPausedTrigger[ReceiveFaucetCouponTrigger]
+        )(config)
+      ) // TODO (#9647): re-enable trigger and check the values.
 
   def compareLeaderboardTable(
       resultRowClassName: String,

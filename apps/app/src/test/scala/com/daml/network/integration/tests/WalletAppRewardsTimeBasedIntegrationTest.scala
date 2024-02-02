@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -7,9 +8,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.*
+import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-// Split out from WallteTimeBasedIntegrationTest due to test-isolation woes making the test in here flaky.
+// Split out from WalletTimeBasedIntegrationTest due to test-isolation woes making the test in here flaky.
 class WalletAppRewardsTimeBasedIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
@@ -27,6 +30,20 @@ class WalletAppRewardsTimeBasedIntegrationTest
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllScanAppConfigs_(
+          // prevent ReceiveFaucetCouponTrigger from seeing stale caches
+          _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          // we use advanceTimeByPollingInterval for ReceiveFaucetCouponTrigger to re-check the open round.
+          // 1ms pollingInterval vs the round tick duration (which is a few minutes) should give enough margin.
+          // Larger than miningRoundsCacheTimeToLiveOverride to guarantee the cache is never used.
+          _.copy(pollingInterval = NonNegativeFiniteDuration.ofMillis(2))
+        )(config)
+      )
 
   "A wallet" should {
 
@@ -50,38 +67,82 @@ class WalletAppRewardsTimeBasedIntegrationTest
         val aliceValidatorStartBalance = aliceValidatorWalletClient.balance()
         val providerStartBalance = splitwellWalletClient.balance()
 
-        actAndCheck(
+        val (_, (aliceAppCoupons, _, aliceValidatorCoupons)) = actAndCheck(
           "Advance rounds until reward coupons are issued",
-          Seq(1, 2).foreach(_ => advanceRoundsByOneTick),
+          Seq(0, 1).foreach(_ => {
+            eventually() {
+              val currentRound =
+                sv1ScanBackend.getOpenAndIssuingMiningRounds()._1.head.contract.payload.round.number
+              // Ensure `ReceiveFaucetCouponTrigger` will do one iteration where it receives the faucet coupon.
+              // On startup, the ValidatorLicense may not yet be present, and later Scan might not yet see a newer open round.
+              // TODO (#9753): this shouldn't be required once polling triggers interval depends on wall clock.
+              advanceTimeByPollingInterval(sv1Backend)
+              aliceValidatorWalletClient
+                .listValidatorFaucetCoupons()
+                .map(_.payload.round.number) should contain(currentRound)
+            }
+            advanceRoundsByOneTick
+          }),
         )(
           "Wait for all reward coupons",
           _ => {
             // App reward coupon to alice's validator for the first (locking) leg
-            aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
+            val aliceAppCoupons =
+              aliceValidatorWalletClient.listAppRewardCoupons()
+            aliceAppCoupons should have length 1
             // App reward to splitwell provider for the second leg
-            splitwellWalletClient.listAppRewardCoupons() should have length 1
+            val splitwellAppCoupons =
+              splitwellWalletClient.listAppRewardCoupons()
+            splitwellAppCoupons should have length 1
             // One validator reward coupon per leg to alice's validator
-            aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 2
-            // TODO(#9551): also test for validator faucet coupons
+            val aliceValidatorCoupons =
+              aliceValidatorWalletClient.listValidatorRewardCoupons()
+            aliceValidatorCoupons should have length 2
+            // Validator faucet coupons are checked as part of the advance rounds loop above,
+            // because by this point they might be claimed already.
+            (aliceAppCoupons, splitwellAppCoupons, aliceValidatorCoupons)
           },
         )
 
+        aliceValidatorBackend.validatorAutomation
+          .trigger[ReceiveFaucetCouponTrigger]
+          .pause()
+          .futureValue
+
         actAndCheck(
-          "Advance rounds again to get rewards",
-          Seq(1, 2).foreach(_ => advanceRoundsByOneTick),
+          "Advance rounds again to collect rewards",
+          Seq(2, 3).foreach(_ => advanceRoundsByOneTick),
         )(
           "Earn rewards",
           _ => {
             aliceValidatorWalletClient.listAppRewardCoupons() should be(empty)
             splitwellWalletClient.listAppRewardCoupons() should be(empty)
             aliceValidatorWalletClient.listValidatorRewardCoupons() should be(empty)
-            // TODO(#9551): also test for validator faucet coupons
+            aliceValidatorWalletClient
+              .listValidatorFaucetCoupons()
+              .filter(_.payload.round.number < 2) should be(empty)
+            logger.info(
+              s"Unlocked: ${aliceValidatorStartBalance.unlockedQty}; apps: ${aliceAppCoupons
+                  .map(_.payload.amount)
+                  .map(BigDecimal(_))
+                  .sum}; validator: ${aliceValidatorCoupons
+                  .map(_.payload.amount)
+                  .map(BigDecimal(_))
+                  .sum}"
+            )
+            val expectedBalance = aliceValidatorStartBalance.unlockedQty + aliceAppCoupons
+              .map(_.payload.amount)
+              .map(BigDecimal(_))
+              .sum + aliceValidatorCoupons
+              .map(_.payload.amount)
+              .map(BigDecimal(_))
+              .sum + 2.85 * 3 // 2.85 CC (at 1CC/USD) per faucet coupon
             checkBalance(
               aliceValidatorWalletClient,
               Some(aliceValidatorStartBalance.round + 4),
               (
-                aliceValidatorStartBalance.unlockedQty,
-                aliceValidatorStartBalance.unlockedQty + 5.0,
+                expectedBalance - smallAmount,
+                expectedBalance + 2.85, // the last validator faucet may or may not have been received/claimed
               ),
               (0, 0),
               (0, 1),
@@ -98,6 +159,10 @@ class WalletAppRewardsTimeBasedIntegrationTest
             )
           },
         )
+
+        aliceValidatorBackend.validatorAutomation
+          .trigger[ReceiveFaucetCouponTrigger]
+          .resume()
       }
 
       transferAndCheckRewards((202.9, 203))

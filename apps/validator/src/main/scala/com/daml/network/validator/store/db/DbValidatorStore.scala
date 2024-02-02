@@ -162,7 +162,7 @@ class DbValidatorStore(
   }
 
   override def lookupValidatorLicenseWithOffset()(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[
+    QueryResult[Option[ContractWithState[
       validatorLicenseCodegen.ValidatorLicense.ContractId,
       validatorLicenseCodegen.ValidatorLicense,
     ]]]
@@ -170,7 +170,7 @@ class DbValidatorStore(
     for {
       resultWithOffset <- storage
         .querySingle(
-          selectFromAcsTableWithOffset(
+          selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
             sql"""
@@ -187,7 +187,7 @@ class DbValidatorStore(
     } yield QueryResult(
       resultWithOffset.offset,
       resultWithOffset.row.map(
-        contractFromRow(validatorLicenseCodegen.ValidatorLicense.COMPANION)(_)
+        contractWithStateFromRow(validatorLicenseCodegen.ValidatorLicense.COMPANION)(_)
       ),
     )
   }

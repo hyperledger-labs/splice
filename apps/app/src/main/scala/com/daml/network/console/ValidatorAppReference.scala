@@ -17,6 +17,7 @@ import com.daml.network.validator.admin.api.client.commands.{
   HttpValidatorPublicAppClient,
   UserInfo,
 }
+import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{
   AppManagerAppClientConfig,
   ValidatorAppBackendConfig,
@@ -270,6 +271,13 @@ final class ValidatorAppBackendReference(
       .lookupUserWallet(userName)
       .getOrElse(throw new RuntimeException(s"User ${userName} doesn't exist"))
       .automation
+  }
+
+  @Help.Summary(
+    "Returns the automation service of this validator. May only be called while the app is running."
+  )
+  def validatorAutomation: ValidatorAutomationService = {
+    appState.automation
   }
 
   @Help.Summary("Return local validator app config")

@@ -30,7 +30,6 @@ class InMemoryValidatorStore(
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCNNodeAppStoreWithoutHistory
     with ValidatorStore {
-  import InMemoryValidatorStore.*
 
   override val walletKey = WalletStore.Key(
     key.validatorParty,
@@ -78,7 +77,7 @@ class InMemoryValidatorStore(
     )
 
   override def lookupValidatorLicenseWithOffset()(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[
+    QueryResult[Option[ContractWithState[
       validatorLicenseCodegen.ValidatorLicense.ContractId,
       validatorLicenseCodegen.ValidatorLicense,
     ]]]
@@ -87,7 +86,7 @@ class InMemoryValidatorStore(
       validatorLicenseCodegen.ValidatorLicense.COMPANION
     ) { (vl: Contract[?, validatorLicenseCodegen.ValidatorLicense]) =>
       vl.payload.validator == key.validatorParty.toProtoPrimitive
-    } map clearDomainFromLookup
+    }
 
   override def lookupValidatorRightByPartyWithOffset(
       party: PartyId
@@ -251,11 +250,4 @@ class InMemoryValidatorStore(
         PageLimit.tryCreate(1),
       )
     } yield maybeContract.headOption map (_.contract)
-}
-
-private[memory] object InMemoryValidatorStore {
-  private def clearDomainFromLookup[I, A](
-      fa: QueryResult[Option[Contract.Has[I, A]]]
-  ): QueryResult[Option[Contract[I, A]]] =
-    fa map (_ map (_.contract))
 }

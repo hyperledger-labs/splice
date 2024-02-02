@@ -444,6 +444,22 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/wallet/validator-faucet-coupons:
+    get:
+      tags: [wallet]
+      x-jvm-package: wallet
+      operationId: "listValidatorFaucetCoupons"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListValidatorFaucetCouponsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/wallet/cancel-featured-app-rights:
     delete:
       tags: [wallet]
@@ -721,6 +737,17 @@ components:
         - validator_reward_coupons
       properties:
         validator_reward_coupons:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListValidatorFaucetCouponsResponse:
+      type: object
+      description: Includes only up to 1000 elements.
+      required:
+        - validator_faucet_coupons
+      properties:
+        validator_faucet_coupons:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"

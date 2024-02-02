@@ -46,7 +46,7 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   ]]
 
   def lookupValidatorLicenseWithOffset()(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[
+    QueryResult[Option[ContractWithState[
       validatorLicenseCodegen.ValidatorLicense.ContractId,
       validatorLicenseCodegen.ValidatorLicense,
     ]]]
@@ -264,7 +264,6 @@ object ValidatorStore {
     Seq[ConstrainedTemplate](
       walletCodegen.WalletAppInstall.COMPANION,
       coinCodegen.ValidatorRight.COMPANION,
-      validatorLicenseCodegen.ValidatorFaucetCoupon.COMPANION,
     ) ++ (if (appManagerEnabled)
             Seq[ConstrainedTemplate](
               appManagerCodegen.AppConfiguration.COMPANION,
@@ -295,14 +294,6 @@ object ValidatorStore {
           )
         },
         mkFilter(validatorLicenseCodegen.ValidatorLicense.COMPANION)(co =>
-          co.payload.validator == validator && co.payload.svc == svc
-        ) { contract =>
-          ValidatorAcsStoreRowData(
-            contract = contract,
-            validatorParty = Some(key.validatorParty),
-          )
-        },
-        mkFilter(validatorLicenseCodegen.ValidatorFaucetCoupon.COMPANION)(co =>
           co.payload.validator == validator && co.payload.svc == svc
         ) { contract =>
           ValidatorAcsStoreRowData(

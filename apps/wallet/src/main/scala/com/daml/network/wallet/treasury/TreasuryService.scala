@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.ValidatorRight
 import com.daml.network.codegen.java.cc.coinrules.transferinput.{
+  ExtTransferInput,
   InputAppRewardCoupon,
   InputCoin,
   InputValidatorRewardCoupon,
@@ -63,6 +64,7 @@ import org.apache.pekko.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import org.apache.pekko.stream.scaladsl.{Keep, Sink, Source}
 import org.apache.pekko.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 
+import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -494,6 +496,10 @@ class TreasuryService(
           validatorRewardCouponsLimit = maxNumInputs,
           issuingRoundsMap,
         )
+      (validatorFaucetsCoinQuantity, validatorFaucetInputs) <- getValidatorFaucetsAndQuantity(
+        maxNumInputs,
+        issuingRoundsMap,
+      )
       (appRewardsTotalCoinQuantity, appRewardInputs) <- getAppRewardsAndQuantity(
         maxNumInputs,
         issuingRoundsMap,
@@ -503,9 +509,8 @@ class TreasuryService(
       val createFeeUsd = configUsd.createFee.fee
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
-          // TODO(#8819): also merge in validator faucet coupons,
           // TODO(#9173): also merge in reward coupons weights,
-          appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity,
+          appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity + validatorFaucetsCoinQuantity,
           coinInputsAndQuantity,
           createFeeUsd,
         )
@@ -517,10 +522,13 @@ class TreasuryService(
           coinInputsAndQuantity.map(_._2),
           validatorRewardInputs,
           appRewardInputs,
+          validatorFaucetInputs,
           numTapOperations,
         )
         val rewardInputRounds =
-          appRewardInputs.map(_._1).toSet ++ validatorRewardInputs.map(_._1).toSet
+          appRewardInputs.map(_._1).toSet ++ validatorRewardInputs
+            .map(_._1)
+            .toSet ++ validatorFaucetInputs.map(_._1).toSet
         val transferContext = new TransferContext(
           openRound.contractId,
           openIssuingRounds.view
@@ -574,9 +582,10 @@ class TreasuryService(
       coinInputs: Seq[InputCoin],
       validatorRewardInputs: Seq[(Round, BigDecimal, InputValidatorRewardCoupon)],
       appRewardInputs: Seq[(Round, BigDecimal, InputAppRewardCoupon)],
+      validatorFaucetInputs: Seq[(Round, BigDecimal, ExtTransferInput)],
       numTapOperations: Int,
   ): Seq[TransferInput] = {
-    val sortedRewardInputs = (validatorRewardInputs ++ appRewardInputs)
+    val sortedRewardInputs = (validatorRewardInputs ++ appRewardInputs ++ validatorFaucetInputs)
       .sorted(
         // prioritize the soonest-to-expire, most-valuable rewards.
         Ordering[(Long, BigDecimal)].on((rw: (Round, BigDecimal, _)) => (rw._1.number, -rw._2))
@@ -641,6 +650,31 @@ class TreasuryService(
         )
       )
     } yield (validatorRewardsCoinQuantity, validatorRewardCouponUsers, validatorRewardInputs)
+  }
+
+  private def getValidatorFaucetsAndQuantity(
+      maxNumInputs: Int,
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+  )(implicit
+      tc: TraceContext
+  ): Future[(BigDecimal, Seq[(Round, BigDecimal, ExtTransferInput)])] = {
+    for {
+      validatorFaucetCouponsInputs <- userStore.listSortedValidatorFaucets(
+        issuingRoundsMap,
+        PageLimit.tryCreate(maxNumInputs),
+      )
+      validatorFaucetsCoinQuantity = validatorFaucetCouponsInputs.map(_._2).sum
+      validatorFaucetsInputs = validatorFaucetCouponsInputs.map(rw =>
+        (
+          rw._1.payload.round,
+          rw._2,
+          new cc.coinrules.transferinput.ExtTransferInput(
+            com.daml.ledger.javaapi.data.Unit.getInstance(),
+            Optional.of(rw._1.contractId),
+          ),
+        )
+      )
+    } yield (validatorFaucetsCoinQuantity, validatorFaucetsInputs)
   }
 
   private def getAppRewardsAndQuantity(

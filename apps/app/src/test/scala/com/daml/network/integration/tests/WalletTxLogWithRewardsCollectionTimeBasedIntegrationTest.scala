@@ -4,6 +4,7 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
+import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.store.TxLogEntry as walletLogEntry
 import com.digitalasset.canton.HasExecutionContext
 
@@ -21,6 +22,12 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // Set a non-unit coin price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
+      .addConfigTransforms((_, config) =>
+        // without this, you can have 1 or 2 transfers in the txlog, or just 1 with different balance
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.withPausedTrigger[ReceiveFaucetCouponTrigger]
+        )(config)
+      )
   }
 
   "A wallet" should {

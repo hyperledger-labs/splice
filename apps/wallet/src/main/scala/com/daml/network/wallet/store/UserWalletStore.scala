@@ -5,6 +5,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.{
+  validatorlicense as validatorCodegen,
   coin as coinCodegen,
   coinrules as coinrulesCodegen,
   round as roundCodegen,
@@ -250,7 +251,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
     Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
   ]]
 
-  /** Returns the validator reward coupon sorted by their round in ascending order and their value in descending order.
+  /** Returns the app reward coupon sorted by their round in ascending order and their value in descending order.
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   def listSortedAppRewards(
@@ -258,6 +259,22 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
+  ]]
+
+  /** Returns the app reward coupon sorted by their round in ascending order and their value in descending order.
+    * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
+    */
+  def listSortedValidatorFaucets(
+      issuingRoundsMap: Map[cc.types.Round, roundCodegen.IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit tc: TraceContext): Future[Seq[
+    (
+        Contract[
+          validatorCodegen.ValidatorFaucetCoupon.ContractId,
+          validatorCodegen.ValidatorFaucetCoupon,
+        ],
+        BigDecimal,
+    )
   ]]
 
   final def lookupFeaturedAppRight()(implicit ec: ExecutionContext, tc: TraceContext): Future[
@@ -483,6 +500,7 @@ object UserWalletStore {
       coinCodegen.Coin.COMPANION,
       coinCodegen.LockedCoin.COMPANION,
       coinCodegen.ValidatorRewardCoupon.COMPANION,
+      validatorCodegen.ValidatorFaucetCoupon.COMPANION,
       subsCodegen.Subscription.COMPANION,
       subsCodegen.SubscriptionRequest.COMPANION,
       subsCodegen.SubscriptionInitialPayment.COMPANION,
@@ -541,11 +559,21 @@ object UserWalletStore {
         mkFilter(coinCodegen.AppRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.provider == endUser
-        )(UserWalletAcsStoreRowData(_)),
+        )(co =>
+          UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
+        ),
         mkFilter(coinCodegen.ValidatorRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.user == endUser
-        )(UserWalletAcsStoreRowData(_)),
+        )(co =>
+          UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
+        ),
+        mkFilter(validatorCodegen.ValidatorFaucetCoupon.COMPANION)(co =>
+          co.payload.svc == svc &&
+            co.payload.validator == endUser
+        )(co =>
+          UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
+        ),
         mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
           // All validator rights where the current user is the validator.
           co.payload.svc == svc &&

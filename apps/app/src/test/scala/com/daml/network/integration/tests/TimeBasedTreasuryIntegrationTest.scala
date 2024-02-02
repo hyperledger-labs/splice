@@ -1,9 +1,11 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.setPollingInterval
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.HasExecutionContext
@@ -23,6 +25,11 @@ class TimeBasedTreasuryIntegrationTest
       .addConfigTransform((_, config) =>
         // for testing non-automation-based coin merging.
         setPollingInterval(NonNegativeFiniteDuration.ofSeconds(30))(config)
+      )
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          _.withPausedTrigger[ReceiveFaucetCouponTrigger]
+        )(config)
       )
   }
 

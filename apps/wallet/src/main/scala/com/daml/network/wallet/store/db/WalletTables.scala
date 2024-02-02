@@ -11,8 +11,11 @@ object WalletTables extends AcsTables {
   case class UserWalletAcsStoreRowData(
       contract: Contract[?, ?],
       contractExpiresAt: Option[Timestamp] = None,
+      rewardCouponRound: Option[Long] = None,
   ) extends AcsRowData {
-    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq.empty
+    override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
+      "reward_coupon_round" -> IndexColumnValue(rewardCouponRound)
+    )
   }
 
   case class UserWalletTxLogStoreRowData(

@@ -111,6 +111,17 @@ class ValidatorAutomationService(
     )
   )
 
+  if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
+    registerTrigger(
+      new ReceiveFaucetCouponTrigger(
+        triggerContext,
+        scanConnection,
+        store,
+        connection,
+      )
+    )
+  }
+
   registerTrigger(
     new TransferFollowTrigger(
       triggerContext,

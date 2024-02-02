@@ -2,6 +2,7 @@ package com.daml.network.console
 
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   payment as walletCodegen,
@@ -379,6 +380,20 @@ abstract class WalletAppReference(
   ] =
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListValidatorRewardCoupons)
+    }
+
+  @Help.Summary("List validator faucet rewards")
+  @Help.Description(
+    "List all open validator faucets rewards for the configured user based on the active ValidatorRights"
+  )
+  def listValidatorFaucetCoupons(): Seq[
+    Contract[
+      validatorLicenseCodegen.ValidatorFaucetCoupon.ContractId,
+      validatorLicenseCodegen.ValidatorFaucetCoupon,
+    ]
+  ] =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListValidatorFaucetCoupons)
     }
 
   @Help.Summary("User status")

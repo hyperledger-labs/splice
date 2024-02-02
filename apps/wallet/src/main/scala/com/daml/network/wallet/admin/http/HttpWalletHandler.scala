@@ -4,6 +4,7 @@ import org.apache.pekko.stream.Materializer
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.install.{
@@ -19,7 +20,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{CommandPriority, RetryProvider}
-import com.daml.network.http.v0.wallet.WalletResource as r0
+import com.daml.network.http.v0.wallet.{WalletResource as r0}
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{Limit, PageLimit}
@@ -213,6 +214,17 @@ class HttpWalletHandler(
         validatorRewardCoupons.map(_.toHttp).toVector
       )
     }
+  }
+
+  override def listValidatorFaucetCoupons(
+      respond: v0.WalletResource.ListValidatorFaucetCouponsResponse.type
+  )()(tuser: TracedUser): Future[v0.WalletResource.ListValidatorFaucetCouponsResponse] = {
+    implicit val TracedUser(user, traceContext) = tuser
+    listContracts(
+      validatorLicenseCodegen.ValidatorFaucetCoupon.COMPANION,
+      user,
+      d0.ListValidatorFaucetCouponsResponse(_),
+    )
   }
 
   override def listTransactions(

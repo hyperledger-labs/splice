@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionInitialPayment,
   SubscriptionRequest,
 }
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
@@ -29,6 +30,7 @@ import com.daml.network.util.{
   TriggerTestUtil,
   WalletTestUtil,
 }
+import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -58,6 +60,13 @@ class WalletTimeBasedIntegrationTest
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
+      .addConfigTransforms((_, config) =>
+        CNNodeConfigTransforms.updateAllAutomationConfigs(
+          // without this, the test "generate app rewards correctly" has as flaky balance.
+          // None of the other tests care about it.
+          _.withPausedTrigger[ReceiveFaucetCouponTrigger]
+        )(config)
+      )
 
   "A wallet" should {
 

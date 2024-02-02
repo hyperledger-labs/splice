@@ -2,6 +2,7 @@ package com.daml.network.wallet.store.memory
 
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStore, Limit, LimitHelpers, PageLimit}
@@ -13,6 +14,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.*
+import scala.jdk.OptionConverters.*
 
 class InMemoryUserWalletStore(
     override val key: UserWalletStore.Key,
@@ -94,6 +96,47 @@ class InMemoryUserWalletStore(
         )
       ),
   )
+
+  def listSortedValidatorFaucets(
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit tc: TraceContext): Future[Seq[
+    (
+        Contract[
+          validatorCodegen.ValidatorFaucetCoupon.ContractId,
+          validatorCodegen.ValidatorFaucetCoupon,
+        ],
+        BigDecimal,
+    )
+  ]] = {
+    // blatant copy-paste from above, this will be deleted anyway.
+    for {
+      rewards <- multiDomainAcsStore.listContracts(
+        validatorCodegen.ValidatorFaucetCoupon.COMPANION
+      )
+    } yield applyLimit(
+      "listSortedValidatorFaucets",
+      limit,
+      rewards
+        .flatMap { rw =>
+          val issuingO = issuingRoundsMap.get(rw.payload.round)
+          issuingO
+            .flatMap(_.optIssuancePerValidatorFaucetCoupon.toScala)
+            .map(rw.contract -> BigDecimal(_))
+        }
+        .sorted(
+          Ordering[(Long, BigDecimal)].on(
+            (x: (
+                Contract.Has[
+                  validatorCodegen.ValidatorFaucetCoupon.ContractId,
+                  validatorCodegen.ValidatorFaucetCoupon,
+                ],
+                BigDecimal,
+            )) => (x._1.payload.round.number, -x._2)
+          )
+        ),
+    )
+  }
 
   override def listTransactions(
       beginAfterEventId: Option[String],

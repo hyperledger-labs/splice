@@ -1,13 +1,15 @@
 package com.daml.network.wallet.store.db
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
-import com.daml.network.util.{Contract, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.wallet.store
 import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -17,8 +19,10 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 
 import scala.concurrent.*
+import scala.jdk.OptionConverters.*
 
 class DbUserWalletStore(
     override val key: UserWalletStore.Key,
@@ -124,6 +128,55 @@ class DbUserWalletStore(
         )
       ),
   )
+
+  def listSortedValidatorFaucets(
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit tc: TraceContext): Future[Seq[
+    (
+        Contract[
+          validatorCodegen.ValidatorFaucetCoupon.ContractId,
+          validatorCodegen.ValidatorFaucetCoupon,
+        ],
+        BigDecimal,
+    )
+  ]] = {
+    issuingRoundsMap
+      .flatMap { case (round, contract) =>
+        contract.optIssuancePerValidatorFaucetCoupon
+          .map(round.number.longValue() -> BigDecimal(_))
+          .toScala
+      }
+      .map { case (round, issuance) =>
+        sql"($round, $issuance)"
+      }
+      .reduceOption { (acc, next) =>
+        (acc ++ sql"," ++ next).toActionBuilder
+      } match {
+      case None => Future.successful(Seq.empty) // no rounds = no results
+      case Some(roundToIssuance) =>
+        for {
+          result <- storage.query(
+            (sql"""
+                 with round_to_issuance(round, issuance) as (values """ ++ roundToIssuance ++ sql""")
+                 select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}, rti.issuance
+                 from #${WalletTables.acsTableName} acs join round_to_issuance rti on acs.reward_coupon_round = rti.round
+                 where acs.store_id = $storeId
+                   and acs.template_id_qualified_name = ${QualifiedName(
+                validatorCodegen.ValidatorFaucetCoupon.TEMPLATE_ID
+              )}
+                 order by (acs.reward_coupon_round, -rti.issuance)
+                 limit ${sqlLimit(limit)}""").toActionBuilder
+              .as[(SelectFromAcsTableResult, BigDecimal)],
+            "listSortedValidatorFaucets",
+          )
+        } yield applyLimit("listSortedValidatorFaucets", limit, result).map {
+          case (row, issuance) =>
+            val contract = contractFromRow(validatorCodegen.ValidatorFaucetCoupon.COMPANION)(row)
+            contract -> issuance
+        }
+    }
+  }
 
   override def listTransactions(
       beginAfterEventIdO: Option[String],
