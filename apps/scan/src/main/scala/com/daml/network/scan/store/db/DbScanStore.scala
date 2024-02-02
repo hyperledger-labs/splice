@@ -136,43 +136,6 @@ class DbScanStore(
       } yield contractWithState
     }
 
-  override def getTotalCoinBalance(asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[BigDecimal] =
-    waitUntilAcsIngested {
-
-      for {
-        result <- storage.query(
-          sql"""
-          select total_coin_balance
-          from   round_totals
-          where  store_id = $storeId
-          and    closed_round = $asOfEndOfRound;
-          """.as[Option[BigDecimal]].headOption,
-          "getTotalCoinBalance",
-        )
-      } yield result.flatten.getOrElse(0)
-    }
-
-  override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
-    waitUntilAcsIngested {
-      for {
-        result <- storage.query(
-          sql"""
-          select coalesce(cumulative_app_rewards, 0) + coalesce(cumulative_validator_rewards, 0)
-          from   round_totals
-          where  store_id = $storeId
-          and    closed_round = (
-                    select max(closed_round)
-                    from round_totals
-                    where store_id = $storeId
-                 );
-          """.as[BigDecimal].headOption,
-          "getTotalRewardsCollectedEver",
-        )
-      } yield result.getOrElse(0)
-    }
-
   override def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
@@ -305,234 +268,6 @@ class DbScanStore(
 
     }
 
-  override def getRewardsCollectedInRound(round: Long)(implicit
-      tc: TraceContext
-  ): Future[BigDecimal] = waitUntilAcsIngested {
-    for {
-      result <- storage.query(
-        sql"""
-        select coalesce(app_rewards, 0) + coalesce(validator_rewards, 0)
-        from   round_totals
-        where  store_id = $storeId 
-        and    closed_round = $round;
-        """.as[BigDecimal].headOption,
-        "getRewardsCollectedInRound",
-      )
-    } yield result.getOrElse(0)
-  }
-
-  override def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
-      tc: TraceContext
-  ): Future[BigDecimal] = waitUntilAcsIngested {
-    for {
-      (round, _) <- getRoundOfLatestData()
-      result <-
-        if (round >= asOfEndOfRound) {
-          storage.query(
-            // The round_party_totals might not have a row for the given round, (when the party has not been active in that round)
-            // in that case just take the most recent round.
-            // This is also why the total_coin_balance is calculated from the two cumulative fields.
-            sql"""
-             select   cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1) as total_coin_balance
-             from     round_party_totals
-             where    store_id = $storeId
-             and      closed_round <= $asOfEndOfRound
-             and      party = $partyId
-             order by closed_round desc
-             limit    1;
-           """.as[Option[BigDecimal]].headOption,
-            "getWalletBalance",
-          )
-        } else Future.successful(None)
-    } yield result.flatten.getOrElse(0)
-  }
-
-  override def getCoinConfigForRound(round: Long)(implicit
-      tc: TraceContext
-  ): Future[TxLogEntry.OpenMiningRoundLogEntry] = waitUntilAcsIngested {
-    for {
-      row <- storage
-        .querySingle(
-          selectFromTxLogTable(
-            txLogTableName,
-            storeId,
-            where = sql"""
-                   entry_type = ${TxLogEntry.OpenMiningRoundLogEntry.dbType} and
-                   round = $round
-              """,
-            orderLimit = sql"order by entry_number desc limit 1",
-          ).headOption,
-          "getCoinConfigForRound",
-        )
-        .value
-      entry = row.map(txLogEntryFromRow[TxLogEntry.OpenMiningRoundLogEntry](txLogConfig))
-      result <- entry match {
-        case Some(omr: TxLogEntry.OpenMiningRoundLogEntry) =>
-          Future.successful(omr)
-        case None =>
-          Future.failed(txLogNotFound())
-      }
-    } yield result
-  }
-
-  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
-    waitUntilAcsIngested {
-      for {
-        row <- storage
-          .querySingle(
-            sql"""
-            select   closed_round, 
-                     closed_round_effective_at
-            from     round_totals
-            where    store_id = $storeId
-            order by closed_round desc
-            limit    1;
-            """.as[(Long, Long)].headOption,
-            "getRoundOfLatestData",
-          )
-          .value
-        result <- row match {
-          case Some((closedRound, effectiveAt)) =>
-            Future.successful(
-              (closedRound, CantonTimestamp.assertFromLong(micros = effectiveAt).toInstant)
-            )
-          case None =>
-            Future.failed(txLogNotFound())
-        }
-      } yield result
-    }
-
-  override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
-      tc: TraceContext
-  ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
-    for {
-      (round, _) <- getRoundOfLatestData()
-      rows <-
-        if (round >= asOfEndOfRound) {
-          storage.query(
-            sql"""
-              with ranked_providers_by_app_rewards as (
-                select   party as provider,
-                         max(cumulative_app_rewards) as cumulative_app_rewards,
-                         rank() over (order by max(cumulative_app_rewards) desc) as rank_nr
-                from     round_party_totals
-                where    store_id = $storeId
-                and      closed_round <= $asOfEndOfRound
-                and      cumulative_app_rewards > 0
-                group by party
-              )
-              select   provider,
-                       cumulative_app_rewards
-              from     ranked_providers_by_app_rewards
-              where    rank_nr <= $limit
-              order by rank_nr;       
-        """.as[(PartyId, BigDecimal)],
-            "getTopProvidersByAppRewards",
-          )
-        } else Future.successful(Seq.empty)
-    } yield rows
-  }
-
-  override def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
-      tc: TraceContext
-  ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
-    for {
-      (round, _) <- getRoundOfLatestData()
-      rows <-
-        if (round >= asOfEndOfRound) {
-          storage.query(
-            sql"""
-              with ranked_validators_by_validator_rewards as (
-                select   party as validator,
-                         max(cumulative_validator_rewards) as cumulative_validator_rewards,
-                         rank() over (order by max(cumulative_validator_rewards) desc) as rank_nr
-                from     round_party_totals
-                where    store_id = $storeId
-                and      closed_round <= $asOfEndOfRound
-                and      cumulative_validator_rewards > 0
-                group by party
-              )
-              select   validator,
-                       cumulative_validator_rewards
-              from     ranked_validators_by_validator_rewards
-              where    rank_nr <= $limit
-              order by rank_nr;       
-           """.as[(PartyId, BigDecimal)],
-            "getTopValidatorsByValidatorRewards",
-          )
-        } else Future.successful(Seq.empty)
-    } yield rows
-  }
-
-  override def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
-      tc: TraceContext
-  ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] = waitUntilAcsIngested {
-    for {
-      (round, _) <- getRoundOfLatestData()
-      rows <-
-        if (round >= asOfEndOfRound) {
-          // There might not be a row for a party where closed_round = asOfEndOfRound, so we need to use the
-          // max cumulatives for each party up to including asOfEndOfRound
-          // and separately get the last purchased round for each party in the leaderboard
-          storage.query(
-            sql"""
-              with ranked_validators_by_purchased_traffic as (
-                select   party as validator,
-                         max(cumulative_traffic_num_purchases) as cumulative_traffic_num_purchases,
-                         max(cumulative_traffic_purchased) as cumulative_traffic_purchased,
-                         max(cumulative_traffic_purchased_cc_spent) as cumulative_traffic_purchased_cc_spent,
-                         rank() over (order by max(cumulative_traffic_purchased) desc) as rank_nr
-                from     round_party_totals
-                where    store_id = $storeId
-                and      closed_round <= $asOfEndOfRound
-                and      cumulative_traffic_purchased > 0
-                group by party
-              ),
-              last_purchases as (
-                select   party as validator,
-                         max(closed_round) as last_purchased_in_round
-                from     round_party_totals
-                where    store_id = $storeId
-                and      closed_round <= $asOfEndOfRound
-                and      traffic_purchased > 0
-                group by party
-              )
-              select    rv.validator,
-                        rv.cumulative_traffic_num_purchases, 
-                        rv.cumulative_traffic_purchased,
-                        rv.cumulative_traffic_purchased_cc_spent,
-                        coalesce(lp.last_purchased_in_round, 0)
-              from      ranked_validators_by_purchased_traffic rv
-              left join last_purchases lp
-              on        rv.validator = lp.validator
-              where     rv.rank_nr <= $limit
-              order by  rv.rank_nr;       
-           """.as[(PartyId, Long, Long, BigDecimal, Long)],
-            "getTopValidatorsByPurchasedTraffic",
-          )
-        } else Future.successful(Seq.empty)
-    } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
-  }
-
-  override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
-      tc: TraceContext
-  ): Future[Long] = waitUntilAcsIngested {
-    for {
-      sum <- storage
-        .querySingle(
-          sql"""
-               select sum(total_traffic_purchased)
-               from #${ScanTables.acsTableName}
-               where store_id = $storeId
-                and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
-                and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
-             """.as[Long].headOption,
-          "getTotalPurchasedMemberTraffic",
-        )
-        .value
-    } yield sum.getOrElse(0L)
-  }
-
   override def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[Seq[ContractWithState[ImportCrate.ContractId, ImportCrate]]] =
@@ -579,4 +314,264 @@ class DbScanStore(
           )
       } yield contractWithStateFromRow(FeaturedAppRight.COMPANION)(row)).value
     }
+
+  override def getCoinConfigForRound(round: Long)(implicit
+      tc: TraceContext
+  ): Future[TxLogEntry.OpenMiningRoundLogEntry] = waitUntilAcsIngested {
+    for {
+      row <- storage
+        .querySingle(
+          selectFromTxLogTable(
+            txLogTableName,
+            storeId,
+            where = sql"""
+                   entry_type = ${TxLogEntry.OpenMiningRoundLogEntry.dbType} and
+                   round = $round
+              """,
+            orderLimit = sql"order by entry_number desc limit 1",
+          ).headOption,
+          "getCoinConfigForRound",
+        )
+        .value
+      entry = row.map(txLogEntryFromRow[TxLogEntry.OpenMiningRoundLogEntry](txLogConfig))
+      result <- entry match {
+        case Some(omr: TxLogEntry.OpenMiningRoundLogEntry) =>
+          Future.successful(omr)
+        case None =>
+          Future.failed(txLogNotFound())
+      }
+    } yield result
+  }
+
+  override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            sql"""
+            select   closed_round,
+                     closed_round_effective_at
+            from     round_totals
+            where    store_id = $storeId
+            order by closed_round desc
+            limit    1;
+            """.as[(Long, Long)].headOption,
+            "getRoundOfLatestData",
+          )
+          .value
+        result <- row match {
+          case Some((closedRound, effectiveAt)) =>
+            Future.successful(
+              (closedRound, CantonTimestamp.assertFromLong(micros = effectiveAt).toInstant)
+            )
+          case None =>
+            Future.failed(roundNotAggregated())
+        }
+      } yield result
+    }
+
+  override def getTotalCoinBalance(asOfEndOfRound: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] =
+    waitUntilAcsIngested {
+      for {
+        result <- ensureAggregated(asOfEndOfRound) {
+          storage.query(
+            sql"""
+              select total_coin_balance
+              from   round_totals
+              where  store_id = $storeId
+              and    closed_round = $asOfEndOfRound;
+              """.as[Option[BigDecimal]].headOption,
+            "getTotalCoinBalance",
+          )
+        }
+      } yield result.flatten.getOrElse(0)
+    }
+
+  override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
+    waitUntilAcsIngested {
+      for {
+        result <- storage.query(
+          sql"""
+          select coalesce(cumulative_app_rewards, 0) + coalesce(cumulative_validator_rewards, 0)
+          from   round_totals
+          where  store_id = $storeId
+          and    closed_round = (
+                    select max(closed_round)
+                    from round_totals
+                    where store_id = $storeId
+                 );
+          """.as[BigDecimal].headOption,
+          "getTotalRewardsCollectedEver",
+        )
+      } yield result.getOrElse(0)
+    }
+
+  override def getRewardsCollectedInRound(round: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] = waitUntilAcsIngested {
+    for {
+      result <- ensureAggregated(round) {
+        storage.query(
+          sql"""
+            select coalesce(app_rewards, 0) + coalesce(validator_rewards, 0)
+            from   round_totals
+            where  store_id = $storeId
+            and    closed_round = $round;
+            """.as[BigDecimal].headOption,
+          "getRewardsCollectedInRound",
+        )
+      }
+    } yield result.getOrElse(0)
+  }
+
+  override def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] = waitUntilAcsIngested {
+    for {
+      result <- ensureAggregated(asOfEndOfRound) {
+        storage.query(
+          // The round_party_totals might not have a row for the given round, (when the party has not been active in that round)
+          // in that case just take the most recent round.
+          // This is also why the total_coin_balance is calculated from the two cumulative fields.
+          sql"""
+             select   cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1) as total_coin_balance
+             from     round_party_totals
+             where    store_id = $storeId
+             and      closed_round <= $asOfEndOfRound
+             and      party = $partyId
+             order by closed_round desc
+             limit    1;
+           """.as[Option[BigDecimal]].headOption,
+          "getWalletBalance",
+        )
+      }
+    } yield result.flatten.getOrElse(0)
+  }
+
+  override def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
+    for {
+      rows <- ensureAggregated(asOfEndOfRound) {
+        storage.query(
+          sql"""
+              with ranked_providers_by_app_rewards as (
+                select   party as provider,
+                         max(cumulative_app_rewards) as cumulative_app_rewards,
+                         rank() over (order by max(cumulative_app_rewards) desc) as rank_nr
+                from     round_party_totals
+                where    store_id = $storeId
+                and      closed_round <= $asOfEndOfRound
+                and      cumulative_app_rewards > 0
+                group by party
+              )
+              select   provider,
+                       cumulative_app_rewards
+              from     ranked_providers_by_app_rewards
+              where    rank_nr <= $limit
+              order by rank_nr;
+            """.as[(PartyId, BigDecimal)],
+          "getTopProvidersByAppRewards",
+        )
+      }
+    } yield rows
+  }
+
+  override def getTopValidatorsByValidatorRewards(asOfEndOfRound: Long, limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[(PartyId, BigDecimal)]] = waitUntilAcsIngested {
+    for {
+      rows <- ensureAggregated(asOfEndOfRound) {
+        storage.query(
+          sql"""
+              with ranked_validators_by_validator_rewards as (
+                select   party as validator,
+                         max(cumulative_validator_rewards) as cumulative_validator_rewards,
+                         rank() over (order by max(cumulative_validator_rewards) desc) as rank_nr
+                from     round_party_totals
+                where    store_id = $storeId
+                and      closed_round <= $asOfEndOfRound
+                and      cumulative_validator_rewards > 0
+                group by party
+              )
+              select   validator,
+                       cumulative_validator_rewards
+              from     ranked_validators_by_validator_rewards
+              where    rank_nr <= $limit
+              order by rank_nr;
+           """.as[(PartyId, BigDecimal)],
+          "getTopValidatorsByValidatorRewards",
+        )
+      }
+    } yield rows
+  }
+
+  override def getTopValidatorsByPurchasedTraffic(asOfEndOfRound: Long, limit: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[HttpScanAppClient.ValidatorPurchasedTraffic]] = waitUntilAcsIngested {
+    for {
+      rows <- ensureAggregated(asOfEndOfRound) {
+        // There might not be a row for a party where closed_round = asOfEndOfRound, so we need to use the
+        // max cumulatives for each party up to including asOfEndOfRound
+        // and separately get the last purchased round for each party in the leaderboard
+        storage.query(
+          sql"""
+              with ranked_validators_by_purchased_traffic as (
+                select   party as validator,
+                         max(cumulative_traffic_num_purchases) as cumulative_traffic_num_purchases,
+                         max(cumulative_traffic_purchased) as cumulative_traffic_purchased,
+                         max(cumulative_traffic_purchased_cc_spent) as cumulative_traffic_purchased_cc_spent,
+                         rank() over (order by max(cumulative_traffic_purchased) desc) as rank_nr
+                from     round_party_totals
+                where    store_id = $storeId
+                and      closed_round <= $asOfEndOfRound
+                and      cumulative_traffic_purchased > 0
+                group by party
+              ),
+              last_purchases as (
+                select   party as validator,
+                         max(closed_round) as last_purchased_in_round
+                from     round_party_totals
+                where    store_id = $storeId
+                and      closed_round <= $asOfEndOfRound
+                and      traffic_purchased > 0
+                group by party
+              )
+              select    rv.validator,
+                        rv.cumulative_traffic_num_purchases,
+                        rv.cumulative_traffic_purchased,
+                        rv.cumulative_traffic_purchased_cc_spent,
+                        coalesce(lp.last_purchased_in_round, 0)
+              from      ranked_validators_by_purchased_traffic rv
+              left join last_purchases lp
+              on        rv.validator = lp.validator
+              where     rv.rank_nr <= $limit
+              order by  rv.rank_nr;
+           """.as[(PartyId, Long, Long, BigDecimal, Long)],
+          "getTopValidatorsByPurchasedTraffic",
+        )
+      }
+    } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
+  }
+
+  override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long] = waitUntilAcsIngested {
+    for {
+      sum <- storage
+        .querySingle(
+          sql"""
+               select sum(total_traffic_purchased)
+               from #${ScanTables.acsTableName}
+               where store_id = $storeId
+                and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
+                and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
+             """.as[Long].headOption,
+          "getTotalPurchasedMemberTraffic",
+        )
+        .value
+    } yield sum.getOrElse(0L)
+  }
 }

@@ -213,8 +213,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val keptCoinAmount = 60.0
         val sentCoinAmount = 40.0
         val coinAmount = keptCoinAmount + sentCoinAmount
-
-        val closedRounds = (0 to 3).map { round =>
+        val lastClosedRound = 3
+        val closedRounds = (0 to lastClosedRound).map { round =>
           closedMiningRound(svcParty, round = round.toLong)
         }
 
@@ -269,6 +269,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             store
               .getWalletBalance(user, 3)
               .futureValue shouldBe (coinAmount - 4 * holdingFee) withClue "at round 3"
+            val failure = store.getWalletBalance(user, lastClosedRound + 1L).failed.futureValue
+            failure.getMessage should be(roundNotAggregated().getMessage)
           }
         }
       }
@@ -531,7 +533,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
         } yield {
           val failure = store.getRoundOfLatestData().failed.futureValue
-          failure.getMessage should be(txLogNotFound().getMessage)
+          failure.getMessage should be(roundNotAggregated().getMessage)
         }
       }
     }

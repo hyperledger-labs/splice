@@ -11,6 +11,7 @@ Release Notes
 * You might see some ``ACS_COMMITMENT_MISMATCH`` warning logs in the participant. These can be ignored.
 * Add `enableHealthProbes` to the global domain helm chart, providing the ability to disable gRPC readiness and liveness probes for the sequencer and mediator.
 * Containers now use tini as the entrypoint to ensure proper signal handling.
+* Fix for wallet balances incorrectly reporting as zero for rounds that have not been aggregated yet. An error will be returned instead.
 
 * Deployment
 

@@ -282,7 +282,11 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getTotalCoinBalance") { _ => _ =>
       for {
-        total <- store.getTotalCoinBalance(asOfEndOfRound)
+        total <- store
+          .getTotalCoinBalance(asOfEndOfRound)
+          .transform(
+            HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
+          )
       } yield {
         definitions.GetTotalCoinBalanceResponse(
           Codec.encode(total)
@@ -300,7 +304,11 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.getWalletBalance") { _ => _ =>
       for {
-        total <- store.getWalletBalance(PartyId tryFromProtoPrimitive partyId, asOfEndOfRound)
+        total <- store
+          .getWalletBalance(PartyId tryFromProtoPrimitive partyId, asOfEndOfRound)
+          .transform(
+            HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
+          )
       } yield definitions.GetWalletBalanceResponse(Codec.encode(total))
     }
   }
@@ -445,6 +453,9 @@ class HttpScanHandler(
                 .toVector
             )
           )
+        )
+        .transform(
+          HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
         )
     }
   }

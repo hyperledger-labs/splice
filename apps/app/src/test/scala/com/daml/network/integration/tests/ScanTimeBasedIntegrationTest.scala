@@ -171,8 +171,17 @@ class ScanTimeBasedIntegrationTest
     clue("Data for a later round does not yet exist")({
       val lastAggregatedRound = sv1ScanBackend.getRoundOfLatestData()._1
       val laterRound = lastAggregatedRound + 1
-      sv1ScanBackend.getTopProvidersByAppRewards(laterRound, 10) shouldBe empty
-      sv1ScanBackend.getTopValidatorsByValidatorRewards(laterRound, 10) shouldBe empty
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.getTopProvidersByAppRewards(
+          laterRound,
+          10,
+        ),
+        _.errorMessage should include(s"Data for round $laterRound not yet computed"),
+      )
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.getTopValidatorsByValidatorRewards(laterRound, 10),
+        _.errorMessage should include(s"Data for round $laterRound not yet computed"),
+      )
     })
 
     def compareLeaderboard(

@@ -377,6 +377,8 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetTotalCoinBalanceResponse.OK(response) =>
         Codec.decode(Codec.BigDecimal)(response.totalBalance)
+      case http.GetTotalCoinBalanceResponse.NotFound(err) =>
+        Left(err.error)
     }
   }
 
@@ -471,8 +473,9 @@ object HttpScanAppClient {
         for {
           amount <- Codec.decode(Codec.BigDecimal)(response.amount)
         } yield amount
+      case http.GetRewardsCollectedResponse.NotFound(err) =>
+        Left(err.error)
     }
-
   }
 
   private def decodePartiesAndRewards(
@@ -497,8 +500,11 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetTopProvidersByAppRewardsResponse.OK(response) =>
-      decodePartiesAndRewards(response.providersAndRewards)
+    ) = {
+      case http.GetTopProvidersByAppRewardsResponse.OK(response) =>
+        decodePartiesAndRewards(response.providersAndRewards)
+      case http.GetTopProvidersByAppRewardsResponse.NotFound(err) =>
+        Left(err.error)
     }
   }
 
@@ -517,8 +523,11 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetTopValidatorsByValidatorRewardsResponse.OK(response) =>
-      decodePartiesAndRewards(response.validatorsAndRewards)
+    ) = {
+      case http.GetTopValidatorsByValidatorRewardsResponse.OK(response) =>
+        decodePartiesAndRewards(response.validatorsAndRewards)
+      case http.GetTopValidatorsByValidatorRewardsResponse.NotFound(err) =>
+        Left(err.error)
     }
   }
 
@@ -546,6 +555,8 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetTopValidatorsByPurchasedTrafficResponse.OK(response) =>
         response.validatorsByPurchasedTraffic.traverse(decodeValidatorPurchasedTraffic)
+      case http.GetTopValidatorsByPurchasedTrafficResponse.NotFound(err) =>
+        Left(err.error)
     }
 
     private def decodeValidatorPurchasedTraffic(traffic: definitions.ValidatorPurchasedTraffic) = {

@@ -99,31 +99,14 @@ trait ScanStore
 
   def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)]
 
-  def verifyDataExistsForEndOfRound(
-      asOfEndOfRound: Long
-  )(implicit tc: TraceContext): Future[Unit] = {
-    if (asOfEndOfRound < 0) {
-      Future.failed(
-        Status.OUT_OF_RANGE
-          .withDescription("Round numbers cannot be negative")
-          .asRuntimeException()
-      )
-    } else {
-      // TODO(#2930): For now, we support querying data for any round up to the latest closed one. This should
-      // be revisited once we add some backfilling (historical or ACS-based) in the scan bootstrap.
-      getRoundOfLatestData().flatMap { case (round, _) =>
-        if (asOfEndOfRound > round) {
-          Future.failed(
-            Status.NOT_FOUND
-              .withDescription(s"Data for round ${asOfEndOfRound} not yet computed")
-              .asRuntimeException()
-          )
-        } else {
-          Future.successful(())
-        }
-      }
-    }
-  }
+  def ensureAggregated[T](asOfEndOfRound: Long)(f: => Future[T])(implicit
+      tc: TraceContext
+  ): Future[T] = for {
+    (lastRound, _) <- getRoundOfLatestData()
+    result <-
+      if (lastRound >= asOfEndOfRound) f
+      else Future.failed(roundNotAggregated())
+  } yield result
 
   def getTopProvidersByAppRewards(asOfEndOfRound: Long, limit: Int)(implicit
       tc: TraceContext

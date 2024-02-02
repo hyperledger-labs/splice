@@ -90,12 +90,14 @@ class InMemoryScanStore(
   override def getWalletBalance(partyId: PartyId, asOfEndOfRound: Long)(implicit
       tc: TraceContext
   ): Future[BigDecimal] = for {
-    txLogEntries <- multiDomainAcsStore.collectTxLogEntries(Function unlift {
-      case balanceChange: TxLogEntry.BalanceChangeLogEntry
-          if balanceChange.round <= asOfEndOfRound =>
-        balanceChange.partyBalanceChanges get partyId
-      case _ => None
-    })
+    txLogEntries <- ensureAggregated(asOfEndOfRound) {
+      multiDomainAcsStore.collectTxLogEntries(Function unlift {
+        case balanceChange: TxLogEntry.BalanceChangeLogEntry
+            if balanceChange.round <= asOfEndOfRound =>
+          balanceChange.partyBalanceChanges get partyId
+        case _ => None
+      })
+    }
   } yield txLogEntries.foldMap(pbc =>
     pbc.changeToInitialAmountAsOfRoundZero
       - pbc.changeToHoldingFeesRate * (asOfEndOfRound + 1)
@@ -127,6 +129,9 @@ class InMemoryScanStore(
         case _ => false
       }
       .collect { case r: Closed => r.round -> r.effectiveAt }
+      .recoverWith { _ =>
+        Future.failed(roundNotAggregated())
+      }
   }
 
   override def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal] =
@@ -171,12 +176,13 @@ class InMemoryScanStore(
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] =
     for {
-      _ <- verifyDataExistsForEndOfRound(asOfEndOfRound)
-      // TODO(#2930): for now we assume that the number of rewards per round is small enough that querying the log by round
-      // provides small enough partitioning of the result, thus no further pagination of the tx log query is required.
-      perRound <- (0L to asOfEndOfRound).toList.traverse(
-        sumRewardsCollectedInRound(_, rewardTypeFilter)
-      )
+      perRound <- ensureAggregated(asOfEndOfRound) {
+        // TODO(#2930): for now we assume that the number of rewards per round is small enough that querying the log by round
+        // provides small enough partitioning of the result, thus no further pagination of the tx log query is required.
+        (0L to asOfEndOfRound).toList.traverse(
+          sumRewardsCollectedInRound(_, rewardTypeFilter)
+        )
+      }
     } yield {
       Monoid.combineAll(perRound).toSeq.sortWith(_._2 > _._2).slice(0, limit)
     }
@@ -317,8 +323,9 @@ class InMemoryScanStore(
     }
 
     for {
-      _ <- verifyDataExistsForEndOfRound(asOfEndOfRound)
-      perRound <- (0L to asOfEndOfRound).toList.traverse(trafficPurchasesByValidatorInRound)
+      perRound <- ensureAggregated(asOfEndOfRound) {
+        (0L to asOfEndOfRound).toList.traverse(trafficPurchasesByValidatorInRound)
+      }
     } yield {
       perRound
         .foldLeft(Map.empty[PartyId, ValidatorPurchasedTraffic])((acc, forRound) => {

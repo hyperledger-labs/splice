@@ -3,6 +3,10 @@ package com.daml.network.store
 import io.grpc.Status
 
 trait StoreErrors {
+  def roundNotAggregated() = {
+    Status.NOT_FOUND.withDescription("Round has not been aggregated yet").asRuntimeException
+  }
+
   def txLogNotFound() = {
     Status.NOT_FOUND.withDescription("No matching log indices found").asRuntimeException
   }
