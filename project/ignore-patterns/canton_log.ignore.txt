@@ -111,4 +111,7 @@ INVALID_SUBMISSION_REQUEST_SIGNATURE.*sequencer
 has recorded multiple values for the same attributes
 Too many log messages detected..*AsynchronousMetricStorage
 
+# TODO(#9765): remove this ignore once the bug is fixed in Canton
+Unexpectedly using default domain parameters
+
 # Make sure to have a trailing newline
