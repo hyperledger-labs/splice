@@ -1272,7 +1272,7 @@ To see which key is used for a given cluster, go to the cluster
 directory and run this command. The DNS SA key is stored under `DNS01_SA_KEY_JSON`:
 
 ```
-cncluster pulumi infra config
+cncluster pulumi infra "infra.$GCP_CLUSTER_BASENAME" config
 ```
 
 ### Github Tokens
