@@ -542,7 +542,14 @@ jobs:
             cncluster activate
             # We use readiness of validator-app as an approximation to the node's readiness
             for ns in $(cat tests-to-run.txt); do
-              cncluster wait $ns validator-app
+              case $ns in
+                "sv-1"|"sv-2"|"sv-3"|"sv-4")
+                  cncluster wait $ns validator-app-0
+                  ;;
+                "validator1"|"splitwell"|"sv")
+                  cncluster wait $ns validator-app
+                  ;;
+              esac
             done
             cncluster backup_nodes $(cat tests-to-run.txt)
       - notify-cluster-fail:
@@ -573,11 +580,15 @@ jobs:
             cncluster activate
             cncluster restore_node --force << parameters.namespace_name >>
 
-            cncluster wait << parameters.namespace_name >> validator-app
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
                 cncluster wait << parameters.namespace_name >> scan-app-0
                 cncluster wait << parameters.namespace_name >> sv-app-0
+                cncluster wait << parameters.namespace_name >> validator-app-0
+                ;;
+              "validator1")
+                cncluster wait << parameters.namespace_name >> validator-app
+                ;;
             esac
       - notify-cluster-fail:
           cluster: << parameters.cluster >>

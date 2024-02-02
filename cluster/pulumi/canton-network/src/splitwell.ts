@@ -21,11 +21,11 @@ import { installValidatorApp } from './validator';
 
 export async function installSplitwell(
   auth0Client: Auth0Client,
-  svc: pulumi.Resource,
   providerWalletUser: string,
   onboardingSecret: string,
   splitPostgresInstances: boolean,
   svActiveDomain: DomainIndex,
+  dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
@@ -83,7 +83,7 @@ export async function installSplitwell(
       },
       scanAddress: scanAddress,
     },
-    { dependsOn: [svc, participant] }
+    { dependsOn: dependsOn.concat([participant]) }
   );
 
   const validatorPostgres = splitPostgresInstances
@@ -91,13 +91,11 @@ export async function installSplitwell(
     : domainPostgres;
   const validatorDbName = 'val_splitwell';
 
-  const extraDependsOn = [
-    svc,
+  const extraDependsOn = dependsOn.concat([
     await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
-  ];
+  ]);
 
   const validator = installValidatorApp({
-    auth0Client,
     xns,
     extraDependsOn,
     participant,
@@ -116,7 +114,6 @@ export async function installSplitwell(
     onboardingSecret,
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     svSponsorAddress: `http://sv-app-${svActiveDomain}.sv-1:5014`,
-    auth0AppName: 'splitwell_validator',
     participantBootstrapDump,
     participantAddress: 'participant',
     topupConfig: topupConfig,
@@ -131,6 +128,11 @@ export async function installSplitwell(
     },
     scanAddress: scanAddress,
     globalDomainUrl: globalDomainUrl,
+    secrets: {
+      xns: xns,
+      auth0Client: auth0Client,
+      auth0AppName: 'splitwell_validator',
+    },
   });
 
   installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);

@@ -1,21 +1,22 @@
+{{- $cnsWebUiLabel := include "appLabel" (list .Values "cns-web-ui") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: cns-web-ui
-  name: cns-web-ui
+    app: {{ $cnsWebUiLabel }}
+  name: {{ $cnsWebUiLabel }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: cns-web-ui
+      app: {{ $cnsWebUiLabel }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: cns-web-ui
+        app: {{ $cnsWebUiLabel }}
     spec:
       containers:
       - name: cns-web-ui
@@ -50,11 +51,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: cns-web-ui
+  name: {{ $cnsWebUiLabel }}
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: cns-web-ui
+    app: {{ $cnsWebUiLabel }}
   ports:
   - name: http
     port: 80

@@ -5,4 +5,4 @@ cluster:
 defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4
 cometbftPorts:
   nodes: 10
-  domains: 1
+  domains: 5

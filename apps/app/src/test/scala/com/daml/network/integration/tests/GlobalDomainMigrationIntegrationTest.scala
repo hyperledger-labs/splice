@@ -337,7 +337,6 @@ class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with Pr
 
           withClueAndLog("migrate the late joining node") {
             // sv1 is the founder so specifically join it later to validate our replay
-            upgradeDomainNode1.oldBackend.triggerGlobalDomainMigrationDump()
             sv1LocalBackend.startSync()
 
             eventuallySucceeds() {

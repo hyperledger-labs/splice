@@ -1,21 +1,22 @@
+{{- $validatorAppLabel := include "appLabel" (list .Values "validator-app") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: validator-app
+  name: {{ $validatorAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: validator-app
+    app: {{ $validatorAppLabel }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: validator-app
+      app: {{ $validatorAppLabel }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: validator-app
+        app: {{ $validatorAppLabel }}
     spec:
       containers:
       - name: validator-app
@@ -225,13 +226,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: validator-app
+  name: {{ $validatorAppLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
-    app: validator-app
+    app: {{ $validatorAppLabel }}
 spec:
   selector:
-    app: validator-app
+    app: {{ $validatorAppLabel }}
   ports:
   - name: val-http
     port: 5003

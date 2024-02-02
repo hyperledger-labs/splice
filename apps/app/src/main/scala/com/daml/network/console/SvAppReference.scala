@@ -127,9 +127,9 @@ abstract class SvAppReference(
     }
 
   @Help.Summary("Dump all the required data for domain migration to the configured location")
-  def triggerGlobalDomainMigrationDump(): Unit =
+  def triggerGlobalDomainMigrationDump(migrationId: Long): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.TriggerDomainMigrationDump())
+      httpCommand(HttpSvAdminAppClient.TriggerDomainMigrationDump(migrationId))
     }
 
   @Help.Summary("Get identities of all domain node components")

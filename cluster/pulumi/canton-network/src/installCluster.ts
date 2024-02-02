@@ -21,7 +21,7 @@ import {
 
 import { installDocs } from './docs';
 import { configureForwardAll } from './gateway';
-import { DefaultGlobalDomainId, DomainIndex, GlobalDomainUpgradeConfig } from './globalDomainNode';
+import { GlobalDomainUpgradeConfig } from './globalDomainNode';
 import { installSplitwell } from './splitwell';
 import { installSvNode, SvOnboarding } from './sv';
 import { installValidator1 } from './validator1';
@@ -63,12 +63,7 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
   : undefined;
 
-const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = {
-  prepareUpgrade: process.env.GLOBAL_DOMAIN_PREPARE_UPGRADE === 'true',
-  legacyGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_LEGACY_ID),
-  activeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_ACTIVE_ID) || DefaultGlobalDomainId,
-  upgradeGlobalDomainId: processIndex(process.env.GLOBAL_DOMAIN_UPGRADE_ID),
-};
+const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = GlobalDomainUpgradeConfig.fromEnv();
 
 const sv2Key = svKeyFromSecret('sv2');
 const sv3Key = svKeyFromSecret('sv3');
@@ -161,8 +156,57 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   configureForwardAll(
     infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>
   );
+  const sv1 = await installSvc(auth0Client, topupConfig);
 
-  const { svApp: sv1 } = await installSvNode(
+  // TODO(#8761) install the validator once the upgrade supports it
+  const installNonSvComponents =
+    !globalDomainUpgradeConfig.isUpgrade() && globalDomainUpgradeConfig.isDefaultActive();
+  const nonSvComponentsDependencies = [sv1.founder.scan];
+  const validator = installNonSvComponents
+    ? await installValidator1(
+        auth0Client,
+        'validator1',
+        validator1Onboarding.secret,
+        'auth0|63e3d75ff4114d87a2c1e4f5',
+        splitPostgresInstances,
+        globalDomainUpgradeConfig.activeGlobalDomainId,
+        nonSvComponentsDependencies,
+        backupConfig,
+        bootstrappingDumpConfig,
+        // x10 validator1's traffic targetThroughput for load tester -- see #9064
+        { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
+      )
+    : undefined;
+
+  // TODO(#8761) install splitwell once the upgrade supports it
+  const splitwell = installNonSvComponents
+    ? await installSplitwell(
+        auth0Client,
+        'auth0|63e12e0415ad881ffe914e61',
+        splitwellOnboarding.secret,
+        splitPostgresInstances,
+        globalDomainUpgradeConfig.activeGlobalDomainId,
+        nonSvComponentsDependencies,
+        backupConfig,
+        bootstrappingDumpConfig,
+        topupConfig
+      )
+    : undefined;
+
+  const docs = installDocs();
+
+  installCNHelmChartByNamespaceName(
+    'cluster-ingress',
+    infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>,
+    'cluster-ingress',
+    'cn-cluster-ingress-full',
+    {},
+    { dependsOn: [validator, splitwell, docs].flatMap(value => (value ? [value] : [])) }
+  );
+}
+
+async function installSvc(auth0Client: Auth0Client, topupConfig: ValidatorTopupConfig) {
+  const sv1 = await installSvNode(
     {
       auth0Client,
       nodename: 'sv-1',
@@ -187,125 +231,80 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     },
     globalDomainUpgradeConfig
   );
+  const svFounderSvApp = sv1.svApp;
+
+  const allSvs = [sv1];
 
   if (!singleSv) {
-    await installSvNode(
-      {
-        auth0Client,
-        nodename: 'sv-2',
-        onboardingName: 'Canton-Foundation-2',
-        validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
-        onboarding: joinViaSv1(sv1, sv2Key),
-        approvedSvIdentities,
-        expectedValidatorOnboardings: [],
-        isDevNet,
-        backupConfig: backupConfig,
-        auth0ValidatorAppName: 'sv2_validator',
-        bootstrappingDumpConfig,
-        topupConfig,
-        splitPostgresInstances,
-        sequencerPruningConfig,
-      },
-      globalDomainUpgradeConfig,
-      sv1
-    );
-    await installSvNode(
-      {
-        auth0Client,
-        nodename: 'sv-3',
-        onboardingName: 'Canton-Foundation-3',
-        validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
-        onboarding: joinViaSv1(sv1, sv3Key),
-        approvedSvIdentities,
-        expectedValidatorOnboardings: [],
-        isDevNet,
-        backupConfig,
-        auth0ValidatorAppName: 'sv3_validator',
-        bootstrappingDumpConfig,
-        topupConfig,
-        splitPostgresInstances,
-        sequencerPruningConfig,
-      },
-      globalDomainUpgradeConfig,
-      sv1
-    );
-    await installSvNode(
-      {
-        auth0Client,
-        nodename: 'sv-4',
-        onboardingName: 'Canton-Foundation-4',
-        validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
-        onboarding: joinViaSv1(sv1, sv4Key),
-        approvedSvIdentities,
-        expectedValidatorOnboardings: [],
-        isDevNet,
-        backupConfig,
-        auth0ValidatorAppName: 'sv4_validator',
-        bootstrappingDumpConfig,
-        topupConfig,
-        splitPostgresInstances,
-        sequencerPruningConfig,
-      },
-      globalDomainUpgradeConfig,
-      sv1
-    );
-  }
-
-  // TODO(#8761) install the validator once the upgrade supports it
-  const installNonSvComponents =
-    globalDomainUpgradeConfig.activeGlobalDomainId == DefaultGlobalDomainId &&
-    globalDomainUpgradeConfig.upgradeGlobalDomainId == undefined;
-  const validator = installNonSvComponents
-    ? await installValidator1(
-        auth0Client,
-        sv1,
-        'validator1',
-        validator1Onboarding.secret,
-        'auth0|63e3d75ff4114d87a2c1e4f5',
-        splitPostgresInstances,
-        globalDomainUpgradeConfig.activeGlobalDomainId,
-        backupConfig,
-        bootstrappingDumpConfig,
-        // x10 validator1's traffic targetThroughput for load tester -- see #9064
-        { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
+    allSvs.push(
+      await installSvNode(
+        {
+          auth0Client,
+          nodename: 'sv-2',
+          onboardingName: 'Canton-Foundation-2',
+          validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
+          onboarding: joinViaSv1(svFounderSvApp, sv2Key),
+          approvedSvIdentities,
+          expectedValidatorOnboardings: [],
+          isDevNet,
+          backupConfig: backupConfig,
+          auth0ValidatorAppName: 'sv2_validator',
+          bootstrappingDumpConfig,
+          topupConfig,
+          splitPostgresInstances,
+          sequencerPruningConfig,
+        },
+        globalDomainUpgradeConfig,
+        svFounderSvApp
       )
-    : undefined;
-
-  // TODO(#8761) install splitwell once the upgrade supports it
-  const splitwell = installNonSvComponents
-    ? await installSplitwell(
-        auth0Client,
-        sv1,
-        'auth0|63e12e0415ad881ffe914e61',
-        splitwellOnboarding.secret,
-        splitPostgresInstances,
-        globalDomainUpgradeConfig.activeGlobalDomainId,
-        backupConfig,
-        bootstrappingDumpConfig,
-        topupConfig
+    );
+    allSvs.push(
+      await installSvNode(
+        {
+          auth0Client,
+          nodename: 'sv-3',
+          onboardingName: 'Canton-Foundation-3',
+          validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
+          onboarding: joinViaSv1(svFounderSvApp, sv3Key),
+          approvedSvIdentities,
+          expectedValidatorOnboardings: [],
+          isDevNet,
+          backupConfig,
+          auth0ValidatorAppName: 'sv3_validator',
+          bootstrappingDumpConfig,
+          topupConfig,
+          splitPostgresInstances,
+          sequencerPruningConfig,
+        },
+        globalDomainUpgradeConfig,
+        svFounderSvApp
       )
-    : undefined;
-
-  const docs = installDocs();
-
-  installCNHelmChartByNamespaceName(
-    'cluster-ingress',
-    infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>,
-    'cluster-ingress',
-    'cn-cluster-ingress-full',
-    {},
-    { dependsOn: [validator, splitwell, docs].flatMap(value => (value ? [value] : [])) }
-  );
-}
-
-function processIndex(maybeValue?: string) {
-  if (maybeValue == undefined) {
-    return undefined;
+    );
+    allSvs.push(
+      await installSvNode(
+        {
+          auth0Client,
+          nodename: 'sv-4',
+          onboardingName: 'Canton-Foundation-4',
+          validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
+          onboarding: joinViaSv1(svFounderSvApp, sv4Key),
+          approvedSvIdentities,
+          expectedValidatorOnboardings: [],
+          isDevNet,
+          backupConfig,
+          auth0ValidatorAppName: 'sv4_validator',
+          bootstrappingDumpConfig,
+          topupConfig,
+          splitPostgresInstances,
+          sequencerPruningConfig,
+        },
+        globalDomainUpgradeConfig,
+        svFounderSvApp
+      )
+    );
   }
-  const index = Number(maybeValue);
-  if (index >= 0 && index < 10) {
-    return index as DomainIndex;
-  } else {
-    throw new Error(`Cannot process ${maybeValue} as domain index`);
-  }
+  return {
+    founder: sv1,
+    allSvs,
+  };
 }

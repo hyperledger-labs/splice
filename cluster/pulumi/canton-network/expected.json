@@ -1216,7 +1216,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometbftPorts": {
-          "domains": 1,
+          "domains": 5,
           "nodes": 10
         },
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
@@ -2084,7 +2084,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-validator-sv-1-e",
+      "name": "postgres-validator-sv-1-0-e",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2098,14 +2098,14 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "databaseName": "validator_sv_1",
+          "databaseName": "validator_sv_1_0",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "sv-1-postgres-validator-sv-1-e",
+    "name": "sv-1-postgres-validator-sv-1-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2469,7 +2469,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-validator/",
       "compat": "true",
-      "name": "validator-sv-1",
+      "name": "validator-sv-1-0",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2486,8 +2486,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
+        "domainId": "0",
         "fixedTokens": false,
-        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
+        "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
@@ -2496,10 +2497,10 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "validator_sv_1",
+          "databaseName": "validator_sv_1_0",
           "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
-          "schema": "validator_sv_1",
+          "schema": "validator_sv_1_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -2523,7 +2524,7 @@
         "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7"
       }
     },
-    "name": "sv-1-validator-sv-1",
+    "name": "sv-1-validator-sv-1-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2996,7 +2997,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-validator-sv-2-e",
+      "name": "postgres-validator-sv-2-0-e",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -3010,14 +3011,14 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "databaseName": "validator_sv_2",
+          "databaseName": "validator_sv_2_0",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "sv-2-postgres-validator-sv-2-e",
+    "name": "sv-2-postgres-validator-sv-2-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3353,7 +3354,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-validator/",
       "compat": "true",
-      "name": "validator-sv-2",
+      "name": "validator-sv-2-0",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -3370,8 +3371,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
+        "domainId": "0",
         "fixedTokens": false,
-        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
+        "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
@@ -3380,10 +3382,10 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "validator_sv_2",
+          "databaseName": "validator_sv_2_0",
           "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
-          "schema": "validator_sv_2",
+          "schema": "validator_sv_2_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -3407,7 +3409,7 @@
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
       }
     },
-    "name": "sv-2-validator-sv-2",
+    "name": "sv-2-validator-sv-2-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3880,7 +3882,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-validator-sv-3-e",
+      "name": "postgres-validator-sv-3-0-e",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -3894,14 +3896,14 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "databaseName": "validator_sv_3",
+          "databaseName": "validator_sv_3_0",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "sv-3-postgres-validator-sv-3-e",
+    "name": "sv-3-postgres-validator-sv-3-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4237,7 +4239,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-validator/",
       "compat": "true",
-      "name": "validator-sv-3",
+      "name": "validator-sv-3-0",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -4254,8 +4256,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
+        "domainId": "0",
         "fixedTokens": false,
-        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
+        "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
@@ -4264,10 +4267,10 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "validator_sv_3",
+          "databaseName": "validator_sv_3_0",
           "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
-          "schema": "validator_sv_3",
+          "schema": "validator_sv_3_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -4291,7 +4294,7 @@
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
       }
     },
-    "name": "sv-3-validator-sv-3",
+    "name": "sv-3-validator-sv-3-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4764,7 +4767,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-validator-sv-4-e",
+      "name": "postgres-validator-sv-4-0-e",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -4778,14 +4781,14 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "databaseName": "validator_sv_4",
+          "databaseName": "validator_sv_4_0",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "sv-4-postgres-validator-sv-4-e",
+    "name": "sv-4-postgres-validator-sv-4-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5121,7 +5124,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-validator/",
       "compat": "true",
-      "name": "validator-sv-4",
+      "name": "validator-sv-4-0",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -5138,8 +5141,9 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
+        "domainId": "0",
         "fixedTokens": false,
-        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
+        "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
@@ -5148,10 +5152,10 @@
         },
         "participantAddress": "participant-0",
         "persistence": {
-          "databaseName": "validator_sv_4",
+          "databaseName": "validator_sv_4_0",
           "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
-          "schema": "validator_sv_4",
+          "schema": "validator_sv_4_0",
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
@@ -5175,7 +5179,7 @@
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"
       }
     },
-    "name": "sv-4-validator-sv-4",
+    "name": "sv-4-validator-sv-4-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5214,7 +5218,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "cometbftPorts": {
-          "domains": 1,
+          "domains": 5,
           "nodes": 10
         },
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",

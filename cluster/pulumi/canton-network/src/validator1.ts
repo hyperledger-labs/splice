@@ -19,12 +19,12 @@ import { installValidatorApp } from './validator';
 
 export async function installValidator1(
   auth0Client: Auth0Client,
-  svc: pulumi.Resource,
   name: string,
   onboardingSecret: string,
   validatorWalletUser: string,
   splitPostgresInstances: boolean,
   svActiveDomain: DomainIndex,
+  dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
   topupConfig?: ValidatorTopupConfig
@@ -75,12 +75,14 @@ export async function installValidator1(
 
   const validatorDbName = 'validator1';
 
-  const extraDependsOn: pulumi.Resource[] = [svc, participantPostgres, validatorPostgres];
+  const extraDependsOn: pulumi.Resource[] = dependsOn.concat([
+    participantPostgres,
+    validatorPostgres,
+  ]);
   const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
   const scanAddress = `http://scan-app-${svActiveDomain}.sv-1:5012`;
 
   const validator = installValidatorApp({
-    auth0Client,
     validatorWalletUser,
     xns,
     participant,
@@ -99,13 +101,17 @@ export async function installValidator1(
     },
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     extraDependsOn,
-    auth0AppName: 'validator1',
     participantBootstrapDump,
     participantAddress: 'participant',
     topupConfig,
     svValidator: false,
     globalDomainUrl,
     scanAddress,
+    secrets: {
+      xns,
+      auth0Client,
+      auth0AppName: 'validator1',
+    },
   });
 
   installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);

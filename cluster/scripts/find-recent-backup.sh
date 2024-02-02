@@ -20,6 +20,11 @@ function main() {
 
   local namespace=$1
   local component="validator"
+  case "$namespace" in
+      sv-1|sv-2|sv-3|sv-4)
+          component="validator-0"
+          ;;
+  esac
   local full_instance="$namespace-$component-pg"
 
   type=$(get_postgres_type "$full_instance")

@@ -8,12 +8,53 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { installCometBftNode } from './cometbft';
 import { Postgres, installPostgresMetrics } from './postgres';
 
-export type GlobalDomainUpgradeConfig = {
+export class GlobalDomainUpgradeConfig {
   prepareUpgrade: boolean;
   legacyGlobalDomainId?: DomainIndex;
   activeGlobalDomainId: DomainIndex;
   upgradeGlobalDomainId?: DomainIndex;
-};
+
+  constructor(
+    prepareUpgrade: boolean,
+    activeGlobalDomainId: DomainIndex,
+    legacyGlobalDomainId?: DomainIndex,
+    upgradeGlobalDomainId?: DomainIndex
+  ) {
+    this.prepareUpgrade = prepareUpgrade;
+    this.legacyGlobalDomainId = legacyGlobalDomainId;
+    this.activeGlobalDomainId = activeGlobalDomainId;
+    this.upgradeGlobalDomainId = upgradeGlobalDomainId;
+  }
+
+  static fromEnv(): GlobalDomainUpgradeConfig {
+    return new GlobalDomainUpgradeConfig(
+      process.env.GLOBAL_DOMAIN_PREPARE_UPGRADE === 'true',
+      processIndex(process.env.GLOBAL_DOMAIN_ACTIVE_ID) || DefaultGlobalDomainId,
+      processIndex(process.env.GLOBAL_DOMAIN_LEGACY_ID),
+      processIndex(process.env.GLOBAL_DOMAIN_UPGRADE_ID)
+    );
+  }
+
+  isUpgrade(): boolean {
+    return this.upgradeGlobalDomainId != undefined;
+  }
+
+  isDefaultActive(): boolean {
+    return this.activeGlobalDomainId == DefaultGlobalDomainId;
+  }
+}
+
+function processIndex(maybeValue?: string) {
+  if (maybeValue == undefined) {
+    return undefined;
+  }
+  const index = Number(maybeValue);
+  if (index >= 0 && index < 10) {
+    return index as DomainIndex;
+  } else {
+    throw new Error(`Cannot process ${maybeValue} as domain index`);
+  }
+}
 
 export const DefaultGlobalDomainId = 0;
 

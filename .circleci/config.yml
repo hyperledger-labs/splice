@@ -893,7 +893,7 @@ commands:
             n=0
             MAX_RETRY=5
             until [ $n -gt $MAX_RETRY ]; do
-              cat << parameters.test_names_file >> | circleci tests run --command "xargs ./.circleci/grab-tests.sh" $extraargs --split-by=timings --test-selector=classname --time-default=5m && break
+              echo << parameters.test_names_file >> | tr ',' '\n' | xargs cat | circleci tests run --command "xargs ./.circleci/grab-tests.sh" $extraargs --split-by=timings --test-selector=classname --time-default=5m && break
               n=$[$n+1]
               sleep 10
             done
@@ -2066,7 +2066,14 @@ jobs:
             cncluster activate
             # We use readiness of validator-app as an approximation to the node's readiness
             for ns in $(cat tests-to-run.txt); do
-              cncluster wait $ns validator-app
+              case $ns in
+                "sv-1"|"sv-2"|"sv-3"|"sv-4")
+                  cncluster wait $ns validator-app-0
+                  ;;
+                "validator1"|"splitwell"|"sv")
+                  cncluster wait $ns validator-app
+                  ;;
+              esac
             done
             cncluster backup_nodes $(cat tests-to-run.txt)
       - notify-cluster-fail:
@@ -2097,11 +2104,15 @@ jobs:
             cncluster activate
             cncluster restore_node --force << parameters.namespace_name >>
 
-            cncluster wait << parameters.namespace_name >> validator-app
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
                 cncluster wait << parameters.namespace_name >> scan-app-0
                 cncluster wait << parameters.namespace_name >> sv-app-0
+                cncluster wait << parameters.namespace_name >> validator-app-0
+                ;;
+              "validator1")
+                cncluster wait << parameters.namespace_name >> validator-app
+                ;;
             esac
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
@@ -2115,16 +2126,22 @@ jobs:
         default: C05DT77QF5M
       test_names_file:
         type: string
-        default: "test-full-class-names-core-preflight.log"
+        default: "test-full-class-names-core-preflight.log,test-full-class-names-third-party-preflight.log"
       parallelism:
         type: integer
         default: 3
       wait_for_sv:
         type: boolean
         default: true
+      wait_for_third_party:
+        type: boolean
+        default: true
       cluster_version:
         type: string
         default: ""
+      migration_id:
+        type: integer
+        default: 0
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
@@ -2179,14 +2196,17 @@ jobs:
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
             # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
-            cncluster wait validator1 validator-app
-            cncluster wait splitwell validator-app
-            cncluster wait sv-1 validator-app
+            if [[ << parameters.wait_for_third_party >> == true ]]; then
+              cncluster wait validator1 validator-app
+              cncluster wait splitwell validator-app
+            fi
+            validator_app="validator-app-<< parameters.migration_id >>"
+            cncluster wait sv-1 $validator_app
             # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
             if [[ "${IS_DEVNET-}" != false ]]; then
-              cncluster wait sv-2 validator-app
-              cncluster wait sv-3 validator-app
-              cncluster wait sv-4 validator-app
+              cncluster wait sv-2 $validator_app
+              cncluster wait sv-3 $validator_app
+              cncluster wait sv-4 $validator_app
             fi
             if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" != false ) ]]; then
               cncluster wait sv validator-app
@@ -2201,7 +2221,7 @@ jobs:
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-frontends.sh
           additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET --keep SV_DEV_NET_WEB_UI_PASSWORD --keep SV_WEB_UI_PASSWORD --keep VALIDATOR_WEB_UI_PASSWORD --keep GCP_DATA_DUMP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
-          extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=https://sequencer.sv-1.svc.${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight"
+          extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=https://sequencer.sv-1.svc.${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" CN_MIGRATION_DOMAIN_INDEX=<< parameters.migration_id >>
           extra_parameters: -DAUTH0_TENANT=dev
           timeout: "15m"
           cmd_retry_count: 3
@@ -2280,7 +2300,6 @@ jobs:
       - restore_daml_artifacts
       - execute_sbt_command:
           cmd: "Test/compile"
-          cmd_retry_count: 3
       - run_bash_command_in_nix:
           cmd_name: wait for sv-runbook deployment to finish
           cluster: << parameters.cluster >>
@@ -3690,6 +3709,7 @@ workflows:
             - deploy_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
+          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
@@ -3697,6 +3717,8 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           wait_for_sv: false
+          wait_for_third_party: false
+          migration_id: 1
           requires:
             - switch_global_domain_upgrade
       - hold:
@@ -3870,6 +3892,7 @@ workflows:
             - deploy_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
+          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
@@ -3877,6 +3900,8 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           wait_for_sv: false
+          wait_for_third_party: false
+          migration_id: 1
           requires:
             - switch_global_domain_upgrade
       - hold:
@@ -4050,6 +4075,7 @@ workflows:
             - deploy_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
+          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
@@ -4057,6 +4083,8 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           wait_for_sv: false
+          wait_for_third_party: false
+          migration_id: 1
           requires:
             - switch_global_domain_upgrade
       - hold:
@@ -4230,6 +4258,7 @@ workflows:
             - deploy_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
+          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
@@ -4237,6 +4266,8 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           wait_for_sv: false
+          wait_for_third_party: false
+          migration_id: 1
           requires:
             - switch_global_domain_upgrade
       - hold:
@@ -4410,6 +4441,7 @@ workflows:
             - deploy_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
+          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
@@ -4417,6 +4449,8 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           wait_for_sv: false
+          wait_for_third_party: false
+          migration_id: 1
           requires:
             - switch_global_domain_upgrade
       - hold:

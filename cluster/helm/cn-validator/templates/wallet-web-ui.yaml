@@ -1,21 +1,22 @@
+{{- $walletWebUiLabel := include "appLabel" (list .Values "wallet-web-ui") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: wallet-web-ui
-  name: wallet-web-ui
+    app: {{ $walletWebUiLabel }}
+  name: {{ $walletWebUiLabel }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: wallet-web-ui
+      app: {{ $walletWebUiLabel }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: wallet-web-ui
+        app: {{ $walletWebUiLabel }}
     spec:
       containers:
       - env:
@@ -50,11 +51,11 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: wallet-web-ui
+  name: {{ $walletWebUiLabel }}
   namespace: {{ .Release.Namespace }}
 spec:
   selector:
-    app: wallet-web-ui
+    app: {{ $walletWebUiLabel }}
   ports:
   - name: http
     port: 80

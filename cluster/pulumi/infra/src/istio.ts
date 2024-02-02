@@ -100,7 +100,7 @@ function configureInternalGatewayService(
 ) {
   const externalIPRanges = loadIPRanges();
   // see notes when installing a CometBft node in the full deployment
-  const cometBftIngressPorts = Array.from(Array(1).keys()).flatMap((domain: number) => {
+  const cometBftIngressPorts = Array.from(Array(5).keys()).flatMap((domain: number) => {
     return Array.from(Array(10).keys()).map(node => {
       return ingressPort(`cometbft-${domain}-${node}-gw`, Number(`26${domain}${node}6`));
     });

@@ -46,7 +46,7 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
     clue(s"Trigger domain dump") {
       eventuallySucceeds() {
         svsWithAuth.parTraverse { sv =>
-          sv.triggerGlobalDomainMigrationDump().pure[Future]
+          sv.triggerGlobalDomainMigrationDump(1L).pure[Future]
         }.futureValue
       }
     }

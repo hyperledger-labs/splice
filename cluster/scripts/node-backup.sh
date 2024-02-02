@@ -212,14 +212,14 @@ function main() {
   elif [ "$1" == "sv" ]; then
     _info "Backing up SV node $namespace"
 
-    backup_component "$namespace" "validator" "$requested_component"
+    backup_component "$namespace" "validator-0" "$requested_component"
     backup_component "$namespace" "scan-0" "$requested_component"
     backup_component "$namespace" "sv-app-0" "$requested_component"
     backup_component "$namespace" "mediator-0" "$requested_component"
     backup_component "$namespace" "sequencer-0" "$requested_component"
     backup_component "$namespace" "cometbft-0" "$requested_component"
 
-    wait_for_backup "$namespace" "validator" "$requested_component"
+    wait_for_backup "$namespace" "validator-0" "$requested_component"
     wait_for_backup "$namespace" "scan-0" "$requested_component"
     wait_for_backup "$namespace" "sv-app-0" "$requested_component"
 

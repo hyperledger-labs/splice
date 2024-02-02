@@ -155,6 +155,7 @@
             - deploy_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
+          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
@@ -162,6 +163,8 @@
             - slack-context
           cluster: "_CLUSTERNAME_"
           wait_for_sv: false
+          wait_for_third_party: false
+          migration_id: 1
           requires:
             - switch_global_domain_upgrade
       - hold:

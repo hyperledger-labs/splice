@@ -1,5 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
+import { Secret } from '@pulumi/kubernetes/core/v1';
 import { Output } from '@pulumi/pulumi';
 import {
   CnInput,
@@ -23,6 +24,7 @@ import {
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { PersistenceConfig } from '../../common';
+import { DomainIndex } from './globalDomainNode';
 
 export type ExtraDomain = {
   alias: string;
@@ -35,10 +37,13 @@ export type ValidatorBackupConfig = {
   config: BackupConfig;
 };
 
+export type ValidatorSecrets = {
+  validatorSecret: Secret;
+  wallet: Secret;
+  cns: Secret;
+};
 export type ValidatorConfig = {
-  auth0Client: Auth0Client;
   xns: ExactNamespace;
-  auth0AppName: string;
   onboardingSecret?: string;
   topupConfig?: ValidatorTopupConfig;
   validatorWalletUser?: string;
@@ -58,9 +63,24 @@ export type ValidatorConfig = {
   participantAddress: Output<string> | string;
   globalDomainUrl: string;
   scanAddress: Output<string> | string;
+  domainId?: DomainIndex;
+  secrets: ValidatorSecrets | ValidatorSecretsConfig;
 };
 
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
+  function maybeDomainSuffixed(value: string) {
+    if (config.domainId != undefined) {
+      return `${value}-${config.domainId}`;
+    } else {
+      return value;
+    }
+  }
+
+  const validatorSecrets =
+    'validatorSecret' in config.secrets
+      ? config.secrets
+      : await installValidatorSecrets(config.secrets);
+
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
     config.participantBootstrapDump
       ? await fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
@@ -81,27 +101,28 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       : installBootstrapDataBucketSecret(config.xns, config.backupConfig.config.bucket)
     : undefined;
 
-  const dependsOn: CnInput<pulumi.Resource>[] = [
-    config.xns.ns,
-    config.participant,
-    await installAuth0Secret(config.auth0Client, config.xns, 'validator', config.auth0AppName),
-    await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
-    await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),
-  ]
-    .concat(
-      config.onboardingSecret
-        ? [installValidatorOnboardingSecret(config.xns, 'validator', config.onboardingSecret)]
-        : []
-    )
+  const validatorOnboardingSecret = config.onboardingSecret
+    ? [
+        installValidatorOnboardingSecret(
+          config.xns,
+          maybeDomainSuffixed('validator'),
+          config.onboardingSecret
+        ),
+      ]
+    : [];
+  const dependsOn: CnInput<pulumi.Resource>[] = [config.xns.ns, config.participant]
+    .concat(validatorOnboardingSecret)
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
+    .concat([validatorSecrets.validatorSecret, validatorSecrets.wallet, validatorSecrets.cns])
     .concat(config.extraDependsOn || []);
 
   return installCNHelmChart(
     config.xns,
-    'validator-' + config.xns.logicalName,
+    maybeDomainSuffixed('validator-' + config.xns.logicalName),
     'cn-validator',
     {
+      domainId: config.domainId?.toString(),
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
@@ -113,7 +134,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       onboardingSecretFrom: config.onboardingSecret
         ? {
             secretKeyRef: {
-              name: validatorOnboardingSecretName('validator'),
+              name: validatorOnboardingSecretName(maybeDomainSuffixed('validator')),
               key: 'secret',
               optional: false,
             },
@@ -137,4 +158,25 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
     },
     { dependsOn }
   );
+}
+
+type ValidatorSecretsConfig = {
+  xns: ExactNamespace;
+  auth0Client: Auth0Client;
+  auth0AppName: string;
+};
+
+export async function installValidatorSecrets(
+  config: ValidatorSecretsConfig
+): Promise<ValidatorSecrets> {
+  return {
+    validatorSecret: await installAuth0Secret(
+      config.auth0Client,
+      config.xns,
+      'validator',
+      config.auth0AppName
+    ),
+    wallet: await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
+    cns: await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),
+  };
 }

@@ -18,7 +18,10 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.CNNodeStatus
-import com.daml.network.http.v0.definitions.CometBftNodeDumpResponse
+import com.daml.network.http.v0.definitions.{
+  CometBftNodeDumpResponse,
+  TriggerDomainMigrationDumpRequest,
+}
 import com.daml.network.http.v0.sv_admin.{
   GetCometBftNodeDebugDumpResponse,
   TriggerDomainMigrationDumpResponse,
@@ -478,7 +481,7 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class TriggerDomainMigrationDump()
+  case class TriggerDomainMigrationDump(migrationId: Long)
       extends BaseCommand[
         http.TriggerDomainMigrationDumpResponse,
         Unit,
@@ -491,7 +494,10 @@ object HttpSvAdminAppClient {
       Throwable,
       HttpResponse,
     ], TriggerDomainMigrationDumpResponse] =
-      client.triggerDomainMigrationDump(headers = headers)
+      client.triggerDomainMigrationDump(
+        headers = headers,
+        body = TriggerDomainMigrationDumpRequest(migrationId),
+      )
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder

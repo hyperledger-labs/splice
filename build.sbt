@@ -1396,7 +1396,17 @@ printTests := {
 
   def isCoreDeploymentPreflightIntegrationTest(name: String): Boolean = isPreflightIntegrationTest(
     name
-  ) && !name.contains("RunbookSv") && !name.contains("RunbookValidator")
+  ) && !isThirdPartyDeploymentPreflightIntegrationTest(
+    name
+  ) && !isRunbookValidatorPreflightIntegrationTest(name) && !isRunbookSvPreflightIntegrationTest(
+    name
+  )
+  def isThirdPartyDeploymentPreflightIntegrationTest(name: String): Boolean =
+    isPreflightIntegrationTest(
+      name
+    ) && (name.contains("Validator1PreflightIntegrationTest") || name.contains(
+      "SelfHostedSplitwellPreflightIntegrationTest"
+    ))
   def isRunbookSvPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("RunbookSv")
   def isRunbookValidatorPreflightIntegrationTest(name: String): Boolean =
@@ -1427,6 +1437,11 @@ printTests := {
       "Preflight tests against core nodes",
       "test-full-class-names-core-preflight.log",
       (t: String) => isCoreDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
+    ),
+    (
+      "Preflight tests against third party components",
+      "test-full-class-names-third-party-preflight.log",
+      (t: String) => isThirdPartyDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
     (
       "Non-DevNet Preflight tests against core nodes",

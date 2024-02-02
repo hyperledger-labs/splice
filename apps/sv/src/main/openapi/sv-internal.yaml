@@ -181,6 +181,12 @@ paths:
       tags: [ sv ]
       x-jvm-package: sv_admin
       operationId: "triggerDomainMigrationDump"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/TriggerDomainMigrationDumpRequest"
       responses:
         "200":
           description: ok
@@ -1166,6 +1172,15 @@ components:
           description: |
             base64 encoded string of a dar package
           type: string
+
+    TriggerDomainMigrationDumpRequest:
+      type: object
+      required:
+        - migration_id
+      properties:
+        migration_id:
+          type: integer
+          format: int64
 
     GetDomainMigrationDumpResponse:
       type: object
