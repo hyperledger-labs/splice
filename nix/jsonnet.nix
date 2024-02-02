@@ -1,4 +1,4 @@
-{ stdenv, lib, jekyll, fetchFromGitHub }:
+{ stdenv, lib, fetchFromGitHub }:
 
 stdenv.mkDerivation rec {
   pname = "jsonnet";
@@ -12,7 +12,7 @@ stdenv.mkDerivation rec {
     sha256 = "sha256-FtVJE9alEl56Uik+nCpJMV5DMVVmRCnE1xMAiWdK39Y=";
   };
 
-  nativeBuildInputs = [ jekyll ];
+  nativeBuildInputs = [ ];
 
   enableParallelBuilding = true;
 
@@ -22,19 +22,12 @@ stdenv.mkDerivation rec {
     "libjsonnet.so"
   ];
 
-  # Upstream writes documentation in html, not in markdown/rst, so no
-  # other output formats, sorry.
-  preBuild = ''
-    jekyll build --source ./doc --destination ./html
-  '';
-
   installPhase = ''
     mkdir -p $out/bin $out/lib $out/include $out/share/doc/jsonnet
     cp jsonnet $out/bin/
     cp jsonnetfmt $out/bin/
     cp libjsonnet*.so $out/lib/
     cp -a include/*.h $out/include/
-    cp -r ./html $out/share/doc/jsonnet
   '';
 
   meta = {
