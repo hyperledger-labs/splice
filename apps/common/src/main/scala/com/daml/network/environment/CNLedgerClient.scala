@@ -10,8 +10,7 @@ import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelCo
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
-import com.digitalasset.canton.tracing.TracerProvider
-import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
+import com.digitalasset.canton.tracing.{TraceContextGrpc, TracerProvider}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -22,7 +21,9 @@ class CNLedgerClient(
     getToken: () => Future[Option[AuthToken]],
     apiLoggingConfig: ApiLoggingConfig,
     override protected val loggerFactory: NamedLoggerFactory,
-    tracerProvider: TracerProvider,
+    // Note: traceProvider is not used right now, but we keep it for future use. See the comments on the tracing
+    // client interceptors below
+    val unusedTracerProvider: TracerProvider,
     override protected[this] val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -44,7 +45,12 @@ class CNLedgerClient(
       .executor(ec)
       .intercept(
         new ApiClientRequestLogger(loggerFactory, apiLoggingConfig),
-        GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor(),
+        // Using the client interceptor here ensures that the trace context is propagated to the server via headers.
+        TraceContextGrpc.clientInterceptor,
+        // Given the server verbosity lots of log messages are associated to the same trace-id.
+        // An alternative would be to use the OpenTelemetry interceptor that creates a new child-span with its own
+        // trace-id for each GRPC call. We used to do that using:
+        // GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor()
       )
 
     val channel = builder.build

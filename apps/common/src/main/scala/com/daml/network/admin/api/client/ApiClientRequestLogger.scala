@@ -6,7 +6,7 @@ package com.daml.network.admin.api.client
 import com.digitalasset.canton.config.ApiLoggingConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ApiRequestLoggerBase
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.*
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener
@@ -38,7 +38,8 @@ class ApiClientRequestLogger(
       callOptions: CallOptions,
       next: Channel,
   ): ClientCall[ReqT, RespT] = {
-    val requestTraceContext: TraceContext = inferRequestTraceContext
+    val requestTraceContext: TraceContext =
+      TraceContextGrpc.inferClientRequestTraceContext(callOptions)
 
     val receiver = next.authority()
     val methodName = method.getFullMethodName

@@ -36,7 +36,7 @@ class ApiRequestLogger(
       headers: Metadata,
       next: ServerCallHandler[ReqT, RespT],
   ): ServerCall.Listener[ReqT] = {
-    val requestTraceContext: TraceContext = inferRequestTraceContext
+    val requestTraceContext: TraceContext = TraceContextGrpc.inferServerRequestTraceContext
 
     val sender = Option(call.getAttributes.get(Grpc.TRANSPORT_ATTR_REMOTE_ADDR).toString)
       .getOrElse("unknown sender")
@@ -246,15 +246,6 @@ class ApiRequestLoggerBase(
       status.withDescription(status.getCause.getLocalizedMessage)
     } else {
       status
-    }
-  }
-
-  protected def inferRequestTraceContext: TraceContext = {
-    val grpcTraceContext = TraceContextGrpc.fromGrpcContext
-    if (grpcTraceContext.traceId.isDefined) {
-      grpcTraceContext
-    } else {
-      TraceContext.withNewTraceContext(identity)
     }
   }
 

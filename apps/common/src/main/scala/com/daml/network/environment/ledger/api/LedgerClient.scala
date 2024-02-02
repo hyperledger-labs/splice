@@ -41,6 +41,7 @@ import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServi
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.javaapi.data.User.Right
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.{ByteString, Duration}
 import com.google.protobuf.field_mask.FieldMask
@@ -86,6 +87,19 @@ private[environment] class LedgerClient(
     }
   }
 
+  // TODO(#9713): make all our methods use this call instead of just withCredentials, so that we get proper logging
+  private def withCredentialsAndTraceContext[T <: AbstractStub[T]](
+      stub: T
+  )(implicit tc: TraceContext): Future[T] = {
+    getToken().map { token =>
+      token.fold(stub) { token =>
+        TraceContextGrpc.addTraceContextToCallOptions(
+          stub
+            .withCallCredentials(new LedgerCallCredentials(token.accessToken))
+        )
+      }
+    }
+  }
   private val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
     CommandServiceGrpc.stub(channel)
   private val packageServiceStub: PackageServiceGrpc.PackageServiceStub =
@@ -177,7 +191,7 @@ private[environment] class LedgerClient(
       commands: Seq[Command],
       disclosedContracts: DisclosedContracts,
       waitFor: SubmitAndWaitFor[Z],
-  )(implicit ec: ExecutionContext): Future[Z] = {
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Z] = {
     val commandsBuilder = CommandsOuterClass.Commands.newBuilder
       .setDomainId(domainId)
       .setCommandId(commandId)
@@ -200,9 +214,8 @@ private[environment] class LedgerClient(
       .newBuilder()
       .setCommands(commandsBuilder.build)
       .build()
-
     for {
-      stub <- withCredentials(commandServiceStub)
+      stub <- withCredentialsAndTraceContext(commandServiceStub)
       res <-
         waitFor.stubSubmit(stub, request, ec).map(waitFor.mapResponse)
     } yield res
