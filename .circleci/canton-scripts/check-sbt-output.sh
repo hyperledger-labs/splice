@@ -24,8 +24,7 @@ read_sbt_output() {
 }
 
 filter_errors() {
-  grep -i -e error -e severe -e warn -e warning -e exception -e critical -e fatal \
-    | grep -v '^\[info\].*daml-errors' || true
+  grep -i -w -e error -e severe -e warn -e warning -e exception -e critical -e fatal || true
 }
 
 # Read ignore patterns

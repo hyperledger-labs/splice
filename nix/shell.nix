@@ -44,6 +44,7 @@ in pkgs.mkShell {
     postgresql_14
     pre-commit
     procps
+    protobuf
     ps
     pulumi-bin
     python3
@@ -82,4 +83,7 @@ in pkgs.mkShell {
   LOCALE_ARCHIVE_2_27 = if pkgs.stdenv.hostPlatform.libc == "glibc"
                         then "${pkgs.glibcLocales}/lib/locale/locale-archive"
                         else null;
+
+  PROTOC = "${pkgs.protobuf}";
+
 }
