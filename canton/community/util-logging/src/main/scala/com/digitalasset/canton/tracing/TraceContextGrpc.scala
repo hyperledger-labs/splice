@@ -49,13 +49,15 @@ object TraceContextGrpc {
     }
   }
 
-  def inferClientRequestTraceContext(callOptions: CallOptions): TraceContext = {
+  def inferCallerTraceContext(callOptions: CallOptions): Option[TraceContext] = {
     val callOptionTraceContext = callOptions.getOption(TraceContextGrpc.TraceContextCallOptionKey)
-    if (callOptionTraceContext == null)
-      // TODO(#9713): remove the need to infer the trace context from thread-local storage, which doesn't work with Futures in the mix, and log a big fat warning if we do
-      TraceContextGrpc.inferServerRequestTraceContext
-    else
-      callOptionTraceContext
+    if (callOptionTraceContext == null) {
+      // TODO(#9754): remove the need to infer the trace context from thread-local storage, which doesn't work with Futures in the mix, and log a big fat warning if we do
+      val grpcTraceContext = TraceContextGrpc.fromGrpcContext
+      Option.when(grpcTraceContext.traceId.isDefined)(grpcTraceContext)
+    } else {
+      Some(callOptionTraceContext)
+    }
   }
 
   def clientInterceptor: ClientInterceptor = new TraceContextClientInterceptor
@@ -72,7 +74,11 @@ object TraceContextGrpc {
             responseListener: ClientCall.Listener[RespT],
             headers: Metadata,
         ): Unit = {
-          val traceContext = inferClientRequestTraceContext(callOptions)
+          // Do not create a fresh trace-context for the default clientInterceptor, as there is no log message
+          // to communicate the new trace-id; and this matches how the interceptor has been used so far.
+          val traceContext = inferCallerTraceContext(callOptions).getOrElse(
+            TraceContext.withNewTraceContext(identity)
+          )
 
           W3CTraceContext.injectIntoGrpcMetadata(traceContext, headers)
 

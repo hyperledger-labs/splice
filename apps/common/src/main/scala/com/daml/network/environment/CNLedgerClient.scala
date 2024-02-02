@@ -10,7 +10,7 @@ import com.digitalasset.canton.ledger.client.configuration.LedgerClientChannelCo
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
-import com.digitalasset.canton.tracing.{TraceContextGrpc, TracerProvider}
+import com.digitalasset.canton.tracing.TracerProvider
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -44,12 +44,11 @@ class CNLedgerClient(
       .builderFor(config.address, config.port.unwrap)
       .executor(ec)
       .intercept(
-        new ApiClientRequestLogger(loggerFactory, apiLoggingConfig),
-        // Using the client interceptor here ensures that the trace context is propagated to the server via headers.
-        TraceContextGrpc.clientInterceptor,
-        // Given the server verbosity lots of log messages are associated to the same trace-id.
-        // An alternative would be to use the OpenTelemetry interceptor that creates a new child-span with its own
-        // trace-id for each GRPC call. We used to do that using:
+        new ApiClientRequestLogger(loggerFactory, apiLoggingConfig)
+        // The above interceptor handles both client request logging and trace-id allocation and propagation.
+        // It does though not create proper spans, like they would be required for distributed tracing.
+        // For that we either want to use the standard tracer below (with appropriate adjustments wrt context propagation),
+        // or extend the above interceptor.
         // GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor()
       )
 

@@ -54,6 +54,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added `tryFromProtoPrimitive` to `Member` trait.
 * Support specifying `darData` on `upload.dars`.
 * Turned `synchronize_topology` into a noop.
+* Added support for passing trace-contexts via gRPC CallOptions to `TraceContextGrpc`
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

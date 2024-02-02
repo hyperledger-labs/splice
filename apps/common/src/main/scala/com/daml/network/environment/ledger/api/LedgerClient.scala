@@ -87,7 +87,9 @@ private[environment] class LedgerClient(
     }
   }
 
-  // TODO(#9713): make all our methods use this call instead of just withCredentials, so that we get proper logging
+  // TODO(#9754): make all our methods use this call instead of just withCredentials to improve trace-id propagation
+  // This is non-trivial though due to he lack of TraceContext support/management within the 'RetryProvider' methods,
+  // which often wrap up the calls to the UserManagement and PackageManagement calls that are missing trace contexts.
   private def withCredentialsAndTraceContext[T <: AbstractStub[T]](
       stub: T
   )(implicit tc: TraceContext): Future[T] = {
@@ -131,10 +133,10 @@ private[environment] class LedgerClient(
 
   override def close(): Unit = GrpcChannel.close(channel)
 
-  def ledgerEnd(): Future[ParticipantOffset.Value.Absolute] = {
+  def ledgerEnd()(implicit traceContext: TraceContext): Future[ParticipantOffset.Value.Absolute] = {
     val req = lapi.state_service.GetLedgerEndRequest()
     for {
-      stub <- withCredentials(stateServiceStub)
+      stub <- withCredentialsAndTraceContext(stateServiceStub)
       offset <- stub.getLedgerEnd(req).map { resp =>
         val participantOffset =
           resp.offset
@@ -160,11 +162,11 @@ private[environment] class LedgerClient(
   def tryGetTransactionTreeByEventId(
       parties: Seq[String],
       id: String,
-  ): Future[TransactionTreeV2] = {
+  )(implicit traceContext: TraceContext): Future[TransactionTreeV2] = {
     val req =
       lapi.update_service.GetTransactionByEventIdRequest(eventId = id, requestingParties = parties)
     for {
-      stub <- withCredentials(updateServiceStub)
+      stub <- withCredentialsAndTraceContext(updateServiceStub)
       res <- stub.getTransactionTreeByEventId(req).map { resp =>
         LedgerClient.lapiTreeToJavaTree(resp.getTransaction)
       }
@@ -435,9 +437,9 @@ private[environment] class LedgerClient(
       submissionId: String,
       submitter: PartyId,
       command: LedgerClient.ReassignmentCommand,
-  ): Future[Unit] =
+  )(implicit traceContext: TraceContext): Future[Unit] =
     for {
-      stub <- withCredentials(commandSubmissionServiceStub)
+      stub <- withCredentialsAndTraceContext(commandSubmissionServiceStub)
       res <- stub
         .submitReassignment(
           LedgerClient

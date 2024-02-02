@@ -78,7 +78,7 @@ class BaseLedgerConnection(
 
   import BaseLedgerConnection.*
 
-  def ledgerEnd(): Future[Value.Absolute] =
+  def ledgerEnd()(implicit traceContext: TraceContext): Future[Value.Absolute] =
     client.ledgerEnd()
 
   def activeContracts(
@@ -131,7 +131,7 @@ class BaseLedgerConnection(
   def tryGetTransactionTreeByEventId(
       parties: Seq[PartyId],
       id: String,
-  ): Future[TransactionTreeV2] =
+  )(implicit traceContext: TraceContext): Future[TransactionTreeV2] =
     client.tryGetTransactionTreeByEventId(parties.map(_.toProtoPrimitive), id)
 
   def getOptionalPrimaryParty(
