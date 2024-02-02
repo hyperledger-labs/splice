@@ -114,30 +114,7 @@ any_time_db_names=(
   "participant_alice"
   "participant_bob"
   "participant_splitwell"
-  "sequencer_driver_global_upgrade"
   "sequencer_driver_global_reonboard"
-)
-
-for (( domain_node = 0; domain_node < 5; domain_node++ )); do
-  any_time_db_names+=(
-  "participant_sv${domain_node}_upgrade"
-  "sequencer_global_upgrade_$domain_node"
-  "mediator_global_upgrade_$domain_node"
-  )
-done
-
-for (( domain_node = 0; domain_node < 5; domain_node++ )); do
-  any_time_db_names+=(
-  "participant_sv${domain_node}_reonboard"
-  "sequencer_global_reonboard_$domain_node"
-  "mediator_global_reonboard_$domain_node"
-  )
-done
-
-any_time_db_names+=(
-"participant_sv4_reonboard_new"
-"sequencer_global_reonboard_new_4"
-"mediator_global_reonboard_new_4"
 )
 
 db_names=()
@@ -148,16 +125,19 @@ if [ $wallclocktime -eq 1 ]; then
   )
 fi
 
-# same names, but with _mediator_offboarding suffix
-IFS=' ' read -r -a mediator_offboarding_db_names <<< \
-    "$(echo "${any_time_db_names[@]}" | sed -Ee 's/( |$)/_mediator_offboarding\1/g')"
-db_names+=("${mediator_offboarding_db_names[@]}")
-
 if [ $simtime -eq 1 ]; then
   # same names, but with _simtime suffix
   IFS=' ' read -r -a simtime_db_names <<< \
       "$(echo "${any_time_db_names[@]}" | sed -Ee 's/( |$)/_simtime\1/g')"
   db_names+=("${simtime_db_names[@]}")
+
+  if [ $globalUpgradeDomain -eq 1 ]; then
+    db_names+=(
+      "sequencer_global_upgrade_1_simtime"
+      "mediator_global_upgrade_1_simtime"
+      "sequencer_driver_global_upgrade_simtime"
+    )
+  fi
 fi
 
 # Create the DB's in parallel

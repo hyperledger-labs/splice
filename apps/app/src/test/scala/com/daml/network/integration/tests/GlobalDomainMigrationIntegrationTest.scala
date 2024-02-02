@@ -43,7 +43,7 @@ import com.daml.network.validator.config.{ValidatorGlobalDomainConfig, Validator
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
-import com.daml.network.util.{Contract, ProcessTestUtil}
+import com.daml.network.util.{Contract, PostgresAroundAll, ProcessTestUtil}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -67,8 +67,23 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Using
 import scala.jdk.OptionConverters.*
 
-// TODO(#9076) Create fresh database instances within the test to support running it multiple times.
-class GlobalDomainMigrationIntegrationTest extends CNNodeIntegrationTest with ProcessTestUtil {
+class GlobalDomainMigrationIntegrationTest
+    extends CNNodeIntegrationTest
+    with ProcessTestUtil
+    with PostgresAroundAll {
+
+  override def usesDbs = {
+    Seq("sequencer_driver_global_upgrade") ++
+      (1 to 4)
+        .map(index =>
+          Seq(
+            s"participant_sv${index}_upgrade",
+            s"sequencer_global_upgrade_$index",
+            s"mediator_global_upgrade_$index",
+          )
+        )
+        .flatten
+  }
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
   // TODO(#9014) make it work with persistent stores

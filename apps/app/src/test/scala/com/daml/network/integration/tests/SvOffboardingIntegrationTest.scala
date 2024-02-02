@@ -13,7 +13,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingSequencerTrigger
 import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
-import com.daml.network.util.ProcessTestUtil
+import com.daml.network.util.{PostgresAroundAll, ProcessTestUtil}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
@@ -22,8 +22,22 @@ import org.scalatest.time.{Minute, Span}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
-// Test can run only once until databases are reset (e.g. through rerunning `./stop-canton.sh && ./start-canton.sh`)
-class SvOffboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTestUtil {
+class SvOffboardingIntegrationTest
+    extends CNNodeIntegrationTest
+    with ProcessTestUtil
+    with PostgresAroundAll {
+
+  override def usesDbs =
+    Seq("sequencer_driver_mediator_offboarding") ++
+      (1 to 4)
+        .map(i =>
+          Seq(
+            s"participant_sv${i}_mediator_offboarding",
+            s"sequencer_sv${i}_mediator_offboarding",
+            s"mediator_sv${i}_mediator_offboarding",
+          )
+        )
+        .flatten
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
   // TODO(#9014) make it work with persistend stores

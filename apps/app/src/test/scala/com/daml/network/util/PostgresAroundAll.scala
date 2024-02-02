@@ -1,0 +1,77 @@
+package com.daml.network.util
+
+import org.postgresql.ds.PGSimpleDataSource
+import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.slf4j.LoggerFactory
+
+import java.sql.Statement
+import scala.util.{Try, Using}
+import cats.syntax.traverse.*
+
+trait PostgresAroundAll extends BeforeAndAfterAll {
+  self: Suite =>
+
+  def usesDbs: Seq[String]
+  private val logger = LoggerFactory.getLogger(getClass)
+
+  private val hostName = env("POSTGRES_HOST")
+  private val port = 5432
+  private val userName = env("POSTGRES_USER")
+  private val password = env("POSTGRES_PASSWORD")
+  private val baseDatabase = "postgres"
+
+  def baseDbUrlWithoutCredentials: String =
+    s"jdbc:postgresql://$hostName:$port/$baseDatabase"
+
+  def baseDbUrl: String =
+    s"$baseDbUrlWithoutCredentials?user=$userName&password=$password"
+
+  private val cantonUser = "canton"
+
+  override protected def beforeAll(): Unit = {
+    logger.debug(s"Using postgres on ${hostName}:${port}")
+    dropAll()
+    usesDbs.foreach(createDb(_))
+    super.beforeAll()
+  }
+
+  override protected def afterAll(): Unit = {
+    super.afterAll()
+    dropAll().fold(
+      err => logger.warn(s"Failed to drop database: $err"),
+      _ => logger.debug("Dropped all databases"),
+    )
+  }
+
+  private def createDb(dbName: String) = {
+    logger.debug(s"Creating database $dbName")
+    executeAdminStatement() { statement =>
+      statement.execute(s"CREATE DATABASE \"$dbName\"")
+      statement.execute(s"GRANT ALL PRIVILEGES ON DATABASE $dbName TO $cantonUser")
+    }
+  }
+
+  private def dropAll() = {
+    usesDbs.map(dbName => Try(dropDb(dbName))).sequence
+  }
+
+  private def dropDb(dbName: String) = {
+    executeAdminStatement() { statement =>
+      statement.execute(s"DROP DATABASE \"$dbName\"")
+    }
+    logger.debug(s"Dropped database $dbName")
+  }
+
+  private def executeAdminStatement[T]()(body: Statement => T): T = {
+    Using.resource {
+      val dataSource = new PGSimpleDataSource()
+      dataSource.setUrl(baseDbUrl)
+      dataSource.getConnection
+    } { connection =>
+      Using.resource(connection.createStatement())(body)
+    }
+  }
+
+  private def env(name: String): String =
+    sys.env.getOrElse(name, sys.error(s"Environment variable not set [$name]"))
+}

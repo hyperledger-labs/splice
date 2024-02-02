@@ -22,7 +22,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
-import com.daml.network.util.ProcessTestUtil
+import com.daml.network.util.{PostgresAroundAll, ProcessTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.jdk.CollectionConverters.*
@@ -31,8 +31,27 @@ import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.Files
 
-// TODO(#9076) Create fresh database instances within the test to support running it multiple times.
-class SvReonboardingIntegrationTest extends CNNodeIntegrationTest with ProcessTestUtil {
+class SvReonboardingIntegrationTest
+    extends CNNodeIntegrationTest
+    with ProcessTestUtil
+    with PostgresAroundAll {
+
+  override def usesDbs =
+    Seq(
+      "sequencer_driver_global_reonboard",
+      "participant_sv4_reonboard_new",
+      "sequencer_global_reonboard_new_4",
+      "mediator_global_reonboard_new_4",
+    ) ++
+      (1 to 4)
+        .map(i =>
+          Seq(
+            s"participant_sv${i}_reonboard",
+            s"sequencer_global_reonboard_${i}",
+            s"mediator_global_reonboard_${i}",
+          )
+        )
+        .flatten
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
   // TODO(#9014) make it work with persistend stores
