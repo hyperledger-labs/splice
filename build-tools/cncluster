@@ -162,7 +162,7 @@ function _uses_pulumi_stack() {
     _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
             --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
             stack init \
-            --secrets-provider="gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}" \
+            --secrets-provider="gcpkms://projects/${PULUMI_BACKEND_GCPKMS_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${PULUMI_BACKEND_GCPKMS_NAME}" \
             2> /dev/null || true
 
     if [ ! -f "${REPO_ROOT}/cluster/pulumi/${pulumi_project}/Pulumi.${pulumi_project}.${GCP_CLUSTER_BASENAME}.yaml" ]; then
@@ -171,7 +171,7 @@ function _uses_pulumi_stack() {
         local -x PULUMI_CONFIG_PASSPHRASE=''
         _pulumi --stack "organization/${pulumi_project}/${pulumi_project}.${GCP_CLUSTER_BASENAME}" \
                 --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
-                stack change-secrets-provider "gcpkms://projects/${CLOUDSDK_CORE_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${GCP_CLUSTER_BASENAME}"
+                stack change-secrets-provider "gcpkms://projects/${PULUMI_BACKEND_GCPKMS_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${PULUMI_BACKEND_GCPKMS_NAME}"
     fi
 }
 
