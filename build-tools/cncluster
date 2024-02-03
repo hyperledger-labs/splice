@@ -845,15 +845,16 @@ subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank sta
 function _cluster_reset() {
     _info "Uninstalling Pulumi canton-network-gateway stack"
 
-    _down_stack canton-network
-    _down_stack sv-runbook
-    _down_stack validator-runbook
+    _down_stack canton-network "canton-network.$GCP_CLUSTER_BASENAME"
+    _down_stack sv-runbook "sv-runbook.$GCP_CLUSTER_BASENAME"
+    _down_stack validator-runbook "validator-runbook.$GCP_CLUSTER_BASENAME"
 
     _info "Cluster in reset/idle state."
 }
 
 function _down_stack() {
     PROJECT=$1
+    STACK=$2
 
     _info "Uninstalling Pulumi ${PROJECT} stack"
 
@@ -863,7 +864,7 @@ function _down_stack() {
 
     touch "$ERRFILE"
 
-    subcmd_pulumi "$PROJECT" "$PROJECT.$GCP_CLUSTER_BASENAME" down --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || { RETCODE="$?"; ERRMSG=$(cat "$ERRFILE")
+    subcmd_pulumi "$PROJECT" "$STACK" down --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || { RETCODE="$?"; ERRMSG=$(cat "$ERRFILE")
     }
 
     rm -rf "$ERRFILE"
@@ -872,9 +873,9 @@ function _down_stack() {
         case "${ERRMSG}" in
             *"the stack is currently locked"*)
                 echo "Retrying because of lock on stack $PROJECT"
-                subcmd_pulumi "$PROJECT" cancel --yes
-                subcmd_pulumi "$PROJECT" refresh --yes --skip-preview
-                _down_stack "$PROJECT"
+                subcmd_pulumi "$PROJECT" "$STACK" cancel --yes
+                subcmd_pulumi "$PROJECT" "$STACK" refresh --yes --skip-preview
+                _down_stack "$PROJECT" "$STACK"
 
                 echo "Reset complete. In case a subsequent 'cncluster apply' fails, refer to the documentation on manual cleanup (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
                 ;;
