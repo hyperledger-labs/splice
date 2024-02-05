@@ -488,6 +488,69 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetAcsSnapshotResponse"
+  /v0/aggregated-rounds:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getAggregatedRounds"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetAggregatedRoundsResponse"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/round-totals:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listRoundTotals"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListRoundTotalsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRoundTotalsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
+  /v0/round-party-totals:
+    post:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "listRoundPartyTotals"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ListRoundPartyTotalsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListRoundPartyTotalsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 components:
   schemas:
     GetSvcPartyIdResponse:
@@ -1101,4 +1164,144 @@ components:
       properties:
         acs_snapshot:
           description: base64-encoded ACS snapshot for the intersection of the SVC party and the requested party’s ACS
+          type: string
+    GetAggregatedRoundsResponse:
+      type: object
+      required: [ "start", "end" ]
+      properties:
+        start:
+          type: integer
+          format: int64
+        end:
+          type: integer
+          format: int64
+    ListRoundTotalsRequest:
+      type: object
+      required:
+        - start_round
+        - end_round
+      properties:
+        start_round:
+          type: integer
+          format: int64
+        end_round:
+          type: integer
+          format: int64
+    ListRoundPartyTotalsRequest:
+      type: object
+      required:
+        - start_round
+        - end_round
+      properties:
+        start_round:
+          type: integer
+          format: int64
+        end_round:
+          type: integer
+          format: int64
+    ListRoundTotalsResponse:
+      type: object
+      required: [ "entries" ]
+      properties:
+        entries:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RoundTotals"
+    ListRoundPartyTotalsResponse:
+      type: object
+      required: [ "entries" ]
+      properties:
+        entries:
+          type: array
+          items:
+            "$ref": "#/components/schemas/RoundPartyTotals"
+    RoundPartyTotals:
+      type: object
+      required:
+        - "closed_round"
+        - "party"
+        - "app_rewards"
+        - "validator_rewards"
+        - "traffic_purchased"
+        - "traffic_purchased_cc_spent"
+        - "traffic_num_purchases"
+        - "cumulative_app_rewards"
+        - "cumulative_validator_rewards"
+        - "cumulative_change_to_initial_amount_as_of_round_zero"
+        - "cumulative_change_to_holding_fees_rate"
+        - "cumulative_traffic_purchased"
+        - "cumulative_traffic_purchased_cc_spent"
+        - "cumulative_traffic_num_purchases"
+      properties:
+        closed_round:
+          type: integer
+          format: int64
+        party:
+          type: string
+        app_rewards:
+          type: string
+        validator_rewards:
+          type: string
+        traffic_purchased:
+          type: integer
+          format: int64
+        traffic_purchased_cc_spent:
+          type: string
+        traffic_num_purchases:
+          type: integer
+          format: int64
+        cumulative_app_rewards:
+          type: string
+        cumulative_validator_rewards:
+          type: string
+        cumulative_change_to_initial_amount_as_of_round_zero:
+          type: string
+        cumulative_change_to_holding_fees_rate:
+          type: string
+        cumulative_traffic_purchased:
+          type: integer
+          format: int64
+        cumulative_traffic_purchased_cc_spent:
+          type: string
+        cumulative_traffic_num_purchases:
+          type: integer
+          format: int64
+    RoundTotals:
+      type: object
+      required:
+        - "closed_round"
+        - "closed_round_effective_at"
+        - "app_rewards"
+        - "validator_rewards"
+        - "change_to_initial_amount_as_of_round_zero"
+        - "change_to_holding_fees_rate"
+        - "cumulative_app_rewards"
+        - "cumulative_validator_rewards"
+        - "cumulative_change_to_initial_amount_as_of_round_zero"
+        - "cumulative_change_to_holding_fees_rate"
+        - "total_coin_balance"
+      properties:
+        closed_round:
+          type: integer
+          format: int64
+        closed_round_effective_at:
+          type: string
+          format: date-time
+        app_rewards:
+          type: string
+        validator_rewards:
+          type: string
+        change_to_initial_amount_as_of_round_zero:
+          type: string
+        change_to_holding_fees_rate:
+          type: string
+        cumulative_app_rewards:
+          type: string
+        cumulative_validator_rewards:
+          type: string
+        cumulative_change_to_initial_amount_as_of_round_zero:
+          type: string
+        cumulative_change_to_holding_fees_rate:
+          type: string
+        total_coin_balance:
           type: string

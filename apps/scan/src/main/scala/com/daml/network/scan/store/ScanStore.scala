@@ -166,6 +166,14 @@ trait ScanStore
   )(implicit
       tc: TraceContext
   ): Future[Seq[TxLogEntry.TransactionLogEntry]]
+
+  def getAggregatedRounds()(implicit tc: TraceContext): Future[Option[ScanAggregator.RoundRange]]
+  def getRoundTotals(startRound: Long, endRound: Long)(implicit
+      tc: TraceContext
+  ): Future[Seq[ScanAggregator.RoundTotals]]
+  def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
+      tc: TraceContext
+  ): Future[Seq[ScanAggregator.RoundPartyTotals]]
 }
 
 object ScanStore {

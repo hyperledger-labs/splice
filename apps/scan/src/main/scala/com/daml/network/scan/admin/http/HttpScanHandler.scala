@@ -733,4 +733,137 @@ class HttpScanHandler(
       }
     }
   }
+  override def getAggregatedRounds(respond: ScanResource.GetAggregatedRoundsResponse.type)()(
+      extracted: com.digitalasset.canton.tracing.TraceContext
+  ): Future[ScanResource.GetAggregatedRoundsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getAggregatedRounds") { _ => _ =>
+      for {
+        range <- store.getAggregatedRounds()
+      } yield {
+        range.fold(
+          v0.ScanResource.GetAggregatedRoundsResponse.NotFound(
+            definitions.ErrorResponse("No aggregated rounds found")
+          )
+        )(range =>
+          v0.ScanResource.GetAggregatedRoundsResponse.OK(
+            definitions.GetAggregatedRoundsResponse(start = range.start, end = range.end)
+          )
+        )
+      }
+    }
+  }
+
+  private def ensureValidRange[T](start: Long, end: Long, maxRounds: Int)(
+      f: => Future[T]
+  )(implicit tc: com.digitalasset.canton.tracing.TraceContext): Future[T] = {
+    require(maxRounds > 0, "maxRounds must be positive")
+    if (start < 0 || end < 0) {
+      Future.failed(
+        HttpErrorHandler.badRequest(
+          s"rounds must be non-negative: start_round $start, end_round $end"
+        )
+      )
+    } else if (end < start) {
+      Future.failed(
+        HttpErrorHandler.badRequest(s"end_round $end must be >= start_round $start")
+      )
+    } else if (end - start + 1 > maxRounds) {
+      Future.failed(
+        HttpErrorHandler.badRequest(s"Cannot request more than $maxRounds rounds at a time")
+      )
+    } else {
+      for {
+        range <- store.getAggregatedRounds()
+        res <- range.fold(
+          Future.failed(
+            HttpErrorHandler.notFound("No aggregated rounds found")
+          ): Future[T]
+        )(range =>
+          if (start < range.start || end > range.end) {
+            Future.failed(
+              HttpErrorHandler.badRequest(
+                s"Requested rounds range ${start}-${end} is outside of the available rounds range ${range.start}-${range.end}"
+              )
+            ): Future[T]
+          } else {
+            f
+          }
+        )
+      } yield res
+    }
+  }
+
+  override def listRoundTotals(
+      respond: ScanResource.ListRoundTotalsResponse.type
+  )(request: definitions.ListRoundTotalsRequest)(
+      extracted: com.digitalasset.canton.tracing.TraceContext
+  ): Future[ScanResource.ListRoundTotalsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listRoundTotals") { _ => _ =>
+      ensureValidRange(request.startRound, request.endRound, 200) {
+        for {
+          roundTotals <- store.getRoundTotals(request.startRound, request.endRound)
+          entries = roundTotals.map { roundTotal =>
+            definitions.RoundTotals(
+              closedRound = roundTotal.closedRound,
+              closedRoundEffectiveAt = java.time.OffsetDateTime
+                .ofInstant(roundTotal.closedRoundEffectiveAt.toInstant, ZoneOffset.UTC),
+              appRewards = Codec.encode(roundTotal.appRewards),
+              validatorRewards = Codec.encode(roundTotal.validatorRewards),
+              changeToInitialAmountAsOfRoundZero =
+                Codec.encode(roundTotal.changeToInitialAmountAsOfRoundZero),
+              changeToHoldingFeesRate = Codec.encode(roundTotal.changeToHoldingFeesRate),
+              cumulativeAppRewards = Codec.encode(roundTotal.cumulativeAppRewards),
+              cumulativeValidatorRewards = Codec.encode(roundTotal.cumulativeValidatorRewards),
+              cumulativeChangeToInitialAmountAsOfRoundZero =
+                Codec.encode(roundTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
+              cumulativeChangeToHoldingFeesRate =
+                Codec.encode(roundTotal.cumulativeChangeToHoldingFeesRate),
+              totalCoinBalance = Codec.encode(roundTotal.totalCoinBalance),
+            )
+          }
+        } yield v0.ScanResource.ListRoundTotalsResponse.OK(
+          definitions.ListRoundTotalsResponse(entries.toVector)
+        )
+      }
+    }
+  }
+  override def listRoundPartyTotals(
+      respond: ScanResource.ListRoundPartyTotalsResponse.type
+  )(request: definitions.ListRoundPartyTotalsRequest)(
+      extracted: com.digitalasset.canton.tracing.TraceContext
+  ): Future[ScanResource.ListRoundPartyTotalsResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.listRoundPartyTotals") { _ => _ =>
+      ensureValidRange(request.startRound, request.endRound, 50) {
+        for {
+          roundPartyTotals <- store.getRoundPartyTotals(request.startRound, request.endRound)
+          entries = roundPartyTotals.map { roundPartyTotal =>
+            definitions.RoundPartyTotals(
+              closedRound = roundPartyTotal.closedRound,
+              party = roundPartyTotal.party,
+              appRewards = Codec.encode(roundPartyTotal.appRewards),
+              validatorRewards = Codec.encode(roundPartyTotal.validatorRewards),
+              trafficPurchased = roundPartyTotal.trafficPurchased,
+              trafficPurchasedCcSpent = Codec.encode(roundPartyTotal.trafficPurchasedCcSpent),
+              trafficNumPurchases = roundPartyTotal.trafficNumPurchases,
+              cumulativeAppRewards = Codec.encode(roundPartyTotal.cumulativeAppRewards),
+              cumulativeValidatorRewards = Codec.encode(roundPartyTotal.cumulativeValidatorRewards),
+              cumulativeChangeToInitialAmountAsOfRoundZero =
+                Codec.encode(roundPartyTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
+              cumulativeChangeToHoldingFeesRate =
+                Codec.encode(roundPartyTotal.cumulativeChangeToHoldingFeesRate),
+              cumulativeTrafficPurchased = roundPartyTotal.cumulativeTrafficPurchased,
+              cumulativeTrafficPurchasedCcSpent =
+                Codec.encode(roundPartyTotal.cumulativeTrafficPurchasedCcSpent),
+              cumulativeTrafficNumPurchases = roundPartyTotal.cumulativeTrafficNumPurchases,
+            )
+          }
+        } yield v0.ScanResource.ListRoundPartyTotalsResponse.OK(
+          definitions.ListRoundPartyTotalsResponse(entries.toVector)
+        )
+      }
+    }
+  }
 }

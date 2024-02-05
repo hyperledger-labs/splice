@@ -132,6 +132,17 @@ class ScanAggregatorTest
       val (round, effectiveAt) = store.getRoundOfLatestData().futureValue
       round shouldBe prevTotals.closedRound
       effectiveAt shouldBe prevTotals.closedRoundEffectiveAt.toInstant
+      store.getAggregatedRounds().futureValue.value shouldBe ScanAggregator.RoundRange(
+        0L,
+        prevTotals.closedRound,
+      )
+      store
+        .getRoundTotals(prevTotals.closedRound, prevTotals.closedRound)
+        .futureValue
+        .loneElement shouldBe prevTotals
+      store
+        .getRoundTotals(0L, prevTotals.closedRound)
+        .futureValue should contain theSameElementsAs Seq(roundTotals0, roundTotals1, prevTotals)
     }
 
     "append round totals for coin balance" in {
@@ -219,6 +230,11 @@ class ScanAggregatorTest
       round shouldBe lastTotals.closedRound
       effectiveAt shouldBe lastTotals.closedRoundEffectiveAt.toInstant
       roundsEffectiveAt(round) shouldBe lastTotals.closedRoundEffectiveAt
+
+      store.getAggregatedRounds().futureValue.value shouldBe ScanAggregator.RoundRange(
+        0L,
+        lastTotals.closedRound,
+      )
     }
 
     "append round party totals from round zero to last closed round (inclusive)" in {
@@ -366,6 +382,13 @@ class ScanAggregatorTest
       store
         .getTopValidatorsByPurchasedTraffic(lastRound, limit)
         .futureValue shouldBe topValidatorsByPurchasedTraffic
+      store
+        .getRoundPartyTotals(0L, lastRound)
+        .futureValue should contain theSameElementsAs expectedRoundPartyRewardTotals.values.flatten
+      store.getAggregatedRounds().futureValue.value shouldBe ScanAggregator.RoundRange(
+        0L,
+        lastRound,
+      )
     }
   }
 
@@ -417,20 +440,20 @@ class ScanAggregatorTest
       balanceChangeHoldingFees: BigDecimal,
   ): Future[Int] = {
     val q = sql"""
-      insert into scan_txlog_store 
+      insert into scan_txlog_store
         (
-          store_id, 
-          event_id, 
+          store_id,
+          event_id,
           domain_id,
-          entry_type, 
+          entry_type,
           round,
           balance_change_change_to_initial_amount_as_of_round_zero,
           balance_change_change_to_holding_fees_rate,
           transaction_offset,
           entry_data
-        )  
+        )
         select
-          $storeId, 
+          $storeId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
           ${TxLogEntry.BalanceChangeLogEntry.dbType},
@@ -459,22 +482,22 @@ class ScanAggregatorTest
       closedRoundEffectiveAt: CantonTimestamp,
   ): Future[Int] = {
     val q = sql"""
-      insert into scan_txlog_store 
+      insert into scan_txlog_store
         (
-          store_id, 
-          event_id, 
+          store_id,
+          event_id,
           domain_id,
-          entry_type, 
+          entry_type,
           round,
           closed_round_effective_at,
           transaction_offset,
           entry_data
-        )  
-      select 
-          $storeId, 
+        )
+      select
+          $storeId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
-          ${TxLogEntry.ClosedMiningRoundLogEntry.dbType}, 
+          ${TxLogEntry.ClosedMiningRoundLogEntry.dbType},
           $round,
           $closedRoundEffectiveAt,
           ${lengthLimited(s"offset-$eventId")},
@@ -501,23 +524,23 @@ class ScanAggregatorTest
       dbType: CantonRequireTypes.String3,
   ): Future[Int] = {
     val q = sql"""
-      insert into scan_txlog_store 
+      insert into scan_txlog_store
         (
-          store_id, 
-          event_id, 
+          store_id,
+          event_id,
           domain_id,
-          entry_type, 
+          entry_type,
           round,
           reward_amount,
           rewarded_party,
           transaction_offset,
           entry_data
-        )  
-      select 
-          $storeId, 
+        )
+      select
+          $storeId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
-          ${dbType}, 
+          ${dbType},
           $round,
           $rewardAmount,
           ${lengthLimited(rewardedParty)},
@@ -530,7 +553,7 @@ class ScanAggregatorTest
           and domain_id = ${lengthLimited(domain)}
           and entry_type = ${dbType}
           and round = $round
-      )     
+      )
       """.asUpdate
     storage.update(q, "appendAppReward")
   }
@@ -579,21 +602,21 @@ class ScanAggregatorTest
       party: String,
   ): Future[Int] = {
     val q = sql"""
-      insert into scan_txlog_store 
+      insert into scan_txlog_store
         (
-          store_id, 
-          event_id, 
+          store_id,
+          event_id,
           domain_id,
-          entry_type, 
+          entry_type,
           round,
           extra_traffic_validator,
           extra_traffic_purchase_traffic_purchased,
           extra_traffic_purchase_cc_spent,
           transaction_offset,
           entry_data
-        )  
-      select 
-          $storeId, 
+        )
+      select
+          $storeId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
           ${TxLogEntry.ExtraTrafficPurchaseLogEntry.dbType},
@@ -610,7 +633,7 @@ class ScanAggregatorTest
           and domain_id = ${lengthLimited(domain)}
           and entry_type = ${TxLogEntry.ExtraTrafficPurchaseLogEntry.dbType}
           and round = $round
-      )     
+      )
       """.asUpdate
     storage.update(q, "appendTrafficPurchase")
   }

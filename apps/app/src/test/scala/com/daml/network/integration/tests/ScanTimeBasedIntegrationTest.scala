@@ -10,6 +10,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.automation.ScanAggregationTrigger
+import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.util.*
 import com.daml.network.util.CNNodeUtil.defaultCnsConfig
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -165,8 +166,11 @@ class ScanTimeBasedIntegrationTest
     clue("Advance one more tick to get to the next closed round") {
       advanceRoundsByOneTick
       val ledgerTime = getLedgerTime.toInstant
+      val expectedLastRound = baseRoundWithLatestData + 1
       sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
-      sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 1, ledgerTime))
+      sv1ScanBackend.getRoundOfLatestData() shouldBe (expectedLastRound, ledgerTime)
+      sv1ScanBackend.getAggregatedRounds() shouldBe ScanAggregator.RoundRange(0, expectedLastRound)
+
     }
     clue("Data for a later round does not yet exist")({
       val lastAggregatedRound = sv1ScanBackend.getRoundOfLatestData()._1
@@ -192,6 +196,8 @@ class ScanTimeBasedIntegrationTest
         (Codec.decode(Codec.Party)((v._1.userStatus().party)).value, v._2)
       )
     }
+    def walletClientParty(walletClient: WalletAppClientReference) =
+      Codec.decode(Codec.Party)(walletClient.userStatus().party).value
 
     actAndCheck(
       "Advance four more rounds, for the previous rounds to close (where rewards were collected)",
@@ -212,8 +218,25 @@ class ScanTimeBasedIntegrationTest
         (0 to baseRoundWithLatestData.toInt + 3).map { round =>
           sv1ScanBackend.getRewardsCollectedInRound(round.toLong)
         }.sum shouldBe appRewardsAliceR3 + appRewardsBobR3 + validatorRewardsAliceR3 + validatorRewardsBobR3
+        val aliceValidatorWalletClientParty =
+          walletClientParty(aliceValidatorWalletClient).toProtoPrimitive
+        val bobValidatorWalletClientParty =
+          walletClientParty(bobValidatorWalletClient).toProtoPrimitive
 
         clue("Compare leaderboard getTopProvidersByAppRewards + 3") {
+          sv1ScanBackend
+            .listRoundPartyTotals(0, baseRoundWithLatestData + 3)
+            .map { rpt =>
+              rpt.party -> (rpt.closedRound, BigDecimal(rpt.cumulativeAppRewards))
+            }
+            .filter { case (p, (_, appRewards)) =>
+              appRewards > 0 && (p == aliceValidatorWalletClientParty || p == bobValidatorWalletClientParty)
+            }
+            .toMap should contain theSameElementsAs Map(
+            aliceValidatorWalletClientParty -> (baseRoundWithLatestData + 3, appRewardsAliceR3),
+            bobValidatorWalletClientParty -> (baseRoundWithLatestData + 3, appRewardsBobR3),
+          )
+
           compareLeaderboard(
             sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 3, 10),
             Seq(
@@ -223,6 +246,19 @@ class ScanTimeBasedIntegrationTest
           )
         }
         clue("Compare leaderboard getTopValidatorsByValidatorRewards + 3") {
+          sv1ScanBackend
+            .listRoundPartyTotals(0, baseRoundWithLatestData + 3)
+            .map { rpt =>
+              rpt.party -> (rpt.closedRound, BigDecimal(rpt.cumulativeValidatorRewards))
+            }
+            .filter { case (p, (_, validatorRewards)) =>
+              validatorRewards > 0 && (p == aliceValidatorWalletClientParty || p == bobValidatorWalletClientParty)
+            }
+            .toMap should contain theSameElementsAs Map(
+            aliceValidatorWalletClientParty -> (baseRoundWithLatestData + 3, validatorRewardsAliceR3),
+            bobValidatorWalletClientParty -> (baseRoundWithLatestData + 3, validatorRewardsBobR3),
+          )
+
           compareLeaderboard(
             sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 3, 10),
             Seq(
@@ -282,6 +318,7 @@ class ScanTimeBasedIntegrationTest
       _ => {
         sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
         sv1ScanBackend.getRoundOfLatestData()._1 shouldBe 2
+        sv1ScanBackend.getAggregatedRounds() shouldBe ScanAggregator.RoundRange(0, 2)
       },
     )
 
@@ -300,6 +337,71 @@ class ScanTimeBasedIntegrationTest
       total2 shouldBe (
         tapRound1Amount - holdingFeeAfterTwoRounds +
           tapRound2Amount - holdingFeeAfterOneRound
+      )
+      sv1ScanBackend.getAggregatedRounds() shouldBe ScanAggregator.RoundRange(0, 2)
+      sv1ScanBackend
+        .listRoundTotals(0, 2)
+        .map(rt => (rt.closedRound, BigDecimal(rt.totalCoinBalance))) shouldBe List(
+        0L -> total0,
+        1L -> total1,
+        2L -> total2,
+      )
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.listRoundTotals(1, 3),
+        _.errorMessage should include("is outside of the available rounds range"),
+      )
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.listRoundPartyTotals(1, 3),
+        _.errorMessage should include("is outside of the available rounds range"),
+      )
+    }
+  }
+
+  "Not get aggregates for incorrect ranges" in { implicit env =>
+    clue("Try to get round totals for negative rounds") {
+      val startRounds = List(-1L, 0L, -1L, 1L, -1L)
+      val endRounds = List(1L, -1L, 0L, -1L, -1L)
+      startRounds.zip(endRounds).foreach { case (start, end) =>
+        assertThrowsAndLogsCommandFailures(
+          sv1ScanBackend.listRoundTotals(start, end),
+          _.errorMessage should include(
+            s"rounds must be non-negative: start_round $start, end_round $end"
+          ),
+        )
+        assertThrowsAndLogsCommandFailures(
+          sv1ScanBackend.listRoundPartyTotals(start, end),
+          _.errorMessage should include(
+            s"rounds must be non-negative: start_round $start, end_round $end"
+          ),
+        )
+      }
+    }
+    clue("Try to get round totals for range where end is smaller than start") {
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.listRoundTotals(10, 9),
+        _.errorMessage should include("end_round 9 must be >= start_round 10"),
+      )
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.listRoundPartyTotals(10, 9),
+        _.errorMessage should include("end_round 9 must be >= start_round 10"),
+      )
+    }
+    clue("Try to get too many round totals or round party totals") {
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.listRoundTotals(0, 200),
+        _.errorMessage should include(s"Cannot request more than 200 rounds at a time"),
+      )
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.listRoundTotals(1, 201),
+        _.errorMessage should include(s"Cannot request more than 200 rounds at a time"),
+      )
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.listRoundPartyTotals(0, 50),
+        _.errorMessage should include(s"Cannot request more than 50 rounds at a time"),
+      )
+      assertThrowsAndLogsCommandFailures(
+        sv1ScanBackend.listRoundPartyTotals(1, 51),
+        _.errorMessage should include(s"Cannot request more than 50 rounds at a time"),
       )
     }
   }

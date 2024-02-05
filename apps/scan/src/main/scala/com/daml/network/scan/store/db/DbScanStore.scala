@@ -574,4 +574,66 @@ class DbScanStore(
         .value
     } yield sum.getOrElse(0L)
   }
+
+  override def getAggregatedRounds()(implicit
+      tc: TraceContext
+  ): Future[Option[ScanAggregator.RoundRange]] =
+    waitUntilAcsIngested {
+      for {
+        rounds <- storage
+          .querySingle(
+            sql"""
+            select min(closed_round) as min_round,
+                   max(closed_round) as max_round
+            from   round_totals
+            where  store_id = $storeId;
+          """.as[ScanAggregator.RoundRange].headOption,
+            "getAggregatedRounds",
+          )
+          .value
+      } yield rounds
+    }
+
+  override def getRoundTotals(startRound: Long, endRound: Long)(implicit
+      tc: TraceContext
+  ): Future[Seq[ScanAggregator.RoundTotals]] = {
+    val q = sql"""
+    select   #${ScanAggregator.roundTotalsColumns}
+    from     round_totals
+    where    store_id = $storeId
+    and      closed_round >= $startRound
+    and      closed_round <= $endRound
+    order by closed_round
+    """
+    waitUntilAcsIngested {
+      for {
+        roundTotals <- storage
+          .query(
+            q.as[ScanAggregator.RoundTotals],
+            "getRoundTotals",
+          )
+      } yield roundTotals
+    }
+  }
+  override def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
+      tc: TraceContext
+  ): Future[Seq[ScanAggregator.RoundPartyTotals]] = {
+    val q = sql"""
+    select   #${ScanAggregator.roundPartyTotalsColumns}
+    from     round_party_totals
+    where    store_id = $storeId
+    and      closed_round >= $startRound
+    and      closed_round <= $endRound
+    order by closed_round, party
+    """
+    waitUntilAcsIngested {
+      for {
+        roundPartyTotals <- storage
+          .query(
+            q.as[ScanAggregator.RoundPartyTotals],
+            "getRoundPartyTotals",
+          )
+      } yield roundPartyTotals
+    }
+  }
 }

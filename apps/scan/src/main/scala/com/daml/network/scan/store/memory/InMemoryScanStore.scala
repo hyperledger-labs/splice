@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
+import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.store.{
   HardLimit,
   InMemoryCNNodeAppStore,
@@ -374,6 +375,22 @@ class InMemoryScanStore(
         (co: Contract[?, coinCodegen.FeaturedAppRight]) =>
           co.payload.provider == providerPartyId.toProtoPrimitive
       }
+
+  // TODO(#8152) InMemoryScanStore will be deleted.
+  override def getAggregatedRounds()(implicit
+      tc: TraceContext
+  ): Future[Option[ScanAggregator.RoundRange]] =
+    Future.successful(None)
+
+  // TODO(#8152) InMemoryScanStore will be deleted.
+  override def getRoundTotals(startRound: Long, endRound: Long)(implicit
+      tc: TraceContext
+  ): Future[Seq[ScanAggregator.RoundTotals]] = Future.successful(Seq.empty)
+
+  // TODO(#8152) InMemoryScanStore will be deleted.
+  override def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
+      tc: TraceContext
+  ): Future[Seq[ScanAggregator.RoundPartyTotals]] = Future.successful(Seq.empty)
 
   override def close(): Unit = {
     super.close()

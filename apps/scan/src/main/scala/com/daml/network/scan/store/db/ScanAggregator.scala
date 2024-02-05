@@ -64,18 +64,7 @@ final class ScanAggregator(
       traceContext: TraceContext
   ): Future[Option[RoundTotals]] = {
     val q = sql"""
-      select store_id, 
-             closed_round, 
-             closed_round_effective_at,
-             coalesce(app_rewards, 0), 
-             coalesce(validator_rewards, 0), 
-             coalesce(change_to_initial_amount_as_of_round_zero,0), 
-             coalesce(change_to_holding_fees_rate,0), 
-             coalesce(cumulative_app_rewards,0), 
-             coalesce(cumulative_validator_rewards,0), 
-             coalesce(cumulative_change_to_initial_amount_as_of_round_zero,0),
-             coalesce(cumulative_change_to_holding_fees_rate,0),
-             coalesce(total_coin_balance,0)
+      select #$roundTotalsColumns
       from   round_totals
       where  store_id = $storeId
       and    closed_round = (select coalesce(max(closed_round), 0) from round_totals)
@@ -92,18 +81,7 @@ final class ScanAggregator(
       traceContext: TraceContext
   ): Future[Option[RoundTotals]] = {
     val q = sql"""
-      select store_id,
-             closed_round, 
-             closed_round_effective_at,
-             coalesce(app_rewards, 0), 
-             coalesce(validator_rewards, 0), 
-             coalesce(change_to_initial_amount_as_of_round_zero,0), 
-             coalesce(change_to_holding_fees_rate, 0), 
-             coalesce(cumulative_app_rewards, 0), 
-             coalesce(cumulative_validator_rewards, 0), 
-             coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0),
-             coalesce(cumulative_change_to_holding_fees_rate, 0),
-             coalesce(total_coin_balance, 0)
+      select #$roundTotalsColumns
       from   round_totals
       where  store_id = $storeId
       and    closed_round = $round
@@ -120,21 +98,7 @@ final class ScanAggregator(
       traceContext: TraceContext
   ): Future[Vector[RoundPartyTotals]] = {
     val q = sql"""
-      select   store_id,
-               closed_round, 
-               party,
-               coalesce(app_rewards, 0), 
-               coalesce(validator_rewards, 0), 
-               coalesce(traffic_purchased, 0), 
-               coalesce(traffic_purchased_cc_spent, 0), 
-               coalesce(traffic_num_purchases, 0), 
-               coalesce(cumulative_app_rewards, 0), 
-               coalesce(cumulative_validator_rewards, 0), 
-               coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0),
-               coalesce(cumulative_change_to_holding_fees_rate, 0),
-               coalesce(cumulative_traffic_purchased, 0),
-               coalesce(cumulative_traffic_purchased_cc_spent, 0),
-               coalesce(cumulative_traffic_num_purchases, 0)
+      select   #$roundPartyTotalsColumns
       from     round_party_totals
       where    store_id = $storeId
       and      closed_round = $round
@@ -257,7 +221,7 @@ final class ScanAggregator(
               from     scan_acs_store
               where    store_id = $storeId
               and      round = $round
-              and      
+              and
               (
                 template_id_qualified_name = ${QualifiedName(
                 OpenMiningRound.COMPANION.TEMPLATE_ID
@@ -306,8 +270,8 @@ final class ScanAggregator(
                   0 as change_to_initial_amount_as_of_round_zero,
                   0 as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId 
-        and       round > ${previousRoundTotals.closedRound} 
+        where     store_id = $storeId
+        and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
         and       entry_type = ${TxLogEntry.AppRewardLogEntry.dbType}
         group by  round
@@ -319,8 +283,8 @@ final class ScanAggregator(
                   0 as change_to_initial_amount_as_of_round_zero,
                   0 as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId 
-        and       round > ${previousRoundTotals.closedRound} 
+        where     store_id = $storeId
+        and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
         and       entry_type = ${TxLogEntry.ValidatorRewardLogEntry.dbType}
         group by  round
@@ -332,8 +296,8 @@ final class ScanAggregator(
                   sum(balance_change_change_to_initial_amount_as_of_round_zero) as change_to_initial_amount_as_of_round_zero,
                   sum(balance_change_change_to_holding_fees_rate) as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId 
-        and       round > ${previousRoundTotals.closedRound} 
+        where     store_id = $storeId
+        and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
         and       entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
         group by  round
@@ -345,12 +309,12 @@ final class ScanAggregator(
                   0 as change_to_initial_amount_as_of_round_zero,
                   0 as change_to_holding_fees_rate
         from      scan_txlog_store
-        where     store_id = $storeId 
-        and       round > ${previousRoundTotals.closedRound} 
+        where     store_id = $storeId
+        and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
-        and       entry_type = ${TxLogEntry.ClosedMiningRoundLogEntry.dbType} 
+        and       entry_type = ${TxLogEntry.ClosedMiningRoundLogEntry.dbType}
         group by  round
-      ), 
+      ),
       new_totals as(
         select    round,
                   max(closed_round_effective_at) as closed_round_effective_at,
@@ -376,27 +340,27 @@ final class ScanAggregator(
       )
       insert into round_totals (
                   store_id,
-                  closed_round, 
+                  closed_round,
                   closed_round_effective_at,
-                  app_rewards, 
-                  validator_rewards, 
-                  change_to_initial_amount_as_of_round_zero, 
-                  change_to_holding_fees_rate, 
-                  cumulative_app_rewards, 
-                  cumulative_validator_rewards, 
-                  cumulative_change_to_initial_amount_as_of_round_zero, 
-                  cumulative_change_to_holding_fees_rate, 
+                  app_rewards,
+                  validator_rewards,
+                  change_to_initial_amount_as_of_round_zero,
+                  change_to_holding_fees_rate,
+                  cumulative_app_rewards,
+                  cumulative_validator_rewards,
+                  cumulative_change_to_initial_amount_as_of_round_zero,
+                  cumulative_change_to_holding_fees_rate,
                   total_coin_balance
       )
       select      $storeId,
-                  ct.round, 
+                  ct.round,
                   ct.closed_round_effective_at,
-                  ct.app_rewards, 
-                  ct.validator_rewards, 
-                  ct.change_to_initial_amount_as_of_round_zero, 
-                  ct.change_to_holding_fees_rate, 
-                  ct.cumulative_app_rewards, 
-                  ct.cumulative_validator_rewards, 
+                  ct.app_rewards,
+                  ct.validator_rewards,
+                  ct.change_to_initial_amount_as_of_round_zero,
+                  ct.change_to_holding_fees_rate,
+                  ct.cumulative_app_rewards,
+                  ct.cumulative_validator_rewards,
                   ct.cumulative_change_to_initial_amount_as_of_round_zero,
                   ct.cumulative_change_to_holding_fees_rate,
                   ct.cumulative_change_to_initial_amount_as_of_round_zero - ct.cumulative_change_to_holding_fees_rate * (ct.round + 1)
@@ -452,7 +416,7 @@ final class ScanAggregator(
         and       round <= $lastClosedRound
         and       entry_type = ${TxLogEntry.AppRewardLogEntry.dbType}
         and       rewarded_party is not null
-        group by  round, 
+        group by  round,
                   rewarded_party
         union all
         select    round,
@@ -470,7 +434,7 @@ final class ScanAggregator(
         and       round <= $lastClosedRound
         and       entry_type = ${TxLogEntry.ValidatorRewardLogEntry.dbType}
         and       rewarded_party is not null
-        group by  round, 
+        group by  round,
                   rewarded_party
         union all
         select    round,
@@ -488,7 +452,7 @@ final class ScanAggregator(
         and       round <= $lastClosedRound
         and       entry_type = ${TxLogEntry.ExtraTrafficPurchaseLogEntry.dbType}
         and       extra_traffic_validator is not null
-        group by  round, 
+        group by  round,
                   extra_traffic_validator
         union all
         select    round,
@@ -506,7 +470,7 @@ final class ScanAggregator(
         and       round > (select last_closed_round from previously_aggregated)
         and       round <= $lastClosedRound
         and       entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
-        group by  round, 
+        group by  round,
                   party
       ),
       new_totals as(
@@ -520,7 +484,7 @@ final class ScanAggregator(
                   sum(change_to_initial_amount_as_of_round_zero) as change_to_initial_amount_as_of_round_zero,
                   sum(change_to_holding_fees_rate) as change_to_holding_fees_rate
         from      new_totals_per_entry
-        group by  round, 
+        group by  round,
                   party
       ),
       previous_totals as (
@@ -557,15 +521,15 @@ final class ScanAggregator(
       )
       insert into round_party_totals (
                   store_id,
-                  closed_round, 
+                  closed_round,
                   party,
-                  app_rewards, 
-                  validator_rewards, 
+                  app_rewards,
+                  validator_rewards,
                   traffic_purchased,
                   traffic_purchased_cc_spent,
                   traffic_num_purchases,
-                  cumulative_app_rewards, 
-                  cumulative_validator_rewards, 
+                  cumulative_app_rewards,
+                  cumulative_validator_rewards,
                   cumulative_traffic_purchased,
                   cumulative_traffic_purchased_cc_spent,
                   cumulative_traffic_num_purchases,
@@ -573,15 +537,15 @@ final class ScanAggregator(
                   cumulative_change_to_holding_fees_rate
       )
       select      $storeId,
-                  ct.round, 
+                  ct.round,
                   ct.party,
-                  ct.app_rewards, 
-                  ct.validator_rewards, 
+                  ct.app_rewards,
+                  ct.validator_rewards,
                   ct.traffic_purchased,
                   ct.traffic_purchased_cc_spent,
                   ct.traffic_num_purchases,
-                  ct.cumulative_app_rewards, 
-                  ct.cumulative_validator_rewards, 
+                  ct.cumulative_app_rewards,
+                  ct.cumulative_validator_rewards,
                   ct.cumulative_traffic_purchased,
                   ct.cumulative_traffic_purchased_cc_spent,
                   ct.cumulative_traffic_num_purchases,
@@ -607,6 +571,7 @@ object ScanAggregator {
   type Party = String
   val zero = BigDecimal(0)
 
+  final case class RoundRange(start: Long, end: Long)
   final case class RoundTotals(
       storeId: Int,
       closedRound: Long = 0L,
@@ -621,6 +586,33 @@ object ScanAggregator {
       cumulativeChangeToHoldingFeesRate: BigDecimal = zero,
       totalCoinBalance: BigDecimal = zero,
   )
+
+  implicit val GetResultRoundRange: GetResult[RoundRange] =
+    GetResult { prs =>
+      import prs.*
+      (RoundRange.apply _).tupled(
+        (
+          <<[Long],
+          <<[Long],
+        )
+      )
+    }
+
+  val roundTotalsColumns = """
+    store_id,
+    closed_round,
+    closed_round_effective_at,
+    coalesce(app_rewards, 0),
+    coalesce(validator_rewards, 0),
+    coalesce(change_to_initial_amount_as_of_round_zero,0),
+    coalesce(change_to_holding_fees_rate, 0),
+    coalesce(cumulative_app_rewards, 0),
+    coalesce(cumulative_validator_rewards, 0),
+    coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0),
+    coalesce(cumulative_change_to_holding_fees_rate, 0),
+    coalesce(total_coin_balance, 0)
+    """
+
   implicit val GetResultRoundTotals: GetResult[RoundTotals] =
     GetResult { prs =>
       import prs.*
@@ -682,4 +674,21 @@ object ScanAggregator {
         )
       )
     }
+  val roundPartyTotalsColumns = """
+  store_id,
+  closed_round,
+  party,
+  coalesce(app_rewards, 0),
+  coalesce(validator_rewards, 0),
+  coalesce(traffic_purchased, 0),
+  coalesce(traffic_purchased_cc_spent, 0),
+  coalesce(traffic_num_purchases, 0),
+  coalesce(cumulative_app_rewards, 0),
+  coalesce(cumulative_validator_rewards, 0),
+  coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0),
+  coalesce(cumulative_change_to_holding_fees_rate, 0),
+  coalesce(cumulative_traffic_purchased, 0),
+  coalesce(cumulative_traffic_purchased_cc_spent, 0),
+  coalesce(cumulative_traffic_num_purchases, 0)
+  """
 }

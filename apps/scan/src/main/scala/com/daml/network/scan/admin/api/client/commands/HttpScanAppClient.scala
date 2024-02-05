@@ -24,6 +24,7 @@ import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
 import com.daml.network.http.v0.definitions.{GetCnsRulesRequest, GetCoinRulesRequest}
+import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.codegen.java.cc
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
@@ -759,6 +760,65 @@ object HttpScanAppClient {
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetAcsSnapshotResponse.OK(response) =>
         Right(ByteString.copyFrom(Base64.getDecoder.decode(response.acsSnapshot)))
+    }
+  }
+  object GetAggregatedRounds
+      extends InternalBaseCommand[http.GetAggregatedRoundsResponse, ScanAggregator.RoundRange] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetAggregatedRoundsResponse] = {
+      client.getAggregatedRounds(headers)
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetAggregatedRoundsResponse.OK(response) =>
+        Right(ScanAggregator.RoundRange(response.start, response.end))
+      case http.GetAggregatedRoundsResponse.NotFound(err) =>
+        Left(err.error)
+    }
+  }
+  case class ListRoundTotals(start: Long, end: Long)
+      extends InternalBaseCommand[
+        http.ListRoundTotalsResponse,
+        Seq[definitions.RoundTotals],
+      ] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListRoundTotalsResponse] = {
+      client.listRoundTotals(definitions.ListRoundTotalsRequest(start, end), headers)
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListRoundTotalsResponse.OK(response) =>
+        Right(response.entries)
+    }
+  }
+  case class ListRoundPartyTotals(start: Long, end: Long)
+      extends InternalBaseCommand[
+        http.ListRoundPartyTotalsResponse,
+        Seq[definitions.RoundPartyTotals],
+      ] {
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.ListRoundPartyTotalsResponse] = {
+      client.listRoundPartyTotals(definitions.ListRoundPartyTotalsRequest(start, end), headers)
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.ListRoundPartyTotalsResponse.OK(response) =>
+        Right(response.entries)
     }
   }
 }

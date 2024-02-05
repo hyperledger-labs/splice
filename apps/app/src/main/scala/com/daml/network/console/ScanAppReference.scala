@@ -19,6 +19,7 @@ import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
+import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract, ContractWithState}
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -308,6 +309,25 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetAcsSnapshot(party)
+      )
+    }
+  def getAggregatedRounds(): ScanAggregator.RoundRange =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.GetAggregatedRounds
+      )
+    }
+  def listRoundTotals(start: Long, end: Long) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ListRoundTotals(start, end)
+      )
+    }
+
+  def listRoundPartyTotals(start: Long, end: Long) =
+    consoleEnvironment.run {
+      httpCommand(
+        HttpScanAppClient.ListRoundPartyTotals(start, end)
       )
     }
 }
