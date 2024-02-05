@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cn.cometbft.{
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.digitalasset.canton.topology.DomainId
+import monocle.Monocle.toAppliedFocusOps
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.Optional
@@ -156,14 +157,18 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
         networkConfig,
         dummySvcDomainId,
         logger,
-        addNonce = false,
       )
       .requests
-    val expectedRequests =
-      if (expectChange)
-        Seq(mkChangeRequest(nodeNr, targetConfig))
-      else Seq()
-    configDiff shouldBe expectedRequests
+    if (expectChange) {
+      val request = mkChangeRequest(nodeNr, targetConfig)
+      configDiff should have size 1
+      val actualRequest = configDiff.head
+      // The submittedAt field is not deterministic, so we remove it from the expected request
+      actualRequest.submittedAt should be(defined)
+      actualRequest.focus(_.submittedAt).replace(None) shouldBe request
+    } else {
+      configDiff should be(empty)
+    }
   }
 
   "CometBftNode.diffNetworkConfig" should {
