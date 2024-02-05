@@ -362,21 +362,26 @@ abstract class TopologyAdminConnection(
       }
     }
 
-  def getTopologySnapshot(domainId: DomainId)(implicit
+  def getTopologySnapshot(
+      domainId: DomainId,
+      from: Option[CantonTimestamp] = None,
+      until: Option[CantonTimestamp] = None,
+  )(implicit
       traceContext: TraceContext
-  ): Future[GenericStoredTopologyTransactionsX] =
+  ): Future[GenericStoredTopologyTransactionsX] = {
     runCmd(
       TopologyAdminCommandsX.Read.ListAll(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = false,
-          timeQuery = TimeQueryX.Range(None, None),
+          timeQuery = TimeQueryX.Range(from, until),
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
         )
       )
     )
+  }
 
   def lookupTrafficControlState(
       domainId: DomainId,
@@ -1175,16 +1180,17 @@ abstract class TopologyAdminConnection(
     )
 
   def getDomainParametersState(
-      domainId: DomainId
+      domainId: DomainId,
+      proposals: TopologyTransactionType = AuthorizedState,
   )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersStateX]] = {
     runCmd(
       TopologyAdminCommandsX.Read.DomainParametersState(
         BaseQueryX(
           domainId.filterString,
-          proposals = false,
+          proposals = proposals.proposals,
           TimeQueryX.HeadState,
           None,
-          filterSigningKey = "",
+          filterSigningKey = proposals.signingKey.getOrElse(""),
           protocolVersion = None,
         ),
         domainId.filterString,

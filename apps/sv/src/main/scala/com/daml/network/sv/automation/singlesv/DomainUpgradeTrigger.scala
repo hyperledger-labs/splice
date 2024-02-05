@@ -2,8 +2,8 @@ package com.daml.network.sv.automation.singlesv
 
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
+import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode}
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.BackupDump
@@ -19,6 +19,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import java.nio.file.Path
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
@@ -66,7 +67,7 @@ final class DomainUpgradeTrigger(
         domainParamsTopologyResult <- ensureDomainIsPaused(globalDomainId)
         // TODO(#8761) wait until it's safe, based on params described in the design
         _ <- waitForMediatorAndParticipantResponseTime(globalDomainId, domainParamsTopologyResult)
-        _ = exportMigrationDump(task.work.migrationId)
+        _ = exportMigrationDump(task.work.migrationId, domainParamsTopologyResult.base.validFrom)
       } yield TaskSuccess(show"Triggered domain pause and migration dump export for ${task.work}")
     } else
       Future.successful(TaskSuccess(show"migration dump already exists. skipping ${task.work}"))
@@ -88,7 +89,7 @@ final class DomainUpgradeTrigger(
       )
   } yield domainParamsTopologyResult
 
-  private def exportMigrationDump(migrationId: Long)(implicit
+  private def exportMigrationDump(migrationId: Long, domainPausedAt: Instant)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Unit = {
@@ -101,6 +102,7 @@ final class DomainUpgradeTrigger(
         svcStore,
         context.clock,
         migrationId,
+        domainPausedAt,
       )
       .foreach { dump =>
         val path = BackupDump.writeToPath(

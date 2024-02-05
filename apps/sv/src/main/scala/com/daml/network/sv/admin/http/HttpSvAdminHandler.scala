@@ -20,7 +20,7 @@ import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.{DomainMigrationDump, DomainNodeIdentitiesDump, LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{BackupDump, Codec, JsonUtil, TemplateJsonDecoder}
@@ -546,22 +546,37 @@ class HttpSvAdminHandler(
             svcRules.payload.config.nextScheduledDomainUpgrade.toScala match {
               case Some(scheduled) =>
                 DomainMigrationDump
-                  .getDomainMigrationDump(
-                    config.domains.global.alias,
+                  .getDomainPausedTime(
                     participantAdminConnection,
-                    domainNode,
-                    loggerFactory,
                     svcStore,
-                    clock,
-                    scheduled.migrationId,
                   )
-                  .map { response =>
-                    v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(response.toHttp)
+                  .flatMap {
+                    case Some(pausedAt) =>
+                      DomainMigrationDump
+                        .getDomainMigrationDump(
+                          config.domains.global.alias,
+                          participantAdminConnection,
+                          domainNode,
+                          loggerFactory,
+                          svcStore,
+                          clock,
+                          scheduled.migrationId,
+                          pausedAt,
+                        )
+                        .map { response =>
+                          v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(response.toHttp)
+                        }
+                    case None =>
+                      Future.failed(
+                        HttpErrorHandler.internalServerError(
+                          s"Could not get DomainMigrationDump because domain is not paused yet"
+                        )
+                      )
                   }
               case None =>
                 Future.failed(
                   HttpErrorHandler.internalServerError(
-                    s"Could not trigger DomainMigrationDump because migration is not scheduled"
+                    s"Could not get DomainMigrationDump because migration is not scheduled"
                   )
                 )
             }
@@ -653,24 +668,39 @@ class HttpSvAdminHandler(
         case Some(domainNode) =>
           optDomainMigrationDumpConfig match {
             case Some(dumpPath) =>
-              DomainMigrationDump
-                .getDomainMigrationDump(
-                  config.domains.global.alias,
+              for {
+                domainPausedAt <- DomainMigrationDump.getDomainPausedTime(
                   participantAdminConnection,
-                  domainNode,
-                  loggerFactory,
                   svcStore,
-                  clock,
-                  request.migrationId,
                 )
-                .map { dump =>
-                  val path = BackupDump.writeToPath(
-                    dumpPath,
-                    dump.toJson.noSpaces,
-                  )
-                  logger.info(s"Wrote domain migration dump at path $path")
-                  SvAdminResource.TriggerDomainMigrationDumpResponseOK
+                dump <- domainPausedAt match {
+                  case Some(pausedAt) =>
+                    DomainMigrationDump
+                      .getDomainMigrationDump(
+                        config.domains.global.alias,
+                        participantAdminConnection,
+                        domainNode,
+                        loggerFactory,
+                        svcStore,
+                        clock,
+                        request.migrationId,
+                        pausedAt,
+                      )
+                  case None =>
+                    Future.failed(
+                      HttpErrorHandler.internalServerError(
+                        s"Could not trigger DomainMigrationDump because domain is not paused yet"
+                      )
+                    )
                 }
+              } yield {
+                val path = BackupDump.writeToPath(
+                  dumpPath,
+                  dump.toJson.noSpaces,
+                )
+                logger.info(s"Wrote domain migration dump at path $path")
+                SvAdminResource.TriggerDomainMigrationDumpResponseOK
+              }
             case None =>
               Future.failed(
                 HttpErrorHandler.internalServerError(

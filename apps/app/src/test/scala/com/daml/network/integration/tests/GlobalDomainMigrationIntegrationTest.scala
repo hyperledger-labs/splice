@@ -294,6 +294,7 @@ class GlobalDomainMigrationIntegrationTest
           },
           // reset to not crash other tests
           {
+            // pausing DomainUpgradeTrigger of all all old SV to avoid them from setting the maxRatePerParticipant back to zero.
             allNodes.foreach { node =>
               node.oldBackend.svcAutomation
                 .trigger[DomainUpgradeTrigger]

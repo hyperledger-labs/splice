@@ -14,7 +14,9 @@ import com.daml.network.sv.DomainNodeIdentitiesDump.{
 }
 import com.daml.network.util.Codec
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.Hash
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.v30.TopologyTransactions
 import com.digitalasset.canton.time.Clock
@@ -26,6 +28,7 @@ import com.google.protobuf.ByteString
 import io.circe.Json
 import io.circe.syntax.*
 
+import java.time.Instant
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -127,6 +130,7 @@ object DomainMigrationDump {
       svcStore: SvSvcStore,
       clock: Clock,
       migrationId: Long,
+      topologyTxsUntil: Instant,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -148,7 +152,9 @@ object DomainMigrationDump {
         .getNodeIdentitiesDump()
       globalDomain <- svcStore.getSvcRules().map(_.domain)
       topologySnapshot <- domainNode.sequencerAdminConnection.getTopologySnapshot(
-        globalDomain
+        globalDomain,
+        None,
+        Some(tryFromInstant(topologyTxsUntil)),
       )
       acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
         Set(svcStore.key.svParty, svcStore.key.svcParty)
@@ -174,4 +180,32 @@ object DomainMigrationDump {
       dars.flatten,
     )
   }
+
+  def getDomainPausedTime(
+      participantAdminConnection: ParticipantAdminConnection,
+      svcStore: SvSvcStore,
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[Option[Instant]] = for {
+    globalDomain <- svcStore.getSvcRules().map(_.domain)
+    domainParamsTopologyResult <- participantAdminConnection.getDomainParametersState(
+      globalDomain
+    )
+    isDomainPaused =
+      domainParamsTopologyResult.mapping.parameters.maxRatePerParticipant == NonNegativeInt.zero
+  } yield
+    if (isDomainPaused) Some(domainParamsTopologyResult.base.validFrom)
+    else None
+
+  private def tryFromInstant(time: Instant) =
+    CantonTimestamp
+      .fromInstant(time)
+      .fold(
+        err =>
+          throw new IllegalArgumentException(
+            s"cannot parse the instant $time for the topology snapshot: $err"
+          ),
+        identity,
+      )
 }
