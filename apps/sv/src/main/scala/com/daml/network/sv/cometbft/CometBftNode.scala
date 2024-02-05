@@ -7,7 +7,11 @@ import com.daml.network.codegen.java.cn.svcrules.{MemberInfo, SvcRules}
 import com.daml.network.sv.config.CometBftConfig
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.drivers as proto
-import com.digitalasset.canton.drivers.cometbft.SvNodeConfig
+import com.digitalasset.canton.drivers.cometbft.{
+  NetworkConfigChangeRequest,
+  SvBootstrapConfigChangeRequest,
+  SvNodeConfig,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -68,12 +72,34 @@ class CometBftNode(
             state.currentConfig.exists(config => config.governanceKeys.contains(ourGovernanceKey))
           )
         if (ourKeyIsRegistered) {
-          logger.debug(
-            show"Reconciling difference in CometBft network configuration: $summary"
-          )
-          networkConfigChanges.requests.traverse(
-            submitChangeRequest
-          )
+          val currentRegisteredNodes = actualConfig.svNodeConfigStates.keySet
+          if (
+            currentRegisteredNodes.sizeIs == 1 && currentRegisteredNodes
+              .contains(owningSvNode)
+          ) {
+            logger.debug(
+              show"Bootstrapping CometBft network configuration: $summary"
+            )
+            submitChangeRequest(
+              NetworkConfigChangeRequest(
+                chainId = actualConfig.chainId,
+                submitterSvNodeId = owningSvNode,
+                submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
+                kind = NetworkConfigChangeRequest.Kind.BootstrapConfigChangeRequest(
+                  SvBootstrapConfigChangeRequest(
+                    networkConfigChanges.requests.map(_.getNodeConfigChangeRequest)
+                  )
+                ),
+              )
+            )
+          } else {
+            logger.debug(
+              show"Reconciling difference in CometBft network configuration: $summary"
+            )
+            networkConfigChanges.requests.traverse(
+              submitChangeRequest
+            )
+          }
         } else {
           logger.info(
             show"Skipping reconciling difference in CometBft network configuration, as our governance public key ${ourGovernanceKey.toString.singleQuoted} is not yet registered: $summary"
