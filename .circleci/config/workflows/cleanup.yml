@@ -20,3 +20,4 @@ workflow:
           context:
             - canton-network-vpn
             - slack-context
+            - artifactory

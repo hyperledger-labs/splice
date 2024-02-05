@@ -3346,6 +3346,7 @@ workflows:
           context:
             - canton-network-vpn
             - slack-context
+            - artifactory
 
   deploy_devnet:
     when:
