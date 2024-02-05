@@ -100,7 +100,7 @@ Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:particip
 # TODO(#9504) Find a better way to deal with ACS commitments during SV reonboarding
 sv\dParticipantReonboard.*ACS_COMMITMENT_MISMATCH.*
 
-# TODO(#9557) Remove this broad exclusion once the Canton bug is fixed.
+# TODO(#9725) Remove this broad exclusion once the Canton bug is fixed.
 ACS_COMMITMENT_MISMATCH
 
 # TODO(#9500) Remove this once Canton fixes the bug
