@@ -17,6 +17,7 @@ import com.daml.network.codegen.java.cn.cns.{
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionPayment
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -89,9 +90,11 @@ class CnsSubscriptionRenewalPaymentTrigger(
           }
         } yield result
       case None =>
-        TaskSuccess(
-          s"skipping as no associated cns entry context for reference ${subscriptionPayment.contract.payload.reference} was found."
-        ).pure[Future]
+        throw Status.INTERNAL
+          .withDescription(
+            s"No associated cns entry context for reference ${subscriptionPayment.contract.payload.reference} was found."
+          )
+          .asRuntimeException()
     }
   }
 
