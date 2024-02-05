@@ -1290,9 +1290,13 @@ subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the cur
 
 function subcmd_pulumi() {
 
-    pulumi_project="${1-}"
-    pulumi_stack="${2-}"
-    pulumi_cmd="${3-}"
+    if [ "$#" -lt 3 ]; then
+       _error "Usage: $0 <project> <stack> <cmd> [args]"
+    fi
+
+    pulumi_project="$1"
+    pulumi_stack="$2"
+    pulumi_cmd="$3"
     shift 3
 
     if [ -z "${pulumi_cmd}" ] || [ -z "${pulumi_project}" ]; then
