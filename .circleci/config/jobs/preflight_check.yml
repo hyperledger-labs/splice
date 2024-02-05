@@ -43,14 +43,14 @@ jobs:
             echo "Setting max_user_watches..."
             echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
       - setup_vpn
-      # Needs to occur before setup_vpn_routes
-      - setup_nix
       - when:
           condition: << parameters.cluster_version >>
           steps:
-            - run_bash_command_in_nix:
-                cmd_name: Checkout commit << parameters.cluster_version >>
-                cmd: git checkout << parameters.cluster_version >>
+            - run:
+                name: Checkout commit << parameters.cluster_version >>
+                command: git checkout << parameters.cluster_version >>
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
