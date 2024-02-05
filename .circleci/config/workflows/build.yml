@@ -29,7 +29,7 @@ workflow:
           # cannot use a simple CCI branch filter for the job since this job is a dependency for all the other jobs in this workflow
           # and cannot be skipped
           branch_ignores: "^(main|deployment/.*)$"
-          max_pipeline_age_secs: 0  # no pipeline age limit
+          max_pipeline_age_secs: 7776000  # 90 days which is the max that the CCI API allows for pipeline cancellation
       # Linting and formatting
       - static_tests:
           <<: *notify-fail
