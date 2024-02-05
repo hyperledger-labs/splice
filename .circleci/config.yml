@@ -1404,9 +1404,9 @@ jobs:
       - when:
           condition: << parameters.deploy_version >>
           steps:
-            - run_bash_command_in_nix:
-                cmd_name: Checkout commit << parameters.deploy_version >>
-                cmd: git checkout << parameters.deploy_version >>
+            - run:
+                name: Checkout commit << parameters.deploy_version >>
+                command: git checkout << parameters.deploy_version >>
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
