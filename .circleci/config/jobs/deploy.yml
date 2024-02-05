@@ -124,6 +124,7 @@ jobs:
     circleci_ip_ranges: true
     docker:
       - image: cimg/base:2021.04
+    resource_class: xlarge
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -160,13 +161,13 @@ jobs:
 
     steps:
       - checkout_with_retry
-      - setup_nix
       - when:
           condition: << parameters.deploy_version >>
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Checkout commit << parameters.deploy_version >>
                 cmd: git checkout << parameters.deploy_version >>
+      - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
           # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
