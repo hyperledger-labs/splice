@@ -158,6 +158,9 @@ jobs:
       upgrade_global_domain_legacy_id:
         type: integer
         default: 0
+      cancel_workflow_on_failure:
+        type: boolean
+        default: false
 
     steps:
       - checkout_with_retry
@@ -254,6 +257,10 @@ jobs:
           steps:
             - notify-cluster-deployment:
                 cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.cancel_workflow_on_failure >>
+          steps:
+            - cancel_entire_workflow_if_this_job_failed
 
   reset_cluster:
     parameters:

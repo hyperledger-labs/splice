@@ -1109,3 +1109,12 @@ commands:
             docker pull ${COMETBFT_DOCKER_IMAGE}
             docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
             docker pull ${OTEL_COLLECTOR_IMAGE}
+
+
+  cancel_entire_workflow_if_this_job_failed:
+    steps:
+      - run:
+          when: on_fail
+          name: Cancel the entire workflow if this job failed
+          command: |
+            curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"

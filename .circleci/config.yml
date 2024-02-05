@@ -1238,6 +1238,15 @@ commands:
             docker pull ${COMETBFT_DOCKER_IMAGE}
             docker pull ${TESTCONTAINERS_SSHD_CONTAINER_IMAGE}
             docker pull ${OTEL_COLLECTOR_IMAGE}
+
+
+  cancel_entire_workflow_if_this_job_failed:
+    steps:
+      - run:
+          when: on_fail
+          name: Cancel the entire workflow if this job failed
+          command: |
+            curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"
 jobs:
   deploy_sv_runbook:
     circleci_ip_ranges: true
@@ -1398,6 +1407,9 @@ jobs:
       upgrade_global_domain_legacy_id:
         type: integer
         default: 0
+      cancel_workflow_on_failure:
+        type: boolean
+        default: false
 
     steps:
       - checkout_with_retry
@@ -1494,6 +1506,10 @@ jobs:
           steps:
             - notify-cluster-deployment:
                 cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.cancel_workflow_on_failure >>
+          steps:
+            - cancel_entire_workflow_if_this_job_failed
 
   reset_cluster:
     parameters:
@@ -3240,6 +3256,7 @@ workflows:
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for cimain
           upgrade_global_domain_prepare: true
+          cancel_workflow_on_failure: true
           requires:
             - docker_images_push
             - wait_for_previous_pipeline
@@ -3586,6 +3603,7 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_prepare: true
+          cancel_workflow_on_failure: true
           requires:
             - deployment_test
             - docker_images_push
@@ -3769,6 +3787,7 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_prepare: true
+          cancel_workflow_on_failure: true
           requires:
             - deployment_test
             - docker_images_push
@@ -3952,6 +3971,7 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_prepare: true
+          cancel_workflow_on_failure: true
           requires:
             - deployment_test
             - docker_images_push
@@ -4135,6 +4155,7 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_prepare: true
+          cancel_workflow_on_failure: true
           requires:
             - deployment_test
             - docker_images_push
@@ -4318,6 +4339,7 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_prepare: true
+          cancel_workflow_on_failure: true
           requires:
             - deployment_test
             - docker_images_push

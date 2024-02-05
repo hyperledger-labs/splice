@@ -25,6 +25,7 @@ workflow:
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for cimain
           upgrade_global_domain_prepare: true
+          cancel_workflow_on_failure: true
           requires:
             - docker_images_push
             - wait_for_previous_pipeline

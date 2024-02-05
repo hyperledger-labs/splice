@@ -31,6 +31,7 @@
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_prepare: true
+          cancel_workflow_on_failure: true
           requires:
             - deployment_test
             - docker_images_push
