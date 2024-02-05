@@ -105,7 +105,7 @@ spec:
                   key: postgresPassword
                   name: {{ .Values.mediator.persistence.secretName }}
           command:
-            - 'sh'
+            - 'bash'
             - '-c'
             - |
               until errmsg=$(psql -h {{ .Values.mediator.persistence.host }} --username=cnadmin --dbname=cantonnet -c 'create database {{ .Values.mediator.persistence.databaseName }}' 2>&1); do
