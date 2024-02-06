@@ -11,7 +11,7 @@ import com.daml.network.environment.{
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.CommonCNNodeAppInstanceReferences
 import com.digitalasset.canton.admin.api.client.data.User
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeNumeric, PositiveInt}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
 import com.digitalasset.canton.config.{
   ClockConfig,
   NonNegativeFiniteDuration,
@@ -25,8 +25,6 @@ import com.digitalasset.canton.integration.{
   TestEnvironment,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, SuppressingLogger}
-import com.digitalasset.canton.topology.transaction.DecentralizedNamespaceDefinitionX
-import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
 import org.scalatest.matchers.should.Matchers
@@ -92,76 +90,6 @@ case class CNNodeEnvironmentDefinition(
         }
       })
     })
-
-  def withResettedDecentralizedNamespace(): CNNodeEnvironmentDefinition = {
-    copy(preSetup = env => {
-      import env.*
-      this.preSetup(env)
-
-      /** The decentralized namespace is reset to contain only sv1 after each env is used
-        * When onboarding SVs their participant namespace is added to the decentralized namespace, so for a "clean" test we have to remove them
-        * We cannot just drop the decentralized namespace because the global domain is owned by it
-        */
-      svs.local
-        .find(_.name == "sv1")
-        .foreach { sv1 =>
-          val participantNamespace = sv1.participantClientWithAdminToken.id.uid.namespace
-          val decentralizedNamespace =
-            DecentralizedNamespaceDefinitionX.computeNamespace(Set(participantNamespace))
-          val sv1Party = participantNamespace
-          sv1.participantClientWithAdminToken.domains
-            .list_connected()
-            .find(_.domainAlias == sv1.config.domains.global.alias)
-            .fold(
-              logger.info("Not resetting decentralized namespace as the domain is not connected")(
-                TraceContext.empty
-              )
-            ) { domainId =>
-              val store = domainId.domainId.filterString
-              sv1.participantClientWithAdminToken.topology.decentralized_namespaces
-                .list(
-                  store,
-                  filterNamespace = decentralizedNamespace.toProtoPrimitive,
-                )
-                .headOption
-                .fold(
-                  logger.info("Not resetting decentralized namespace as it doesn't exist yet")(
-                    TraceContext.empty
-                  )
-                ) { existingDecentralizedNamespace =>
-                  logger.info("Resetting decentralized namespace to contain only sv1")(
-                    TraceContext.empty
-                  )
-                  val ownersThatMustBeRemoved =
-                    existingDecentralizedNamespace.item.owners.diff(Set(sv1Party))
-                  if (ownersThatMustBeRemoved.nonEmpty) {
-                    def proposeDecentralizedNamespaceReset(client: CNParticipantClientReference)
-                        : Unit = {
-                      client.topology.decentralized_namespaces
-                        .propose(
-                          Set(sv1Party),
-                          PositiveInt.one,
-                          store,
-                          serial =
-                            Some(existingDecentralizedNamespace.context.serial + PositiveInt.one),
-                        )
-                        .discard
-                    }
-                    existingDecentralizedNamespace.item.owners.foreach { owner =>
-                      svs.local
-                        // remove SV apps that end with local, as they are usually not yet started
-                        .filterNot(_.name.endsWith("Local"))
-                        .filterNot(_.name.endsWith("Onboarded"))
-                        .map(_.participantClientWithAdminToken)
-                        .find(_.id.uid.namespace == owner)
-                        .foreach(proposeDecentralizedNamespaceReset)
-                    }
-                  }
-                }
-            }
-        }
-    })
-  }
 
   def withInitializedNodes(): CNNodeEnvironmentDefinition =
     copy(setup = implicit env => {
@@ -366,14 +294,12 @@ object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
-      .withResettedDecentralizedNamespace()
 
   def simpleTopology4Svs(testName: String): CNNodeEnvironmentDefinition =
     fromResources(Seq("simple-topology.conf"), testName)
       .withAllocatedUsers()
       .withInitializedNodes()
       .withTrafficTopupsEnabled
-      .withResettedDecentralizedNamespace()
 
   def simpleTopology1SvWithSimTime(testName: String): CNNodeEnvironmentDefinition =
     simpleTopology1Sv(testName).withSimTime

@@ -114,7 +114,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
     // latest OpenMiningRound was created with doubled tick duration.
     eventually()({
-      val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+      val now = sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get()
 
       val rounds = getOpenMiningRounds()
       rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
@@ -201,7 +201,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
 
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
-    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+    val now = sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get()
     sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.activeDomain
     setFutureConfigSchedule(
       createConfigSchedule(
@@ -216,7 +216,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
     // latest OpenMiningRound was created with reduced tick duration.
     eventually()({
-      val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+      val now = sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get()
 
       val rounds = getOpenMiningRounds()
       rounds.oldestOpen.data.tickDuration shouldBe SvUtil.toRelTime(defaultTickDuration)
@@ -401,7 +401,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     val config202 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 202)
 
     {
-      val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+      val now = sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get()
       val configSchedule = {
         new cc.schedule.Schedule(
           mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration),

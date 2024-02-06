@@ -102,6 +102,20 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
         .votingPower
         .toDouble should be(0d)
     }
+    // Wait until the namespace change goes through, otherwise the namespace reset trigger might break.
+    eventually() {
+      Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
+        sv.participantClient.topology.decentralized_namespaces
+          .list(
+            filterStore = globalDomainId.filterString,
+            filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
+          )
+          .loneElement
+          .item
+          .owners
+          .forgetNE should have size 3
+      }
+    }
   }
 
   // In case this test fails, please also test CometBFT state sync is working by:

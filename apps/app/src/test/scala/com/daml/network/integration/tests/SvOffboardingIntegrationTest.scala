@@ -39,6 +39,9 @@ class SvOffboardingIntegrationTest
         )
         .flatten
 
+  // Runs against a temporary Canton instance.
+  override lazy val resetDecentralizedNamespace = false
+
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
   // TODO(#9014) make it work with persistend stores
   registerPlugin(new UseInMemoryStores(loggerFactory))

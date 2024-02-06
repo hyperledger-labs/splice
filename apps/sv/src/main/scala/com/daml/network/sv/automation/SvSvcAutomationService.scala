@@ -33,6 +33,7 @@ import com.daml.network.sv.automation.singlesv.membership.offboarding.{
 }
 import com.daml.network.sv.automation.singlesv.membership.onboarding.{
   SvOnboardingMediatorProposalTrigger,
+  SvOnboardingMediatorUnlimitedTrafficTrigger,
   SvOnboardingPartyToParticipantProposalTrigger,
   SvOnboardingPromoteParticipantToSubmitterTrigger,
   SvOnboardingSequencerProposalTrigger,
@@ -184,6 +185,14 @@ class SvSvcAutomationService(
         wallClockTriggerContext,
         svcStore,
         participantAdminConnection,
+        localDomainNode.map(_.mediatorAdminConnection),
+      )
+    )
+    registerTrigger(
+      new SvOnboardingMediatorUnlimitedTrafficTrigger(
+        wallClockTriggerContext,
+        svcStore,
+        participantAdminConnection,
       )
     )
     registerTrigger(
@@ -191,6 +200,7 @@ class SvSvcAutomationService(
         wallClockTriggerContext,
         svcStore,
         participantAdminConnection,
+        localDomainNode.map(_.sequencerAdminConnection),
       )
     )
     registerTrigger(

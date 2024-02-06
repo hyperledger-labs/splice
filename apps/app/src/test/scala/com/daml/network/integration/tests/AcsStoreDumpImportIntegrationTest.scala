@@ -65,6 +65,9 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
           }(config),
       )
 
+  // Runs against a temporary Canton instance.
+  override lazy val resetDecentralizedNamespace = false
+
   "sv1" should {
     "load the initial ACS dump" in { implicit env =>
       usingStandaloneCantonWithNewCn {

@@ -115,7 +115,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     val (previousGlobalId, coinRulesCid) = clue("change coinconfig to migrate domains") {
       inside(sv1ScanBackend.getCoinRules()) {
         case ContractWithState(firstCoinRules, Assigned(global1)) =>
-          val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+          val now = sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get()
           val currentSchedule = firstCoinRules.payload.configSchedule
           val activeDomainId =
             CoinConfigSchedule(currentSchedule).getConfigAsOf(now).globalDomain.activeDomain

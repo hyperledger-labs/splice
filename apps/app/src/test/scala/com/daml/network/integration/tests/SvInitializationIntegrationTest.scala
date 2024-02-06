@@ -112,19 +112,43 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       .headOption
       .value
     newDecentralizedNamespace.mapping.threshold shouldBe PositiveInt.tryCreate(3)
-    startSv(4, sv4Backend, sv4ValidatorBackend)
 
-    clue("All SVs have reported their Scan URLs in SVC rules") {
-      eventually() {
-        val svcRules = sv1Backend.appState.svcStore.getSvcRules().futureValue.contract.payload
-        svcRules.members.asScala
-          .flatMap(_._2.domainNodes.get(globalDomainId.toProtoPrimitive).scan.toScala)
-          // onle sv1 and sv2 have scan apps
-          .map(_.publicUrl) should contain theSameElementsAs Seq(
-          "http://localhost:5012",
-          "http://localhost:5112",
-        )
+    try {
+      startSv(4, sv4Backend, sv4ValidatorBackend)
+
+      clue("All SVs have reported their Scan URLs in SVC rules") {
+        eventually() {
+          val svcRules = sv1Backend.appState.svcStore.getSvcRules().futureValue.contract.payload
+          svcRules.members.asScala
+            .flatMap(_._2.domainNodes.get(globalDomainId.toProtoPrimitive).scan.toScala)
+            // onle sv1 and sv2 have scan apps
+            .map(_.publicUrl) should contain theSameElementsAs Seq(
+            "http://localhost:5012",
+            "http://localhost:5112",
+          )
+        }
       }
+    } finally {
+      // Remove the sequencer again, otherwise the logic for resetting the namespace to only contain
+      // sv1 will fail.
+      Seq(
+        sv1Backend.appState.participantAdminConnection,
+        sv2Backend.appState.participantAdminConnection,
+        sv3Backend.appState.participantAdminConnection,
+        sv4Backend.appState.participantAdminConnection,
+      ).parTraverse { connection =>
+        val id = connection.getId().futureValue
+        connection
+          .ensureDecentralizedNamespaceDefinitionRemovalProposal(
+            globalDomainId,
+            svcParty.uid.namespace,
+            sv1SequencerId.uid.namespace,
+            id.namespace.fingerprint,
+            RetryFor.WaitingOnInitDependency,
+          )
+      }.futureValue
+        .headOption
+        .value
     }
   }
 

@@ -166,7 +166,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   "respect scheduled change of maxNumInputs" in { implicit env =>
     // current config: maxNumInputs = 4
     // We then schedule a reduction of maxNumInputs to 3
-    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+    val now = sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get()
     val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
     val configSchedule = new cc.schedule.Schedule(
       mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 4),
@@ -196,7 +196,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     aliceValidatorWalletClient.tap(5)
     eventually() {
       val currentInstant =
-        sv1Backend.participantClientWithAdminToken.ledger_api.time.get().toInstant
+        sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get().toInstant
       getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(1, 2)
       aliceValidatorWalletClient.list().coins should have length 2
       aliceValidatorWalletClient
@@ -238,7 +238,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
       eventually() {
         val currentInstant =
-          sv1Backend.participantClientWithAdminToken.ledger_api.time.get().toInstant
+          sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get().toInstant
         getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(2, 3)
         // As the max number of input is reduced to 3
         // only 3 inputs are used: 1 coin, ValidatorRewardCoupon from round 2 and AppRewardCoupon from round 2

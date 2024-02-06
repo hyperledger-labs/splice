@@ -36,6 +36,9 @@ class SelfHostedSplitwellPreflightIntegrationTest
     ("ParticipantAdminApi", 7102),
   )
 
+  // Runs against a temporary Canton instance.
+  override lazy val resetDecentralizedNamespace = false
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition

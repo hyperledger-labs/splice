@@ -5,9 +5,9 @@ import cats.syntax.functorFilter._
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets
 import com.digitalasset.canton.console.{
-  LocalInstanceReferenceX,
-  LocalMediatorReferenceX,
-  LocalSequencerNodeReferenceX,
+  LocalInstanceReference,
+  LocalMediatorReference,
+  LocalSequencerNodeReference,
 }
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.domain.config.DomainParametersConfig
@@ -23,7 +23,7 @@ val domainParametersConfig = DomainParametersConfig(
   devVersionSupport = true,
 )
 
-def staticParameters(sequencer: LocalInstanceReferenceX) =
+def staticParameters(sequencer: LocalInstanceReference) =
   domainParametersConfig
     .toStaticDomainParameters(sequencer.config.crypto)
     .map(StaticDomainParameters(_))
@@ -31,8 +31,8 @@ def staticParameters(sequencer: LocalInstanceReferenceX) =
 
 def bootstrapOtherDomain(
     name: String,
-    sequencer: LocalSequencerNodeReferenceX,
-    mediator: LocalMediatorReferenceX,
+    sequencer: LocalSequencerNodeReference,
+    mediator: LocalMediatorReference,
 ) =
   bootstrap.domain(
     name,

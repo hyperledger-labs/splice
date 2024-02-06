@@ -1,6 +1,7 @@
 package com.daml.network.sv.automation.singlesv.offboarding
 
 import cats.implicits.showInterpolator
+import cats.syntax.traverse.*
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -8,7 +9,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
-import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
+import com.daml.network.environment.{MediatorAdminConnection, ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.topology.MediatorId
 import com.digitalasset.canton.tracing.TraceContext
@@ -29,6 +30,7 @@ class SvOffboardingMediatorTrigger(
     override protected val context: TriggerContext,
     svcStore: SvSvcStore,
     participantAdminConnection: ParticipantAdminConnection,
+    mediatorAdminConnection: Option[MediatorAdminConnection],
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -44,6 +46,9 @@ class SvOffboardingMediatorTrigger(
       currentMediatorState <- participantAdminConnection.getMediatorDomainState(
         svcRules.domain
       )
+      ourMediatorId <- mediatorAdminConnection.traverse {
+        _.getMediatorId
+      }
     } yield {
       val svcRulesCurrentMediators = getMediatorIds(
         svcRules.contract.payload.members
@@ -52,7 +57,9 @@ class SvOffboardingMediatorTrigger(
           .flatMap(_.domainNodes.values().asScala)
       )
       currentMediatorState.mapping.active
-        .filterNot(svcRulesCurrentMediators.contains)
+        // TODO(#9813) Consider removing the filter for our own mediator
+        // once Canton is fixed.
+        .filterNot(e => svcRulesCurrentMediators.contains(e) || ourMediatorId.contains(e))
     }
   }
 

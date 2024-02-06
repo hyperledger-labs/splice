@@ -20,11 +20,13 @@ import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -588,21 +590,6 @@ class HttpSvHandler(
       )
     } yield ()
 
-  // TODO(#6256): Remove this and make SvApp pay for mediator traffic as well
-  private def grantMediatorUnlimitedTraffic(
-      mediatorId: MediatorId
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    for {
-      ourParticipant <- participantAdminConnection.getParticipantId()
-      globalDomain <- svcStore.getSvcRules().map(_.domain)
-      _ <- participantAdminConnection.ensureTrafficControlState(
-        globalDomain,
-        mediatorId,
-        Long.MaxValue,
-        ourParticipant.uid.namespace.fingerprint,
-      )
-    } yield ()
-
   // TODO(#5196) Replace this in favor of a Daml based flow. Note that for now
   // there is no authorization check here. The daml flow will naturally give us one
   // so implementing it here seems like wasted effort.
@@ -611,7 +598,30 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext) = {
     for {
       _ <- addMediatorToTopologyState(mediatorId)
-      _ <- grantMediatorUnlimitedTraffic(mediatorId)
+      globalDomain <- svcStore.getSvcRules().map(_.domain)
+      _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
+        "Mediator has been granted unlimited traffic",
+        participantAdminConnection
+          .lookupTrafficControlState(
+            globalDomain,
+            mediatorId,
+          )
+          .map {
+            case None =>
+              throw Status.NOT_FOUND
+                .withDescription(show"No traffic state for mediator $mediatorId")
+                .asRuntimeException
+            case Some(traffic) if traffic.mapping.totalExtraTrafficLimit != PositiveLong.MaxValue =>
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  show"Mediator $mediatorId does not have unlimited traffic limit, current limit: abc"
+                )
+                .asRuntimeException()
+            case _ => ()
+          },
+        logger,
+      )
     } yield ()
   }
 

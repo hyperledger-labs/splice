@@ -1,7 +1,6 @@
 package com.daml.network.sv.onboarding
 
 import cats.data.OptionT
-import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -125,9 +124,4 @@ object SvcPartyHosting {
   final case class RequiredProposalNotFound(
       partyToParticipantSerial: PositiveInt
   ) extends SvcPartyMigrationFailure
-
-  case class PartyToParticipantProposalThresholdMismatch()
-      extends QuietNonRetryableException(
-        "Proposal must be recreated because the threshold has changed."
-      )
 }

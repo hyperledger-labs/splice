@@ -732,6 +732,7 @@ abstract class TopologyAdminConnection(
       },
       retryFor,
       signedBy,
+      isProposal = true,
     )
   }
 
@@ -892,6 +893,7 @@ abstract class TopologyAdminConnection(
       },
       retryFor,
       signedBy,
+      isProposal = true,
     )
   }
 
@@ -998,6 +1000,7 @@ abstract class TopologyAdminConnection(
       },
       retryFor,
       signedBy,
+      isProposal = true,
     )
 
   def proposeInitialDecentralizedNamespaceDefinition(
@@ -1134,7 +1137,7 @@ abstract class TopologyAdminConnection(
             ),
           signedBy,
           serial = previousOrNone.fold(PositiveInt.one)(_.base.serial + PositiveInt.one),
-          isProposal = false,
+          isProposal = true,
         ).map(_ => ()),
       logger,
     )

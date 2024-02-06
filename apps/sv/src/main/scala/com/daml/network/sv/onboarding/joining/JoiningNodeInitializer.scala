@@ -192,6 +192,10 @@ class JoiningNodeInitializer(
             .startOnboardingWithSvcPartyMigration(initConnection, svcStore)
         }
       _ = svcAutomation.registerPostOnboardingTriggers()
+      // It is important to wait only here since at this point we may have been added
+      // to the decentralized namespace so we depend on our own automation promoting us to
+      // submission rights.
+      _ <- waitForSvParticipantToHaveSubmissionRights(svcPartyId, globalDomain)
       _ <- waitForSvcMembership(svcStore)
       _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcPartyId)
       _ <- withSvStore
@@ -224,6 +228,34 @@ class JoiningNodeInitializer(
         svcAutomation,
       )
     }
+  }
+
+  private def waitForSvParticipantToHaveSubmissionRights(svcParty: PartyId, domainId: DomainId) = {
+    val description =
+      show"SV participant ${participantId} has Submission rights for party ${svcParty}"
+    retryProvider.getValueWithRetries(
+      RetryFor.WaitingOnInitDependency,
+      description,
+      for {
+        svcPartyHosting <- participantAdminConnection
+          .getPartyToParticipant(domainId, svcParty)
+      } yield {
+        svcPartyHosting.mapping.participants.find(_.participantId == participantId) match {
+          case None =>
+            throw Status.NOT_FOUND
+              .withDescription(
+                show"Party ${svcParty} is not hosted on participant ${participantId}"
+              )
+              .asRuntimeException()
+          case Some(HostingParticipant(_, permission)) =>
+            if (permission == ParticipantPermissionX.Submission)
+              svcPartyHosting
+            else
+              throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()
+        }
+      },
+      logger,
+    )
   }
 
   private def withSvConnection[T](
@@ -407,7 +439,6 @@ class JoiningNodeInitializer(
               svParty.uid.namespace.fingerprint,
               RetryFor.WaitingOnInitDependency,
             )
-          _ <- waitForSvParticipantToHaveSubmissionRights()
         } yield ()
       }
 
@@ -486,34 +517,6 @@ class JoiningNodeInitializer(
               throw Status.NOT_FOUND.withDescription(description).asRuntimeException()
           }
         } yield svOnboardingConfirmed,
-        logger,
-      )
-    }
-
-    private def waitForSvParticipantToHaveSubmissionRights() = {
-      val description =
-        show"SV participant ${participantId} has Submission rights for party ${svcParty}"
-      retryProvider.getValueWithRetries(
-        RetryFor.WaitingOnInitDependency,
-        description,
-        for {
-          svcPartyHosting <- participantAdminConnection
-            .getPartyToParticipant(domainId, svcParty)
-        } yield {
-          svcPartyHosting.mapping.participants.find(_.participantId == participantId) match {
-            case None =>
-              throw Status.NOT_FOUND
-                .withDescription(
-                  show"Party ${svcParty} is not hosted on participant ${participantId}"
-                )
-                .asRuntimeException()
-            case Some(HostingParticipant(_, permission)) =>
-              if (permission == ParticipantPermissionX.Submission)
-                svcPartyHosting
-              else
-                throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()
-          }
-        },
         logger,
       )
     }

@@ -7,7 +7,6 @@ import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.OnboardSvPartyMigrationAuthorizeProposalNotFound
 import com.daml.network.sv.config.{SvAppClientConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.SvcPartyHosting
-import com.daml.network.sv.onboarding.SvcPartyHosting.PartyToParticipantProposalThresholdMismatch
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
@@ -70,59 +69,58 @@ class JoiningNodeSvcPartyHosting(
                       .flatMap {
                         case Left(proposalNotFound) =>
                           if (
-                            proposalNotFound.partyToParticipantMappingSerial >= partyToParticipantProposal.base.serial
+                            proposalNotFound.partyToParticipantMappingSerial < partyToParticipantProposal.base.serial
                           ) {
-                            logger.info(
-                              s"Proposals $partyToParticipantProposal no longer matches base serial, must be re-created $proposalNotFound"
-                            )
-                            Future.failed(proposalNotFound)
-                          } else {
-                            svConnection.getSvcInfo().flatMap { newSvcInfo =>
-                              if (
-                                newSvcInfo.svcRules.payload.members
-                                  .size() != svcMembersSize
-                              ) {
-                                Future.failed(PartyToParticipantProposalThresholdMismatch())
-                              } else {
-                                Future.failed(
-                                  Status.NOT_FOUND
-                                    .withDescription(
-                                      s"Proposal not found by sponsor $proposalNotFound but serial matches proposal serial $partyToParticipantProposal"
-                                    )
-                                    .asRuntimeException()
+                            // We can just retry in this case without resubmitting the proposal, the sponsor will eventually catch up
+                            // and our proposal will either be valid or fail with an invalid error.
+                            Future.failed(
+                              Status.FAILED_PRECONDITION
+                                .withDescription(
+                                  s"Sponsor failed with missing proposal for serial ${proposalNotFound.partyToParticipantMappingSerial} which is smaller than our proposal for serial ${partyToParticipantProposal.base.serial}, sponsor is likely lagging behind."
                                 )
-                              }
-                            }
+                                .asRuntimeException()
+                            )
+                          } else {
+                            Future.failed(proposalNotFound)
                           }
                         case Right(acsSnapshot) => Future.successful(acsSnapshot)
                       },
                     logger,
                   )
                   .recoverWith {
-                    case _: PartyToParticipantProposalThresholdMismatch =>
-                      participantAdminConnection
-                        .reconnectAllDomains()
-                        .map(_ =>
-                          throw Status.FAILED_PRECONDITION
-                            .withDescription(
-                              s"The size of the SVC has changed during the party migration, the proposal must be recreated."
-                            )
-                            .asRuntimeException()
-                        )
                     case proposalNotFound: OnboardSvPartyMigrationAuthorizeProposalNotFound =>
                       // Reconnect so that the participant gets its state in sync before the next retry
                       logger.info(
                         "Reconnecting to all the domains so that the proposal can be recreated from the latest base."
                       )
-                      participantAdminConnection
-                        .reconnectAllDomains()
-                        .map(_ =>
-                          throw Status.FAILED_PRECONDITION
-                            .withDescription(
-                              s"Proposal not found by sponsor, and serial $proposalNotFound does not match proposal serial ${partyToParticipantProposal.base.serial}. Proposal must be re-created."
+                      for {
+                        _ <- participantAdminConnection.reconnectAllDomains()
+                        _ <- retryProvider.waitUntil(
+                          RetryFor.WaitingOnInitDependency,
+                          s"Serial ${proposalNotFound.partyToParticipantMappingSerial} expected by sponsor is observed",
+                          participantAdminConnection
+                            .getPartyToParticipant(
+                              domainId,
+                              svcParty,
                             )
-                            .asRuntimeException()
+                            .map(result =>
+                              if (
+                                result.base.serial < proposalNotFound.partyToParticipantMappingSerial
+                              ) {
+                                throw Status.FAILED_PRECONDITION
+                                  .withDescription(
+                                    s"Current serial is ${result.base.serial}, waiting for ${proposalNotFound.partyToParticipantMappingSerial}"
+                                  )
+                                  .asRuntimeException()
+                              }
+                            ),
+                          logger,
                         )
+                      } yield throw Status.FAILED_PRECONDITION
+                        .withDescription(
+                          s"Failed because serial advanced and invalidated our proposal (serial reported by sponsor: ${proposalNotFound.partyToParticipantMappingSerial})"
+                        )
+                        .asRuntimeException()
                   }
               } yield {
                 response

@@ -1,5 +1,5 @@
 import cats.syntax.either._
-import com.digitalasset.canton.console.LocalInstanceReferenceX
+import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.domain.config.DomainParametersConfig
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
@@ -9,7 +9,7 @@ def main() {
     protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
     devVersionSupport = true,
   )
-  def staticParameters(sequencer: LocalInstanceReferenceX) =
+  def staticParameters(sequencer: LocalInstanceReference) =
     domainParametersConfig
       .toStaticDomainParameters(sequencer.config.crypto)
       .map(StaticDomainParameters(_))

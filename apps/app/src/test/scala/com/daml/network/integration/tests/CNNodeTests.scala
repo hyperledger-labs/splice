@@ -11,7 +11,7 @@ import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.plugins.WaitForPorts
+import com.daml.network.integration.plugins.{ResetDecentralizedNamespace, WaitForPorts}
 import com.daml.network.metrics.CNNodeMetricsFactory
 import com.daml.network.sv.config.{SvOnboardingConfig, TrafficControlConfig}
 import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
@@ -66,7 +66,12 @@ object CNNodeTests {
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
+    protected lazy val resetDecentralizedNamespace: Boolean = true
+
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
+    if (resetDecentralizedNamespace) {
+      registerPlugin(new ResetDecentralizedNamespace())
+    }
 
     override def environmentDefinition
         : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -83,7 +88,12 @@ object CNNodeTests {
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
+    protected lazy val resetDecentralizedNamespace: Boolean = true
+
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
+    if (resetDecentralizedNamespace) {
+      registerPlugin(new ResetDecentralizedNamespace())
+    }
 
     override def environmentDefinition
         : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

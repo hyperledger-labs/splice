@@ -257,7 +257,7 @@ trait LedgerApiExtensions {
             filterIdentifier.qualifiedName.moduleName,
             filterIdentifier.qualifiedName.entityName,
           )
-          ledgerApi.ledger_api.acs
+          ledgerApi.ledger_api_v2.state.acs
             .of_party(partyId, filterTemplates = Seq(templateId))
             .map(_.event)
             .flatMap(ev =>

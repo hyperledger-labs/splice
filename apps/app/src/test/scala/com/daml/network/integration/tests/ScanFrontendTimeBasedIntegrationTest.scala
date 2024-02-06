@@ -146,7 +146,7 @@ class ScanFrontendTimeBasedIntegrationTest
       // is a contract such as it was written when it got accepted (e.g. like in 1970).
       // The values are not processed as of now, but the frontend does post-process
       // the Coin Rules contract to get the actual coin configurations (see getCoinConfigurationAsOfNow()).
-      val ledgerNow = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
+      val ledgerNow = sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get()
       val javaYesterday = Instant.now().minusSeconds(86400) // yesterday
       val javaTomorrow = Instant.now().plusSeconds(86400) // tomorrow
 

@@ -220,10 +220,6 @@ class GlobalDomainMigrationIntegrationTest
       loggerFactory,
     )
 
-    val sv2LocalBackend = svb("sv2Local")
-    val sv3LocalBackend = svb("sv3Local")
-    val sv4LocalBackend = svb("sv4Local")
-
     startAllSync(
       sv1ScanBackend,
       sv1Backend,
