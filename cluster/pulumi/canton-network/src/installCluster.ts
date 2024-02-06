@@ -68,7 +68,6 @@ const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = GlobalDomainUpgrade
 const sv2Key = svKeyFromSecret('sv2');
 const sv3Key = svKeyFromSecret('sv3');
 const sv4Key = svKeyFromSecret('sv4');
-const sv5Key = svKeyFromSecret('sv5');
 
 const svRunbookApprovedSvIdentities = [
   {
@@ -325,7 +324,7 @@ async function installSvc(auth0Client: Auth0Client, topupConfig: ValidatorTopupC
               nodename: 'sv-5',
               onboardingName: 'Canton-Foundation-5',
               validatorWalletUser: 'auth0|65c15c482a18b1ef030ba290',
-              onboarding: joinViaSv1(svFounderSvApp, sv5Key),
+              onboarding: joinViaSv1(svFounderSvApp, svKeyFromSecret('sv5')),
               approvedSvIdentities,
               expectedValidatorOnboardings: [],
               isDevNet,

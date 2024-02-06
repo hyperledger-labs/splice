@@ -1359,6 +1359,8 @@ creating and testing larger networks. Currently this adds only 1 more, `sv-5` --
 
 To enable these additional SVs, set `ENABLE_TEST_SVS=1` for that cluster's env configuration, then `cncluster apply`.
 
+Note that the keys for the extra SVs need to be present in the Google Cloud project that the cluster is running in. Currently the keys are only uploaded to `da-cn-scratchnet`.
+
 ## SV Operations
 
 Supervalidator nodes (SVs) play a central role in the governance and operation of each CN deployment.
