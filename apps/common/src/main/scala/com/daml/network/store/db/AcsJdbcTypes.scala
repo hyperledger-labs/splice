@@ -1,26 +1,25 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, Value}
-import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
+import com.daml.ledger.javaapi.data.CreatedEvent
+import com.daml.ledger.javaapi.data.codegen.json.JsonLfWriter
+import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord, DefinedDataType}
 import com.daml.lf.data.Ref.HexString
 import com.daml.lf.data.Time.Timestamp
-import com.daml.lf.value.Value as LfValue
-import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.util.Contract
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
-import com.digitalasset.canton.ledger.api.validation.NoLoggingValueValidator
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
-import com.google.protobuf
 import io.circe.Json
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, SetParameter}
-import spray.json.{JsString, JsValue, JsonFormat, deserializationError}
+import spray.json.*
 
 import java.sql.{PreparedStatement, ResultSet}
 import com.google.protobuf.ByteString
+
+import java.io.StringWriter
 
 trait AcsJdbcTypes {
   import AcsJdbcTypes.JsonString
@@ -208,23 +207,9 @@ trait AcsJdbcTypes {
         case None => pp.setNull(java.sql.Types.OTHER)
       }
 
-  protected def payloadJsonFromContract(
-      payload: DamlRecord[?]
-  ): JsValue = {
-    payloadJsonFromValue(payload.toValue)
-  }
-
-  protected def payloadJsonFromValue(value: Value): JsValue = {
-    AcsJdbcTypes.payloadJsonFromValue(value)
-  }
-
-  protected def payloadValueJsonStringFromRecord(
-      payloadValue: com.daml.ledger.javaapi.data.DamlRecord
-  ): JsonString = {
-    val builder = new java.lang.StringBuilder()
-    protobuf.util.JsonFormat.printer().appendTo(payloadValue.toProtoRecord, builder)
-    JsonString(builder.toString)
-  }
+  protected def payloadJsonFromDefinedDataType(
+      data: DefinedDataType[?]
+  ): JsValue = AcsJdbcTypes.payloadJsonFromDefinedDataType(data)
 
   /** The DB may truncate strings of unbounded length, so it's advised to use a LengthLimitedString instead.
     * We use String2066 because it's the max length of an [[com.digitalasset.canton.protocol.LfTemplateId]].
@@ -249,35 +234,21 @@ trait AcsJdbcTypes {
 object AcsJdbcTypes {
   final case class JsonString(value: String)
 
-  private val contractCodec = {
-    // copied from JsonContractIdFormat
-    implicit val ContractIdFormat: JsonFormat[LfValue.ContractId] =
-      new JsonFormat[LfValue.ContractId] {
-        override def write(obj: LfValue.ContractId): JsValue =
-          JsString(obj.coid)
-
-        override def read(json: JsValue): LfValue.ContractId = json match {
-          case JsString(s) =>
-            LfValue.ContractId.fromString(s).fold(deserializationError(_), identity)
-          case _ => deserializationError("ContractId must be a string")
-        }
-      }
-
-    // DB *must not* use stringly ints or decimals;
-    // this output relies on a *big* invariant: comparing the raw JSON data
-    // with the built-in SQL operators <, >, &c, yields equal results to
-    // comparing the same data in a data-aware way. That's why we *must* use
-    // numbers-as-numbers in this codec, and why ISO-8601 strings
-    // for dates and timestamps are so important.
-    new ApiCodecCompressed(encodeDecimalAsString = false, encodeInt64AsString = false)
-  }
-
-  def payloadJsonFromValue(value: Value): JsValue = {
-    contractCodec.apiValueToJsValue(
-      NoLoggingValueValidator
-        .validateValue(com.daml.ledger.api.v1.value.Value.fromJavaProto(value.toProto))
-        .fold(err => throw err, identity)
+  // DB *must not* use stringly ints or decimals;
+  // this output relies on a *big* invariant: comparing the raw JSON data
+  // with the built-in SQL operators <, >, &c, yields equal results to
+  // comparing the same data in a data-aware way. That's why we *must* use
+  // numbers-as-numbers in this codec, and why ISO-8601 strings
+  // for dates and timestamps are so important.
+  def payloadJsonFromDefinedDataType(
+      data: DefinedDataType[?]
+  ): JsValue = {
+    val sw = new StringWriter()
+    val jw = new JsonLfWriter(
+      sw,
+      JsonLfWriter.opts().encodeInt64AsString(false).encodeNumericAsString(false),
     )
+    data.jsonEncoder.encode(jw)
+    sw.toString.parseJson
   }
-
 }

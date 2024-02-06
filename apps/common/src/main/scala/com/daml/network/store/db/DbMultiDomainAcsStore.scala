@@ -987,7 +987,7 @@ class DbMultiDomainAcsStore[TXE](
           val templateId = contract.identifier
           val templateIdQualifiedName = QualifiedName(templateId)
           val templateIdPackageId = lengthLimited(contract.identifier.getPackageId)
-          val createArguments = payloadJsonFromContract(contract.payload)
+          val createArguments = payloadJsonFromDefinedDataType(contract.payload)
           val createdAt = Timestamp.assertFromInstant(contract.createdAt)
           val contractExpiresAt = rowData.contractExpiresAt
           val ContractStateRowData(

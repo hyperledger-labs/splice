@@ -22,15 +22,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
-import spray.json.{
-  DefaultJsonProtocol,
-  DeserializationException,
-  JsString,
-  JsValue,
-  JsonFormat,
-  RootJsonFormat,
-  deserializationError,
-}
+import spray.json.*
 
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
@@ -156,7 +148,7 @@ object SvcTxLogParser {
             }
 
             override def write(obj: ActionRequiringConfirmation): JsValue =
-              AcsJdbcTypes.payloadJsonFromValue(obj.toValue)
+              AcsJdbcTypes.payloadJsonFromDefinedDataType(obj)
           }
         implicit val errorEntryFormat: RootJsonFormat[ErrorTxLogEntry] =
           jsonFormat0(() => ErrorTxLogEntry.apply())

@@ -3,6 +3,14 @@
 Release Notes
 =============
 
+2024-02-12
+----------
+
+* The JSON encoding of jsonb columns in the database has been changed.
+  Please make sure to clean all the database before upgrading.
+  Data with the old JSON encoding cannot be read by the new version of the software.
+
+
 2024-02-05
 ----------
 

@@ -311,7 +311,7 @@ class HttpSvAdminHandler(
           voteResults
             .map(res =>
               JsonUtil.sprayJsValueToCirceJson(
-                payloadJsonFromValue(
+                payloadJsonFromDefinedDataType(
                   new VoteResult(
                     res.action,
                     res.executed,
@@ -321,7 +321,7 @@ class HttpSvAdminHandler(
                     Instant.parse(res.votedAt),
                     res.acceptedBy.asJava,
                     res.rejectedBy.asJava,
-                  ).toValue
+                  )
                 )
               )
             )

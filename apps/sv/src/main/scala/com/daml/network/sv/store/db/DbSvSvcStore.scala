@@ -176,7 +176,7 @@ class DbSvSvcStore(
             sql"""
                  where store_id = $storeId
                    and template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
-                   and action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
+                   and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
                  limit ${sqlLimit(limit)}
                """).toActionBuilder.as[SelectFromAcsTableResult],
           "listConfirmations",
@@ -339,7 +339,7 @@ class DbSvSvcStore(
             where = sql"""
                     template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                 and confirmer = $confirmer
-                and action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
+                and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
                   """,
             orderLimit = sql" limit 1",
           ).headOption,
@@ -753,7 +753,7 @@ class DbSvSvcStore(
             storeId,
             where = sql"""
                           template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
-                      and action_requiring_confirmation = ${payloadJsonFromValue(action.toValue)}
+                      and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
                       and requester = ${key.svParty}
                         """,
             orderLimit = sql"limit 1",

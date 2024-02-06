@@ -1006,7 +1006,7 @@ object SvSvcStore {
           contract,
           contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           actionRequiringConfirmation =
-            Some(AcsJdbcTypes.payloadJsonFromValue(contract.payload.action.toValue)),
+            Some(AcsJdbcTypes.payloadJsonFromDefinedDataType(contract.payload.action)),
           confirmer = Some(PartyId.tryFromProtoPrimitive(contract.payload.confirmer)),
           actionCnsEntryContextCid = actionCnsEntryContextCid,
           actionCnsEntryContextPaymentId = actionCnsEntryContextPaymentId,
@@ -1025,7 +1025,7 @@ object SvSvcStore {
           contract,
           contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           actionRequiringConfirmation =
-            Some(AcsJdbcTypes.payloadJsonFromValue(contract.payload.action.toValue)),
+            Some(AcsJdbcTypes.payloadJsonFromDefinedDataType(contract.payload.action)),
           requester = Some(PartyId.tryFromProtoPrimitive(contract.payload.requester)),
         )
       },
