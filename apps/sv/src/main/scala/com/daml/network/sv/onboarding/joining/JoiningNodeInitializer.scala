@@ -130,6 +130,10 @@ class JoiningNodeInitializer(
         ledgerClient,
       )
       globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
+      // We need to first wait to ensure the CometBFT node is caught up
+      // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any
+      // fault tolerance then it might be blocked until the CometBFT node is caught up.
+      _ <- waitUntilCometBftNodeHasCaughtUp
       svcPartyHosting = newSvcPartyHosting(
         storeKey,
         participantAdminConnection,
@@ -194,7 +198,6 @@ class JoiningNodeInitializer(
         .setDomainNodeConfigIfRequired(svcAutomation, localDomainNode, Onboarding)
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
-          _ <- waitUntilCometBftNodeHasCaughtUp
           _ <-
             localDomainNode.onboardLocalSequencerIfRequired(
               config.domains.global.alias,

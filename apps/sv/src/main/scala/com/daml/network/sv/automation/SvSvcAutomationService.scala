@@ -102,28 +102,6 @@ class SvSvcAutomationService(
   if (config.automation.enableClosedRoundArchival)
     registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))
 
-  // Register optional BFT triggers
-  cometBft.foreach { node =>
-    if (triggerContext.config.enableCometbftReconciliation) {
-      registerTrigger(
-        new PublishLocalCometBftNodeConfigTrigger(
-          triggerContext,
-          svcStore,
-          connection,
-          node,
-          config.scan,
-        )
-      )
-      registerTrigger(
-        new ReconcileCometBftNetworkConfigWithSvcRulesTrigger(
-          triggerContext,
-          svcStore,
-          node,
-        )
-      )
-    }
-  }
-
   if (config.automation.enableLeaderReplacementTrigger) {
     registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
   }
@@ -273,6 +251,28 @@ class SvSvcAutomationService(
         )
       case _ => ()
     }
+    // Register optional BFT triggers
+    cometBft.foreach { node =>
+      if (triggerContext.config.enableCometbftReconciliation) {
+        registerTrigger(
+          new PublishLocalCometBftNodeConfigTrigger(
+            triggerContext,
+            svcStore,
+            connection,
+            node,
+            config.scan,
+          )
+        )
+        registerTrigger(
+          new ReconcileCometBftNetworkConfigWithSvcRulesTrigger(
+            triggerContext,
+            svcStore,
+            node,
+          )
+        )
+      }
+    }
+
   }
 
   val localSequencerClientContext: Option[LocalSequencerClientContext] = localDomainNode.map(cfg =>
