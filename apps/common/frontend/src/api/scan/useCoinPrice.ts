@@ -1,10 +1,10 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
 
 import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 
-import { Contract, PollingStrategy } from '../../utils';
 import { useScanClient } from './ScanClientContext';
 
 const useCoinPrice = (): UseQueryResult<BigNumber> => {

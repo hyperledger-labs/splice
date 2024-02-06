@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract, ContractWithState, PollingStrategy } from 'common-frontend';
+import { Contract, ContractWithState, PollingStrategy } from 'common-frontend-utils';
 
 import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules/';
 

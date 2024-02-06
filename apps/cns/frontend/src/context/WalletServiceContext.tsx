@@ -1,5 +1,6 @@
 // TODO(#8515) -- reuse this from wallet UI
-import { BaseApiMiddleware, OpenAPILoggingMiddleware, useUserState } from 'common-frontend';
+import { useUserState } from 'common-frontend';
+import { BaseApiMiddleware, OpenAPILoggingMiddleware } from 'common-frontend-utils';
 import React, { useContext, useMemo } from 'react';
 import {
   createConfiguration,

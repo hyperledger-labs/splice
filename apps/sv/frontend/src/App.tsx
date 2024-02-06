@@ -1,13 +1,7 @@
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import {
-  AuthProvider,
-  ErrorBoundary,
-  ErrorRouterPage,
-  UserProvider,
-  cnReplaceEqualDeep,
-  theme,
-} from 'common-frontend';
+import { AuthProvider, ErrorBoundary, ErrorRouterPage, UserProvider, theme } from 'common-frontend';
+import { cnReplaceEqualDeep } from 'common-frontend-utils';
 import {
   Route,
   RouterProvider,

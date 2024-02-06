@@ -1,5 +1,5 @@
 import { UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import { useLookupFeaturedAppRightBuilder } from 'common-frontend/scan-api';
 
 import { FeaturedAppRight } from '@daml.js/canton-coin/lib/CC/Coin/';

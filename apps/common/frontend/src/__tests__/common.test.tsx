@@ -1,8 +1,7 @@
+import { Contract } from 'common-frontend-utils';
 import { test, expect } from 'vitest';
 
 import { Coin } from '@daml.js/canton-coin/lib/CC/Coin';
-
-import { Contract } from '..';
 
 test('decode contracts from old and new model', async () => {
   const base = {

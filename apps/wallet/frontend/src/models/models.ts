@@ -1,5 +1,5 @@
 import BigNumber from 'bignumber.js';
-import { Contract } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import { CoinPosition } from 'wallet-openapi';
 
 import {

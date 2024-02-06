@@ -1,6 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { ListCnsEntriesResponse } from 'cns-external-openapi';
-import { PollingStrategy } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 
 import { useExternalCnsClient } from '../../context/ValidatorServiceContext';
 

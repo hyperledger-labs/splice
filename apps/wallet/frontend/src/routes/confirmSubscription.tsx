@@ -4,9 +4,9 @@ import {
   Loading,
   ErrorDisplay,
   IntervalDisplay,
-  Contract,
   DisableConditionally,
 } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import { useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 

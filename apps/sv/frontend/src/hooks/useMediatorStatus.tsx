@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { PollingStrategy } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 import { NodeStatus } from 'sv-openapi';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';

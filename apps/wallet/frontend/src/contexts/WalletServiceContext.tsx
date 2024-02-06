@@ -1,12 +1,12 @@
 import * as external from 'wallet-external-openapi';
 import BigNumber from 'bignumber.js';
+import { useUserState } from 'common-frontend';
 import {
   BaseApiMiddleware,
   Contract,
   ContractWithState,
   OpenAPILoggingMiddleware,
-  useUserState,
-} from 'common-frontend';
+} from 'common-frontend-utils';
 import React, { useContext, useMemo } from 'react';
 import {
   createConfiguration,

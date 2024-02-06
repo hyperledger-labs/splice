@@ -1,5 +1,5 @@
 import { UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import { useLookupCnsEntryByNameFromResponse } from 'common-frontend/scan-api';
 
 import { CnsEntry } from '@daml.js/cns/lib/CN/Cns/';

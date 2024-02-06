@@ -1,6 +1,5 @@
 import { UseQueryResult } from '@tanstack/react-query';
 import {
-  durationToInterval,
   ErrorDisplay,
   getCoinConfigurationAsOfNow,
   Loading,
@@ -8,6 +7,7 @@ import {
   SvClientProvider,
   TitledTable,
 } from 'common-frontend';
+import { durationToInterval } from 'common-frontend-utils';
 import React from 'react';
 import JSONPretty from 'react-json-pretty';
 import 'react-json-pretty/themes/monikai.css';

@@ -1,5 +1,5 @@
 import { useMutation, UseMutationResult, useQueryClient } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 
 import { SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
 

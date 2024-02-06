@@ -1,6 +1,6 @@
 import { UseQueryResult } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { Contract } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import { useCoinPriceFromOpenRounds } from 'common-frontend/scan-api';
 
 import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';

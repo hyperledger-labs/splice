@@ -1,4 +1,5 @@
-import { JSONValue, JsonEditor, Loading } from 'common-frontend';
+import { Loading } from 'common-frontend';
+import { JSONValue, JsonEditor } from 'common-frontend-utils';
 import React from 'react';
 
 import { FormControl, Stack, Typography } from '@mui/material';

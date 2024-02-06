@@ -1,4 +1,5 @@
 import { UseQueryResult } from '@tanstack/react-query';
+import { Contract } from 'common-frontend-utils';
 import React, { useEffect } from 'react';
 
 import { Autocomplete, StandardTextFieldProps, TextField } from '@mui/material';
@@ -8,7 +9,6 @@ import { Party } from '@daml/types';
 
 import useListCnsEntries from '../api/scan/useListCnsEntries';
 import useLookupCnsEntryByName from '../api/scan/useLookupCnsEntryByName';
-import { Contract } from '../utils';
 
 export interface CnsFieldProps extends StandardTextFieldProps {
   onPartyChanged: (newParty: Party) => void;

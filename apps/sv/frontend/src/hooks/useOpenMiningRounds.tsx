@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract, PollingStrategy } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 

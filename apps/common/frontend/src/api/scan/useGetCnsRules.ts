@@ -1,8 +1,8 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { CnsRules } from '@daml.js/cns/lib/CN/Cns/';
 
-import { Contract, PollingStrategy } from '../../utils';
 import { useScanClient } from './ScanClientContext';
 
 const useGetCnsRules = (): UseQueryResult<Contract<CnsRules>> => {

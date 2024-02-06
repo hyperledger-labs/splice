@@ -1,10 +1,5 @@
-import {
-  AssignedContract,
-  Contract,
-  DisableConditionally,
-  ErrorDisplay,
-  Loading,
-} from 'common-frontend';
+import { DisableConditionally, ErrorDisplay, Loading } from 'common-frontend';
+import { AssignedContract, Contract } from 'common-frontend-utils';
 import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';

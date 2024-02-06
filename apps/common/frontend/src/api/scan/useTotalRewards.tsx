@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { PollingStrategy } from 'common-frontend-utils';
 import { GetRewardsCollectedResponse } from 'scan-openapi';
 
-import { PollingStrategy } from '../..';
 import { useScanClient } from './ScanClientContext';
 
 const useTotalRewards = (): UseQueryResult<GetRewardsCollectedResponse> => {

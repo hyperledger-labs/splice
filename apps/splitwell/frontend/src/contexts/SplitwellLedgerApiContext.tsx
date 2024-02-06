@@ -1,11 +1,10 @@
 import {
   LedgerApiClient,
-  Contract,
-  AssignedContract,
   LedgerApiProps,
   useUserState,
   LedgerApiClientProvider,
 } from 'common-frontend';
+import { AssignedContract, Contract } from 'common-frontend-utils';
 import React, { useContext } from 'react';
 
 import {

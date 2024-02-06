@@ -1,4 +1,4 @@
-import { JSONValue, JsonEditor } from 'common-frontend';
+import { JSONValue, JsonEditor } from 'common-frontend-utils';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React, { useState } from 'react';

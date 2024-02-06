@@ -1,4 +1,5 @@
-import { JSONValue, Loading } from 'common-frontend';
+import { Loading } from 'common-frontend';
+import { JSONValue } from 'common-frontend-utils';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 import React from 'react';

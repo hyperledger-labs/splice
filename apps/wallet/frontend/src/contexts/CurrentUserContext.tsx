@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { PollingStrategy } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 import { createContext, useContext, useState } from 'react';
 
 import { Party } from '@daml/types';

@@ -3,6 +3,7 @@
     "common/frontend-test-utils",
     "common/frontend-typeface-termina",
     "common/frontend",
+    "common/frontend/utils",
     "cns/frontend",
     "scan/frontend",
     "scan/openapi-ts-client",

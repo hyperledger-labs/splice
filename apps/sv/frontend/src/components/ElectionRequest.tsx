@@ -1,6 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
 import { DisableConditionally, Loading, SvClientProvider } from 'common-frontend';
-import { Contract } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import React, { useEffect, useState } from 'react';
 
 import { Button, Stack, Table, TableBody, Typography } from '@mui/material';

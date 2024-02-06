@@ -1,7 +1,6 @@
 import * as openapi from 'scan-openapi';
+import { OpenAPILoggingMiddleware } from 'common-frontend-utils';
 import React, { useContext, useMemo } from 'react';
-
-import { OpenAPILoggingMiddleware } from '../../utils';
 
 const ScanClientContext = React.createContext<openapi.ScanApi | undefined>(undefined);
 

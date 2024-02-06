@@ -6,7 +6,8 @@ import {
   ResponseContext,
   ServerConfiguration,
 } from 'cns-external-openapi';
-import { BaseApiMiddleware, OpenAPILoggingMiddleware, useUserState } from 'common-frontend';
+import { useUserState } from 'common-frontend';
+import { BaseApiMiddleware, OpenAPILoggingMiddleware } from 'common-frontend-utils';
 import React, { useContext, useMemo } from 'react';
 
 const ExternalCnsContext = React.createContext<CnsApi | undefined>(undefined);

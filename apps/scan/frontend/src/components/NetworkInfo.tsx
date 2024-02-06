@@ -1,11 +1,7 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import {
-  ErrorDisplay,
-  getCoinConfigurationAsOfNow,
-  Loading,
-  microsecondsToMinutes,
-} from 'common-frontend';
+import { ErrorDisplay, getCoinConfigurationAsOfNow, Loading } from 'common-frontend';
+import { microsecondsToMinutes } from 'common-frontend-utils';
 import { useGetCoinRules } from 'common-frontend/scan-api';
 import { formatDistanceToNow } from 'date-fns';
 

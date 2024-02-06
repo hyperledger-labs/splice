@@ -1,6 +1,6 @@
+import { Contract as OpenAPIContract } from 'scan-openapi';
 import {
   AssignedContract as OpenAPIAssignedContract,
-  Contract as OpenAPIContract,
   ContractWithState as OpenAPIContractWithState,
 } from 'splitwell-openapi';
 import { z } from 'zod';

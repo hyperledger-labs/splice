@@ -1,5 +1,5 @@
 import * as openapi from 'splitwell-openapi';
-import { OpenAPILoggingMiddleware } from 'common-frontend';
+import { OpenAPILoggingMiddleware } from 'common-frontend-utils';
 import React, { useContext, useMemo } from 'react';
 
 const SplitwellContext = React.createContext<openapi.SplitwellApi | undefined>(undefined);

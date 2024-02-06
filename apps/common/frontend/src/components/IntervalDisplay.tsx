@@ -1,6 +1,5 @@
+import { microsecondsToInterval } from 'common-frontend-utils/temporal-fns';
 import React from 'react';
-
-import { microsecondsToInterval } from '../utils/temporal-fns';
 
 interface IntervalDisplayProps {
   microseconds: string;

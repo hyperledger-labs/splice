@@ -4,10 +4,10 @@ import {
   AuthProvider,
   UserProvider,
   theme,
-  cnReplaceEqualDeep,
   useUserState,
   PackageIdResolver,
 } from 'common-frontend';
+import { cnReplaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React, { useEffect } from 'react';
 import {

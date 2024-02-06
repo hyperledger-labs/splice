@@ -1,3 +1,4 @@
+import { Contract } from 'common-frontend-utils';
 import React from 'react';
 
 import { Typography, TypographyProps } from '@mui/material';
@@ -6,7 +7,6 @@ import Tooltip from '@mui/material/Tooltip';
 import { CnsEntry as CnsEntryC } from '@daml.js/cns/lib/CN/Cns/';
 
 import useLookupCnsEntryByParty from '../api/scan/useLookupCnsEntryByParty';
-import { Contract } from '../utils';
 import PartyId, { PartyIdProps } from './PartyId';
 
 export type CnsEntryProps = PartyIdProps & TypographyProps;

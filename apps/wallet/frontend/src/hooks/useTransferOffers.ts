@@ -1,6 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
-import { Contract, PollingStrategy } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer/module';
 

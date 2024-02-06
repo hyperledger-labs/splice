@@ -1,11 +1,11 @@
 import {
-  Contract,
   CnsEntry as CnsEntryComponent,
   CnsField,
   ErrorDisplay,
   Loading,
   TransferButton,
 } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
 

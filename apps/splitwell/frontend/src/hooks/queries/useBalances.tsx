@@ -1,5 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract, PollingStrategy } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
+import { PollingStrategy } from 'common-frontend-utils';
 
 import { Group } from '@daml.js/splitwell/lib/CN/Splitwell';
 

@@ -1,9 +1,9 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 import { LookupFeaturedAppRightResponse } from 'scan-openapi';
 
 import { FeaturedAppRight } from '@daml.js/canton-coin/lib/CC/Coin/';
 
-import { Contract, PollingStrategy } from '../../utils';
 import { useScanClient } from './ScanClientContext';
 
 const useLookupFeaturedAppRight = (

@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract, PollingStrategy } from 'common-frontend';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { ValidatorOnboarding } from '@daml.js/validator-lifecycle/lib/CN/ValidatorOnboarding/module';
 

@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { ErrorRouterPage, cnReplaceEqualDeep, theme } from 'common-frontend';
+import { ErrorRouterPage, theme } from 'common-frontend';
+import { cnReplaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import React from 'react';
 import {

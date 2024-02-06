@@ -1,4 +1,5 @@
-import { getUTCWithOffset, JsonEditor, JSONValue, Loading } from 'common-frontend';
+import { Loading } from 'common-frontend';
+import { getUTCWithOffset, JsonEditor, JSONValue } from 'common-frontend-utils';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';

@@ -1,4 +1,5 @@
-import { callWithLogging, Contract, useUserState } from 'common-frontend';
+import { useUserState } from 'common-frontend';
+import { Contract, callWithLogging } from 'common-frontend-utils';
 import React, { useContext } from 'react';
 
 import Ledger, { CommandMeta, CreateEvent, DisclosedContract, LedgerOptions } from '@daml/ledger';

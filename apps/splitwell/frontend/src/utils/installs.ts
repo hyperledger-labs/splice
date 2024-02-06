@@ -1,4 +1,4 @@
-import { Contract } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 
 import { SplitwellInstall, SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
 import { ContractId } from '@daml/types';

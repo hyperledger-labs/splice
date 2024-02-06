@@ -1,6 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { PollingStrategy } from 'common-frontend-utils';
 
-import { PollingStrategy } from '../..';
 import { useScanClient } from './ScanClientContext';
 
 const useGetSvcPartyId = (): UseQueryResult<string> => {

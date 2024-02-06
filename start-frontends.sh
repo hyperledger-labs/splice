@@ -164,6 +164,8 @@ function wait_for_workspace_build() {
 wait_for_workspace_build "common-test-utils" "common/frontend-test-utils/lib/cjs/package.json"
 # listen & auto-rebuild common-frontend code when its src changes
 wait_for_workspace_build "common-frontend" "common/frontend/lib/index.js"
+# likewise for common-frontend-utils
+wait_for_workspace_build "common-frontend-utils" "common/frontend/utils/lib/index.js"
 
 # The set of frontends we want to start as part of typical integration testing
 function start_local_frontends() {

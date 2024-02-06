@@ -1,8 +1,8 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { Contract, ContractWithState, PollingStrategy } from 'common-frontend-utils';
 
 import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules/';
 
-import { Contract, ContractWithState, PollingStrategy } from '../../utils';
 import { useScanClient } from './ScanClientContext';
 
 const useGetCoinRules = (): UseQueryResult<ContractWithState<CoinRules>> => {

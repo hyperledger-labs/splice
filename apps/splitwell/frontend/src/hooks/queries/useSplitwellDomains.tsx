@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { PollingStrategy } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 
 import { useSplitwellClient } from '../../contexts/SplitwellServiceContext';
 

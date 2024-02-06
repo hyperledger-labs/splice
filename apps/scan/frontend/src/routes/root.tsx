@@ -1,4 +1,5 @@
-import { Header, PollingStrategy } from 'common-frontend';
+import { Header } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 import { useGetRoundOfLatestData } from 'common-frontend/scan-api';
 import React, { useMemo } from 'react';
 import { NavLink, Outlet, useLocation } from 'react-router-dom';

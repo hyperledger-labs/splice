@@ -1,4 +1,4 @@
-import { Contract } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';

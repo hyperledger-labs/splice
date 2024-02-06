@@ -1,5 +1,5 @@
 import { UseMutationResult, useMutation } from '@tanstack/react-query';
-import { Contract } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 
 import { GroupInvite, SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
 

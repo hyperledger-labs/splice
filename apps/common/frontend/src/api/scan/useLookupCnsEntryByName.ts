@@ -1,10 +1,9 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { Contract, PollingStrategy } from 'common-frontend-utils';
 import { ApiException, LookupEntryByNameResponse } from 'scan-openapi';
 
 import { CnsEntry } from '@daml.js/cns/lib/CN/Cns/';
 
-import { PollingStrategy } from '../..';
-import { Contract } from '../../utils';
 import { useScanClient } from './ScanClientContext';
 
 const useLookupCnsEntryByName = (

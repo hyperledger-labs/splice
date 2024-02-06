@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
+import { PollingStrategy } from 'common-frontend-utils';
 import { GetTotalCoinBalanceResponse } from 'scan-openapi';
 
-import { PollingStrategy } from '../..';
 import { useScanClient } from './ScanClientContext';
 import useGetRoundOfLatestData from './useGetRoundOfLatestData';
 

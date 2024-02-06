@@ -1,4 +1,5 @@
-import { Contract, CopyableTypography, DateDisplay } from 'common-frontend';
+import { CopyableTypography, DateDisplay } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import React from 'react';
 
 import { Chip } from '@mui/material';

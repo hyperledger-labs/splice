@@ -1,5 +1,6 @@
 import { useMutation } from '@tanstack/react-query';
-import { DisableConditionally, getUTCWithOffset, SvClientProvider } from 'common-frontend';
+import { DisableConditionally, SvClientProvider } from 'common-frontend';
+import { getUTCWithOffset } from 'common-frontend-utils';
 import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';

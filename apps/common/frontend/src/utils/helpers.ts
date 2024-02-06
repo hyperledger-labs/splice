@@ -1,4 +1,4 @@
-import { Contract, AssignedContract } from './interfaces';
+import { Contract, AssignedContract } from 'common-frontend-utils/interfaces';
 
 function equalWith<T>(a: T[], b: T[], p: (a: T, b: T) => boolean) {
   if (a.length !== b.length) {

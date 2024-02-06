@@ -1,6 +1,6 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
+import { PollingStrategy } from 'common-frontend-utils';
 
-import { PollingStrategy } from '../..';
 import { useLedgerApiClient } from '../../contexts/LedgerApiContext';
 
 const usePrimaryParty = (): UseQueryResult<string> => {

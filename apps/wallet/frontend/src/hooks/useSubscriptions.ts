@@ -1,5 +1,5 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { PollingStrategy } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { WalletSubscription } from '../models/models';

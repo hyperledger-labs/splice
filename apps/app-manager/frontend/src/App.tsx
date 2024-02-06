@@ -1,13 +1,8 @@
 import * as React from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import {
-  AuthProvider,
-  cnReplaceEqualDeep,
-  ErrorRouterPage,
-  theme,
-  UserProvider,
-} from 'common-frontend';
+import { AuthProvider, ErrorRouterPage, theme, UserProvider } from 'common-frontend';
+import { cnReplaceEqualDeep } from 'common-frontend-utils';
 import { ScanClientProvider } from 'common-frontend/scan-api';
 import {
   createBrowserRouter,

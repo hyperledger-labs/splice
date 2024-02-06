@@ -1,7 +1,7 @@
 import { useInfiniteQuery, UseInfiniteQueryResult } from '@tanstack/react-query';
+import { PollingStrategy } from 'common-frontend-utils';
 import { ListActivityRequest, ListActivityResponseItem } from 'scan-openapi';
 
-import { PollingStrategy } from '../..';
 import { useScanClient } from './ScanClientContext';
 
 const useActivity = (): UseInfiniteQueryResult<ListActivityResponseItem[]> => {

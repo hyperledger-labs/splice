@@ -1,5 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { PollingStrategy, useUserState } from 'common-frontend';
+import { useUserState } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 
 import { useWalletClient, UserStatusResponse } from '../contexts/WalletServiceContext';
 

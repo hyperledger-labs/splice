@@ -1,5 +1,5 @@
 import { UseQueryResult, useQuery } from '@tanstack/react-query';
-import { PollingStrategy } from 'common-frontend';
+import { PollingStrategy } from 'common-frontend-utils';
 import { InstalledApp } from 'validator-openapi';
 
 import { useAppManagerClient } from '../../contexts/AppManagerServiceContext';

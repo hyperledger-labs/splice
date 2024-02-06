@@ -1,6 +1,7 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { AmountDisplay, Contract, DateDisplay, ErrorDisplay, Loading } from 'common-frontend';
+import { AmountDisplay, DateDisplay, ErrorDisplay, Loading } from 'common-frontend';
+import { Contract } from 'common-frontend-utils';
 import { useCallback, useMemo, useState } from 'react';
 
 import { ArrowCircleLeftOutlined } from '@mui/icons-material';
