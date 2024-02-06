@@ -6,6 +6,7 @@ import {
   CLUSTER_BASENAME,
   CLUSTER_DNS_NAME,
   clusterLargeDisk,
+  envFlag,
   ExactNamespace,
   installCNHelmChart,
   isDevNet,
@@ -162,6 +163,25 @@ class CometBftNodeConfig {
   get nodeConfigs(): {
     [key: string]: NodeConfig;
   } {
+    const additionalSvNodes: { [key: string]: NodeConfig } = envFlag('ENABLE_TEST_SVS')
+      ? {
+          'sv-5': {
+            id: '205437468610305149d131bbf9bf1f47658d861b',
+            privateKey:
+              'tlDwOSTLO1tAz9qfnTTUFFwVzJmtI7qn37rsoRbHPMRW2YWZ+53OXReOPSFzG/4pUCk4zxd1GJgb2ePFiDNlQQ==',
+            identifier: this.nodeIdentifier,
+            externalAddress: this.p2pExternalAddress(5),
+            istioPort: this.istioExternalPort(5),
+            validator: {
+              keyAddress: '1A6C9E60AFD830682CBEF5496F6E5515B20B0F2D',
+              privateKey:
+                'kQtt4AjOpT4Nz79PZIP1eJ7o7o09R7AIzRnbLV1VN9rKTKnOZMl6LnD4OI0zrucJ9vToUykeWJhTsVenENgmBg==',
+              publicKey: 'ykypzmTJei5w+DiNM67nCfb06FMpHliYU7FXpxDYJgY=',
+            },
+          },
+        }
+      : {};
+
     return {
       'sv-1': this.sv1NodeConfig,
       'sv-2': {
@@ -207,6 +227,7 @@ class CometBftNodeConfig {
           publicKey: '2umZdUS97a6VUXMGsgKJ/VbQbanxWaFUxK1QimhlEjo=',
         },
       },
+      ...additionalSvNodes,
     };
   }
 

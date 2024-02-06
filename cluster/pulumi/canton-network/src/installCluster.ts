@@ -68,6 +68,7 @@ const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = GlobalDomainUpgrade
 const sv2Key = svKeyFromSecret('sv2');
 const sv3Key = svKeyFromSecret('sv3');
 const sv4Key = svKeyFromSecret('sv4');
+const sv5Key = svKeyFromSecret('sv5');
 
 const svRunbookApprovedSvIdentities = [
   {
@@ -81,6 +82,7 @@ const sv234NameSet = new Set<string>([
   'Canton-Foundation-2',
   'Canton-Foundation-3',
   'Canton-Foundation-4',
+  'Canton-Foundation-5',
 ]);
 
 const allApprovedSvIdentities = (
@@ -91,7 +93,19 @@ const allApprovedSvIdentities = (
     : loadYamlFromFile(
         `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
       )
-).approvedSvIdentities.concat(approveSvRunbook ? svRunbookApprovedSvIdentities : []);
+).approvedSvIdentities
+  .concat(approveSvRunbook ? svRunbookApprovedSvIdentities : [])
+  .concat(
+    envFlag('ENABLE_TEST_SVS')
+      ? [
+          {
+            name: 'Canton-Foundation-5',
+            publicKey:
+              'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcqp8MagXVcEra7PySl8mZk4hgVYpEX0FZKtSKZKYEaUDw5In/LmVt4c/M39SyTI2fcn7ZxRGkLXThzA3A6Mksg==',
+          },
+        ]
+      : []
+  );
 
 const approvedSvIdentities = singleSv
   ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
@@ -302,6 +316,33 @@ async function installSvc(auth0Client: Auth0Client, topupConfig: ValidatorTopupC
         svFounderSvApp
       )
     );
+
+    const additionalSvNodes = envFlag('ENABLE_TEST_SVS')
+      ? [
+          await installSvNode(
+            {
+              auth0Client,
+              nodename: 'sv-5',
+              onboardingName: 'Canton-Foundation-5',
+              validatorWalletUser: 'auth0|65c15c482a18b1ef030ba290',
+              onboarding: joinViaSv1(svFounderSvApp, sv5Key),
+              approvedSvIdentities,
+              expectedValidatorOnboardings: [],
+              isDevNet,
+              backupConfig,
+              auth0ValidatorAppName: 'sv5_validator',
+              bootstrappingDumpConfig,
+              topupConfig,
+              splitPostgresInstances,
+              sequencerPruningConfig,
+            },
+            globalDomainUpgradeConfig,
+            svFounderSvApp
+          ),
+        ]
+      : [];
+
+    allSvs.concat(additionalSvNodes);
   }
   return {
     founder: sv1,

@@ -9,10 +9,12 @@ const cnAuth0Cfg: Auth0Config = {
     'sv-2': 'rv4bllgKWAiW9tBtdvURMdHW42MAXghz',
     'sv-3': 'SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk',
     'sv-4': 'CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN',
+    'sv-5': 'RSgbsze3cGHipLxhPGtGy7fqtYgyefTb',
     sv1_validator: '7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov',
     sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
     sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
     sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
+    sv5_validator: 'TdcDPsIwSXVw4rZmGqxl6Ifkn4neeOzW',
   },
 
   namespaceToUiToClientId: {
@@ -45,6 +47,11 @@ const cnAuth0Cfg: Auth0Config = {
       wallet: 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
       cns: 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
       sv: 'VoSuAamXhvwISHGgaCtULYmbRIWbQeTb',
+    },
+    'sv-5': {
+      wallet: 'lcssSWnNbo9c0gj0SZVMncjfNJhbVaft',
+      cns: 'lcssSWnNbo9c0gj0SZVMncjfNJhbVaft',
+      sv: 'lcssSWnNbo9c0gj0SZVMncjfNJhbVaft',
     },
   },
 

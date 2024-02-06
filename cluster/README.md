@@ -60,6 +60,7 @@
   - [Participant Admin User Configuration](#participant-admin-user-configuration)
   - [Token configuration](#token-configuration)
   - [Testing the SV Helm Runbook](#testing-the-sv-helm-runbook)
+  - [Enabling additional SVs for Testing](#enabling-additional-svs-for-testing)
   - [SV Operations](#sv-operations)
     - [Approving new SVs](#approving-new-svs)
       - [Approving via SV API](#approving-via-sv-api)
@@ -1350,6 +1351,13 @@ Once everything is up and running, you should be able to e.g. browse to the SV w
 To bring the deployment down, run:
 
 `cncluster pdown_sv`
+
+## Enabling additional SVs for Testing
+
+When deploying a cluster, it is possible to enable additional SVs beyond the typical 1-4, for the purpose of
+creating and testing larger networks. Currently this adds only 1 more, `sv-5` -- but more are planned.
+
+To enable these additional SVs, set `ENABLE_TEST_SVS=1` for that cluster's env configuration, then `cncluster apply`.
 
 ## SV Operations
 
