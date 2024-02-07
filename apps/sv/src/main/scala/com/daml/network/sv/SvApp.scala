@@ -247,20 +247,20 @@ class SvApp(
             // TODO(#5419): make the whole SvApp init tracing instead of just this local piece of code
             TraceContext.withNewTraceContext(implicit traceContext => {
               val initializer = new FoundingNodeInitializer(
-                config,
-                foundingConfig,
-                cometBftNode,
-                darFilesToUploadDuringInit,
-                loggerFactory,
-                retryProvider,
-                ledgerClient,
-                participantAdminConnection,
-                participantId,
-                clock,
-                storage,
                 localDomainNode.getOrElse(
                   sys.error("Founding node must always specify a domain config")
                 ),
+                foundingConfig,
+                darFilesToUploadDuringInit,
+                participantId,
+                config,
+                cometBftNode,
+                ledgerClient,
+                participantAdminConnection,
+                clock,
+                storage,
+                retryProvider,
+                loggerFactory,
               )
               initializer.bootstrapCollective()
             })
@@ -268,54 +268,54 @@ class SvApp(
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           appInitStep("JoiningNodeInitializer joining collective with key") {
             val initializer = new JoiningNodeInitializer(
-              config,
+              localDomainNode,
               Some(joiningConfig),
-              cometBftNode,
+              participantId,
               darFilesToUploadDuringInit,
-              loggerFactory,
-              retryProvider,
+              config,
+              cometBftNode,
               ledgerClient,
               participantAdminConnection,
-              participantId,
               clock,
               storage,
-              localDomainNode,
+              loggerFactory,
+              retryProvider,
             )
             initializer.joinCollectiveAndOnboardNodes()
           }
         case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
           appInitStep("DomainMigrationInitializer initializing node from dump") {
             val initializer = new DomainMigrationInitializer(
-              config,
+              localDomainNode.getOrElse(
+                sys.error("It must always specify a domain config for Domain Migration")
+              ),
               domainMigrationConfig,
+              config,
               cometBftNode,
-              loggerFactory,
-              retryProvider,
               ledgerClient,
               participantAdminConnection,
               clock,
               storage,
-              localDomainNode.getOrElse(
-                sys.error("It must always specify a domain config for Domain Migration")
-              ),
+              loggerFactory,
+              retryProvider,
             )
             initializer.migrateDomain()
           }
         case None =>
           appInitStep("JoiningNodeInitializer joining collective") {
             val initializer = new JoiningNodeInitializer(
-              config,
+              localDomainNode,
               None,
-              cometBftNode,
+              participantId,
               darFilesToUploadDuringInit,
-              loggerFactory,
-              retryProvider,
+              config,
+              cometBftNode,
               ledgerClient,
               participantAdminConnection,
-              participantId,
               clock,
               storage,
-              localDomainNode,
+              loggerFactory,
+              retryProvider,
             )
             initializer.joinCollectiveAndOnboardNodes()
           }

@@ -19,7 +19,12 @@ import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
-import com.daml.network.sv.onboarding.{DomainNodeReconciler, SetupUtil, SvcPartyHosting}
+import com.daml.network.sv.onboarding.{
+  DomainNodeReconciler,
+  NodeInitializerUtil,
+  SetupUtil,
+  SvcPartyHosting,
+}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
@@ -28,7 +33,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
@@ -66,19 +71,18 @@ import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
 class FoundingNodeInitializer(
-    // TODO(#5364): cleanup the order and mass of these parameters
-    config: SvAppBackendConfig,
-    foundingConfig: SvOnboardingConfig.FoundCollective,
-    cometBftNode: Option[CometBftNode],
-    requiredDars: Seq[UploadablePackage],
-    override protected val loggerFactory: NamedLoggerFactory,
-    retryProvider: RetryProvider,
-    ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
-    participantId: ParticipantId,
-    clock: Clock,
-    storage: Storage,
     localDomainNode: LocalDomainNode,
+    foundingConfig: SvOnboardingConfig.FoundCollective,
+    requiredDars: Seq[UploadablePackage],
+    participantId: ParticipantId,
+    override protected val config: SvAppBackendConfig,
+    override protected val cometBftNode: Option[CometBftNode],
+    override protected val ledgerClient: CNLedgerClient,
+    override protected val participantAdminConnection: ParticipantAdminConnection,
+    override protected val clock: Clock,
+    override protected val storage: Storage,
+    override protected val retryProvider: RetryProvider,
+    override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
@@ -87,7 +91,7 @@ class FoundingNodeInitializer(
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,
-) extends NamedLogging {
+) extends NodeInitializerUtil {
 
   def bootstrapCollective(): Future[
     (
@@ -142,10 +146,7 @@ class FoundingNodeInitializer(
       )
       _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcParty)
       globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
-      svcPartyHosting = newSvcPartyHosting(
-        storeKey,
-        participantAdminConnection,
-      )
+      svcPartyHosting = newSvcPartyHosting(storeKey)
       // NOTE: we assume that SVC party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the SVC party
       // is allocated, as a stand-in for all of these actions.
@@ -157,24 +158,22 @@ class FoundingNodeInitializer(
             globalDomain,
             participantId,
           )
-        } yield
-          (
-            if (svcPartyIsAuthorized) ()
-            else
-              throw Status.FAILED_PRECONDITION
-                .withDescription(
-                  s"SVC party is allocated on participant $participantId and domain $globalDomain"
-                )
-                .asRuntimeException()
-          ),
+        } yield {
+          if (svcPartyIsAuthorized) ()
+          else
+            throw Status.FAILED_PRECONDITION
+              .withDescription(
+                s"SVC party is allocated on participant $participantId and domain $globalDomain"
+              )
+              .asRuntimeException()
+        },
         logger,
       )
 
       svcAutomation = newSvSvcAutomationService(
         svStore,
         svcStore,
-        ledgerClient,
-        cometBftNode,
+        Some(localDomainNode),
       )
       _ = svcAutomation.registerPostOnboardingTriggers()
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -497,7 +496,7 @@ class FoundingNodeInitializer(
           ),
         ).tupled
         _ <- svcRules match {
-          case QueryResult(offset, None) => {
+          case QueryResult(offset, None) =>
             coinRules match {
               case Some(coinRules) =>
                 sys.error(
@@ -574,10 +573,9 @@ class FoundingNodeInitializer(
                     .yieldUnit()
                 } yield ()
             }
-          }
           case QueryResult(_, Some(AssignedContract(svcRules, _))) =>
             coinRules match {
-              case Some(coinRules) => {
+              case Some(coinRules) =>
                 if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
                   logger.info(
                     "CoinRules and SvcRules already exist and founding party is an SVC member; doing nothing." +
@@ -591,7 +589,6 @@ class FoundingNodeInitializer(
                       show"\nCoinRules: $coinRules\nSvcRules: $svcRules"
                   )
                 }
-              }
               case None =>
                 sys.error(
                   "An SvcRules contract was found but no CoinRules contract exists. " +
@@ -603,67 +600,6 @@ class FoundingNodeInitializer(
     }
 
   }
-
-  // TODO(#5364): inline these methods if they are used only once, or share them properly
-  private def newSvStore(key: SvStore.Key) = SvSvStore(
-    key,
-    storage,
-    loggerFactory,
-    retryProvider,
-  )
-
-  private def newSvSvAutomationService(
-      svStore: SvSvStore,
-      svcStore: SvSvcStore,
-      ledgerClient: CNLedgerClient,
-  ) =
-    new SvSvAutomationService(
-      clock,
-      config,
-      svStore,
-      svcStore,
-      ledgerClient,
-      retryProvider,
-      loggerFactory,
-    )
-
-  private def newSvcStore(key: SvStore.Key) = {
-    SvSvcStore(
-      key,
-      storage,
-      loggerFactory,
-      retryProvider,
-    )
-  }
-
-  private def newSvSvcAutomationService(
-      svStore: SvSvStore,
-      svcStore: SvSvcStore,
-      ledgerClient: CNLedgerClient,
-      cometBftNode: Option[CometBftNode],
-  ) =
-    new SvSvcAutomationService(
-      clock,
-      config,
-      svStore,
-      svcStore,
-      ledgerClient,
-      participantAdminConnection,
-      retryProvider,
-      cometBftNode,
-      Some(localDomainNode),
-      loggerFactory,
-    )
-
-  private def newSvcPartyHosting(
-      storeKey: SvStore.Key,
-      participantAdminConnection: ParticipantAdminConnection,
-  ) = new SvcPartyHosting(
-    participantAdminConnection,
-    storeKey.svcParty,
-    retryProvider,
-    loggerFactory,
-  )
 
 }
 

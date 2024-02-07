@@ -14,7 +14,7 @@ import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode}
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
-import com.daml.network.sv.onboarding.{SetupUtil, SvcPartyHosting}
+import com.daml.network.sv.onboarding.{NodeInitializerUtil, SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
   DomainNodeInitializer,
   DomainTopologyTransactions,
@@ -25,7 +25,7 @@ import com.daml.network.sv.DomainNodeIdentitiesDump.DomainNodeIdentities
 import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
@@ -55,16 +55,16 @@ import scala.math.Ordered.orderingToOrdered
 
 /** Container for the methods required by the SvApp to initialize the SV node of upgraded domain. */
 class DomainMigrationInitializer(
-    config: SvAppBackendConfig,
-    domainMigrationConfig: SvOnboardingConfig.DomainMigration,
-    cometBftNode: Option[CometBftNode],
-    override protected val loggerFactory: NamedLoggerFactory,
-    retryProvider: RetryProvider,
-    ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
-    clock: Clock,
-    storage: Storage,
     localDomainNode: LocalDomainNode,
+    domainMigrationConfig: SvOnboardingConfig.DomainMigration,
+    override protected val config: SvAppBackendConfig,
+    override protected val cometBftNode: Option[CometBftNode],
+    override protected val ledgerClient: CNLedgerClient,
+    override protected val participantAdminConnection: ParticipantAdminConnection,
+    override protected val clock: Clock,
+    override protected val storage: Storage,
+    override protected val loggerFactory: NamedLoggerFactory,
+    override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
@@ -73,7 +73,7 @@ class DomainMigrationInitializer(
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,
-) extends NamedLogging {
+) extends NodeInitializerUtil {
   private val readOnlyConnection = ledgerClient.readOnlyConnection(
     this.getClass.getSimpleName,
     loggerFactory,
@@ -96,10 +96,7 @@ class DomainMigrationInitializer(
         )
         .asRuntimeException()
     val storeKey = SvStore.Key(migrationDump.svPartyId, migrationDump.svcPartyId)
-    val svcPartyHosting = newSvcPartyHosting(
-      storeKey,
-      participantAdminConnection,
-    )
+    val svcPartyHosting = newSvcPartyHosting(storeKey)
     for {
       _ <- migrateToNewDomainNode(migrationDump, svcPartyHosting)
       _ <- SetupUtil.setupSvParty(
@@ -131,8 +128,6 @@ class DomainMigrationInitializer(
         newSvSvcAutomationService(
           svStore,
           svcStore,
-          ledgerClient,
-          cometBftNode,
           Some(localDomainNode),
         )
 
@@ -410,66 +405,6 @@ class DomainMigrationInitializer(
       )
     } yield {}
   }
-  private def newSvStore(key: SvStore.Key) = SvSvStore(
-    key,
-    storage,
-    loggerFactory,
-    retryProvider,
-  )
-
-  private def newSvcStore(key: SvStore.Key) = {
-    SvSvcStore(
-      key,
-      storage,
-      loggerFactory,
-      retryProvider,
-    )
-  }
-
-  private def newSvSvAutomationService(
-      svStore: SvSvStore,
-      svcStore: SvSvcStore,
-      ledgerClient: CNLedgerClient,
-  ) =
-    new SvSvAutomationService(
-      clock,
-      config,
-      svStore,
-      svcStore,
-      ledgerClient,
-      retryProvider,
-      loggerFactory,
-    )
-
-  private def newSvSvcAutomationService(
-      svStore: SvSvStore,
-      svcStore: SvSvcStore,
-      ledgerClient: CNLedgerClient,
-      cometBftNode: Option[CometBftNode],
-      localDomainNode: Option[LocalDomainNode],
-  ) =
-    new SvSvcAutomationService(
-      clock,
-      config,
-      svStore,
-      svcStore,
-      ledgerClient,
-      participantAdminConnection,
-      retryProvider,
-      cometBftNode,
-      localDomainNode,
-      loggerFactory,
-    )
-
-  private def newSvcPartyHosting(
-      storeKey: SvStore.Key,
-      participantAdminConnection: ParticipantAdminConnection,
-  ) = new SvcPartyHosting(
-    participantAdminConnection,
-    storeKey.svcParty,
-    retryProvider,
-    loggerFactory,
-  )
 }
 
 object DomainMigrationInitializer {

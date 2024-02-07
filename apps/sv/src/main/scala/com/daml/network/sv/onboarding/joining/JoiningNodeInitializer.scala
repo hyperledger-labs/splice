@@ -19,13 +19,18 @@ import com.daml.network.sv.cometbft.{
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState.{Onboarded, Onboarding}
-import com.daml.network.sv.onboarding.{DomainNodeReconciler, SetupUtil, SvcPartyHosting}
+import com.daml.network.sv.onboarding.{
+  DomainNodeReconciler,
+  NodeInitializerUtil,
+  SetupUtil,
+  SvcPartyHosting,
+}
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.lifecycle.CloseContext
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
@@ -43,19 +48,18 @@ import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize a joining SV node. */
 class JoiningNodeInitializer(
-    // TODO(#5364): cleanup the order and mass of these parameters
-    config: SvAppBackendConfig,
-    joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
-    cometBftNode: Option[CometBftNode],
-    requiredDars: Seq[UploadablePackage],
-    override val loggerFactory: NamedLoggerFactory,
-    retryProvider: RetryProvider,
-    ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
-    participantId: ParticipantId,
-    clock: Clock,
-    storage: Storage,
     localDomainNode: Option[LocalDomainNode],
+    joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
+    participantId: ParticipantId,
+    requiredDars: Seq[UploadablePackage],
+    override protected val config: SvAppBackendConfig,
+    override protected val cometBftNode: Option[CometBftNode],
+    override protected val ledgerClient: CNLedgerClient,
+    override protected val participantAdminConnection: ParticipantAdminConnection,
+    override protected val clock: Clock,
+    override protected val storage: Storage,
+    override val loggerFactory: NamedLoggerFactory,
+    override protected val retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContextExecutor,
     httpClient: HttpRequest => Future[HttpResponse],
@@ -64,7 +68,7 @@ class JoiningNodeInitializer(
     mat: Materializer,
     tc: TraceContext,
     tracer: Tracer,
-) extends NamedLogging {
+) extends NodeInitializerUtil {
 
   def joinCollectiveAndOnboardNodes(): Future[
     (
@@ -134,10 +138,7 @@ class JoiningNodeInitializer(
       // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any
       // fault tolerance then it might be blocked until the CometBFT node is caught up.
       _ <- waitUntilCometBftNodeHasCaughtUp
-      svcPartyHosting = newSvcPartyHosting(
-        storeKey,
-        participantAdminConnection,
-      )
+      svcPartyHosting = newSvcPartyHosting(storeKey)
       svcPartyIsAuthorized <- svcPartyHosting.isSvcPartyAuthorizedOn(
         globalDomain,
         participantId,
@@ -167,8 +168,6 @@ class JoiningNodeInitializer(
               newSvSvcAutomationService(
                 svStore,
                 svcStore,
-                ledgerClient,
-                cometBftNode,
                 localDomainNode,
               )
             _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
@@ -232,7 +231,7 @@ class JoiningNodeInitializer(
 
   private def waitForSvParticipantToHaveSubmissionRights(svcParty: PartyId, domainId: DomainId) = {
     val description =
-      show"SV participant ${participantId} has Submission rights for party ${svcParty}"
+      show"SV participant $participantId has Submission rights for party $svcParty"
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
       description,
@@ -244,7 +243,7 @@ class JoiningNodeInitializer(
           case None =>
             throw Status.NOT_FOUND
               .withDescription(
-                show"Party ${svcParty} is not hosted on participant ${participantId}"
+                show"Party $svcParty is not hosted on participant $participantId"
               )
               .asRuntimeException()
           case Some(HostingParticipant(_, permission)) =>
@@ -484,7 +483,7 @@ class JoiningNodeInitializer(
                   Seq(svStore.key.svcParty),
                 )
                 _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for svcParty")
-                svcAutomation = newSvSvcAutomationService(svcStore)
+                svcAutomation = newSvSvcAutomationService(svStore, svcStore, localDomainNode)
                 _ <- svcAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias
                 )
@@ -558,83 +557,7 @@ class JoiningNodeInitializer(
           )
         )
     }
-
-    // TODO(#5364): inline these methods where they are used only once, or move them up.
-    private def newSvSvcAutomationService(svcStore: SvSvcStore) =
-      new SvSvcAutomationService(
-        clock,
-        config,
-        svStore,
-        svcStore,
-        ledgerClient,
-        participantAdminConnection,
-        retryProvider,
-        cometBftNode,
-        localDomainNode,
-        loggerFactory,
-      )
   }
-
-  private def newSvStore(key: SvStore.Key) = SvSvStore(
-    key,
-    storage,
-    loggerFactory,
-    retryProvider,
-  )
-
-  private def newSvSvAutomationService(
-      svStore: SvSvStore,
-      svcStore: SvSvcStore,
-      ledgerClient: CNLedgerClient,
-  ) =
-    new SvSvAutomationService(
-      clock,
-      config,
-      svStore,
-      svcStore,
-      ledgerClient,
-      retryProvider,
-      loggerFactory,
-    )
-
-  private def newSvcStore(key: SvStore.Key) = {
-    SvSvcStore(
-      key,
-      storage,
-      loggerFactory,
-      retryProvider,
-    )
-  }
-
-  private def newSvSvcAutomationService(
-      svStore: SvSvStore,
-      svcStore: SvSvcStore,
-      ledgerClient: CNLedgerClient,
-      cometBftNode: Option[CometBftNode],
-      localDomainNode: Option[LocalDomainNode],
-  ) =
-    new SvSvcAutomationService(
-      clock,
-      config,
-      svStore,
-      svcStore,
-      ledgerClient,
-      participantAdminConnection,
-      retryProvider,
-      cometBftNode,
-      localDomainNode,
-      loggerFactory,
-    )
-
-  private def newSvcPartyHosting(
-      storeKey: SvStore.Key,
-      participantAdminConnection: ParticipantAdminConnection,
-  ) = new SvcPartyHosting(
-    participantAdminConnection,
-    storeKey.svcParty,
-    retryProvider,
-    loggerFactory,
-  )
 
   private def getSvcPartyId(connection: BaseLedgerConnection): Future[PartyId] = for {
     svcPartyFromMetadata <- connection.lookupSvcPartyFromUserMetadata(config.ledgerApiUser)
