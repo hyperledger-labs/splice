@@ -21,6 +21,8 @@ import io.opentelemetry.api.trace.Tracer
 import java.nio.file.Path
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.*
+import scala.jdk.DurationConverters.*
 import scala.jdk.OptionConverters.*
 
 final class DomainUpgradeTrigger(
@@ -43,11 +45,14 @@ final class DomainUpgradeTrigger(
       schedule <- OptionT.fromOption[Future](
         svcRules.contract.payload.config.nextScheduledDomainUpgrade.toScala
       )
+      domainTime <- OptionT.liftF(
+        participantAdminConnection.getDomainTime(svcRules.domain, timeouts.default)
+      )
       _ <-
-        // check if the current time is after the scheduled time for migration.
+        // check if the domain time is after the scheduled time for migration.
         // and the migrationId configured for this SV is not the same as that of the current scheduled migration
         if (
-          now.toInstant.isAfter(schedule.time) && migrationId.forall(
+          domainTime.timestamp.toInstant.isAfter(schedule.time) && migrationId.forall(
             _ != schedule.migrationId
           ) && !BackupDump.fileExists(dumpPath)
         )
@@ -67,7 +72,7 @@ final class DomainUpgradeTrigger(
         domainParamsTopologyResult <- ensureDomainIsPaused(globalDomainId)
         // TODO(#8761) wait until it's safe, based on params described in the design
         _ <- waitForMediatorAndParticipantResponseTime(globalDomainId, domainParamsTopologyResult)
-        _ = exportMigrationDump(task.work.migrationId, domainParamsTopologyResult.base.validFrom)
+        _ <- exportMigrationDump(task.work.migrationId, domainParamsTopologyResult.base.validFrom)
       } yield TaskSuccess(show"Triggered domain pause and migration dump export for ${task.work}")
     } else
       Future.successful(TaskSuccess(show"migration dump already exists. skipping ${task.work}"))
@@ -92,7 +97,7 @@ final class DomainUpgradeTrigger(
   private def exportMigrationDump(migrationId: Long, domainPausedAt: Instant)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Unit = {
+  ): Future[Unit] = {
     DomainMigrationDump
       .getDomainMigrationDump(
         domainAlias,
@@ -104,14 +109,13 @@ final class DomainUpgradeTrigger(
         migrationId,
         domainPausedAt,
       )
-      .foreach { dump =>
+      .map { dump =>
         val path = BackupDump.writeToPath(
           dumpPath,
           dump.toJson.noSpaces,
         )
         logger.info(s"Wrote domain migration dump at path $path")
       }
-
   }
 
   private def waitForMediatorAndParticipantResponseTime(
@@ -123,6 +127,8 @@ final class DomainUpgradeTrigger(
     val domainDynamicParams = domainParamsTopologyResult.mapping.parameters
     val duration = domainDynamicParams.mediatorReactionTimeout.duration
       .plus(domainDynamicParams.participantResponseTimeout.duration)
+      .plus(5.seconds.toJava) // a small buffer to account for network latency
+
     val readyForDumpAfter = domainParamsTopologyResult.base.validFrom.plus(duration)
     for {
       _ <- context.retryProvider

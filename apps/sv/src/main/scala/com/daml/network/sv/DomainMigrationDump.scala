@@ -130,7 +130,7 @@ object DomainMigrationDump {
       svcStore: SvSvcStore,
       clock: Clock,
       migrationId: Long,
-      topologyTxsUntil: Instant,
+      domainPausedTime: Instant,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -154,7 +154,7 @@ object DomainMigrationDump {
       topologySnapshot <- domainNode.sequencerAdminConnection.getTopologySnapshot(
         globalDomain,
         None,
-        Some(tryFromInstant(topologyTxsUntil)),
+        Some(tryFromInstant(domainPausedTime)),
       )
       acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
         Set(svcStore.key.svParty, svcStore.key.svcParty)
