@@ -1,5 +1,5 @@
 {{/*Used by the sv runbook, which is not aware of multiple domains yet.*/}}
-{{- if and (empty ((.Values.ingress).globalDomain).activeGlobalDomainId) (empty ((.Values.ingress).globalDomain).globalDomainId) }}
+{{- if and .Values.withSvIngress (and (empty ((.Values.ingress).globalDomain).activeGlobalDomainId) (empty ((.Values.ingress).globalDomain).globalDomainId)) }}
   {{- if .Values.ingress.sequencer }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
@@ -79,66 +79,5 @@ spec:
             port:
               number: 80
             host: scan-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-  {{- end }}
-  {{- if .Values.ingress.wallet }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: wallet-sv-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-    - "wallet.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-    - cluster-ingress/cn-http-gateway
-  http:
-    - match:
-        - port: 443
-          uri:
-            prefix: "/api/validator/"
-      route:
-        - destination:
-            port:
-              number: 5003
-            host: validator-app.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-    - match:
-        - port: 443
-      route:
-        - destination:
-            port:
-              number: 80
-            host: wallet-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-  {{- end }}
-  {{- if .Values.ingress.cns }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: cns-sv-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-    - "cns.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-    - cluster-ingress/cn-http-gateway
-  http:
-    - match:
-        - port: 443
-          uri:
-            prefix: "/api/validator/"
-      route:
-        - destination:
-            port:
-              number: 5003
-            host: validator-app.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-    - match:
-        - port: 443
-      route:
-        - destination:
-            port:
-              number: 80
-            host: cns-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
   {{- end }}
 {{- end }}
