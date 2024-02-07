@@ -30,6 +30,7 @@ import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.util.ShowUtil.*
 
+import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.DurationConverters.*
 
@@ -264,9 +265,9 @@ class SequencerAdministrationGroup(
 
   /** Snapshot based on given snapshot to used as initial state by other sequencer nodes in the process of onboarding.
     */
-  def snapshot(timestamp: CantonTimestamp): SequencerSnapshot =
+  def snapshot(instant: Instant): SequencerSnapshot =
     consoleEnvironment.run {
-      runner.adminCommand(EnterpriseSequencerAdminCommands.Snapshot(timestamp))
+      runner.adminCommand(EnterpriseSequencerAdminCommands.Snapshot(instant))
     }
 
 }

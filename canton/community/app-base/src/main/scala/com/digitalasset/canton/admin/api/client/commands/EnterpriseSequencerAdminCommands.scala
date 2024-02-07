@@ -22,6 +22,7 @@ import com.digitalasset.canton.domain.sequencing.admin.grpc.{
   InitializeSequencerResponseX,
 }
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot
+import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
@@ -29,6 +30,7 @@ import com.digitalasset.canton.topology.{DomainId, Member}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
+import java.time.Instant
 import scala.concurrent.Future
 
 object EnterpriseSequencerAdminCommands {
@@ -170,14 +172,14 @@ object EnterpriseSequencerAdminCommands {
       InitializeSequencerResponseX.fromProtoV30(response).leftMap(_.toString)
   }
 
-  final case class Snapshot(timestamp: CantonTimestamp)
+  final case class Snapshot(instant: Instant)
       extends BaseSequencerAdministrationCommand[
         v30.Snapshot.Request,
         v30.Snapshot.Response,
         SequencerSnapshot,
       ] {
     override def createRequest(): Either[String, v30.Snapshot.Request] = {
-      Right(v30.Snapshot.Request(Some(timestamp.toProtoPrimitive)))
+      Right(v30.Snapshot.Request(Some(ProtoConverter.InstantConverter.toProtoPrimitive(instant))))
     }
 
     override def submitRequest(

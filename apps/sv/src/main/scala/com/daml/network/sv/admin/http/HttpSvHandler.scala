@@ -24,13 +24,14 @@ import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TopologyStoreId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import java.time.Instant
 import java.util.{Base64, UUID}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -519,7 +520,7 @@ class HttpSvHandler(
   private def dummyTopologyTransaction(
       globalDomainId: DomainId,
       sequencerAdminConnection: SequencerAdminConnection,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Instant] = {
     val dummyHint = s"dummy-${UUID.randomUUID}"
     for {
       party <- svcStoreWithIngestion.connection.ensurePartyAllocated(
@@ -530,22 +531,25 @@ class HttpSvHandler(
       )
       msg = "Wait for sequencer to observe party allocation"
       _ = logger.info(msg)
-      _ <- retryProvider.retryForClientCalls(
+      sequencedAt <- retryProvider.retryForClientCalls(
         msg,
         for {
           state <- sequencerAdminConnection.listPartyToParticipant(filterParty = party.filterString)
         } yield {
-          if (state.isEmpty) {
-            throw Status.FAILED_PRECONDITION
-              .withDescription(
-                s"Sequencer has not yet observed allocation of $party"
-              )
-              .asRuntimeException()
+          state.lastOption match {
+            case None =>
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Sequencer has not yet observed allocation of $party"
+                )
+                .asRuntimeException()
+            case Some(last) =>
+              last.base.sequenced
           }
         },
         logger,
       )
-    } yield ()
+    } yield sequencedAt
   }
 
   private def getSequencerOnboardingSnapshots(
@@ -561,15 +565,17 @@ class HttpSvHandler(
       // in the topology state or not. We could crash after the topology update but before this and there doesn't seem to be a good way
       // to test for this.
       globalDomain <- svcStore.getSvcRules().map(_.domain)
-      _ <- dummyTopologyTransaction(globalDomain, sequencerAdminConnection)
+      dummyTxSequencedAt <- dummyTopologyTransaction(globalDomain, sequencerAdminConnection)
       _ = logger.info(s"Downloading topology and sequencer snapshot")
       // TODO(#5339) Check if we need to be careful at which offset we query our snapshot.
-      topologySnapshot <- sequencerAdminConnection.getTopologySnapshot(globalDomain)
-      sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(
-        topologySnapshot.lastChangeTimestamp.getOrElse(
-          throw new IllegalStateException(s"Topology snapshot has no last change timestamp")
+      sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(dummyTxSequencedAt)
+      topologySnapshot <- sequencerAdminConnection
+        .getTopologySnapshot(globalDomain)
+        .map(txns =>
+          StoredTopologyTransactionsX(
+            txns.result.filter(_.sequenced.value <= sequencerSnapshot.lastTs)
+          )
         )
-      )
     } yield definitions.SequencerSnapshot(
       topologySnapshot = Base64.getEncoder.encodeToString(topologySnapshot.toProtoV30.toByteArray),
       sequencerSnapshot = Base64.getEncoder.encodeToString(sequencerSnapshot.toByteArray),

@@ -22,6 +22,7 @@ import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerTrafficStatus
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connection to the subset of the Canton sequencer admin API that we rely
@@ -53,11 +54,11 @@ class SequencerAdminConnection(
   def getSequencerId(implicit traceContext: TraceContext): Future[SequencerId] =
     getId().map(SequencerId(_))
 
-  def getSequencerSnapshot(ts: CantonTimestamp)(implicit
+  def getSequencerSnapshot(instant: Instant)(implicit
       traceContext: TraceContext
   ): Future[SequencerSnapshot] =
     runCmd(
-      EnterpriseSequencerAdminCommands.Snapshot(ts)
+      EnterpriseSequencerAdminCommands.Snapshot(instant)
     )
 
   def initialize(

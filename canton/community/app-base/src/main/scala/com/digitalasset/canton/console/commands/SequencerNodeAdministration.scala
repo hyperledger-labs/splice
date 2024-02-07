@@ -20,6 +20,8 @@ import com.digitalasset.canton.topology.store.{
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.PositiveSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, TopologyMappingX}
 
+import java.time.Instant
+
 class SequencerXSetupGroup(parent: ConsoleCommandGroup)
     extends ConsoleCommandGroup.Impl(parent)
     with InitNodeId {
@@ -27,11 +29,11 @@ class SequencerXSetupGroup(parent: ConsoleCommandGroup)
   @Help.Summary(
     "Download sequencer snapshot at given point in time to bootstrap another sequencer"
   )
-  def snapshot(timestamp: CantonTimestamp): SequencerSnapshot = {
+  def snapshot(instant: Instant): SequencerSnapshot = {
     // TODO(#14074) add something like "snapshot for sequencer-id", rather than timestamp based
     //      we still need to keep the timestamp based such that we can provide recovery for corrupted sequencers
     consoleEnvironment.run {
-      runner.adminCommand(EnterpriseSequencerAdminCommands.Snapshot(timestamp))
+      runner.adminCommand(EnterpriseSequencerAdminCommands.Snapshot(instant))
     }
   }
 

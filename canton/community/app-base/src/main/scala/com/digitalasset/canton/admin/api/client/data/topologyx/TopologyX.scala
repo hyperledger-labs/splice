@@ -39,6 +39,7 @@ final case class BaseResult(
     store: TopologyStore,
     validFrom: Instant,
     validUntil: Option[Instant],
+    sequenced: Instant,
     operation: TopologyChangeOpX,
     transactionHash: ByteString,
     serial: PositiveInt,
@@ -51,6 +52,8 @@ object BaseResult {
       protoValidFrom <- ProtoConverter.required("valid_from", value.validFrom)
       validFrom <- ProtoConverter.InstantConverter.fromProtoPrimitive(protoValidFrom)
       validUntil <- value.validUntil.traverse(ProtoConverter.InstantConverter.fromProtoPrimitive)
+      protoSequenced <- ProtoConverter.required("sequenced", value.sequenced)
+      sequenced <- ProtoConverter.InstantConverter.fromProtoPrimitive(protoSequenced)
       operation <- TopologyChangeOpX.fromProtoV30(value.operation)
       serial <- PositiveInt
         .create(value.serial)
@@ -71,6 +74,7 @@ object BaseResult {
       store,
       validFrom,
       validUntil,
+      sequenced,
       operation,
       value.transactionHash,
       serial,
