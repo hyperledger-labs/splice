@@ -165,6 +165,13 @@ clusters.)
    (your GitHub username if you are logging into CircleCI using your GitHub account)
    and `local-username` is the local username on your machine (as returned by `whoami`).
 
+   Open `./circleci/cluster-lock-slack-ids.json`, and add a line of the format
+   ```
+   "<local-username>": "<slack-user-id>",
+   ```
+   to receive slack pings when your cluster lock is ~1hr away from expiring. Determine your user ID
+   from your profile settings, as described [here](https://www.workast.com/help/article/how-to-find-a-slack-user-id/).
+
 ### Private Environment Variables
 
 There are a number of environment variables managed with `direnv` that
