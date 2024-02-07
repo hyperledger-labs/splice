@@ -32,10 +32,13 @@ import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.util.{CoinConfigSchedule, HasHealth, UploadablePackage}
+import com.daml.network.util.{CoinConfigSchedule, HasHealth, PackageVetting, UploadablePackage}
 import com.daml.network.validator.admin.AppManagerService
 import com.daml.network.validator.admin.http.*
-import com.daml.network.validator.automation.ValidatorAutomationService
+import com.daml.network.validator.automation.{
+  ValidatorAutomationService,
+  ValidatorPackageVettingTrigger,
+}
 import com.daml.network.validator.config.{
   AppInstance,
   ValidatorAppBackendConfig,
@@ -482,6 +485,21 @@ class ValidatorApp(
           retryProvider,
           loggerFactory,
         )
+      }
+      // Prevet early to make sure we have the required packages even
+      // before the automation kicks in.
+      _ <- appInitStep("Vet packages") {
+        for {
+          coinRules <- scanConnection.getCoinRules()
+          packageVetting = new PackageVetting(
+            ValidatorPackageVettingTrigger.packages,
+            config.prevetDuration,
+            clock,
+            participantAdminConnection,
+            loggerFactory,
+          )
+          _ <- packageVetting.vetPackages(coinRules)
+        } yield ()
       }
 
       // Register the traffic balance service

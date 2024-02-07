@@ -10,6 +10,7 @@ import com.daml.network.environment.*
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
+import com.daml.network.sv.automation.singlesv.SvPackageVettingTrigger
 import com.daml.network.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
@@ -28,7 +29,7 @@ import com.daml.network.sv.onboarding.{
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
-import com.daml.network.util.{Contract, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{Contract, PackageVetting, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -520,6 +521,26 @@ class JoiningNodeInitializer(
       )
     }
 
+    private def vetThroughSponsor(sponsorConfig: NetworkAppClientConfig): Future[Unit] = {
+      logger.info("Vetting packages based on state from sponsor")
+      for {
+        // This is not a BFT read: That's acceptable because
+        // we will only vet packages that have been statically compiled into the app.
+        // At most, we can be tricked into vetting a package a bit too early.
+        svcInfo <- withSvConnection(sponsorConfig)(_.getSvcInfo())
+        coinRules = svcInfo.coinRules
+        vetting = new PackageVetting(
+          SvPackageVettingTrigger.packages,
+          config.prevetDuration,
+          clock,
+          participantAdminConnection,
+          loggerFactory,
+        )
+        _ <- vetting.vetPackages(coinRules)
+        _ = logger.info("Packages vetting completed")
+      } yield ()
+    }
+
     private def requestOnboarding(
         sponsorConfig: NetworkAppClientConfig,
         name: String,
@@ -531,13 +552,21 @@ class JoiningNodeInitializer(
         privateKey
       ) match {
         case Right(token) =>
-          logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
-          retryProvider.retry(
-            RetryFor.WaitingOnInitDependency,
-            "request onboarding",
-            withSvConnection(sponsorConfig)(_.startSvOnboarding(token)),
-            logger,
-          )
+          // startSvOnboarding creates a contract with the SV as an observer so we need to vet before.
+          // technically we can still get issues if the config changes while we are onboarding. However,
+          // we prevet so this is extremely unlikely and even if we hit it,
+          // we will just crash and retry so it doesn't seem worth the complexity
+          // to wrap everything in a giant retry.
+          for {
+            _ <- vetThroughSponsor(sponsorConfig)
+            _ = logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
+            _ <- retryProvider.retry(
+              RetryFor.WaitingOnInitDependency,
+              "request onboarding",
+              withSvConnection(sponsorConfig)(_.startSvOnboarding(token)),
+              logger,
+            )
+          } yield ()
         case Left(error) =>
           Future.failed(
             Status.INTERNAL

@@ -1,8 +1,6 @@
 package com.daml.network.integration.tests
 
-import cats.syntax.parallel.*
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.util.FutureInstances.*
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{ARC_CoinRules}
@@ -19,7 +17,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.concurrent.{ExecutionContext, Future}
 
 class ModelUpgradeIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -32,19 +29,27 @@ class ModelUpgradeIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withSequencerConnectionsFromScanDisabled()
+      .withManualStart
 
   "daml model upgrade" should {
     "support switching to new svc-governance version" in { implicit env =>
-      implicit val ec: ExecutionContext = env.executionContext
+      startAllSync(
+        sv1Backend,
+        sv2Backend,
+        sv3Backend,
+        sv1ValidatorBackend,
+        sv2ValidatorBackend,
+        sv3ValidatorBackend,
+        sv1ScanBackend,
+        aliceValidatorBackend,
+      )
+
       val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
       aliceWalletClient.tap(10)
       val coin = aliceWalletClient.list().coins.loneElement.contract
       coin.identifier.getPackageId shouldBe DarResources.cantonCoin_0_1_0.packageId
       BigDecimal(coin.payload.amount.initialAmount) shouldBe 10.0
-
-      p2pTransfer(aliceWalletClient, bobWalletClient, bob, 5.0)
 
       val svcRules = sv1Backend.getSvcInfo().svcRules
       svcRules.identifier.getPackageId shouldBe DarResources.svcGovernance_0_1_0.packageId
@@ -58,25 +63,26 @@ class ModelUpgradeIntegrationTest
       // before it is reached but close enough that we don't need to wait for long.
       // 12 seconds seems to work well empirically.
       val scheduledTime = Instant.now().plus(12, ChronoUnit.SECONDS)
+      val newCoinConfig = new cc.coinconfig.CoinConfig(
+        coinConfig.transferConfig,
+        coinConfig.issuanceCurve,
+        coinConfig.globalDomain,
+        coinConfig.tickDuration,
+        new cc.coinconfig.PackageConfig(
+          "0.2.0",
+          "0.2.0",
+          "0.2.0",
+          "0.1.0",
+          "0.2.0",
+          "0.2.0",
+        ),
+      )
       val upgradeAction = new ARC_CoinRules(
         new CRARC_AddFutureCoinConfigSchedule(
           new CoinRules_AddFutureCoinConfigSchedule(
             new com.daml.network.codegen.java.da.types.Tuple2(
               scheduledTime,
-              new cc.coinconfig.CoinConfig(
-                coinConfig.transferConfig,
-                coinConfig.issuanceCurve,
-                coinConfig.globalDomain,
-                coinConfig.tickDuration,
-                new cc.coinconfig.PackageConfig(
-                  "0.2.0",
-                  "0.2.0",
-                  "0.2.0",
-                  "0.1.0",
-                  "0.2.0",
-                  "0.2.0",
-                ),
-              ),
+              newCoinConfig,
             )
           )
         )
@@ -96,27 +102,22 @@ class ModelUpgradeIntegrationTest
               )
             },
           )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
-
-          Seq(sv2Backend, sv3Backend).parTraverse { sv =>
-            Future {
-              clue("both sv2 and sv3 see the vote request") {
-                val svVoteRequest = eventually() {
-                  sv.listVoteRequests().loneElement
-                }
-                svVoteRequest.contractId shouldBe voteRequest.contractId
-              }
-              clue(s"${sv.name} accepts vote") {
-                eventuallySucceeds() {
-                  sv.castVote(
-                    voteRequest.contractId,
-                    true,
-                    "url",
-                    "description",
-                  )
-                }
-              }
+          clue("sv2 sees the vote request") {
+            val svVoteRequest = eventually() {
+              sv2Backend.listVoteRequests().loneElement
             }
-          }.futureValue
+            svVoteRequest.contractId shouldBe voteRequest.contractId
+          }
+          clue(s"sv2 accepts vote") {
+            eventuallySucceeds() {
+              sv2Backend.castVote(
+                voteRequest.contractId,
+                true,
+                "url",
+                "description",
+              )
+            }
+          }
         },
       )(
         "observing CoinRules with upgraded config",
@@ -146,7 +147,7 @@ class ModelUpgradeIntegrationTest
           new CoinRules_AddFutureCoinConfigSchedule(
             new com.daml.network.codegen.java.da.types.Tuple2(
               Instant.now().plus(1, ChronoUnit.HOURS),
-              coinConfig,
+              newCoinConfig,
             )
           )
         )
@@ -166,20 +167,18 @@ class ModelUpgradeIntegrationTest
               )
             },
           )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
-          Seq(sv2Backend, sv3Backend).foreach { sv =>
-            clue(s"${sv.name} accepts vote") {
-              val svVoteRequest = eventually() {
-                sv.listVoteRequests().loneElement
-              }
-              svVoteRequest.contractId shouldBe voteRequest.contractId
-              eventuallySucceeds() {
-                sv.castVote(
-                  svVoteRequest.contractId,
-                  true,
-                  "url",
-                  "description",
-                )
-              }
+          clue(s"sv2 accepts vote") {
+            val svVoteRequest = eventually() {
+              sv2Backend.listVoteRequests().loneElement
+            }
+            svVoteRequest.contractId shouldBe voteRequest.contractId
+            eventuallySucceeds() {
+              sv2Backend.castVote(
+                svVoteRequest.contractId,
+                true,
+                "url",
+                "description",
+              )
             }
           }
         },
@@ -201,9 +200,13 @@ class ModelUpgradeIntegrationTest
         _ => {
           val coin = aliceWalletClient.list().coins.loneElement.contract
           coin.identifier.getPackageId shouldBe DarResources.cantonCoin_0_2_0.packageId
-          BigDecimal(coin.payload.amount.initialAmount) should beWithin(25 - smallAmount, 25)
+          BigDecimal(coin.payload.amount.initialAmount) should beWithin(30 - smallAmount, 30)
         },
       )
+
+      // Bob can join after the upgrade
+      bobValidatorBackend.startSync()
+      val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
       // This is just to invalidate the coin rules cache on Bob’s side. In a real upgrade, the upgrade will be announced days or weeks in advance
       // while cache expiration is a few minutes so this is a non-issue.
       clue("Bob taps after upgrade") {
@@ -217,9 +220,26 @@ class ModelUpgradeIntegrationTest
           p2pTransfer(aliceWalletClient, bobWalletClient, bob, 4.0)
         },
       )(
-        "old and new transfers appear in scan tx log",
+        "old and new taps and transfers appear in scan tx log",
         _ => {
           val txs = sv1ScanBackend.listActivity(pageEndEventId = None, pageSize = 50)
+          // old tap
+          forExactly(1, txs) { tx =>
+            val tf = tx.tap.value
+            tf.coinOwner shouldBe alice.toProtoPrimitive
+            tf.coinAmount shouldBe "10.0000000000"
+          }
+          // new taps
+          forExactly(1, txs) { tx =>
+            val tf = tx.tap.value
+            tf.coinOwner shouldBe alice.toProtoPrimitive
+            tf.coinAmount shouldBe "20.0000000000"
+          }
+          forExactly(1, txs) { tx =>
+            val tf = tx.tap.value
+            tf.coinOwner shouldBe bob.toProtoPrimitive
+            tf.coinAmount shouldBe "5.0000000000"
+          }
           // new transfer
           forExactly(1, txs) { tx =>
             val tf = tx.transfer.value
@@ -227,15 +247,11 @@ class ModelUpgradeIntegrationTest
             tf.receivers.loneElement.party shouldBe bob.toProtoPrimitive
             BigDecimal(tf.receivers.loneElement.amount) shouldBe 4.0
           }
-          // old transfer
-          forExactly(1, txs) { tx =>
-            val tf = tx.transfer.value
-            tf.sender.party shouldBe alice.toProtoPrimitive
-            tf.receivers.loneElement.party shouldBe bob.toProtoPrimitive
-            BigDecimal(tf.receivers.loneElement.amount) shouldBe 5.0
-          }
         },
       )
+
+      // SV4 can join after the upgrade.
+      startAllSync(sv4Backend, sv4ValidatorBackend)
     }
   }
 }
