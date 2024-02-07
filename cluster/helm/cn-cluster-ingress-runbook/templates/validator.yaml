@@ -60,4 +60,36 @@ spec:
             host: cns-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
+  {{ if .Values.ingress.splitwell }}
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: splitwell-runbook-{{ (.Values.cluster).svNamespace }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  hosts:
+    - "splitwell.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+  gateways:
+    - cluster-ingress/cn-http-gateway
+  http:
+    - match:
+        - port: 443
+          uri:
+            prefix: "/api/json-api/"
+      route:
+        - destination:
+            port:
+              number: 7575
+            host: participant.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+      rewrite:
+        uri: "/"
+    - match:
+        - port: 443
+      route:
+        - destination:
+            port:
+              number: 80
+            host: splitwell-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+---
+  {{- end }}
 {{- end }}

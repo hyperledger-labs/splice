@@ -1,7 +1,0 @@
-apiVersion: v2
-name: cn-istio-fwd
-type: application
-description: Canton Network Traffic Forwarding
-
-version: VERSION_NUMBER
-appVersion: IMAGE_TAG

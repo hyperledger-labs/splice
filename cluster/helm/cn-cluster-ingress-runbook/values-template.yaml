@@ -10,6 +10,7 @@ ingress:
   cns: true
   scan: true
   sequencer: true
+  splitwell: false
   globalDomain:
     globalDomainId: ""
     activeGlobalDomainId: ""

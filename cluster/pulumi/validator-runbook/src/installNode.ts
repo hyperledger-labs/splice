@@ -12,7 +12,6 @@ import {
   fixedTokens,
   setupBootstrapping,
   imagePullSecretByNamespaceName,
-  infraStack,
   installCNRunbookHelmChart,
   installCNRunbookHelmChartByNamespaceName,
   loadYamlFromFile,
@@ -105,7 +104,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installCNRunbookHelmChartByNamespaceName(
-    infraStack.requireOutput('ingressNs') as pulumi.Output<string>,
+    xns.logicalName,
     'cluster-ingress-validator',
     'cn-cluster-ingress-runbook',
     {

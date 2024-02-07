@@ -52,6 +52,8 @@ export async function installSplitwell(
     { dependsOn: [xns.ns] }
   );
 
+  installIngress(xns);
+
   const participantPostgres = splitPostgresInstances
     ? postgres.installPostgres(xns, 'participant-pg', true)
     : domainPostgres;
@@ -167,4 +169,21 @@ function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): p
   installPostgresMetrics(postgres, sequencerDbName, [domain]);
 
   return domain;
+}
+
+function installIngress(xns: ExactNamespace) {
+  installCNHelmChart(
+    xns,
+    'cluster-ingress-splitwell-uis',
+    'cn-cluster-ingress-runbook',
+    {
+      cluster: {
+        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+        hostPrefix: '',
+        svNamespace: xns.logicalName,
+      },
+      withSvIngress: false,
+    },
+    {}
+  );
 }

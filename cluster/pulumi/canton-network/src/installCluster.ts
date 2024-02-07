@@ -7,9 +7,6 @@ import {
   CnInput,
   domainFeesConfig,
   envFlag,
-  infraStack,
-  InfrastructureOutputs,
-  installCNHelmChartByNamespaceName,
   isDevNet,
   loadYamlFromFile,
   REPO_ROOT,
@@ -20,7 +17,6 @@ import {
 } from 'cn-pulumi-common';
 
 import { installDocs } from './docs';
-import { configureForwardAll } from './gateway';
 import { GlobalDomainUpgradeConfig } from './globalDomainNode';
 import { installSplitwell } from './splitwell';
 import { installSvNode, SvOnboarding } from './sv';
@@ -166,16 +162,13 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     };
   }
 
-  configureForwardAll(
-    infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>
-  );
   const sv1 = await installSvc(auth0Client, topupConfig);
 
   // TODO(#8761) install the validator once the upgrade supports it
   const installNonSvComponents =
     !globalDomainUpgradeConfig.isUpgrade() && globalDomainUpgradeConfig.isDefaultActive();
   const nonSvComponentsDependencies = [sv1.founder.scan];
-  const validator = installNonSvComponents
+  installNonSvComponents
     ? await installValidator1(
         auth0Client,
         'validator1',
@@ -192,7 +185,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     : undefined;
 
   // TODO(#8761) install splitwell once the upgrade supports it
-  const splitwell = installNonSvComponents
+  installNonSvComponents
     ? await installSplitwell(
         auth0Client,
         'auth0|63e12e0415ad881ffe914e61',
@@ -206,18 +199,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       )
     : undefined;
 
-  const docs = installDocs();
-
-  installCNHelmChartByNamespaceName(
-    'cluster-ingress',
-    infraStack.requireOutput(InfrastructureOutputs.INGRESS_NAMESPACE) as pulumi.Output<string>,
-    'cluster-ingress',
-    'cn-cluster-ingress-full',
-    {},
-    { dependsOn: [validator, splitwell, docs].flatMap(value => (value ? [value] : [])) }
-  );
+  installDocs();
 }
-
 async function installSvc(auth0Client: Auth0Client, topupConfig: ValidatorTopupConfig) {
   const sv1 = await installSvNode(
     {

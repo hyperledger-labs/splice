@@ -509,7 +509,7 @@ Another reference Helm chart is provided for that, which can be installed using:
 
 .. code-block:: bash
 
-    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n cluster-ingress --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-cluster-ingress-values.yaml
+    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-cluster-ingress-values.yaml
 
 
 .. _helm-validator-wallet-ui:

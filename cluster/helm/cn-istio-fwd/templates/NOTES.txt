@@ -1,4 +1,0 @@
-Canton Network Istio Virtual Service
-
-A VirtualService that forwards all inbound traffic from Istio to Nginx
-for the purpose of routing to back end services.

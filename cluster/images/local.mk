@@ -21,7 +21,6 @@ images := \
 	splitwell-web-ui \
 	\
 	docs \
-	external-proxy-full \
 	gcs-proxy \
 	load-tester \
 

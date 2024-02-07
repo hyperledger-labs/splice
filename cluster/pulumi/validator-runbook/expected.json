@@ -75,7 +75,7 @@
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
       "name": "cluster-ingress-validator",
-      "namespace": "cn-namespace",
+      "namespace": "validator",
       "timeout": 480,
       "values": {
         "cluster": {

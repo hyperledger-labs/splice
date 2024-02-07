@@ -9,7 +9,7 @@ import {
   ValidatorTopupConfig,
   CLUSTER_BASENAME,
 } from 'cn-pulumi-common';
-import type { Auth0Client } from 'cn-pulumi-common';
+import type { Auth0Client, ExactNamespace } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
 import { DomainIndex } from './globalDomainNode';
@@ -69,6 +69,7 @@ export async function installValidator1(
     }
   );
 
+  installIngress(xns);
   const validatorPostgres = splitPostgresInstances
     ? postgres.installPostgres(xns, 'validator-pg', true)
     : participantPostgres;
@@ -117,4 +118,24 @@ export async function installValidator1(
   installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
 
   return validator;
+}
+
+function installIngress(xns: ExactNamespace) {
+  installCNHelmChart(
+    xns,
+    'cluster-ingress-validator1',
+    'cn-cluster-ingress-runbook',
+    {
+      cluster: {
+        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+        hostPrefix: '',
+        svNamespace: xns.logicalName,
+      },
+      withSvIngress: false,
+      ingress: {
+        splitwell: true,
+      },
+    },
+    {}
+  );
 }

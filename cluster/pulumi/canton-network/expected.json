@@ -641,32 +641,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-full/",
-      "compat": "true",
-      "name": "cluster-ingress",
-      "namespace": "cn-namespace",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
-      }
-    },
-    "name": "cluster-ingress-cluster-ingress",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "apiVersion": "v1",
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
@@ -1119,24 +1093,6 @@
     "type": "kubernetes:core/v1:Namespace"
   },
   {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-istio-fwd/",
-      "compat": "true",
-      "name": "fwd-all",
-      "namespace": "cn-namespace",
-      "values": {
-        "cluster": {
-          "basename": "mock"
-        }
-      }
-    },
-    "name": "fwd-all",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
     "custom": false,
     "id": "organization/infra/infra.mock",
     "inputs": {
@@ -1145,6 +1101,48 @@
     "name": "organization/infra/infra.mock",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "compat": "true",
+      "name": "cluster-ingress-splitwell-uis",
+      "namespace": "splitwell",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "hostPrefix": "",
+          "hostname": "mock.network.canton.global",
+          "imageTag": "0.0.1-deadbeef",
+          "name": "cn-mocknet",
+          "svNamespace": "splitwell"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingress": {
+          "cns": true,
+          "globalDomain": {
+            "activeGlobalDomainId": "",
+            "globalDomainId": ""
+          },
+          "scan": true,
+          "sequencer": true,
+          "splitwell": false,
+          "sv": true,
+          "wallet": true
+        },
+        "withSvIngress": false
+      }
+    },
+    "name": "splitwell-cluster-ingress-splitwell-uis",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,
@@ -1831,6 +1829,7 @@
           },
           "scan": true,
           "sequencer": true,
+          "splitwell": false,
           "sv": true,
           "wallet": false
         },
@@ -1872,6 +1871,7 @@
           },
           "scan": true,
           "sequencer": true,
+          "splitwell": false,
           "sv": true,
           "wallet": true
         },
@@ -2744,6 +2744,7 @@
           },
           "scan": true,
           "sequencer": true,
+          "splitwell": false,
           "sv": true,
           "wallet": false
         },
@@ -2785,6 +2786,7 @@
           },
           "scan": true,
           "sequencer": true,
+          "splitwell": false,
           "sv": true,
           "wallet": true
         },
@@ -3629,6 +3631,7 @@
           },
           "scan": true,
           "sequencer": true,
+          "splitwell": false,
           "sv": true,
           "wallet": false
         },
@@ -3670,6 +3673,7 @@
           },
           "scan": true,
           "sequencer": true,
+          "splitwell": false,
           "sv": true,
           "wallet": true
         },
@@ -4514,6 +4518,7 @@
           },
           "scan": true,
           "sequencer": true,
+          "splitwell": false,
           "sv": true,
           "wallet": false
         },
@@ -4555,6 +4560,7 @@
           },
           "scan": true,
           "sequencer": true,
+          "splitwell": false,
           "sv": true,
           "wallet": true
         },
@@ -5197,6 +5203,48 @@
     "name": "sv-4",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "compat": "true",
+      "name": "cluster-ingress-validator1",
+      "namespace": "validator1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "hostPrefix": "",
+          "hostname": "mock.network.canton.global",
+          "imageTag": "0.0.1-deadbeef",
+          "name": "cn-mocknet",
+          "svNamespace": "validator1"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingress": {
+          "cns": true,
+          "globalDomain": {
+            "activeGlobalDomainId": "",
+            "globalDomainId": ""
+          },
+          "scan": true,
+          "sequencer": true,
+          "splitwell": true,
+          "sv": true,
+          "wallet": true
+        },
+        "withSvIngress": false
+      }
+    },
+    "name": "validator1-cluster-ingress-validator1",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,

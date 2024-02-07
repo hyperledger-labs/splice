@@ -10,7 +10,6 @@ import {
   ExactNamespace,
   fixedTokens,
   setupBootstrapping,
-  infraStack,
   imagePullSecretByNamespaceName,
   installCNRunbookHelmChart,
   installCNRunbookHelmChartByNamespaceName,
@@ -120,7 +119,7 @@ export async function installNode(
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installCNRunbookHelmChartByNamespaceName(
-    infraStack.requireOutput('ingressNs') as pulumi.Output<string>,
+    xns.logicalName,
     'cluster-ingress-sv',
     'cn-cluster-ingress-runbook',
     {

@@ -1,12 +1,10 @@
 app_charts := \
-	cn-cluster-ingress-full \
 	cn-cluster-ingress-runbook \
 	cn-cluster-loopback-gateway \
 	cn-cometbft \
 	cn-docs \
 	cn-domain \
 	cn-global-domain \
-	cn-istio-fwd \
 	cn-istio-gateway \
 	cn-load-tester \
 	cn-participant \
