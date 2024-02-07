@@ -111,9 +111,6 @@ INVALID_SUBMISSION_REQUEST_SIGNATURE.*sequencer
 has recorded multiple values for the same attributes
 Too many log messages detected..*AsynchronousMetricStorage
 
-# TODO(#9765): remove this ignore once the bug is fixed in Canton
-Unexpectedly using default domain parameters
-
 # TODO(#9544): remove once the slowdown in Canton has been fixed
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 
