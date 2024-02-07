@@ -19,6 +19,10 @@ jobs:
       - run_trailing_whitespace_check
       - run_daml_warts_check
       - run_todo_script
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile lint"
       - cleanup_sbt_test_job
@@ -111,6 +115,10 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_sbt_test_job
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
           cmd: "Test/compile bundle"

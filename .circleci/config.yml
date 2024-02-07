@@ -869,6 +869,10 @@ commands:
       test_names_file:
         type: string
     steps:
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile printTests"
           fail_on_error_in_output: false
@@ -1561,6 +1565,10 @@ jobs:
       - run_trailing_whitespace_check
       - run_daml_warts_check
       - run_todo_script
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile lint"
       - cleanup_sbt_test_job
@@ -1653,6 +1661,10 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_sbt_test_job
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
           cmd: "Test/compile bundle"
@@ -2200,6 +2212,10 @@ jobs:
       - restore_precompiled_classes
       - restore_frontend_node_modules
       - restore_daml_artifacts
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile"
           # TODO(#6153): we bumped this up to allow nix to rebuild everything if needed.
@@ -2316,6 +2332,10 @@ jobs:
       - restore_precompiled_classes
       - restore_frontend_node_modules
       - restore_daml_artifacts
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile"
       - run_bash_command_in_nix:
@@ -2412,6 +2432,10 @@ jobs:
       - restore_precompiled_classes
       - restore_frontend_node_modules
       - restore_daml_artifacts
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile"
       - run_bash_command_in_nix:

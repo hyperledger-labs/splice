@@ -740,6 +740,10 @@ commands:
       test_names_file:
         type: string
     steps:
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile printTests"
           fail_on_error_in_output: false
