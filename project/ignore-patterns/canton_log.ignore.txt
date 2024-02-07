@@ -114,4 +114,7 @@ Too many log messages detected..*AsynchronousMetricStorage
 # TODO(#9544): remove once the slowdown in Canton has been fixed
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 
+# TODO(#8147) Remove this once this is fixed in Canton
+Received a mediator request.*with some informees not being hosted by an active participant
+
 # Make sure to have a trailing newline
