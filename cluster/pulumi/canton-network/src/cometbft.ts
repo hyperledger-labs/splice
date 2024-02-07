@@ -179,6 +179,62 @@ class CometBftNodeConfig {
               publicKey: 'ykypzmTJei5w+DiNM67nCfb06FMpHliYU7FXpxDYJgY=',
             },
           },
+          'sv-6': {
+            id: '60c21490e82d6a1fb0c35b9a04e4f64ae00ce5c0',
+            privateKey:
+              'CtgCJPhaF9SzNIl0jMP18BIM9DseWY4Dlc8fRgBh2ygswJBWtSCcJT4YQBXrjQlpQMMl8gaYg8sK2+bbMw0LMw==',
+            identifier: this.nodeIdentifier,
+            externalAddress: this.p2pExternalAddress(6),
+            istioPort: this.istioExternalPort(6),
+            validator: {
+              keyAddress: 'DC41F08916D8C41B931F9037E6F2571C58D0E01A',
+              privateKey:
+                'RlLIq1RqLGHh2a9XG3BtXRstOmw4avIFA3WzVJaGsXjAAUSM7xfipoPp1EzVNK9aNf5IxegsSogiOqpZSLURMg==',
+              publicKey: 'wAFEjO8X4qaD6dRM1TSvWjX+SMXoLEqIIjqqWUi1ETI=',
+            },
+          },
+          'sv-7': {
+            id: '81f3b7d26ae796d369fbf42481a65c6265b41e8c',
+            privateKey:
+              'VQBBlN8oYVR4vxr8OjF/Q2YTKJVBCpa/048YDp8Gn2PtugPDFiJVxcpZ2ozkQsQ+CXl4IVEmhpLshRO/QVWz9g==',
+            identifier: this.nodeIdentifier,
+            externalAddress: this.p2pExternalAddress(7),
+            istioPort: this.istioExternalPort(7),
+            validator: {
+              keyAddress: '66FA9399FF2E7AF2517E7CE2EDCA11F51C573F61',
+              privateKey:
+                'Vj9Z0txjW+4MM8AcnDezkQw+tLeJ0jKRRsj5xX9mvmxpZZJGAgAlJzek9rPz3O7bITKpG4pjlJjwS+m3+SW3vg==',
+              publicKey: 'aWWSRgIAJSc3pPaz89zu2yEyqRuKY5SY8Evpt/klt74=',
+            },
+          },
+          'sv-8': {
+            id: '404371a5f62773ca07925555c9fbb6287861947c',
+            privateKey:
+              '8/AM1nf0Hf5nJre5cBTfLhCmUG6YfFNCBaXrBJNi0pYSEzTcRJ5LNZKgQpP5a9aVYzQmCVVlaV2nfOJKzTWmFA==',
+            identifier: this.nodeIdentifier,
+            externalAddress: this.p2pExternalAddress(8),
+            istioPort: this.istioExternalPort(8),
+            validator: {
+              keyAddress: '5E35AE8D464FA92525BCC408C7827A943BDF4900',
+              privateKey:
+                '0IuhH2UTzhzYPbF3AQaSwp4WaHOYo/65Jr7lvxeAfqn9b9t8YL1LRV4q3HkgP0cUngk7x1Judj/ATwn7IRI7Fg==',
+              publicKey: '/W/bfGC9S0VeKtx5ID9HFJ4JO8dSbnY/wE8J+yESOxY=',
+            },
+          },
+          'sv-9': {
+            id: 'aeee969d0efb0784ea36b9ad743a2e5964828325',
+            privateKey:
+              'a5d4ZHxQkazrjZH3R6TVZYIFkBoWflC/RmkQCmhhRInWm7Ikj9wBEvdKJuPEWv78MSmOLi3pJuYchkKkbwcvrA==',
+            identifier: this.nodeIdentifier,
+            externalAddress: this.p2pExternalAddress(9),
+            istioPort: this.istioExternalPort(9),
+            validator: {
+              keyAddress: '06070D2FD47073BE1635C3DEB862A88669906847',
+              privateKey:
+                'yDch3FNnIHFJPGlUpOYecAtxlwAi3QBi7dELVC/ON3muR3ekkf6TCsO32Lxvcj1zVGrOeewV7k+54TeAHmdmDw==',
+              publicKey: 'rkd3pJH+kwrDt9i8b3I9c1RqznnsFe5PueE3gB5nZg8=',
+            },
+          },
         }
       : {};
 

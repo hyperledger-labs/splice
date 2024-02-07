@@ -10,11 +10,19 @@ const cnAuth0Cfg: Auth0Config = {
     'sv-3': 'SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk',
     'sv-4': 'CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN',
     'sv-5': 'RSgbsze3cGHipLxhPGtGy7fqtYgyefTb',
+    'sv-6': '3MO1BRMNqEiIntIM1YWwBRT1EPpKyGO6',
+    'sv-7': '4imYa3E6Q5JPdLjZxHatRDtV1Wurq7pK',
+    'sv-8': 'lQogWncLX7AIc2laUj8VVW6zwNJ169vR',
+    'sv-9': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
     sv1_validator: '7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov',
     sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
     sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
     sv4_validator: 'FqRozyrmu2d6dFQYC4J9uK8Y6SXCVrhL',
     sv5_validator: 'TdcDPsIwSXVw4rZmGqxl6Ifkn4neeOzW',
+    sv6_validator: '4pUXGkvvybNyTeWXEBlesr9qcYCQh2sh',
+    sv7_validator: '2cfFl6z5huY4rVYvxOEja8MvDdplYCDW',
+    sv8_validator: 'JYvSRekV1E5EUZ2sJ494YyHXbxR3OHIR',
+    sv9_validator: 'BABNqQ3m5ROTGJTlTHVlIckS3cwJ0M0w',
   },
 
   namespaceToUiToClientId: {
@@ -52,6 +60,26 @@ const cnAuth0Cfg: Auth0Config = {
       wallet: 'lcssSWnNbo9c0gj0SZVMncjfNJhbVaft',
       cns: 'lcssSWnNbo9c0gj0SZVMncjfNJhbVaft',
       sv: 'lcssSWnNbo9c0gj0SZVMncjfNJhbVaft',
+    },
+    'sv-6': {
+      wallet: 'In766kX3Vrdho1GWc4t7GFBJZKWnlxqu',
+      cns: 'In766kX3Vrdho1GWc4t7GFBJZKWnlxqu',
+      sv: 'In766kX3Vrdho1GWc4t7GFBJZKWnlxqu',
+    },
+    'sv-7': {
+      wallet: 'Crm2DAy06LERqR3G2rMEOAtabyHlVDcz',
+      cns: 'Crm2DAy06LERqR3G2rMEOAtabyHlVDcz',
+      sv: 'Crm2DAy06LERqR3G2rMEOAtabyHlVDcz',
+    },
+    'sv-8': {
+      wallet: 'KYTWN1NGGIV0TQsrOCHAZYEOSCtC2u1H',
+      cns: 'KYTWN1NGGIV0TQsrOCHAZYEOSCtC2u1H',
+      sv: 'KYTWN1NGGIV0TQsrOCHAZYEOSCtC2u1H',
+    },
+    'sv-9': {
+      wallet: 'LrcTKBVtJ2NmqEZvtGB3LcMWh4uopEle',
+      cns: 'LrcTKBVtJ2NmqEZvtGB3LcMWh4uopEle',
+      sv: 'LrcTKBVtJ2NmqEZvtGB3LcMWh4uopEle',
     },
   },
 

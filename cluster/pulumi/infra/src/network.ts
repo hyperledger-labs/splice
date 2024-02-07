@@ -161,6 +161,10 @@ function clusterCertificate(
           `*.sv-3.svc.${dnsName}`,
           `*.sv-4.svc.${dnsName}`,
           `*.sv-5.svc.${dnsName}`,
+          `*.sv-6.svc.${dnsName}`,
+          `*.sv-7.svc.${dnsName}`,
+          `*.sv-8.svc.${dnsName}`,
+          `*.sv-9.svc.${dnsName}`,
           `*.sv.svc.${dnsName}`,
         ],
         issuerRef: {

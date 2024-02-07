@@ -1355,7 +1355,7 @@ To bring the deployment down, run:
 ## Enabling additional SVs for Testing
 
 When deploying a cluster, it is possible to enable additional SVs beyond the typical 1-4, for the purpose of
-creating and testing larger networks. Currently this adds only 1 more, `sv-5` -- but more are planned.
+creating and testing larger networks. Currently this enables svs 5,6,7,8,9.
 
 To enable these additional SVs, set `ENABLE_TEST_SVS=1` for that cluster's env configuration, then `cncluster apply`.
 
