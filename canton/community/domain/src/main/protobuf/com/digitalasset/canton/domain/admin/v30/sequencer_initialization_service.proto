@@ -8,8 +8,6 @@ package com.digitalasset.canton.domain.admin.v30;
 import "com/digitalasset/canton/protocol/v30/sequencing.proto";
 import "com/digitalasset/canton/topology/admin/v30/topology_ext.proto";
 
-import "scalapb/scalapb.proto";
-
 // Service allowing a Domain node to initialize the sequencer instance.
 // Should typically only be exposed to the domain node and not all clients
 service SequencerInitializationService {
@@ -19,7 +17,7 @@ service SequencerInitializationService {
   // and will immediately attempt to use it.
   // If the request is received after the sequencer has been successfully initialized it should return successfully
   // if the domain_id matches the domain that the sequencer has been initialized for, otherwise it should fail.
-  rpc Initialize(InitializeSequencerRequest) returns (InitializeSequencerResponse);
+  rpc InitializeSequencer(InitializeSequencerRequest) returns (InitializeSequencerResponse);
 }
 
 // Includes sufficient detail for:

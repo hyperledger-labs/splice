@@ -8,7 +8,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{DomainTimeTrackerConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.domain.admin.v30.MediatorAdministrationServiceGrpc
-import com.digitalasset.canton.domain.api.v30.DomainTimeServiceGrpc
+import com.digitalasset.canton.time.admin.v30.DomainTimeServiceGrpc
 import com.digitalasset.canton.domain.mediator.store.{
   FinalizedResponseStore,
   MediatorDeduplicationStore,

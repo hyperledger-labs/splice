@@ -119,7 +119,7 @@ object EnterpriseMediatorAdministrationCommands {
         service: v30.MediatorInitializationServiceGrpc.MediatorInitializationServiceStub,
         request: v30.InitializeMediatorRequest,
     ): Future[v30.InitializeMediatorResponse] =
-      service.initialize(request)
+      service.initializeMediator(request)
     override def handleResponse(
         response: v30.InitializeMediatorResponse
     ): Either[String, Unit] =

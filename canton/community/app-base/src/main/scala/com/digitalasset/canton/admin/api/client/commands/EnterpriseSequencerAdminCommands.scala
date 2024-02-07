@@ -155,7 +155,7 @@ object EnterpriseSequencerAdminCommands {
         service: SequencerInitializationServiceGrpc.SequencerInitializationServiceStub,
         request: v30.InitializeSequencerRequest,
     ): Future[v30.InitializeSequencerResponse] =
-      service.initialize(request)
+      service.initializeSequencer(request)
 
     override def createRequest(): Either[String, v30.InitializeSequencerRequest] =
       Right(

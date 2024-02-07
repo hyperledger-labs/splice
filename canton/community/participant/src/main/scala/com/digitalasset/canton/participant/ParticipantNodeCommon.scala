@@ -19,7 +19,7 @@ import com.digitalasset.canton.concurrent.{
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{DbConfig, H2DbConfig}
 import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi, SyncCryptoApiProvider}
-import com.digitalasset.canton.domain.api.v30.DomainTimeServiceGrpc
+import com.digitalasset.canton.time.admin.v30.DomainTimeServiceGrpc
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrapCommon}
 import com.digitalasset.canton.health.MutableHealthComponent
 import com.digitalasset.canton.http.metrics.HttpApiMetrics

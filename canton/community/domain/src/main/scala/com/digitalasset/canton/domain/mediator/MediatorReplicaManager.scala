@@ -6,7 +6,7 @@ package com.digitalasset.canton.domain.mediator
 import cats.data.EitherT
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.domain.admin.v30.MediatorAdministrationServiceGrpc
-import com.digitalasset.canton.domain.api.v30
+import com.digitalasset.canton.time.admin.v30
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
