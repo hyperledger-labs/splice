@@ -63,10 +63,6 @@ Synchronous event processing failed for event batch with sequencer counters.*
 # Detailed API logging is extremely useful for debugging so we turn this on in our tests.
 Your detailed API event logging is turned on but you are doing quite a few concurrent requests.
 
-# TODO(#8406): Remove this once fixed by canton
-# Sometimes DomainOutboxQueue Pending is not empty even though it requires to be. Will be fixed by canton #15061.
-.*tried to dequeue while pending wasn't empty.*
-
 # TODO(#8295): Remove this once fixed in Canton
 UNAUTHORIZED_TOPOLOGY_TRANSACTION
 
@@ -84,8 +80,6 @@ Sender .* of send request .* is not registered so cannot send or receive events\
 
 # This is happenening during party migration and is expected. We can remove this in the future if/when canton detects and handles this warning
 .*Received a commitment where we have no shared contract.*ACS_MISMATCH_NO_SHARED_CONTRACTS.*
-# TODO(#9125): happens until we import the dump acs, check in the future if we can remove it
-sv\dParticipantUpgrade.*ACS_COMMITMENT_MISMATCH.*
 
 # globalMediatorSv4 is offboarded at this time
 c.d.c.t.TimeProofRequestSubmitterImpl:mediatorx=globalMediatorSv4Offboarding
