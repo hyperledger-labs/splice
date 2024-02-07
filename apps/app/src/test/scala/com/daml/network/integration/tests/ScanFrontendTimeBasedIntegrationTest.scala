@@ -17,7 +17,8 @@ class ScanFrontendTimeBasedIntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil
-    with DomainFeesTestUtil {
+    with DomainFeesTestUtil
+    with TriggerTestUtil {
 
   val coinPrice = 2
 
@@ -30,7 +31,7 @@ class ScanFrontendTimeBasedIntegrationTest
         CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
-      ) // TODO (#9647): re-enable trigger and check the values.
+      )
 
   def compareLeaderboardTable(
       resultRowClassName: String,
@@ -328,5 +329,74 @@ class ScanFrontendTimeBasedIntegrationTest
         )
       }
     }
+
+    "see the validator faucet leaderboard" in { implicit env =>
+      waitForWalletUser(aliceValidatorWalletClient)
+      waitForWalletUser(bobValidatorWalletClient)
+      val aliceValidatorWalletParty = aliceValidatorWalletClient.userStatus().party
+      val bobValidatorWalletParty = bobValidatorWalletClient.userStatus().party
+
+      val openRounds = sv1ScanBackend
+        .getOpenAndIssuingMiningRounds()
+        ._1
+        .filter(_.payload.opensAt.isBefore(env.environment.clock.now.toInstant))
+
+      clue("Alice starts claiming Faucet coupons") {
+        setTriggersWithin(
+          Seq.empty,
+          Seq(aliceValidatorBackend.validatorAutomation.trigger[ReceiveFaucetCouponTrigger]),
+        ) {
+          eventually() {
+            advanceTimeByPollingInterval(sv1Backend)
+            aliceValidatorWalletClient
+              .listValidatorFaucetCoupons() should have length openRounds.length.toLong
+          }
+        }
+      }
+
+      openRounds.foreach(_ => advanceRoundsByOneTick)
+      advanceRoundsByOneTick
+      eventually() {
+        aliceValidatorWalletClient.listValidatorFaucetCoupons() should have length 0
+      }
+
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck(
+          "Go to Scan UI for validator faucets leaderboard",
+          go to s"http://localhost:${scanUIPort}/validator-faucets-leaderboard",
+        )(
+          "See the entry for the faucet in the leaderboard",
+          _ => {
+            val firstCollectedInRound = openRounds
+              .minByOption(_.contract.payload.round.number)
+              .toList
+              .loneElement
+              .payload
+              .round
+              .number
+            val lastCollectedInRound =
+              openRounds
+                .maxByOption(_.contract.payload.round.number)
+                .toList
+                .loneElement
+                .payload
+                .round
+                .number
+            val actual =
+              findAll(className("validator-faucets-leaderboard-row")).toSeq.map(seleniumText)
+            actual should have length 4
+            actual.head should be(
+              s"${aliceValidatorWalletParty} ${openRounds.size} 0 $firstCollectedInRound $lastCollectedInRound"
+            )
+            actual.tail should contain theSameElementsAs Seq(
+              sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+              splitwellValidatorBackend.getValidatorPartyId().toProtoPrimitive,
+              bobValidatorWalletParty,
+            ).map(party => s"$party 0 0 0 0")
+          },
+        )
+      }
+    }
+
   }
 }

@@ -17,16 +17,10 @@ import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem
-import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.store.Limit
 
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.http.v0.definitions.BalanceChange
-import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
-
-class InMemoryScanIntegrationTest extends ScanIntegrationTest {
-  registerPlugin(new UseInMemoryStores(loggerFactory))
-}
 
 class ScanIntegrationTest
     extends CNNodeIntegrationTest
@@ -44,12 +38,6 @@ class ScanIntegrationTest
       .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.withPausedTrigger[CollectRewardsAndMergeCoinsTrigger]
-        )(config)
-      )
-      // TODO (#9647): re-enable trigger and check the values.
-      .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
       .addConfigTransforms((_, config) =>
@@ -547,7 +535,7 @@ class ScanIntegrationTest
     val (appRewardAmount, validatorRewardAmount) =
       getRewardCouponsValue(appRewardCoupons, validatorRewardCoupons, true)
 
-    clue("Checking app and validator reward amounts") {
+    clue("Checking app and validator reward and faucet amounts") {
       eventually() {
         bobValidatorWalletClient.listAppRewardCoupons() should have size 0
         bobValidatorWalletClient.listValidatorRewardCoupons() should have size 0
@@ -569,8 +557,11 @@ class ScanIntegrationTest
           .flatMap(_.sender.inputValidatorRewardAmount)
           .map(BigDecimal(_))
           .filter(_ != zero)
-        val inputValidatorAmount = inputValidatorAmounts.loneElement
-        inputValidatorAmount shouldBe validatorRewardAmount
+        val inputValidatorAmount = inputValidatorAmounts
+        inputValidatorAmount should contain theSameElementsAs (Seq(
+          validatorRewardAmount + 2.85
+        ) ++ Seq
+          .fill(2)(BigDecimal(2.85).setScale(10))) // 2 validator faucets
       }
     }
   }

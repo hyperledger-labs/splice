@@ -18,6 +18,7 @@ import Activity from './routes/activity';
 import AppLeaderboard from './routes/appLeaderboard';
 import DomainFeesLeaderboard from './routes/domainFeesLeaderboard';
 import Root from './routes/root';
+import ValidatorFaucetsLeaderboard from './routes/validatorFaucetsLeaderboard';
 import ValidatorLeaderboard from './routes/validatorLeaderboard';
 import { config } from './utils';
 
@@ -49,6 +50,7 @@ const router = createBrowserRouter(
         <Route path="app-leaderboard" element={<AppLeaderboard />} />
         <Route path="validator-leaderboard" element={<ValidatorLeaderboard />} />
         <Route path="domain-fees-leaderboard" element={<DomainFeesLeaderboard />} />
+        <Route path="validator-faucets-leaderboard" element={<ValidatorFaucetsLeaderboard />} />
       </Route>
     </Route>
   )

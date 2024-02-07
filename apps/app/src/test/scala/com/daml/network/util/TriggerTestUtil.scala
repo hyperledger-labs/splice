@@ -1,8 +1,9 @@
 package com.daml.network.util
 
 import com.daml.network.automation.Trigger
+import com.digitalasset.canton.BaseTest
 
-trait TriggerTestUtil {
+trait TriggerTestUtil { self: BaseTest =>
 
   /** Enable/Disable triggers before executing a code block
     */
@@ -11,12 +12,12 @@ trait TriggerTestUtil {
       triggersToResumeAtStart: Seq[Trigger],
   )(codeBlock: => T) = {
     try {
-      triggersToPauseAtStart.map(_.pause())
-      triggersToResumeAtStart.map(_.resume())
+      triggersToPauseAtStart.foreach(_.pause().futureValue)
+      triggersToResumeAtStart.foreach(_.resume())
       codeBlock
     } finally {
-      triggersToPauseAtStart.map(_.resume())
-      triggersToResumeAtStart.map(_.pause())
+      triggersToPauseAtStart.foreach(_.resume())
+      triggersToResumeAtStart.foreach(_.pause().futureValue)
     }
   }
 

@@ -6,6 +6,7 @@ import useGetCoinRules from './useGetCoinRules';
 import useGetRoundOfLatestData from './useGetRoundOfLatestData';
 import useGetSvcPartyId from './useGetSvcPartyId';
 import useGetTopValidatorsByPurchasedTraffic from './useGetTopValidatorsByPurchasedTraffic';
+import useGetTopValidatorsByValidatorFaucets from './useGetTopValidatorsByValidatorFaucets';
 import useGetTopValidatorsByValidatorRewards from './useGetTopValidatorsByValidatorRewards';
 import useListCnsEntries, { useListCnsEntriesFromResponse } from './useListCnsEntries';
 import useLookupCnsEntryByName, {
@@ -32,6 +33,7 @@ export {
   useGetSvcPartyId,
   useGetTopValidatorsByValidatorRewards,
   useGetTopValidatorsByPurchasedTraffic,
+  useGetTopValidatorsByValidatorFaucets,
   useLookupFeaturedAppRight,
   useLookupFeaturedAppRightBuilder,
   useActivity,

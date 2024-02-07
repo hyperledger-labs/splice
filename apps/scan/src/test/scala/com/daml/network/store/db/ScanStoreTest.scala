@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_Coin
 import com.daml.network.codegen.java.cc.coinrules.BuyMemberTrafficResult
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.cc.validatorlicense.FaucetState
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.cns.CnsEntry
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
@@ -1492,4 +1493,44 @@ class DbScanStoreTest
     for {
       _ <- resetAllCnAppTables(storage)
     } yield ()
+
+  // TODO (#8152): move with the other tests. In-memory does not implement getTopValidatorLicenses
+  "getTopValidatorLicenses" should {
+
+    "return the top `limit` validator licenses by number of rounds collected" in {
+      // total 1001
+      val first = validatorLicense(
+        userParty(9001),
+        svcParty,
+        Some(new FaucetState(new Round(0), new Round(1000), 0L)),
+      )
+      // total 1000
+      val almostFirst = validatorLicense(
+        userParty(2),
+        svcParty,
+        Some(new FaucetState(new Round(0), new Round(1000), 1L)),
+      )
+      // total 681
+      val third = validatorLicense(
+        userParty(2),
+        svcParty,
+        Some(new FaucetState(new Round(700), new Round(1000), 20L)),
+      )
+      // total 2
+      val outOfLimit = validatorLicense(
+        userParty(6),
+        svcParty,
+        Some(new FaucetState(new Round(999), new Round(1000), 0L)),
+      )
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(outOfLimit)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(almostFirst)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(first)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(third)(store.multiDomainAcsStore)
+        result <- store.getTopValidatorLicenses(PageLimit.tryCreate(3))
+      } yield result shouldBe Seq(first, almostFirst, third)
+    }
+
+  }
 }

@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
@@ -340,6 +341,11 @@ class InMemoryScanStore(
         .take(limit)
     }
   }
+
+  override def getTopValidatorLicenses(limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] =
+    throw new NotImplementedError("Not gonna bother.")
 
   override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit
       tc: TraceContext

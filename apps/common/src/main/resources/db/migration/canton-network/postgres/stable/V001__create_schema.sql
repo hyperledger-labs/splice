@@ -318,7 +318,10 @@ create table scan_acs_store
     member_traffic_member         text,
 
     -- the traffic purchased in a MemberTraffic
-    total_traffic_purchased       bigint
+    total_traffic_purchased       bigint,
+
+    -- the rounds collected in a ValidatorLicense's faucetState. Used to sort for top validators by faucets collected.
+    validator_license_rounds_collected bigint
 );
 
 -- lookup validator traffic
@@ -350,6 +353,11 @@ create index scan_acs_store_sid_deo_den
 create index scan_acs_store_sid_tid_mtm
     on scan_acs_store (store_id, template_id_qualified_name, member_traffic_member)
     where member_traffic_member is not null;
+
+-- top validator licenses by rounds collected
+create index scan_acs_store_sid_tid_vlrc
+    on scan_acs_store (store_id, template_id_qualified_name, validator_license_rounds_collected)
+    where validator_license_rounds_collected is not null;
 
 create table scan_txlog_store
 (

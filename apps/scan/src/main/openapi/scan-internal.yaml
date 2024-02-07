@@ -286,6 +286,29 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
+  /v0/top-validators-by-validator-faucets:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getTopValidatorsByValidatorFaucets"
+      parameters:
+        - in: query
+          name: limit
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetTopValidatorsByValidatorFaucetsResponse"
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+        "404":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/top-validators-by-purchased-traffic:
     get:
       tags: [scan]
@@ -736,6 +759,32 @@ components:
           type: string
         rewards:
           type: string
+    GetTopValidatorsByValidatorFaucetsResponse:
+      type: object
+      required: [ "validatorsByReceivedFaucets" ]
+      properties:
+        validatorsByReceivedFaucets:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidatorReceivedFaucets"
+    ValidatorReceivedFaucets:
+      type: object
+      required: [ "validator", "numRoundsCollected", "numRoundsMissed", "firstCollectedInRound", "lastCollectedInRound" ]
+      properties:
+        validator:
+          type: string
+        numRoundsCollected:
+          type: integer
+          format: int64
+        numRoundsMissed:
+          type: integer
+          format: int64
+        firstCollectedInRound:
+          type: integer
+          format: int64
+        lastCollectedInRound:
+          type: integer
+          format: int64
     GetTopValidatorsByPurchasedTrafficResponse:
       type: object
       required: ["validatorsByPurchasedTraffic"]

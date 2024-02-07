@@ -6,15 +6,17 @@ import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
 import com.daml.network.scan.store.db.ScanTables.txLogTableName
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
+import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
-import com.daml.network.util.{ContractWithState, QualifiedName, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -554,6 +556,25 @@ class DbScanStore(
         )
       }
     } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
+  }
+
+  override def getTopValidatorLicenses(limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[ValidatorLicense.ContractId, ValidatorLicense]]] = waitUntilAcsIngested {
+    for {
+      rows <- storage
+        .query(
+          (selectFromAcsTable(ScanTables.acsTableName) ++
+            sql"""
+                where store_id = $storeId
+                  and template_id_qualified_name = ${QualifiedName(ValidatorLicense.TEMPLATE_ID)}
+                order by validator_license_rounds_collected desc limit ${sqlLimit(limit)}
+              """).toActionBuilder.as[SelectFromAcsTableResult],
+          "getTopValidatorLicenses",
+        )
+    } yield applyLimit("getTopValidatorLicenses", limit, rows).map(
+      contractFromRow(ValidatorLicense.COMPANION)(_)
+    )
   }
 
   override def getTotalPurchasedMemberTraffic(memberId: Member, domainId: DomainId)(implicit

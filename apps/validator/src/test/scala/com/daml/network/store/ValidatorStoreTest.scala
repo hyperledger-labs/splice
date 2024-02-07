@@ -1,9 +1,6 @@
 package com.daml.network.store
 
-import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  validatorlicense as validatorLicenseCodegen,
-}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.topology.DomainId
 
@@ -28,8 +25,6 @@ import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext
 import scala.concurrent.Future
 import com.daml.network.http.v0.definitions
 import io.circe.syntax.*
-
-import java.util.Optional
 
 abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
 
@@ -64,7 +59,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
         val signatories = Seq(svcParty, validator) // actually, validator is only observer
         for {
           store <- mkStore()
-          license1 = validatorLicense()
+          license1 = validatorLicense(validator, sponsor)
           _ <- dummyDomain.create(license1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
           )
@@ -465,21 +460,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     contract(
       identifier = templateId,
       contractId = new walletCodegen.WalletAppInstall.ContractId(nextCid()),
-      payload = template,
-    )
-  }
-
-  private def validatorLicense() = {
-    val templateId = validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID
-    val template = new validatorLicenseCodegen.ValidatorLicense(
-      validator.toProtoPrimitive,
-      sponsor.toProtoPrimitive,
-      svcParty.toProtoPrimitive,
-      Optional.empty(),
-    )
-    contract(
-      identifier = templateId,
-      contractId = new validatorLicenseCodegen.ValidatorLicense.ContractId(nextCid()),
       payload = template,
     )
   }

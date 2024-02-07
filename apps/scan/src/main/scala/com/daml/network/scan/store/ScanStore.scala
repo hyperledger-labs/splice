@@ -120,6 +120,10 @@ trait ScanStore
       tc: TraceContext
   ): Future[Seq[ValidatorPurchasedTraffic]]
 
+  def getTopValidatorLicenses(limit: Limit)(implicit tc: TraceContext): Future[Seq[
+    Contract[cc.validatorlicense.ValidatorLicense.ContractId, cc.validatorlicense.ValidatorLicense]
+  ]]
+
   def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[cc.globaldomain.BaseRateTrafficLimits] =
@@ -291,6 +295,16 @@ object ScanStore {
               .fold(e => throw new IllegalArgumentException(e), Some(_)),
             totalTrafficPurchased = Some(contract.payload.totalPurchased),
           )
+        },
+        mkFilter(cc.validatorlicense.ValidatorLicense.COMPANION)(co => co.payload.svc == svc) {
+          contract =>
+            val roundsCollected = contract.payload.faucetState.map { faucetState =>
+              faucetState.lastReceivedFor.number - faucetState.firstReceivedFor.number - faucetState.numCouponsMissed + 1L
+            }
+            ScanAcsStoreRowData(
+              contract = contract,
+              validatorLicenseRoundsCollected = Some(roundsCollected.orElse(0L)),
+            )
         },
       ),
     )

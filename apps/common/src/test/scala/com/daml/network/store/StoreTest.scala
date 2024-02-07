@@ -225,6 +225,25 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     Numeric.assertFromBigDecimal(Numeric.Scale.assertFromInt(scale), value)
   }
 
+  protected def validatorLicense(
+      validator: PartyId,
+      sponsor: PartyId,
+      faucetState: Option[validatorLicenseCodegen.FaucetState] = None,
+  ) = {
+    val templateId = validatorLicenseCodegen.ValidatorLicense.TEMPLATE_ID
+    val template = new validatorLicenseCodegen.ValidatorLicense(
+      validator.toProtoPrimitive,
+      sponsor.toProtoPrimitive,
+      svcParty.toProtoPrimitive,
+      faucetState.toJava,
+    )
+    contract(
+      identifier = templateId,
+      contractId = new validatorLicenseCodegen.ValidatorLicense.ContractId(nextCid()),
+      payload = template,
+    )
+  }
+
   protected def validatorRewardCoupon(
       round: Int,
       user: PartyId,
