@@ -24,7 +24,7 @@ import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.store.{StoredTopologyTransactionsX, TopologyStoreId}
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status.Code
@@ -570,12 +570,7 @@ class HttpSvHandler(
       // TODO(#5339) Check if we need to be careful at which offset we query our snapshot.
       sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(dummyTxSequencedAt)
       topologySnapshot <- sequencerAdminConnection
-        .getTopologySnapshot(globalDomain)
-        .map(txns =>
-          StoredTopologyTransactionsX(
-            txns.result.filter(_.sequenced.value <= sequencerSnapshot.lastTs)
-          )
-        )
+        .getSequencerTopologySnapshot(globalDomain, sequencerSnapshot.lastTs)
     } yield definitions.SequencerSnapshot(
       topologySnapshot = Base64.getEncoder.encodeToString(topologySnapshot.toProtoV30.toByteArray),
       sequencerSnapshot = Base64.getEncoder.encodeToString(sequencerSnapshot.toByteArray),

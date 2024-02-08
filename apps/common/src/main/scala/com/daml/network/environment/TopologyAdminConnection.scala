@@ -35,6 +35,7 @@ import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionX,
+  StoredTopologyTransactionsX,
   TimeQueryX,
   TopologyStoreId,
 }
@@ -382,6 +383,22 @@ abstract class TopologyAdminConnection(
       )
     )
   }
+
+  def getSequencerTopologySnapshot(domainId: DomainId, timestamp: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[GenericStoredTopologyTransactionsX] =
+    getTopologySnapshot(domainId, from = None, until = None)
+      .map(txns =>
+        StoredTopologyTransactionsX(
+          // Note that we explicitly do not specify an until and filter afterwards.
+          // until filters on validFrom whereas we need to filter on sequenced.
+          txns.result
+            .filter(_.sequenced.value <= timestamp)
+        )
+          // Turn it into a snapshot which sets validUntil = None
+          // in case we filtered out a newer transaction.
+          .asSnapshotAtMaxEffectiveTime
+      )
 
   def lookupTrafficControlState(
       domainId: DomainId,
