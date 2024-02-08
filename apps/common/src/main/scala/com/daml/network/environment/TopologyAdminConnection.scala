@@ -363,11 +363,10 @@ abstract class TopologyAdminConnection(
       }
     }
 
-  def getTopologySnapshot(
+  private def getSnapshot(
       domainId: DomainId,
-      from: Option[CantonTimestamp] = None,
-      until: Option[CantonTimestamp] = None,
-      proposals: Boolean = false,
+      timestamp: CantonTimestamp,
+      proposals: Boolean,
   )(implicit
       traceContext: TraceContext
   ): Future[GenericStoredTopologyTransactionsX] = {
@@ -376,36 +375,31 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = proposals,
-          timeQuery = TimeQueryX.Range(from, until),
+          timeQuery = TimeQueryX.Range(from = None, until = None),
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
         )
       )
+    ).map(txns =>
+      StoredTopologyTransactionsX(
+        // Note that we explicitly do not specify an until in the call to ListAll and filter afterwards.
+        // until filters on validFrom whereas we need to filter on sequenced.
+        txns.result
+          .filter(_.sequenced.value <= timestamp)
+      )
+        // Turn it into a snapshot which sets validUntil = None
+        // in case we filtered out a newer transaction.
+        .asSnapshotAtMaxEffectiveTime
     )
   }
 
-  def getSequencerTopologySnapshot(domainId: DomainId, timestamp: CantonTimestamp)(implicit
+  def getTopologySnapshot(domainId: DomainId, timestamp: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[GenericStoredTopologyTransactionsX] = {
-    def getSnapshot(proposals: Boolean) = {
-      getTopologySnapshot(domainId, from = None, until = None, proposals = proposals)
-        .map(txns =>
-          StoredTopologyTransactionsX(
-            // Note that we explicitly do not specify an until and filter afterwards.
-            // until filters on validFrom whereas we need to filter on sequenced.
-            txns.result
-              .filter(_.sequenced.value <= timestamp)
-          )
-            // Turn it into a snapshot which sets validUntil = None
-            // in case we filtered out a newer transaction.
-            .asSnapshotAtMaxEffectiveTime
-        )
-    }
-
     for {
-      proposals <- getSnapshot(proposals = true)
-      authorizedTxs <- getSnapshot(proposals = false)
+      proposals <- getSnapshot(domainId, timestamp, proposals = true)
+      authorizedTxs <- getSnapshot(domainId, timestamp, proposals = false)
     } yield {
       StoredTopologyTransactionsX(
         (proposals.result ++ authorizedTxs.result).sortBy(_.sequenced.value)

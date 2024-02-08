@@ -570,7 +570,7 @@ class HttpSvHandler(
       // TODO(#5339) Check if we need to be careful at which offset we query our snapshot.
       sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(dummyTxSequencedAt)
       topologySnapshot <- sequencerAdminConnection
-        .getSequencerTopologySnapshot(globalDomain, sequencerSnapshot.lastTs)
+        .getTopologySnapshot(globalDomain, sequencerSnapshot.lastTs)
     } yield definitions.SequencerSnapshot(
       topologySnapshot = Base64.getEncoder.encodeToString(topologySnapshot.toProtoV30.toByteArray),
       sequencerSnapshot = Base64.getEncoder.encodeToString(sequencerSnapshot.toByteArray),

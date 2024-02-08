@@ -152,14 +152,11 @@ object DomainMigrationDump {
         .getNodeIdentitiesDump()
       globalDomain <- svcStore.getSvcRules().map(_.domain)
       topologySnapshotWithProposals <- domainNode.sequencerAdminConnection
-        .getSequencerTopologySnapshot(
+        .getTopologySnapshot(
           globalDomain,
           tryFromInstant(domainPausedTime),
         )
-      // TODO(#9870): Consider removing this and fixing GlobalDomainMigrationIntegrationTest to work without it
-      topologySnapshot = StoredTopologyTransactionsX(
-        topologySnapshotWithProposals.result.filter(_.transaction.isProposal == false)
-      )
+      topologySnapshot = topologySnapshotWithProposals.filter(_.isProposal == false)
       acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
         Set(svcStore.key.svParty, svcStore.key.svcParty)
       )
