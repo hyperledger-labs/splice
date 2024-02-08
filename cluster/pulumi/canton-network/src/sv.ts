@@ -39,6 +39,7 @@ import {
 } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { installPostgresMetrics, Postgres } from './postgres';
+import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svconfs';
 import { installValidatorApp, installValidatorSecrets, ValidatorSecrets } from './validator';
 
 export function installSvKeySecret(
@@ -80,7 +81,7 @@ export type SvOnboarding =
       sponsorApiUrl: string;
     };
 
-export type ApprovedSvIdentity = { name: string; publicKey: string };
+export type ApprovedSvIdentity = { name: string; publicKey: string | pulumi.Output<string> };
 
 export type SequencerPruningConfig = {
   enabled: boolean;
@@ -88,11 +89,12 @@ export type SequencerPruningConfig = {
   retentionPeriod?: string;
 };
 
-export type SvConfig = {
+export interface SvConfig extends StaticSvConfig {
   auth0Client: Auth0Client;
-  nodename: string;
-  onboardingName: string;
-  validatorWalletUser: string;
+  nodeConfigs: {
+    founder: StaticCometBftConfigWithNodeName;
+    peers: StaticCometBftConfigWithNodeName[];
+  };
   onboarding: SvOnboarding;
   approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
@@ -101,9 +103,8 @@ export type SvConfig = {
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   sequencerPruningConfig: SequencerPruningConfig;
-  auth0ValidatorAppName: string;
   splitPostgresInstances: boolean;
-};
+}
 
 async function getAcsBootstrappingDump(xns: ExactNamespace, config: BootstrappingDumpConfig) {
   const file = await getLatestSvcAcsDumpFile(xns, config);
@@ -115,25 +116,27 @@ async function getAcsBootstrappingDump(xns: ExactNamespace, config: Bootstrappin
 
 const clusterUrl = `${CLUSTER_BASENAME}.network.canton.global`;
 
-export async function installSvNode(
-  config: SvConfig,
-  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
-  cometBftSyncSource?: k8s.helm.v3.Release
-): Promise<{
+export type InstalledSv = {
   validatorApp: Resource;
   svApp: Release;
   scan: Release;
   globalDomain: GlobalDomainNode;
   participant: Release;
-}> {
-  const xns = exactNamespace(config.nodename);
+};
+
+export async function installSvNode(
+  config: SvConfig,
+  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
+  cometBftSyncSource?: k8s.helm.v3.Release
+): Promise<InstalledSv> {
+  const xns = exactNamespace(config.nodeName);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
-    await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodename),
+    await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodeName),
   ];
 
   const auth0UISecrets: pulumi.Resource[] = [
-    await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodename),
+    await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodeName),
   ];
 
   config.backupConfig = config.backupConfig
@@ -186,8 +189,12 @@ export async function installSvNode(
     globalDomainUpgradeConfig,
     defaultPostgres,
     {
-      name: config.nodename,
+      name: config.nodeName,
       onboardingName: config.onboardingName,
+      nodeConfigs: {
+        ...config.nodeConfigs,
+        self: { ...config.cometBft, nodeName: config.nodeName },
+      },
       syncSource: cometBftSyncSource,
     },
     config,
@@ -243,7 +250,7 @@ async function installValidator(
 ) {
   const validatorPostgres =
     defaultPostgres || postgres.installPostgres(xns, `validator-${id}-pg`, true);
-  const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodename)}_${id}`;
+  const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}_${id}`;
   const globalDomainUrl = `https://sequencer-${id}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
 
   const validator = await installValidatorApp({
@@ -279,6 +286,11 @@ function installDomainSpecificComponents(
   cometbft: {
     name: string;
     onboardingName: string;
+    nodeConfigs: {
+      self: StaticCometBftConfigWithNodeName;
+      founder: StaticCometBftConfigWithNodeName;
+      peers: StaticCometBftConfigWithNodeName[];
+    };
     syncSource?: Release;
   },
   svConfig: SvConfig,
@@ -359,7 +371,7 @@ function installDomainSpecificComponents(
     const scan = installScan(
       xns,
       id,
-      svConfig.nodename,
+      svConfig.nodeName,
       globalDomainNode,
       svApp,
       participant,
@@ -400,7 +412,7 @@ function installSvApp(
 ) {
   const svAppPostgres =
     defaultPostgres || postgres.installPostgres(xns, `sv-app-${domainId}-pg`, true);
-  const svAppName = sanitizedForPostgres(`${config.nodename}-${domainId}`);
+  const svAppName = sanitizedForPostgres(`${config.nodeName}-${domainId}`);
 
   const svValues = {
     domainId: domainId.toString(),
@@ -419,11 +431,11 @@ function installSvApp(
         sequencerAddress: globalDomain.namespaceInternalSequencerAddress,
         mediatorAddress: globalDomain.namespaceInternalMediatorAddress,
         // required to prevent participants from using new nodes when the domain is upgraded
-        sequencerPublicUrl: `https://sequencer-${domainId}.${config.nodename}.svc.${CLUSTER_BASENAME}.network.canton.global`,
+        sequencerPublicUrl: `https://sequencer-${domainId}.${config.nodeName}.svc.${CLUSTER_BASENAME}.network.canton.global`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     scan: {
-      publicUrl: `https://scan-${domainId}.${config.nodename}.svc.${clusterUrl}`,
+      publicUrl: `https://scan-${domainId}.${config.nodeName}.svc.${clusterUrl}`,
     },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
       expiresIn: onboarding.expiresIn,

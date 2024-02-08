@@ -1355,9 +1355,9 @@ To bring the deployment down, run:
 ## Enabling additional SVs for Testing
 
 When deploying a cluster, it is possible to enable additional SVs beyond the typical 1-4, for the purpose of
-creating and testing larger networks. Currently this enables svs 5,6,7,8,9.
+creating and testing larger networks. Currently a max value of `9` is supported.
 
-To enable these additional SVs, set `ENABLE_TEST_SVS=1` for that cluster's env configuration, then `cncluster apply`.
+To enable these additional SVs, set `SVC_SIZE=<num>` for that cluster's env configuration, then `cncluster apply`.
 
 Note that the keys for the extra SVs need to be present in the Google Cloud project that the cluster is running in. Currently the keys are only uploaded to `da-cn-scratchnet`.
 

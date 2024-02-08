@@ -1,25 +1,21 @@
-import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
   BackupConfig,
   bootstrapDataBucketSpec,
   BootstrappingDumpConfig,
-  CnInput,
   domainFeesConfig,
   envFlag,
   isDevNet,
-  loadYamlFromFile,
-  REPO_ROOT,
+  requireEnv,
   sequencerPruningConfig,
-  SvIdKey,
-  svKeyFromSecret,
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
 import { installDocs } from './docs';
 import { GlobalDomainUpgradeConfig } from './globalDomainNode';
 import { installSplitwell } from './splitwell';
-import { installSvNode, SvOnboarding } from './sv';
+import { Svc } from './svc';
+import svconfs from './svconfs';
 import { installValidator1 } from './validator1';
 
 /// Toplevel Chart Installs
@@ -34,11 +30,6 @@ if (approveSvRunbook) {
   console.error('Approving SV used in SV runbook');
 }
 
-const singleSv = envFlag('SINGLE_SV') || !isDevNet;
-if (singleSv) {
-  console.error('Launching with a single SV');
-}
-
 // This flag determines whether to split postgres instances per app, or have one per namespace.
 // By default, we split instances on CloudSQL (where we expect longer-living environments, thus want to support backup&recovery),
 // but not on k8s-deployed postgres (where we optimize for faster deployment).
@@ -50,20 +41,11 @@ type BootstrapCliConfig = {
   date: string;
 };
 
-type ApprovedSvIdentity = {
-  name: string;
-  publicKey: string;
-};
-
 const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
   : undefined;
 
 const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = GlobalDomainUpgradeConfig.fromEnv();
-
-const sv2Key = svKeyFromSecret('sv2');
-const sv3Key = svKeyFromSecret('sv3');
-const sv4Key = svKeyFromSecret('sv4');
 
 const svRunbookApprovedSvIdentities = [
   {
@@ -72,72 +54,6 @@ const svRunbookApprovedSvIdentities = [
       'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==',
   },
 ];
-
-const sv234NameSet = new Set<string>([
-  'Canton-Foundation-2',
-  'Canton-Foundation-3',
-  'Canton-Foundation-4',
-  'Canton-Foundation-5',
-  'Canton-Foundation-6',
-  'Canton-Foundation-7',
-  'Canton-Foundation-8',
-  'Canton-Foundation-9',
-]);
-
-const allApprovedSvIdentities = (
-  isDevNet
-    ? loadYamlFromFile(
-        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
-      )
-    : loadYamlFromFile(
-        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
-      )
-).approvedSvIdentities
-  .concat(approveSvRunbook ? svRunbookApprovedSvIdentities : [])
-  .concat(
-    envFlag('ENABLE_TEST_SVS')
-      ? [
-          {
-            name: 'Canton-Foundation-5',
-            publicKey:
-              'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEcqp8MagXVcEra7PySl8mZk4hgVYpEX0FZKtSKZKYEaUDw5In/LmVt4c/M39SyTI2fcn7ZxRGkLXThzA3A6Mksg==',
-          },
-          {
-            name: 'Canton-Foundation-6',
-            publicKey:
-              'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE/mXrevpMIq/nfkzy7cdkQmjqPZOJWl9hS1lKfbz033Ethk0N4PaYZLMTYEVTdsuOqBmvqRz1ZFP5r+HZIJWCcQ==',
-          },
-          {
-            name: 'Canton-Foundation-7',
-            publicKey:
-              'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEW0oHwJ7ol7EmAjuAVBxrss7xSHZwLYWZdpXcQbDQEyxrwlBOgxEet4Wp2kSO5RUZqy2RNM/6isSvqV/opj4bjg==',
-          },
-          {
-            name: 'Canton-Foundation-8',
-            publicKey:
-              'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEF3Q65PI/YMMYOBkJIk0q3NlFO0FJPUIFjZvWLa1d4YebB/PvpDTRtwsU4fJvsxtq5A3JwOmoaJrVgrpvYJPNzA==',
-          },
-          {
-            name: 'Canton-Foundation-9',
-            publicKey:
-              'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEN+dP+9lYqi1rgctKW3sRH+3TKejYLo9jchCAnR32JtJKfjtxIPWLf0rh1G4mOQo9gYppcX4IyxU0QoxRvhLk/Q==',
-          },
-        ]
-      : []
-  );
-
-const approvedSvIdentities = singleSv
-  ? allApprovedSvIdentities.filter((id: ApprovedSvIdentity) => !sv234NameSet.has(id.name))
-  : allApprovedSvIdentities;
-
-function joinViaSv1(sv1: pulumi.Resource, keys: CnInput<SvIdKey>): SvOnboarding {
-  return {
-    type: 'join-with-key',
-    sponsorApiUrl: `http://sv-app-${globalDomainUpgradeConfig.activeGlobalDomainId}.sv-1:5014`,
-    sponsorRelease: sv1,
-    keys,
-  };
-}
 
 const splitwellOnboarding = {
   name: 'splitwell',
@@ -159,6 +75,29 @@ const standaloneValidatorOnboarding = {
 
 let backupConfig: BackupConfig | undefined;
 let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
+
+function getSvcSize(): number {
+  // If not devnet, enforce 1 sv
+  if (!isDevNet) {
+    return 1;
+  }
+
+  const maxSvcSize = svconfs.length;
+  const svcSize = +requireEnv(
+    'SVC_SIZE',
+    `Specify how many foundation SV nodes this cluster should be deployed with. (min 1, max ${maxSvcSize})`
+  );
+
+  if (svcSize < 1) {
+    throw new Error('SVC_SIZE must be at least 1');
+  }
+
+  if (svcSize > maxSvcSize) {
+    throw new Error(`SVC_SIZE must be at most ${maxSvcSize}`);
+  }
+
+  return svcSize;
+}
 
 export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   const bootstrapBucketSpec = await bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
@@ -186,12 +125,31 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     };
   }
 
-  const sv1 = await installSvc(auth0Client, topupConfig);
+  const svc = new Svc('svc', {
+    svcSize: getSvcSize(),
+
+    auth0Client,
+    approvedSvIdentities: approveSvRunbook ? svRunbookApprovedSvIdentities : [],
+    expectedValidatorOnboardings: [
+      splitwellOnboarding,
+      validator1Onboarding,
+      standaloneValidatorOnboarding,
+    ],
+    isDevNet,
+    backupConfig,
+    bootstrappingDumpConfig,
+    topupConfig,
+    splitPostgresInstances,
+    sequencerPruningConfig,
+    globalDomainUpgradeConfig,
+  });
+
+  const founder = await svc.founder;
 
   // TODO(#8761) install the validator once the upgrade supports it
   const installNonSvComponents =
     !globalDomainUpgradeConfig.isUpgrade() && globalDomainUpgradeConfig.isDefaultActive();
-  const nonSvComponentsDependencies = [sv1.founder.scan];
+  const nonSvComponentsDependencies = [founder.scan];
   installNonSvComponents
     ? await installValidator1(
         auth0Client,
@@ -224,214 +182,4 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     : undefined;
 
   installDocs();
-}
-async function installSvc(auth0Client: Auth0Client, topupConfig: ValidatorTopupConfig) {
-  const sv1 = await installSvNode(
-    {
-      auth0Client,
-      nodename: 'sv-1',
-      onboardingName: isDevNet ? 'Canton-Foundation-1' : 'Canton-Foundation',
-      validatorWalletUser: isDevNet
-        ? 'auth0|64afbc0956a97fe9577249d7'
-        : 'auth0|64529b128448ded6aa68048f',
-      onboarding: { type: 'found-collective' },
-      approvedSvIdentities,
-      expectedValidatorOnboardings: [
-        splitwellOnboarding,
-        validator1Onboarding,
-        standaloneValidatorOnboarding,
-      ],
-      isDevNet,
-      backupConfig,
-      bootstrappingDumpConfig,
-      topupConfig,
-      auth0ValidatorAppName: 'sv1_validator',
-      splitPostgresInstances,
-      sequencerPruningConfig,
-    },
-    globalDomainUpgradeConfig
-  );
-  const svFounderSvApp = sv1.svApp;
-
-  const allSvs = [sv1];
-
-  if (!singleSv) {
-    allSvs.push(
-      await installSvNode(
-        {
-          auth0Client,
-          nodename: 'sv-2',
-          onboardingName: 'Canton-Foundation-2',
-          validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
-          onboarding: joinViaSv1(svFounderSvApp, sv2Key),
-          approvedSvIdentities,
-          expectedValidatorOnboardings: [],
-          isDevNet,
-          backupConfig: backupConfig,
-          auth0ValidatorAppName: 'sv2_validator',
-          bootstrappingDumpConfig,
-          topupConfig,
-          splitPostgresInstances,
-          sequencerPruningConfig,
-        },
-        globalDomainUpgradeConfig,
-        svFounderSvApp
-      )
-    );
-    allSvs.push(
-      await installSvNode(
-        {
-          auth0Client,
-          nodename: 'sv-3',
-          onboardingName: 'Canton-Foundation-3',
-          validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
-          onboarding: joinViaSv1(svFounderSvApp, sv3Key),
-          approvedSvIdentities,
-          expectedValidatorOnboardings: [],
-          isDevNet,
-          backupConfig,
-          auth0ValidatorAppName: 'sv3_validator',
-          bootstrappingDumpConfig,
-          topupConfig,
-          splitPostgresInstances,
-          sequencerPruningConfig,
-        },
-        globalDomainUpgradeConfig,
-        svFounderSvApp
-      )
-    );
-    allSvs.push(
-      await installSvNode(
-        {
-          auth0Client,
-          nodename: 'sv-4',
-          onboardingName: 'Canton-Foundation-4',
-          validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
-          onboarding: joinViaSv1(svFounderSvApp, sv4Key),
-          approvedSvIdentities,
-          expectedValidatorOnboardings: [],
-          isDevNet,
-          backupConfig,
-          auth0ValidatorAppName: 'sv4_validator',
-          bootstrappingDumpConfig,
-          topupConfig,
-          splitPostgresInstances,
-          sequencerPruningConfig,
-        },
-        globalDomainUpgradeConfig,
-        svFounderSvApp
-      )
-    );
-
-    const additionalSvNodes = envFlag('ENABLE_TEST_SVS')
-      ? [
-          await installSvNode(
-            {
-              auth0Client,
-              nodename: 'sv-5',
-              onboardingName: 'Canton-Foundation-5',
-              validatorWalletUser: 'auth0|65c15c482a18b1ef030ba290',
-              onboarding: joinViaSv1(svFounderSvApp, svKeyFromSecret('sv5')),
-              approvedSvIdentities,
-              expectedValidatorOnboardings: [],
-              isDevNet,
-              backupConfig,
-              auth0ValidatorAppName: 'sv5_validator',
-              bootstrappingDumpConfig,
-              topupConfig,
-              splitPostgresInstances,
-              sequencerPruningConfig,
-            },
-            globalDomainUpgradeConfig,
-            svFounderSvApp
-          ),
-          await installSvNode(
-            {
-              auth0Client,
-              nodename: 'sv-6',
-              onboardingName: 'Canton-Foundation-6',
-              validatorWalletUser: 'auth0|65c26e959666d60d24fe523a',
-              onboarding: joinViaSv1(svFounderSvApp, svKeyFromSecret('sv6')),
-              approvedSvIdentities,
-              expectedValidatorOnboardings: [],
-              isDevNet,
-              backupConfig,
-              auth0ValidatorAppName: 'sv6_validator',
-              bootstrappingDumpConfig,
-              topupConfig,
-              splitPostgresInstances,
-              sequencerPruningConfig,
-            },
-            globalDomainUpgradeConfig,
-            svFounderSvApp
-          ),
-          await installSvNode(
-            {
-              auth0Client,
-              nodename: 'sv-7',
-              onboardingName: 'Canton-Foundation-7',
-              validatorWalletUser: 'auth0|65c26e9d45eaef5c191a167e',
-              onboarding: joinViaSv1(svFounderSvApp, svKeyFromSecret('sv7')),
-              approvedSvIdentities,
-              expectedValidatorOnboardings: [],
-              isDevNet,
-              backupConfig,
-              auth0ValidatorAppName: 'sv7_validator',
-              bootstrappingDumpConfig,
-              topupConfig,
-              splitPostgresInstances,
-              sequencerPruningConfig,
-            },
-            globalDomainUpgradeConfig,
-            svFounderSvApp
-          ),
-          await installSvNode(
-            {
-              auth0Client,
-              nodename: 'sv-8',
-              onboardingName: 'Canton-Foundation-8',
-              validatorWalletUser: 'auth0|65c26ea449ef8564a0ec9297',
-              onboarding: joinViaSv1(svFounderSvApp, svKeyFromSecret('sv8')),
-              approvedSvIdentities,
-              expectedValidatorOnboardings: [],
-              isDevNet,
-              backupConfig,
-              auth0ValidatorAppName: 'sv8_validator',
-              bootstrappingDumpConfig,
-              topupConfig,
-              splitPostgresInstances,
-              sequencerPruningConfig,
-            },
-            globalDomainUpgradeConfig,
-            svFounderSvApp
-          ),
-          await installSvNode(
-            {
-              auth0Client,
-              nodename: 'sv-9',
-              onboardingName: 'Canton-Foundation-9',
-              validatorWalletUser: 'auth0|65c26eac58f141b4ca1dc5da',
-              onboarding: joinViaSv1(svFounderSvApp, svKeyFromSecret('sv9')),
-              approvedSvIdentities,
-              expectedValidatorOnboardings: [],
-              isDevNet,
-              backupConfig,
-              auth0ValidatorAppName: 'sv9_validator',
-              bootstrappingDumpConfig,
-              topupConfig,
-              splitPostgresInstances,
-              sequencerPruningConfig,
-            },
-            globalDomainUpgradeConfig,
-            svFounderSvApp
-          ),
-        ]
-      : [];
-
-    allSvs.concat(additionalSvNodes);
-  }
-  return {
-    founder: sv1,
-    allSvs,
-  };
 }

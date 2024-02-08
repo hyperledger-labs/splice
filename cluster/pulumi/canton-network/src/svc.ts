@@ -1,74 +1,176 @@
-import { Output } from '@pulumi/pulumi';
-import { ExpectedValidatorOnboarding, isDevNet } from 'cn-pulumi-common';
+import * as k8s from '@pulumi/kubernetes';
+import * as pulumi from '@pulumi/pulumi';
+import {
+  Auth0Client,
+  BackupConfig,
+  BootstrappingDumpConfig,
+  CnInput,
+  ExpectedValidatorOnboarding,
+  REPO_ROOT,
+  SvIdKey,
+  ValidatorTopupConfig,
+  loadYamlFromFile,
+  svKeyFromSecret,
+} from 'cn-pulumi-common';
+import _ from 'lodash';
 
-// import { NodeConfig } from './cometbft';
-import { SvOnboarding } from './sv';
+import { GlobalDomainUpgradeConfig } from './globalDomainNode';
+import {
+  ApprovedSvIdentity,
+  InstalledSv,
+  SequencerPruningConfig,
+  SvOnboarding,
+  installSvNode,
+} from './sv';
+import svconfs, { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svconfs';
 
-type SvConf = {
-  nodeName: string;
-  onboardingName: string;
-  validatorWalletUser: string;
-  onboarding: SvOnboarding;
-  expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
-  auth0ValidatorAppName: string;
-  cometBft: NodeConfig;
-};
+interface SvcArgs {
+  svcSize: number;
 
-type NodeConfig = {
-  privateKey: Output<string> | string;
-  validator: {
-    keyAddress: Output<string> | string;
-    privateKey: Output<string> | string;
-    publicKey: Output<string> | string;
-  };
-  nodeIndex: number;
-  retainBlocks?: number;
-  id: Output<string> | string;
-};
+  auth0Client: Auth0Client;
+  approvedSvIdentities: ApprovedSvIdentity[];
+  expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the founder
+  isDevNet: boolean;
+  backupConfig?: BackupConfig;
+  bootstrappingDumpConfig?: BootstrappingDumpConfig;
+  topupConfig?: ValidatorTopupConfig;
+  splitPostgresInstances: boolean;
+  sequencerPruningConfig: SequencerPruningConfig;
+  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig;
+}
+export class Svc extends pulumi.ComponentResource {
+  args: SvcArgs;
+  founder: Promise<InstalledSv>;
+  allSvs: Promise<InstalledSv[]>;
 
-const splitwellOnboarding = {
-  name: 'splitwell',
-  secret: 'splitwellsecret',
-  expiresIn: '24h',
-};
+  private joinViaSv1(sv1: pulumi.Resource, keys: CnInput<SvIdKey>): SvOnboarding {
+    return {
+      type: 'join-with-key',
+      sponsorApiUrl: `http://sv-app-${this.args.globalDomainUpgradeConfig.activeGlobalDomainId}.sv-1:5014`,
+      sponsorRelease: sv1,
+      keys,
+    };
+  }
 
-const validator1Onboarding = {
-  name: 'validator1',
-  secret: 'validator1secret',
-  expiresIn: '24h',
-};
-
-const standaloneValidatorOnboarding = {
-  name: 'validator',
-  secret: 'validatorsecret',
-  expiresIn: '24h',
-};
-
-export const svConfs: SvConf[] = [
-  {
-    nodeName: 'sv-1',
-    onboarding: { type: 'found-collective' },
-    onboardingName: isDevNet ? 'Canton-Foundation-1' : 'Canton-Foundation',
-    auth0ValidatorAppName: 'sv1_validator',
-    validatorWalletUser: isDevNet
-      ? 'auth0|64afbc0956a97fe9577249d7'
-      : 'auth0|64529b128448ded6aa68048f',
-    expectedValidatorOnboardings: [
-      splitwellOnboarding,
-      validator1Onboarding,
-      standaloneValidatorOnboarding,
-    ],
-    cometBft: {
-      nodeIndex: 1,
-      id: '5af57aa83abcec085c949323ed8538108757be9c',
-      privateKey:
-        '/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==',
-      validator: {
-        keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
-        privateKey:
-          'npgiYbG0Iaslb/JHzliAg5BkfYMOaK3tCdKWvvO4FjCCmTBzVYK20vxkBMEg9YgFEKtvR5XgnAwKeNFrnpEQ/A==',
-        publicKey: 'gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw=',
-      },
+  private async installSvNode(
+    svConf: StaticSvConfig,
+    onboarding: SvOnboarding,
+    nodeConfigs: {
+      founder: StaticCometBftConfigWithNodeName;
+      peers: StaticCometBftConfigWithNodeName[];
     },
-  },
-];
+    extraApprovedSvIdentities: ApprovedSvIdentity[],
+    expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
+    cometBftSyncSource?: k8s.helm.v3.Release
+  ) {
+    const defaultApprovedSvIdentities = (
+      this.args.isDevNet
+        ? loadYamlFromFile(
+            `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-dev.yaml`
+          )
+        : loadYamlFromFile(
+            `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/approved-sv-id-values-test.yaml`
+          )
+    ).approvedSvIdentities;
+
+    const approvedSvIdentities = _.uniqBy(
+      [
+        ...defaultApprovedSvIdentities,
+        ...extraApprovedSvIdentities,
+        ...this.args.approvedSvIdentities,
+      ],
+      'name'
+    );
+
+    return installSvNode(
+      {
+        nodeName: svConf.nodeName,
+        onboardingName: svConf.onboardingName,
+        nodeConfigs,
+        cometBft: svConf.cometBft,
+        validatorWalletUser: svConf.validatorWalletUser,
+        auth0ValidatorAppName: svConf.auth0ValidatorAppName,
+        onboarding,
+        auth0Client: this.args.auth0Client,
+        approvedSvIdentities,
+        expectedValidatorOnboardings,
+        isDevNet: this.args.isDevNet,
+        backupConfig: this.args.backupConfig,
+        bootstrappingDumpConfig: this.args.bootstrappingDumpConfig,
+        topupConfig: this.args.topupConfig,
+        splitPostgresInstances: this.args.splitPostgresInstances,
+        sequencerPruningConfig: this.args.sequencerPruningConfig,
+      },
+      this.args.globalDomainUpgradeConfig,
+      cometBftSyncSource
+    );
+  }
+
+  private async installSvc() {
+    const [founderConf, ...restSvConfs] = svconfs.slice(0, this.args.svcSize);
+
+    const keys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
+      return {
+        ...acc,
+        [conf.onboardingName]: svKeyFromSecret(conf.nodeName.replace('-', '')),
+      };
+    }, {});
+
+    const additionalSvIdentities = Object.entries(keys).map(([onboardingName, keys]) => ({
+      name: onboardingName,
+      publicKey: keys.publicKey,
+    }));
+
+    const founderCometBftConf = { ...founderConf.cometBft, nodeName: founderConf.nodeName };
+    const peerCometBftConfs = restSvConfs.map(conf => ({
+      ...conf.cometBft,
+      nodeName: conf.nodeName,
+    }));
+
+    const founder = await this.installSvNode(
+      founderConf,
+      { type: 'found-collective' },
+      {
+        founder: founderCometBftConf,
+        peers: peerCometBftConfs,
+      },
+      additionalSvIdentities,
+      this.args.expectedValidatorOnboardings
+    );
+
+    const restSvs = await Promise.all(
+      restSvConfs.map(conf => {
+        const onboarding = this.joinViaSv1(founder.svApp, keys[conf.onboardingName]);
+        const cometBft = {
+          founder: founderCometBftConf,
+          peers: peerCometBftConfs.filter(c => c.id !== conf.cometBft.id), // remove self from peer list
+        };
+
+        return this.installSvNode(
+          conf,
+          onboarding,
+          cometBft,
+          additionalSvIdentities,
+          [],
+          founder.svApp
+        );
+      })
+    );
+
+    return { founder, allSvs: [founder, ...restSvs] };
+  }
+
+  constructor(name: string, args: SvcArgs, opts?: pulumi.ComponentResourceOptions) {
+    super('canton:network:svc', name, args, opts);
+    this.args = args;
+
+    const svc = this.installSvc();
+
+    // eslint-disable-next-line promise/prefer-await-to-then
+    this.founder = svc.then(r => r.founder);
+    // eslint-disable-next-line promise/prefer-await-to-then
+    this.allSvs = svc.then(r => r.allSvs);
+
+    this.registerOutputs({});
+  }
+}

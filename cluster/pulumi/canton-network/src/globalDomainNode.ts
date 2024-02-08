@@ -7,6 +7,7 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { installCometBftNode } from './cometbft';
 import { Postgres, installPostgresMetrics } from './postgres';
+import { StaticCometBftConfigWithNodeName } from './svconfs';
 
 export class GlobalDomainUpgradeConfig {
   prepareUpgrade: boolean;
@@ -96,6 +97,11 @@ export class GlobalDomainNode extends ComponentResource {
     cometbft: {
       name: string;
       onboardingName: string;
+      nodeConfigs: {
+        self: StaticCometBftConfigWithNodeName;
+        founder: StaticCometBftConfigWithNodeName;
+        peers: StaticCometBftConfigWithNodeName[];
+      };
       syncSource?: Release;
     },
     disableAutoInit: boolean,
@@ -115,6 +121,7 @@ export class GlobalDomainNode extends ComponentResource {
       xns,
       cometbft.name,
       cometbft.onboardingName,
+      cometbft.nodeConfigs,
       domainId,
       cometbft.syncSource,
       { parent: this }
