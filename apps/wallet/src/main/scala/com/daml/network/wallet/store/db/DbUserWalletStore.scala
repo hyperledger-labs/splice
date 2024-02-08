@@ -41,6 +41,7 @@ class DbUserWalletStore(
       storeDescriptor = Json.obj(
         "version" -> Json.fromInt(1),
         "store" -> Json.fromString("DbUserWalletStore"),
+        "endUserName" -> Json.fromString(key.endUserName),
         "endUserParty" -> Json.fromString(key.endUserParty.toProtoPrimitive),
         "validatorParty" -> Json.fromString(key.validatorParty.toProtoPrimitive),
         "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),

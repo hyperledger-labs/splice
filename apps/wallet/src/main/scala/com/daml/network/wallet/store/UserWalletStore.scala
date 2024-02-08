@@ -520,6 +520,8 @@ object UserWalletStore {
       /** The party-id of the wallet's validator */
       validatorParty: PartyId,
 
+      // TODO (#6385): this shouldn't be required anymore.
+      // The implication is that we're running more than one ingestion for the same party with different stores.
       /** The participant user name of the end-user */
       endUserName: String,
 
