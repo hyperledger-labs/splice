@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests.migration
 
-import cats.implicits.{catsSyntaxApplicativeId, catsSyntaxParallelTraverse1}
+import com.daml.network.codegen.java.cn.svcrules.DomainUpgradeSchedule
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
@@ -8,16 +8,16 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.auth.PreflightAuthUtil
-import com.digitalasset.canton.concurrent.Threading
+import com.daml.network.util.SvTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.protocol.DynamicDomainParameters
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
-import scala.concurrent.Future
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 class GlobalDomainUpgradeClusterPreflightIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
-    with PreflightAuthUtil {
+    with PreflightAuthUtil
+    with SvTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -32,25 +32,17 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
       svclWithToken(sv.name)
     }
 
-    clue(s"Pausing global domain everywhere") {
-      eventuallySucceeds() {
-        svsWithAuth.parTraverse { sv =>
-          sv.pauseGlobalDomain().pure[Future]
-        }.futureValue
-      }
-    }
-    // TODO(#8761) move the sleep in the app
-    Threading.sleep(
-      (DynamicDomainParameters.defaultMediatorReactionTimeout + DynamicDomainParameters.defaultParticipantResponseTimeout).duration.toMillis
-    )
-    clue(s"Trigger domain dump") {
-      eventuallySucceeds() {
-        svsWithAuth.parTraverse { sv =>
-          sv.triggerGlobalDomainMigrationDump(1L).pure[Future]
-        }.futureValue
-      }
-    }
+    val svToCreateVoteRequest = svsWithAuth.headOption.value
+    svsWithAuth.tail.size should be >= 2
+    val svsToVote = svsWithAuth.tail.take(2)
 
+    clue(s"schedule domain migration") {
+      val scheduledTime = Instant.now().plus(10, ChronoUnit.SECONDS)
+      scheduleDomainMigration(
+        svToCreateVoteRequest,
+        svsToVote,
+        Some(new DomainUpgradeSchedule(scheduledTime, 1L)),
+      )
+    }
   }
-
 }

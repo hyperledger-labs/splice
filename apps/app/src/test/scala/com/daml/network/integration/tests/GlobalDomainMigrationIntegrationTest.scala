@@ -5,18 +5,8 @@ import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.sv.automation.singlesv.{DomainUpgradeTrigger, SvRewardTrigger}
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
-  SRARC_AddMember,
-  SRARC_SetConfig,
-}
-import com.daml.network.codegen.java.cn.svcrules.{
-  DomainUpgradeSchedule,
-  SvcRules,
-  SvcRulesConfig,
-  SvcRules_AddMember,
-  SvcRules_SetConfig,
-  VoteRequest,
-}
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
+import com.daml.network.codegen.java.cn.svcrules.{DomainUpgradeSchedule, SvcRules_AddMember}
 import com.daml.network.config.{
   CNDbConfig,
   CNNodeConfigTransforms,
@@ -47,7 +37,7 @@ import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
-import com.daml.network.util.{Contract, PostgresAroundAll, ProcessTestUtil, WalletTestUtil}
+import com.daml.network.util.{PostgresAroundAll, ProcessTestUtil, SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -68,15 +58,15 @@ import java.io.File
 import java.nio.file.{Path, Paths}
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
-import scala.jdk.OptionConverters.*
 
 class GlobalDomainMigrationIntegrationTest
     extends CNNodeIntegrationTest
     with ProcessTestUtil
     with PostgresAroundAll
+    with SvTestUtil
     with WalletTestUtil {
 
   override def usesDbs = {
@@ -655,103 +645,6 @@ class GlobalDomainMigrationIntegrationTest
         )
       }
     }
-  }
-
-  private def getSvcRulesConfig(
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
-      domainUpgradeSchedule: Option[DomainUpgradeSchedule],
-  ) = new SvcRulesConfig(
-    svcRules.payload.config.numUnclaimedRewardsThreshold,
-    svcRules.payload.config.numMemberTrafficContractsThreshold,
-    svcRules.payload.config.actionConfirmationTimeout,
-    svcRules.payload.config.svOnboardingRequestTimeout,
-    svcRules.payload.config.svOnboardingConfirmedTimeout,
-    svcRules.payload.config.voteRequestTimeout,
-    svcRules.payload.config.leaderInactiveTimeout,
-    svcRules.payload.config.domainNodeConfigLimits,
-    svcRules.payload.config.maxTextLength,
-    svcRules.payload.config.initialTrafficGrant,
-    svcRules.payload.config.svChallengeDeadline,
-    svcRules.payload.config.globalDomain,
-    domainUpgradeSchedule.toJava,
-  )
-
-  private def scheduleDomainMigration(
-      svToCreateVoteRequest: SvAppBackendReference,
-      svsToCastVotes: Seq[SvAppBackendReference],
-      domainUpgradeSchedule: Option[DomainUpgradeSchedule],
-  )(implicit
-      ec: ExecutionContextExecutor
-  ): Unit = {
-    val svcRules = svToCreateVoteRequest.getSvcInfo().svcRules
-    val action = new ARC_SvcRules(
-      new SRARC_SetConfig(
-        new SvcRules_SetConfig(
-          getSvcRulesConfig(svcRules, domainUpgradeSchedule)
-        )
-      )
-    )
-
-    actAndCheck(
-      "Voting on an SvcRules config change for scheduled migration", {
-        def onlySetConfigVoteRequests(
-            voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
-        ) =
-          voteRequests.filter {
-            _.payload.action match {
-              case action: ARC_SvcRules =>
-                action.svcAction match {
-                  case _: SRARC_SetConfig => true
-                  case _ => false
-                }
-              case _ => false
-            }
-          }
-
-        val (_, voteRequest) = actAndCheck(
-          "Creating vote request",
-          eventuallySucceeds() {
-            svToCreateVoteRequest.createVoteRequest(
-              svToCreateVoteRequest.getSvcInfo().svParty.toProtoPrimitive,
-              action,
-              "url",
-              "description",
-              svToCreateVoteRequest.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
-            )
-          },
-        )(
-          "vote request has been created",
-          _ => onlySetConfigVoteRequests(svToCreateVoteRequest.listVoteRequests()).loneElement,
-        )
-
-        svsToCastVotes.parTraverse { sv =>
-          Future {
-            clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
-              val svVoteRequest = eventually() {
-                onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
-              }
-              svVoteRequest.contractId shouldBe voteRequest.contractId
-            }
-            clue(s"${sv.name} accepts vote") {
-              eventuallySucceeds() {
-                sv.castVote(
-                  voteRequest.contractId,
-                  true,
-                  "url",
-                  "description",
-                )
-              }
-            }
-          }
-        }.futureValue
-      },
-    )(
-      "observing SvcRules with changed config",
-      _ => {
-        val newSvcRules = svToCreateVoteRequest.getSvcInfo().svcRules
-        newSvcRules.payload.config.nextScheduledDomainUpgrade.toScala shouldBe domainUpgradeSchedule
-      },
-    )
   }
 
   private def withClueAndLog[T](clueMessage: String)(fun: => T) = withClue(clueMessage) {

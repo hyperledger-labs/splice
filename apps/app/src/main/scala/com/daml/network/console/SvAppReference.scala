@@ -23,6 +23,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem
 
 import scala.concurrent.duration.FiniteDuration
@@ -137,6 +138,96 @@ abstract class SvAppReference(
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetDomainNodeIdentitiesDump())
     }
+
+  @Help.Summary("Create a vote request (via admin API)")
+  def createVoteRequest(
+      requester: String,
+      action: ActionRequiringConfirmation,
+      reasonUrl: String,
+      reasonDescription: String,
+      expiration: RelTime,
+  )(implicit tc: TraceContext): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.CreateVoteRequest(
+          requester,
+          action,
+          reasonUrl,
+          reasonDescription,
+          expiration,
+        )
+      )
+    }
+  }
+
+  @Help.Summary("List vote requests (via admin API)")
+  def listVoteRequests(): Seq[Contract[VoteRequest.ContractId, VoteRequest]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.ListVoteRequests
+      )
+    }
+  }
+
+  @Help.Summary("List vote results")
+  def listVoteResults(
+      actionName: Option[String],
+      executed: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: BigInt,
+  ): Seq[VoteResult] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.ListVoteResults(
+          actionName,
+          executed,
+          requester,
+          effectiveFrom,
+          effectiveTo,
+          limit,
+        )()
+      )
+    }
+  }
+
+  @Help.Summary("Cast a vote (via admin API)")
+  def castVote(
+      voteRequestCid: VoteRequest.ContractId,
+      isAccepted: Boolean,
+      reasonUrl: String,
+      reasonDescription: String,
+  ): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.CastVote(voteRequestCid, isAccepted, reasonUrl, reasonDescription)
+      )
+    }
+  }
+
+  @Help.Summary("Update a vote (via admin API)")
+  def updateVote(
+      voteRequestCid: VoteRequest.ContractId,
+      isAccepted: Boolean,
+      reasonUrl: String,
+      reasonDescription: String,
+  ): Unit = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.UpdateVote(voteRequestCid, isAccepted, reasonUrl, reasonDescription)
+      )
+    }
+  }
+
+  @Help.Summary("List votes (via admin API)")
+  def listVotes(voteRequestCid: Vector[String]): Seq[Contract[Vote.ContractId, Vote]] = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpSvAdminAppClient.ListVotes(voteRequestCid)
+      )
+    }
+  }
 }
 
 final case class SvAppClientReference(
@@ -264,96 +355,6 @@ class SvAppBackendReference(
     consoleEnvironment.run {
       httpCommand(
         HttpSvAdminAppClient.CreateElectionRequest(requester, ranking)
-      )
-    }
-  }
-
-  @Help.Summary("Create a vote request (via admin API)")
-  def createVoteRequest(
-      requester: String,
-      action: ActionRequiringConfirmation,
-      reasonUrl: String,
-      reasonDescription: String,
-      expiration: RelTime,
-  ): Unit = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.CreateVoteRequest(
-          requester,
-          action,
-          reasonUrl,
-          reasonDescription,
-          expiration,
-        )
-      )
-    }
-  }
-
-  @Help.Summary("List vote requests (via admin API)")
-  def listVoteRequests(): Seq[Contract[VoteRequest.ContractId, VoteRequest]] = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.ListVoteRequests
-      )
-    }
-  }
-
-  @Help.Summary("List vote results")
-  def listVoteResults(
-      actionName: Option[String],
-      executed: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: BigInt,
-  ): Seq[VoteResult] = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.ListVoteResults(
-          actionName,
-          executed,
-          requester,
-          effectiveFrom,
-          effectiveTo,
-          limit,
-        )()
-      )
-    }
-  }
-
-  @Help.Summary("Cast a vote (via admin API)")
-  def castVote(
-      voteRequestCid: VoteRequest.ContractId,
-      isAccepted: Boolean,
-      reasonUrl: String,
-      reasonDescription: String,
-  ): Unit = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.CastVote(voteRequestCid, isAccepted, reasonUrl, reasonDescription)
-      )
-    }
-  }
-
-  @Help.Summary("Update a vote (via admin API)")
-  def updateVote(
-      voteRequestCid: VoteRequest.ContractId,
-      isAccepted: Boolean,
-      reasonUrl: String,
-      reasonDescription: String,
-  ): Unit = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.UpdateVote(voteRequestCid, isAccepted, reasonUrl, reasonDescription)
-      )
-    }
-  }
-
-  @Help.Summary("List votes (via admin API)")
-  def listVotes(voteRequestCid: Vector[String]): Seq[Contract[Vote.ContractId, Vote]] = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.ListVotes(voteRequestCid)
       )
     }
   }

@@ -1,17 +1,33 @@
 package com.daml.network.util
 
+import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.ledger.javaapi.data.TransactionTreeV2
 import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
-import com.daml.network.console.{CNParticipantClientReference, SvAppBackendReference}
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
+import com.daml.network.codegen.java.cn.svcrules.{
+  ActionRequiringConfirmation,
+  DomainUpgradeSchedule,
+  SvcRulesConfig,
+  SvcRules_SetConfig,
+  VoteRequest,
+}
+import com.daml.network.console.{
+  CNParticipantClientReference,
+  SvAppBackendReference,
+  SvAppReference,
+}
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.SvTestUtil.ConfirmingSv
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 trait SvTestUtil extends CNNodeTestCommon {
   this: CommonCNNodeAppInstanceReferences =>
@@ -47,6 +63,87 @@ trait SvTestUtil extends CNNodeTestCommon {
     }
   }
 
+  def getConfirmingSvs(svBackends: Seq[SvAppBackendReference]): Seq[ConfirmingSv] =
+    svBackends.map(sv => ConfirmingSv(sv.participantClientWithAdminToken, sv.getSvcInfo().svParty))
+
+  def scheduleDomainMigration(
+      svToCreateVoteRequest: SvAppReference,
+      svsToCastVotes: Seq[SvAppReference],
+      domainUpgradeSchedule: Option[DomainUpgradeSchedule],
+  )(implicit
+      ec: ExecutionContextExecutor
+  ): Unit = {
+    val svcRules = svToCreateVoteRequest.getSvcInfo().svcRules
+    val action = new ARC_SvcRules(
+      new SRARC_SetConfig(
+        new SvcRules_SetConfig(
+          updateNextScheduledDomainUpgrade(svcRules.payload.config, domainUpgradeSchedule)
+        )
+      )
+    )
+
+    actAndCheck(
+      "Voting on an SvcRules config change for scheduled migration", {
+        def onlySetConfigVoteRequests(
+            voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
+        ) =
+          voteRequests.filter {
+            _.payload.action match {
+              case action: ARC_SvcRules =>
+                action.svcAction match {
+                  case _: SRARC_SetConfig => true
+                  case _ => false
+                }
+              case _ => false
+            }
+          }
+
+        val (_, voteRequest) = actAndCheck(
+          "Creating vote request",
+          eventuallySucceeds() {
+            svToCreateVoteRequest.createVoteRequest(
+              svToCreateVoteRequest.getSvcInfo().svParty.toProtoPrimitive,
+              action,
+              "url",
+              "description",
+              svToCreateVoteRequest.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+            )
+          },
+        )(
+          "vote request has been created",
+          _ => onlySetConfigVoteRequests(svToCreateVoteRequest.listVoteRequests()).loneElement,
+        )
+
+        svsToCastVotes.parTraverse { sv =>
+          Future {
+            clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
+              val svVoteRequest = eventually() {
+                onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
+              }
+              svVoteRequest.contractId shouldBe voteRequest.contractId
+            }
+            clue(s"${sv.name} accepts vote") {
+              eventuallySucceeds() {
+                sv.castVote(
+                  voteRequest.contractId,
+                  true,
+                  "url",
+                  "description",
+                )
+              }
+            }
+          }
+        }.futureValue
+      },
+    )(
+      "observing SvcRules with changed config",
+      _ => {
+        val newSvcRules = svToCreateVoteRequest.getSvcInfo().svcRules
+        newSvcRules.payload.config.nextScheduledDomainUpgrade.toScala shouldBe domainUpgradeSchedule
+      },
+    )
+  }
+
   private def confirmAction(
       participantClient: CNParticipantClientReference,
       svPartyId: PartyId,
@@ -71,8 +168,24 @@ trait SvTestUtil extends CNNodeTestCommon {
     }
   }
 
-  def getConfirmingSvs(svBackends: Seq[SvAppBackendReference]): Seq[ConfirmingSv] =
-    svBackends.map(sv => ConfirmingSv(sv.participantClientWithAdminToken, sv.getSvcInfo().svParty))
+  private def updateNextScheduledDomainUpgrade(
+      svcRulesConfig: SvcRulesConfig,
+      domainUpgradeSchedule: Option[DomainUpgradeSchedule],
+  ) = new SvcRulesConfig(
+    svcRulesConfig.numUnclaimedRewardsThreshold,
+    svcRulesConfig.numMemberTrafficContractsThreshold,
+    svcRulesConfig.actionConfirmationTimeout,
+    svcRulesConfig.svOnboardingRequestTimeout,
+    svcRulesConfig.svOnboardingConfirmedTimeout,
+    svcRulesConfig.voteRequestTimeout,
+    svcRulesConfig.leaderInactiveTimeout,
+    svcRulesConfig.domainNodeConfigLimits,
+    svcRulesConfig.maxTextLength,
+    svcRulesConfig.initialTrafficGrant,
+    svcRulesConfig.svChallengeDeadline,
+    svcRulesConfig.globalDomain,
+    domainUpgradeSchedule.toJava,
+  )
 }
 
 object SvTestUtil {
