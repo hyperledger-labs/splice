@@ -69,22 +69,9 @@ trait StandaloneCanton extends PostgresAroundAll with ProcessTestUtil {
         dbNamesEnv :+
         ("AUTO_INIT_ALL" -> autoInit.toString)
 
-    // TODO(#9834): retire this ugly workaround for the buggy mediator auto-init configuration
-    val extraConfigs =
-      if (autoInit) { Seq() }
-      else {
-        (if (svs123) {
-           (1 to 3).map(i => s"canton.mediators.sv${i}StandaloneMediator.init.auto-init=false")
-         } else {
-           Seq()
-         }) ++
-          (if (sv4) { Seq("canton.mediators.sv4StandaloneMediator.init.auto-init=false") }
-           else Seq())
-      }
-
     withCanton(
       configs,
-      extraConfigs,
+      Seq(),
       logSuffix,
       extraEnv2: _*
     )(test)
