@@ -37,7 +37,7 @@ import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
-import com.daml.network.util.{PostgresAroundAll, ProcessTestUtil, SvTestUtil, WalletTestUtil}
+import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -65,23 +65,11 @@ import scala.util.Using
 class GlobalDomainMigrationIntegrationTest
     extends CNNodeIntegrationTest
     with ProcessTestUtil
-    with PostgresAroundAll
     with SvTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with StandaloneCanton {
 
-  override def usesDbs = {
-    Seq("sequencer_driver_global_upgrade") ++
-      (1 to 4)
-        .map(index =>
-          Seq(
-            s"participant_sv${index}_upgrade",
-            s"sequencer_global_upgrade_$index",
-            s"mediator_global_upgrade_$index",
-          )
-        )
-        .flatten ++
-      Seq("participant_validator")
-  }
+  override def dbsSuffix = "domain_migration"
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
   // TODO(#9014) make it work with persistent stores
@@ -293,15 +281,16 @@ class GlobalDomainMigrationIntegrationTest
       )
     }
 
-    withCanton(
-      Seq(testResourcesPath / "global-upgrade-domain-node.conf"),
-      Seq(),
-      "global-domain-migration",
-      "SV1_ADMIN_USER" -> sv1LocalBackend.config.ledgerApiUser,
-      "SV2_ADMIN_USER" -> sv2LocalBackend.config.ledgerApiUser,
-      "SV3_ADMIN_USER" -> sv3LocalBackend.config.ledgerApiUser,
-      "SV4_ADMIN_USER" -> sv4LocalBackend.config.ledgerApiUser,
-    ) {
+    withCantonSvNodes(
+      (
+        Some(sv1LocalBackend),
+        Some(sv2LocalBackend),
+        Some(sv3LocalBackend),
+        Some(sv4LocalBackend),
+      ),
+      logSuffix = "global-domain-migration",
+      autoInit = false,
+    )() {
       Using.resources(
         createUpgradeNode(1, sv1Backend, retryProvider, wallClock),
         createUpgradeNode(2, sv2Backend, retryProvider, wallClock),

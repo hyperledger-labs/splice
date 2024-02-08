@@ -22,7 +22,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
-import com.daml.network.util.{PostgresAroundAll, ProcessTestUtil}
+import com.daml.network.util.{ProcessTestUtil, StandaloneCanton}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.jdk.CollectionConverters.*
@@ -34,24 +34,15 @@ import java.nio.file.Files
 class SvReonboardingIntegrationTest
     extends CNNodeIntegrationTest
     with ProcessTestUtil
-    with PostgresAroundAll {
+    with StandaloneCanton {
 
+  override def dbsSuffix = "reonboard"
   override def usesDbs =
     Seq(
-      "sequencer_driver_global_reonboard",
       "participant_sv4_reonboard_new",
-      "sequencer_global_reonboard_new_4",
-      "mediator_global_reonboard_new_4",
-    ) ++
-      (1 to 4)
-        .map(i =>
-          Seq(
-            s"participant_sv${i}_reonboard",
-            s"sequencer_global_reonboard_${i}",
-            s"mediator_global_reonboard_${i}",
-          )
-        )
-        .flatten
+      "sequencer_sv4_reonboard_new",
+      "mediator_sv4_reonboard_new",
+    ) ++ super.usesDbs
 
   // Runs against a temporary Canton instance.
   override lazy val resetDecentralizedNamespace = false
@@ -71,8 +62,8 @@ class SvReonboardingIntegrationTest
       // Disable user allocation
       .withPreSetup(_ => ())
       .addConfigTransformsToFront(
-        (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(23_000)(conf),
-        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(23_000)(conf),
+        (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(22_000)(conf),
+        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
       )
       .addConfigTransforms(
         (_, config) =>
@@ -110,27 +101,27 @@ class SvReonboardingIntegrationTest
     // Mediators/sequencers that have been offboarderded stay in a broken state which is fine in prod
     // (you can onboard a fresh mediator/sequencer)
     // but annoying in tests so we use a dedicated Canton instance for this test.
-    withCanton(
-      Seq(testResourcesPath / "sv123-reonboard-canton.conf"),
-      Seq.empty,
-      "sv123-reonboarding",
-      "SV1_ADMIN_USER" -> sv1Backend.config.ledgerApiUser,
-      "SV2_ADMIN_USER" -> sv2Backend.config.ledgerApiUser,
-      "SV3_ADMIN_USER" -> sv3Backend.config.ledgerApiUser,
-    ) {
+    withCantonSvNodes(
+      (
+        Some(sv1Backend),
+        Some(sv2Backend),
+        Some(sv3Backend),
+        None,
+      ),
+      logSuffix = "sv123-reonboarding",
+      sv4 = false,
+    )() {
 
       val (
         dump,
         sv4Party,
         (sv1MediatorId, sv2MediatorId, sv3MediatorId, _),
         (sv1SequencerId, sv2SequencerId, sv3SequencerId, _),
-      ) = withCanton(
-        Seq(testResourcesPath / "sv4-reonboard-canton.conf"),
-        Seq.empty,
-        "sv4-reonboarding",
-        "ADMIN_USER" -> sv4Backend.config.ledgerApiUser,
-      ) {
-
+      ) = withCantonSvNodes(
+        (None, None, None, Some(sv4Backend)),
+        logSuffix = "sv4-reonboarding",
+        svs123 = false,
+      )() {
         startAllSync(
           sv1ScanBackend,
           sv1Backend,
@@ -275,11 +266,13 @@ class SvReonboardingIntegrationTest
         )
       }
 
-      withCanton(
-        Seq(testResourcesPath / "sv4-reonboard-canton-new.conf"),
-        Seq.empty,
-        "sv4-reonboarding-new",
-        "ADMIN_USER" -> sv4Backend.config.ledgerApiUser,
+      withCantonSvNodes(
+        (None, None, None, Some(sv4Backend)),
+        logSuffix = "sv4-reonboarding-new",
+        svs123 = false,
+        overrideDbsSuffix = Some("reonboard_new"),
+      )(
+        "SV4_PARTICIPANT_AUTO_INIT" -> "false"
       ) {
         eventually() {
           sv4ReonboardBackend.participantClientWithAdminToken.health.status shouldBe NodeStatus

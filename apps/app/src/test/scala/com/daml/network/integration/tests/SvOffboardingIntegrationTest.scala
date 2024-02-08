@@ -13,7 +13,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingSequencerTrigger
 import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
-import com.daml.network.util.{PostgresAroundAll, ProcessTestUtil}
+import com.daml.network.util.{ProcessTestUtil, StandaloneCanton}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.{MediatorId, SequencerId}
@@ -25,19 +25,9 @@ import scala.jdk.OptionConverters.RichOptional
 class SvOffboardingIntegrationTest
     extends CNNodeIntegrationTest
     with ProcessTestUtil
-    with PostgresAroundAll {
+    with StandaloneCanton {
 
-  override def usesDbs =
-    Seq("sequencer_driver_mediator_offboarding") ++
-      (1 to 4)
-        .map(i =>
-          Seq(
-            s"participant_sv${i}_mediator_offboarding",
-            s"sequencer_sv${i}_mediator_offboarding",
-            s"mediator_sv${i}_mediator_offboarding",
-          )
-        )
-        .flatten
+  override def dbsSuffix = "offboarding"
 
   // Runs against a temporary Canton instance.
   override lazy val resetDecentralizedNamespace = false
@@ -52,13 +42,13 @@ class SvOffboardingIntegrationTest
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
       .addConfigTransformsToFront(
-        (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(24_000)(conf),
-        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(24_000)(conf),
+        (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(22_000)(conf),
+        (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
       )
       .addConfigTransformsToFront((_, conf) =>
-        CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(24_000)(conf)
+        CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(22_000)(conf)
       )
-      .withSequencerConnectionsFromScanDisabled(24_000)
+      .withSequencerConnectionsFromScanDisabled(22_000)
       .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllAutomationConfigs(
           _.withResumedTrigger[SvOffboardingMediatorTrigger]
@@ -71,17 +61,15 @@ class SvOffboardingIntegrationTest
     // Mediator offboarding leaves the offboarded mediator in a permanently broken state.
     // To make sure this doesn't keep a Canton instance that spams us with logs for that mediator,
     // we use a dedicated Canton instance for this test that is shut down at the end.
-    withCanton(
-      Seq(
-        testResourcesPath / "mediator-offboarding-canton.conf"
+    withCantonSvNodes(
+      (
+        Some(sv1Backend),
+        Some(sv2Backend),
+        Some(sv3Backend),
+        Some(sv4Backend),
       ),
-      Seq(),
       "mediator-offboarding",
-      "SV1_ADMIN_USER" -> sv1Backend.config.ledgerApiUser,
-      "SV2_ADMIN_USER" -> sv2Backend.config.ledgerApiUser,
-      "SV3_ADMIN_USER" -> sv3Backend.config.ledgerApiUser,
-      "SV4_ADMIN_USER" -> sv4Backend.config.ledgerApiUser,
-    ) {
+    )() {
       clue("Initialize SVC with 4 SVs") {
         startAllSync(
           sv1ScanBackend,
