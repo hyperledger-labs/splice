@@ -17,7 +17,12 @@ import com.daml.network.codegen.java.cn.svcrules.{
   SvcRules_SetConfig,
   VoteRequest,
 }
-import com.daml.network.config.{CNDbConfig, CNNodeConfigTransforms}
+import com.daml.network.config.{
+  CNDbConfig,
+  CNNodeConfigTransforms,
+  CNParticipantClientConfig,
+  NetworkAppClientConfig,
+}
 import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
 import com.daml.network.environment.{
   CNNodeEnvironmentImpl,
@@ -39,11 +44,10 @@ import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
-import com.daml.network.validator.config.{ValidatorGlobalDomainConfig, ValidatorDomainConfig}
-import com.daml.network.config.NetworkAppClientConfig
+import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
-import com.daml.network.util.{Contract, PostgresAroundAll, ProcessTestUtil}
+import com.daml.network.util.{Contract, PostgresAroundAll, ProcessTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -51,7 +55,9 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
+import org.slf4j.event.Level
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
@@ -70,7 +76,8 @@ import scala.jdk.OptionConverters.*
 class GlobalDomainMigrationIntegrationTest
     extends CNNodeIntegrationTest
     with ProcessTestUtil
-    with PostgresAroundAll {
+    with PostgresAroundAll
+    with WalletTestUtil {
 
   override def usesDbs = {
     Seq("sequencer_driver_global_upgrade") ++
@@ -82,7 +89,8 @@ class GlobalDomainMigrationIntegrationTest
             s"mediator_global_upgrade_$index",
           )
         )
-        .flatten
+        .flatten ++
+      Seq("participant_validator")
   }
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
@@ -154,6 +162,23 @@ class GlobalDomainMigrationIntegrationTest
                     )
                   ),
                 )
+          ) + (
+            InstanceName.tryCreate("aliceValidatorLocal") -> {
+              val aliceValidatorConfig = config
+                .validatorApps(InstanceName.tryCreate("aliceValidator"))
+              aliceValidatorConfig
+                .copy(
+                  participantClient = CNParticipantClientConfig(
+                    ClientConfig(port = Port.tryCreate(5902)),
+                    aliceValidatorConfig.participantClient.ledgerApi.copy(
+                      clientConfig =
+                        aliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                          port = Port.tryCreate(5901)
+                        )
+                    ),
+                  )
+                )
+            }
           ),
           walletAppClients = config.walletAppClients + (
             InstanceName.tryCreate("sv1WalletLocal") ->
@@ -239,10 +264,47 @@ class GlobalDomainMigrationIntegrationTest
         countTapsFromScan(sv1ScanBackend, 1337) shouldBe 1
       },
     )
+
+    val aliceValidatorLocalBackend = v("aliceValidatorLocal")
+
     withCanton(
-      Seq(
-        testResourcesPath / "global-upgrade-domain-node.conf"
-      ),
+      Seq(testResourcesPath / "unavailable-validator-topology-canton.conf"),
+      Seq(),
+      "stop-alice-validator-before-domain-migration",
+      "VALIDATOR_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
+    ) {
+      startAllSync(aliceValidatorLocalBackend)
+      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorLocalBackend)
+      aliceWalletClient.tap(50.0)
+      withClueAndLog("alice has tapped a coin") {
+        checkWallet(aliceUserParty, aliceWalletClient, Seq((50, 50)))
+      }
+      aliceValidatorLocalBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
+        true
+      )
+      aliceValidatorLocalBackend.stop()
+    }
+
+    withClueAndLog(
+      s"the validator is no longer available"
+    ) {
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        {
+          aliceValidatorLocalBackend.participantClientWithAdminToken.health.status
+        },
+        logEntries => {
+          forExactly(1, logEntries) { logEntry =>
+            logEntry.message should startWith(
+              s"""Request failed for remote participant for `aliceValidatorLocal`, with admin token. Is the server running? Did you configure the server address as 0.0.0.0? Are you using the right TLS settings? (details logged as DEBUG)
+                 |  GrpcServiceUnavailable: UNAVAILABLE/io exception""".stripMargin
+            )
+          }
+        },
+      )
+    }
+
+    withCanton(
+      Seq(testResourcesPath / "global-upgrade-domain-node.conf"),
       Seq(),
       "global-domain-migration",
       "SV1_ADMIN_USER" -> sv1LocalBackend.config.ledgerApiUser,
