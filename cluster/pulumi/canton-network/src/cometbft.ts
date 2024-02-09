@@ -143,6 +143,7 @@ class CometBftNodeConfig {
       identifier: this.nodeIdentifier,
       externalAddress: this.p2pExternalAddress(staticConf.nodeIndex),
       istioPort: this.istioExternalPort(staticConf.nodeIndex),
+      retainBlocks: staticConf.retainBlocks,
       validator: {
         keyAddress: staticConf.validator.keyAddress,
         privateKey: staticConf.validator.privateKey,

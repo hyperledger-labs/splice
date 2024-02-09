@@ -4376,7 +4376,7 @@
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==",
-          "retainBlocks": 700000,
+          "retainBlocks": 10000,
           "rpcPort": 26657,
           "snapshotHeightDelta": 1000,
           "validator": {
