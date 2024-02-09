@@ -31,7 +31,7 @@ function main() {
 
   if [ "$type" == "canton:network:postgres" ]; then
     # Since we assume that the latest backup was a full one, it suffices to find any volumesnapshot in this namespace
-    backup_run_id=$(kubectl get volumesnapshot -n "$namespace" --sort-by=.metadata.creationTimestamp -o json | jq -r '.items[-1].metadata.name' | grep -o '[^-]*$')
+    backup_run_id=$(kubectl get volumesnapshot -n "$namespace" --sort-by=.metadata.creationTimestamp -o json | jq -r '.items[-1].metadata.name // empty' | grep -o '[^-]*$')
     echo "$backup_run_id"
   elif [ "$type" == "canton:cloud:postgres" ]; then
     # Since we assume that the latest backup was a full one, we just find the latest backup on the validator's db.
