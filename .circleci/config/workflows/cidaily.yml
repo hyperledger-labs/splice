@@ -144,26 +144,27 @@ workflow:
           cluster: "cidaily"
           requires:
             - deploy_validator_runbook_devnet
-      - backup_cluster:
-          name: backup_cidaily
-          <<: *main-branch-only
-          cluster: "cidaily"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_cidaily
-      - backup_cluster:
-          name: backup_cidaily_testnet
-          <<: *main-branch-only
-          cluster: "cidaily-testnet"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_cidaily_testnet
+      # TODO(#9889) Reenable once GCP unbreaks cloudsql
+      # - backup_cluster:
+      #     name: backup_cidaily
+      #     <<: *main-branch-only
+      #     cluster: "cidaily"
+      #     context:
+      #       - artifactory
+      #       - canton-network-vpn
+      #       - slack-context
+      #     requires:
+      #       - deploy_cluster_cidaily
+      # - backup_cluster:
+      #     name: backup_cidaily_testnet
+      #     <<: *main-branch-only
+      #     cluster: "cidaily-testnet"
+      #     context:
+      #       - artifactory
+      #       - canton-network-vpn
+      #       - slack-context
+      #     requires:
+      #       - deploy_cluster_cidaily_testnet
 
   cidaily_health_check:
     when:
