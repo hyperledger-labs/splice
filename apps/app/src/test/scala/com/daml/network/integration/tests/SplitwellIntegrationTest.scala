@@ -97,7 +97,7 @@ class SplitwellIntegrationTest
     }
 
     "use its own app domain" in { implicit env =>
-      val (_, bobUserParty, _, _, key, _) = initSplitwellTest()
+      val (aliceUserParty, bobUserParty, _, _, key, _) = initSplitwellTest()
 
       aliceWalletClient.tap(50)
 
@@ -130,9 +130,15 @@ class SplitwellIntegrationTest
         "alice sees balance update on splitwell domain",
         _ =>
           inside(aliceSplitwellClient.listBalanceUpdates(key)) { case Seq(update) =>
-            aliceValidatorBackend.participantClient.transfer
-              .lookup_contract_domain(update.contractId) shouldBe Map(
-              javaToScalaContractId(update.contractId) -> "splitwell"
+            val domainId = aliceValidatorBackend.participantClient.domains.id_of(
+              DomainAlias.tryCreate("splitwell")
+            )
+            aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+              .lookup_contract_domain(
+                aliceUserParty,
+                Set(update.contractId.contractId),
+              ) shouldBe Map(
+              update.contractId.contractId -> domainId
             )
           },
       )

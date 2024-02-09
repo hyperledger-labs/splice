@@ -299,7 +299,7 @@ class WalletTimeBasedIntegrationTest
           },
         )
 
-        val now = aliceValidatorBackend.participantClient.ledger_api_v2.time.get()
+        val now = aliceValidatorBackend.participantClient.ledger_api.time.get()
         val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(now)
         val transferContextWithClosedRound = new AppTransferContext(
           transferContext.coinRules,
@@ -372,7 +372,7 @@ class WalletTimeBasedIntegrationTest
       val (_, bob) = onboardAliceAndBob()
       aliceWalletClient.tap(100.0)
 
-      val now = aliceValidatorBackend.participantClient.ledger_api_v2.time.get()
+      val now = aliceValidatorBackend.participantClient.ledger_api.time.get()
       val expiration = now.plus(Duration.ofMinutes(1))
 
       val (_, _) = actAndCheck(

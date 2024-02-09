@@ -124,52 +124,11 @@ CREATE TABLE participant_command_completions (
     rejection_status_code INTEGER,
     rejection_status_message VARCHAR,
     rejection_status_details BINARY LARGE OBJECT,
-    domain_id INTEGER,
+    domain_id INTEGER NOT NULL,
     trace_context BINARY LARGE OBJECT
 );
 
 CREATE INDEX participant_command_completions_application_id_offset_idx ON participant_command_completions USING btree (application_id, completion_offset);
-
----------------------------------------------------------------------------------------------------
--- Events table: divulgence
----------------------------------------------------------------------------------------------------
-CREATE TABLE participant_events_divulgence (
-    -- * fixed-size columns first to avoid padding
-    event_sequential_id bigint NOT NULL, -- event identification: same ordering as event_offset
-
-    -- * event identification
-    event_offset VARCHAR, -- offset of the transaction that divulged the contract
-
-    -- * transaction metadata
-    workflow_id VARCHAR,
-
-    -- * submitter info (only visible on submitting participant)
-    command_id VARCHAR,
-    application_id VARCHAR,
-    submitters INTEGER ARRAY,
-
-    -- * shared event information
-    contract_id VARCHAR NOT NULL,
-    template_id INTEGER,
-    tree_event_witnesses INTEGER ARRAY NOT NULL DEFAULT ARRAY[], -- informees
-
-    -- * contract data
-    create_argument BINARY LARGE OBJECT,
-
-    -- * compression flags
-    create_argument_compression SMALLINT,
-
-    domain_id INTEGER
-);
-
--- offset index: used to translate to sequential_id
-CREATE INDEX participant_events_divulgence_event_offset ON participant_events_divulgence (event_offset);
-
--- sequential_id index for paging
-CREATE INDEX participant_events_divulgence_event_sequential_id ON participant_events_divulgence (event_sequential_id);
-
--- lookup divulgance events, in order of ingestion
-CREATE INDEX participant_events_divulgence_contract_id_idx ON participant_events_divulgence (contract_id, event_sequential_id);
 
 ---------------------------------------------------------------------------------------------------
 -- Events table: create
@@ -217,7 +176,7 @@ CREATE TABLE participant_events_create (
     -- * contract driver metadata
     driver_metadata BINARY LARGE OBJECT,
 
-    domain_id INTEGER,
+    domain_id INTEGER NOT NULL,
     trace_context BINARY LARGE OBJECT
 );
 
@@ -278,7 +237,7 @@ CREATE TABLE participant_events_consuming_exercise (
     exercise_argument_compression SMALLINT,
     exercise_result_compression SMALLINT,
 
-    domain_id INTEGER,
+    domain_id INTEGER NOT NULL,
     trace_context BINARY LARGE OBJECT
 );
 
@@ -336,7 +295,7 @@ CREATE TABLE participant_events_non_consuming_exercise (
     exercise_argument_compression SMALLINT,
     exercise_result_compression SMALLINT,
 
-    domain_id INTEGER,
+    domain_id INTEGER NOT NULL,
     trace_context BINARY LARGE OBJECT
 );
 
@@ -447,7 +406,7 @@ CREATE INDEX participant_events_assign_event_sequential_id ON participant_events
 CREATE INDEX participant_events_assign_event_offset ON participant_events_assign (event_offset, event_sequential_id);
 
 -- index for queries resolving contract ID to sequential IDs.
-CREATE INDEX participant_events_assign_event_contract_id ON participant_events_assign (contract_id);
+CREATE INDEX participant_events_assign_event_contract_id ON participant_events_assign (contract_id, event_sequential_id);
 
 -----------------------------
 -- Filter tables for events

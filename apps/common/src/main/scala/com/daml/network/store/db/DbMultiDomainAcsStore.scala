@@ -48,7 +48,7 @@ import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, Reassignm
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableWithStateResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
 import scala.collection.mutable
 
@@ -77,7 +77,7 @@ class DbMultiDomainAcsStore[TXE](
   import DbMultiDomainAcsStore.*
   import profile.api.jdbcActionExtensionMethods
 
-  override protected def metricsFactory: LabeledMetricsFactory = retryProvider.metricsFactory
+  override protected def metricsFactory: CantonLabeledMetricsFactory = retryProvider.metricsFactory
 
   private val state = new AtomicReference[State](State.empty())
 

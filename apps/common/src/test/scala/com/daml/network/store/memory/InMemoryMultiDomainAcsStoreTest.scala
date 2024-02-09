@@ -13,7 +13,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 
 class InMemoryMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[

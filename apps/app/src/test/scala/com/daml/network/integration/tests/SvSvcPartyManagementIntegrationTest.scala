@@ -161,7 +161,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         coinFromSv4Participant should have size 2
         coinFromSv4Participant shouldBe coinFromSv1Participant
 
-        sv4Participant.ledger_api_v2.state.acs.of_party(svcParty) should not be empty
+        sv4Participant.ledger_api.state.acs.of_party(svcParty) should not be empty
       }
 
       clue("sv4 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {

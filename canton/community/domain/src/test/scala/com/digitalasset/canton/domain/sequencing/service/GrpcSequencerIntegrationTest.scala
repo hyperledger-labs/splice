@@ -20,7 +20,7 @@ import com.digitalasset.canton.crypto.{HashPurpose, Nonce}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.api.v30
 import com.digitalasset.canton.domain.api.v30.SequencerAuthenticationServiceGrpc.SequencerAuthenticationService
-import com.digitalasset.canton.domain.metrics.DomainTestMetrics
+import com.digitalasset.canton.domain.metrics.SequencerTestMetrics
 import com.digitalasset.canton.domain.sequencing.SequencerParameters
 import com.digitalasset.canton.domain.sequencing.sequencer.Sequencer
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.CreateSubscriptionError
@@ -150,12 +150,12 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
   private val service =
     new GrpcSequencerService(
       sequencer,
-      DomainTestMetrics.sequencer,
+      SequencerTestMetrics,
       loggerFactory,
       authenticationCheck,
       new SubscriptionPool[GrpcManagedSubscription[_]](
         clock,
-        DomainTestMetrics.sequencer,
+        SequencerTestMetrics,
         timeouts,
         loggerFactory,
       ),
@@ -175,15 +175,17 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
   )
 
   private val authService = new SequencerAuthenticationService {
-    override def challenge(request: v30.Challenge.Request): Future[v30.Challenge.Response] =
+    override def challenge(
+        request: v30.SequencerAuthentication.ChallengeRequest
+    ): Future[v30.SequencerAuthentication.ChallengeResponse] =
       for {
         fingerprints <- cryptoApi.ips.currentSnapshotApproximation
           .signingKeys(participant)
           .map(_.map(_.fingerprint).toList)
-      } yield v30.Challenge.Response(
-        v30.Challenge.Response.Value
+      } yield v30.SequencerAuthentication.ChallengeResponse(
+        v30.SequencerAuthentication.ChallengeResponse.Value
           .Success(
-            v30.Challenge.Success(
+            v30.SequencerAuthentication.ChallengeResponse.Success(
               ReleaseVersion.current.toProtoPrimitive,
               Nonce.generate(cryptoApi.pureCrypto).toProtoPrimitive,
               fingerprints.map(_.unwrap),
@@ -191,13 +193,13 @@ final case class Env(loggerFactory: NamedLoggerFactory)(implicit
           )
       )
     override def authenticate(
-        request: v30.Authentication.Request
-    ): Future[v30.Authentication.Response] =
+        request: v30.SequencerAuthentication.AuthenticateRequest
+    ): Future[v30.SequencerAuthentication.AuthenticateResponse] =
       Future.successful(
-        v30.Authentication.Response(
-          v30.Authentication.Response.Value
+        v30.SequencerAuthentication.AuthenticateResponse(
+          v30.SequencerAuthentication.AuthenticateResponse.Value
             .Success(
-              v30.Authentication.Success(
+              v30.SequencerAuthentication.AuthenticateResponse.Success(
                 AuthenticationToken.generate(cryptoApi.pureCrypto).toProtoPrimitive,
                 Some(clock.now.plusSeconds(100000).toProtoPrimitive),
               )

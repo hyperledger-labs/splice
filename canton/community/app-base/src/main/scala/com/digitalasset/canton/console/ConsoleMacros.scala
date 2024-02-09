@@ -191,7 +191,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       def apply(
           file: Option[String] = None,
           useParticipantAlias: Boolean = true,
-          defaultParticipantX: Option[ParticipantReferenceX] = None,
+          defaultParticipantX: Option[ParticipantReference] = None,
       )(implicit env: ConsoleEnvironment): JFile = {
 
         def toLedgerApi(participantConfig: BaseParticipantConfig) =
@@ -200,7 +200,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
             participantConfig.clientLedgerApi.port.unwrap,
           )
 
-        def participantValue(p: ParticipantReferenceX): String =
+        def participantValue(p: ParticipantReference): String =
           if (useParticipantAlias) p.name else p.uid.toProtoPrimitive
 
         val allParticipants = env.participantsX.all
@@ -237,7 +237,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     def generate_daml_script_participants_conf(
         file: Option[String] = None,
         useParticipantAlias: Boolean = true,
-        defaultParticipantX: Option[ParticipantReferenceX] = None,
+        defaultParticipantX: Option[ParticipantReference] = None,
     )(implicit env: ConsoleEnvironment): JFile =
       GenerateDamlScriptParticipantsConf(
         file,
@@ -326,7 +326,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         |part of repair or export/import procedure, the corresponding contract id must be recomputed."""
     )
     def recompute_contract_ids(
-        participant: LocalParticipantReferenceX,
+        participant: LocalParticipantReference,
         acs: Seq[SerializableContract],
         protocolVersion: ProtocolVersion,
     ): (Seq[SerializableContract], Map[LfContractId, LfContractId]) = {
@@ -569,7 +569,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     // intentionally not publicly documented
     object jwt {
       def generate_unsafe_token_for_participant(
-          participant: LocalParticipantReferenceX,
+          participant: LocalParticipantReference,
           admin: Boolean,
           applicationId: String,
       ): Map[PartyId, String] = {
@@ -746,7 +746,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         |transactions as well as the fully authorized decentralized namespace definition in the specified topology store."""
     )
     def decentralized_namespace(
-        owners: Seq[InstanceReferenceX],
+        owners: Seq[InstanceReference],
         store: String = AuthorizedStore.filterName,
     ): (Namespace, Seq[GenericSignedTopologyTransactionX]) = {
       val ownersNE = NonEmpty
@@ -804,7 +804,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     }
 
     private def expected_namespace(
-        owners: Seq[InstanceReferenceX]
+        owners: Seq[InstanceReference]
     ): Either[String, Option[Namespace]] = {
       val expectedNamespace =
         DecentralizedNamespaceDefinitionX.computeNamespace(
@@ -829,11 +829,11 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     }
 
     private def in_domain(
-        sequencers: NonEmpty[Seq[SequencerNodeReferenceX]],
-        mediators: NonEmpty[Seq[MediatorReferenceX]],
+        sequencers: NonEmpty[Seq[SequencerNodeReference]],
+        mediators: NonEmpty[Seq[MediatorReference]],
     )(domainId: DomainId): Either[String, Option[DomainId]] = {
       def isNotInitializedOrSuccessWithDomain(
-          instance: InstanceReferenceX
+          instance: InstanceReference
       ): Either[String, Boolean /* isInitializedWithDomain */ ] = {
         instance.health.status match {
           case nonFailure if nonFailure.isActive.contains(false) =>
@@ -873,7 +873,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         )
     }
 
-    private def no_domain(nodes: NonEmpty[Seq[InstanceReferenceX]]): Either[String, Unit] =
+    private def no_domain(nodes: NonEmpty[Seq[InstanceReference]]): Either[String, Unit] =
       EitherUtil.condUnitE(
         !nodes.exists(_.health.initialized()),
         "the domain has not yet been bootstrapped but some sequencers or mediators are already part of one",
@@ -881,9 +881,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     private def check_domain_bootstrap_status(
         name: String,
-        owners: Seq[InstanceReferenceX],
-        sequencers: Seq[SequencerNodeReferenceX],
-        mediators: Seq[MediatorReferenceX],
+        owners: Seq[InstanceReference],
+        sequencers: Seq[SequencerNodeReference],
+        mediators: Seq[MediatorReference],
     ): Either[String, Option[DomainId]] =
       for {
         neOwners <- NonEmpty.from(owners.distinct).toRight("you need at least one domain owner")
@@ -903,9 +903,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     private def run_bootstrap(
         domainName: String,
         staticDomainParameters: data.StaticDomainParameters,
-        domainOwners: Seq[InstanceReferenceX],
-        sequencers: Seq[SequencerNodeReferenceX],
-        mediators: Seq[MediatorReferenceX],
+        domainOwners: Seq[InstanceReference],
+        sequencers: Seq[SequencerNodeReference],
+        mediators: Seq[MediatorReference],
     ): DomainId = {
       val (decentralizedNamespace, foundingTxs) =
         bootstrap.decentralized_namespace(domainOwners, store = AuthorizedStore.filterName)
@@ -981,9 +981,9 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     )
     def domain(
         domainName: String,
-        sequencers: Seq[SequencerNodeReferenceX],
-        mediators: Seq[MediatorReferenceX],
-        domainOwners: Seq[InstanceReferenceX] = Seq.empty,
+        sequencers: Seq[SequencerNodeReference],
+        mediators: Seq[MediatorReference],
+        domainOwners: Seq[InstanceReference] = Seq.empty,
         staticDomainParameters: data.StaticDomainParameters =
           data.StaticDomainParameters.defaultsWithoutKMS,
     ): DomainId = {
@@ -1022,7 +1022,7 @@ object ConsoleMacros extends ConsoleMacros with NamedLogging {
 object DebuggingHelpers extends LazyLogging {
 
   def get_active_contracts(
-      ref: LocalParticipantReferenceCommon[?],
+      ref: LocalParticipantReference,
       limit: PositiveInt = PositiveInt.tryCreate(1000000),
   ): (Map[String, String], Map[String, TemplateId]) =
     get_active_contracts_helper(
@@ -1031,7 +1031,7 @@ object DebuggingHelpers extends LazyLogging {
     )
 
   def get_active_contracts_from_internal_db_state(
-      ref: ParticipantReferenceCommon,
+      ref: ParticipantReference,
       state: SyncStateInspection,
       limit: PositiveInt = PositiveInt.tryCreate(1000000),
   ): (Map[String, String], Map[String, TemplateId]) =
@@ -1044,7 +1044,7 @@ object DebuggingHelpers extends LazyLogging {
     )
 
   private def get_active_contracts_helper(
-      ref: ParticipantReferenceCommon,
+      ref: ParticipantReference,
       lookup: DomainAlias => Seq[(Boolean, SerializableContract)],
   ): (Map[String, String], Map[String, TemplateId]) = {
     val syncAcs = ref.domains
@@ -1057,11 +1057,11 @@ object DebuggingHelpers extends LazyLogging {
       }
       .toMap
     val lapiAcs =
-      ref.ledger_api_v2.state.acs.of_all().map(ev => (ev.event.contractId, ev.templateId)).toMap
+      ref.ledger_api.state.acs.of_all().map(ev => (ev.event.contractId, ev.templateId)).toMap
     (syncAcs, lapiAcs)
   }
 
-  def diff_active_contracts(ref: LocalParticipantReferenceCommon[?], limit: Int = 1000000): Unit = {
+  def diff_active_contracts(ref: LocalParticipantReference, limit: Int = 1000000): Unit = {
     val (syncAcs, lapiAcs) = get_active_contracts(ref, limit)
     if (syncAcs.sizeCompare(lapiAcs) != 0) {
       logger.error(s"Sync ACS differs ${syncAcs.size} from Ledger API ACS ${lapiAcs.size} in size")
@@ -1088,7 +1088,7 @@ object DebuggingHelpers extends LazyLogging {
   }
 
   def active_contracts_by_template(
-      ref: LocalParticipantReferenceCommon[?],
+      ref: LocalParticipantReference,
       limit: Int = 1000000,
   ): (Map[String, Int], Map[TemplateId, Int]) = {
     val (syncAcs, lapiAcs) = get_active_contracts(ref, limit)

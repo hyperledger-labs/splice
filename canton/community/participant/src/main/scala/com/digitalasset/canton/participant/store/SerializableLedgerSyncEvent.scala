@@ -145,7 +145,7 @@ private[store] object SerializableLedgerSyncEvent
 
   override val supportedProtoVersions: SupportedProtoVersions =
     SupportedProtoVersions(
-      ProtoVersion(0) -> VersionedProtoConverter
+      ProtoVersion(30) -> VersionedProtoConverter
         .storage(ReleaseProtocolVersion(ProtocolVersion.v30), v30.LedgerSyncEvent)(
           supportedProtoVersion(_)(fromProtoV30),
           _.toProtoV30.toByteString,
@@ -661,7 +661,6 @@ private[store] final case class SerializableDivulgedContract(divulgedContract: D
     val DivulgedContract(contractId, contractInst) = divulgedContract
     v30.DivulgedContract(
       contractId = contractId.toProtoPrimitive,
-      // This is fine to use empty agreement text for divulged contract
       contractInst = serializeContract(contractInst)
         .valueOr(err =>
           throw new DbSerializationException(
@@ -679,11 +678,10 @@ private[store] object SerializableDivulgedContract {
     val v30.DivulgedContract(contractIdP, contractInstP) = divulgedContract
     for {
       contractId <- ProtoConverter.parseLfContractId(contractIdP)
-      contractInstAndAgreementText <- deserializeContract(contractInstP).leftMap(err =>
+      contractInstance <- deserializeContract(contractInstP).leftMap(err =>
         ValueConversionError("contractInst", err.errorMessage)
       )
-      contractInst = contractInstAndAgreementText.map(_.contractInstance)
-    } yield DivulgedContract(contractId, contractInst)
+    } yield DivulgedContract(contractId, contractInstance)
   }
 }
 
@@ -695,9 +693,12 @@ private[store] final case class SerializableCommandRejected(
       commandRejected
 
     val commandKindP = commandKind match {
-      case ProcessingSteps.RequestType.Transaction => v30.CommandKind.Transaction
-      case ProcessingSteps.RequestType.TransferOut => v30.CommandKind.TransferOut
-      case ProcessingSteps.RequestType.TransferIn => v30.CommandKind.TransferIn
+      case ProcessingSteps.RequestType.Transaction =>
+        v30.CommandKind.COMMAND_KIND_TRANSACTION_UNSPECIFIED
+      case ProcessingSteps.RequestType.TransferOut =>
+        v30.CommandKind.COMMAND_KIND_TRANSFER_OUT
+      case ProcessingSteps.RequestType.TransferIn =>
+        v30.CommandKind.COMMAND_KIND_TRANSFER_IN
     }
 
     v30.CommandRejected(
@@ -724,9 +725,12 @@ private[store] object SerializableCommandRejected {
       commandRejectedP
 
     val commandTypeE: ParsingResult[ProcessingSteps.RequestType.Values] = commandTypeP match {
-      case v30.CommandKind.Transaction => Right(ProcessingSteps.RequestType.Transaction)
-      case v30.CommandKind.TransferOut => Right(ProcessingSteps.RequestType.TransferOut)
-      case v30.CommandKind.TransferIn => Right(ProcessingSteps.RequestType.TransferIn)
+      case v30.CommandKind.COMMAND_KIND_TRANSACTION_UNSPECIFIED =>
+        Right(ProcessingSteps.RequestType.Transaction)
+      case v30.CommandKind.COMMAND_KIND_TRANSFER_OUT =>
+        Right(ProcessingSteps.RequestType.TransferOut)
+      case v30.CommandKind.COMMAND_KIND_TRANSFER_IN =>
+        Right(ProcessingSteps.RequestType.TransferIn)
       case v30.CommandKind.Unrecognized(unrecognizedValue) =>
         Left(ProtoDeserializationError.UnrecognizedEnum("command kind", unrecognizedValue))
     }

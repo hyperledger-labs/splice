@@ -13,7 +13,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.ledger.javaapi.data.{
   CreatedEvent as JavaCreatedEvent,
   ExercisedEvent,
-  Transaction as JavaTransaction,
+  TransactionV2,
   TransactionTreeV2,
 }
 
@@ -36,7 +36,7 @@ object JavaDecodeUtil {
 
   def decodeAllCreated[TC](
       companion: ContractCompanion[TC, ?, ?]
-  )(transaction: JavaTransaction): Seq[TC] = {
+  )(transaction: TransactionV2): Seq[TC] = {
     for {
       event <- transaction.getEvents.asScala.toList
       eventP = event.toProtoEvent

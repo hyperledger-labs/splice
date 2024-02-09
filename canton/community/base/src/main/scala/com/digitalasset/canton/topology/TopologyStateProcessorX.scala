@@ -16,6 +16,7 @@ import com.digitalasset.canton.topology.processing.{
 }
 import com.digitalasset.canton.topology.store.ValidatedTopologyTransactionX.GenericValidatedTopologyTransactionX
 import com.digitalasset.canton.topology.store.{
+  SignedTopologyTransactionsX,
   TopologyStoreId,
   TopologyStoreX,
   TopologyTransactionRejection,
@@ -77,6 +78,9 @@ class TopologyStateProcessorX(
       pureCrypto,
       store,
       None,
+      // if transactions are put directly into a store (ie there is no outbox queue)
+      // then the authorization validation is final.
+      validationIsFinal = outboxQueue.isEmpty,
       loggerFactory.append("role", "incoming"),
     )
 
@@ -91,7 +95,7 @@ class TopologyStateProcessorX(
   def validateAndApplyAuthorization(
       sequenced: SequencedTime,
       effective: EffectiveTime,
-      transactions: Seq[GenericSignedTopologyTransactionX],
+      transactionsToValidate: Seq[GenericSignedTopologyTransactionX],
       // TODO(#12390) propagate and abort unless we use force
       abortIfCascading: Boolean,
       expectFullAuthorization: Boolean,
@@ -106,9 +110,11 @@ class TopologyStateProcessorX(
 
     type Lft = Seq[GenericValidatedTopologyTransactionX]
 
+    val transactions = SignedTopologyTransactionsX.compact(transactionsToValidate)
+
     // first, pre-load the currently existing mappings and proposals for the given transactions
-    val preloadTxsForMappingF = preloadTxsForMapping(EffectiveTime.MaxValue, transactions)
-    val preloadProposalsForTxF = preloadProposalsForTx(EffectiveTime.MaxValue, transactions)
+    val preloadTxsForMappingF = preloadTxsForMapping(effective, transactions)
+    val preloadProposalsForTxF = preloadProposalsForTx(effective, transactions)
     val duplicatesF = findDuplicates(effective, transactions)
     // TODO(#14064) preload authorization data
     val ret = for {
@@ -335,13 +341,11 @@ class TopologyStateProcessorX(
         else {
           // check that the transaction has not been added before (but allow it if it has a different version ...)
           store
-            .findStored(tx)
+            .findStored(timestamp.value, tx)
             .map(
               _.filter(x =>
-                // if the stored transaction was stored at an earlier effective time
-                x.validFrom.value < timestamp.value &&
-                  // and the transaction to validate has the same proto version
-                  x.transaction.protoVersion == tx.protoVersion &&
+                // if the transaction to validate has the same proto version
+                x.transaction.protoVersion == tx.protoVersion &&
                   // and the transaction to validate doesn't add new signatures
                   tx.signatures.diff(x.transaction.signatures).isEmpty
               ).map(_.validFrom)

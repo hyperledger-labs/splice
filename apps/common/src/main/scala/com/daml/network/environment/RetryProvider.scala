@@ -16,7 +16,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.{Backoff, RetryUtil, Success}
@@ -52,7 +52,7 @@ final class RetryProvider(
     override val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
     val futureSupervisor: FutureSupervisor,
-    val metricsFactory: LabeledMetricsFactory,
+    val metricsFactory: CantonLabeledMetricsFactory,
 ) extends NamedLogging
     with FlagCloseable {
   import RetryProvider.Retryable
@@ -399,7 +399,7 @@ object RetryProvider {
       loggerFactory: NamedLoggerFactory,
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
-      metricsFactory: LabeledMetricsFactory,
+      metricsFactory: CantonLabeledMetricsFactory,
   ): RetryProvider = {
     new RetryProvider(loggerFactory, timeouts, futureSupervisor, metricsFactory)
   }
@@ -429,7 +429,7 @@ object RetryProvider {
       transientDescription: String,
       nonTransientDescription: String,
       fatalBehavior: String,
-      metricsFactory: LabeledMetricsFactory,
+      metricsFactory: CantonLabeledMetricsFactory,
       additionalMetricsLabels: Map[String, String],
   ) extends ExceptionRetryable {
     // Additional categories that are not marked as retryable but we
@@ -644,7 +644,7 @@ object RetryProvider {
     private[RetryProvider] def apply(
         operationName: String,
         a: A,
-        metricsFactory: LabeledMetricsFactory,
+        metricsFactory: CantonLabeledMetricsFactory,
         additionalMetricsLabels: Map[String, String],
     ): ExceptionRetryable
   }
@@ -655,7 +655,7 @@ object RetryProvider {
         override def apply(
             operationName: String,
             a: String => ExceptionRetryable,
-            metricsFactory: LabeledMetricsFactory,
+            metricsFactory: CantonLabeledMetricsFactory,
             additionalMetricsLabels: Map[String, String],
         ) = a(operationName)
       }
@@ -664,7 +664,7 @@ object RetryProvider {
       override def apply(
           operationName: String,
           additionalCodes: Seq[Status.Code],
-          metricsFactory: LabeledMetricsFactory,
+          metricsFactory: CantonLabeledMetricsFactory,
           additionalMetricsLabels: Map[String, String],
       ) = RetryProvider.RetryableError(
         operationName,
@@ -683,7 +683,7 @@ object RetryProvider {
         override def apply(
             operationName: String,
             additionalConditions: RetryableConditions,
-            metricsFactory: LabeledMetricsFactory,
+            metricsFactory: CantonLabeledMetricsFactory,
             additionalMetricsLabels: Map[String, String],
         ) = RetryProvider.RetryableError(
           operationName,

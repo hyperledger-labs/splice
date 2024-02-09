@@ -1,5 +1,5 @@
 # SV local state that only has the SV as a stakeholder
-sdk-version: 3.0.0-snapshot.20240130.12664.0.va195d0f6
+sdk-version: 3.0.0-snapshot.20240207.12714.0.v2ff3f7c3
 name: sv-local
 source: daml
 version: 0.1.0

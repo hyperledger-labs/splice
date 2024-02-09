@@ -1013,6 +1013,7 @@ object BuildCommon {
       .disablePlugins(WartRemover, ScalafmtPlugin)
       .dependsOn(
         `canton-daml-errors` % "compile->compile;test->test",
+        `canton-util-logging`,
         `canton-ledger-api`,
       )
       .settings(

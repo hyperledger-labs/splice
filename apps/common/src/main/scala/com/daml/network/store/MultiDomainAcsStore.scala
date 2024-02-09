@@ -32,7 +32,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -48,7 +48,7 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
   private implicit val mc: MetricsContext = MetricsContext(
     "store_name" -> this.getClass.getSimpleName
   )
-  protected def metricsFactory: LabeledMetricsFactory
+  protected def metricsFactory: CantonLabeledMetricsFactory
   val metrics = new StoreMetrics(metricsFactory)
 
   import MultiDomainAcsStore.*

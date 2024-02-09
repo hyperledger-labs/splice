@@ -8,7 +8,7 @@ import com.daml.network.sv.migration.DomainDataSnapshot.Dar
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.protocol.v30.TopologyTransactions
+import com.digitalasset.canton.topology.admin.v30.TopologyTransactions
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.tracing.TraceContext
@@ -73,9 +73,9 @@ object DomainDataSnapshot {
     topologySnapshotWithProposals <- participantAdminConnection
       .getTopologySnapshot(
         globalDomain,
-        tryFromInstant(timestamp),
+        CantonTimestamp.tryFromInstant(timestamp),
       )
-    topologySnapshot = topologySnapshotWithProposals.filter(_.isProposal == false)
+    topologySnapshot = topologySnapshotWithProposals.filter(_.transaction.isProposal == false)
     acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
       Set(svcStore.key.svParty, svcStore.key.svcParty)
     )
@@ -92,14 +92,4 @@ object DomainDataSnapshot {
   )
 
   final case class Dar(hash: Hash, content: ByteString)
-  private def tryFromInstant(time: Instant) =
-    CantonTimestamp
-      .fromInstant(time)
-      .fold(
-        err =>
-          throw new IllegalArgumentException(
-            s"cannot parse the instant $time for the topology snapshot: $err"
-          ),
-        identity,
-      )
 }

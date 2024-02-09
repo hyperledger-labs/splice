@@ -5,7 +5,9 @@ package com.digitalasset.canton.topology.store
 
 import cats.syntax.option.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.CantonRequireTypes.String255
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.topology.DefaultTestIdentities
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.*
@@ -16,6 +18,111 @@ trait TopologyStoreXTest extends AsyncWordSpec with TopologyStoreXTestBase {
 
   val testData = new TopologyStoreXTestData(loggerFactory, executionContext)
   import testData.*
+
+  private lazy val submissionId = String255.tryCreate("submissionId")
+  private lazy val submissionId2 = String255.tryCreate("submissionId2")
+
+  protected def partyMetadataStore(mk: () => PartyMetadataStore): Unit = {
+    import DefaultTestIdentities.*
+    "inserting new succeeds" in {
+      val store = mk()
+      for {
+        _ <- store.insertOrUpdatePartyMetadata(
+          party1,
+          Some(participant1),
+          None,
+          CantonTimestamp.Epoch,
+          submissionId,
+        )
+        fetch <- store.metadataForParty(party1)
+      } yield {
+        fetch shouldBe Some(
+          PartyMetadata(party1, None, Some(participant1))(CantonTimestamp.Epoch, submissionId)
+        )
+      }
+    }
+
+    "updating existing succeeds" in {
+      val store = mk()
+      for {
+        _ <- store.insertOrUpdatePartyMetadata(
+          party1,
+          None,
+          None,
+          CantonTimestamp.Epoch,
+          submissionId,
+        )
+        _ <- store.insertOrUpdatePartyMetadata(
+          party2,
+          None,
+          None,
+          CantonTimestamp.Epoch,
+          submissionId,
+        )
+        _ <- store.insertOrUpdatePartyMetadata(
+          party1,
+          Some(participant1),
+          Some(String255.tryCreate("MoreName")),
+          CantonTimestamp.Epoch,
+          submissionId,
+        )
+        _ <- store.insertOrUpdatePartyMetadata(
+          party2,
+          Some(participant3),
+          Some(String255.tryCreate("Boooh")),
+          CantonTimestamp.Epoch,
+          submissionId,
+        )
+        meta1 <- store.metadataForParty(party1)
+        meta2 <- store.metadataForParty(party2)
+      } yield {
+        meta1 shouldBe Some(
+          PartyMetadata(party1, Some(String255.tryCreate("MoreName")), Some(participant1))(
+            CantonTimestamp.Epoch,
+            String255.empty,
+          )
+        )
+        meta2 shouldBe Some(
+          PartyMetadata(party2, Some(String255.tryCreate("Boooh")), Some(participant3))(
+            CantonTimestamp.Epoch,
+            String255.empty,
+          )
+        )
+      }
+    }
+
+    "deal with delayed notifications" in {
+      val store = mk()
+      val rec1 =
+        PartyMetadata(party1, None, Some(participant1))(CantonTimestamp.Epoch, submissionId)
+      val rec2 =
+        PartyMetadata(party2, Some(String255.tryCreate("Boooh")), Some(participant3))(
+          CantonTimestamp.Epoch,
+          submissionId2,
+        )
+      for {
+        _ <- store.insertOrUpdatePartyMetadata(
+          rec1.partyId,
+          rec1.participantId,
+          rec1.displayName,
+          rec1.effectiveTimestamp,
+          rec1.submissionId,
+        )
+        _ <- store.insertOrUpdatePartyMetadata(
+          rec2.partyId,
+          rec2.participantId,
+          rec2.displayName,
+          rec2.effectiveTimestamp,
+          rec2.submissionId,
+        )
+        _ <- store.markNotified(rec2)
+        notNotified <- store.fetchNotNotified()
+      } yield {
+        notNotified shouldBe Seq(rec1)
+      }
+    }
+
+  }
 
   // TODO(#14066): Test coverage is rudimentary - enough to convince ourselves that queries basically seem to work.
   //  Increase coverage.
@@ -59,8 +166,9 @@ trait TopologyStoreXTest extends AsyncWordSpec with TopologyStoreXTestBase {
             _ <- update(store, ts6, add = Seq(tx6_MDS))
 
             maxTs <- store.maxTimestamp()
-            retrievedTx <- store.findStored(tx1_NSD_Proposal)
+            retrievedTx <- store.findStored(CantonTimestamp.MaxValue, tx1_NSD_Proposal)
             txProtocolVersion <- store.findStoredForVersion(
+              CantonTimestamp.MaxValue,
               tx1_NSD_Proposal.transaction,
               ProtocolVersion.v30,
             )
@@ -89,9 +197,9 @@ trait TopologyStoreXTest extends AsyncWordSpec with TopologyStoreXTestBase {
               ts4,
               removeMapping = Set(tx1_NSD_Proposal.transaction.mapping.uniqueKey),
             )
-            removedByMappingHash <- store.findStored(tx1_NSD_Proposal)
+            removedByMappingHash <- store.findStored(CantonTimestamp.MaxValue, tx1_NSD_Proposal)
             _ <- update(store, ts4, removeTxs = Set(tx2_OTK.transaction.hash))
-            removedByTxHash <- store.findStored(tx2_OTK)
+            removedByTxHash <- store.findStored(CantonTimestamp.MaxValue, tx2_OTK)
 
             mdsTx <- store.findFirstMediatorStateForMediator(
               tx6_MDS.transaction.mapping.active.headOption.getOrElse(fail())
@@ -102,8 +210,6 @@ trait TopologyStoreXTest extends AsyncWordSpec with TopologyStoreXTestBase {
             )
 
           } yield {
-            store.dumpStoreContent()
-
             assert(maxTs.contains((SequencedTime(ts6), EffectiveTime(ts6))))
             retrievedTx.map(_.transaction) shouldBe Some(tx1_NSD_Proposal)
             txProtocolVersion.map(_.transaction) shouldBe Some(tx1_NSD_Proposal)

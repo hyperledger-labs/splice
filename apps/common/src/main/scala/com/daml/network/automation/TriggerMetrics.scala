@@ -4,10 +4,10 @@ import com.daml.network.environment.CNMetrics
 import com.daml.metrics.api.{MetricDoc, MetricName}
 import com.daml.metrics.api.MetricDoc.MetricQualification.{Latency, Traffic}
 import com.daml.metrics.api.MetricHandle.{Timer, Meter}
-import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
 class TriggerMetrics(
-    metricsFactory: LabeledMetricsFactory
+    metricsFactory: CantonLabeledMetricsFactory
 ) {
   val prefix: MetricName = CNMetrics.MetricsPrefix :+ "trigger"
 

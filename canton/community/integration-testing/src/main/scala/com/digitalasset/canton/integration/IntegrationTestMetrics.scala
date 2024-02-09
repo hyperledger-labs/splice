@@ -4,7 +4,8 @@
 package com.digitalasset.canton.integration
 
 import com.daml.metrics.api.{MetricHandle, MetricName, MetricsContext}
-import com.digitalasset.canton.metrics.MetricHandle.{LabeledMetricsFactory, NoOpMetricsFactory}
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
+import CantonLabeledMetricsFactory.NoOpMetricsFactory
 import org.scalatest.Suite
 
 import scala.collection.concurrent.TrieMap
@@ -21,7 +22,7 @@ trait IntegrationTestMetrics {
     * Here we want to collect metrics about the test infrastructure, i.e., code that runs before
     * EnvironmentSetup starts the application. We therefore can't reuse any existing metric factories.
     */
-  protected def testInfrastructureMetricsFactory: LabeledMetricsFactory = NoOpMetricsFactory
+  protected def testInfrastructureMetricsFactory: CantonLabeledMetricsFactory = NoOpMetricsFactory
 
   protected def testInfrastructureSuiteMetrics: IntegrationTestMetrics.SuiteMetrics =
     IntegrationTestMetrics.suiteMetrics.getOrElseUpdate(
@@ -67,7 +68,7 @@ object IntegrationTestMetrics {
     def environmentCreateFixture: MetricHandle.Timer
   }
 
-  class SuiteMetrics(suiteName: String, metricsFactory: LabeledMetricsFactory)
+  class SuiteMetrics(suiteName: String, metricsFactory: CantonLabeledMetricsFactory)
       extends EnvironmentMetrics {
     val context = MetricsContext(
       "suite_name" -> this.suiteName
@@ -107,8 +108,11 @@ object IntegrationTestMetrics {
     )(context)
   }
 
-  class TestMetrics(suiteName: String, testName: String, metricsFactory: LabeledMetricsFactory)
-      extends EnvironmentMetrics {
+  class TestMetrics(
+      suiteName: String,
+      testName: String,
+      metricsFactory: CantonLabeledMetricsFactory,
+  ) extends EnvironmentMetrics {
     val context = MetricsContext(
       "suite_name" -> this.suiteName,
       "test_name" -> this.testName,

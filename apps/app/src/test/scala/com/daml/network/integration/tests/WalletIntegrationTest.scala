@@ -3,7 +3,6 @@ package com.daml.network.integration.tests
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
-import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
@@ -16,6 +15,7 @@ import com.daml.network.util.{JavaDecodeUtil as DecodeUtil, WalletTestUtil}
 import com.daml.network.integration.plugins.UseInMemoryStores
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 import com.typesafe.config.ConfigFactory
 import org.slf4j.event.Level
@@ -120,7 +120,7 @@ class WalletIntegrationTest
             )
           )
         val offsetBefore =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_v2.state.end()
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end()
         // sending three commands in short succession to the idle wallet should lead to two transactions being executed
         // tx 1: first command that arrived is immediately executed
         // tx 2: other commands that arrived after the first command was started are executed in one batch
@@ -170,7 +170,7 @@ class WalletIntegrationTest
         }
 
         val offsetBefore =
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_v2.state.end()
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.state.end()
 
         requests.foreach { case (requestId, _) =>
           Future(aliceWalletClient.acceptAppPaymentRequest(requestId)).discard
@@ -354,6 +354,9 @@ class WalletIntegrationTest
       val splitwellDomainId = aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
         DomainAlias.tryCreate("splitwell")
       )
+      val globalDomainId = aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
+        DomainAlias.tryCreate("global")
+      )
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(50)
       val (_, requestId) = actAndCheck(
@@ -367,10 +370,11 @@ class WalletIntegrationTest
       )(
         "request and delivery offer get transferred to global domain",
         { case (request, _) =>
-          val domains = aliceValidatorBackend.participantClientWithAdminToken.transfer
-            .lookup_contract_domain(request)
-          domains shouldBe Map[LfContractId, String](
-            javaToScalaContractId(request) -> "global"
+          val domains =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .lookup_contract_domain(aliceParty, Set(request.contractId))
+          domains shouldBe Map[String, DomainId](
+            request.contractId -> globalDomainId
           )
           request
         },

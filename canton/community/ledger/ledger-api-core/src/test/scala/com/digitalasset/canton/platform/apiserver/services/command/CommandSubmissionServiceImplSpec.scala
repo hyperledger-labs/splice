@@ -36,8 +36,7 @@ import com.digitalasset.canton.platform.apiserver.execution.{
   CommandExecutionResult,
   CommandExecutor,
 }
-import com.digitalasset.canton.platform.apiserver.services.ErrorCause
-import com.digitalasset.canton.platform.services.time.TimeProviderType
+import com.digitalasset.canton.platform.apiserver.services.{ErrorCause, TimeProviderType}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import com.google.rpc.status.Status as RpcStatus
@@ -107,7 +106,6 @@ class CommandSubmissionServiceImplSpec
     loggerFactory.assertLogs(
       within = {
         val tmplId = toIdentifier("M:T")
-        val sharedKeys = true
 
         val errorsToExpectedStatuses: Seq[(ErrorCause, Status)] = List(
           ErrorCause.DamlLf(
@@ -122,7 +120,7 @@ class CommandSubmissionServiceImplSpec
             LfError.Interpretation(
               LfError.Interpretation.DamlException(
                 LfInterpretationError.DuplicateContractKey(
-                  GlobalKey.assertBuild(tmplId, Value.ValueUnit, sharedKeys)
+                  GlobalKey.assertBuild(tmplId, Value.ValueUnit)
                 )
               ),
               None,

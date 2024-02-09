@@ -32,7 +32,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeNumeric
-import com.digitalasset.canton.domain.config.{CommunityDomainConfig, RemoteDomainConfig}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{
   CommunityParticipantConfig,
@@ -75,9 +74,7 @@ case class CNNodeConfig(
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
     // TODO(#736): we want to remove all of the configurations options below:
-    domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
-    remoteDomains: Map[InstanceName, RemoteDomainConfig] = Map.empty,
     remoteParticipants: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
     participantsX: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
     remoteParticipantsX: Map[InstanceName, RemoteParticipantConfig] = Map.empty,
@@ -541,8 +538,6 @@ object CNNodeConfig {
     implicit val splitwellClientConfigReader: ConfigReader[SplitwellAppClientConfig] =
       deriveReader[SplitwellAppClientConfig]
 
-    implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
-      deriveReader[CommunityDomainConfig]
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
       deriveReader[CommunityParticipantConfig]
 
@@ -760,8 +755,6 @@ object CNNodeConfig {
     implicit val splitwellClientConfigWriter: ConfigWriter[SplitwellAppClientConfig] =
       deriveWriter[SplitwellAppClientConfig]
 
-    implicit val communityDomainConfigWriter: ConfigWriter[CommunityDomainConfig] =
-      deriveWriter[CommunityDomainConfig]
     implicit val communityParticipantConfigWriter: ConfigWriter[CommunityParticipantConfig] =
       deriveWriter[CommunityParticipantConfig]
 

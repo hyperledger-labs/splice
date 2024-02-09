@@ -86,6 +86,7 @@ trait LedgerApiExtensions {
                 disclosedContracts = disclosedContracts.map(DisclosedContract.fromJavaProto(_)),
                 domainId = domainId,
                 applicationId = applicationId,
+                packageIdSelectionPreference = Seq.empty,
               )
             )
           }
@@ -194,7 +195,7 @@ trait LedgerApiExtensions {
             verbose: Boolean = true,
             timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
         ): Seq[javaapi.data.TransactionTreeV2] = {
-          ledgerApi.ledger_api_v2.updates
+          ledgerApi.ledger_api.updates
             .trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout)
             .collect { case LedgerApiV2Commands.UpdateService.TransactionTreeWrapper(tree) =>
               javaapi.data.TransactionTreeV2.fromProto(TransactionTree.toJavaProto(tree))
@@ -257,7 +258,7 @@ trait LedgerApiExtensions {
             filterIdentifier.qualifiedName.moduleName,
             filterIdentifier.qualifiedName.entityName,
           )
-          ledgerApi.ledger_api_v2.state.acs
+          ledgerApi.ledger_api.state.acs
             .of_party(partyId, filterTemplates = Seq(templateId))
             .map(_.event)
             .flatMap(ev =>
@@ -268,6 +269,17 @@ trait LedgerApiExtensions {
                 .toList
             )
             .filter(predicate)
+        }
+
+        def lookup_contract_domain(
+            partyId: PartyId,
+            contractIds: Set[String],
+        ): Map[String, DomainId] = {
+          val contracts = ledgerApi.ledger_api.state.acs.active_contracts_of_party(partyId)
+          contracts.view
+            .map(c => c.getCreatedEvent.contractId -> DomainId.tryFromString(c.domainId))
+            .filter({ case (c, _) => contractIds.contains(c) })
+            .toMap
         }
       }
     }

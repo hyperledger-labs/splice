@@ -16,8 +16,7 @@ import com.daml.network.util.{MultiDomainTestUtil, SplitwellTestUtil, WalletTest
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.protocol.LfContractId
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import org.slf4j.event.Level
 import scala.util.Try
@@ -99,7 +98,6 @@ class SplitwellUpgradeIntegrationTest
 
     "create per domain install contracts" in { implicit env =>
       val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      // val splitwellDomains = providerSplitwellBackend.getSplitwellDomainIds()
       val (_, install) = installFirstAlice(alice)
 
       bracket(
@@ -111,12 +109,18 @@ class SplitwellUpgradeIntegrationTest
           _ => {
             val (contracts, newInstall) = twoInstalls(alice, install)
             val contractDomains =
-              aliceValidatorBackend.participantClient.transfer.lookup_contract_domain(
-                contracts.map[LfContractId](_.id): _*
-              )
-            contractDomains shouldBe Map[LfContractId, DomainAlias](
-              javaToScalaContractId(newInstall.id) -> splitwellUpgradeAlias,
-              javaToScalaContractId(install.id) -> splitwellAlias,
+              aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+                .lookup_contract_domain(
+                  alice,
+                  contracts.map(_.id.contractId).toSet,
+                )
+            val splitwellUpgradeDomainId =
+              aliceValidatorBackend.participantClient.domains.id_of(splitwellUpgradeAlias)
+            val splitwellDomainId =
+              aliceValidatorBackend.participantClient.domains.id_of(splitwellAlias)
+            contractDomains shouldBe Map[String, DomainId](
+              newInstall.id.contractId -> splitwellUpgradeDomainId,
+              install.id.contractId -> splitwellDomainId,
             )
           },
         )
@@ -145,17 +149,23 @@ class SplitwellUpgradeIntegrationTest
         _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
       )
       val acceptedInvite = bobSplitwellClient.acceptInvite(invite)
+      val splitwellDomainId = aliceValidatorBackend.participantClient.domains.id_of(splitwellAlias)
+      val splitwellUpgradeDomainId =
+        aliceValidatorBackend.participantClient.domains.id_of(splitwellUpgradeAlias)
       val contractDomains =
-        splitwellBackend.participantClient.transfer.lookup_contract_domain(
-          group.contract.contractId,
-          invite.contract.contractId,
-          acceptedInvite,
+        splitwellBackend.participantClient.ledger_api_extensions.acs.lookup_contract_domain(
+          splitwellBackend.getProviderPartyId(),
+          Set(
+            group.contract.contractId.contractId,
+            invite.contract.contractId.contractId,
+            acceptedInvite.contractId,
+          ),
         )
-      contractDomains shouldBe Seq[LfContractId](
-        group.contract.contractId,
-        invite.contract.contractId,
-        acceptedInvite,
-      ).map(cid => cid -> splitwellAlias.unwrap).toMap
+      contractDomains shouldBe Seq[String](
+        group.contract.contractId.contractId,
+        invite.contract.contractId.contractId,
+        acceptedInvite.contractId,
+      ).map(cid => cid -> splitwellDomainId).toMap
       bracket(
         connectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
         disconnectSplitwellUpgradeDomain(aliceValidatorBackend.participantClient),
@@ -173,16 +183,19 @@ class SplitwellUpgradeIntegrationTest
               // group is transferred out by UpgradeGroupTrigger,
               // and in by the AssignTrigger.
               val contractDomains =
-                splitwellBackend.participantClient.transfer.lookup_contract_domain(
-                  group.contract.contractId,
-                  invite.contract.contractId,
-                  acceptedInvite,
+                splitwellBackend.participantClient.ledger_api_extensions.acs.lookup_contract_domain(
+                  splitwellBackend.getProviderPartyId(),
+                  Set(
+                    group.contract.contractId.contractId,
+                    invite.contract.contractId.contractId,
+                    acceptedInvite.contractId,
+                  ),
                 )
-              contractDomains shouldBe Seq[LfContractId](
-                group.contract.contractId,
-                invite.contract.contractId,
-                acceptedInvite,
-              ).map(cid => cid -> splitwellUpgradeAlias.unwrap).toMap
+              contractDomains shouldBe Seq[String](
+                group.contract.contractId.contractId,
+                invite.contract.contractId.contractId,
+                acceptedInvite.contractId,
+              ).map(cid => cid -> splitwellUpgradeDomainId).toMap
             },
           )
         }

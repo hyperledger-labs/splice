@@ -234,6 +234,7 @@ class SyncDomain(
     persistent.submissionTrackerStore,
     participantNodePersistentState.map(_.inFlightSubmissionStore),
     domainId,
+    parameters.journalGarbageCollectionDelay,
     timeouts,
     loggerFactory,
   )
@@ -249,6 +250,7 @@ class SyncDomain(
       journalGarbageCollector.observer,
       pruningMetrics,
       staticDomainParameters.protocolVersion,
+      staticDomainParameters.catchUpParameters,
       timeouts,
       futureSupervisor,
       persistent.activeContractStore,
@@ -563,7 +565,7 @@ class SyncDomain(
         clock,
         logger,
         parameters.delayLoggingThreshold,
-        metrics.sequencerClient.delay,
+        metrics.sequencerClient.handler.delay,
       )
 
     def firstUnpersistedEventScF: Future[SequencerCounter] =
@@ -579,14 +581,12 @@ class SyncDomain(
       Ordering[CantonTimestamp].min(cleanReplayTs, sequencerCounterPreheadTs)
     }
 
-    def waitForParticipantToBeInTopology(
+    def waitForParticipantToBeInTopology(implicit
         initializationTraceContext: TraceContext
     ): EitherT[FutureUnlessShutdown, SyncDomainInitializationError, Unit] =
       EitherT(
         domainHandle.topologyClient
-          .await(_.isParticipantActive(participantId), timeouts.verifyActive.duration)(
-            initializationTraceContext
-          )
+          .await(_.isParticipantActive(participantId), timeouts.verifyActive.duration)
           .map(isActive =>
             if (isActive) Right(())
             else

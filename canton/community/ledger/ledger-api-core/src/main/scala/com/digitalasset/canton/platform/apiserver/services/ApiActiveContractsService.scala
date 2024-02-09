@@ -78,7 +78,6 @@ private[apiserver] final class ApiActiveContractsService private (
               filter = filters,
               verbose = request.verbose,
               activeAtO = activeAtO,
-              multiDomainEnabled = false,
             )
             .map(ApiConversions.toV1)
         }
@@ -92,7 +91,7 @@ private[apiserver] final class ApiActiveContractsService private (
           identity,
         )
         .via(logger.logErrorsOnStream)
-        .via(StreamMetrics.countElements(metrics.daml.lapi.streams.acs))
+        .via(StreamMetrics.countElements(metrics.lapi.streams.acs))
     }
   }
 

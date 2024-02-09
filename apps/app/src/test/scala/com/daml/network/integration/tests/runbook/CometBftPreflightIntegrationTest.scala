@@ -51,7 +51,7 @@ class CometBftPreflightIntegrationTest
     }
   }
 
-  "Sv4 prunes its CometBFT stack" in { implicit env =>
+  "Sv4 pruneps its CometBFT stack" in { implicit env =>
     val RetainBlock = 10000 // check parameter configured in CometBft helm chart
 
     val sv4 = svclWithToken("sv4")

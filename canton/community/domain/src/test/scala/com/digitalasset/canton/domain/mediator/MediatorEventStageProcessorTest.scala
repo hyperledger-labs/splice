@@ -3,20 +3,18 @@
 
 package com.digitalasset.canton.domain.mediator
 
-import com.daml.metrics.api.MetricName
 import com.digitalasset.canton.config.CachingConfigs
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.crypto.{DomainSyncCryptoClient, Signature}
+import com.digitalasset.canton.crypto.{DomainSyncCryptoClient, Signature, TestHash}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.mediator.store.{
   InMemoryFinalizedResponseStore,
   InMemoryMediatorDeduplicationStore,
   MediatorState,
 }
-import com.digitalasset.canton.domain.metrics.{DomainTestMetrics, MediatorMetrics}
+import com.digitalasset.canton.domain.metrics.MediatorTestMetrics
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.LogEntry
-import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.sequencing.*
@@ -37,8 +35,8 @@ import scala.concurrent.Future
 class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest with HasTestCloseContext {
   self =>
   private lazy val domainId = DefaultTestIdentities.domainId
-  private lazy val mediatorId = DefaultTestIdentities.mediator
-  private lazy val mediatorMetrics = DomainTestMetrics.mediator
+  private lazy val mediatorId = DefaultTestIdentities.mediatorIdX
+  private lazy val mediatorMetrics = MediatorTestMetrics
   private lazy val participantResponseTimeout = NonNegativeFiniteDuration.tryOfSeconds(10)
   private lazy val factory = new ExampleTransactionFactory()(domainId = domainId)
   private lazy val fullInformeeTree = factory.MultipleRootsAndViewNestings.fullInformeeTree
@@ -103,7 +101,7 @@ class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest with H
       },
       testedProtocolVersion,
       noopDeduplicator,
-      new MediatorMetrics(MetricName("mediator-event-state-processor"), NoOpMetricsFactory),
+      MediatorTestMetrics,
       loggerFactory,
     )
 
@@ -118,7 +116,10 @@ class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest with H
         None,
         Batch.of(
           testedProtocolVersion,
-          (InformeeMessage(fullInformeeTree)(testedProtocolVersion), Recipients.cc(mediatorId)),
+          (
+            InformeeMessage(fullInformeeTree, Signature.noSignature)(testedProtocolVersion),
+            Recipients.cc(mediatorId),
+          ),
         ),
         testedProtocolVersion,
       )
@@ -144,7 +145,7 @@ class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest with H
 
     val informeeMessage = mock[InformeeMessage]
     when(informeeMessage.domainId).thenReturn(domainId)
-    when(informeeMessage.rootHash).thenReturn(None)
+    when(informeeMessage.rootHash).thenReturn(RootHash(TestHash.digest(0)))
 
     val mediatorResponse = mock[MediatorResponse]
     when(mediatorResponse.representativeProtocolVersion).thenReturn(
@@ -308,7 +309,7 @@ class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest with H
                 MediatorEvent.Request(
                   _,
                   `firstRequestTs`,
-                  InformeeMessage(_),
+                  InformeeMessage(_, _),
                   _,
                   _,
                 ),
@@ -321,12 +322,13 @@ class MediatorEventStageProcessorTest extends AsyncWordSpec with BaseTest with H
 
   private def responseAggregation(requestId: RequestId): Future[ResponseAggregation[?]] = {
     val mockTopologySnapshot = mock[TopologySnapshot]
-    when(mockTopologySnapshot.consortiumThresholds(any[Set[LfPartyId]])).thenAnswer {
-      (parties: Set[LfPartyId]) => Future.successful(parties.map(x => x -> PositiveInt.one).toMap)
-    }
+    when(mockTopologySnapshot.consortiumThresholds(any[Set[LfPartyId]])(anyTraceContext))
+      .thenAnswer { (parties: Set[LfPartyId]) =>
+        Future.successful(parties.map(x => x -> PositiveInt.one).toMap)
+      }
     ResponseAggregation.fromRequest(
       requestId,
-      InformeeMessage(fullInformeeTree)(testedProtocolVersion),
+      InformeeMessage(fullInformeeTree, Signature.noSignature)(testedProtocolVersion),
       mockTopologySnapshot,
     )
   }

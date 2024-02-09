@@ -12,7 +12,6 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
   it should "select all relevant strings for interning" in {
     val iterators = DbDtoToStringsForInterning(fixture)
     iterators.templateIds.toList.sorted shouldBe List(
-      "14",
       "25",
       "50",
       "87",
@@ -20,12 +19,6 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
     ).sorted
     iterators.parties.toList.sorted shouldBe List(
       "2",
-      "10",
-      "11",
-      "12",
-      "15",
-      "16",
-      "17",
       "20",
       "21",
       "22",
@@ -68,7 +61,6 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       "96",
     ).sorted
     iterators.domainIds.toList.sorted shouldBe List(
-      "domain1",
       "domain2",
       "domain3",
       "domain4",
@@ -97,20 +89,6 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       internalId = 1,
       externalString = "5",
     ),
-    DbDto.EventDivulgence(
-      event_offset = Some("6"),
-      command_id = Some("7"),
-      workflow_id = Some("8"),
-      application_id = Some("9"),
-      submitters = Some(Set("10", "11", "12")),
-      contract_id = "13",
-      template_id = Some("14"),
-      tree_event_witnesses = Set("15", "16", "17"),
-      create_argument = None,
-      create_argument_compression = Some(1),
-      event_sequential_id = 1,
-      domain_id = Some("domain1"),
-    ),
     DbDto.EventCreate(
       event_offset = Some("15"),
       transaction_id = Some("16"),
@@ -136,7 +114,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       create_key_value_compression = Some(1),
       event_sequential_id = 1,
       driver_metadata = None,
-      domain_id = Some("domain2"),
+      domain_id = "domain2",
       trace_context = serializableTraceContext,
     ),
     DbDto.EventExercise(
@@ -164,7 +142,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       exercise_result = None,
       exercise_child_event_ids = Some(Vector("61", "62", "63")),
       exercise_result_compression = Some(1),
-      domain_id = Some("domain3"),
+      domain_id = "domain3",
       trace_context = serializableTraceContext,
     ),
     DbDto.CommandCompletion(
@@ -182,7 +160,7 @@ class DbDtoToStringsForInterningSpec extends AnyFlatSpec with Matchers {
       deduplication_duration_seconds = Some(1),
       deduplication_duration_nanos = Some(1),
       deduplication_start = Some(1),
-      domain_id = Some("domain4"),
+      domain_id = "domain4",
       trace_context = serializableTraceContext,
     ),
     DbDto.ConfigurationEntry(

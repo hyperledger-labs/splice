@@ -9,7 +9,7 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{CNNodeUtil, Contract, ContractWithState}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.{BaseTest, HasActorSystem, HasExecutionContext}

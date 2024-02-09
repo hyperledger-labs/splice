@@ -75,7 +75,7 @@ class WalletTransferOfferStatusIntegrationTest
     def getRootFromTxId(txId: String, parties: Set[PartyId])(implicit
         env: CNNodeTests.CNNodeTestConsoleEnvironment
     ): (TransactionTree, TreeEvent) = {
-      val txTree = aliceValidatorBackend.participantClientWithAdminToken.ledger_api_v2.updates
+      val txTree = aliceValidatorBackend.participantClientWithAdminToken.ledger_api.updates
         .by_id(parties, txId)
         .getOrElse(fail("Expected to see the transaction tree in the ledger."))
       val root = txTree.eventsById

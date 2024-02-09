@@ -14,16 +14,17 @@ import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.{
   HealthAdministrationX,
   KeyAdministrationGroup,
-  TopologyAdministrationGroupCommon,
+  PartiesAdministrationGroupX,
+  TopologyAdministrationGroupX,
 }
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   ConsoleEnvironment,
   ConsoleMacros,
   Help,
-  InstanceReferenceCommon,
-  LocalInstanceReferenceCommon,
-  RemoteParticipantReferenceX,
+  InstanceReference,
+  LocalInstanceReference,
+  RemoteParticipantReference,
 }
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -38,7 +39,7 @@ import scala.util.Try
 import scala.util.control.NonFatal
 
 /** Copy of Canton ParticipantReference */
-trait CNNodeAppReference extends InstanceReferenceCommon {
+trait CNNodeAppReference extends InstanceReference {
 
   override val name: String
 
@@ -67,7 +68,10 @@ trait CNNodeAppReference extends InstanceReferenceCommon {
   override def clear_cache(): Unit = ()
 
   // Doesn't make sense for CN
-  def topology: TopologyAdministrationGroupCommon = ???
+  override def topology: TopologyAdministrationGroupX = ???
+
+  // Doesn't make sense for CN
+  override def parties: PartiesAdministrationGroupX = ???
 
   // Doesn't make sense for CN
   override def id: NodeIdentity = ???
@@ -184,7 +188,7 @@ trait HttpCNNodeAppReference extends CNNodeAppReference with HttpCommandRunner {
     }
 }
 
-trait CNNodeAppBackendReference extends CNNodeAppReference with LocalInstanceReferenceCommon {
+trait CNNodeAppBackendReference extends CNNodeAppReference with LocalInstanceReference {
   override def config: CNNodeBackendConfig
 
   @Help.Summary("Start node and wait for initialization to complete")
@@ -230,7 +234,7 @@ class CNParticipantClientReference(
     consoleEnvironment: CNNodeConsoleEnvironment,
     override val name: String,
     override val config: RemoteParticipantConfig,
-) extends RemoteParticipantReferenceX(consoleEnvironment, name) {
+) extends RemoteParticipantReference(consoleEnvironment, name) {
 
   // TODO(#5141) Consider removing this once Canton no longer explodes
   // when uploading the same DAR twice.

@@ -13,7 +13,7 @@ import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 

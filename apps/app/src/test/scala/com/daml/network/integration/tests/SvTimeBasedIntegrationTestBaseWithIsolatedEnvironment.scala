@@ -49,7 +49,7 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
   protected def advanceTimeAndCheckOpenRounds(
       toAdvanceAt: Instant
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-    val now = sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get()
+    val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     val duration = JavaDuration.between(now.toInstant, toAdvanceAt)
     val timeShift = JavaDuration.ofSeconds(10)
     val skew = timeShift

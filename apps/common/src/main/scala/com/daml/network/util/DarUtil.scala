@@ -20,9 +20,7 @@ object DarUtil {
 
   def readDarMetadata(name: String, stream: InputStream): PackageMetadata = {
     val dar = readDar(name, stream)
-    dar.main._2.metadata.getOrElse(
-      throw new AssertionError(s"Package is missing metadata which is mandatory in LF >= 1.8")
-    )
+    dar.main._2.metadata
   }
 
   def readDar(file: File): Dar[(PackageId, Package)] =

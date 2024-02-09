@@ -123,7 +123,7 @@ class SvTimeBasedOnboardingIntegrationTest
             val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
               sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
               testCandidateSecret,
-              sv1Backend.participantClientWithAdminToken.ledger_api_v2.time
+              sv1Backend.participantClientWithAdminToken.ledger_api.time
                 .get()
                 .toInstant
                 .plusSeconds(3600),

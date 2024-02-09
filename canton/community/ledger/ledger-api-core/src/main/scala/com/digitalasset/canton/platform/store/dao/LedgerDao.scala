@@ -47,7 +47,6 @@ private[platform] trait LedgerDaoTransactionsReader {
       endInclusive: Offset,
       filter: TemplatePartiesFilter,
       eventProjectionProperties: EventProjectionProperties,
-      multiDomainEnabled: Boolean,
   )(implicit loggingContext: LoggingContextWithTrace): Source[(Offset, GetUpdatesResponse), NotUsed]
 
   def lookupFlatTransactionById(
@@ -60,7 +59,6 @@ private[platform] trait LedgerDaoTransactionsReader {
       endInclusive: Offset,
       requestingParties: Set[Party],
       eventProjectionProperties: EventProjectionProperties,
-      multiDomainEnabled: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[(Offset, GetUpdateTreesResponse), NotUsed]
@@ -74,7 +72,6 @@ private[platform] trait LedgerDaoTransactionsReader {
       activeAt: Offset,
       filter: TemplatePartiesFilter,
       eventProjectionProperties: EventProjectionProperties,
-      multiDomainEnabled: Boolean,
   )(implicit loggingContext: LoggingContextWithTrace): Source[GetActiveContractsResponse, NotUsed]
 }
 
@@ -172,7 +169,11 @@ private[platform] trait LedgerReadDao extends ReportsHealth {
     * @param pruneUpToInclusive offset up to which to prune archived history inclusively
     * @return
     */
-  def prune(pruneUpToInclusive: Offset, pruneAllDivulgedContracts: Boolean)(implicit
+  def prune(
+      pruneUpToInclusive: Offset,
+      pruneAllDivulgedContracts: Boolean,
+      incompletReassignmentOffsets: Vector[Offset],
+  )(implicit
       loggingContext: LoggingContextWithTrace
   ): Future[Unit]
 
@@ -198,7 +199,7 @@ private[platform] trait LedgerWriteDao extends ReportsHealth {
 
   /** Initializes the database with the given ledger identity.
     * If the database was already intialized, instead compares the given identity parameters
-    * to the existing ones, and returns a Future failed with [[com.digitalasset.canton.platform.common.MismatchException]]
+    * to the existing ones, and returns a Future failed with [[MismatchException]]
     * if they don't match.
     *
     * This method is idempotent.
@@ -265,7 +266,6 @@ private[platform] trait LedgerWriteDao extends ReportsHealth {
       ledgerEffectiveTime: Timestamp,
       offset: Offset,
       transaction: CommittedTransaction,
-      divulgedContracts: Iterable[state.DivulgedContract],
       blindingInfo: Option[BlindingInfo],
       hostedWitnesses: List[Party],
       recordTime: Timestamp,

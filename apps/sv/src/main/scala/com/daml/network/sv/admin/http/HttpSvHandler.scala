@@ -21,6 +21,7 @@ import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.PositiveLong
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
@@ -568,7 +569,9 @@ class HttpSvHandler(
       dummyTxSequencedAt <- dummyTopologyTransaction(globalDomain, sequencerAdminConnection)
       _ = logger.info(s"Downloading topology and sequencer snapshot")
       // TODO(#5339) Check if we need to be careful at which offset we query our snapshot.
-      sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(dummyTxSequencedAt)
+      sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(
+        CantonTimestamp.tryFromInstant(dummyTxSequencedAt)
+      )
       topologySnapshot <- sequencerAdminConnection
         .getTopologySnapshot(globalDomain, sequencerSnapshot.lastTs)
     } yield definitions.SequencerSnapshot(

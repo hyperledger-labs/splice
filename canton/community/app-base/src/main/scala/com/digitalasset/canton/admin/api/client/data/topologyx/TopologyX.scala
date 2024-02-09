@@ -52,7 +52,7 @@ object BaseResult {
       protoValidFrom <- ProtoConverter.required("valid_from", value.validFrom)
       validFrom <- ProtoConverter.InstantConverter.fromProtoPrimitive(protoValidFrom)
       validUntil <- value.validUntil.traverse(ProtoConverter.InstantConverter.fromProtoPrimitive)
-      protoSequenced <- ProtoConverter.required("sequenced", value.sequenced)
+      protoSequenced <- ProtoConverter.required("sequencer", value.sequenced)
       sequenced <- ProtoConverter.InstantConverter.fromProtoPrimitive(protoSequenced)
       operation <- TopologyChangeOpX.fromProtoV30(value.operation)
       serial <- PositiveInt

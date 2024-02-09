@@ -18,7 +18,7 @@ import com.digitalasset.canton.console.{
   ConsoleGrpcAdminCommandRunner,
   ConsoleOutput,
   Help,
-  LocalInstanceReferenceCommon,
+  LocalInstanceReference,
   NodeReferences,
   StandardConsoleOutput,
 }
@@ -362,7 +362,7 @@ class CNNodeConsoleEnvironment(
   override def health: CantonHealthAdministration[CommunityCantonStatus] =
     health_
 
-  override protected def startupOrderPrecedence(instance: LocalInstanceReferenceCommon): Int =
+  override protected def startupOrderPrecedence(instance: LocalInstanceReference): Int =
     instance match {
       case _: SvAppBackendReference => 1
       case _: ScanAppBackendReference => 2

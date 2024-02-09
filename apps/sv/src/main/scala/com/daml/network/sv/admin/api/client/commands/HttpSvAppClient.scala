@@ -13,7 +13,7 @@ import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
-import com.digitalasset.canton.protocol.v30
+import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}

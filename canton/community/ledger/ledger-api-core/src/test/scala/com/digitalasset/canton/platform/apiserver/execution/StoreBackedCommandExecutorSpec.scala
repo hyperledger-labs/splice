@@ -275,12 +275,7 @@ class StoreBackedCommandExecutorSpec
             observers = Set(Ref.Party.assertFromString("observer")),
             keyOpt = Some(
               GlobalKeyWithMaintainers
-                .assertBuild(
-                  identifier,
-                  someContractKey(signatory, "some key"),
-                  Set(signatory),
-                  shared = true,
-                )
+                .assertBuild(identifier, someContractKey(signatory, "some key"), Set(signatory))
             ),
             resume = verdict => {
               ref.set(Some(verdict))
@@ -332,10 +327,10 @@ class StoreBackedCommandExecutorSpec
 
       val store = mock[ContractStore]
       when(
-        store.lookupContractStateWithoutDivulgence(any[LfContractId])(any[LoggingContextWithTrace])
+        store.lookupContractState(any[LfContractId])(any[LoggingContextWithTrace])
       ).thenReturn(Future.successful(ContractState.NotFound))
       when(
-        store.lookupContractStateWithoutDivulgence(same(stakeholderContractId))(
+        store.lookupContractState(same(stakeholderContractId))(
           any[LoggingContextWithTrace]
         )
       ).thenReturn(
@@ -344,7 +339,7 @@ class StoreBackedCommandExecutorSpec
         )
       )
       when(
-        store.lookupContractStateWithoutDivulgence(same(archivedContractId))(
+        store.lookupContractState(same(archivedContractId))(
           any[LoggingContextWithTrace]
         )
       ).thenReturn(Future.successful(ContractState.Archived))
@@ -403,7 +398,7 @@ class StoreBackedCommandExecutorSpec
         Some(divulgedContractId),
         Some(
           Some(
-            s"Contract with $divulgedContractId was not found or it refers to a divulged contract."
+            s"Contract with $divulgedContractId was not found."
           )
         ),
       )

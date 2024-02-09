@@ -3,7 +3,6 @@
 
 module Canton.Internal.Bong where
 
--- import Daml.Script
 import DA.Text
 import DA.List
 

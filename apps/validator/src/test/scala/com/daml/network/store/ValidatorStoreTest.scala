@@ -1,7 +1,7 @@
 package com.daml.network.store
 
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.topology.DomainId
 
 import java.time.Instant

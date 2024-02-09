@@ -18,11 +18,12 @@ import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.*
-import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.digitalasset.canton.metrics.MetricsFactoryType.External
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.digitalasset.canton.tracing.TracingConfig.Tracer
+import io.opentelemetry.exporter.prometheus.PrometheusCollector
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.{AppendedClues, BeforeAndAfterEach}
@@ -48,13 +49,20 @@ object CNNodeTests {
       with CNNodeTestCommon
       with LedgerApiExtensions {
 
-    override lazy val testInfrastructureMetricsFactory: LabeledMetricsFactory = {
+    @nowarn("msg=PrometheusCollector in package prometheus is deprecated")
+    override lazy val testInfrastructureMetricsFactory: CantonLabeledMetricsFactory = {
       val configuredOpenTelemetry = OpenTelemetryFactory.initializeOpenTelemetry(
         initializeGlobalOpenTelemetry = false,
+        // We rely on the deprecated version for now. Once we upgrade prometheus, we should switch to
+        // the version in prometheus-contrib.
+        // https://github.com/open-telemetry/opentelemetry-java-contrib/blob/2a66e05af62f04dd7cb3a0dd6c00ba9d2be8d392/prometheus-client-bridge/src/main/java/io/opentelemetry/contrib/metrics/prometheus/clientbridge/PrometheusCollector.java
+        attachReporters = sdkMeterProviderBuilder => {
+          sdkMeterProviderBuilder.registerMetricReader(PrometheusCollector.create())
+        },
         metricsEnabled = true,
         config = Tracer(),
         histograms = Seq.empty,
-        loggerFactory,
+        loggerFactory = loggerFactory,
       )
       CNNodeMetricsFactory
         .forConfig(

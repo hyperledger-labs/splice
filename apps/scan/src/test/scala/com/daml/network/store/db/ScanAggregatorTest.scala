@@ -19,7 +19,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.config.CantonRequireTypes
 import com.daml.network.environment.RetryProvider
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.metrics.MetricHandle
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.TxLogEntry.EntryType
@@ -417,7 +417,7 @@ class ScanAggregatorTest
       svcParty = svcParty,
       storage,
       loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, MetricHandle.NoOpMetricsFactory),
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

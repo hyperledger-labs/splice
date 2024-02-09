@@ -54,7 +54,7 @@ message GetIdResponse {
 message GetOnboardingTransactionsRequest {}
 
 message GetOnboardingTransactionsResponse {
-  com.digitalasset.canton.protocol.v30.TopologyTransactions transactions = 1;
+  com.digitalasset.canton.topology.admin.v30.TopologyTransactions transactions = 1;
 }
 
 message GetIdRequest {}

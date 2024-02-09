@@ -33,7 +33,6 @@ import com.daml.network.util.{
 }
 import com.daml.network.validator.config.AppManagerConfig
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
-import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import org.scalatest.prop.TableDrivenPropertyChecks.forEvery as tForEvery
@@ -115,7 +114,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     val (previousGlobalId, coinRulesCid) = clue("change coinconfig to migrate domains") {
       inside(sv1ScanBackend.getCoinRules()) {
         case ContractWithState(firstCoinRules, Assigned(global1)) =>
-          val now = sv1Backend.participantClientWithAdminToken.ledger_api_v2.time.get()
+          val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
           val currentSchedule = firstCoinRules.payload.configSchedule
           val activeDomainId =
             CoinConfigSchedule(currentSchedule).getConfigAsOf(now).globalDomain.activeDomain
@@ -586,9 +585,10 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
 
     clue("see whether the svcrules moves") {
       eventually() {
-        val cid: LfContractId = svcRulesCid
-        sv1ValidatorBackend.participantClient.transfer.lookup_contract_domain(cid) shouldBe Map(
-          cid -> globalUpgradeDomain
+        val cid: String = svcRulesCid.contractId
+        sv1ValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+          .lookup_contract_domain(svcParty, Set(cid)) shouldBe Map(
+          cid -> globalUpgradeId
         )
       }
     }
@@ -618,15 +618,16 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       )
       eventually() {
         tForEvery(companions) { (_, companion, queryingParty) =>
-          val contractIds = sv1Backend.participantClient.ledger_api_extensions.acs
+          val contractIds = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
             .filterJava(companion)(queryingParty)
-            .map(_.id: LfContractId)
+            .map(_.id.contractId)
           contractIds should not be empty
           val domains =
-            sv1ValidatorBackend.participantClient.transfer.lookup_contract_domain(contractIds: _*)
+            sv1ValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+              .lookup_contract_domain(queryingParty, contractIds.toSet)
 
           tForEvery(Table("contract ID", contractIds: _*)) { cid =>
-            domains.get(cid) shouldBe Some(globalUpgradeDomain.unwrap)
+            domains.get(cid) shouldBe Some(globalUpgradeId)
           }
         }
       }

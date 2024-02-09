@@ -9,11 +9,10 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.ParticipantCommands
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.ParticipantNodeCommon
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 
-class ParticipantReferencesExtensions(participants: Seq[ParticipantReferenceCommon])(implicit
+class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(implicit
     override val consoleEnvironment: ConsoleEnvironment
 ) extends Helpful
     with NamedLogging
@@ -35,7 +34,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReferenceComm
         vetAllPackages: Boolean = true,
         synchronizeVetting: Boolean = true,
         darDataO: Option[ByteString] = None,
-    ): Map[ParticipantReferenceCommon, String] = {
+    ): Map[ParticipantReference, String] = {
       val res = ConsoleCommandResult.runAll(participants)(
         ParticipantCommands.dars
           .upload(
@@ -112,7 +111,7 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReferenceComm
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.
         """)
     def connect_local(
-        domain: InstanceReferenceWithSequencerConnection,
+        domain: SequencerNodeReference,
         alias: DomainAlias,
         manualConnect: Boolean = false,
         synchronize: Option[NonNegativeDuration] = Some(
@@ -134,14 +133,11 @@ class ParticipantReferencesExtensions(participants: Seq[ParticipantReferenceComm
 
 }
 
-class LocalParticipantReferencesExtensions[
-    ParticipantNodeT <: ParticipantNodeCommon,
-    LocalParticipantRef <: LocalParticipantReferenceCommon[ParticipantNodeT],
-](
-    participants: Seq[LocalParticipantRef]
+class LocalParticipantReferencesExtensions(
+    participants: Seq[LocalParticipantReference]
 )(implicit
     override val consoleEnvironment: ConsoleEnvironment
 ) extends ParticipantReferencesExtensions(participants)
-    with LocalInstancesExtensions[LocalParticipantRef] {
-  override def instances: Seq[LocalParticipantRef] = participants
+    with LocalInstancesExtensions[LocalParticipantReference] {
+  override def instances: Seq[LocalParticipantReference] = participants
 }

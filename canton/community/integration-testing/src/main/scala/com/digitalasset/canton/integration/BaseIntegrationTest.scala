@@ -4,7 +4,7 @@
 package com.digitalasset.canton.integration
 
 import com.daml.metrics.Timed
-import com.digitalasset.canton.console.{CommandFailure, ParticipantReferenceCommon}
+import com.digitalasset.canton.console.{CommandFailure, ParticipantReference}
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.{
@@ -87,8 +87,8 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     * But unlike `ping`, this version mixes nicely with `eventually`.
     */
   def assertPingSucceeds(
-      sender: ParticipantReferenceCommon,
-      receiver: ParticipantReferenceCommon,
+      sender: ParticipantReference,
+      receiver: ParticipantReference,
       timeoutMillis: Long = 20000,
       workflowId: String = "",
       id: String = "",

@@ -5,6 +5,7 @@ import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.stream.{KillSwitch, KillSwitches, Materializer}
 import org.apache.pekko.stream.scaladsl.{Flow, Keep, Sink, Source}
 import cats.syntax.traverse.*
+import com.daml.error.ErrorResource
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
 import com.daml.ledger.api.v1.admin.ObjectMetaOuterClass
@@ -29,7 +30,6 @@ import com.daml.network.environment.ledger.api.{
 import com.daml.network.store.MultiDomainAcsStore.IngestionFilter
 import com.daml.network.util.{AssignedContract, Contract, DisclosedContracts}
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.error.CantonErrorResource
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -578,7 +578,7 @@ class CNLedgerConnection(
             val statusProto = io.grpc.protobuf.StatusProto.fromThrowable(ex)
             ErrorDetails.from(statusProto).collect {
               case ResourceInfoDetail(contractId, type_)
-                  if type_ == CantonErrorResource.ContractId.asString =>
+                  if type_ == ErrorResource.ContractId.asString =>
                 inactiveContractCallbacks.get().foreach(f => f(contractId))
             }: Unit
 

@@ -20,7 +20,6 @@ import com.daml.network.validator.config.{
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.domain.config.CommunityDomainConfig
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import monocle.macros.syntax.lens.*
 
@@ -301,14 +300,6 @@ object CNNodeConfigTransforms {
     _.focus(_.splitwellAppClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
-
-  def updateAllDomainConfigs(
-      update: (String, CommunityDomainConfig) => CommunityDomainConfig
-  ): CNNodeConfigTransform =
-    cantonConfig =>
-      cantonConfig
-        .focus(_.domains)
-        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
 
   def updateRemoteParticipantConfigs(
       update: (String, RemoteParticipantConfig) => RemoteParticipantConfig

@@ -52,21 +52,6 @@ template GetCash
   where
     signatory payer, owner
 
-template DiscloseIou
-  with
-    sender: Party
-    receiver: Party
-    iou: ContractId Iou
-  where
-    signatory sender
-    observer receiver
-
-    choice Disclose: ()
-      controller sender
-      do
-        fetch iou
-        return ()
-
 template Dummy
   with
     party: Party

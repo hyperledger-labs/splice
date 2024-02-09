@@ -46,7 +46,7 @@ import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, Proces
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.metrics.MetricHandle.NoOpMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import org.slf4j.event.Level
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.topology.store.TopologyStoreId

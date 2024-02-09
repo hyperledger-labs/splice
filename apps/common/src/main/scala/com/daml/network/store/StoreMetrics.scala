@@ -4,9 +4,9 @@ import com.daml.metrics.api.MetricDoc.MetricQualification.Latency
 import com.daml.metrics.api.MetricHandle.Timer
 import com.daml.metrics.api.{MetricDoc, MetricName}
 import com.daml.network.environment.CNMetrics
-import com.digitalasset.canton.metrics.MetricHandle.LabeledMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
-class StoreMetrics(metricsFactory: LabeledMetricsFactory) {
+class StoreMetrics(metricsFactory: CantonLabeledMetricsFactory) {
 
   val prefix: MetricName = CNMetrics.MetricsPrefix :+ "store"
 

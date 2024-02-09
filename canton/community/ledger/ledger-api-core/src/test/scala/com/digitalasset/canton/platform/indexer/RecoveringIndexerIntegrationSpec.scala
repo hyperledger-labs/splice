@@ -261,7 +261,6 @@ class RecoveringIndexerIntegrationSpec
             parallelExecutionContext,
             tracer,
             loggerFactory,
-            multiDomainEnabled = false,
           )
       _ <- new IndexerServiceOwner(
         readService = participantState._1,
@@ -274,7 +273,6 @@ class RecoveringIndexerIntegrationSpec
         executionContext = servicesExecutionContext,
         tracer = tracer,
         loggerFactory = loggerFactory,
-        multiDomainEnabled = false,
         startupMode = MigrateAndStart,
         dataSourceProperties = IndexerConfig.createDataSourcePropertiesForTesting(
           indexerConfig.ingestionParallelism.unwrap
@@ -313,10 +311,10 @@ class RecoveringIndexerIntegrationSpec
         eventually {
           for {
             ledgerEnd <- dbDispatcher
-              .executeSql(metrics.daml.index.db.getLedgerEnd)(parameterStorageBackend.ledgerEnd)
+              .executeSql(metrics.index.db.getLedgerEnd)(parameterStorageBackend.ledgerEnd)
             _ = ledgerEndCache.set(ledgerEnd.lastOffset -> ledgerEnd.lastEventSeqId)
             knownParties <- dbDispatcher
-              .executeSql(metrics.daml.index.db.loadAllParties)(partyStorageBacked.knownParties)
+              .executeSql(metrics.index.db.loadAllParties)(partyStorageBacked.knownParties)
           } yield {
             knownParties.map(_.displayName) shouldBe partyNames.map(Some(_))
             ()

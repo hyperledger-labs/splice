@@ -2,6 +2,7 @@ package com.daml.network.integration.plugins
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
+import com.digitalasset.canton.metrics.MetricsReporterConfig
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests
 import com.daml.network.config.CNNodeConfig
@@ -31,6 +32,12 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
     config.splitwellApps.foreach(sw => waitForPort(sw._1, sw._2.adminApi.port.unwrap))
     config.scanApps.foreach(scan => waitForPort(scan._1, scan._2.adminApi.port.unwrap))
     extraPortsToWaitFor.foreach(p => waitForPort(InstanceName.tryCreate(p._1), p._2))
+    // Wait long enough that the prometheus server can start.
+    config.monitoring.metrics.reporters.foreach {
+      case MetricsReporterConfig.Prometheus(_, port) =>
+        waitForPort(InstanceName.tryCreate("prometheus"), port.unwrap)
+      case _: MetricsReporterConfig.Csv =>
+    }
     config
   }
 

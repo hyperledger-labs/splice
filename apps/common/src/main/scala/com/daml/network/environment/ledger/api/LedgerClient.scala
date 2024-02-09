@@ -22,8 +22,7 @@ import com.daml.network.util.DisclosedContracts
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
-import com.digitalasset.canton.ledger.api.auth.client.LedgerCallCredentials
-import com.digitalasset.canton.ledger.client.GrpcChannel
+import com.digitalasset.canton.ledger.client.{GrpcChannel, LedgerCallCredentials}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.daml.ledger.api.v1.admin.package_management_service.{

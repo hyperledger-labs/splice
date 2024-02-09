@@ -35,7 +35,7 @@ private[dao] sealed class EventsReader(
 )(implicit ec: ExecutionContext)
     extends LedgerDaoEventsReader {
 
-  protected val dbMetrics: metrics.daml.index.db.type = metrics.daml.index.db
+  protected val dbMetrics: metrics.index.db.type = metrics.index.db
 
   override def getEventsByContractId(contractId: ContractId, requestingParties: Set[Party])(implicit
       loggingContext: LoggingContextWithTrace
@@ -64,10 +64,10 @@ private[dao] sealed class EventsReader(
       }
 
       createEvent = deserialized.flatMap { case (event, domainId) =>
-        event.event.created.map(create => Created(Some(create), domainId.getOrElse("")))
+        event.event.created.map(create => Created(Some(create), domainId))
       }.headOption
       archiveEvent = deserialized.flatMap { case (event, domainId) =>
-        event.event.archived.map(archive => Archived(Some(archive), domainId.getOrElse("")))
+        event.event.archived.map(archive => Archived(Some(archive), domainId))
       }.headOption
 
     } yield {
@@ -93,7 +93,7 @@ private[dao] sealed class EventsReader(
       maxIterations: Int,
   )(implicit loggingContext: LoggingContextWithTrace): Future[GetEventsByContractKeyResponse] = {
     val keyHash: String =
-      platform.Key.assertBuild(templateId, contractKey, shared = true).hash.bytes.toHexString
+      platform.Key.assertBuild(templateId, contractKey).hash.bytes.toHexString
 
     val eventProjectionProperties = EventProjectionProperties(
       // Used by LfEngineToApi

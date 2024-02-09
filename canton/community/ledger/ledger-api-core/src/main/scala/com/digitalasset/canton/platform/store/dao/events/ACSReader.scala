@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.platform.store.dao.events
 
-import com.daml.ledger.api.v1.event.Event
 import com.daml.ledger.api.v2.state_service.{
   ActiveContract,
   GetActiveContractsResponse,
@@ -20,12 +19,7 @@ import com.daml.tracing
 import com.daml.tracing.{SpanAttribute, Spans}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.logging.LoggingContextWithTrace.implicitExtractTraceContext
-import com.digitalasset.canton.logging.{
-  ErrorLoggingContext,
-  LoggingContextWithTrace,
-  NamedLoggerFactory,
-  NamedLogging,
-}
+import com.digitalasset.canton.logging.{LoggingContextWithTrace, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.Metrics
 import com.digitalasset.canton.platform.TemplatePartiesFilter
 import com.digitalasset.canton.platform.config.ActiveContractsServiceStreamsConfig
@@ -38,7 +32,6 @@ import com.digitalasset.canton.platform.store.backend.EventStorageBackend.{
 }
 import com.digitalasset.canton.platform.store.backend.common.EventPayloadSourceForFlatTx
 import com.digitalasset.canton.platform.store.dao.PaginatingAsyncStream.IdPaginationState
-import com.digitalasset.canton.platform.store.dao.events.EventsTable.TransactionConversions
 import com.digitalasset.canton.platform.store.dao.events.TransactionsReader.{
   deserializeEntry,
   endSpanOnTermination,
@@ -89,7 +82,7 @@ class ACSReader(
 )(implicit executionContext: ExecutionContext)
     extends NamedLogging {
 
-  private val dbMetrics = metrics.daml.index.db
+  private val dbMetrics = metrics.index.db
 
   private val paginatingAsyncStream = new PaginatingAsyncStream(loggerFactory)
 
@@ -97,7 +90,6 @@ class ACSReader(
       filteringConstraints: TemplatePartiesFilter,
       activeAt: (Offset, Long),
       eventProjectionProperties: EventProjectionProperties,
-      multiDomainEnabled: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[GetActiveContractsResponse, NotUsed] = {
@@ -111,7 +103,6 @@ class ACSReader(
       filteringConstraints,
       activeAt,
       eventProjectionProperties,
-      multiDomainEnabled,
     )
       .wireTap(getActiveContractsResponse => {
         val event =
@@ -125,7 +116,6 @@ class ACSReader(
       filter: TemplatePartiesFilter,
       activeAt: (Offset, Long),
       eventProjectionProperties: EventProjectionProperties,
-      multiDomainEnabled: Boolean,
   )(implicit
       loggingContext: LoggingContextWithTrace
   ): Source[GetActiveContractsResponse, NotUsed] = {
@@ -142,7 +132,8 @@ class ACSReader(
     val idQueryPageSizing = IdPageSizing.calculateFrom(
       maxIdPageSize = config.maxIdsPerIdPage,
       workingMemoryInBytesForIdPages =
-        config.maxWorkingMemoryInBytesForIdPages / (if (multiDomainEnabled) 2 else 1),
+        // to accomodate for the fact that we have queues for Assign and Create events as well
+        config.maxWorkingMemoryInBytesForIdPages / 2,
       numOfDecomposedFilters = decomposedFilters.size,
       numOfPagesInIdPageBuffer = config.maxPagesPerIdPagesBuffer,
       loggerFactory = loggerFactory,
@@ -156,7 +147,7 @@ class ACSReader(
       )((state: IdPaginationState) =>
         createIdQueriesLimiter.execute(
           globalIdQueriesLimiter.execute(
-            dispatcher.executeSql(metrics.daml.index.db.getActiveContractIdsForCreated) { connection =>
+            dispatcher.executeSql(metrics.index.db.getActiveContractIdsForCreated) { connection =>
               val ids =
                 eventStorageBackend.transactionStreamingQueries
                   .fetchIdsOfCreateEventsForStakeholder(
@@ -185,35 +176,34 @@ class ACSReader(
       )((state: IdPaginationState) =>
         assignIdQueriesLimiter.execute(
           globalIdQueriesLimiter.execute(
-            dispatcher.executeSql(metrics.daml.index.db.getActiveContractIdsForAssigned) {
-              connection =>
-                val ids =
-                  eventStorageBackend.fetchAssignEventIdsForStakeholder(
-                    stakeholder = filter.party,
-                    templateId = filter.templateId,
-                    startExclusive = state.fromIdExclusive,
-                    endInclusive = activeAtEventSeqId,
-                    limit = state.pageSize,
-                  )(connection)
-                logger.debug(
-                  s"ActiveContractIds for assign events $filter returned #${ids.size} ${ids.lastOption
-                      .map(last => s"until $last")
-                      .getOrElse("")}"
-                )
-                ids
+            dispatcher.executeSql(metrics.index.db.getActiveContractIdsForAssigned) { connection =>
+              val ids =
+                eventStorageBackend.fetchAssignEventIdsForStakeholder(
+                  stakeholder = filter.party,
+                  templateId = filter.templateId,
+                  startExclusive = state.fromIdExclusive,
+                  endInclusive = activeAtEventSeqId,
+                  limit = state.pageSize,
+                )(connection)
+              logger.debug(
+                s"ActiveContractIds for assign events $filter returned #${ids.size} ${ids.lastOption
+                    .map(last => s"until $last")
+                    .getOrElse("")}"
+              )
+              ids
             }
           )
         )
       )
 
-    def fetchNotArchivedCreatePayloads(
+    def fetchActiveCreatePayloads(
         ids: Iterable[Long]
-    ): Future[Vector[EventStorageBackend.Entry[Raw.FlatEvent]]] =
-      globalPayloadQueriesLimiter.execute(
-        dispatcher.executeSql(metrics.daml.index.db.getActiveContractBatchForNotArchived) {
-          connection =>
+    ): Future[Vector[EventStorageBackend.RawActiveContract]] =
+      localPayloadQueriesLimiter.execute(
+        globalPayloadQueriesLimiter.execute(
+          dispatcher.executeSql(metrics.index.db.getActiveContractBatchForCreated) { connection =>
             val result = queryNonPruned.executeSql(
-              eventStorageBackend.activeContractCreateEventBatch(
+              eventStorageBackend.activeContractCreateEventBatchV2(
                 eventSequentialIds = ids,
                 allFilterParties = allFilterParties,
                 endInclusive = activeAtEventSeqId,
@@ -231,35 +221,6 @@ class ACSReader(
                   .getOrElse("")}"
             )
             result
-        }
-      )
-
-    def fetchActiveCreatePayloads(
-        ids: Iterable[Long]
-    ): Future[Vector[EventStorageBackend.RawActiveContract]] =
-      localPayloadQueriesLimiter.execute(
-        globalPayloadQueriesLimiter.execute(
-          dispatcher.executeSql(metrics.daml.index.db.getActiveContractBatchForCreated) {
-            connection =>
-              val result = queryNonPruned.executeSql(
-                eventStorageBackend.activeContractCreateEventBatchV2(
-                  eventSequentialIds = ids,
-                  allFilterParties = allFilterParties,
-                  endInclusive = activeAtEventSeqId,
-                )(connection),
-                activeAtOffset,
-                pruned =>
-                  ACSReader.acsBeforePruningErrorReason(
-                    acsOffset = activeAtOffset.toHexString,
-                    prunedUpToOffset = pruned.toHexString,
-                  ),
-              )(connection, implicitly)
-              logger.debug(
-                s"getActiveContractBatch returned ${ids.size}/${result.size} ${ids.lastOption
-                    .map(last => s"until $last")
-                    .getOrElse("")}"
-              )
-              result
           }
         )
       )
@@ -269,27 +230,26 @@ class ACSReader(
     ): Future[Vector[EventStorageBackend.RawActiveContract]] =
       localPayloadQueriesLimiter.execute(
         globalPayloadQueriesLimiter.execute(
-          dispatcher.executeSql(metrics.daml.index.db.getActiveContractBatchForAssigned) {
-            connection =>
-              val result = queryNonPruned.executeSql(
-                eventStorageBackend.activeContractAssignEventBatch(
-                  eventSequentialIds = ids,
-                  allFilterParties = allFilterParties,
-                  endInclusive = activeAtEventSeqId,
-                )(connection),
-                activeAtOffset,
-                pruned =>
-                  ACSReader.acsBeforePruningErrorReason(
-                    acsOffset = activeAtOffset.toHexString,
-                    prunedUpToOffset = pruned.toHexString,
-                  ),
-              )(connection, implicitly)
-              logger.debug(
-                s"getActiveContractBatch returned ${ids.size}/${result.size} ${ids.lastOption
-                    .map(last => s"until $last")
-                    .getOrElse("")}"
-              )
-              result
+          dispatcher.executeSql(metrics.index.db.getActiveContractBatchForAssigned) { connection =>
+            val result = queryNonPruned.executeSql(
+              eventStorageBackend.activeContractAssignEventBatch(
+                eventSequentialIds = ids,
+                allFilterParties = allFilterParties,
+                endInclusive = activeAtEventSeqId,
+              )(connection),
+              activeAtOffset,
+              pruned =>
+                ACSReader.acsBeforePruningErrorReason(
+                  acsOffset = activeAtOffset.toHexString,
+                  prunedUpToOffset = pruned.toHexString,
+                ),
+            )(connection, implicitly)
+            logger.debug(
+              s"getActiveContractBatch returned ${ids.size}/${result.size} ${ids.lastOption
+                  .map(last => s"until $last")
+                  .getOrElse("")}"
+            )
+            result
           }
         )
       )
@@ -298,7 +258,7 @@ class ACSReader(
         offsets: Iterable[Offset]
     ): Future[Vector[Long]] =
       globalIdQueriesLimiter.execute(
-        dispatcher.executeSql(metrics.daml.index.db.getAssingIdsForOffsets) { connection =>
+        dispatcher.executeSql(metrics.index.db.getAssingIdsForOffsets) { connection =>
           val ids =
             eventStorageBackend
               .lookupAssignSequentialIdByOffset(offsets.map(_.toHexString))(connection)
@@ -315,7 +275,7 @@ class ACSReader(
         offsets: Iterable[Offset]
     ): Future[Vector[Long]] =
       globalIdQueriesLimiter.execute(
-        dispatcher.executeSql(metrics.daml.index.db.getUnassingIdsForOffsets) { connection =>
+        dispatcher.executeSql(metrics.index.db.getUnassingIdsForOffsets) { connection =>
           val ids =
             eventStorageBackend
               .lookupUnassignSequentialIdByOffset(offsets.map(_.toHexString))(connection)
@@ -336,7 +296,7 @@ class ACSReader(
         localPayloadQueriesLimiter.execute(
           globalPayloadQueriesLimiter.execute(
             dispatcher.executeSql(
-              metrics.daml.index.db.reassignmentStream.fetchEventAssignPayloads
+              metrics.index.db.reassignmentStream.fetchEventAssignPayloads
             ) { connection =>
               val result = queryNonPruned.executeSql(
                 eventStorageBackend.assignEventBatch(
@@ -366,7 +326,7 @@ class ACSReader(
       localPayloadQueriesLimiter.execute(
         globalPayloadQueriesLimiter.execute(
           dispatcher.executeSql(
-            metrics.daml.index.db.reassignmentStream.fetchEventUnassignPayloads
+            metrics.index.db.reassignmentStream.fetchEventUnassignPayloads
           ) { connection =>
             val result = queryNonPruned.executeSql(
               eventStorageBackend.unassignEventBatch(
@@ -394,7 +354,7 @@ class ACSReader(
         contractIds: Iterable[String]
     ): Future[Vector[Long]] =
       globalIdQueriesLimiter.execute(
-        dispatcher.executeSql(metrics.daml.index.db.getCreateIdsForContractIds) { connection =>
+        dispatcher.executeSql(metrics.index.db.getCreateIdsForContractIds) { connection =>
           val ids =
             eventStorageBackend.lookupCreateSequentialIdByContractId(contractIds)(connection)
           logger.debug(
@@ -412,7 +372,7 @@ class ACSReader(
       if (contractIds.isEmpty) Future.successful(Vector.empty)
       else
         globalIdQueriesLimiter.execute(
-          dispatcher.executeSql(metrics.daml.index.db.getAssignIdsForContractIds) { connection =>
+          dispatcher.executeSql(metrics.index.db.getAssignIdsForContractIds) { connection =>
             val ids =
               eventStorageBackend.lookupAssignSequentialIdByContractId(contractIds)(connection)
             logger.debug(
@@ -431,7 +391,7 @@ class ACSReader(
       else
         globalPayloadQueriesLimiter.execute(
           dispatcher
-            .executeSql(metrics.daml.index.db.flatTxStream.fetchEventCreatePayloads) { connection =>
+            .executeSql(metrics.index.db.flatTxStream.fetchEventCreatePayloads) { connection =>
               val result = queryNonPruned.executeSql(
                 eventStorageBackend.transactionStreamingQueries
                   .fetchEventPayloadsFlat(EventPayloadSourceForFlatTx.Create)(
@@ -522,91 +482,7 @@ class ACSReader(
     val inputBufferSize =
       Utils.largestSmallerOrEqualPowerOfTwo(config.maxParallelPayloadCreateQueries)
 
-    if (multiDomainEnabled) {
-      val activeFromCreatePipe =
-        decomposedFilters
-          .map(fetchCreateIds)
-          .pipe(EventIdsUtils.sortAndDeduplicateIds)
-          .batchN(
-            maxBatchSize = config.maxPayloadsPerPayloadsPage,
-            maxBatchCount = config.maxParallelPayloadCreateQueries + 1,
-          )
-          .async
-          .addAttributes(Attributes.inputBuffer(initial = inputBufferSize, max = inputBufferSize))
-          .mapAsync(config.maxParallelPayloadCreateQueries)(fetchActiveCreatePayloads)
-          .mapConcat(identity)
-      val activeFromAssignPipe =
-        decomposedFilters
-          .map(fetchAssignIds)
-          .pipe(EventIdsUtils.sortAndDeduplicateIds)
-          .batchN(
-            maxBatchSize = config.maxPayloadsPerPayloadsPage,
-            maxBatchCount = config.maxParallelPayloadCreateQueries + 1,
-          )
-          .async
-          .addAttributes(Attributes.inputBuffer(initial = inputBufferSize, max = inputBufferSize))
-          .mapAsync(config.maxParallelPayloadCreateQueries)(fetchActiveAssignPayloads)
-          .mapConcat(identity)
-
-      activeFromCreatePipe
-        .mergeSorted(activeFromAssignPipe)(Ordering.by(_.eventSequentialId))
-        .mapAsync(config.contractProcessingParallelism)(
-          toApiResponseActiveContract(_, eventProjectionProperties)
-        )
-        .concatLazy(
-          Source.lazyFutureSource(() =>
-            incompleteOffsets(
-              activeAtOffset,
-              filter.allFilterParties,
-              loggingContext.traceContext,
-            ).map { offsets =>
-              def incompleteOffsetPages: () => Iterator[Vector[Offset]] =
-                () => offsets.sliding(config.maxIncompletePageSize, config.maxIncompletePageSize)
-
-              val incompleteAssigned: Source[(String, GetActiveContractsResponse), NotUsed] =
-                Source
-                  .fromIterator(incompleteOffsetPages)
-                  .mapAsync(config.maxParallelIdCreateQueries)(
-                    fetchAssignIdsForOffsets
-                  )
-                  .mapConcat(identity)
-                  .grouped(config.maxIncompletePageSize)
-                  .mapAsync(config.maxParallelPayloadCreateQueries)(
-                    fetchAssignPayloads
-                  )
-                  .mapConcat(_.filter(assignMeetsConstraints))
-                  .mapAsync(config.contractProcessingParallelism)(
-                    toApiResponseIncompleteAssigned(eventProjectionProperties)
-                  )
-
-              val incompleteUnassigned: Source[(String, GetActiveContractsResponse), NotUsed] =
-                Source
-                  .fromIterator(incompleteOffsetPages)
-                  .mapAsync(config.maxParallelIdCreateQueries)(
-                    fetchUnassignIdsForOffsets
-                  )
-                  .mapConcat(identity)
-                  .grouped(config.maxIncompletePageSize)
-                  .mapAsync(config.maxParallelPayloadCreateQueries)(
-                    fetchUnassignPayloads
-                  )
-                  .mapConcat(_.filter(unassignMeetsConstraints))
-                  .grouped(config.maxIncompletePageSize)
-                  .mapAsync(config.maxParallelPayloadCreateQueries)(
-                    fetchCreatedEventsForUnassignedBatch
-                  )
-                  .mapConcat(identity)
-                  .mapAsync(config.contractProcessingParallelism)(
-                    toApiResponseIncompleteUnassigned(eventProjectionProperties)
-                  )
-
-              incompleteAssigned
-                .mergeSorted(incompleteUnassigned)(Ordering.by(_._1))
-                .map(_._2)
-            }
-          )
-        )
-    } else {
+    val activeFromCreatePipe =
       decomposedFilters
         .map(fetchCreateIds)
         .pipe(EventIdsUtils.sortAndDeduplicateIds)
@@ -616,30 +492,79 @@ class ACSReader(
         )
         .async
         .addAttributes(Attributes.inputBuffer(initial = inputBufferSize, max = inputBufferSize))
-        .mapAsync(config.maxParallelPayloadCreateQueries)(fetchNotArchivedCreatePayloads)
-        .mapAsync(config.contractProcessingParallelism)(
-          deserializeLfValues(_, eventProjectionProperties)
+        .mapAsync(config.maxParallelPayloadCreateQueries)(fetchActiveCreatePayloads)
+        .mapConcat(identity)
+    val activeFromAssignPipe =
+      decomposedFilters
+        .map(fetchAssignIds)
+        .pipe(EventIdsUtils.sortAndDeduplicateIds)
+        .batchN(
+          maxBatchSize = config.maxPayloadsPerPayloadsPage,
+          maxBatchCount = config.maxParallelPayloadCreateQueries + 1,
         )
-        .mapConcat(
-          TransactionConversions.toGetActiveContractsResponse(_)(
-            ErrorLoggingContext(logger, loggingContext)
-          )
-        )
-    }
-  }
+        .async
+        .addAttributes(Attributes.inputBuffer(initial = inputBufferSize, max = inputBufferSize))
+        .mapAsync(config.maxParallelPayloadCreateQueries)(fetchActiveAssignPayloads)
+        .mapConcat(identity)
 
-  private def deserializeLfValues(
-      rawEvents: Vector[EventStorageBackend.Entry[Raw.FlatEvent]],
-      eventProjectionProperties: EventProjectionProperties,
-  )(implicit lc: LoggingContextWithTrace): Future[Vector[EventStorageBackend.Entry[Event]]] = {
-    Timed.future(
-      future = Future.delegate(
-        Future.traverse(rawEvents)(
-          deserializeEntry(eventProjectionProperties, lfValueTranslation)
+    activeFromCreatePipe
+      .mergeSorted(activeFromAssignPipe)(Ordering.by(_.eventSequentialId))
+      .mapAsync(config.contractProcessingParallelism)(
+        toApiResponseActiveContract(_, eventProjectionProperties)
+      )
+      .concatLazy(
+        Source.lazyFutureSource(() =>
+          incompleteOffsets(
+            activeAtOffset,
+            filter.allFilterParties,
+            loggingContext.traceContext,
+          ).map { offsets =>
+            def incompleteOffsetPages: () => Iterator[Vector[Offset]] =
+              () => offsets.sliding(config.maxIncompletePageSize, config.maxIncompletePageSize)
+
+            val incompleteAssigned: Source[(String, GetActiveContractsResponse), NotUsed] =
+              Source
+                .fromIterator(incompleteOffsetPages)
+                .mapAsync(config.maxParallelIdCreateQueries)(
+                  fetchAssignIdsForOffsets
+                )
+                .mapConcat(identity)
+                .grouped(config.maxIncompletePageSize)
+                .mapAsync(config.maxParallelPayloadCreateQueries)(
+                  fetchAssignPayloads
+                )
+                .mapConcat(_.filter(assignMeetsConstraints))
+                .mapAsync(config.contractProcessingParallelism)(
+                  toApiResponseIncompleteAssigned(eventProjectionProperties)
+                )
+
+            val incompleteUnassigned: Source[(String, GetActiveContractsResponse), NotUsed] =
+              Source
+                .fromIterator(incompleteOffsetPages)
+                .mapAsync(config.maxParallelIdCreateQueries)(
+                  fetchUnassignIdsForOffsets
+                )
+                .mapConcat(identity)
+                .grouped(config.maxIncompletePageSize)
+                .mapAsync(config.maxParallelPayloadCreateQueries)(
+                  fetchUnassignPayloads
+                )
+                .mapConcat(_.filter(unassignMeetsConstraints))
+                .grouped(config.maxIncompletePageSize)
+                .mapAsync(config.maxParallelPayloadCreateQueries)(
+                  fetchCreatedEventsForUnassignedBatch
+                )
+                .mapConcat(identity)
+                .mapAsync(config.contractProcessingParallelism)(
+                  toApiResponseIncompleteUnassigned(eventProjectionProperties)
+                )
+
+            incompleteAssigned
+              .mergeSorted(incompleteUnassigned)(Ordering.by(_._1))
+              .map(_._2)
+          }
         )
-      ),
-      timer = dbMetrics.getActiveContracts.translationTimer,
-    )
+      )
   }
 
   private def toApiResponseActiveContract(

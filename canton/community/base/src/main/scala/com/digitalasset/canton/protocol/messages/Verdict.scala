@@ -5,22 +5,20 @@ package com.digitalasset.canton.protocol.messages
 
 import cats.syntax.traverse.*
 import com.daml.error.ContextualizedErrorLogger
-import com.daml.error.utils.DeserializedCantonError
+import com.daml.error.utils.DecodedCantonError
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.ProtoDeserializationError.{InvariantViolation, OtherError}
 import com.digitalasset.canton.error.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.v30
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.*
+import com.digitalasset.canton.{LfPartyId, protocol}
 import com.google.protobuf.empty
 import com.google.rpc.status.Status
 import pprint.Tree
-
-import scala.Ordered.orderingToOrdered
 
 trait TransactionRejection {
   def logWithContext(extra: Map[String, String] = Map())(implicit
@@ -49,12 +47,13 @@ object Verdict
     extends HasProtocolVersionedCompanion[Verdict]
     with ProtocolVersionedCompanionDbHelpers[Verdict] {
 
-  val supportedProtoVersions = SupportedProtoVersions(
-    ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(v30.Verdict)(
-      supportedProtoVersion(_)(fromProtoV30),
-      _.toProtoV30.toByteString,
+  val supportedProtoVersions: protocol.messages.Verdict.SupportedProtoVersions =
+    SupportedProtoVersions(
+      ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(v30.Verdict)(
+        supportedProtoVersion(_)(fromProtoV30),
+        _.toProtoV30.toByteString,
+      )
     )
-  )
 
   final case class Approve()(
       override val representativeProtocolVersion: RepresentativeProtocolVersion[Verdict.type]
@@ -91,7 +90,7 @@ object Verdict
     override def logWithContext(extra: Map[String, String])(implicit
         contextualizedErrorLogger: ContextualizedErrorLogger
     ): Unit =
-      DeserializedCantonError.fromGrpcStatus(status) match {
+      DecodedCantonError.fromGrpcStatus(status) match {
         case Right(error) => error.logWithContext(extra)
         case Left(err) =>
           contextualizedErrorLogger.warn(s"Failed to parse mediator rejection: $err")
@@ -100,7 +99,7 @@ object Verdict
     override def rpcStatusWithoutLoggingContext(): Status = status
 
     override def isTimeoutDeterminedByMediator: Boolean =
-      DeserializedCantonError.fromGrpcStatus(status).exists(_.code.id == MediatorError.Timeout.id)
+      DecodedCantonError.fromGrpcStatus(status).exists(_.code.id == MediatorError.Timeout.id)
   }
 
   object MediatorReject {
@@ -191,7 +190,7 @@ object Verdict
 
   def fromProtoV30(verdictP: v30.Verdict): ParsingResult[Verdict] = {
     val v30.Verdict(someVerdictP) = verdictP
-    import v30.Verdict.{SomeVerdict as V}
+    import v30.Verdict.SomeVerdict as V
 
     protocolVersionRepresentativeFor(ProtoVersion(30)).flatMap { rpv =>
       someVerdictP match {

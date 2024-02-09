@@ -6,7 +6,7 @@ import com.daml.network.splitwell.metrics.SplitwellAppMetrics
 import com.daml.network.sv.metrics.SvAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.digitalasset.canton.buildinfo.BuildInfo
-import com.digitalasset.canton.metrics.MetricHandle.CantonOpenTelemetryMetricsFactory
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.CantonOpenTelemetryMetricsFactory
 import com.digitalasset.canton.metrics.MetricsFactoryType
 import io.opentelemetry.api.metrics.{Meter, MeterProvider}
 

@@ -1,18 +1,14 @@
 package com.daml.network.environment
 
 import cats.syntax.either.*
-import cats.syntax.functor.*
 import cats.syntax.traverse.*
 import com.daml.network.http.v0.{definitions as jsonV0}
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.health.ComponentStatus
-import com.digitalasset.canton.health.admin.{v30 as proto}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.serialization.ProtoConverter.DurationConverter
 import com.digitalasset.canton.topology.UniqueIdentifier
-import com.google.protobuf.ByteString
 
 import java.time.Duration
 
@@ -43,18 +39,6 @@ case class CNNodeStatus(
       ).mkString(System.lineSeparator())
     )
 
-  // unused, but definition required by NodeStatus.Status trait
-  def toProtoV30: proto.NodeStatus.Status =
-    proto.NodeStatus.Status(
-      uid.toProtoPrimitive,
-      Some(DurationConverter.toProtoPrimitive(uptime)),
-      ports.fmap(_.unwrap),
-      ByteString.EMPTY,
-      active,
-      None,
-      components.map(_.toProtoV30),
-    )
-
   def toHttp: jsonV0.Status =
     jsonV0.Status(
       uid.toProtoPrimitive,
@@ -63,6 +47,9 @@ case class CNNodeStatus(
       None,
       active,
     )
+
+  // Required by Status trait but unused by us.
+  override def toProtoV30 = ???
 }
 
 object CNNodeStatus {
