@@ -6,7 +6,7 @@ import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
-import com.daml.network.wallet.store.TxLogEntry as walletLogEntry
+import com.daml.network.wallet.store.{BalanceChangeTxLogEntry, TxLogEntry as walletLogEntry}
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.topology.PartyId
 
@@ -90,10 +90,10 @@ class WalletTxLogAcsIntegrationTest
       checkTxHistory(
         sv1WalletClient,
         Seq(
-          { case logEntry: walletLogEntry.BalanceChange =>
+          { case logEntry: BalanceChangeTxLogEntry =>
             // Entry appears as a mint even though the coin was created with a tap,
             // since we cannot determine how coins in the initial ACS were created.
-            logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Mint
+            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
             logEntry.amount.bigDecimal shouldBe mintAmount
             logEntry.coinPrice shouldBe unknownCoinPrice
           }

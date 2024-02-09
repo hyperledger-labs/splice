@@ -1026,16 +1026,19 @@ class DbMultiDomainAcsStore[TXE](
     ) = {
       val safeOffset = lengthLimited(offset)
       val (entryType, entryData) = txLogConfig.encodeEntry(txe)
+      // Note: lengthLimited() uses String2066 which throws an exception if the string is longer than 2066 characters.
+      // Here we use String256M to support larger TxLogEntry payloads.
+      val safeEntryData = String256M.tryCreate(entryData)
       val rowData = txLogConfig.entryToRow(txe)
       val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
       val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
 
-      summary.ingestedTxLogEntries.addOne(entryData.compactPrint)
+      summary.ingestedTxLogEntries.addOne(entryData)
       (sql"""
       insert into #$txLogTableName(store_id, transaction_offset, domain_id, acs_contract_id,
       entry_type, entry_data #$indexColumnNames)
       values ($storeId, $safeOffset, $domainId, $acsContractId,
-              $entryType, $entryData""" ++ indexColumnNameValues ++ sql""")
+              $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
     """).toActionBuilder.asUpdate
     }
 

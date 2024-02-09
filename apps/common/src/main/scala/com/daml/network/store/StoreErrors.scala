@@ -22,4 +22,12 @@ trait StoreErrors {
   def txDecodingFailed() = {
     Status.INTERNAL.withDescription(s"Log entry could not be decoded").asRuntimeException
   }
+
+  def txEncodingFailed() = {
+    Status.INTERNAL.withDescription(s"Log entry could not be encoded").asRuntimeException
+  }
+
+  def txMissingField() = {
+    Status.INTERNAL.withDescription(s"Log entry is missing a required field").asRuntimeException
+  }
 }

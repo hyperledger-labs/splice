@@ -49,7 +49,7 @@ import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.protocol.LfContractId
 import com.google.protobuf.ByteString
-import spray.json.{DefaultJsonProtocol, DeserializationException, JsValue, RootJsonFormat}
+import spray.json.{DefaultJsonProtocol, RootJsonFormat}
 
 import java.time.{Duration, Instant}
 import java.util.Optional
@@ -887,13 +887,15 @@ object StoreTest {
   object TestTxLogEntry extends StoreErrors {
 
     val dbType: String3 = String3.tryCreate("tte")
-    def encode(entry: TestTxLogEntry): (String3, JsValue) = {
+    def encode(entry: TestTxLogEntry): (String3, String) = {
       import spray.json.*
       import TestTxLogEntry.JsonProtocol.*
-      (TestTxLogEntry.dbType, entry.toJson)
+      (TestTxLogEntry.dbType, entry.toJson.compactPrint)
     }
-    def decode(dbType: String3, json: JsValue): TestTxLogEntry = {
+    def decode(dbType: String3, str: String): TestTxLogEntry = {
       import TestTxLogEntry.JsonProtocol.*
+      import spray.json.*
+      val json = str.parseJson
       try {
         dbType match {
           case TestTxLogEntry.dbType => json.convertTo[TestTxLogEntry]

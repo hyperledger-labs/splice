@@ -3,7 +3,11 @@ package com.daml.network.wallet.store.db
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.util.Contract
-import com.daml.network.wallet.store.TxLogEntry
+import com.daml.network.wallet.store.{
+  BuyTrafficRequestTxLogEntry,
+  TransferOfferTxLogEntry,
+  TxLogEntry,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.{LengthLimitedString, String3}
 
 object WalletTables extends AcsTables {
@@ -37,21 +41,22 @@ object WalletTables extends AcsTables {
         case e: TxLogEntry.TransactionHistoryTxLogEntry =>
           UserWalletTxLogStoreRowData(
             entry,
-            TxLogEntry.TransactionHistoryTxLogEntry.txLogId,
+            TxLogEntry.LogId.TransactionHistoryTxLog,
             eventId = Some(e.eventId),
           )
-        case e: TxLogEntry.BuyTrafficRequest =>
+        case e: BuyTrafficRequestTxLogEntry =>
           UserWalletTxLogStoreRowData(
             entry,
-            TxLogEntry.BuyTrafficRequest.txLogId,
+            TxLogEntry.LogId.BuyTrafficRequestTxLog,
             trackingId = Some(e.trackingId),
           )
-        case e: TxLogEntry.TransferOffer =>
+        case e: TransferOfferTxLogEntry =>
           UserWalletTxLogStoreRowData(
             entry,
-            TxLogEntry.TransferOffer.txLogId,
+            TxLogEntry.LogId.TransferOfferTxLog,
             trackingId = Some(e.trackingId),
           )
+        case e => throw new RuntimeException(s"Unknown TxLogEntry $e")
       }
   }
 

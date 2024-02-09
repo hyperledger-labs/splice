@@ -4,7 +4,6 @@ import cats.implicits.catsSyntaxApplicativeId
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.svcrules.VoteResult
 import com.daml.network.config.BackupDumpConfig
 import com.daml.network.environment.{
   CNNodeStatus,
@@ -35,9 +34,7 @@ import io.opentelemetry.api.trace.Tracer
 import slick.jdbc.PostgresProfile
 
 import java.nio.file.Path
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 class HttpSvAdminHandler(
@@ -312,16 +309,7 @@ class HttpSvAdminHandler(
             .map(res =>
               JsonUtil.sprayJsValueToCirceJson(
                 payloadJsonFromDefinedDataType(
-                  new VoteResult(
-                    res.action,
-                    res.executed,
-                    res.expired,
-                    res.requester,
-                    Instant.parse(res.effectiveAt),
-                    Instant.parse(res.votedAt),
-                    res.acceptedBy.asJava,
-                    res.rejectedBy.asJava,
-                  )
+                  res
                 )
               )
             )

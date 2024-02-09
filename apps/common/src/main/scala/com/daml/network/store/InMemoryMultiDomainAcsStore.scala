@@ -711,7 +711,7 @@ object InMemoryMultiDomainAcsStore {
               .map(_._3)
               .map(txe => {
                 val (_, data) = txLogConfig.encodeEntry(txe)
-                data.compactPrint
+                data
               }),
           ),
           offsetChanged,
@@ -774,7 +774,7 @@ object InMemoryMultiDomainAcsStore {
         newAcsSize = stNew.createEvents.size,
         ingestedTxLogEntries = ingestedTxLogEntries.map(txe => {
           val (_, data) = txLogConfig.encodeEntry(txe)
-          data.compactPrint
+          data
         }),
       )
 

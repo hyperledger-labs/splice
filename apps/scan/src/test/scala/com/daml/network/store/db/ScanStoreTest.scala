@@ -17,12 +17,19 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.history.{CoinExpire, LockedCoinExpireCoin, Transfer}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.store.ScanStore
-import com.daml.network.scan.store.TxLogEntry.*
+import com.daml.network.scan.store.{
+  OpenMiningRoundTxLogEntry,
+  ReceiverAmount,
+  ScanStore,
+  SenderAmount,
+  SortOrder,
+  TransferTxLogEntry,
+}
 import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{PageLimit, StoreErrors, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
+import com.daml.network.util.CNNodeUtil.damlDecimal
 import com.daml.network.util.{
   Contract,
   ContractWithState,
@@ -43,7 +50,6 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
-import com.daml.network.scan.store.SortOrder
 import com.digitalasset.canton.util.MonadUtil
 
 abstract class ScanStoreTest extends StoreTest with HasExecutionContext with StoreErrors {
@@ -471,7 +477,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
     "getCoinConfigForRound" should {
 
-      "return the coin OpenMiningRoundLogEntry for the round" in {
+      "return the coin OpenMiningRoundTxLogEntry for the round" in {
         val wanted = openMiningRound(svcParty, round = 2, coinPrice = 2.0)
         val unwanted = openMiningRound(svcParty, round = 3, coinPrice = 3.0)
         for {
@@ -481,10 +487,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         } yield {
           val logEntry = store.getCoinConfigForRound(round = 2).futureValue
           logEntry match {
-            case omr: OpenMiningRoundLogEntry =>
+            case omr: OpenMiningRoundTxLogEntry =>
               omr.round should be(wanted.payload.round.number)
             case x =>
-              fail(s"Entry was not an OpenMiningRoundLogEntry but a $x")
+              fail(s"Entry was not an OpenMiningRoundTxLogEntry but a $x")
           }
           numeric(logEntry.coinCreateFee) should be(
             numeric(
@@ -914,42 +920,44 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val round = 1L
         val now = java.time.Instant.EPOCH
         val zero = BigDecimal(0)
-        val txs: List[TransferLogEntry] = (1 to nrTransfers).map { i =>
-          TransferLogEntry(
+        val txs: List[TransferTxLogEntry] = (1 to nrTransfers).map { i =>
+          TransferTxLogEntry(
             offset = s"$i",
             eventId = s"$i",
             domainId = dummyDomain,
-            date = now,
-            provider = user1.toProtoPrimitive,
-            sender = SenderAmount(
-              user1.toProtoPrimitive,
-              BigDecimal(i),
-              zero,
-              zero,
-              zero,
-              zero,
-              zero,
-              zero,
+            date = Some(now),
+            provider = user1,
+            sender = Some(
+              SenderAmount(
+                user1,
+                BigDecimal(i),
+                zero,
+                zero,
+                zero,
+                zero,
+                zero,
+                zero,
+              )
             ),
             balanceChanges = Seq(),
-            receivers = Seq(ReceiverAmount(user2.toProtoPrimitive, BigDecimal(i), zero)),
+            receivers = Seq(ReceiverAmount(user2, BigDecimal(i), zero)),
             round = round,
             coinPrice = BigDecimal(1.0),
           )
         }.toList
-        def stripEventId(tx: TransferLogEntry) = tx.copy(eventId = "")
+        def stripEventId(tx: TransferTxLogEntry) = tx.copy(eventId = "")
         val expectedFirstPage = txs.reverse.take(limit).toList
         val expectedSecondPage = txs.reverse.drop(limit).take(limit).toList
 
         def transferFromTransaction(
             store: ScanStore,
             coinRulesContract: Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules],
-            tx: TransferLogEntry,
+            tx: TransferTxLogEntry,
             offset: String,
         ) = {
-          val senderParty = PartyId.tryFromProtoPrimitive(tx.sender.party)
-          val senderAmount = tx.sender.inputCoinAmount
-          val receiverParty = PartyId.tryFromProtoPrimitive(tx.receivers(0).party)
+          val senderParty = tx.sender.getOrElse(throw txMissingField()).party
+          val senderAmount = tx.sender.getOrElse(throw txMissingField()).inputCoinAmount
+          val receiverParty = tx.receivers(0).party
           val receiverAmount = tx.receivers(0).amount
           dummyDomain
             .exercise(
@@ -994,7 +1002,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           }
         } yield {
           val firstPageDescending = store
-            .listByType[TransferLogEntry](None, SortOrder.Descending, limit)
+            .listByType[TransferTxLogEntry](None, SortOrder.Descending, limit)
             .futureValue
             .toList
 
@@ -1004,7 +1012,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               .map(stripEventId)
           )
           val nextPageDescending = store
-            .listByType[TransferLogEntry](
+            .listByType[TransferTxLogEntry](
               Some(firstPageDescending.last.eventId),
               SortOrder.Descending,
               limit,
@@ -1019,14 +1027,14 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           )
 
           val firstPageAscending = store
-            .listByType[TransferLogEntry](None, SortOrder.Ascending, limit)
+            .listByType[TransferTxLogEntry](None, SortOrder.Ascending, limit)
             .futureValue
             .toList
 
           firstPageAscending should be(nextPageDescending.reverse)
 
           val nextPageAscending = store
-            .listByType[TransferLogEntry](
+            .listByType[TransferTxLogEntry](
               Some(firstPageAscending.last.eventId),
               SortOrder.Ascending,
               limit,
@@ -1129,17 +1137,17 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       balanceChanges: Map[String, cc.coinrules.BalanceChange],
       coinPrice: Double,
   ) = new cc.coinrules.TransferSummary(
-    new java.math.BigDecimal(inputAppRewardAmount),
-    new java.math.BigDecimal(inputValidatorRewardAmount),
-    new java.math.BigDecimal(inputSvRewardAmount),
-    new java.math.BigDecimal(inputCoinAmount),
+    damlDecimal(inputAppRewardAmount),
+    damlDecimal(inputValidatorRewardAmount),
+    damlDecimal(inputSvRewardAmount),
+    damlDecimal(inputCoinAmount),
     balanceChanges.asJava,
-    new java.math.BigDecimal(0.0),
-    java.util.List.of(new java.math.BigDecimal(0.0)),
-    new java.math.BigDecimal(0.0),
-    new java.math.BigDecimal(0.0),
-    new java.math.BigDecimal(coinPrice),
-    java.util.Optional.of(new java.math.BigDecimal(inputValidatorFaucetAmount)),
+    damlDecimal(0.0),
+    java.util.List.of(damlDecimal(0.0)),
+    damlDecimal(0.0),
+    damlDecimal(0.0),
+    damlDecimal(coinPrice),
+    java.util.Optional.of(damlDecimal(inputValidatorFaucetAmount)),
   )
 
   private def mkTransferResult(

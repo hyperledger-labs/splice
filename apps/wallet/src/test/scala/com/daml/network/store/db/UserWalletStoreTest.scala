@@ -16,7 +16,15 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
+import com.daml.network.wallet.store.{
+  BalanceChangeTxLogEntry,
+  BuyTrafficRequestStatusRejected,
+  BuyTrafficRequestTxLogEntry,
+  TransferOfferStatusAccepted,
+  TransferOfferTxLogEntry,
+  TxLogEntry,
+  UserWalletStore,
+}
 import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.daml.network.environment.{DarResources, RetryProvider}
@@ -27,7 +35,6 @@ import com.daml.network.util.{
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
 }
-import com.daml.network.wallet.store.TxLogEntry.{BuyTrafficRequestStatus, TransferOfferStatus}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
@@ -225,11 +232,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           result.offset should be(acceptedTree.getOffset)
           result.value.map(_.status) should be(
             Some(
-              TransferOfferStatus.Accepted(
-                new transferOffersCodegen.AcceptedTransferOffer.ContractId(
-                  goodAcceptedTransferOfferCid
-                ),
-                acceptedTree.getUpdateId,
+              TransferOfferTxLogEntry.Status.Accepted(
+                TransferOfferStatusAccepted(
+                  goodAcceptedTransferOfferCid,
+                  acceptedTree.getUpdateId,
+                )
               )
             )
           )
@@ -291,7 +298,9 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           result.offset should be(cancelledTree.getOffset)
           result.value.map(_.status) should be(
             Some(
-              BuyTrafficRequestStatus.Rejected("just because")
+              BuyTrafficRequestTxLogEntry.Status.Rejected(
+                BuyTrafficRequestStatusRejected("just because")
+              )
             )
           )
         }
@@ -794,24 +803,24 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store,
             // Note: transactions are returned in reverse chronological order
             Seq(
-              { case logEntry: TxLogEntry.BalanceChange =>
-                logEntry.transactionSubtype shouldBe TxLogEntry.BalanceChange.Mint
+              { case logEntry: BalanceChangeTxLogEntry =>
+                logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
                 logEntry.amount shouldBe 5.0
               },
-              { case logEntry: TxLogEntry.BalanceChange =>
-                logEntry.transactionSubtype shouldBe TxLogEntry.BalanceChange.Mint
+              { case logEntry: BalanceChangeTxLogEntry =>
+                logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
                 logEntry.amount shouldBe 4.0
               },
-              { case logEntry: TxLogEntry.BalanceChange =>
-                logEntry.transactionSubtype shouldBe TxLogEntry.BalanceChange.Mint
+              { case logEntry: BalanceChangeTxLogEntry =>
+                logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
                 logEntry.amount shouldBe 3.0
               },
-              { case logEntry: TxLogEntry.BalanceChange =>
-                logEntry.transactionSubtype shouldBe TxLogEntry.BalanceChange.Mint
+              { case logEntry: BalanceChangeTxLogEntry =>
+                logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
                 logEntry.amount shouldBe 2.0
               },
-              { case logEntry: TxLogEntry.BalanceChange =>
-                logEntry.transactionSubtype shouldBe TxLogEntry.BalanceChange.Mint
+              { case logEntry: BalanceChangeTxLogEntry =>
+                logEntry.subtype.value shouldBe TxLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
                 logEntry.amount shouldBe 1.0
               },
             ),

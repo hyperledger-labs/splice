@@ -12,7 +12,7 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.daml.network.wallet.store.TxLogEntry as walletLogEntry
+import com.daml.network.wallet.store.{NotificationTxLogEntry, TxLogEntry as walletLogEntry}
 import org.scalatest.Assertion
 
 import java.time.Duration
@@ -304,8 +304,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
       checkTxHistory(
         aliceWalletClient,
-        Seq({ case logEntry: walletLogEntry.Notification =>
-          logEntry.transactionSubtype shouldBe walletLogEntry.Notification.DirectTransferFailed
+        Seq({ case logEntry: NotificationTxLogEntry =>
+          logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.DirectTransferFailed.toProto
           logEntry.details should startWith("ITR_InsufficientFunds")
         }),
       )

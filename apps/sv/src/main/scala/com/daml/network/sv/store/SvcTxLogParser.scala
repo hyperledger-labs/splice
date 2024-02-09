@@ -14,15 +14,12 @@ import com.daml.network.codegen.java.cn.svcrules.{
   VoteResult,
 }
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
-import com.daml.network.store.db.AcsJdbcTypes
-import com.daml.network.store.{StoreErrors, TxLogStore}
+import com.daml.network.store.TxLogStore
 import com.daml.network.sv.history.*
-import com.daml.network.util.{ExerciseNode, TemplateJsonDecoder}
-import com.digitalasset.canton.config.CantonRequireTypes.String3
+import com.daml.network.util.ExerciseNode
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
-import spray.json.*
 
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
@@ -30,7 +27,7 @@ import scala.jdk.CollectionConverters.*
 class SvcTxLogParser(
     override val loggerFactory: NamedLoggerFactory
 ) extends TxLogStore.Parser[
-      SvcTxLogParser.TxLogEntry
+      TxLogEntry
     ]
     with NamedLogging {
 
@@ -70,117 +67,24 @@ class SvcTxLogParser(
       incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
   )(implicit
       tc: TraceContext
-  ): Seq[(DomainId, Option[codegen.ContractId[?]], SvcTxLogParser.TxLogEntry)] =
+  ): Seq[(DomainId, Option[codegen.ContractId[?]], TxLogEntry)] =
     Seq.empty
 
   override def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit
       tc: TraceContext
-  ): Seq[SvcTxLogParser.TxLogEntry] = {
+  ): Seq[TxLogEntry] = {
     val ret = parseTrees(tx, domain, tx.getRootEventIds.asScala.toList).entries
     ret
   }
 
   override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
     Some(
-      TxLogEntry.ErrorTxLogEntry()
+      ErrorTxLogEntry()
     )
 
 }
 
 object SvcTxLogParser {
-
-  sealed trait TxLogEntry
-
-  object TxLogEntry {
-
-    // Note: the spray-json reader depends on a TemplateJsonDecoder
-    // to decode the ActionRequiringConfirmation payload.
-    case class Codec(templateJsonDecoder: TemplateJsonDecoder) {
-      def encode(entry: TxLogEntry): (String3, JsValue) = {
-        import spray.json.*
-        import JsonProtocol.*
-        entry match {
-          case e: ErrorTxLogEntry => (ErrorTxLogEntry.dbType, e.toJson)
-          case e: DefiniteVoteTxLogEntry => (DefiniteVoteTxLogEntry.dbType, e.toJson)
-
-        }
-      }
-      def decode(dbType: String3, json: JsValue): TxLogEntry = {
-        import JsonProtocol.*
-        try {
-          dbType match {
-            case ErrorTxLogEntry.dbType => json.convertTo[ErrorTxLogEntry]
-            case DefiniteVoteTxLogEntry.dbType =>
-              json.convertTo[DefiniteVoteTxLogEntry]
-            case _ => throw txDecodingFailed()
-          }
-        } catch {
-          case _: DeserializationException => throw txDecodingFailed()
-        }
-      }
-
-      object JsonProtocol extends DefaultJsonProtocol with StoreErrors {
-        implicit val domainIdFormat: JsonFormat[DomainId] =
-          new JsonFormat[DomainId] {
-            override def write(obj: DomainId) =
-              JsString(obj.uid.toProtoPrimitive)
-
-            override def read(json: JsValue) = json match {
-              case JsString(s) =>
-                DomainId
-                  .fromProtoPrimitive(s, "")
-                  .fold(f => deserializationError(f.message), identity)
-              case _ => deserializationError("DomainId must be a string")
-            }
-          }
-
-        implicit val arcFormat: RootJsonFormat[ActionRequiringConfirmation] =
-          new RootJsonFormat[ActionRequiringConfirmation] {
-            override def read(json: JsValue): ActionRequiringConfirmation = {
-              val circeJson =
-                io.circe.parser.parse(json.toString).getOrElse(throw txDecodingFailed())
-              templateJsonDecoder.decodeValue(
-                ActionRequiringConfirmation.valueDecoder(),
-                ActionRequiringConfirmation._packageId,
-                "CN.SvcRules",
-                "ActionRequiringConfirmation",
-              )(circeJson)
-            }
-
-            override def write(obj: ActionRequiringConfirmation): JsValue =
-              AcsJdbcTypes.payloadJsonFromDefinedDataType(obj)
-          }
-        implicit val errorEntryFormat: RootJsonFormat[ErrorTxLogEntry] =
-          jsonFormat0(() => ErrorTxLogEntry.apply())
-        implicit val definiteVoteEntryFormat: RootJsonFormat[DefiniteVoteTxLogEntry] =
-          jsonFormat9(DefiniteVoteTxLogEntry.apply)
-
-      }
-    }
-
-    final case class ErrorTxLogEntry() extends TxLogEntry {}
-
-    object ErrorTxLogEntry {
-      val dbType: String3 = String3.tryCreate("err")
-    }
-
-    final case class DefiniteVoteTxLogEntry(
-        actionName: String,
-        executed: Boolean,
-        requester: String,
-        effectiveAt: String,
-        votedAt: String,
-        expired: Boolean,
-        rejectedBy: List[String],
-        acceptedBy: List[String],
-        action: ActionRequiringConfirmation,
-    ) extends TxLogEntry
-
-    object DefiniteVoteTxLogEntry {
-      val dbType: String3 = String3.tryCreate("dv")
-    }
-
-  }
 
   case class State(
       entries: immutable.Queue[TxLogEntry]
@@ -195,19 +99,10 @@ object SvcTxLogParser {
     def fromExecuteDefiniteVote(
         node: ExerciseNode[SvcRules_ExecuteDefiniteVote, VoteResult]
     ): State = {
-      val action = mapActionName(node.result.value.action)
       State(
         immutable.Queue(
-          TxLogEntry.DefiniteVoteTxLogEntry(
-            actionName = action,
-            executed = node.result.value.executed,
-            requester = node.result.value.requester,
-            effectiveAt = node.result.value.effectiveAt.toString,
-            votedAt = node.result.value.votedAt.toString,
-            action = node.result.value.action,
-            expired = node.result.value.expired,
-            rejectedBy = node.result.value.rejectedBy.asScala.toList,
-            acceptedBy = node.result.value.acceptedBy.asScala.toList,
+          DefiniteVoteTxLogEntry(
+            result = Some(node.result.value)
           )
         )
       )
@@ -216,25 +111,16 @@ object SvcTxLogParser {
     def fromVoteRequestExpire(
         node: ExerciseNode[SvcRules_VoteRequest_Expire, VoteResult]
     ): State = {
-      val action = mapActionName(node.result.value.action)
       State(
         immutable.Queue(
-          TxLogEntry.DefiniteVoteTxLogEntry(
-            actionName = action,
-            executed = node.result.value.executed,
-            requester = node.result.value.requester,
-            effectiveAt = node.result.value.effectiveAt.toString,
-            votedAt = node.result.value.votedAt.toString,
-            action = node.result.value.action,
-            expired = node.result.value.expired,
-            rejectedBy = node.result.value.rejectedBy.asScala.toList,
-            acceptedBy = node.result.value.acceptedBy.asScala.toList,
+          DefiniteVoteTxLogEntry(
+            result = Some(node.result.value)
           )
         )
       )
     }
 
-    private def mapActionName(
+    def mapActionName(
         action: ActionRequiringConfirmation
     ): String = {
       action match {

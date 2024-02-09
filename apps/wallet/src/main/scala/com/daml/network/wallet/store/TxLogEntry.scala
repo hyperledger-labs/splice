@@ -2,9 +2,6 @@ package com.daml.network.wallet.store
 
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.Identifier
-import com.daml.ledger.javaapi.data.codegen.Choice
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cn.wallet.transferoffer as transferCodegen
 import com.daml.network.history.{
   CnsRules_CollectEntryRenewalPayment,
   CnsRules_CollectInitialEntryPayment,
@@ -15,530 +12,409 @@ import com.daml.network.history.{
   LockedCoinUnlock,
 }
 import com.daml.network.http.v0.definitions as httpDef
-import com.daml.network.http.v0.definitions.GetTransferOfferStatusResponse
+import com.daml.network.http.v0.definitions.{
+  GetBuyTrafficRequestStatusResponse,
+  GetTransferOfferStatusResponse,
+}
 import com.daml.network.store.StoreErrors
 import com.daml.network.util.{Codec, ExerciseNodeCompanion}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
-import spray.json.{
-  DefaultJsonProtocol,
-  DeserializationException,
-  JsNull,
-  JsObject,
-  JsString,
-  JsValue,
-  RootJsonFormat,
-}
 
 import java.time.{Instant, ZoneOffset}
 
-sealed trait TxLogEntry
+trait TxLogEntry
 
-sealed trait TxLogEntryCompanion {
-
-  /** A short string that identifies the TxLogEntry type in the database.
-    * Must not change, unless the store descriptor changes at the same time.
-    */
-  def dbType: String3
-
-  def txLogId: String3
-}
-
-object TxLogEntry {
-  def encode(entry: TxLogEntry): (String3, JsValue) = {
-    import spray.json.*
-    import JsonProtocol.*
-    entry match {
-      case e: Unknown => (Unknown.dbType, e.toJson)
-      case e: Notification => (Notification.dbType, e.toJson)
-      case e: Transfer => (Transfer.dbType, e.toJson)
-      case e: BalanceChange => (BalanceChange.dbType, e.toJson)
-      case e: TransferOffer => (TransferOffer.dbType, e.toJson)
-      case e: BuyTrafficRequest => (BuyTrafficRequest.dbType, e.toJson)
+object TxLogEntry extends StoreErrors {
+  def encode(entry: TxLogEntry): (String3, String) = {
+    import scalapb.json4s.JsonFormat
+    val entryType = entry match {
+      case _: UnknownTxLogEntry => EntryType.UnknownTxLogEntry
+      case _: BalanceChangeTxLogEntry => EntryType.BalanceChangeTxLogEntry
+      case _: TransferTxLogEntry => EntryType.TransferTxLogEntry
+      case _: NotificationTxLogEntry => EntryType.NotificationTxLogEntry
+      case _: TransferOfferTxLogEntry => EntryType.TransferOfferTxLogEntry
+      case _: BuyTrafficRequestTxLogEntry => EntryType.BuyTrafficRequestTxLogEntry
+      case _ => throw txEncodingFailed()
     }
+    val jsonValue = entry match {
+      case e: scalapb.GeneratedMessage => JsonFormat.toJsonString(e)
+      case _ => throw txEncodingFailed()
+    }
+    (entryType, jsonValue)
   }
-  def decode(dbType: String3, json: JsValue): TxLogEntry = {
-    import TxLogEntry.JsonProtocol.*
+  def decode(entryType: String3, json: String): TxLogEntry = {
+    import scalapb.json4s.JsonFormat.fromJsonString as from
     try {
-      dbType match {
-        case Unknown.dbType => json.convertTo[Unknown]
-        case Notification.dbType => json.convertTo[Notification]
-        case Transfer.dbType => json.convertTo[Transfer]
-        case BalanceChange.dbType => json.convertTo[BalanceChange]
-        case TransferOffer.dbType => json.convertTo[TransferOffer]
-        case BuyTrafficRequest.dbType => json.convertTo[BuyTrafficRequest]
+      entryType match {
+        case EntryType.UnknownTxLogEntry => from[UnknownTxLogEntry](json)
+        case EntryType.BalanceChangeTxLogEntry => from[BalanceChangeTxLogEntry](json)
+        case EntryType.TransferTxLogEntry => from[TransferTxLogEntry](json)
+        case EntryType.NotificationTxLogEntry => from[NotificationTxLogEntry](json)
+        case EntryType.TransferOfferTxLogEntry => from[TransferOfferTxLogEntry](json)
+        case EntryType.BuyTrafficRequestTxLogEntry => from[BuyTrafficRequestTxLogEntry](json)
         case _ => throw txDecodingFailed()
       }
     } catch {
-      case _: DeserializationException => throw txDecodingFailed()
+      case _: RuntimeException => throw txDecodingFailed()
     }
-  }
-
-  object JsonProtocol extends DefaultJsonProtocol with StoreErrors {
-    import com.digitalasset.canton.http.json.JsonProtocol.*
-
-    implicit val notificationSubtypeFormat
-        : RootJsonFormat[Notification.NotificationTransactionSubtype] =
-      new RootJsonFormat[Notification.NotificationTransactionSubtype] {
-        override def write(obj: Notification.NotificationTransactionSubtype): JsValue = {
-          JsObject(
-            "choice" -> JsString(obj.choice.name),
-            "coinOperation" -> obj.coinOperation.fold[JsValue](JsNull)(JsString(_)),
-          )
-        }
-
-        override def read(json: JsValue): Notification.NotificationTransactionSubtype = {
-          val fields = json.asJsObject.fields
-          val choice = fields("choice").convertTo[String]
-          val coinOperation = fields("coinOperation") match {
-            case JsNull => None
-            case f: JsString => Some(f.value)
-            case _ => throw txDecodingFailed()
-          }
-          Notification.NotificationTransactionSubtype
-            .find(choice, coinOperation)
-            .getOrElse(throw txDecodingFailed())
-        }
-      }
-
-    implicit val transferSubtypeFormat: RootJsonFormat[Transfer.TransferTransactionSubtype] =
-      new RootJsonFormat[Transfer.TransferTransactionSubtype] {
-        override def write(obj: Transfer.TransferTransactionSubtype): JsValue = {
-          JsObject(
-            "choice" -> JsString(obj.choice.name)
-          )
-        }
-
-        override def read(json: JsValue): Transfer.TransferTransactionSubtype = {
-          val fields = json.asJsObject.fields
-          val choice = fields("choice").convertTo[String]
-          Transfer.TransferTransactionSubtype
-            .find(choice)
-            .getOrElse(throw txDecodingFailed())
-        }
-      }
-
-    implicit val balanceChangeSubtypeFormat
-        : RootJsonFormat[BalanceChange.BalanceChangeTransactionSubtype] =
-      new RootJsonFormat[BalanceChange.BalanceChangeTransactionSubtype] {
-        override def write(obj: BalanceChange.BalanceChangeTransactionSubtype): JsValue = {
-          JsObject(
-            "choice" -> JsString(obj.choice.name)
-          )
-        }
-
-        override def read(json: JsValue): BalanceChange.BalanceChangeTransactionSubtype = {
-          val fields = json.asJsObject.fields
-          val choice = fields("choice").convertTo[String]
-          BalanceChange.BalanceChangeTransactionSubtype
-            .find(choice)
-            .getOrElse(throw txDecodingFailed())
-        }
-      }
-
-    implicit val transferOfferStatusFormat: RootJsonFormat[TransferOfferStatus] =
-      new RootJsonFormat[TransferOfferStatus] {
-        override def write(obj: TransferOfferStatus): JsValue = {
-          obj match {
-            case TransferOfferStatus.Created(contractId, transactionId) =>
-              JsObject(
-                "status" -> JsString("Created"),
-                "transactionId" -> JsString(transactionId),
-                "contractId" -> JsString(contractId.contractId),
-              )
-            case TransferOfferStatus.Accepted(contractId, transactionId) =>
-              JsObject(
-                "status" -> JsString("Accepted"),
-                "transactionId" -> JsString(transactionId),
-                "contractId" -> JsString(contractId.contractId),
-              )
-            case TransferOfferStatus.Completed(contractId, transactionId) =>
-              JsObject(
-                "status" -> JsString("Completed"),
-                "transactionId" -> JsString(transactionId),
-                "contractId" -> JsString(contractId.contractId),
-              )
-            case TransferOfferStatus.Rejected =>
-              JsObject(
-                "status" -> JsString("Rejected")
-              )
-            case TransferOfferStatus.Withdrawn(reason) =>
-              JsObject(
-                "status" -> JsString("Withdrawn"),
-                "withdrawnReason" -> JsString(reason),
-              )
-            case TransferOfferStatus.Expired =>
-              JsObject(
-                "status" -> JsString("Expired")
-              )
-          }
-        }
-
-        override def read(json: JsValue): TransferOfferStatus = {
-          val fields = json.asJsObject.fields
-          val status = fields("status").convertTo[String]
-          status match {
-            case "Created" =>
-              val contractId = fields("contractId").convertTo[String]
-              val transactionId = fields("transactionId").convertTo[String]
-              TransferOfferStatus.Created(
-                contractId = new transferCodegen.TransferOffer.ContractId(contractId),
-                transactionId = transactionId,
-              )
-            case "Accepted" =>
-              val contractId = fields("contractId").convertTo[String]
-              val transactionId = fields("transactionId").convertTo[String]
-              TransferOfferStatus.Accepted(
-                contractId = new transferCodegen.AcceptedTransferOffer.ContractId(contractId),
-                transactionId = transactionId,
-              )
-            case "Completed" =>
-              val contractId = fields("contractId").convertTo[String]
-              val transactionId = fields("transactionId").convertTo[String]
-              TransferOfferStatus.Completed(
-                contractId = new cc.coin.Coin.ContractId(contractId),
-                transactionId = transactionId,
-              )
-            case "Rejected" =>
-              TransferOfferStatus.Rejected
-            case "Withdrawn" =>
-              val reason = fields("withdrawnReason").convertTo[String]
-              TransferOfferStatus.Withdrawn(reason)
-            case "Expired" =>
-              TransferOfferStatus.Expired
-          }
-        }
-      }
-
-    implicit val buyTrafficRequestStatusFormat: RootJsonFormat[BuyTrafficRequestStatus] =
-      new RootJsonFormat[BuyTrafficRequestStatus] {
-        override def write(obj: BuyTrafficRequestStatus): JsValue = {
-          obj match {
-            case BuyTrafficRequestStatus.Created =>
-              JsObject(
-                "status" -> JsString("Created")
-              )
-            case BuyTrafficRequestStatus.Completed(transactionId) =>
-              JsObject(
-                "status" -> JsString("Completed"),
-                "transactionId" -> JsString(transactionId),
-              )
-            case BuyTrafficRequestStatus.Rejected(reason) =>
-              JsObject(
-                "status" -> JsString("Rejected"),
-                "rejectionReason" -> JsString(reason),
-              )
-            case BuyTrafficRequestStatus.Expired =>
-              JsObject(
-                "status" -> JsString("Expired")
-              )
-          }
-        }
-
-        override def read(json: JsValue): BuyTrafficRequestStatus = {
-          val fields = json.asJsObject.fields
-          val status = fields("status").convertTo[String]
-          status match {
-            case "Created" =>
-              BuyTrafficRequestStatus.Created
-            case "Completed" =>
-              val transactionId = fields("transactionId").convertTo[String]
-              BuyTrafficRequestStatus.Completed(transactionId)
-            case "Rejected" =>
-              val reason = fields("rejectionReason").convertTo[String]
-              BuyTrafficRequestStatus.Rejected(reason)
-            case "Expired" =>
-              BuyTrafficRequestStatus.Expired
-          }
-        }
-      }
-
-    implicit val unknownEntryFormat: RootJsonFormat[Unknown] = jsonFormat1(Unknown.apply)
-    implicit val notificationEntryFormat: RootJsonFormat[Notification] =
-      jsonFormat4(Notification.apply)
-    implicit val transferEntryFormat: RootJsonFormat[Transfer] = jsonFormat10(Transfer.apply)
-    implicit val balanceChangeEntryFormat: RootJsonFormat[BalanceChange] =
-      jsonFormat6(BalanceChange.apply)
-    implicit val transferOfferEntryFormat: RootJsonFormat[TransferOffer] =
-      jsonFormat4(TransferOffer.apply)
-    implicit val buyTrafficRequestEntryFormat: RootJsonFormat[BuyTrafficRequest] =
-      jsonFormat3(BuyTrafficRequest.apply)
   }
 
   /** TxLogEntries that are part of the transaction history in the UI */
-  sealed trait TransactionHistoryTxLogEntry extends TxLogEntry {
+  trait TransactionHistoryTxLogEntry extends TxLogEntry {
     // The UI uses the event ID for pagination, see WalletServiceContext.tsx#listTransactions
-    def setEventId(eventId: String): TxLogEntry
     def eventId: String
-
-    def toResponseItem: httpDef.ListTransactionsResponseItem
-  }
-  object TransactionHistoryTxLogEntry {
-    val txLogId: String3 = String3.tryCreate("txh")
-  }
-  sealed trait TransactionHistoryTxLogEntryCompanion extends TxLogEntryCompanion {
-
-    /** The transaction type as used in the wallet API.
-      * If you change this, you need to update the wallet UI as well.
-      */
-    def transactionType: String
   }
 
-  /** TxLogEntries that are NOT part of the transaction history in the UI */
-  sealed trait NonTxnHistoryTxLogEntry extends TxLogEntry
-
-  sealed trait TransferOfferTxLogEntry extends NonTxnHistoryTxLogEntry
-  sealed trait BuyTrafficRequestTxLogEntry extends NonTxnHistoryTxLogEntry
-
-  sealed abstract class TransactionSubtype(
-      val companion: ExerciseNodeCompanion,
-      coinOperation: Option[String],
-  ) {
-    val templateId: Identifier = companion.template.TEMPLATE_ID
-    val choice: Choice[companion.Tpl, companion.Arg, companion.Res] = companion.choice
-
-    def toResponseItem: httpDef.TransactionSubtype = httpDef.TransactionSubtype(
-      templateId =
-        s"${templateId.getPackageId}:${templateId.getModuleName}:${templateId.getEntityName}",
-      choice = choice.name,
-      coinOperation = coinOperation,
-    )
+  object LogId {
+    val TransactionHistoryTxLog: String3 = String3.tryCreate("txh")
+    val TransferOfferTxLog: String3 = String3.tryCreate("tof")
+    val BuyTrafficRequestTxLog: String3 = String3.tryCreate("btr")
   }
 
-  /* Unknown event, caused the parser failing to parse a transaction tree */
-  final case class Unknown(eventId: String) extends TransactionHistoryTxLogEntry {
-    override def toResponseItem: httpDef.ListTransactionsResponseItem =
+  object EntryType {
+    val UnknownTxLogEntry: String3 = String3.tryCreate("unk")
+    val TransferOfferTxLogEntry: String3 = String3.tryCreate("tof")
+    val BuyTrafficRequestTxLogEntry: String3 = String3.tryCreate("btr")
+    val TransferTxLogEntry: String3 = String3.tryCreate("tra")
+    val BalanceChangeTxLogEntry: String3 = String3.tryCreate("bal")
+    val NotificationTxLogEntry: String3 = String3.tryCreate("not")
+  }
+
+  object Http {
+
+    object TransactionType {
+      val Unknown = "unknown"
+      val Transfer = "transfer"
+      val BalanceChange = "balance_change"
+      val Notification = "notification"
+    }
+
+    object TransferOfferStatus {
+      val Created = "created"
+      val Accepted = "accepted"
+      val Completed = "completed"
+      val Failed = "failed"
+    }
+
+    object BuyTrafficRequestStatus {
+      val Created = "created"
+      val Completed = "completed"
+      val Failed = "failed"
+    }
+
+    // Note: deserialization is only needed for the Canton console
+    def fromResponseItem(
+        item: httpDef.ListTransactionsResponseItem
+    ): Either[String, TransactionHistoryTxLogEntry] = {
+      import httpDef.ListTransactionsResponseItem.members as members
+      item match {
+        case members.TransferResponseItem(transfer) =>
+          transferFromResponseItem(transfer)
+        case members.BalanceChangeResponseItem(balanceChange) =>
+          balanceChangeFromResponseItem(balanceChange)
+        case members.NotificationResponseItem(notification) =>
+          notificationFromResponseItem(notification)
+        case members.UnknownResponseItem(unknown) =>
+          unknownFromResponseItem(unknown)
+        case _ => Left(s"Unknown item $item")
+      }
+    }
+
+    def toResponseItem(entry: TransactionHistoryTxLogEntry): httpDef.ListTransactionsResponseItem =
+      entry match {
+        case e: UnknownTxLogEntry => toUnknownResponseItem(e)
+        case e: TransferTxLogEntry => toTransferResponseItem(e)
+        case e: BalanceChangeTxLogEntry => toBalanceChangeResponseItem(e)
+        case e: NotificationTxLogEntry => toNotificationResponseItem(e)
+        case _ => throw txEncodingFailed()
+      }
+
+    private def toUnknownResponseItem(
+        entry: UnknownTxLogEntry
+    ): httpDef.ListTransactionsResponseItem =
       httpDef.UnknownResponseItem(
-        transactionType = Unknown.transactionType,
+        transactionType = TransactionType.Unknown,
         transactionSubtype = httpDef.TransactionSubtype("unknown", "unknown"),
-        eventId = eventId,
+        eventId = entry.eventId,
         date = java.time.OffsetDateTime.ofInstant(Instant.now(), ZoneOffset.UTC),
       )
 
-    override def setEventId(eventId: String): TxLogEntry = copy(eventId = eventId)
-  }
-  object Unknown extends TransactionHistoryTxLogEntryCompanion {
-    override val dbType: String3 = String3.tryCreate("unk")
-    override def txLogId: String3 = TransactionHistoryTxLogEntry.txLogId
-    override val transactionType = "unknown"
-  }
-
-  sealed trait TransferOfferStatus {
-    def toStatusResponse: httpDef.GetTransferOfferStatusResponse
-  }
-  sealed trait TransferOfferStatusCompanion {
-    def status: String
-  }
-  object TransferOfferStatus {
-    case class Created(
-        contractId: transferCodegen.TransferOffer.ContractId,
-        transactionId: String,
-    ) extends TransferOfferStatus {
-      override def toStatusResponse: GetTransferOfferStatusResponse =
-        httpDef.TransferOfferCreatedResponse(
-          status = Created.status,
-          transactionId = transactionId,
-          contractId = contractId.contractId,
+    private def unknownFromResponseItem(
+        item: httpDef.UnknownResponseItem
+    ): Either[String, UnknownTxLogEntry] = {
+      Right(
+        UnknownTxLogEntry(
+          eventId = item.eventId
         )
-    }
-    object Created extends TransferOfferStatusCompanion {
-      override val status = "created"
+      )
     }
 
-    case class Accepted(
-        contractId: transferCodegen.AcceptedTransferOffer.ContractId,
-        transactionId: String,
-    ) extends TransferOfferStatus {
-      override def toStatusResponse: GetTransferOfferStatusResponse =
-        httpDef.TransferOfferAcceptedResponse(
-          status = Accepted.status,
-          transactionId = transactionId,
-          contractId = contractId.contractId,
-        )
-    }
-    object Accepted extends TransferOfferStatusCompanion {
-      override val status = "accepted"
-    }
+    private def toTransferResponseItem(
+        entry: TransferTxLogEntry
+    ): httpDef.ListTransactionsResponseItem = {
+      val subtype = entry.subtype.getOrElse(throw txMissingField())
+      val date = entry.date.getOrElse(throw txMissingField())
+      val sender = entry.sender.getOrElse(throw txMissingField())
 
-    case class Completed(
-        contractId: cc.coin.Coin.ContractId,
-        transactionId: String,
-    ) extends TransferOfferStatus {
-      override def toStatusResponse: GetTransferOfferStatusResponse =
-        httpDef.TransferOfferCompletedResponse(
-          status = Completed.status,
-          transactionId = transactionId,
-          contractId = contractId.contractId,
-        )
-    }
-    object Completed extends TransferOfferStatusCompanion {
-      override val status = "completed"
-    }
-
-    sealed trait Failed extends TransferOfferStatus
-    object Failed extends TransferOfferStatusCompanion {
-      override val status = "failed"
-    }
-
-    case object Rejected extends Failed {
-      override def toStatusResponse: GetTransferOfferStatusResponse =
-        httpDef.TransferOfferFailedResponse(
-          status = Failed.status,
-          failureKind = httpDef.TransferOfferFailedResponse.FailureKind.Rejected,
-        )
-    }
-
-    case class Withdrawn(reason: String) extends Failed {
-      override def toStatusResponse: GetTransferOfferStatusResponse =
-        httpDef.TransferOfferFailedResponse(
-          status = Failed.status,
-          failureKind = httpDef.TransferOfferFailedResponse.FailureKind.Withdrawn,
-          withdrawnReason = Some(reason),
-        )
-    }
-
-    case object Expired extends Failed {
-      override def toStatusResponse: GetTransferOfferStatusResponse =
-        httpDef.TransferOfferFailedResponse(
-          status = Failed.status,
-          failureKind = httpDef.TransferOfferFailedResponse.FailureKind.Expired,
-        )
-    }
-
-  }
-
-  final case class TransferOffer(
-      trackingId: String,
-      status: TransferOfferStatus,
-      sender: String,
-      receiver: String,
-  ) extends TransferOfferTxLogEntry
-  object TransferOffer extends TxLogEntryCompanion {
-    override val txLogId: String3 = String3.tryCreate("tof")
-    override val dbType: String3 = String3.tryCreate("tof")
-  }
-
-  sealed trait BuyTrafficRequestStatus {
-    def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse
-  }
-  sealed trait BuyTrafficRequestStatusCompanion {
-    def status: String
-  }
-
-  object BuyTrafficRequestStatus {
-    case object Created extends BuyTrafficRequestStatus with BuyTrafficRequestStatusCompanion {
-      override val status = "created"
-      override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse = {
-        httpDef.BuyTrafficRequestCreatedResponse(
-          status = Created.status
-        )
-      }
-    }
-
-    case class Completed(
-        transactionId: String
-    ) extends BuyTrafficRequestStatus {
-      override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
-        httpDef.BuyTrafficRequestCompletedResponse(
-          status = Completed.status,
-          transactionId = transactionId,
-        )
-    }
-    object Completed extends BuyTrafficRequestStatusCompanion {
-      override val status = "completed"
-    }
-
-    sealed trait Failed extends BuyTrafficRequestStatus
-    object Failed extends BuyTrafficRequestStatusCompanion {
-      override val status = "failed"
-    }
-
-    case class Rejected(reason: String) extends Failed {
-      override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse =
-        httpDef.BuyTrafficRequestFailedResponse(
-          status = Failed.status,
-          failureReason = httpDef.BuyTrafficRequestFailedResponse.FailureReason.Rejected,
-          rejectionReason = Some(reason),
-        )
-    }
-    case object Expired extends Failed {
-      override def toStatusResponse: httpDef.GetBuyTrafficRequestStatusResponse = {
-        httpDef.BuyTrafficRequestFailedResponse(
-          status = Failed.status,
-          failureReason = httpDef.BuyTrafficRequestFailedResponse.FailureReason.Expired,
-        )
-      }
-    }
-  }
-
-  final case class BuyTrafficRequest(
-      trackingId: String,
-      status: BuyTrafficRequestStatus,
-      buyer: String,
-  ) extends BuyTrafficRequestTxLogEntry
-  object BuyTrafficRequest extends TxLogEntryCompanion {
-    override val txLogId: String3 = String3.tryCreate("btr")
-    override val dbType: String3 = String3.tryCreate("btr")
-  }
-
-  /** Balance change due to a transfer */
-  final case class Transfer(
-      eventId: String,
-      transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype,
-      date: Instant,
-      provider: String,
-      sender: (String, BigDecimal),
-      receivers: Seq[(String, BigDecimal)],
-      senderHoldingFees: BigDecimal,
-      coinPrice: BigDecimal,
-      appRewardsUsed: BigDecimal,
-      validatorRewardsUsed: BigDecimal,
-  ) extends TransactionHistoryTxLogEntry {
-    override def toResponseItem: httpDef.ListTransactionsResponseItem =
       httpDef.TransferResponseItem(
-        transactionType = Transfer.transactionType,
-        transactionSubtype = transactionSubtype.toResponseItem,
-        eventId = eventId,
+        transactionType = TransactionType.Transfer,
+        transactionSubtype = toSubtypeReponseItem(subtype),
+        eventId = entry.eventId,
         date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-        provider = provider,
-        sender = httpDef.PartyAndAmount(sender._1, Codec.encode(sender._2)),
-        receivers = receivers.map(r => httpDef.PartyAndAmount(r._1, Codec.encode(r._2))).toVector,
-        holdingFees = Codec.encode(senderHoldingFees),
-        coinPrice = Codec.encode(coinPrice),
-        appRewardsUsed = Codec.encode(appRewardsUsed),
-        validatorRewardsUsed = Codec.encode(validatorRewardsUsed),
+        provider = entry.provider,
+        sender = httpDef.PartyAndAmount(sender.party, Codec.encode(sender.amount)),
+        receivers = entry.receivers
+          .map(r => httpDef.PartyAndAmount(r.party, Codec.encode(r.amount)))
+          .toVector,
+        holdingFees = Codec.encode(entry.senderHoldingFees),
+        coinPrice = Codec.encode(entry.coinPrice),
+        appRewardsUsed = Codec.encode(entry.appRewardsUsed),
+        validatorRewardsUsed = Codec.encode(entry.validatorRewardsUsed),
+      )
+    }
+
+    private def transferFromResponseItem(
+        item: httpDef.TransferResponseItem
+    ): Either[String, TransferTxLogEntry] = {
+      for {
+        subtype <- subtypeFromResponseItem(item.transactionSubtype)
+        sender = item.sender
+        senderAmount <- Codec.decode(Codec.BigDecimal)(sender.amount)
+        receivers <- item.receivers.traverse(r =>
+          for {
+            amount <- Codec.decode(Codec.BigDecimal)(r.amount)
+          } yield PartyAndAmount(r.party, amount)
+        )
+        senderHoldingFees <- Codec.decode(Codec.BigDecimal)(item.holdingFees)
+        coinPrice <- Codec.decode(Codec.BigDecimal)(item.coinPrice)
+        appRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.appRewardsUsed)
+        validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.validatorRewardsUsed)
+      } yield TransferTxLogEntry(
+        eventId = item.eventId,
+        subtype = Some(subtype),
+        date = Some(item.date.toInstant),
+        provider = item.provider,
+        sender = Some(PartyAndAmount(sender.party, senderAmount)),
+        receivers = receivers,
+        senderHoldingFees = senderHoldingFees,
+        coinPrice = coinPrice,
+        appRewardsUsed = appRewardsUsed,
+        validatorRewardsUsed = validatorRewardsUsed,
+      )
+    }
+
+    private def toBalanceChangeResponseItem(
+        entry: BalanceChangeTxLogEntry
+    ): httpDef.ListTransactionsResponseItem = {
+      val subtype = entry.subtype.getOrElse(throw txMissingField())
+      val date = entry.date.getOrElse(throw txMissingField())
+
+      httpDef.BalanceChangeResponseItem(
+        transactionType = TransactionType.BalanceChange,
+        transactionSubtype = toSubtypeReponseItem(subtype),
+        eventId = entry.eventId,
+        date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
+        receivers = Vector(
+          httpDef.PartyAndAmount(entry.receiver, Codec.encode(entry.amount))
+        ),
+        coinPrice = Codec.encode(entry.coinPrice),
+      )
+    }
+
+    private def balanceChangeFromResponseItem(
+        item: httpDef.BalanceChangeResponseItem
+    ): Either[String, BalanceChangeTxLogEntry] = {
+      for {
+        receiverAndAmount <- item.receivers.headOption.toRight("No receivers")
+        coinPrice <- Codec.decode(Codec.BigDecimal)(item.coinPrice)
+        subtype <- subtypeFromResponseItem(item.transactionSubtype)
+      } yield BalanceChangeTxLogEntry(
+        subtype = Some(subtype),
+        eventId = item.eventId,
+        date = Some(item.date.toInstant),
+        receiver = receiverAndAmount.party,
+        amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
+        coinPrice = coinPrice,
+      )
+    }
+
+    private def toNotificationResponseItem(
+        entry: NotificationTxLogEntry
+    ): httpDef.ListTransactionsResponseItem = {
+      val subtype = entry.subtype.getOrElse(throw txMissingField())
+      val date = entry.date.getOrElse(throw txMissingField())
+
+      httpDef.NotificationResponseItem(
+        transactionType = TransactionType.Notification,
+        transactionSubtype = toSubtypeReponseItem(subtype),
+        eventId = entry.eventId,
+        date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
+        details = entry.details,
+      )
+    }
+
+    private def notificationFromResponseItem(
+        item: httpDef.NotificationResponseItem
+    ): Either[String, NotificationTxLogEntry] = {
+      for {
+        subtype <- subtypeFromResponseItem(item.transactionSubtype)
+      } yield NotificationTxLogEntry(
+        subtype = Some(subtype),
+        eventId = item.eventId,
+        date = Some(item.date.toInstant),
+        details = item.details,
+      )
+    }
+
+    private def toSubtypeReponseItem(
+        subtype: TransactionSubtype
+    ): httpDef.TransactionSubtype =
+      httpDef.TransactionSubtype(
+        templateId = s"${subtype.packageId}:${subtype.moduleName}:${subtype.entityName}",
+        choice = subtype.choice,
+        coinOperation = if (subtype.coinOperation.isEmpty) None else Some(subtype.coinOperation),
       )
 
-    override def setEventId(eventId: String): TxLogEntry = copy(eventId = eventId)
+    private def subtypeFromResponseItem(
+        item: httpDef.TransactionSubtype
+    ): Either[String, TransactionSubtype] = for {
+      templateId <- item.templateId.split(":") match {
+        case Array(packageId, moduleName, entityName) =>
+          Right((packageId, moduleName, entityName))
+        case _ => Left("Invalid templateId")
+      }
+    } yield TransactionSubtype(
+      packageId = templateId._1,
+      moduleName = templateId._2,
+      entityName = templateId._3,
+      choice = item.choice,
+      coinOperation = item.coinOperation.getOrElse(""),
+    )
+
+    def toStatusResponse(
+        status: TransferOfferTxLogEntry.Status
+    ): GetTransferOfferStatusResponse = status match {
+      case TransferOfferTxLogEntry.Status.Empty => throw txMissingField()
+      case status: TransferOfferTxLogEntry.Status.Created => toTOSCreatedResponse(status.value)
+      case status: TransferOfferTxLogEntry.Status.Accepted => toTOSAcceptedResponse(status.value)
+      case status: TransferOfferTxLogEntry.Status.Completed => toTOSCompletedResponse(status.value)
+      case _: TransferOfferTxLogEntry.Status.Rejected => toTOSRejectedResponse
+      case status: TransferOfferTxLogEntry.Status.Withdrawn => toTOSWithdrawnResponse(status.value)
+      case _: TransferOfferTxLogEntry.Status.Expired => toTOSExpiredResponse
+    }
+
+    private def toTOSCreatedResponse(
+        status: TransferOfferStatusCreated
+    ): GetTransferOfferStatusResponse =
+      httpDef.TransferOfferCreatedResponse(
+        status = TransferOfferStatus.Created,
+        transactionId = status.transactionId,
+        contractId = status.contractId,
+      )
+
+    private def toTOSAcceptedResponse(
+        status: TransferOfferStatusAccepted
+    ): GetTransferOfferStatusResponse =
+      httpDef.TransferOfferAcceptedResponse(
+        status = TransferOfferStatus.Accepted,
+        transactionId = status.transactionId,
+        contractId = status.contractId,
+      )
+
+    private def toTOSCompletedResponse(
+        status: TransferOfferStatusCompleted
+    ): GetTransferOfferStatusResponse =
+      httpDef.TransferOfferCompletedResponse(
+        status = TransferOfferStatus.Completed,
+        transactionId = status.transactionId,
+        contractId = status.contractId,
+      )
+
+    private def toTOSRejectedResponse: GetTransferOfferStatusResponse =
+      httpDef.TransferOfferFailedResponse(
+        status = TransferOfferStatus.Failed,
+        failureKind = httpDef.TransferOfferFailedResponse.FailureKind.Rejected,
+      )
+
+    private def toTOSWithdrawnResponse(
+        status: TransferOfferStatusWithdrawn
+    ): GetTransferOfferStatusResponse =
+      httpDef.TransferOfferFailedResponse(
+        status = TransferOfferStatus.Failed,
+        failureKind = httpDef.TransferOfferFailedResponse.FailureKind.Withdrawn,
+        withdrawnReason = Some(status.reason),
+      )
+
+    private def toTOSExpiredResponse: GetTransferOfferStatusResponse =
+      httpDef.TransferOfferFailedResponse(
+        status = TransferOfferStatus.Failed,
+        failureKind = httpDef.TransferOfferFailedResponse.FailureKind.Expired,
+      )
+
+    def toStatusResponse(
+        status: BuyTrafficRequestTxLogEntry.Status
+    ): GetBuyTrafficRequestStatusResponse = status match {
+      case BuyTrafficRequestTxLogEntry.Status.Empty => throw txMissingField()
+      case _: BuyTrafficRequestTxLogEntry.Status.Created => toBTRCreatedResponse
+      case status: BuyTrafficRequestTxLogEntry.Status.Completed =>
+        toBTRCompletedResponse(status.value)
+      case status: BuyTrafficRequestTxLogEntry.Status.Rejected =>
+        toBTRRejectedResponse(status.value)
+      case _: BuyTrafficRequestTxLogEntry.Status.Expired => toBTRExpiredResponse
+    }
+
+    private def toBTRCreatedResponse: httpDef.GetBuyTrafficRequestStatusResponse = {
+      httpDef.BuyTrafficRequestCreatedResponse(
+        status = BuyTrafficRequestStatus.Created
+      )
+    }
+    private def toBTRCompletedResponse(
+        status: BuyTrafficRequestStatusCompleted
+    ): httpDef.GetBuyTrafficRequestStatusResponse =
+      httpDef.BuyTrafficRequestCompletedResponse(
+        status = BuyTrafficRequestStatus.Completed,
+        transactionId = status.transactionId,
+      )
+
+    private def toBTRRejectedResponse(
+        status: BuyTrafficRequestStatusRejected
+    ): httpDef.GetBuyTrafficRequestStatusResponse =
+      httpDef.BuyTrafficRequestFailedResponse(
+        status = BuyTrafficRequestStatus.Failed,
+        failureReason = httpDef.BuyTrafficRequestFailedResponse.FailureReason.Rejected,
+        rejectionReason = Some(status.reason),
+      )
+
+    private def toBTRExpiredResponse: httpDef.GetBuyTrafficRequestStatusResponse = {
+      httpDef.BuyTrafficRequestFailedResponse(
+        status = BuyTrafficRequestStatus.Failed,
+        failureReason = httpDef.BuyTrafficRequestFailedResponse.FailureReason.Expired,
+      )
+    }
   }
 
-  object Transfer extends TransactionHistoryTxLogEntryCompanion {
-    override val dbType: String3 = String3.tryCreate("tra")
-    override def txLogId: String3 = TransactionHistoryTxLogEntry.txLogId
-    override val transactionType = "transfer"
+  sealed abstract class TransactionSubtypeDef(
+      val companion: ExerciseNodeCompanion,
+      val coinOperation: Option[String],
+  ) {
+    val templateId: Identifier = companion.template.TEMPLATE_ID
+    val choice: String = companion.choice.name
 
-    sealed abstract class TransferTransactionSubtype(
-        companion: ExerciseNodeCompanion
-    ) extends TransactionSubtype(companion, None)
+    def toProto: TransactionSubtype =
+      new TransactionSubtype(
+        packageId = templateId.getPackageId,
+        moduleName = templateId.getModuleName,
+        entityName = templateId.getEntityName,
+        choice = choice,
+        coinOperation = coinOperation.getOrElse(""),
+      )
+  }
 
-    object TransferTransactionSubtype {
-      val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](
-        P2PPaymentCompleted,
-        AppPaymentAccepted,
-        AppPaymentCollected,
-        SubscriptionInitialPaymentAccepted,
-        SubscriptionInitialPaymentCollected,
-        SubscriptionPaymentAccepted,
-        SubscriptionPaymentCollected,
-        WalletAutomation,
-        ExtraTrafficPurchase,
-        InitialEntryPaymentCollection,
-        EntryRenewalPaymentCollection,
-        Transfer,
-      ).map(txSubtype => txSubtype.choice.name -> txSubtype).toMap
+  sealed abstract class TransferTransactionSubtype(
+      companion: ExerciseNodeCompanion
+  ) extends TransactionSubtypeDef(companion, None)
 
-      def find(choiceName: String): Option[TransferTransactionSubtype] =
-        values.get(choiceName)
-    }
+  object TransferTransactionSubtype {
     case object P2PPaymentCompleted
         extends TransferTransactionSubtype(AcceptedTransferOffer_Complete)
     case object AppPaymentAccepted extends TransferTransactionSubtype(AppPaymentRequest_Accept)
@@ -558,59 +434,32 @@ object TxLogEntry {
     case object EntryRenewalPaymentCollection
         extends TransferTransactionSubtype(CnsRules_CollectEntryRenewalPayment)
     case object Transfer extends TransferTransactionSubtype(com.daml.network.history.Transfer)
+
+    val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](
+      P2PPaymentCompleted,
+      AppPaymentAccepted,
+      AppPaymentCollected,
+      SubscriptionInitialPaymentAccepted,
+      SubscriptionInitialPaymentCollected,
+      SubscriptionPaymentAccepted,
+      SubscriptionPaymentCollected,
+      WalletAutomation,
+      ExtraTrafficPurchase,
+      InitialEntryPaymentCollection,
+      EntryRenewalPaymentCollection,
+      Transfer,
+    ).map(txSubtype => txSubtype.choice -> txSubtype).toMap
+
+    def find(choiceName: String): Option[TransferTransactionSubtype] =
+      values.get(choiceName)
   }
 
-  /** Balance change not due to a transfer, for example a tap or returning a locked coin to the owner. */
-  final case class BalanceChange(
-      eventId: String,
-      transactionSubtype: BalanceChange.BalanceChangeTransactionSubtype,
-      date: Instant,
-      receiver: String,
-      amount: BigDecimal,
-      coinPrice: BigDecimal,
-  ) extends TransactionHistoryTxLogEntry {
-    override def toResponseItem: httpDef.ListTransactionsResponseItem =
-      httpDef.BalanceChangeResponseItem(
-        transactionType = BalanceChange.transactionType,
-        transactionSubtype = transactionSubtype.toResponseItem,
-        eventId = eventId,
-        date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-        receivers = Vector(httpDef.PartyAndAmount(receiver, Codec.encode(amount))),
-        coinPrice = Codec.encode(coinPrice),
-      )
+  sealed abstract class BalanceChangeTransactionSubtype(
+      companion: ExerciseNodeCompanion
+  ) extends TransactionSubtypeDef(companion, None)
 
-    override def setEventId(eventId: String): TxLogEntry = copy(eventId = eventId)
-  }
+  object BalanceChangeTransactionSubtype {
 
-  object BalanceChange extends TransactionHistoryTxLogEntryCompanion {
-    override val dbType: String3 = String3.tryCreate("bal")
-    override def txLogId: String3 = TransactionHistoryTxLogEntry.txLogId
-    override val transactionType = "balance_change"
-
-    sealed abstract class BalanceChangeTransactionSubtype(companion: ExerciseNodeCompanion)
-        extends TransactionSubtype(companion, None)
-
-    object BalanceChangeTransactionSubtype {
-      val values: Map[String, BalanceChangeTransactionSubtype] =
-        Set[BalanceChangeTransactionSubtype](
-          Tap,
-          Mint,
-          SvRewardCollected,
-          AppPaymentRejected,
-          AppPaymentExpired,
-          SubscriptionInitialPaymentRejected,
-          SubscriptionInitialPaymentExpired,
-          SubscriptionPaymentRejected,
-          SubscriptionPaymentExpired,
-          LockedCoinUnlocked,
-          LockedCoinOwnerExpired,
-          LockedCoinExpired,
-          CoinExpired,
-        ).map(txSubtype => txSubtype.choice.name -> txSubtype).toMap
-
-      def find(choiceName: String): Option[BalanceChangeTransactionSubtype] =
-        values.get(choiceName)
-    }
     case object Tap extends BalanceChangeTransactionSubtype(com.daml.network.history.Tap)
     case object Mint extends BalanceChangeTransactionSubtype(com.daml.network.history.Mint)
     case object SvRewardCollected extends BalanceChangeTransactionSubtype(SvcRules_CollectSvReward)
@@ -630,56 +479,33 @@ object TxLogEntry {
         extends BalanceChangeTransactionSubtype(LockedCoinOwnerExpireLock)
     case object LockedCoinExpired extends BalanceChangeTransactionSubtype(LockedCoinExpireCoin)
     case object CoinExpired extends BalanceChangeTransactionSubtype(CoinExpire)
+
+    val values: Map[String, BalanceChangeTransactionSubtype] =
+      Set[BalanceChangeTransactionSubtype](
+        Tap,
+        Mint,
+        SvRewardCollected,
+        AppPaymentRejected,
+        AppPaymentExpired,
+        SubscriptionInitialPaymentRejected,
+        SubscriptionInitialPaymentExpired,
+        SubscriptionPaymentRejected,
+        SubscriptionPaymentExpired,
+        LockedCoinUnlocked,
+        LockedCoinOwnerExpired,
+        LockedCoinExpired,
+        CoinExpired,
+      ).map(txSubtype => txSubtype.choice -> txSubtype).toMap
+
+    def find(choiceName: String): Option[BalanceChangeTransactionSubtype] =
+      values.get(choiceName)
   }
 
-  /** An event that does not change anyone's coin balance. */
-  final case class Notification(
-      eventId: String,
-      transactionSubtype: Notification.NotificationTransactionSubtype,
-      date: Instant,
-      details: String,
-  ) extends TransactionHistoryTxLogEntry {
-    override def toResponseItem: httpDef.ListTransactionsResponseItem =
-      httpDef.NotificationResponseItem(
-        transactionType = Notification.transactionType,
-        transactionSubtype = transactionSubtype.toResponseItem,
-        eventId = eventId,
-        date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-        details = details,
-      )
-
-    override def setEventId(eventId: String): TxLogEntry = copy(eventId = eventId)
-  }
-
-  object Notification extends TransactionHistoryTxLogEntryCompanion {
-    override val dbType: String3 = String3.tryCreate("not")
-    override def txLogId: String3 = TransactionHistoryTxLogEntry.txLogId
-    override val transactionType = "notification"
-
-    /** @param coinOperation the constructor name of the CoinOperation. Only relevant for WalletAppInstall_ExecuteBatch
-      */
-    sealed abstract class NotificationTransactionSubtype(
-        companion: ExerciseNodeCompanion,
-        val coinOperation: Option[String],
-    ) extends TransactionSubtype(companion, coinOperation)
-    object NotificationTransactionSubtype {
-      val values: Map[(String, Option[String]), NotificationTransactionSubtype] =
-        Set[NotificationTransactionSubtype](
-          DirectTransferFailed,
-          SubscriptionPaymentFailed,
-          SubscriptionExpired,
-        ).map(txSubtype =>
-          (
-            txSubtype.choice.name,
-            txSubtype.coinOperation,
-          ) -> txSubtype
-        ).toMap
-      def find(
-          choiceName: String,
-          coinOperationConstructor: Option[String],
-      ): Option[NotificationTransactionSubtype] =
-        values.get((choiceName, coinOperationConstructor))
-    }
+  sealed abstract class NotificationTransactionSubtype(
+      companion: ExerciseNodeCompanion,
+      coinOperation: Option[String],
+  ) extends TransactionSubtypeDef(companion, coinOperation)
+  object NotificationTransactionSubtype {
     case object DirectTransferFailed
         extends NotificationTransactionSubtype(
           WalletAppInstall_ExecuteBatch,
@@ -692,96 +518,23 @@ object TxLogEntry {
         )
     case object SubscriptionExpired
         extends NotificationTransactionSubtype(SubscriptionIdleState_ExpireSubscription, None)
+
+    val values: Map[(String, Option[String]), NotificationTransactionSubtype] =
+      Set[NotificationTransactionSubtype](
+        DirectTransferFailed,
+        SubscriptionPaymentFailed,
+        SubscriptionExpired,
+      ).map(txSubtype =>
+        (
+          txSubtype.choice,
+          txSubtype.coinOperation,
+        ) -> txSubtype
+      ).toMap
+    def find(
+        choiceName: String,
+        coinOperationConstructor: Option[String],
+    ): Option[NotificationTransactionSubtype] =
+      values.get((choiceName, coinOperationConstructor))
   }
 
-  private def transferFromResponseItem(
-      item: httpDef.TransferResponseItem
-  ): Either[String, TxLogEntry.Transfer] = {
-    for {
-      transactionSubtype <- TxLogEntry.Transfer.TransferTransactionSubtype
-        .find(item.transactionSubtype.choice)
-        .toRight("TransactionSubtype not found")
-      sender = item.sender
-      senderAmount <- Codec.decode(Codec.BigDecimal)(sender.amount)
-      receivers <- item.receivers.traverse(r =>
-        Codec.decode(Codec.BigDecimal)(r.amount).map(amount => r.party -> amount)
-      )
-      senderHoldingFees <- Codec.decode(Codec.BigDecimal)(item.holdingFees)
-      coinPrice <- Codec.decode(Codec.BigDecimal)(item.coinPrice)
-      appRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.appRewardsUsed)
-      validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.validatorRewardsUsed)
-    } yield TxLogEntry.Transfer(
-      eventId = item.eventId,
-      transactionSubtype = transactionSubtype,
-      date = item.date.toInstant,
-      provider = item.provider,
-      sender = sender.party -> senderAmount,
-      receivers = receivers,
-      senderHoldingFees = senderHoldingFees,
-      coinPrice = coinPrice,
-      appRewardsUsed = appRewardsUsed,
-      validatorRewardsUsed = validatorRewardsUsed,
-    )
-  }
-
-  private def balanceChangeFromResponseItem(
-      item: httpDef.BalanceChangeResponseItem
-  ): Either[String, TxLogEntry.BalanceChange] = {
-    for {
-      transactionSubtype <- TxLogEntry.BalanceChange.BalanceChangeTransactionSubtype
-        .find(item.transactionSubtype.choice)
-        .toRight("TransactionSubtype not found")
-      receiverAndAmount <- item.receivers.headOption.toRight("No receivers")
-      coinPrice <- Codec.decode(Codec.BigDecimal)(item.coinPrice)
-    } yield TxLogEntry.BalanceChange(
-      transactionSubtype = transactionSubtype,
-      eventId = item.eventId,
-      date = item.date.toInstant,
-      receiver = receiverAndAmount.party,
-      amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
-      coinPrice = coinPrice,
-    )
-  }
-
-  private def notificationFromResponseItem(
-      item: httpDef.NotificationResponseItem
-  ): Either[String, TxLogEntry.Notification] = {
-    for {
-      transactionSubtype <- TxLogEntry.Notification.NotificationTransactionSubtype
-        .find(item.transactionSubtype.choice, item.transactionSubtype.coinOperation)
-        .toRight("TransactionSubtype not found")
-    } yield TxLogEntry.Notification(
-      transactionSubtype = transactionSubtype,
-      eventId = item.eventId,
-      date = item.date.toInstant,
-      details = item.details,
-    )
-  }
-
-  private def unknownFromResponseItem(
-      item: httpDef.UnknownResponseItem
-  ): Either[String, TxLogEntry.Unknown] = {
-    Right(
-      TxLogEntry.Unknown(
-        eventId = item.eventId
-      )
-    )
-  }
-
-  // Note: deserialization is only needed for the Canton console
-  def fromResponseItem(
-      item: httpDef.ListTransactionsResponseItem
-  ): Either[String, TransactionHistoryTxLogEntry] = {
-    item match {
-      case httpDef.ListTransactionsResponseItem.members.TransferResponseItem(transfer) =>
-        transferFromResponseItem(transfer)
-      case httpDef.ListTransactionsResponseItem.members.BalanceChangeResponseItem(balanceChange) =>
-        balanceChangeFromResponseItem(balanceChange)
-      case httpDef.ListTransactionsResponseItem.members.NotificationResponseItem(notification) =>
-        notificationFromResponseItem(notification)
-      case httpDef.ListTransactionsResponseItem.members.UnknownResponseItem(unknown) =>
-        unknownFromResponseItem(unknown)
-      case _ => Left(s"Unknown item $item")
-    }
-  }
 }

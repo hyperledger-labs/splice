@@ -2,9 +2,7 @@ package com.daml.network.store.db
 
 import scala.concurrent.Future
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-
 import com.daml.network.environment.DarResources
-import com.daml.network.scan.store.TxLogEntry
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.scan.store.db.ScanAggregator.*
 import com.daml.network.scan.store.db.DbScanStore
@@ -13,7 +11,6 @@ import com.daml.network.store.StoreErrors
 import com.daml.network.store.db.CNPostgresTest
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.util.TemplateJsonDecoder
-
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
@@ -25,6 +22,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.metrics.MetricHandle
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.scan.store.TxLogEntry.EntryType
 
 class ScanAggregatorTest
     extends StoreTest
@@ -456,7 +454,7 @@ class ScanAggregatorTest
           $storeId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
-          ${TxLogEntry.BalanceChangeLogEntry.dbType},
+          ${EntryType.BalanceChangeTxLogEntry},
           $round,
           $balanceChangeRoundZero,
           $balanceChangeHoldingFees,
@@ -467,7 +465,7 @@ class ScanAggregatorTest
           where store_id = $storeId
             and event_id = ${lengthLimited(eventId)}
             and domain_id = ${lengthLimited(domain)}
-            and entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
+            and entry_type = ${EntryType.BalanceChangeTxLogEntry}
             and round = $round
         )
         on conflict do nothing
@@ -497,7 +495,7 @@ class ScanAggregatorTest
           $storeId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
-          ${TxLogEntry.ClosedMiningRoundLogEntry.dbType},
+          ${EntryType.ClosedMiningRoundTxLogEntry},
           $round,
           $closedRoundEffectiveAt,
           ${lengthLimited(s"offset-$eventId")},
@@ -507,7 +505,7 @@ class ScanAggregatorTest
         where store_id = $storeId
           and event_id = ${lengthLimited(eventId)}
           and domain_id = ${lengthLimited(domain)}
-          and entry_type = ${TxLogEntry.ClosedMiningRoundLogEntry.dbType}
+          and entry_type = ${EntryType.ClosedMiningRoundTxLogEntry}
           and round = $round
       )
       """.asUpdate
@@ -572,7 +570,7 @@ class ScanAggregatorTest
     round,
     rewardAmount,
     rewardedParty,
-    TxLogEntry.AppRewardLogEntry.dbType,
+    EntryType.AppRewardTxLogEntry,
   )
 
   def appendValidatorReward(
@@ -589,7 +587,7 @@ class ScanAggregatorTest
     round,
     rewardAmount,
     rewardedParty,
-    TxLogEntry.ValidatorRewardLogEntry.dbType,
+    EntryType.ValidatorRewardTxLogEntry,
   )
 
   def appendTrafficPurchase(
@@ -619,7 +617,7 @@ class ScanAggregatorTest
           $storeId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
-          ${TxLogEntry.ExtraTrafficPurchaseLogEntry.dbType},
+          ${EntryType.ExtraTrafficPurchaseTxLogEntry},
           $round,
           ${lengthLimited(party)},
           $purchase,
@@ -631,7 +629,7 @@ class ScanAggregatorTest
         where store_id = $storeId
           and event_id = ${lengthLimited(eventId)}
           and domain_id = ${lengthLimited(domain)}
-          and entry_type = ${TxLogEntry.ExtraTrafficPurchaseLogEntry.dbType}
+          and entry_type = ${EntryType.ExtraTrafficPurchaseTxLogEntry}
           and round = $round
       )
       """.asUpdate
@@ -649,7 +647,7 @@ class ScanAggregatorTest
                      ($asOfEndOfRound + 1) * sum(balance_change_change_to_holding_fees_rate)
                from scan_txlog_store
                where store_id = $storeId
-                 and entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
+                 and entry_type = ${EntryType.BalanceChangeTxLogEntry}
                  and round <= $asOfEndOfRound;
              """.as[Option[BigDecimal]].headOption,
         "getTotalCoinBalanceFromTxLog",
@@ -661,7 +659,7 @@ class ScanAggregatorTest
         select   rewarded_party, sum(reward_amount) as total_app_rewards
         from     scan_txlog_store
         where    store_id = $storeId
-        and      entry_type = ${TxLogEntry.AppRewardLogEntry.dbType}
+        and      entry_type = ${EntryType.AppRewardTxLogEntry}
         and      round <= $asOfEndOfRound
         group by rewarded_party
         order by total_app_rewards desc
@@ -679,7 +677,7 @@ class ScanAggregatorTest
         select rewarded_party, sum(reward_amount) as total_validator_rewards
         from   scan_txlog_store
         where  store_id = $storeId
-        and    entry_type = ${TxLogEntry.ValidatorRewardLogEntry.dbType}
+        and    entry_type = ${EntryType.ValidatorRewardTxLogEntry}
         and    round <= $asOfEndOfRound
         group by rewarded_party
         order by total_validator_rewards desc
@@ -702,7 +700,7 @@ class ScanAggregatorTest
                      max(round)                                    as last_purchased_in_round
               from scan_txlog_store
               where store_id = $storeId
-                and entry_type = ${TxLogEntry.ExtraTrafficPurchaseLogEntry.dbType}
+                and entry_type = ${EntryType.ExtraTrafficPurchaseTxLogEntry}
                 and round <= $asOfEndOfRound
               group by extra_traffic_validator
               order by total_traffic_purchased desc

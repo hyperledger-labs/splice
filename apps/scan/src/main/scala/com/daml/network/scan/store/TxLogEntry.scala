@@ -1,176 +1,86 @@
 package com.daml.network.scan.store
 
-import com.daml.ledger.javaapi.data.{TreeEvent, *}
 import com.daml.network.codegen.java.cc
-import com.daml.network.history.*
 import com.daml.network.store.StoreErrors
-import com.daml.network.util.{Codec, ExerciseNode}
+import com.daml.network.util.Codec
 
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import java.time.Instant
 import com.daml.network.http.v0.definitions as httpDef
+import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.TransactionType as HttpTransactionType
 import com.digitalasset.canton.config.CantonRequireTypes.String3
-import com.digitalasset.canton.topology.{DomainId, PartyId}
-import spray.json.{
-  DefaultJsonProtocol,
-  DeserializationException,
-  JsString,
-  JsValue,
-  JsonFormat,
-  RootJsonFormat,
-  deserializationError,
-}
+import com.digitalasset.canton.topology.PartyId
 
 import java.time.ZoneOffset
 import scala.math.BigDecimal.RoundingMode
 
-sealed trait TxLogEntry {
+trait TxLogEntry {
   // Scan store uses the eventId for pagination
   def eventId: String
 }
 
-object TxLogEntry {
+object TxLogEntry extends StoreErrors {
 
-  def encode(entry: TxLogEntry): (String3, JsValue) = {
-    import spray.json.*
-    import JsonProtocol.*
-    entry match {
-      case e: ErrorLogEntry => (ErrorLogEntry.dbType, e.toJson)
-      case e: BalanceChangeLogEntry => (BalanceChangeLogEntry.dbType, e.toJson)
-      case e: ClosedMiningRoundLogEntry => (ClosedMiningRoundLogEntry.dbType, e.toJson)
-      case e: ExtraTrafficPurchaseLogEntry => (ExtraTrafficPurchaseLogEntry.dbType, e.toJson)
-      case e: OpenMiningRoundLogEntry => (OpenMiningRoundLogEntry.dbType, e.toJson)
-      case e: AppRewardLogEntry => (AppRewardLogEntry.dbType, e.toJson)
-      case e: MintLogEntry => (MintLogEntry.dbType, e.toJson)
-      case e: SvRewardCollectedLogEntry => (SvRewardCollectedLogEntry.dbType, e.toJson)
-      case e: TapLogEntry => (TapLogEntry.dbType, e.toJson)
-      case e: TransferLogEntry => (TransferLogEntry.dbType, e.toJson)
-      case e: ValidatorRewardLogEntry => (ValidatorRewardLogEntry.dbType, e.toJson)
-
-    }
+  object EntryType {
+    val ErrorTxLogEntry = String3.tryCreate("err")
+    val BalanceChangeTxLogEntry = String3.tryCreate("bac")
+    val ClosedMiningRoundTxLogEntry = String3.tryCreate("cmr")
+    val ExtraTrafficPurchaseTxLogEntry = String3.tryCreate("etp")
+    val OpenMiningRoundTxLogEntry = String3.tryCreate("omr")
+    val AppRewardTxLogEntry = String3.tryCreate("are")
+    val MintTxLogEntry = String3.tryCreate("min")
+    val SvRewardCollectedTxLogEntry = String3.tryCreate("src")
+    val TapTxLogEntry = String3.tryCreate("tap")
+    val TransferTxLogEntry = String3.tryCreate("tra")
+    val ValidatorRewardTxLogEntry = String3.tryCreate("vre")
   }
-  def decode(dbType: String3, json: JsValue): TxLogEntry = {
-    import TxLogEntry.JsonProtocol.*
+
+  def encode(entry: TxLogEntry): (String3, String) = {
+    import scalapb.json4s.JsonFormat
+    val entryType = entry match {
+      case _: ErrorTxLogEntry => EntryType.ErrorTxLogEntry
+      case _: BalanceChangeTxLogEntry => EntryType.BalanceChangeTxLogEntry
+      case _: ClosedMiningRoundTxLogEntry => EntryType.ClosedMiningRoundTxLogEntry
+      case _: ExtraTrafficPurchaseTxLogEntry => EntryType.ExtraTrafficPurchaseTxLogEntry
+      case _: OpenMiningRoundTxLogEntry => EntryType.OpenMiningRoundTxLogEntry
+      case _: AppRewardTxLogEntry => EntryType.AppRewardTxLogEntry
+      case _: MintTxLogEntry => EntryType.MintTxLogEntry
+      case _: SvRewardCollectedTxLogEntry => EntryType.SvRewardCollectedTxLogEntry
+      case _: TapTxLogEntry => EntryType.TapTxLogEntry
+      case _: TransferTxLogEntry => EntryType.TransferTxLogEntry
+      case _: ValidatorRewardTxLogEntry => EntryType.ValidatorRewardTxLogEntry
+      case _ => throw txEncodingFailed()
+    }
+    val jsonValue = entry match {
+      case e: scalapb.GeneratedMessage => JsonFormat.toJsonString(e)
+      case _ => throw txEncodingFailed()
+    }
+    (entryType, jsonValue)
+  }
+  def decode(entryType: String3, json: String): TxLogEntry = {
+    import scalapb.json4s.JsonFormat.fromJsonString as from
     try {
-      dbType match {
-        case ErrorLogEntry.dbType => json.convertTo[ErrorLogEntry]
-        case BalanceChangeLogEntry.dbType => json.convertTo[BalanceChangeLogEntry]
-        case ClosedMiningRoundLogEntry.dbType => json.convertTo[ClosedMiningRoundLogEntry]
-        case ExtraTrafficPurchaseLogEntry.dbType => json.convertTo[ExtraTrafficPurchaseLogEntry]
-        case OpenMiningRoundLogEntry.dbType => json.convertTo[OpenMiningRoundLogEntry]
-        case AppRewardLogEntry.dbType => json.convertTo[AppRewardLogEntry]
-        case MintLogEntry.dbType => json.convertTo[MintLogEntry]
-        case SvRewardCollectedLogEntry.dbType => json.convertTo[SvRewardCollectedLogEntry]
-        case TapLogEntry.dbType => json.convertTo[TapLogEntry]
-        case TransferLogEntry.dbType => json.convertTo[TransferLogEntry]
-        case ValidatorRewardLogEntry.dbType => json.convertTo[ValidatorRewardLogEntry]
+      entryType match {
+        case EntryType.ErrorTxLogEntry => from[ErrorTxLogEntry](json)
+        case EntryType.BalanceChangeTxLogEntry => from[BalanceChangeTxLogEntry](json)
+        case EntryType.ClosedMiningRoundTxLogEntry => from[ClosedMiningRoundTxLogEntry](json)
+        case EntryType.ExtraTrafficPurchaseTxLogEntry => from[ExtraTrafficPurchaseTxLogEntry](json)
+        case EntryType.OpenMiningRoundTxLogEntry => from[OpenMiningRoundTxLogEntry](json)
+        case EntryType.AppRewardTxLogEntry => from[AppRewardTxLogEntry](json)
+        case EntryType.MintTxLogEntry => from[MintTxLogEntry](json)
+        case EntryType.SvRewardCollectedTxLogEntry => from[SvRewardCollectedTxLogEntry](json)
+        case EntryType.TapTxLogEntry => from[TapTxLogEntry](json)
+        case EntryType.TransferTxLogEntry => from[TransferTxLogEntry](json)
+        case EntryType.ValidatorRewardTxLogEntry => from[ValidatorRewardTxLogEntry](json)
         case _ => throw txDecodingFailed()
       }
     } catch {
-      case _: DeserializationException => throw txDecodingFailed()
+      case _: RuntimeException => throw txDecodingFailed()
     }
   }
 
-  object JsonProtocol extends DefaultJsonProtocol with StoreErrors {
-    import com.digitalasset.canton.http.json.JsonProtocol.*
-    implicit val domainIdFormat: JsonFormat[DomainId] =
-      new JsonFormat[DomainId] {
-        override def write(obj: DomainId) =
-          JsString(obj.uid.toProtoPrimitive)
-
-        override def read(json: JsValue) = json match {
-          case JsString(s) =>
-            DomainId.fromProtoPrimitive(s, "").fold(f => deserializationError(f.message), identity)
-          case _ => deserializationError("DomainId must be a string")
-        }
-      }
-    implicit val partyIdFormat: JsonFormat[PartyId] =
-      new JsonFormat[PartyId] {
-        override def write(obj: PartyId) =
-          JsString(obj.uid.toProtoPrimitive)
-
-        override def read(json: JsValue) = json match {
-          case JsString(s) =>
-            PartyId.fromProtoPrimitive(s, "").fold(f => deserializationError(f.message), identity)
-          case _ => deserializationError("PartyId must be a string")
-        }
-      }
-
-    import BalanceChangeLogEntry.PartyBalanceChange
-
-    implicit val partyBalanceChangeFormat: RootJsonFormat[PartyBalanceChange] =
-      jsonFormat2(PartyBalanceChange.apply)
-
-    implicit val errorEntryFormat: RootJsonFormat[ErrorLogEntry] = jsonFormat1(ErrorLogEntry.apply)
-    implicit val balanceChangeEntryFormat: RootJsonFormat[BalanceChangeLogEntry] = jsonFormat6(
-      BalanceChangeLogEntry.apply
-    )
-    implicit val closedMiningRoundEntryFormat: RootJsonFormat[ClosedMiningRoundLogEntry] =
-      jsonFormat4(
-        ClosedMiningRoundLogEntry.apply
-      )
-    implicit val extraTrafficPurchaseEntryFormat: RootJsonFormat[ExtraTrafficPurchaseLogEntry] =
-      jsonFormat6(
-        ExtraTrafficPurchaseLogEntry.apply
-      )
-    implicit val openMiningRoundEntryFormat: RootJsonFormat[OpenMiningRoundLogEntry] = jsonFormat8(
-      OpenMiningRoundLogEntry.apply
-    )
-    implicit val appRewardEntryFormat: RootJsonFormat[AppRewardLogEntry] = jsonFormat5(
-      AppRewardLogEntry.apply
-    )
-    implicit val mintEntryFormat: RootJsonFormat[MintLogEntry] = jsonFormat8(
-      MintLogEntry.apply
-    )
-    implicit val svRewardCollectedEntryFormat: RootJsonFormat[SvRewardCollectedLogEntry] =
-      jsonFormat8(
-        SvRewardCollectedLogEntry.apply
-      )
-    implicit val tapEntryFormat: RootJsonFormat[TapLogEntry] = jsonFormat8(
-      TapLogEntry.apply
-    )
-    implicit val senderAmountFormat: JsonFormat[SenderAmount] = jsonFormat8(SenderAmount.apply)
-    implicit val receiverAmountFormat: JsonFormat[ReceiverAmount] = jsonFormat3(
-      ReceiverAmount.apply
-    )
-    implicit val balanceChangeFormat: JsonFormat[BalanceChange] = jsonFormat3(BalanceChange.apply)
-    implicit val transferEntryFormat: RootJsonFormat[TransferLogEntry] = jsonFormat10(
-      TransferLogEntry.apply
-    )
-    implicit val validatorRewardEntryFormat: RootJsonFormat[ValidatorRewardLogEntry] = jsonFormat5(
-      ValidatorRewardLogEntry.apply
-    )
-
-  }
-
-  final case class ErrorLogEntry(
-      eventId: String
-  ) extends TxLogEntry
-
-  object ErrorLogEntry {
-    val dbType: String3 = String3.tryCreate("err")
-  }
-
-  final case class BalanceChangeLogEntry(
-      override val eventId: String,
-      domainId: DomainId,
-      round: Long,
-      changeToInitialAmountAsOfRoundZero: BigDecimal,
-      changeToHoldingFeesRate: BigDecimal,
-      partyBalanceChanges: Map[PartyId, BalanceChangeLogEntry.PartyBalanceChange],
-  ) extends TxLogEntry
-
-  object BalanceChangeLogEntry {
-    val dbType: String3 = String3.tryCreate("bac")
-
-    final case class PartyBalanceChange(
-        changeToInitialAmountAsOfRoundZero: BigDecimal,
-        changeToHoldingFeesRate: BigDecimal,
-    )
-  }
-
-  sealed trait RewardLogEntry extends TxLogEntry {
+  trait RewardTxLogEntry extends TxLogEntry {
     def party: PartyId
 
     def amount: BigDecimal
@@ -178,305 +88,125 @@ object TxLogEntry {
     def round: Long
   }
 
-  final case class AppRewardLogEntry(
-      override val eventId: String,
-      domainId: DomainId,
-      round: Long,
-      party: PartyId,
-      amount: BigDecimal,
-  ) extends RewardLogEntry
-
-  object AppRewardLogEntry {
-    val dbType: String3 = String3.tryCreate("are")
+  trait TransactionTxLogEntry extends TxLogEntry {
+    def date: Option[Instant]
   }
 
-  final case class ValidatorRewardLogEntry(
-      override val eventId: String,
-      domainId: DomainId,
-      round: Long,
-      party: PartyId,
-      amount: BigDecimal,
-  ) extends RewardLogEntry
-
-  object ValidatorRewardLogEntry {
-    val dbType: String3 = String3.tryCreate("vre")
-  }
-
-  final case class ExtraTrafficPurchaseLogEntry(
-      override val eventId: String,
-      domainId: DomainId,
-      round: Long,
-      validator: PartyId,
-      trafficPurchased: Long,
-      ccSpent: BigDecimal,
-  ) extends TxLogEntry
-
-  object ExtraTrafficPurchaseLogEntry {
-    val dbType: String3 = String3.tryCreate("etp")
-  }
-
-  final case class OpenMiningRoundLogEntry(
-      override val eventId: String,
-      domainId: DomainId,
-      round: Long,
-      coinCreateFee: BigDecimal,
-      holdingFee: BigDecimal,
-      lockHolderFee: BigDecimal,
-      initialTransferFee: BigDecimal,
-      transferFeeSteps: Seq[(BigDecimal, BigDecimal)],
-  ) extends TxLogEntry
-
-  object OpenMiningRoundLogEntry {
-    val dbType: String3 = String3.tryCreate("omr")
-  }
-
-  final case class ClosedMiningRoundLogEntry(
-      override val eventId: String,
-      domainId: DomainId,
-      round: Long,
-      effectiveAt: Instant,
-  ) extends TxLogEntry
-
-  object ClosedMiningRoundLogEntry {
-    val dbType: String3 = String3.tryCreate("cmr")
-  }
-
-  sealed trait TransactionType {
-    def toResponse: httpDef.TransactionHistoryResponseItem.TransactionType
-  }
-  object TransactionType {
-    import httpDef.TransactionHistoryResponseItem.{TransactionType as HttpTransactionType}
-    case object Transfer extends TransactionType {
-      def toResponse = HttpTransactionType.Transfer
-    }
-    case object Mint extends TransactionType {
-      def toResponse = HttpTransactionType.Mint
-    }
-    case object Tap extends TransactionType {
-      def toResponse = HttpTransactionType.DevnetTap
-    }
-    case object SvRewardCollected extends TransactionType {
-      def toResponse = HttpTransactionType.SvRewardCollected
-    }
-  }
-
-  final case class SenderAmount(
-      party: String,
-      inputCoinAmount: BigDecimal,
-      inputAppRewardAmount: BigDecimal,
-      inputValidatorRewardAmount: BigDecimal,
-      senderChangeAmount: BigDecimal,
-      senderChangeFee: BigDecimal,
-      senderFee: BigDecimal,
-      holdingFees: BigDecimal,
-  ) {
-    def toResponse = httpDef.SenderAmount(
-      party = party,
-      inputCoinAmount = Some(Codec.encode(inputCoinAmount)),
-      inputAppRewardAmount = Some(Codec.encode(inputAppRewardAmount)),
-      inputValidatorRewardAmount = Some(Codec.encode(inputValidatorRewardAmount)),
-      senderChangeAmount = Codec.encode(senderChangeAmount),
-      senderChangeFee = Codec.encode(senderChangeFee),
-      senderFee = Codec.encode(senderFee),
-      holdingFees = Codec.encode(holdingFees),
+  object Http {
+    private def toResponse(data: SenderAmount) = httpDef.SenderAmount(
+      party = data.party.toProtoPrimitive,
+      inputCoinAmount = Some(Codec.encode(data.inputCoinAmount)),
+      inputAppRewardAmount = Some(Codec.encode(data.inputAppRewardAmount)),
+      inputValidatorRewardAmount = Some(Codec.encode(data.inputValidatorRewardAmount)),
+      senderChangeAmount = Codec.encode(data.senderChangeAmount),
+      senderChangeFee = Codec.encode(data.senderChangeFee),
+      senderFee = Codec.encode(data.senderFee),
+      holdingFees = Codec.encode(data.holdingFees),
     )
-  }
-  final case class ReceiverAmount(
-      party: String,
-      amount: BigDecimal,
-      receiverFee: BigDecimal,
-  ) {
-    def toResponse = httpDef.ReceiverAmount(
-      party = party,
-      amount = Codec.encode(amount),
-      receiverFee = Codec.encode(receiverFee),
+
+    private def toResponse(data: ReceiverAmount) = httpDef.ReceiverAmount(
+      party = data.party.toProtoPrimitive,
+      amount = Codec.encode(data.amount),
+      receiverFee = Codec.encode(data.receiverFee),
     )
-  }
 
-  final case class BalanceChange(
-      party: String,
-      changeToInitialAmountAsOfRoundZero: BigDecimal,
-      changeToHoldingFeesRate: BigDecimal,
-  ) {
-    def toResponse = httpDef.BalanceChange(
-      party = party,
-      changeToInitialAmountAsOfRoundZero = Codec.encode(changeToInitialAmountAsOfRoundZero),
-      changeToHoldingFeesRate = Codec.encode(changeToHoldingFeesRate),
+    private def toResponse(data: BalanceChange) = httpDef.BalanceChange(
+      party = data.party.toProtoPrimitive,
+      changeToInitialAmountAsOfRoundZero = Codec.encode(data.changeToInitialAmountAsOfRoundZero),
+      changeToHoldingFeesRate = Codec.encode(data.changeToHoldingFeesRate),
     )
-  }
 
-  sealed trait TransactionLogEntry extends TxLogEntry {
-    def transactionType: TransactionType
-    def toResponseItem: httpDef.TransactionHistoryResponseItem
-    def date: Instant
-  }
-
-  object TransferLogEntry {
-    val dbType: String3 = String3.tryCreate("tra")
-
-    def apply(
-        tx: TransactionTreeV2,
-        event: TreeEvent,
-        domainId: DomainId,
-        node: ExerciseNode[Transfer.Arg, Transfer.Res],
-    ): TransferLogEntry = {
-      val coinPrice = node.result.value.summary.coinPrice
-      val sender = parseSenderAmount(node.argument.value, node.result.value)
-      val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
-
-      TransferLogEntry(
-        offset = tx.getOffset,
-        eventId = event.getEventId,
-        domainId = domainId,
-        date = tx.getEffectiveAt,
-        provider = node.argument.value.transfer.provider,
-        sender = sender,
-        receivers = receivers,
-        balanceChanges = node.result.value.summary.balanceChanges.asScala
-          .map { case (party, bc) =>
-            BalanceChange(
-              party = party,
-              changeToInitialAmountAsOfRoundZero = bc.changeToInitialAmountAsOfRoundZero,
-              changeToHoldingFeesRate = bc.changeToHoldingFeesRate,
-            )
-          }
-          .toSeq
-          .sortBy(_.party),
-        round = node.result.value.round.number,
-        coinPrice = coinPrice,
+    private def toTransferResponseItem(entry: TransferTxLogEntry) =
+      httpDef.TransactionHistoryResponseItem(
+        transactionType = HttpTransactionType.Transfer,
+        eventId = entry.eventId,
+        offset = Some(entry.offset),
+        domainId = entry.domainId.toProtoPrimitive,
+        date = java.time.OffsetDateTime
+          .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
+        transfer = Some(
+          httpDef.Transfer(
+            provider = entry.provider.toProtoPrimitive,
+            sender = toResponse(entry.sender.getOrElse(throw txMissingField())),
+            receivers = entry.receivers.map(toResponse).toVector,
+            balanceChanges = entry.balanceChanges.map(toResponse).toVector,
+          )
+        ),
+        round = entry.round,
+        coinPrice = Codec.encode(entry.coinPrice),
       )
-    }
-  }
 
-  final case class TransferLogEntry(
-      override val eventId: String,
-      offset: String,
-      domainId: DomainId,
-      date: Instant,
-      provider: String,
-      sender: SenderAmount,
-      receivers: Seq[ReceiverAmount],
-      balanceChanges: Seq[BalanceChange],
-      round: Long,
-      coinPrice: BigDecimal,
-  ) extends TransactionLogEntry {
-    override def transactionType = TransactionType.Transfer
-    override def toResponseItem = httpDef.TransactionHistoryResponseItem(
-      transactionType = transactionType.toResponse,
-      eventId = eventId,
-      offset = Some(offset),
-      domainId = domainId.toProtoPrimitive,
-      date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-      transfer = Some(
-        httpDef.Transfer(
-          provider = provider,
-          sender = sender.toResponse,
-          receivers = receivers.map(_.toResponse).toVector,
-          balanceChanges = balanceChanges.map(_.toResponse).toVector,
-        )
-      ),
-      round = round,
-      coinPrice = Codec.encode(coinPrice),
-    )
-  }
-
-  final case class TapLogEntry(
-      override val eventId: String,
-      offset: String,
-      domainId: DomainId,
-      date: Instant,
-      coinOwner: String,
-      coinAmount: BigDecimal,
-      round: Long,
-      coinPrice: BigDecimal,
-  ) extends TransactionLogEntry {
-    override def transactionType = TransactionType.Tap
-    override def toResponseItem = httpDef.TransactionHistoryResponseItem(
-      transactionType = transactionType.toResponse,
-      eventId = eventId,
-      offset = Some(offset),
-      domainId = domainId.toProtoPrimitive,
-      date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
+    private def toTapResponseItem(entry: TapTxLogEntry) = httpDef.TransactionHistoryResponseItem(
+      transactionType = HttpTransactionType.DevnetTap,
+      eventId = entry.eventId,
+      offset = Some(entry.offset),
+      domainId = entry.domainId.toProtoPrimitive,
+      date = java.time.OffsetDateTime
+        .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
       tap = Some(
         httpDef.CoinAmount(
-          coinOwner = coinOwner,
-          coinAmount = Codec.encode(coinAmount),
+          coinOwner = entry.coinOwner.toProtoPrimitive,
+          coinAmount = Codec.encode(entry.coinAmount),
         )
       ),
-      round = round,
-      coinPrice = Codec.encode(coinPrice),
+      round = entry.round,
+      coinPrice = Codec.encode(entry.coinPrice),
     )
-  }
 
-  object TapLogEntry {
-    val dbType: String3 = String3.tryCreate("tap")
-  }
-
-  final case class MintLogEntry(
-      override val eventId: String,
-      offset: String,
-      domainId: DomainId,
-      date: Instant,
-      coinOwner: String,
-      coinAmount: BigDecimal,
-      round: Long,
-      coinPrice: BigDecimal,
-  ) extends TransactionLogEntry {
-    override def transactionType = TransactionType.Mint
-    override def toResponseItem = httpDef.TransactionHistoryResponseItem(
-      transactionType = transactionType.toResponse,
-      eventId = eventId,
-      offset = Some(offset),
-      domainId = domainId.toProtoPrimitive,
-      date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
+    private def toMintResponseItem(entry: MintTxLogEntry) = httpDef.TransactionHistoryResponseItem(
+      transactionType = HttpTransactionType.Mint,
+      eventId = entry.eventId,
+      offset = Some(entry.offset),
+      domainId = entry.domainId.toProtoPrimitive,
+      date = java.time.OffsetDateTime
+        .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
       mint = Some(
         httpDef.CoinAmount(
-          coinOwner = coinOwner,
-          coinAmount = Codec.encode(coinAmount),
+          coinOwner = entry.coinOwner.toProtoPrimitive,
+          coinAmount = Codec.encode(entry.coinAmount),
         )
       ),
-      round = round,
-      coinPrice = Codec.encode(coinPrice),
+      round = entry.round,
+      coinPrice = Codec.encode(entry.coinPrice),
     )
+
+    private def toSvRewardCollectedResponseItem(entry: SvRewardCollectedTxLogEntry) =
+      httpDef.TransactionHistoryResponseItem(
+        transactionType = HttpTransactionType.SvRewardCollected,
+        eventId = entry.eventId,
+        offset = Some(entry.offset),
+        domainId = entry.domainId.toProtoPrimitive,
+        date = java.time.OffsetDateTime
+          .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
+        svRewardCollected = Some(
+          httpDef.CoinAmount(
+            coinOwner = entry.coinOwner.toProtoPrimitive,
+            coinAmount = Codec.encode(entry.coinAmount),
+          )
+        ),
+        round = entry.round,
+        coinPrice = Codec.encode(entry.coinPrice),
+      )
+
+    def toResponseItem(entry: TransactionTxLogEntry): httpDef.TransactionHistoryResponseItem =
+      entry match {
+        case entry: TransferTxLogEntry => toTransferResponseItem(entry)
+        case entry: TapTxLogEntry => toTapResponseItem(entry)
+        case entry: SvRewardCollectedTxLogEntry => toSvRewardCollectedResponseItem(entry)
+        case entry: MintTxLogEntry => toMintResponseItem(entry)
+        case _ => throw txLogIsOfWrongType()
+      }
   }
 
-  object MintLogEntry {
-    val dbType: String3 = String3.tryCreate("min")
+  sealed trait TransactionType
+  object TransactionType {
+    case object Transfer extends TransactionType
+    case object Mint extends TransactionType
+    case object Tap extends TransactionType
+    case object SvRewardCollected extends TransactionType
   }
 
-  final case class SvRewardCollectedLogEntry(
-      override val eventId: String,
-      offset: String,
-      domainId: DomainId,
-      date: Instant,
-      coinOwner: String,
-      coinAmount: BigDecimal,
-      round: Long,
-      coinPrice: BigDecimal,
-  ) extends TransactionLogEntry {
-    override def transactionType = TransactionType.SvRewardCollected
-    override def toResponseItem = httpDef.TransactionHistoryResponseItem(
-      transactionType = transactionType.toResponse,
-      eventId = eventId,
-      offset = Some(offset),
-      domainId = domainId.toProtoPrimitive,
-      date = java.time.OffsetDateTime.ofInstant(date, ZoneOffset.UTC),
-      svRewardCollected = Some(
-        httpDef.CoinAmount(
-          coinOwner = coinOwner,
-          coinAmount = Codec.encode(coinAmount),
-        )
-      ),
-      round = round,
-      coinPrice = Codec.encode(coinPrice),
-    )
-  }
-
-  object SvRewardCollectedLogEntry {
-    val dbType: String3 = String3.tryCreate("src")
-  }
-
-  private def parseSenderAmount(
+  def parseSenderAmount(
       arg: cc.coinrules.CoinRules_Transfer,
       res: cc.coinrules.TransferResult,
   ): SenderAmount = {
@@ -486,7 +216,7 @@ object TxLogEntry {
       .sum
 
     SenderAmount(
-      party = sender,
+      party = PartyId.tryFromProtoPrimitive(sender),
       inputCoinAmount = res.summary.inputCoinAmount,
       inputAppRewardAmount = res.summary.inputAppRewardAmount,
       inputValidatorRewardAmount = res.summary.inputValidatorRewardAmount,
@@ -497,7 +227,7 @@ object TxLogEntry {
     )
   }
 
-  private def parseReceiverAmounts(
+  def parseReceiverAmounts(
       arg: cc.coinrules.CoinRules_Transfer,
       res: cc.coinrules.TransferResult,
   ): Seq[ReceiverAmount] = {
@@ -507,13 +237,13 @@ object TxLogEntry {
     // the order of receivers.
     parseOutputAmounts(arg, res)
       .map(o =>
-        ReceiverAmount(
-          party = o.output.receiver,
+        new ReceiverAmount(
+          party = PartyId.tryFromProtoPrimitive(o.output.receiver),
           amount = o.output.amount,
           receiverFee = o.receiverFee,
         )
       )
-      .foldLeft(immutable.ListMap.empty[String, ReceiverAmount])((acc, receiverAmount) =>
+      .foldLeft(immutable.ListMap.empty[PartyId, ReceiverAmount])((acc, receiverAmount) =>
         acc.updatedWith(receiverAmount.party)(prev =>
           Some(prev.fold(receiverAmount) { r =>
             r.copy(

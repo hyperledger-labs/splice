@@ -528,6 +528,7 @@ lazy val `apps-common` =
         scalatestScalacheck % Test,
         scalapb_runtime_grpc,
         scalapb_runtime,
+        scalapb_json4,
         java_jwt,
         jwks_rsa,
         spray_json,

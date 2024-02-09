@@ -18,7 +18,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.WalletTestUtil.{DynamicUserRefs, StaticUserRefs}
-import com.daml.network.wallet.store.TxLogEntry.TransferOfferStatus
+import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -202,7 +202,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       transferOfferId => {
         inside(senderWallet.getTransferOfferStatus(trackingId)) {
           case d0.GetTransferOfferStatusResponse.members.TransferOfferCreatedResponse(response) =>
-            response.status shouldBe TransferOfferStatus.Created.status
+            response.status shouldBe TxLogEntry.Http.TransferOfferStatus.Created
         }
         forExactly(1, receiverWallet.listTransferOffers()) { offer =>
           offer.contractId shouldBe transferOfferId
@@ -220,7 +220,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       _ => {
         inside(senderWallet.getTransferOfferStatus(trackingId)) {
           case d0.GetTransferOfferStatusResponse.members.TransferOfferCompletedResponse(response) =>
-            response.status shouldBe TransferOfferStatus.Completed.status
+            response.status shouldBe TxLogEntry.Http.TransferOfferStatus.Completed
         }
       },
     )

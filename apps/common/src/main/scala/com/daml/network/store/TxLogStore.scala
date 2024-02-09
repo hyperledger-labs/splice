@@ -9,8 +9,9 @@ import scala.jdk.CollectionConverters.*
 import scala.util.Try
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.daml.network.store.db.TxLogRowData
+import com.daml.network.util.Codec
 import com.digitalasset.canton.config.CantonRequireTypes.String3
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.collection.SeqView
 import scala.reflect.ClassTag
@@ -115,10 +116,10 @@ object TxLogStore {
     def entryToRow: TXE => TxLogRowData
 
     /** Encodes the entry payload to a JSON object */
-    def encodeEntry: TXE => (String3, spray.json.JsValue)
+    def encodeEntry: TXE => (String3, String)
 
     /** Decodes the entry payload from a JSON object */
-    def decodeEntry: (String3, spray.json.JsValue) => TXE
+    def decodeEntry: (String3, String) => TXE
   }
 
   object Config {
@@ -134,5 +135,60 @@ object TxLogStore {
         "This app does not serialize any TxLog entries"
       )
     }
+  }
+
+  /** The TypeMapper instances below are used by scalapb to convert from the types used in the
+    * serialized JSON format (e.g., String) to some application-specific types (e.g., PartyId).
+    *
+    * Note that not all conversions are safe: for example, asking scalapb to convert a string field
+    * to a PartyId effectively makes the field required - missing text fields are equivalent to an
+    * empty string which is not a valid PartyId. In this case, asking scalapb to convert a string field
+    * to an Option[PartyId] is safer.
+    */
+  trait TxLogEntryTypeMappers {
+    // Note: Timestamp is serialized as an RFC 3339 string in JSON (e.g., "1972-01-01T10:00:20.021Z")
+    protected implicit val `TypeMapper[com.google.protobuf.timestamp.Timestamp, java.time.Instant]`
+        : scalapb.TypeMapper[com.google.protobuf.timestamp.Timestamp, java.time.Instant] =
+      scalapb.TypeMapper[com.google.protobuf.timestamp.Timestamp, java.time.Instant](
+        _.asJavaInstant
+      )(javaInstant =>
+        com.google.protobuf.timestamp.Timestamp(javaInstant.getEpochSecond, javaInstant.getNano)
+      )
+    // Notes:
+    // - Fields with default values are omitted by default in proto3 JSON output
+    // - The default value for a string field is the empty string
+    // - The empty string is not a valid PartyId or DomainId
+    // - It is therefore safe to map the empty string to None
+    protected implicit val `TypeMapper[String, Option[PartyId]]`
+        : scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.PartyId]] =
+      scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.PartyId]](str =>
+        if (str.isEmpty) None else Some(PartyId.tryFromProtoPrimitive(str))
+      )(_.map(_.toProtoPrimitive).getOrElse(""))
+    protected implicit val `TypeMapper[String, Option[DomainId]]`
+        : scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.DomainId]] =
+      scalapb.TypeMapper[String, Option[com.digitalasset.canton.topology.DomainId]](str =>
+        if (str.isEmpty) None else Some(DomainId.tryFromString(str))
+      )(_.map(_.toProtoPrimitive).getOrElse(""))
+
+    protected implicit val `TypeMapper[String, java.math.BigDecimal]`
+        : scalapb.TypeMapper[String, java.math.BigDecimal] =
+      scalapb.TypeMapper[String, java.math.BigDecimal](Codec.tryDecode(Codec.JavaBigDecimal))(
+        Codec.encode(_)(Codec.javaBigDecimalValue)
+      )
+    protected implicit val `TypeMapper[String, scala.math.BigDecimal]`
+        : scalapb.TypeMapper[String, scala.math.BigDecimal] =
+      scalapb.TypeMapper[String, scala.math.BigDecimal](Codec.tryDecode(Codec.BigDecimal))(
+        Codec.encode(_)(Codec.bigDecimalValue)
+      )
+    protected implicit val `TypeMapper[String, PartyId]`
+        : scalapb.TypeMapper[String, com.digitalasset.canton.topology.PartyId] =
+      scalapb.TypeMapper[String, com.digitalasset.canton.topology.PartyId](
+        PartyId.tryFromProtoPrimitive
+      )(_.toProtoPrimitive)
+    protected implicit val `TypeMapper[String, DomainId]`
+        : scalapb.TypeMapper[String, com.digitalasset.canton.topology.DomainId] =
+      scalapb.TypeMapper[String, com.digitalasset.canton.topology.DomainId](DomainId.tryFromString)(
+        _.toProtoPrimitive
+      )
   }
 }

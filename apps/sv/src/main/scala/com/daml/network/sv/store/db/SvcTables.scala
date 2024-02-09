@@ -3,9 +3,9 @@ package com.daml.network.sv.store.db
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
+import com.daml.network.store.StoreErrors
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
-import com.daml.network.sv.store.SvcTxLogParser
-import com.daml.network.sv.store.SvcTxLogParser.TxLogEntry
+import com.daml.network.sv.store.{DefiniteVoteTxLogEntry, ErrorTxLogEntry, TxLogEntry}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{Member, PartyId}
@@ -91,11 +91,11 @@ object SvcTables extends AcsTables with NamedLogging {
     )
   }
 
-  object SvcTxLogRowData {
+  object SvcTxLogRowData extends StoreErrors {
 
-    def fromTxLogEntry(record: SvcTxLogParser.TxLogEntry): SvcTxLogRowData = {
+    def fromTxLogEntry(record: TxLogEntry): SvcTxLogRowData = {
       record match {
-        case err: SvcTxLogParser.TxLogEntry.ErrorTxLogEntry =>
+        case err: ErrorTxLogEntry =>
           SvcTxLogRowData(
             entry = err,
             actionName = None,
@@ -104,15 +104,17 @@ object SvcTables extends AcsTables with NamedLogging {
             effectiveAt = None,
             votedAt = None,
           )
-        case dv: SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry =>
+        case dv: DefiniteVoteTxLogEntry =>
+          val result = dv.result.getOrElse(throw txMissingField())
           SvcTxLogRowData(
             entry = dv,
-            actionName = Some(dv.actionName),
-            executed = Some(dv.executed),
-            requester = Some(dv.requester),
-            effectiveAt = Some(dv.effectiveAt),
-            votedAt = Some(dv.votedAt),
+            actionName = Some(TxLogEntry.mapActionName(result.action)),
+            executed = Some(result.executed),
+            requester = Some(result.requester),
+            effectiveAt = Some(result.effectiveAt.toString),
+            votedAt = Some(result.votedAt.toString),
           )
+        case _ => throw txLogIsOfWrongType()
       }
     }
   }

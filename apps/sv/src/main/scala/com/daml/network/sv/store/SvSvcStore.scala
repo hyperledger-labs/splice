@@ -23,6 +23,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules_ConfirmSvOnboarding,
   VoteRequest,
+  VoteResult,
 }
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
@@ -59,11 +60,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
-trait SvSvcStore
-    extends CNNodeAppStore[
-      SvcTxLogParser.TxLogEntry
-    ]
-    with PackageIdResolver.HasCoinRules {
+trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCoinRules {
   import SvSvcStore.{coinRulesFollowers, svcRulesFollowers}
 
   protected val outerLoggerFactory: NamedLoggerFactory
@@ -75,12 +72,11 @@ trait SvSvcStore
   override lazy val acsContractFilter =
     SvSvcStore.contractFilter(key.svcParty, key.svParty)
 
-  override lazy val txLogConfig = new TxLogStore.Config[SvcTxLogParser.TxLogEntry] {
-    val codec = SvcTxLogParser.TxLogEntry.Codec(templateJsonDecoder)
+  override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
     override val parser = new SvcTxLogParser(loggerFactory)
     override def entryToRow = SvcTables.SvcTxLogRowData.fromTxLogEntry
-    override def encodeEntry = codec.encode
-    override def decodeEntry = codec.decode
+    override def encodeEntry = TxLogEntry.encode
+    override def decodeEntry = TxLogEntry.decode
   }
 
   def key: SvStore.Key
@@ -102,7 +98,7 @@ trait SvSvcStore
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]]
+  ): Future[Seq[VoteResult]]
 
   def lookupSvcRules()(implicit
       tc: TraceContext

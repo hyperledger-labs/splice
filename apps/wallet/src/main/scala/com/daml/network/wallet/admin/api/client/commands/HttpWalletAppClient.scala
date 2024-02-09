@@ -885,7 +885,7 @@ object HttpWalletAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.ListTransactionsResponse.OK(response) =>
-      response.items.traverse(TxLogEntry.fromResponseItem)
+      response.items.traverse(TxLogEntry.Http.fromResponseItem)
     }
   }
 }

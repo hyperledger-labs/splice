@@ -1,7 +1,21 @@
 package com.daml.network.scan.store.db
 
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.scan.store.TxLogEntry
+import com.daml.network.scan.store.{
+  AppRewardTxLogEntry,
+  BalanceChangeTxLogEntry,
+  ClosedMiningRoundTxLogEntry,
+  ErrorTxLogEntry,
+  ExtraTrafficPurchaseTxLogEntry,
+  MintTxLogEntry,
+  OpenMiningRoundTxLogEntry,
+  SvRewardCollectedTxLogEntry,
+  TapTxLogEntry,
+  TransferTxLogEntry,
+  TxLogEntry,
+  ValidatorRewardTxLogEntry,
+}
+import com.daml.network.store.StoreErrors
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.topology.{Member, PartyId}
@@ -64,40 +78,40 @@ object ScanTables extends AcsTables {
     )
   }
 
-  object ScanTxLogRowData {
+  object ScanTxLogRowData extends StoreErrors {
 
     def fromTxLogEntry(record: TxLogEntry): ScanTxLogRowData = {
       record match {
-        case err: TxLogEntry.ErrorLogEntry =>
+        case err: ErrorTxLogEntry =>
           ScanTxLogRowData(
             entry = err
           )
-        case omr: TxLogEntry.OpenMiningRoundLogEntry =>
+        case omr: OpenMiningRoundTxLogEntry =>
           ScanTxLogRowData(
             entry = omr,
             round = Some(omr.round),
           )
-        case cmr: TxLogEntry.ClosedMiningRoundLogEntry =>
+        case cmr: ClosedMiningRoundTxLogEntry =>
           ScanTxLogRowData(
             entry = cmr,
             round = Some(cmr.round),
-            closedRoundEffectiveAt = Some(CantonTimestamp.assertFromInstant(cmr.effectiveAt)),
+            closedRoundEffectiveAt = cmr.effectiveAt.map(CantonTimestamp.assertFromInstant),
           )
-        case are: TxLogEntry.AppRewardLogEntry =>
+        case are: AppRewardTxLogEntry =>
           ScanTxLogRowData(
             entry = are,
             round = Some(are.round),
             rewardAmount = Some(are.amount),
             rewardedParty = Some(are.party),
           )
-        case vre: TxLogEntry.ValidatorRewardLogEntry =>
+        case vre: ValidatorRewardTxLogEntry =>
           ScanTxLogRowData(
             entry = vre,
             round = Some(vre.round),
             rewardAmount = Some(vre.amount),
             rewardedParty = Some(vre.party),
           )
-        case etp: TxLogEntry.ExtraTrafficPurchaseLogEntry =>
+        case etp: ExtraTrafficPurchaseTxLogEntry =>
           ScanTxLogRowData(
             entry = etp,
             round = Some(etp.round),
@@ -105,7 +119,7 @@ object ScanTables extends AcsTables {
             extraTrafficPurchaseTrafficPurchase = Some(etp.trafficPurchased),
             extraTrafficPurchaseCcSpent = Some(etp.ccSpent),
           )
-        case bac: TxLogEntry.BalanceChangeLogEntry =>
+        case bac: BalanceChangeTxLogEntry =>
           ScanTxLogRowData(
             entry = bac,
             round = Some(bac.round),
@@ -113,26 +127,28 @@ object ScanTables extends AcsTables {
               Some(bac.changeToInitialAmountAsOfRoundZero),
             balanceChangeChangeToHoldingFeesRate = Some(bac.changeToHoldingFeesRate),
           )
-        case rar: TxLogEntry.TransferLogEntry =>
+        case rar: TransferTxLogEntry =>
           ScanTxLogRowData(
             entry = rar,
             round = Some(rar.round),
           )
-        case entry: TxLogEntry.TapLogEntry =>
+        case entry: TapTxLogEntry =>
           ScanTxLogRowData(
             entry = entry,
             round = Some(entry.round),
           )
-        case entry: TxLogEntry.MintLogEntry =>
+        case entry: MintTxLogEntry =>
           ScanTxLogRowData(
             entry = entry,
             round = Some(entry.round),
           )
-        case entry: TxLogEntry.SvRewardCollectedLogEntry =>
+        case entry: SvRewardCollectedTxLogEntry =>
           ScanTxLogRowData(
             entry = entry,
             round = Some(entry.round),
           )
+        case _ =>
+          throw txEncodingFailed()
       }
     }
 

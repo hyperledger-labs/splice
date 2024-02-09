@@ -23,8 +23,9 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
 }
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-
 import cats.syntax.either.*
+import com.daml.network.wallet.store.TxLogEntry
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -136,7 +137,7 @@ class HttpExternalWalletHandler(
             r0.GetTransferOfferStatusResponseNotFound(
               d0.ErrorResponse(s"Couldn't find transfer offer with tracking id $trackingId")
             )
-          )(status => r0.GetTransferOfferStatusResponseOK(status.toStatusResponse))
+          )(status => r0.GetTransferOfferStatusResponseOK(TxLogEntry.Http.toStatusResponse(status)))
       }
     }
   }
@@ -272,7 +273,7 @@ class HttpExternalWalletHandler(
               d0.ErrorResponse(s"Couldn't find transfer offer with tracking id $trackingId")
             )
           )(status => {
-            r0.GetBuyTrafficRequestStatusResponse(status.toStatusResponse)
+            r0.GetBuyTrafficRequestStatusResponse(TxLogEntry.Http.toStatusResponse(status))
           })
       }
     }

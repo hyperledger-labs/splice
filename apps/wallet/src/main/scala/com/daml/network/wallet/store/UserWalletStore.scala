@@ -86,7 +86,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       trackingId: String
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[TxLogEntry.TransferOffer]]]
+  ): Future[QueryResult[Option[TransferOfferTxLogEntry]]]
 
   def listExpiredBuyTrafficRequests: ListExpiredContracts[
     trafficRequestCodegen.BuyTrafficRequest.ContractId,
@@ -101,7 +101,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       trackingId: String
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[TxLogEntry.BuyTrafficRequest]]]
+  ): Future[QueryResult[Option[BuyTrafficRequestTxLogEntry]]]
 
   final def listAppPaymentRequests(
       limit: Limit = Limit.DefaultLimit

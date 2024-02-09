@@ -20,13 +20,13 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{CommandPriority, RetryProvider}
-import com.daml.network.http.v0.wallet.{WalletResource as r0}
+import com.daml.network.http.v0.wallet.WalletResource as r0
 import com.daml.network.http.v0.{definitions as d0, wallet as v0}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.{Limit, PageLimit}
 import com.daml.network.util.{CNNodeUtil, Codec, Contract, DisclosedContracts}
 import com.daml.network.wallet.UserWalletManager
-import com.daml.network.wallet.store.UserWalletStore
+import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.error.MediatorError.Timeout
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -243,7 +243,7 @@ class HttpWalletHandler(
         )
       } yield v0.WalletResource.ListTransactionsResponse.OK(
         d0.ListTransactionsResponse(
-          items = transactions.map(_.toResponseItem).toVector
+          items = transactions.map(TxLogEntry.Http.toResponseItem).toVector
         )
       )
     }

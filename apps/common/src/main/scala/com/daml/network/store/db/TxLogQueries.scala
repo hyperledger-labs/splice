@@ -44,7 +44,7 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
           <<[DomainId],
           <<[Option[ContractId[?]]],
           <<[String3],
-          <<[spray.json.JsValue],
+          <<[String],
         )
       )
     }
@@ -102,7 +102,7 @@ object TxLogQueries {
       domainId: DomainId,
       acsContractId: Option[ContractId[?]],
       entryType: String3,
-      entryData: spray.json.JsValue,
+      entryData: String,
   )
 
   object SelectFromTxLogTableResult {

@@ -5,7 +5,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
-import com.daml.network.wallet.store.TxLogEntry as walletLogEntry
+import com.daml.network.wallet.store.{TransferTxLogEntry, TxLogEntry as walletLogEntry}
 import com.digitalasset.canton.HasExecutionContext
 
 class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
@@ -79,12 +79,12 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       checkTxHistory(
         bobValidatorWalletClient,
         Seq[CheckTxHistoryFn](
-          { case logEntry: walletLogEntry.Transfer =>
-            logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.WalletAutomation
-            inside(logEntry.sender) { case (sender, amount) =>
-              sender shouldBe bobValidatorBackend.getValidatorPartyId().toProtoPrimitive
-              amount should be(balanceAfter - balanceBefore)
-            }
+          { case logEntry: TransferTxLogEntry =>
+            logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.WalletAutomation.toProto
+            logEntry.sender.value.party shouldBe bobValidatorBackend
+              .getValidatorPartyId()
+              .toProtoPrimitive
+            logEntry.sender.value.amount should be(balanceAfter - balanceBefore)
             logEntry.receivers shouldBe empty
             logEntry.appRewardsUsed shouldBe appRewardAmount
             logEntry.validatorRewardsUsed shouldBe validatorRewardAmount

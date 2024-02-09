@@ -168,7 +168,7 @@ class ScanTxLogParser(
 
   override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
     Some(
-      ErrorLogEntry(
+      ErrorTxLogEntry(
         eventId = eventId
       )
     )
@@ -209,8 +209,6 @@ object ScanTxLogParser {
     def append(entry: TxLogEntry) = State(entries = entries :+ entry)
   }
 
-  import BalanceChangeLogEntry.PartyBalanceChange
-
   private object State {
     def apply(entry: TxLogEntry): State = {
       State(immutable.Queue(entry))
@@ -232,7 +230,7 @@ object ScanTxLogParser {
     ): State = {
       val amountAO0 = amountAsOfRoundZero(coin.amount)
       State(
-        BalanceChangeLogEntry(
+        BalanceChangeTxLogEntry(
           eventId = event.getEventId(),
           domainId = domainId,
           round = coin.amount.createdAt.number,
@@ -275,36 +273,36 @@ object ScanTxLogParser {
         activityType: TransactionType,
     ): State = {
       val coin = getCoinFromSummary(tx, ccsum)
-      val activityEntry: TransactionLogEntry = activityType match {
+      val activityEntry: TransactionTxLogEntry = activityType match {
         case TransactionType.Tap =>
-          TapLogEntry(
+          TapTxLogEntry(
             offset = tx.getOffset,
             eventId = event.getEventId,
             domainId = domainId,
-            date = tx.getEffectiveAt,
-            coinOwner = coin.owner,
+            date = Some(tx.getEffectiveAt),
+            coinOwner = PartyId.tryFromProtoPrimitive(coin.owner),
             coinAmount = coin.amount.initialAmount,
             coinPrice = ccsum.coinPrice,
             round = ccsum.round.number,
           )
         case TransactionType.Mint =>
-          MintLogEntry(
+          MintTxLogEntry(
             offset = tx.getOffset,
             eventId = event.getEventId,
             domainId = domainId,
-            date = tx.getEffectiveAt,
-            coinOwner = coin.owner,
+            date = Some(tx.getEffectiveAt),
+            coinOwner = PartyId.tryFromProtoPrimitive(coin.owner),
             coinAmount = coin.amount.initialAmount,
             coinPrice = ccsum.coinPrice,
             round = ccsum.round.number,
           )
         case TransactionType.SvRewardCollected =>
-          SvRewardCollectedLogEntry(
+          SvRewardCollectedTxLogEntry(
             offset = tx.getOffset,
             eventId = event.getEventId,
             domainId = domainId,
-            date = tx.getEffectiveAt,
-            coinOwner = coin.owner,
+            date = Some(tx.getEffectiveAt),
+            coinOwner = PartyId.tryFromProtoPrimitive(coin.owner),
             coinAmount = coin.amount.initialAmount,
             coinPrice = ccsum.coinPrice,
             round = ccsum.round.number,
@@ -338,7 +336,7 @@ object ScanTxLogParser {
       val appRewardEntry =
         if (appRewards.compareTo(BigDecimal(0.0)) > 0) {
           val entry =
-            AppRewardLogEntry(
+            AppRewardTxLogEntry(
               eventId = rootEventId.getOrElse(event.getEventId()),
               domainId = domainId,
               round = round,
@@ -353,7 +351,7 @@ object ScanTxLogParser {
       val validatorRewardEntry =
         if (validatorRewards.compareTo(BigDecimal(0.0)) > 0) {
           val entry =
-            ValidatorRewardLogEntry(
+            ValidatorRewardTxLogEntry(
               eventId = rootEventId.getOrElse(event.getEventId()),
               domainId = domainId,
               round = round,
@@ -394,7 +392,7 @@ object ScanTxLogParser {
         )
 
       val balanceChangeEntry = State(
-        BalanceChangeLogEntry(
+        BalanceChangeTxLogEntry(
           eventId = rootEventId.getOrElse(event.getEventId()),
           domainId = domainId,
           round = round.number,
@@ -416,11 +414,44 @@ object ScanTxLogParser {
       )
 
       val activityEntry = State(
-        TransferLogEntry(tx, event, domainId, node)
+        transferTxLogEntry(tx, event, domainId, node)
       )
       rewardEntries
         .appended(balanceChangeEntry)
         .appended(activityEntry)
+    }
+
+    def transferTxLogEntry(
+        tx: TransactionTreeV2,
+        event: TreeEvent,
+        domainId: DomainId,
+        node: ExerciseNode[Transfer.Arg, Transfer.Res],
+    ): TransferTxLogEntry = {
+      val coinPrice = node.result.value.summary.coinPrice
+      val sender = parseSenderAmount(node.argument.value, node.result.value)
+      val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
+
+      new TransferTxLogEntry(
+        offset = tx.getOffset,
+        eventId = event.getEventId,
+        domainId = domainId,
+        date = Some(tx.getEffectiveAt),
+        provider = PartyId.tryFromProtoPrimitive(node.argument.value.transfer.provider),
+        sender = Some(sender),
+        receivers = receivers,
+        balanceChanges = node.result.value.summary.balanceChanges.asScala
+          .map { case (party, bc) =>
+            BalanceChange(
+              party = PartyId.tryFromProtoPrimitive(party),
+              changeToInitialAmountAsOfRoundZero = bc.changeToInitialAmountAsOfRoundZero,
+              changeToHoldingFeesRate = bc.changeToHoldingFeesRate,
+            )
+          }
+          .toSeq
+          .sortBy(_.party),
+        round = node.result.value.round.number,
+        coinPrice = coinPrice,
+      )
     }
 
     def fromCoinExpireSummary(
@@ -429,7 +460,7 @@ object ScanTxLogParser {
         cxsum: CoinExpireSummary,
     ): State = {
       State(
-        BalanceChangeLogEntry(
+        BalanceChangeTxLogEntry(
           eventId = event.getEventId(),
           domainId = domainId,
           round = cxsum.round.number,
@@ -462,7 +493,7 @@ object ScanTxLogParser {
       val round = node.result.value.round
       val trafficPurchased = node.argument.value.trafficAmount
       val ccSpent = node.result.value.ccPaid
-      val buyExtraTrafficEntry = ExtraTrafficPurchaseLogEntry(
+      val buyExtraTrafficEntry = ExtraTrafficPurchaseTxLogEntry(
         eventId = event.getEventId(),
         domainId = domainId,
         round = round.number,
@@ -472,7 +503,7 @@ object ScanTxLogParser {
       )
 
       val balanceChangeEntry = State(
-        BalanceChangeLogEntry(
+        BalanceChangeTxLogEntry(
           eventId = event.getEventId(),
           domainId = domainId,
           round = round.number,
@@ -546,7 +577,7 @@ object ScanTxLogParser {
       val amountAO0 = -amountAsOfRoundZero(burntCoin.amount)
       val holdingFees = -burntCoin.amount.ratePerRound.rate
       State(
-        BalanceChangeLogEntry(
+        BalanceChangeTxLogEntry(
           eventId = rootEventId.getOrElse(event.getEventId()),
           domainId = domainId,
           round = burntCoin.amount.createdAt.number,
@@ -569,16 +600,24 @@ object ScanTxLogParser {
     ): State = {
       val config = round.payload.transferConfigUsd
       val coinPrice = round.payload.coinPrice
-      val newEntry = OpenMiningRoundLogEntry(
+      val newEntry = OpenMiningRoundTxLogEntry(
         eventId = event.getEventId(),
         domainId = domainId,
         round = round.payload.round.number,
         coinCreateFee = dollarsToCC(config.createFee.fee, coinPrice),
         holdingFee = dollarsToCC(config.holdingFee.rate, coinPrice),
         lockHolderFee = dollarsToCC(config.lockHolderFee.fee, coinPrice),
-        initialTransferFee = config.transferFee.initialRate,
-        transferFeeSteps = config.transferFee.steps.asScala.toSeq.map(step =>
-          (dollarsToCC(step._1, coinPrice), step._2)
+        transferFee = Some(
+          SteppedRate(
+            initialRate = config.transferFee.initialRate,
+            steps = config.transferFee.steps.asScala.toSeq
+              .map(step =>
+                SteppedRate.Step(
+                  from = dollarsToCC(step._1, coinPrice),
+                  rate = step._2,
+                )
+              ),
+          )
         ),
       )
 
@@ -591,11 +630,11 @@ object ScanTxLogParser {
         domainId: DomainId,
         round: ClosedMiningRoundCreate.ContractType,
     ): State = {
-      val newEntry = ClosedMiningRoundLogEntry(
+      val newEntry = ClosedMiningRoundTxLogEntry(
         eventId = event.getEventId(),
         domainId = domainId,
         round = round.payload.round.number,
-        effectiveAt = tx.getEffectiveAt,
+        effectiveAt = Some(tx.getEffectiveAt),
       )
 
       State(newEntry)
@@ -609,7 +648,7 @@ object ScanTxLogParser {
   ): TxLogEntry = {
     val amount = coin.amount
     val amountAO0 = amountAsOfRoundZero(amount)
-    BalanceChangeLogEntry(
+    BalanceChangeTxLogEntry(
       eventId = eventId,
       domainId = domainId,
       round = amount.createdAt.number,

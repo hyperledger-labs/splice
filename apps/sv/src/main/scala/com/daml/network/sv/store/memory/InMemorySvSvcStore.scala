@@ -27,7 +27,8 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
+import com.daml.network.sv.store.TxLogEntry.mapActionName
+import com.daml.network.sv.store.{DefiniteVoteTxLogEntry, SvStore, SvSvcStore, TxLogEntry}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.{
   AssignedContract,
@@ -52,7 +53,7 @@ class InMemorySvSvcStore(
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
-) extends InMemoryCNNodeAppStore[SvcTxLogParser.TxLogEntry]
+) extends InMemoryCNNodeAppStore[TxLogEntry]
     with SvSvcStore
     with LimitHelpers {
   import InMemorySvSvcStore.*
@@ -66,13 +67,14 @@ class InMemorySvSvcStore(
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
+  ): Future[Seq[VoteResult]] = {
     for {
       entries <- multiDomainAcsStore
-        .collectTxLogIndicesType[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]
+        .collectTxLogIndicesType[DefiniteVoteTxLogEntry]
+      results = entries.map(_.result.getOrElse(throw txMissingField()))
       ind = actionName match {
-        case Some(actionName) => entries.filter(_.actionName.contains(actionName))
-        case None => entries
+        case Some(actionName) => results.filter(e => mapActionName(e.action).contains(actionName))
+        case None => results
       }
       ind2 = executed match {
         case Some(executed) => ind.filter(_.executed == executed)
@@ -83,7 +85,7 @@ class InMemorySvSvcStore(
         case None => ind2
       }
       records = ind3.flatMap { entry =>
-        val effectiveAt = Instant.parse(entry.effectiveAt)
+        val effectiveAt = entry.effectiveAt
         (effectiveFrom, effectiveTo) match {
           case (Some(effectiveFromDate), Some(effectiveToDate))
               if effectiveAt.isAfter(Instant.parse(effectiveFromDate)) && effectiveAt.isBefore(

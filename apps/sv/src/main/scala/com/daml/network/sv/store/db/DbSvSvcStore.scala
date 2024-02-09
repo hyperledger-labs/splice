@@ -25,7 +25,8 @@ import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
-import com.daml.network.sv.store.{SvStore, SvSvcStore, SvcTxLogParser}
+import com.daml.network.sv.store.TxLogEntry.EntryType
+import com.daml.network.sv.store.{DefiniteVoteTxLogEntry, SvStore, SvSvcStore, TxLogEntry}
 import com.daml.network.util.*
 import com.daml.network.util.Contract.Companion.Template
 import com.digitalasset.canton.data.CantonTimestamp
@@ -50,7 +51,7 @@ class DbSvSvcStore(
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
-) extends DbCNNodeAppStore[SvcTxLogParser.TxLogEntry](
+) extends DbCNNodeAppStore[TxLogEntry](
       storage,
       SvcTables.acsTableName,
       SvcTables.txLogTableName,
@@ -65,7 +66,7 @@ class DbSvSvcStore(
     with SvSvcStore
     with AcsTables
     with AcsQueries
-    with TxLogQueries[SvcTxLogParser.TxLogEntry]
+    with TxLogQueries[TxLogEntry]
     with LimitHelpers
     with NamedLogging {
 
@@ -1052,7 +1053,7 @@ class DbSvSvcStore(
     )
   }
 
-  def listVoteResults(
+  override def listVoteResults(
       actionName: Option[String],
       executed: Option[Boolean],
       _requester: Option[String],
@@ -1061,8 +1062,8 @@ class DbSvSvcStore(
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry]] = {
-    val dbType = SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry.dbType
+  ): Future[Seq[VoteResult]] = {
+    val dbType = EntryType.DefiniteVoteTxLogEntry
     val actionNameCondition = actionName match {
       case Some(actionName) =>
         sql"""and action_name like ${lengthLimited(s"%${lengthLimited(actionName)}%")}"""
@@ -1101,9 +1102,11 @@ class DbSvSvcStore(
         ),
         "listVoteResults",
       )
-      recentVoteResults = applyLimit("listVoteResults", limit, rows).map(
-        txLogEntryFromRow[SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry](txLogConfig)
-      )
+      recentVoteResults = applyLimit("listVoteResults", limit, rows)
+        .map(
+          txLogEntryFromRow[DefiniteVoteTxLogEntry](txLogConfig)
+        )
+        .map(_.result.getOrElse(throw txMissingField()))
     } yield recentVoteResults
   }
 

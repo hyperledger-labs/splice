@@ -5,7 +5,11 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.wallet.store.TxLogEntry as walletLogEntry
+import com.daml.network.wallet.store.{
+  BalanceChangeTxLogEntry,
+  TransferTxLogEntry,
+  TxLogEntry as walletLogEntry,
+}
 import com.digitalasset.canton.HasExecutionContext
 
 class WalletTxLogWithDomainFeesIntegrationTest
@@ -65,22 +69,25 @@ class WalletTxLogWithDomainFeesIntegrationTest
           checkTxHistory(
             sv1WalletClient,
             Seq[CheckTxHistoryFn](
-              { case logEntry: walletLogEntry.Transfer =>
+              { case logEntry: TransferTxLogEntry =>
                 // Payment of domain fees by validator to SVC
-                logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.ExtraTrafficPurchase
-                inside(logEntry.sender) { case (sender, amount) =>
-                  sender shouldBe sv1ValidatorBackend.getValidatorPartyId().toProtoPrimitive
-                  // amount actually paid will be more than totalCostCc due to fees
-                  amount should beWithin(-totalCostCc - smallAmount, -totalCostCc)
-                }
-                inside(logEntry.receivers) { case Seq((receiver, amount)) =>
-                  receiver shouldBe svcParty.toProtoPrimitive
+                logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.ExtraTrafficPurchase.toProto
+                logEntry.sender.value.party shouldBe sv1ValidatorBackend
+                  .getValidatorPartyId()
+                  .toProtoPrimitive
+                // amount actually paid will be more than totalCostCc due to fees
+                logEntry.sender.value.amount should beWithin(
+                  -totalCostCc - smallAmount,
+                  -totalCostCc,
+                )
+                inside(logEntry.receivers) { case Seq(receiver) =>
+                  receiver.party shouldBe svcParty.toProtoPrimitive
                   // domain fees paid is immediately burnt by SVC
-                  amount shouldBe 0
+                  receiver.amount shouldBe 0
                 }
               },
-              { case logEntry: walletLogEntry.BalanceChange =>
-                logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
+              { case logEntry: BalanceChangeTxLogEntry =>
+                logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
                 logEntry.receiver shouldBe sv1ValidatorBackend
                   .getValidatorPartyId()
                   .toProtoPrimitive
@@ -101,22 +108,25 @@ class WalletTxLogWithDomainFeesIntegrationTest
           checkTxHistory(
             aliceValidatorWalletClient,
             Seq[CheckTxHistoryFn](
-              { case logEntry: walletLogEntry.Transfer =>
+              { case logEntry: TransferTxLogEntry =>
                 // Payment of domain fees by validator to SVC
-                logEntry.transactionSubtype shouldBe walletLogEntry.Transfer.ExtraTrafficPurchase
-                inside(logEntry.sender) { case (sender, amount) =>
-                  sender shouldBe aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive
-                  // amount actually paid will be more than totalCostCc due to fees
-                  amount should beWithin(-totalCostCc - smallAmount, -totalCostCc)
-                }
-                inside(logEntry.receivers) { case Seq((receiver, amount)) =>
-                  receiver shouldBe svcParty.toProtoPrimitive
+                logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.ExtraTrafficPurchase.toProto
+                logEntry.sender.value.party shouldBe aliceValidatorBackend
+                  .getValidatorPartyId()
+                  .toProtoPrimitive
+                // amount actually paid will be more than totalCostCc due to fees
+                logEntry.sender.value.amount should beWithin(
+                  -totalCostCc - smallAmount,
+                  -totalCostCc,
+                )
+                inside(logEntry.receivers) { case Seq(receiver) =>
+                  receiver.party shouldBe svcParty.toProtoPrimitive
                   // domain fees paid is immediately burnt by SVC
-                  amount shouldBe 0
+                  receiver.amount shouldBe 0
                 }
               },
-              { case logEntry: walletLogEntry.BalanceChange =>
-                logEntry.transactionSubtype shouldBe walletLogEntry.BalanceChange.Tap
+              { case logEntry: BalanceChangeTxLogEntry =>
+                logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
                 logEntry.receiver shouldBe aliceValidatorBackend
                   .getValidatorPartyId()
                   .toProtoPrimitive

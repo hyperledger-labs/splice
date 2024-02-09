@@ -11,7 +11,12 @@ import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLog
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.wallet.store
-import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
+import com.daml.network.wallet.store.{
+  BuyTrafficRequestTxLogEntry,
+  TransferOfferTxLogEntry,
+  TxLogEntry,
+  UserWalletStore,
+}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
@@ -193,19 +198,19 @@ class DbUserWalletStore(
               selectFromTxLogTable(
                 WalletTables.txLogTableName,
                 storeId,
-                where = sql"tx_log_id = ${TxLogEntry.TransactionHistoryTxLogEntry.txLogId}",
+                where = sql"tx_log_id = ${TxLogEntry.LogId.TransactionHistoryTxLog}",
                 orderLimit = sql"order by entry_number desc limit ${sqlLimit(limit)}",
               )
             )(beginAfterEventId =>
               selectFromTxLogTable(
                 WalletTables.txLogTableName,
                 storeId,
-                where = sql"""tx_log_id = ${TxLogEntry.TransactionHistoryTxLogEntry.txLogId}
+                where = sql"""tx_log_id = ${TxLogEntry.LogId.TransactionHistoryTxLog}
                   and entry_number < (
                       select entry_number
                       from #${WalletTables.txLogTableName}
                       where store_id = $storeId
-                      and tx_log_id = ${TxLogEntry.TransactionHistoryTxLogEntry.txLogId}
+                      and tx_log_id = ${TxLogEntry.LogId.TransactionHistoryTxLog}
                       and event_id = ${lengthLimited(beginAfterEventId)}
                   )""",
                 orderLimit = sql"order by entry_number desc limit ${sqlLimit(limit)}",
@@ -220,7 +225,7 @@ class DbUserWalletStore(
 
   override def getLatestTransferOfferEventByTrackingId(trackingId: String)(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[TxLogEntry.TransferOffer]]] =
+  ): Future[QueryResult[Option[TransferOfferTxLogEntry]]] =
     waitUntilAcsIngested {
       import cats.implicits.*
       for {
@@ -229,16 +234,16 @@ class DbUserWalletStore(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               storeId,
-              sql"entry_type = ${TxLogEntry.TransferOffer.dbType} and tracking_id = ${lengthLimited(trackingId)}",
+              sql"entry_type = ${TxLogEntry.EntryType.TransferOfferTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
             ).headOption,
             "getLatestTransferOfferEventByTrackingId",
           )
           .getOrElse(throw offsetExpectedError())
         entry = resultWithOffset.row.map(
-          txLogEntryFromRow[TxLogEntry.TransferOffer](txLogConfig)
+          txLogEntryFromRow[TransferOfferTxLogEntry](txLogConfig)
         )
-      } yield QueryResult[Option[TxLogEntry.TransferOffer]](
+      } yield QueryResult[Option[TransferOfferTxLogEntry]](
         resultWithOffset.offset,
         entry,
       )
@@ -246,7 +251,7 @@ class DbUserWalletStore(
 
   override def getLatestBuyTrafficRequestEventByTrackingId(trackingId: String)(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[TxLogEntry.BuyTrafficRequest]]] =
+  ): Future[QueryResult[Option[BuyTrafficRequestTxLogEntry]]] =
     waitUntilAcsIngested {
       import cats.implicits.*
       for {
@@ -255,16 +260,16 @@ class DbUserWalletStore(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               storeId,
-              sql"entry_type = ${TxLogEntry.BuyTrafficRequest.dbType} and tracking_id = ${lengthLimited(trackingId)}",
+              sql"entry_type = ${TxLogEntry.EntryType.BuyTrafficRequestTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
             ).headOption,
             "getLatestBuyTrafficRequestEventByTrackingId",
           )
           .getOrElse(throw offsetExpectedError())
         entry = resultWithOffset.row.map(
-          txLogEntryFromRow[TxLogEntry.BuyTrafficRequest](txLogConfig)
+          txLogEntryFromRow[BuyTrafficRequestTxLogEntry](txLogConfig)
         )
-      } yield QueryResult[Option[TxLogEntry.BuyTrafficRequest]](
+      } yield QueryResult[Option[BuyTrafficRequestTxLogEntry]](
         resultWithOffset.offset,
         entry,
       )

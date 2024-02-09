@@ -11,7 +11,7 @@ import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.wallet.automation.AcceptedTransferOfferTrigger
-import com.daml.network.wallet.store.TxLogEntry.TransferOfferStatus
+import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
@@ -58,7 +58,7 @@ class WalletTransferOfferStatusIntegrationTest
                     contractId,
                   )
                 ) =>
-              status should be(TransferOfferStatus.Created.status)
+              status should be(TxLogEntry.Http.TransferOfferStatus.Created)
               getRootFromTxId(
                 txId,
                 Set(senderParty, receiverParty),
@@ -112,7 +112,7 @@ class WalletTransferOfferStatusIntegrationTest
                       contractId,
                     )
                   ) =>
-                status should be(TransferOfferStatus.Accepted.status)
+                status should be(TxLogEntry.Http.TransferOfferStatus.Accepted)
                 val (tree, exercise) = getRootFromTxId(
                   txId,
                   Set(aliceUserParty, bobUserParty),
@@ -142,7 +142,7 @@ class WalletTransferOfferStatusIntegrationTest
                     contractId,
                   )
                 ) =>
-              status should be(TransferOfferStatus.Completed.status)
+              status should be(TxLogEntry.Http.TransferOfferStatus.Completed)
               val (tree, batchExercise) = getRootFromTxId(
                 txId,
                 Set(aliceUserParty, bobUserParty),
@@ -192,7 +192,7 @@ class WalletTransferOfferStatusIntegrationTest
                     Some(withdrawReason),
                   )
                 ) =>
-              status should be(TransferOfferStatus.Failed.status)
+              status should be(TxLogEntry.Http.TransferOfferStatus.Failed)
               failure should be(d0.TransferOfferFailedResponse.FailureKind.Withdrawn)
               withdrawReason should be("Withdrawn by sender")
           }
@@ -223,7 +223,7 @@ class WalletTransferOfferStatusIntegrationTest
                     Some(withdrawReason),
                   )
                 ) =>
-              status should be(TransferOfferStatus.Failed.status)
+              status should be(TxLogEntry.Http.TransferOfferStatus.Failed)
               failure should be(d0.TransferOfferFailedResponse.FailureKind.Withdrawn)
               withdrawReason should startWith("out of funds")
           }
@@ -253,7 +253,7 @@ class WalletTransferOfferStatusIntegrationTest
                     None,
                   )
                 ) =>
-              status should be(TransferOfferStatus.Failed.status)
+              status should be(TxLogEntry.Http.TransferOfferStatus.Failed)
               failure should be(d0.TransferOfferFailedResponse.FailureKind.Rejected)
           }
         },
@@ -282,7 +282,7 @@ class WalletTransferOfferStatusIntegrationTest
             case d0.GetTransferOfferStatusResponse.members.TransferOfferFailedResponse(
                   d0.TransferOfferFailedResponse(status, failure, None)
                 ) =>
-              status should be(TransferOfferStatus.Failed.status)
+              status should be(TxLogEntry.Http.TransferOfferStatus.Failed)
               failure should be(d0.TransferOfferFailedResponse.FailureKind.Expired)
           }
         },

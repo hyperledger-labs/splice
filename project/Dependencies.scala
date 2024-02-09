@@ -20,6 +20,7 @@ object Dependencies {
     "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
   lazy val scalapb_runtime_grpc =
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+  lazy val scalapb_json4 = "com.thesamet.scalapb" %% "scalapb-json4s" % "0.11.1"
 
   lazy val auth0 = "com.auth0" % "auth0" % "1.44.1"
 

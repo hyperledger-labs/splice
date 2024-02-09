@@ -95,7 +95,7 @@ trait ScanStore
 
   def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[TxLogEntry.OpenMiningRoundLogEntry]
+  ): Future[OpenMiningRoundTxLogEntry]
 
   def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)]
 
@@ -169,7 +169,7 @@ trait ScanStore
       limit: PageLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[TxLogEntry.TransactionLogEntry]]
+  ): Future[Seq[TxLogEntry.TransactionTxLogEntry]]
 
   def getAggregatedRounds()(implicit tc: TraceContext): Future[Option[ScanAggregator.RoundRange]]
   def getRoundTotals(startRound: Long, endRound: Long)(implicit

@@ -51,7 +51,6 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.history.SvcRulesExecuteDefiniteVote
-import com.daml.network.sv.store.SvcTxLogParser.TxLogEntry.DefiniteVoteTxLogEntry
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
@@ -1064,17 +1063,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             )
             .futureValue
             .toList
-            .loneElement shouldBe DefiniteVoteTxLogEntry(
-            actionName = "SRARC_AddMember",
-            executed = true,
-            requester = result.requester,
-            effectiveAt = result.effectiveAt.toString,
-            votedAt = result.votedAt.toString,
-            expired = result.expired,
-            rejectedBy = result.rejectedBy.asScala.toList,
-            acceptedBy = result.acceptedBy.asScala.toList,
-            action = result.action,
-          )
+            .loneElement shouldBe result
           store
             .listVoteResults(
               Some("SRARC_AddMember"),

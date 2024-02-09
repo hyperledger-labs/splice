@@ -12,7 +12,7 @@ import com.daml.network.wallet.automation.{
   CompleteBuyTrafficRequestTrigger,
   ExpireBuyTrafficRequestsTrigger,
 }
-import com.daml.network.wallet.store.TxLogEntry.BuyTrafficRequestStatus
+import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -102,7 +102,7 @@ class WalletBuyTrafficRequestIntegrationTest
                     Some(rejectionReason),
                   )
                 ) =>
-              status shouldBe BuyTrafficRequestStatus.Failed.status
+              status shouldBe TxLogEntry.Http.BuyTrafficRequestStatus.Failed
               failure shouldBe d0.BuyTrafficRequestFailedResponse.FailureReason.Rejected
               rejectionReason should startWith("out of funds")
           }
@@ -132,7 +132,7 @@ class WalletBuyTrafficRequestIntegrationTest
                     Some(rejectionReason),
                   )
                 ) =>
-              status shouldBe BuyTrafficRequestStatus.Failed.status
+              status shouldBe TxLogEntry.Http.BuyTrafficRequestStatus.Failed
               failure shouldBe d0.BuyTrafficRequestFailedResponse.FailureReason.Rejected
               rejectionReason should startWith("not enough traffic requested")
           }
@@ -163,7 +163,7 @@ class WalletBuyTrafficRequestIntegrationTest
               case d0.GetBuyTrafficRequestStatusResponse.members.BuyTrafficRequestCompletedResponse(
                     d0.BuyTrafficRequestCompletedResponse(status, _)
                   ) =>
-                status shouldBe BuyTrafficRequestStatus.Completed.status
+                status shouldBe TxLogEntry.Http.BuyTrafficRequestStatus.Completed
             }
             clue("Receiving validator's on-ledger traffic is updated") {
               val expectedTotalPurchasedTraffic = (initialTrafficAmount + minTopupAmount)
@@ -248,7 +248,7 @@ class WalletBuyTrafficRequestIntegrationTest
             case d0.GetBuyTrafficRequestStatusResponse.members.BuyTrafficRequestFailedResponse(
                   d0.BuyTrafficRequestFailedResponse(status, failureReason, None)
                 ) =>
-              status shouldBe BuyTrafficRequestStatus.Failed.status
+              status shouldBe TxLogEntry.Http.BuyTrafficRequestStatus.Failed
               failureReason shouldBe d0.BuyTrafficRequestFailedResponse.FailureReason.Expired
           }
         },
@@ -376,7 +376,7 @@ class WalletBuyTrafficRequestIntegrationTest
           inside(response) {
             case d0.GetBuyTrafficRequestStatusResponse.members
                   .BuyTrafficRequestCreatedResponse(d0.BuyTrafficRequestCreatedResponse(status)) =>
-              status shouldBe BuyTrafficRequestStatus.Created.status
+              status shouldBe TxLogEntry.Http.BuyTrafficRequestStatus.Created
           }
         },
       )

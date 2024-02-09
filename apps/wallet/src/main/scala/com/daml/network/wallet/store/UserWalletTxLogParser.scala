@@ -58,6 +58,11 @@ import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
+import com.daml.network.wallet.store.TxLogEntry.{
+  BalanceChangeTransactionSubtype,
+  NotificationTransactionSubtype,
+  TransferTransactionSubtype,
+}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 class UserWalletTxLogParser(
@@ -221,14 +226,14 @@ class UserWalletTxLogParser(
                       State.fromNotification(
                         tree,
                         root,
-                        TxLogEntry.Notification.DirectTransferFailed,
+                        TxLogEntry.NotificationTransactionSubtype.DirectTransferFailed,
                         details,
                       )
                     case _: CO_SubscriptionMakePayment =>
                       State.fromNotification(
                         tree,
                         root,
-                        TxLogEntry.Notification.SubscriptionPaymentFailed,
+                        TxLogEntry.NotificationTransactionSubtype.SubscriptionPaymentFailed,
                         details,
                       )
                     // The errors below should not produce notifications
@@ -245,7 +250,7 @@ class UserWalletTxLogParser(
               // explicit self-transfers
               case (_, _: COO_MergeTransferInputs, Right(Seq(childEvent))) =>
                 defer(parseTree(tree, childEvent, domainId))
-                  .map(_.setTransferSubtype(TxLogEntry.Transfer.WalletAutomation))
+                  .map(_.setTransferSubtype(TransferTransactionSubtype.WalletAutomation))
               // All other successful operations are handled by parsing their subtree
               case (_, _, Right(childEvents)) =>
                 childEvents.foldMap(parseTree(tree, _, domainId))
@@ -270,7 +275,7 @@ class UserWalletTxLogParser(
           case TransferOffer_Reject(node) =>
             now(
               State.fromTransferOfferFailure(
-                TxLogEntry.TransferOfferStatus.Rejected,
+                TransferOfferTxLogEntry.Status.Rejected(TransferOfferStatusRejected()),
                 node,
               )
             )
@@ -278,7 +283,9 @@ class UserWalletTxLogParser(
           case TransferOffer_Withdraw(node) =>
             now(
               State.fromTransferOfferFailure(
-                TxLogEntry.TransferOfferStatus.Withdrawn(node.argument.value.reason),
+                TransferOfferTxLogEntry.Status.Withdrawn(
+                  TransferOfferStatusWithdrawn(node.argument.value.reason)
+                ),
                 node,
               )
             )
@@ -286,7 +293,7 @@ class UserWalletTxLogParser(
           case TransferOffer_Expire(node) =>
             now(
               State.fromTransferOfferFailure(
-                TxLogEntry.TransferOfferStatus.Expired,
+                TransferOfferTxLogEntry.Status.Expired(TransferOfferStatusExpired()),
                 node,
               )
             )
@@ -308,13 +315,15 @@ class UserWalletTxLogParser(
                   exercised.getChildEventIds.asScala.toList,
                   domainId,
                 )
-              }.map(_.setTransferSubtype(TxLogEntry.Transfer.P2PPaymentCompleted))
+              }.map(_.setTransferSubtype(TransferTransactionSubtype.P2PPaymentCompleted))
             } yield stateFromOfferCompletion.appended(stateFromChildren)
 
           case AcceptedTransferOffer_Abort(node) =>
             now(
               State.fromTransferOfferFailure(
-                TxLogEntry.TransferOfferStatus.Withdrawn(node.argument.value.reason),
+                TransferOfferTxLogEntry.Status.Withdrawn(
+                  TransferOfferStatusWithdrawn(node.argument.value.reason)
+                ),
                 node,
               )
             )
@@ -322,7 +331,9 @@ class UserWalletTxLogParser(
           case AcceptedTransferOffer_Expire(node) =>
             now(
               State.fromTransferOfferFailure(
-                TxLogEntry.TransferOfferStatus.Expired,
+                TransferOfferTxLogEntry.Status.Expired(
+                  TransferOfferStatusExpired()
+                ),
                 node,
               )
             )
@@ -330,7 +341,9 @@ class UserWalletTxLogParser(
           case AcceptedTransferOffer_Withdraw(node) =>
             now(
               State.fromTransferOfferFailure(
-                TxLogEntry.TransferOfferStatus.Withdrawn(node.argument.value.reason),
+                TransferOfferTxLogEntry.Status.Withdrawn(
+                  TransferOfferStatusWithdrawn(node.argument.value.reason)
+                ),
                 node,
               )
             )
@@ -361,7 +374,9 @@ class UserWalletTxLogParser(
           case BuyTrafficRequest_Cancel(node) =>
             now(
               State.fromBuyTrafficRequestFailure(
-                TxLogEntry.BuyTrafficRequestStatus.Rejected(node.argument.value.reason),
+                BuyTrafficRequestTxLogEntry.Status.Rejected(
+                  BuyTrafficRequestStatusRejected(node.argument.value.reason)
+                ),
                 node,
               )
             )
@@ -369,7 +384,9 @@ class UserWalletTxLogParser(
           case BuyTrafficRequest_Expire(node) =>
             now(
               State.fromBuyTrafficRequestFailure(
-                TxLogEntry.BuyTrafficRequestStatus.Expired,
+                BuyTrafficRequestTxLogEntry.Status.Expired(
+                  BuyTrafficRequestStatusExpired()
+                ),
                 node,
               )
             )
@@ -386,7 +403,7 @@ class UserWalletTxLogParser(
                 exercised.getChildEventIds.asScala.toList,
                 domainId,
               )
-            }.map(_.setTransferSubtype(TxLogEntry.Transfer.AppPaymentAccepted))
+            }.map(_.setTransferSubtype(TransferTransactionSubtype.AppPaymentAccepted))
 
           // Collecting app payments = unlocking a locked coin + transferring the coin to the provider
           case AcceptedAppPayment_Collect(_) =>
@@ -396,7 +413,7 @@ class UserWalletTxLogParser(
                 exercised.getChildEventIds.asScala.toList,
                 domainId,
               )
-            }.map(_.mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.AppPaymentCollected))
+            }.map(_.mergeBalanceChangesIntoTransfer(TransferTransactionSubtype.AppPaymentCollected))
 
           case AcceptedAppPayment_Reject(node) =>
             now(
@@ -404,7 +421,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.AppPaymentRejected,
+                BalanceChangeTransactionSubtype.AppPaymentRejected,
               )
             )
 
@@ -414,7 +431,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.AppPaymentExpired,
+                BalanceChangeTransactionSubtype.AppPaymentExpired,
               )
             )
 
@@ -430,7 +447,9 @@ class UserWalletTxLogParser(
                 exercised.getChildEventIds.asScala.toList,
                 domainId,
               )
-            }.map(_.setTransferSubtype(TxLogEntry.Transfer.SubscriptionInitialPaymentAccepted))
+            }.map(
+              _.setTransferSubtype(TransferTransactionSubtype.SubscriptionInitialPaymentAccepted)
+            )
 
           // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
           case SubscriptionInitialPayment_Collect(_) =>
@@ -442,7 +461,7 @@ class UserWalletTxLogParser(
               )
             }.map(
               _.mergeBalanceChangesIntoTransfer(
-                TxLogEntry.Transfer.SubscriptionInitialPaymentCollected
+                TransferTransactionSubtype.SubscriptionInitialPaymentCollected
               )
             )
 
@@ -452,7 +471,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.SubscriptionInitialPaymentRejected,
+                BalanceChangeTransactionSubtype.SubscriptionInitialPaymentRejected,
               )
             )
 
@@ -462,7 +481,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.SubscriptionInitialPaymentExpired,
+                BalanceChangeTransactionSubtype.SubscriptionInitialPaymentExpired,
               )
             )
 
@@ -473,7 +492,7 @@ class UserWalletTxLogParser(
                 exercised.getChildEventIds.asScala.toList,
                 domainId,
               )
-            }.map(_.setTransferSubtype(TxLogEntry.Transfer.SubscriptionPaymentAccepted))
+            }.map(_.setTransferSubtype(TransferTransactionSubtype.SubscriptionPaymentAccepted))
 
           case SubscriptionIdleState_ExpireSubscription(node) =>
             // Note: this notification is shown to both the provider and the subscriber
@@ -481,7 +500,7 @@ class UserWalletTxLogParser(
               State.fromNotification(
                 tree,
                 exercised,
-                TxLogEntry.Notification.SubscriptionExpired,
+                NotificationTransactionSubtype.SubscriptionExpired,
                 s"Expired by ${node.argument.value.actor} because the last subscription payment was missed",
               )
             )
@@ -495,7 +514,9 @@ class UserWalletTxLogParser(
                 domainId,
               )
             }.map(
-              _.mergeBalanceChangesIntoTransfer(TxLogEntry.Transfer.SubscriptionPaymentCollected)
+              _.mergeBalanceChangesIntoTransfer(
+                TransferTransactionSubtype.SubscriptionPaymentCollected
+              )
             )
 
           case SubscriptionPayment_Reject(node) =>
@@ -504,7 +525,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value._2,
-                TxLogEntry.BalanceChange.SubscriptionPaymentRejected,
+                BalanceChangeTransactionSubtype.SubscriptionPaymentRejected,
               )
             )
 
@@ -514,7 +535,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value._2,
-                TxLogEntry.BalanceChange.SubscriptionPaymentExpired,
+                BalanceChangeTransactionSubtype.SubscriptionPaymentExpired,
               )
             )
 
@@ -524,7 +545,7 @@ class UserWalletTxLogParser(
 
           case Transfer(node) =>
             // Note: we do not parse the child events, as we can extract all information about the transfer from this node
-            now(State.fromTransfer(tree, root, node, TxLogEntry.Transfer.Transfer))
+            now(State.fromTransfer(tree, root, node, TransferTransactionSubtype.Transfer))
 
           // ------------------------------------------------------------------
           // Minting new coins
@@ -536,7 +557,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.Tap,
+                BalanceChangeTransactionSubtype.Tap,
               )
             )
 
@@ -546,7 +567,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.SvRewardCollected,
+                BalanceChangeTransactionSubtype.SvRewardCollected,
               )
             )
 
@@ -556,7 +577,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.Mint,
+                BalanceChangeTransactionSubtype.Mint,
               )
             )
 
@@ -567,7 +588,7 @@ class UserWalletTxLogParser(
                 root,
                 node.result.value,
                 // We show imports as minted coins.
-                TxLogEntry.BalanceChange.Mint,
+                BalanceChangeTransactionSubtype.Mint,
               )
             )
 
@@ -581,7 +602,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.LockedCoinUnlocked,
+                BalanceChangeTransactionSubtype.LockedCoinUnlocked,
               )
             )
 
@@ -591,7 +612,7 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                TxLogEntry.BalanceChange.LockedCoinOwnerExpired,
+                BalanceChangeTransactionSubtype.LockedCoinOwnerExpired,
               )
             )
 
@@ -605,7 +626,7 @@ class UserWalletTxLogParser(
                 tree,
                 exercised,
                 node.result.value.owner,
-                TxLogEntry.BalanceChange.CoinExpired,
+                BalanceChangeTransactionSubtype.CoinExpired,
               )
             )
 
@@ -615,7 +636,7 @@ class UserWalletTxLogParser(
                 tree,
                 exercised,
                 node.result.value.owner,
-                TxLogEntry.BalanceChange.LockedCoinExpired,
+                BalanceChangeTransactionSubtype.LockedCoinExpired,
               )
             )
 
@@ -635,7 +656,7 @@ class UserWalletTxLogParser(
               tree,
               exercised,
               domainId,
-              TxLogEntry.Transfer.InitialEntryPaymentCollection,
+              TransferTransactionSubtype.InitialEntryPaymentCollection,
             )
 
           case CnsRules_CollectEntryRenewalPayment(_) =>
@@ -643,7 +664,7 @@ class UserWalletTxLogParser(
               tree,
               exercised,
               domainId,
-              TxLogEntry.Transfer.EntryRenewalPaymentCollection,
+              TransferTransactionSubtype.EntryRenewalPaymentCollection,
             )
 
           // ------------------------------------------------------------------
@@ -706,13 +727,13 @@ class UserWalletTxLogParser(
   }
 
   override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
-    Some(TxLogEntry.Unknown(eventId))
+    Some(UnknownTxLogEntry(eventId))
 
   private def fromCnsEntryPaymentCollection(
       tree: TransactionTreeV2,
       exercised: ExercisedEvent,
       domainId: DomainId,
-      transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype,
+      transactionSubtype: TransferTransactionSubtype,
   )(implicit tc: TraceContext): Eval[State] = {
     import Eval.defer
     // first child event is the subscription payment collected by SVC
@@ -756,26 +777,27 @@ object UserWalletTxLogParser {
       val partyStr = party.toProtoPrimitive
       State(
         entries = entries.filter {
-          case t: TxLogEntry.Transfer =>
-            t.sender._1 == partyStr || t.receivers.exists(_._1 == partyStr)
-          case to: TxLogEntry.TransferOffer => to.sender == partyStr || to.receiver == partyStr
-          case btr: TxLogEntry.BuyTrafficRequest => btr.buyer == partyStr
-          case b: TxLogEntry.BalanceChange => b.receiver == partyStr
+          case t: TransferTxLogEntry =>
+            t.sender.exists(_.party == partyStr) || t.receivers.exists(_.party == partyStr)
+          case to: TransferOfferTxLogEntry => to.sender == partyStr || to.receiver == partyStr
+          case btr: BuyTrafficRequestTxLogEntry => btr.buyer == partyStr
+          case b: BalanceChangeTxLogEntry => b.receiver == partyStr
           // Only relevant notifications are added to parsing state
-          case _: TxLogEntry.Notification => true
-          case _: TxLogEntry.Unknown => true
+          case _: NotificationTxLogEntry => true
+          case _: UnknownTxLogEntry => true
+          case e => throw new RuntimeException(s"Unknown TxLogEntry type $e")
         }
       )
     }
 
     /** Sets the transaction type of all transfer events to the given type */
     def setTransferSubtype(
-        transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype
+        transactionSubtype: TransferTransactionSubtype
     ): State = {
       State(
         entries = entries.map {
-          case b: TxLogEntry.Transfer =>
-            b.copy(transactionSubtype = transactionSubtype)
+          case b: TransferTxLogEntry =>
+            b.copy(subtype = Some(transactionSubtype.toProto))
           case other => other
         }
       )
@@ -790,7 +812,10 @@ object UserWalletTxLogParser {
     def setEventId(eventId: String): State = {
       State(
         entries = entries.map {
-          case e: TxLogEntry.TransactionHistoryTxLogEntry => e.setEventId(eventId)
+          case e: UnknownTxLogEntry => e.copy(eventId = eventId)
+          case e: TransferTxLogEntry => e.copy(eventId = eventId)
+          case e: BalanceChangeTxLogEntry => e.copy(eventId = eventId)
+          case e: NotificationTxLogEntry => e.copy(eventId = eventId)
           case e => e
         }
       )
@@ -803,39 +828,41 @@ object UserWalletTxLogParser {
       * them for a transfer. In this case, we only want to display one balance change for the user.
       */
     def mergeBalanceChangesIntoTransfer(
-        transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype
+        transactionSubtype: TransferTransactionSubtype
     ): State = {
       val balanceChanges = entries.foldLeft(Map[String, BigDecimal]())((changes, entry) =>
         entry match {
-          case b: TxLogEntry.BalanceChange =>
+          case b: BalanceChangeTxLogEntry =>
             changes.updatedWith(b.receiver)(amount => Some(amount.fold(b.amount)(_ + b.amount)))
           case _ => changes
         }
       )
-      def netAmount(party: String, amount: BigDecimal) =
-        party -> (amount + balanceChanges
-          .getOrElse(party, BigDecimal(0)))
+      def netAmount(p: PartyAndAmount) =
+        PartyAndAmount(
+          party = p.party,
+          amount = (p.amount + balanceChanges
+            .getOrElse(p.party, BigDecimal(0))),
+        )
 
       // The code below works only if there is exactly one transfer.
       // Otherwise the balance changes are lost or duplicated by adding them to multiple transfers.
-      assert(entries.collect { case t: TxLogEntry.Transfer => t }.length == 1)
+      assert(entries.collect { case t: TransferTxLogEntry => t }.length == 1)
 
       val newEntries: Queue[TxLogEntry] = entries.flatMap {
-        case t: TxLogEntry.Transfer =>
+        case t: TransferTxLogEntry =>
           Some(
             t.copy(
-              transactionSubtype = transactionSubtype,
-              sender = netAmount(t.sender._1, t.sender._2),
-              receivers = t.receivers.map { case (receiver, amount) =>
-                netAmount(receiver, amount)
-              },
+              subtype = Some(transactionSubtype.toProto),
+              sender = t.sender.map(netAmount),
+              receivers = t.receivers.map(netAmount),
             )
           )
-        case _: TxLogEntry.BalanceChange => None
-        case n: TxLogEntry.TransferOffer => Some(n)
-        case n: TxLogEntry.BuyTrafficRequest => Some(n)
-        case n: TxLogEntry.Notification => Some(n)
-        case n: TxLogEntry.Unknown => Some(n)
+        case _: BalanceChangeTxLogEntry => None
+        case n: TransferOfferTxLogEntry => Some(n)
+        case n: BuyTrafficRequestTxLogEntry => Some(n)
+        case n: NotificationTxLogEntry => Some(n)
+        case n: UnknownTxLogEntry => Some(n)
+        case n => throw new RuntimeException(s"Unknown TxLogEntry type $n")
       }
 
       State(
@@ -857,12 +884,12 @@ object UserWalletTxLogParser {
         tx: TransactionTreeV2,
         event: TreeEvent,
         owner: String,
-        transactionSubtype: TxLogEntry.BalanceChange.BalanceChangeTransactionSubtype,
+        transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
-      val newEntry = TxLogEntry.BalanceChange(
+      val newEntry = BalanceChangeTxLogEntry(
         eventId = event.getEventId,
-        transactionSubtype = transactionSubtype,
-        date = tx.getEffectiveAt,
+        subtype = Some(transactionSubtype.toProto),
+        date = Some(tx.getEffectiveAt),
         amount = BigDecimal(0),
         receiver = owner,
         coinPrice = BigDecimal(0),
@@ -887,9 +914,11 @@ object UserWalletTxLogParser {
       }
       fromTransferOfferOperation(
         transferOffer.trackingId,
-        TxLogEntry.TransferOfferStatus.Created(
-          new transferCodegen.TransferOffer.ContractId(offerCid),
-          tx.getUpdateId,
+        TransferOfferTxLogEntry.Status.Created(
+          TransferOfferStatusCreated(
+            offerCid,
+            tx.getUpdateId,
+          )
         ),
         transferOffer.sender,
         transferOffer.receiver,
@@ -913,9 +942,11 @@ object UserWalletTxLogParser {
         }
       fromTransferOfferOperation(
         acceptedTransferOffer.trackingId,
-        TxLogEntry.TransferOfferStatus.Accepted(
-          new transferCodegen.AcceptedTransferOffer.ContractId(acceptedCid),
-          tx.getUpdateId,
+        TransferOfferTxLogEntry.Status.Accepted(
+          TransferOfferStatusAccepted(
+            acceptedCid,
+            tx.getUpdateId,
+          )
         ),
         acceptedTransferOffer.sender,
         acceptedTransferOffer.receiver,
@@ -923,7 +954,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransferOfferFailure(
-        failureReason: TxLogEntry.TransferOfferStatus.Failed,
+        failureReason: TransferOfferTxLogEntry.Status,
         node: ExerciseNode[?, transferCodegen.TransferOfferTrackingInfo],
     ): State = {
       val trackingInfo = node.result.value
@@ -942,7 +973,7 @@ object UserWalletTxLogParser {
       val trackingInfo = node.result.value._1._2
       val receiverCoinContractId = node.result.value._1._1.createdCoins.asScala.toList match {
         case (coin: cc.coinrules.createdcoin.TransferResultCoin) :: Nil =>
-          coin.contractIdValue
+          coin.contractIdValue.contractId
         case x =>
           throw new RuntimeException(
             s"Expected createdCoins to contain a single TransferResultCoin, but was $x"
@@ -950,9 +981,11 @@ object UserWalletTxLogParser {
       }
       fromTransferOfferOperation(
         trackingInfo.trackingId,
-        TxLogEntry.TransferOfferStatus.Completed(
-          receiverCoinContractId,
-          tx.getUpdateId,
+        TransferOfferTxLogEntry.Status.Completed(
+          TransferOfferStatusCompleted(
+            receiverCoinContractId,
+            tx.getUpdateId,
+          )
         ),
         trackingInfo.sender,
         trackingInfo.receiver,
@@ -961,15 +994,15 @@ object UserWalletTxLogParser {
 
     private def fromTransferOfferOperation(
         trackingId: String,
-        status: TxLogEntry.TransferOfferStatus,
+        status: TransferOfferTxLogEntry.Status,
         sender: String,
         receiver: String,
     ) = {
-      val newEntry = TxLogEntry.TransferOffer(
+      val newEntry = TransferOfferTxLogEntry(
         trackingId = trackingId,
-        status,
-        sender,
-        receiver,
+        status = status,
+        sender = sender,
+        receiver = receiver,
       )
       State(entries = immutable.Queue(newEntry))
     }
@@ -978,14 +1011,14 @@ object UserWalletTxLogParser {
         tx: TransactionTreeV2,
         event: TreeEvent,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
-        transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype,
+        transactionSubtype: TransferTransactionSubtype,
     ): State = {
-      val newEntry = TxLogEntry.Transfer(
+      val newEntry = TransferTxLogEntry(
         eventId = event.getEventId,
-        transactionSubtype = transactionSubtype,
-        date = tx.getEffectiveAt,
+        subtype = Some(transactionSubtype.toProto),
+        date = Some(tx.getEffectiveAt),
         provider = node.argument.value.transfer.provider,
-        sender = parseSender(node.argument.value, node.result.value),
+        sender = Some(parseSender(node.argument.value, node.result.value)),
         receivers = parseReceivers(node.argument.value, node.result.value),
         senderHoldingFees = node.result.value.summary.holdingFees,
         coinPrice = node.result.value.summary.coinPrice,
@@ -1014,7 +1047,7 @@ object UserWalletTxLogParser {
       }
       fromBuyTrafficRequestOperation(
         buyTrafficRequest.trackingId,
-        TxLogEntry.BuyTrafficRequestStatus.Created,
+        BuyTrafficRequestTxLogEntry.Status.Created(BuyTrafficRequestStatusCreated()),
         buyTrafficRequest.endUserParty,
       )
     }
@@ -1026,15 +1059,17 @@ object UserWalletTxLogParser {
       val trackingInfo = node.result.value._1._2
       fromBuyTrafficRequestOperation(
         trackingInfo.trackingId,
-        TxLogEntry.BuyTrafficRequestStatus.Completed(
-          tx.getUpdateId
+        BuyTrafficRequestTxLogEntry.Status.Completed(
+          BuyTrafficRequestStatusCompleted(
+            tx.getUpdateId
+          )
         ),
         trackingInfo.endUserParty,
       )
     }
 
     def fromBuyTrafficRequestFailure(
-        failureReason: TxLogEntry.BuyTrafficRequestStatus.Failed,
+        failureReason: BuyTrafficRequestTxLogEntry.Status,
         node: ExerciseNode[?, trafficRequestCodegen.BuyTrafficRequestTrackingInfo],
     ): State = {
       val trackingInfo = node.result.value
@@ -1047,13 +1082,13 @@ object UserWalletTxLogParser {
 
     private def fromBuyTrafficRequestOperation(
         trackingId: String,
-        status: TxLogEntry.BuyTrafficRequestStatus,
+        status: BuyTrafficRequestTxLogEntry.Status,
         buyer: String,
     ) = {
-      val newEntry = TxLogEntry.BuyTrafficRequest(
+      val newEntry = BuyTrafficRequestTxLogEntry(
         trackingId = trackingId,
-        status,
-        buyer,
+        status = status,
+        buyer = buyer,
       )
       State(entries = immutable.Queue(newEntry))
     }
@@ -1066,18 +1101,18 @@ object UserWalletTxLogParser {
       val sender = node.argument.value.provider
       // Hack to grab the SVC party-id from the balance changes, which list both sender and the SVC
       val receivers = node.result.value.summary.balanceChanges.keySet().asScala.toSeq.collect {
-        case party if party != sender => (party, BigDecimal(0.0))
+        case party if party != sender => PartyAndAmount(party, BigDecimal(0.0))
       }
       val summary = node.result.value.summary
       val netSenderInput = summary.inputCoinAmount - summary.holdingFees
       val senderBalanceChange = BigDecimal(summary.senderChangeAmount) - netSenderInput
 
-      val newEntry = TxLogEntry.Transfer(
+      val newEntry = TransferTxLogEntry(
         eventId = event.getEventId,
-        transactionSubtype = TxLogEntry.Transfer.ExtraTrafficPurchase,
-        date = tx.getEffectiveAt,
+        subtype = Some(TransferTransactionSubtype.ExtraTrafficPurchase.toProto),
+        date = Some(tx.getEffectiveAt),
         provider = sender,
-        sender = (sender, senderBalanceChange),
+        sender = Some(PartyAndAmount(sender, senderBalanceChange)),
         receivers = receivers,
         senderHoldingFees = node.result.value.summary.holdingFees,
         coinPrice = node.result.value.summary.coinPrice,
@@ -1094,7 +1129,7 @@ object UserWalletTxLogParser {
         tx: TransactionTreeV2,
         event: ExercisedEvent,
         stateFromPaymentCollection: State,
-        transactionSubtype: TxLogEntry.Transfer.TransferTransactionSubtype,
+        transactionSubtype: TransferTransactionSubtype,
     ): State = {
       // second child event is burning of transferred coin by SVC
       val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
@@ -1115,7 +1150,7 @@ object UserWalletTxLogParser {
         tx: TransactionTreeV2,
         event: TreeEvent,
         ccsum: CoinCreateSummary[T],
-        transactionSubtype: TxLogEntry.BalanceChange.BalanceChangeTransactionSubtype,
+        transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
       // Note: CoinCreateSummary only contains the contract id of the new coin, but not the coin payload.
       // However, the new coin is always created in the same transaction.
@@ -1123,10 +1158,10 @@ object UserWalletTxLogParser {
       // we locate the corresponding coin create event in the transaction tree.
       val coinCid = ccsum.coin.contractId
       val coin = getCoinCreateEvent(tx, coinCid)
-      val newEntry = TxLogEntry.BalanceChange(
+      val newEntry = BalanceChangeTxLogEntry(
         eventId = event.getEventId,
-        transactionSubtype = transactionSubtype,
-        date = tx.getEffectiveAt,
+        subtype = Some(transactionSubtype.toProto),
+        date = Some(tx.getEffectiveAt),
         amount = coin.amount.initialAmount,
         receiver = coin.owner,
         coinPrice = ccsum.coinPrice,
@@ -1139,13 +1174,13 @@ object UserWalletTxLogParser {
     def fromNotification(
         tx: TransactionTreeV2,
         event: TreeEvent,
-        transactionSubtype: TxLogEntry.Notification.NotificationTransactionSubtype,
+        transactionSubtype: NotificationTransactionSubtype,
         details: String,
     ): State = {
-      val newEntry = TxLogEntry.Notification(
+      val newEntry = NotificationTxLogEntry(
         eventId = event.getEventId,
-        transactionSubtype = transactionSubtype,
-        date = tx.getEffectiveAt,
+        subtype = Some(transactionSubtype.toProto),
+        date = Some(tx.getEffectiveAt),
         details = details,
       )
       State(
@@ -1160,15 +1195,15 @@ object UserWalletTxLogParser {
       (
         ac.domainId,
         Some(new codegen.ContractId(ac.createdEvent.getContractId)),
-        TxLogEntry.BalanceChange(
+        BalanceChangeTxLogEntry(
           eventId = ac.createdEvent.getEventId,
-          transactionSubtype = TxLogEntry.BalanceChange.Mint,
+          subtype = Some(BalanceChangeTransactionSubtype.Mint.toProto),
           receiver = activeCoin.payload.owner,
           amount = activeCoin.payload.amount.initialAmount,
           // We know the round in which the coin was created (activeCoin.payload.amount.createdAt),
           // but we don't know when that round was open (let alone when exactly the coin was created),
           // and what the coin price was at that time.
-          date = Instant.EPOCH,
+          date = Some(Instant.EPOCH),
           coinPrice = BigDecimal(1),
         ),
       )
@@ -1178,13 +1213,13 @@ object UserWalletTxLogParser {
         burntCoin: CoinCreate.T
     ) = State(entries =
       immutable.Queue(
-        TxLogEntry.BalanceChange(
+        BalanceChangeTxLogEntry(
           receiver = burntCoin.owner,
           amount = -burntCoin.amount.initialAmount,
           // all values below don't matter - they will be removed by mergeBalanceChangesIntoTransfer
           eventId = "",
-          transactionSubtype = TxLogEntry.BalanceChange.Tap,
-          date = Instant.now(),
+          subtype = Some(BalanceChangeTransactionSubtype.Tap.toProto),
+          date = Some(Instant.now()),
           coinPrice = BigDecimal(0),
         )
       )
@@ -1206,7 +1241,7 @@ object UserWalletTxLogParser {
   private def parseSender(
       arg: cc.coinrules.CoinRules_Transfer,
       res: cc.coinrules.TransferResult,
-  ): (String, BigDecimal) = {
+  ): PartyAndAmount = {
     val sender = arg.transfer.sender
 
     // Input coins, excluding holding fees
@@ -1222,14 +1257,17 @@ object UserWalletTxLogParser {
     val netChange = BigDecimal(res.summary.senderChangeAmount)
 
     // Net change in the balance of the senders
-    sender -> (netOutput + netChange - netInput)
+    PartyAndAmount(
+      party = sender,
+      amount = netOutput + netChange - netInput,
+    )
   }
 
   /** Returns a list of receivers and their net balance changes */
   private def parseReceivers(
       arg: cc.coinrules.CoinRules_Transfer,
       res: cc.coinrules.TransferResult,
-  ): Seq[(String, BigDecimal)] = {
+  ): Seq[PartyAndAmount] = {
     def netBalanceChange(o: OutputWithFees) =
       if (o.output.lock.isEmpty) {
         o.output.amount - o.receiverFee
@@ -1246,6 +1284,7 @@ object UserWalletTxLogParser {
       .foldLeft(immutable.ListMap.empty[String, BigDecimal])((acc, receiver) =>
         acc.updatedWith(receiver._1)(prev => Some(prev.fold(receiver._2)(_ + receiver._2)))
       )
+      .map(o => PartyAndAmount(o._1, o._2))
       .toList
   }
 

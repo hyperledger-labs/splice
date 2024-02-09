@@ -11,8 +11,9 @@ import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
+import com.daml.network.scan.store.TxLogEntry.EntryType
 import com.daml.network.scan.store.db.ScanTables.txLogTableName
-import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
+import com.daml.network.scan.store.{OpenMiningRoundTxLogEntry, ScanStore, SortOrder, TxLogEntry}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
@@ -223,13 +224,13 @@ class DbScanStore(
       limit: PageLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[TxLogEntry.TransactionLogEntry]] =
+  ): Future[Seq[TxLogEntry.TransactionTxLogEntry]] =
     waitUntilAcsIngested {
       val entryTypeCondition = sql"""entry_type in (
-                  ${TxLogEntry.TransferLogEntry.dbType},
-                  ${TxLogEntry.TapLogEntry.dbType},
-                  ${TxLogEntry.MintLogEntry.dbType},
-                  ${TxLogEntry.SvRewardCollectedLogEntry.dbType}
+                  ${EntryType.TransferTxLogEntry},
+                  ${EntryType.TapTxLogEntry},
+                  ${EntryType.MintTxLogEntry},
+                  ${EntryType.SvRewardCollectedTxLogEntry}
                 )"""
       // Literal sort order since Postgres complains when trying to bind it to a parameter
       val (compareEntryNumber, orderLimit) = sortOrder match {
@@ -265,7 +266,7 @@ class DbScanStore(
           ),
           "listTransactions",
         )
-        entries = rows.map(txLogEntryFromRow[TxLogEntry.TransactionLogEntry](txLogConfig))
+        entries = rows.map(txLogEntryFromRow[TxLogEntry.TransactionTxLogEntry](txLogConfig))
       } yield entries
 
     }
@@ -319,7 +320,7 @@ class DbScanStore(
 
   override def getCoinConfigForRound(round: Long)(implicit
       tc: TraceContext
-  ): Future[TxLogEntry.OpenMiningRoundLogEntry] = waitUntilAcsIngested {
+  ): Future[OpenMiningRoundTxLogEntry] = waitUntilAcsIngested {
     for {
       row <- storage
         .querySingle(
@@ -327,7 +328,7 @@ class DbScanStore(
             txLogTableName,
             storeId,
             where = sql"""
-                   entry_type = ${TxLogEntry.OpenMiningRoundLogEntry.dbType} and
+                   entry_type = ${EntryType.OpenMiningRoundTxLogEntry} and
                    round = $round
               """,
             orderLimit = sql"order by entry_number desc limit 1",
@@ -335,9 +336,9 @@ class DbScanStore(
           "getCoinConfigForRound",
         )
         .value
-      entry = row.map(txLogEntryFromRow[TxLogEntry.OpenMiningRoundLogEntry](txLogConfig))
+      entry = row.map(txLogEntryFromRow[OpenMiningRoundTxLogEntry](txLogConfig))
       result <- entry match {
-        case Some(omr: TxLogEntry.OpenMiningRoundLogEntry) =>
+        case Some(omr: OpenMiningRoundTxLogEntry) =>
           Future.successful(omr)
         case None =>
           Future.failed(txLogNotFound())

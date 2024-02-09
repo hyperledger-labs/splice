@@ -11,7 +11,17 @@ import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
-import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
+import com.daml.network.scan.store.{
+  AppRewardTxLogEntry,
+  BalanceChangeTxLogEntry,
+  ClosedMiningRoundTxLogEntry,
+  ExtraTrafficPurchaseTxLogEntry,
+  OpenMiningRoundTxLogEntry,
+  ScanStore,
+  SortOrder,
+  TxLogEntry,
+  ValidatorRewardTxLogEntry,
+}
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.store.{
   HardLimit,
@@ -31,6 +41,7 @@ import scala.concurrent.*
 import java.time.Instant
 import com.daml.network.scan.store.SortOrder.Ascending
 import com.daml.network.scan.store.SortOrder.Descending
+import com.daml.network.scan.store.TxLogEntry.RewardTxLogEntry
 
 class InMemoryScanStore(
     override val serviceUserPrimaryParty: PartyId,
@@ -77,8 +88,7 @@ class InMemoryScanStore(
     for {
       totalCoinBalance <- multiDomainAcsStore
         .collectTxLogEntries {
-          case balanceChange: TxLogEntry.BalanceChangeLogEntry
-              if balanceChange.round <= asOfEndOfRound =>
+          case balanceChange: BalanceChangeTxLogEntry if balanceChange.round <= asOfEndOfRound =>
             balanceChange
         }
         .map(txLogEntries =>
@@ -94,8 +104,7 @@ class InMemoryScanStore(
   ): Future[BigDecimal] = for {
     txLogEntries <- ensureAggregated(asOfEndOfRound) {
       multiDomainAcsStore.collectTxLogEntries(Function unlift {
-        case balanceChange: TxLogEntry.BalanceChangeLogEntry
-            if balanceChange.round <= asOfEndOfRound =>
+        case balanceChange: BalanceChangeTxLogEntry if balanceChange.round <= asOfEndOfRound =>
           balanceChange.partyBalanceChanges get partyId
         case _ => None
       })
@@ -107,22 +116,22 @@ class InMemoryScanStore(
 
   override def getCoinConfigForRound(
       round: Long
-  )(implicit tc: TraceContext): Future[TxLogEntry.OpenMiningRoundLogEntry] = {
+  )(implicit tc: TraceContext): Future[OpenMiningRoundTxLogEntry] = {
     for {
       entry <- multiDomainAcsStore.getLatestTxLogEntry {
-        case roundConfig: TxLogEntry.OpenMiningRoundLogEntry =>
+        case roundConfig: OpenMiningRoundTxLogEntry =>
           roundConfig.round == round
         case _ => false
       }
     } yield entry match {
-      case r: TxLogEntry.OpenMiningRoundLogEntry => r
+      case r: OpenMiningRoundTxLogEntry => r
       case _ =>
         throw Status.INTERNAL.withDescription("Unexpected log entry type").asRuntimeException()
     }
   }
 
   override def getRoundOfLatestData()(implicit tc: TraceContext): Future[(Long, Instant)] = {
-    type Closed = TxLogEntry.ClosedMiningRoundLogEntry
+    type Closed = ClosedMiningRoundTxLogEntry
 
     multiDomainAcsStore
       .getLatestTxLogEntry {
@@ -130,7 +139,7 @@ class InMemoryScanStore(
           true
         case _ => false
       }
-      .collect { case r: Closed => r.round -> r.effectiveAt }
+      .collect { case r: Closed => r.round -> r.effectiveAt.getOrElse(throw txMissingField()) }
       .recoverWith { _ =>
         Future.failed(roundNotAggregated())
       }
@@ -147,7 +156,7 @@ class InMemoryScanStore(
     for {
       ret <- multiDomainAcsStore
         .collectTxLogEntries {
-          case reward: TxLogEntry.RewardLogEntry if round.fold(true)(_ == reward.round) =>
+          case reward: RewardTxLogEntry if round.fold(true)(_ == reward.round) =>
             reward
         }
         .map(rewards => rewards.foldLeft(BigDecimal.valueOf(0.0))((sum, r) => sum + r.amount))
@@ -156,13 +165,12 @@ class InMemoryScanStore(
 
   private def sumRewardsCollectedInRound(
       round: Long,
-      rewardTypeFilter: (TxLogEntry.RewardLogEntry) => Boolean,
+      rewardTypeFilter: (RewardTxLogEntry) => Boolean,
   ) =
     for {
       ret <- multiDomainAcsStore
         .collectTxLogEntries {
-          case reward: TxLogEntry.RewardLogEntry
-              if reward.round == round && rewardTypeFilter(reward) =>
+          case reward: RewardTxLogEntry if reward.round == round && rewardTypeFilter(reward) =>
             reward
         }
         .map(rewards =>
@@ -173,7 +181,7 @@ class InMemoryScanStore(
   private def getTopRewardRecipients(
       asOfEndOfRound: Long,
       limit: Int,
-      rewardTypeFilter: (TxLogEntry.RewardLogEntry) => Boolean,
+      rewardTypeFilter: (RewardTxLogEntry) => Boolean,
   )(implicit
       tc: TraceContext
   ): Future[Seq[(PartyId, BigDecimal)]] =
@@ -196,7 +204,7 @@ class InMemoryScanStore(
       asOfEndOfRound,
       limit,
       (_ match {
-        case _: TxLogEntry.AppRewardLogEntry => true
+        case _: AppRewardTxLogEntry => true
         case _ => false
       }),
     )
@@ -208,7 +216,7 @@ class InMemoryScanStore(
       asOfEndOfRound,
       limit,
       (_ match {
-        case _: TxLogEntry.ValidatorRewardLogEntry => true
+        case _: ValidatorRewardTxLogEntry => true
         case _ => false
       }),
     )
@@ -248,23 +256,23 @@ class InMemoryScanStore(
       limit: PageLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[TxLogEntry.TransactionLogEntry]] = Future.successful {
+  ): Future[Seq[TxLogEntry.TransactionTxLogEntry]] = Future.successful {
     val fromEnd = multiDomainAcsStore.getQueue.view
     val fromBeginning = multiDomainAcsStore.getQueue.view.reverse
     val entries = sortOrder match {
       case Descending =>
         pageEndEventId.fold(
-          TxLogStore.firstPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromEnd, limit)
+          TxLogStore.firstPage[TxLogEntry, TxLogEntry.TransactionTxLogEntry](fromEnd, limit)
         )(endId =>
-          TxLogStore.nextPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromEnd, endId, limit)(
+          TxLogStore.nextPage[TxLogEntry, TxLogEntry.TransactionTxLogEntry](fromEnd, endId, limit)(
             _.eventId
           )
         )
       case Ascending =>
         pageEndEventId.fold(
-          TxLogStore.firstPage[TxLogEntry, TxLogEntry.TransactionLogEntry](fromBeginning, limit)
+          TxLogStore.firstPage[TxLogEntry, TxLogEntry.TransactionTxLogEntry](fromBeginning, limit)
         )(endId =>
-          TxLogStore.nextPage[TxLogEntry, TxLogEntry.TransactionLogEntry](
+          TxLogStore.nextPage[TxLogEntry, TxLogEntry.TransactionTxLogEntry](
             fromBeginning,
             endId,
             limit,
@@ -280,7 +288,7 @@ class InMemoryScanStore(
   ): Future[Map[PartyId, ValidatorPurchasedTraffic]] =
     multiDomainAcsStore
       .collectTxLogEntries {
-        case indexRecord: TxLogEntry.ExtraTrafficPurchaseLogEntry if indexRecord.round == round =>
+        case indexRecord: ExtraTrafficPurchaseTxLogEntry if indexRecord.round == round =>
           indexRecord
       }
       .map(

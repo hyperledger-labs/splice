@@ -8,7 +8,12 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStore, Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.Contract
-import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
+import com.daml.network.wallet.store.{
+  BuyTrafficRequestTxLogEntry,
+  TransferOfferTxLogEntry,
+  TxLogEntry,
+  UserWalletStore,
+}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -161,13 +166,13 @@ class InMemoryUserWalletStore(
       trackingId: String
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[TxLogEntry.TransferOffer]]] = {
+  ): Future[QueryResult[Option[TransferOfferTxLogEntry]]] = {
     for {
       (offset, entryOpt) <- multiDomainAcsStore.collectLatestTxLogEntryWithOffset {
-        case to: TxLogEntry.TransferOffer if to.trackingId == trackingId => to
+        case to: TransferOfferTxLogEntry if to.trackingId == trackingId => to
       }
     } yield entryOpt match {
-      case Some(offer: TxLogEntry.TransferOffer) =>
+      case Some(offer: TransferOfferTxLogEntry) =>
         QueryResult(offset, Some(offer))
       case None =>
         QueryResult(offset, None)
@@ -179,13 +184,13 @@ class InMemoryUserWalletStore(
       trackingId: String
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[TxLogEntry.BuyTrafficRequest]]] = {
+  ): Future[QueryResult[Option[BuyTrafficRequestTxLogEntry]]] = {
     for {
       (offset, entryOpt) <- multiDomainAcsStore.collectLatestTxLogEntryWithOffset {
-        case btr: TxLogEntry.BuyTrafficRequest if btr.trackingId == trackingId => btr
+        case btr: BuyTrafficRequestTxLogEntry if btr.trackingId == trackingId => btr
       }
     } yield entryOpt match {
-      case Some(request: TxLogEntry.BuyTrafficRequest) =>
+      case Some(request: BuyTrafficRequestTxLogEntry) =>
         QueryResult(offset, Some(request))
       case None =>
         QueryResult(offset, None)

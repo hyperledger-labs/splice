@@ -17,7 +17,7 @@ import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
-import com.daml.network.scan.store.ScanStore
+import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{Codec, Contract, ContractWithState}
 import com.daml.network.util.PrettyInstances.*
@@ -43,7 +43,6 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
   SvRewardCollected,
   Transfer,
 }
-import com.daml.network.scan.store.SortOrder
 import com.daml.network.store.PageLimit
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
@@ -320,21 +319,24 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getCoinConfigForRound") { _ => _ =>
       store
         .getCoinConfigForRound(round)
-        .map(cfg =>
+        .map(cfg => {
+          val transferFee = cfg.transferFee.getOrElse(throw new RuntimeException("No transfer fee"))
           v0.ScanResource.GetCoinConfigForRoundResponse.OK(
             definitions.GetCoinConfigForRoundResponse(
               Codec.encode(cfg.coinCreateFee),
               Codec.encode(cfg.holdingFee),
               Codec.encode(cfg.lockHolderFee),
               definitions.SteppedRate(
-                Codec.encode(cfg.initialTransferFee),
-                cfg.transferFeeSteps
-                  .map((step) => definitions.RateStep(Codec.encode(step._1), Codec.encode(step._2)))
+                Codec.encode(transferFee.initialRate),
+                transferFee.steps
+                  .map((step) =>
+                    definitions.RateStep(Codec.encode(step.from), Codec.encode(step.rate))
+                  )
                   .toVector,
               ),
             )
           )
-        )
+        })
         .transform(HttpErrorHandler.onGrpcNotFound(s"Round ${round} not found"))
     }
   }
@@ -611,7 +613,7 @@ class HttpScanHandler(
           PageLimit.tryCreate(request.pageSize.intValue()),
         )
       } yield definitions.TransactionHistoryResponse(
-        txs.map(_.toResponseItem).toVector
+        txs.map(TxLogEntry.Http.toResponseItem).toVector
       )
     }
   }
@@ -632,7 +634,7 @@ class HttpScanHandler(
         )
       } yield definitions.ListActivityResponse(
         transactions.map { tx =>
-          val txItem = tx.toResponseItem
+          val txItem = TxLogEntry.Http.toResponseItem(tx)
           import definitions.ListActivityResponseItem.*
           definitions.ListActivityResponseItem(
             activityType = txItem.transactionType match {

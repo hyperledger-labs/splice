@@ -1,16 +1,15 @@
 package com.daml.network.scan.store.db
 
 import com.daml.network.store.db.AcsJdbcTypes
-import com.daml.network.scan.store.TxLogEntry
 import com.daml.network.util.QualifiedName
 import com.daml.ledger.javaapi.data.codegen.ContractId
-
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
+
 import scala.concurrent.{ExecutionContext, Future}
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -19,6 +18,7 @@ import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import ScanAggregator.*
+import com.daml.network.scan.store.TxLogEntry.EntryType
 
 final class ScanAggregator(
     storage: DbStorage,
@@ -173,7 +173,7 @@ final class ScanAggregator(
                      acs_contract_id
             from     scan_txlog_store
             where    store_id = $storeId
-            and      entry_type = ${TxLogEntry.ClosedMiningRoundLogEntry.dbType}
+            and      entry_type = ${EntryType.ClosedMiningRoundTxLogEntry}
             and      round > $lastAggregatedRound
             order by round desc
           """.as[(Long, Option[ContractId[Any]])],
@@ -273,7 +273,7 @@ final class ScanAggregator(
         where     store_id = $storeId
         and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
-        and       entry_type = ${TxLogEntry.AppRewardLogEntry.dbType}
+        and       entry_type = ${EntryType.AppRewardTxLogEntry}
         group by  round
         union all
         select    round,
@@ -286,7 +286,7 @@ final class ScanAggregator(
         where     store_id = $storeId
         and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
-        and       entry_type = ${TxLogEntry.ValidatorRewardLogEntry.dbType}
+        and       entry_type = ${EntryType.ValidatorRewardTxLogEntry}
         group by  round
         union all
         select    round,
@@ -299,7 +299,7 @@ final class ScanAggregator(
         where     store_id = $storeId
         and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
-        and       entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
+        and       entry_type = ${EntryType.BalanceChangeTxLogEntry}
         group by  round
         union all
         select    round,
@@ -312,7 +312,7 @@ final class ScanAggregator(
         where     store_id = $storeId
         and       round > ${previousRoundTotals.closedRound}
         and       round <= $lastClosedRound
-        and       entry_type = ${TxLogEntry.ClosedMiningRoundLogEntry.dbType}
+        and       entry_type = ${EntryType.ClosedMiningRoundTxLogEntry}
         group by  round
       ),
       new_totals as(
@@ -414,7 +414,7 @@ final class ScanAggregator(
         where     store_id = $storeId
         and       round > (select last_closed_round from previously_aggregated)
         and       round <= $lastClosedRound
-        and       entry_type = ${TxLogEntry.AppRewardLogEntry.dbType}
+        and       entry_type = ${EntryType.AppRewardTxLogEntry}
         and       rewarded_party is not null
         group by  round,
                   rewarded_party
@@ -432,7 +432,7 @@ final class ScanAggregator(
         where     store_id = $storeId
         and       round > (select last_closed_round from previously_aggregated)
         and       round <= $lastClosedRound
-        and       entry_type = ${TxLogEntry.ValidatorRewardLogEntry.dbType}
+        and       entry_type = ${EntryType.ValidatorRewardTxLogEntry}
         and       rewarded_party is not null
         group by  round,
                   rewarded_party
@@ -450,7 +450,7 @@ final class ScanAggregator(
         where     store_id = $storeId
         and       round > (select last_closed_round from previously_aggregated)
         and       round <= $lastClosedRound
-        and       entry_type = ${TxLogEntry.ExtraTrafficPurchaseLogEntry.dbType}
+        and       entry_type = ${EntryType.ExtraTrafficPurchaseTxLogEntry}
         and       extra_traffic_validator is not null
         group by  round,
                   extra_traffic_validator
@@ -469,7 +469,7 @@ final class ScanAggregator(
         where     store_id = $storeId
         and       round > (select last_closed_round from previously_aggregated)
         and       round <= $lastClosedRound
-        and       entry_type = ${TxLogEntry.BalanceChangeLogEntry.dbType}
+        and       entry_type = ${EntryType.BalanceChangeTxLogEntry}
         group by  round,
                   party
       ),
