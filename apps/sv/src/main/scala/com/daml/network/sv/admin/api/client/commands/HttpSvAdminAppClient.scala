@@ -27,7 +27,7 @@ import com.daml.network.http.v0.sv_admin.{
   TriggerDomainMigrationDumpResponse,
 }
 import com.daml.network.http.v0.{definitions, sv_admin as http}
-import com.daml.network.sv.{DomainMigrationDump, DomainNodeIdentitiesDump}
+import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -530,7 +530,7 @@ object HttpSvAdminAppClient {
   case class GetDomainNodeIdentitiesDump()
       extends BaseCommand[
         http.GetDomainNodeIdentitiesDumpResponse,
-        DomainNodeIdentitiesDump,
+        DomainNodeIdentities,
       ] {
     override def submitRequest(
         client: Client,
@@ -544,7 +544,7 @@ object HttpSvAdminAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.GetDomainNodeIdentitiesDumpResponse.OK(response) =>
-      DomainNodeIdentitiesDump.fromHttp(response)
+      DomainNodeIdentities.fromHttp(response.identities)
     }
   }
 

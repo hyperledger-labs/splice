@@ -1149,16 +1149,48 @@ components:
     DomainNodeIdentities:
       type: object
       required:
+        - sv_party_id
+        - svc_party_id
+        - domain_alias
+        - domain_id
         - participant
         - sequencer
         - mediator
       properties:
+        sv_party_id:
+          type: string
+        svc_party_id:
+          type: string
+        domain_alias:
+          type: string
+        domain_id:
+          type: string
         participant:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
         sequencer:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
         mediator:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
+
+    DomainDataSnapshot:
+      type: object
+      required:
+        - topology_snapshot
+        - acs_snapshot
+        - dars
+      properties:
+        topology_snapshot:
+          description: |
+            base64 encoded string of topology snapshot
+          type: string
+        acs_snapshot:
+          description: |
+            base64 encoded string of acs snapshot
+          type: string
+        dars:
+          type: array
+          items:
+            $ref: "#/components/schemas/Dar"
 
     Dar:
       type: object
@@ -1186,40 +1218,16 @@ components:
       type: object
       required:
         - migration_id
-        - sv_party_id
-        - svc_party_id
-        - domain_alias
-        - domain_id
         - identities
-        - topology_snapshot
-        - acs_snapshot
-        - dars
+        - data_snapshot
       properties:
         migration_id:
           type: integer
           format: int64
-        sv_party_id:
-          type: string
-        svc_party_id:
-          type: string
-        domain_alias:
-          type: string
-        domain_id:
-          type: string
         identities:
           $ref: "#/components/schemas/DomainNodeIdentities"
-        topology_snapshot:
-          description: |
-            base64 encoded string of topology snapshot
-          type: string
-        acs_snapshot:
-          description: |
-            base64 encoded string of acs snapshot
-          type: string
-        dars:
-          type: array
-          items:
-            $ref: "#/components/schemas/Dar"
+        data_snapshot:
+          $ref: "#/components/schemas/DomainDataSnapshot"
 
     GetDomainNodeIdentitiesDumpResponse:
       type: object

@@ -14,11 +14,12 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
-import com.daml.network.sv.{DomainNodeIdentitiesDump, SvApp, SvAppBootstrap}
+import com.daml.network.sv.{SvApp, SvAppBootstrap}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.automation.singlesv.RestartLeaderBasedAutomationTrigger
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
+import com.daml.network.sv.migration.DomainNodeIdentities
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.health.admin.data.NodeStatus
@@ -134,7 +135,7 @@ abstract class SvAppReference(
     }
 
   @Help.Summary("Get identities of all domain node components")
-  def getDomainNodeIdentitiesDump(): DomainNodeIdentitiesDump =
+  def getDomainNodeIdentitiesDump(): DomainNodeIdentities =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetDomainNodeIdentitiesDump())
     }

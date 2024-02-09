@@ -1,6 +1,7 @@
 package com.daml.network.sv.admin.http
 
 import cats.implicits.catsSyntaxApplicativeId
+import com.daml.network.http.v0.definitions as http
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
@@ -16,9 +17,10 @@ import com.daml.network.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
 import com.daml.network.store.db.AcsJdbcTypes
-import com.daml.network.sv.{DomainMigrationDump, DomainNodeIdentitiesDump, LocalDomainNode, SvApp}
+import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
+import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -586,16 +588,18 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.getDomainNodeIdentitiesDump") { implicit tc => _ =>
       localDomainNode match {
         case Some(domainNode) =>
-          DomainNodeIdentitiesDump
-            .getDomainNodeIdentitiesDump(
+          DomainNodeIdentities
+            .getDomainNodeIdentities(
               participantAdminConnection,
               domainNode,
+              svcStore,
+              config.domains.global.alias,
               clock,
               loggerFactory,
             )
             .map { response =>
-              v0.SvAdminResource.GetDomainNodeIdentitiesDumpResponse.OK(
-                DomainNodeIdentitiesDump(response).toHttp
+              SvAdminResource.GetDomainNodeIdentitiesDumpResponse.OK(
+                http.GetDomainNodeIdentitiesDumpResponse(response.toHttp())
               )
             }
         case None =>

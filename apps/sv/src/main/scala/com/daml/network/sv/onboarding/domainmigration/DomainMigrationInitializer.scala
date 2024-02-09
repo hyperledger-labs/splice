@@ -10,10 +10,11 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.setup.NodeInitializer
-import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode}
+import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
+import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
 import com.daml.network.sv.onboarding.{NodeInitializerUtil, SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
   DomainNodeInitializer,
@@ -21,7 +22,6 @@ import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
   loadDomainMigrationDump,
 }
 import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
-import com.daml.network.sv.DomainNodeIdentitiesDump.DomainNodeIdentities
 import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -95,7 +95,8 @@ class DomainMigrationInitializer(
           "Migration id from the dump does not match the configured migration id in ths SV. Please check if the SV app is configured with the correct migration id"
         )
         .asRuntimeException()
-    val storeKey = SvStore.Key(migrationDump.svPartyId, migrationDump.svcPartyId)
+    val storeKey =
+      SvStore.Key(migrationDump.nodeIdentities.svPartyId, migrationDump.nodeIdentities.svcPartyId)
     val svcPartyHosting = newSvcPartyHosting(storeKey)
     for {
       _ <- migrateToNewDomainNode(migrationDump, svcPartyHosting)
@@ -122,7 +123,7 @@ class DomainMigrationInitializer(
       _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(
         svAutomation.connection,
         config,
-        migrationDump.svcPartyId,
+        migrationDump.nodeIdentities.svcPartyId,
       )
       svcAutomation =
         newSvSvcAutomationService(
@@ -148,15 +149,15 @@ class DomainMigrationInitializer(
       svcPartyHosting: SvcPartyHosting,
   ): Future[Unit] = {
     val domainTopologyTransactions = DomainTopologyTransactions(
-      domainMigrationDump.topologySnapshot.result
+      domainMigrationDump.domainDataSnapshot.topologySnapshot.result
     )
-    val domainAlias = domainMigrationDump.domainAlias
+    val domainAlias = domainMigrationDump.nodeIdentities.domainAlias
     def importDarsAndAcs() = {
       for {
         _ <- participantAdminConnection.disconnectFromAllDomains()
         _ = logger.info("Disconnected from all domains")
         // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-        _ <- MonadUtil.sequentialTraverse(domainMigrationDump.dars.map { dar =>
+        _ <- MonadUtil.sequentialTraverse(domainMigrationDump.domainDataSnapshot.dars.map { dar =>
           UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
         }) { dar =>
           participantAdminConnection.uploadDarFileLocally(
@@ -166,7 +167,9 @@ class DomainMigrationInitializer(
         }
         _ = logger.info("uploaded all dars to the participant.")
 
-        _ <- participantAdminConnection.uploadAcsSnapshot(domainMigrationDump.acsSnapshot)
+        _ <- participantAdminConnection.uploadAcsSnapshot(
+          domainMigrationDump.domainDataSnapshot.acsSnapshot
+        )
         _ = logger.info("Acs snapshot is restored")
 
         _ <- participantAdminConnection.reconnectDomain(domainAlias)
@@ -186,7 +189,6 @@ class DomainMigrationInitializer(
     }
     for {
       _ <- initializeDomainNode(
-        domainMigrationDump.domainId,
         domainMigrationDump.nodeIdentities,
         domainTopologyTransactions,
       )
@@ -203,7 +205,7 @@ class DomainMigrationInitializer(
               .ensureDomainRegistered(
                 DomainConnectionConfig(
                   domainAlias,
-                  domainId = Some(domainMigrationDump.domainId),
+                  domainId = Some(domainMigrationDump.nodeIdentities.domainId),
                   sequencerConnections =
                     SequencerConnections.single(localDomainNode.sequencerConnection),
                   initializeFromTrustedDomain = true,
@@ -219,7 +221,7 @@ class DomainMigrationInitializer(
         "participant caught up with the domain state topology",
         participantAdminConnection
           .getDomainParametersState(
-            domainMigrationDump.domainId
+            domainMigrationDump.nodeIdentities.domainId
           )
           .map { domainParameters =>
             if (
@@ -236,14 +238,14 @@ class DomainMigrationInitializer(
       )
       _ <- participantAdminConnection
         .ensureDomainParameters(
-          domainMigrationDump.domainId,
+          domainMigrationDump.nodeIdentities.domainId,
           // TODO(#8761) hard code for now
           _.tryUpdate(maxRatePerParticipant = DynamicDomainParameters.defaultMaxRatePerParticipant),
           signedBy = domainMigrationDump.nodeIdentities.participant.id.uid.namespace.fingerprint,
         )
       _ = logger.info("resumed domain")
       _ <- svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
-        domainMigrationDump.domainId,
+        domainMigrationDump.nodeIdentities.domainId,
         ParticipantId(domainMigrationDump.nodeIdentities.participant.id.uid),
       )
       _ = logger.info(
@@ -254,7 +256,6 @@ class DomainMigrationInitializer(
   }
 
   private def initializeDomainNode(
-      domainId: DomainId,
       nodeIdentities: DomainNodeIdentities,
       domainTopologyTransactions: DomainTopologyTransactions,
   ): Future[Unit] = {
@@ -278,12 +279,12 @@ class DomainMigrationInitializer(
         transactions =>
           localDomainNode.sequencerAdminConnection
             .addTopologyTransactionsAndEnsurePersisted(
-              Some(domainId),
+              Some(nodeIdentities.domainId),
               Seq(transactions.transaction),
             )
       )
       _ <- initializeMediator(
-        domainId,
+        nodeIdentities.domainId,
         domainNodeInitiaizer,
         nodeIdentities.mediator,
       )
@@ -292,10 +293,10 @@ class DomainMigrationInitializer(
         "mediator synced topology",
         for {
           sequencerTopology <- localDomainNode.sequencerAdminConnection.listAllTransactions(
-            Some(TopologyStoreId.DomainStore(domainId))
+            Some(TopologyStoreId.DomainStore(nodeIdentities.domainId))
           )
           mediatorTopology <- localDomainNode.mediatorAdminConnection.listAllTransactions(
-            Some(TopologyStoreId.DomainStore(domainId))
+            Some(TopologyStoreId.DomainStore(nodeIdentities.domainId))
           )
         } yield {
           if (sequencerTopology.size != mediatorTopology.size) {

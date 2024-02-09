@@ -4,7 +4,8 @@ import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
-import com.daml.network.sv.{DomainMigrationDump, LocalDomainNode}
+import com.daml.network.sv.{LocalDomainNode}
+import com.daml.network.sv.migration.DomainMigrationDump
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.BackupDump
 import com.digitalasset.canton.DomainAlias
