@@ -398,6 +398,7 @@ commands:
             if ! cncluster ci_assert_fresh_lock; then
               post_slack_message "The cluster lock on '<< parameters.cluster >>' held by ${slack_mention_text} is too old. \n*Unlocking and resetting cluster.* :reaper: ( <'${CIRCLE_BUILD_URL}'|CI Build> )"
 
+              cncluster prefresh
               cncluster ci_reset_unlock
             elif ! cncluster ci_warn_lock_expiry; then
               post_slack_message "${slack_mention_text}: your lock on '<< parameters.cluster >>' will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*"
