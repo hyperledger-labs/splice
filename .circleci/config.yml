@@ -2087,7 +2087,7 @@ jobs:
       include_sv:
         type: boolean
         default: true
-      include_third_party:
+      include_non_sv_nodes:
         type: boolean
         default: true
       parallelism:
@@ -2119,7 +2119,7 @@ jobs:
                 nodes="sv-1"
               fi
             fi
-            if [[ << parameters.include_third_party >> != false ]]; then
+            if [[ << parameters.include_non_sv_nodes >> != false ]]; then
               nodes="$nodes splitwell validator1"
             fi
             echo $nodes > nodes.txt
@@ -3370,7 +3370,7 @@ workflows:
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
-          include_third_party: false
+          include_non_sv_nodes: false
           context:
             - artifactory
             - canton-network-vpn
@@ -3788,7 +3788,7 @@ workflows:
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchneta"
-          include_third_party: false
+          include_non_sv_nodes: false
           context:
             - artifactory
             - canton-network-vpn
@@ -3969,7 +3969,7 @@ workflows:
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchnetb"
-          include_third_party: false
+          include_non_sv_nodes: false
           context:
             - artifactory
             - canton-network-vpn
@@ -4150,7 +4150,7 @@ workflows:
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchnetc"
-          include_third_party: false
+          include_non_sv_nodes: false
           context:
             - artifactory
             - canton-network-vpn
@@ -4331,7 +4331,7 @@ workflows:
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchnetd"
-          include_third_party: false
+          include_non_sv_nodes: false
           context:
             - artifactory
             - canton-network-vpn
@@ -4512,7 +4512,7 @@ workflows:
       - backup_cluster:
           <<: *main-branch-never
           cluster: "scratchnete"
-          include_third_party: false
+          include_non_sv_nodes: false
           context:
             - artifactory
             - canton-network-vpn

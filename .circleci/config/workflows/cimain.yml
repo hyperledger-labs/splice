@@ -72,7 +72,7 @@ workflow:
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
-          include_third_party: false
+          include_non_sv_nodes: false
           context:
             - artifactory
             - canton-network-vpn

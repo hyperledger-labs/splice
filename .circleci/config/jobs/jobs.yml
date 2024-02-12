@@ -516,7 +516,7 @@ jobs:
       include_sv:
         type: boolean
         default: true
-      include_third_party:
+      include_non_sv_nodes:
         type: boolean
         default: true
       parallelism:
@@ -548,7 +548,7 @@ jobs:
                 nodes="sv-1"
               fi
             fi
-            if [[ << parameters.include_third_party >> != false ]]; then
+            if [[ << parameters.include_non_sv_nodes >> != false ]]; then
               nodes="$nodes splitwell validator1"
             fi
             echo $nodes > nodes.txt
