@@ -4,12 +4,12 @@ package com.daml.network.sv.cometbft
 
 import com.daml.network.http.v0.definitions.CometBftJsonRpcRequestId
 import com.daml.network.sv.cometbft.CometBftClientIntegrationTest.{
+  createUpdateNetworkConfigRequest,
   InitialVotingPower,
   PubKey2,
   SvNode1,
   SvNode2,
   SvNode2CometId,
-  createUpdateNetworkConfigRequest,
 }
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.drivers.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest
@@ -24,7 +24,9 @@ import com.digitalasset.canton.drivers.cometbft.{
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import org.scalatest.wordspec.AsyncWordSpec
+import scalapb.TimestampConverters
 
+import java.time.Instant
 import scala.concurrent.ExecutionContext
 
 class CometBftClientIntegrationTest
@@ -53,8 +55,7 @@ class CometBftClientIntegrationTest
         }
     }
 
-    // TODO(#8726): re-enable the test
-    "apply a network config change" ignore {
+    "apply a network config change" in {
       for {
         networkConfig <- cometBftClient
           .readNetworkConfig()
@@ -129,7 +130,7 @@ class CometBftClientIntegrationTest
 object CometBftClientIntegrationTest {
   private val InitialVotingPower = 10L
 
-  private val SvNode1 = "initial"
+  private val SvNode1 = "Canton-Foundation-1"
   private val PubKey2 = "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
   private val SvNode2 = "svNode2"
   private val SvNode2CometId = "8A931AB5F957B8331BDEF3A0A081BD9F017A777F"
@@ -141,9 +142,11 @@ object CometBftClientIntegrationTest {
       pubKey: String,
   ) = {
     val request = NetworkConfigChangeRequest(
-      chainId,
-      submitterSvNodeId,
-      NodeConfigChangeRequest(
+      chainId = chainId,
+      submitterSvNodeId = submitterSvNodeId,
+      submitterKeyId = CometBftRequestSigner.GenesisFingerprint,
+      submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
+      kind = NodeConfigChangeRequest(
         SvNodeConfigChangeRequest.of(
           changedSvNodeId,
           currentConfigRevision = 0L,

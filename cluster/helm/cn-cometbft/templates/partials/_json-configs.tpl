@@ -42,7 +42,8 @@
     {{ end }}
     "governance_keys": [
       {
-        "pub_key": "m16haLzv/d/Ok04Sm39ABk0f0HsSWYNZxrIUiyQ+cK8="
+        "pub_key": "m16haLzv/d/Ok04Sm39ABk0f0HsSWYNZxrIUiyQ+cK8=",
+        "key_id": "12202b5d36b909489e4e00464ae7b558183da96fabc9eca3ddc5e34fbdba246a4be6"
       }
     ],
     "sequencing_keys": [

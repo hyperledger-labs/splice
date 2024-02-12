@@ -63,36 +63,38 @@ class CometBftContainer(testIdentifier: String, nodeType: ContainerType = Single
     network.foreach(container.setNetwork)
     container.addExposedPort(defaultCometBftHttpPort)
     container.waitingFor(Wait.forHttp("/health").forPort(defaultCometBftHttpPort))
+
+    def cometbftNodeForSv(id: String) = {
+      container.withCreateContainerCmdModifier { createContainerCmd =>
+        // Set hostname so that containers are discoverable through the sv1, sv2...namess
+        createContainerCmd.withHostName(id)
+        ()
+      }
+      container.setCommand(
+        "start"
+      )
+      container.addEnv("TMHOME", "/testconfig")
+      container
+        .withCopyFileToContainer(
+          MountableFile.forClasspathResource(
+            s"cometbft/$id"
+          ),
+          "/testconfig",
+        )
+        // Share the genesis file
+        .withCopyFileToContainer(
+          MountableFile.forClasspathResource(
+            s"cometbft/genesis-single-validator.json"
+          ),
+          "/testconfig/config/genesis.json",
+        )
+    }
+
     val modifiedContainer = nodeType match {
       case CometBftContainer.SingleNode =>
-        container.withCreateContainerCmdModifier { createContainerCmd =>
-          createContainerCmd.withEntrypoint("testing-entrypoint.sh")
-          ()
-        }
+        cometbftNodeForSv("sv1")
       case CometBftContainer.SvNetwork(id) =>
-        container.withCreateContainerCmdModifier { createContainerCmd =>
-          // Set hostname so that containers are discoverable through the sv1, sv2...namess
-          createContainerCmd.withHostName(id)
-          ()
-        }
-        container.setCommand(
-          "start"
-        )
-        container.addEnv("TMHOME", "/testconfig")
-        container
-          .withCopyFileToContainer(
-            MountableFile.forClasspathResource(
-              s"cometbft/$id"
-            ),
-            "/testconfig",
-          )
-          // Share the genesis file
-          .withCopyFileToContainer(
-            MountableFile.forClasspathResource(
-              s"cometbft/genesis-single-validator.json"
-            ),
-            "/testconfig/config/genesis.json",
-          )
+        cometbftNodeForSv(id)
     }
     logger.info(s"Starting CometBFT node $nodeType")(TraceContext.empty)
     modifiedContainer.start()

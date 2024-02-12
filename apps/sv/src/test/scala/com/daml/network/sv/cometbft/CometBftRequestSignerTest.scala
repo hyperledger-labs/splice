@@ -59,7 +59,7 @@ class CometBftRequestSignerTest extends AnyWordSpec with BaseTest {
     }
 
     "match public keys keys" in {
-      CometBftRequestSigner.genesisPubKeyBytes shouldBe CometBftRequestSigner.genesisPubKeyBytesFromPrivateKey
+      CometBftRequestSigner.GenesisPubKeyBytes shouldBe CometBftRequestSigner.genesisPubKeyBytesFromPrivateKey
     }
 
     "validate the correct signature for the request" in {
@@ -74,6 +74,10 @@ class CometBftRequestSignerTest extends AnyWordSpec with BaseTest {
         bogusRequestSignature,
         request.toByteArray,
       )
+    }
+
+    "generate the expected fingerprint for the public key" in {
+      CometBftRequestSigner.GenesisFingerprint shouldBe "12202b5d36b909489e4e00464ae7b558183da96fabc9eca3ddc5e34fbdba246a4be6"
     }
 
   }

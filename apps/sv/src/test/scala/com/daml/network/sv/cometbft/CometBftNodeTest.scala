@@ -40,6 +40,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
     proto.cometbft.NetworkConfigChangeRequest(
       chainId = chainId,
       submitterSvNodeId = owningSvNodeId,
+      submitterKeyId = CometBftRequestSigner.GenesisFingerprint,
       kind = proto.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest(changeRequest),
     )
   }
@@ -153,6 +154,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
     val configDiff = CometBftNode
       .diffNetworkConfig(
         owningSvNodeId,
+        CometBftRequestSigner.GenesisFingerprint,
         mkMemberInfos(targetConfig.map((nodeNr, _)).toList ++ Seq(10 -> "key-10", 11 -> "key-11")),
         networkConfig,
         dummySvcDomainId,

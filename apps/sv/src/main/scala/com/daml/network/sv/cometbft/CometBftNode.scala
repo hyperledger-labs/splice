@@ -48,6 +48,7 @@ class CometBftNode(
     actualConfig <- cometBftClient.readNetworkConfig()
     networkConfigChanges = diffNetworkConfig(
       owningSvNode,
+      CometBftRequestSigner.GenesisFingerprint,
       target.payload.members,
       actualConfig,
       target.domain,
@@ -65,7 +66,10 @@ class CometBftNode(
         )
         // TODO(#4925): select the governance key to use for submitting the change requests comparing the KMS (Canton ;-)) against the configured state
         val ourGovernanceKey =
-          proto.cometbft.GovernanceKey(CometBftRequestSigner.GenesisPubKeyBase64)
+          proto.cometbft.GovernanceKey(
+            CometBftRequestSigner.GenesisPubKeyBase64,
+            CometBftRequestSigner.GenesisFingerprint,
+          )
         val ourKeyIsRegistered = actualConfig.svNodeConfigStates
           .get(owningSvNode)
           .exists(state =>
@@ -82,6 +86,7 @@ class CometBftNode(
                 chainId = actualConfig.chainId,
                 submitterSvNodeId = owningSvNode,
                 submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
+                submitterKeyId = CometBftRequestSigner.GenesisFingerprint,
                 kind = NetworkConfigChangeRequest.Kind.BootstrapConfigChangeRequest(
                   SvBootstrapConfigChangeRequest(
                     networkConfigChanges.requests.map(_.getNodeConfigChangeRequest)
@@ -143,7 +148,10 @@ class CometBftNode(
           ),
           // TODO(#4925) use a per-node key, instead of this static one
           governanceKeys = List(
-            proto.cometbft.GovernanceKey(CometBftRequestSigner.GenesisPubKeyBase64)
+            proto.cometbft.GovernanceKey(
+              CometBftRequestSigner.GenesisPubKeyBase64,
+              CometBftRequestSigner.GenesisFingerprint,
+            )
           ),
           // TODO(#5882): add support for sequencing keys
           sequencingKeys = List.empty,
@@ -172,6 +180,7 @@ object CometBftNode {
     */
   def diffNetworkConfig(
       owningSvNode: String,
+      signingKeyId: String,
       targetMemberInfos: java.util.Map[String, daml.svcrules.MemberInfo],
       currentNetworkConfig: proto.cometbft.GetNetworkConfigResponse,
       domainId: DomainId,
@@ -194,6 +203,7 @@ object CometBftNode {
       proto.cometbft.NetworkConfigChangeRequest(
         chainId = currentNetworkConfig.chainId,
         submitterSvNodeId = owningSvNode,
+        submitterKeyId = signingKeyId,
         submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
         kind = proto.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest(changeRequest),
       )
@@ -303,8 +313,14 @@ object CometBftNode {
           (nodeId, cometBftNodeConfigToProto(nodeConfig))
         })
         .toMap,
-      governanceKeys =
-        config.governanceKeys.asScala.map(key => proto.cometbft.GovernanceKey(key.pubKey)).toSeq,
+      governanceKeys = config.governanceKeys.asScala
+        .map(key =>
+          proto.cometbft.GovernanceKey(
+            key.pubKey,
+            CometBftRequestSigner.fingerprintForBase64PublicKey(key.pubKey),
+          )
+        )
+        .toSeq,
       sequencingKeys =
         config.sequencingKeys.asScala.map(key => proto.cometbft.SequencingKey(key.pubKey)).toSeq,
     )
