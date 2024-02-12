@@ -70,6 +70,11 @@ export const sequencerPruningConfig = enableSequencerPruning
     }
   : { enabled: false };
 
+const enableCometbftPruning = envFlag('ENABLE_COMETBFT_PRUNING', true);
+export const cometbftRetainBlocks = enableCometbftPruning
+  ? parseInt(requireEnv('COMETBFT_RETAIN_BLOCKS'))
+  : 0; // 0 implies retain all blocks
+
 // Refrence to upstream infrastructure stack.
 export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
 

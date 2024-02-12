@@ -5,6 +5,7 @@ import { Resource } from '@pulumi/pulumi';
 import {
   ExactNamespace,
   isDevNet,
+  cometbftRetainBlocks,
   installCNRunbookHelmChart,
   loadYamlFromFile,
   REPO_ROOT,
@@ -62,6 +63,7 @@ export function installCometBftNode(
     _.mergeWith(cometBftValues, {
       node: {
         externalAddress: `cometbft.svc.${CLUSTER_BASENAME}.network.canton.global:26096`,
+        retainBlocks: cometbftRetainBlocks,
       },
       istioVirtualService: {
         enabled: true,

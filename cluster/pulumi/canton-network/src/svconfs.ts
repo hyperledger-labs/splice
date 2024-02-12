@@ -1,5 +1,5 @@
 import { Output } from '@pulumi/pulumi';
-import { isDevNet } from 'cn-pulumi-common';
+import { cometbftRetainBlocks, isDevNet } from 'cn-pulumi-common';
 
 import { DomainIndex } from './globalDomainNode';
 
@@ -19,7 +19,7 @@ export type StaticCometBftConfig = {
     publicKey: Output<string> | string;
   };
   nodeIndex: DomainIndex;
-  retainBlocks?: number;
+  retainBlocks: number;
   id: Output<string> | string;
 };
 
@@ -40,6 +40,7 @@ const svconfs: StaticSvConfig[] = [
       id: '5af57aa83abcec085c949323ed8538108757be9c',
       privateKey:
         '/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==',
+      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: '8A931AB5F957B8331BDEF3A0A081BD9F017A777F',
         privateKey:
@@ -58,6 +59,7 @@ const svconfs: StaticSvConfig[] = [
       id: 'c36b3bbd969d993ba0b4809d1f587a3a341f22c1',
       privateKey:
         '1Je33z2g+Dj2UWLqnsO+xwUwbalIS0LLcYAoj+fYuEE2le4kJjJ0h+L7FfVg+3mbgvrikdke91I2X5C2frj0Eg==',
+      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: '04A57312179F1E0C93B868779EE4C7FAC41666F0',
         privateKey:
@@ -76,6 +78,7 @@ const svconfs: StaticSvConfig[] = [
       id: '0d8e87c54d199e85548ccec123c9d92966ec458c',
       privateKey:
         'DdbW/buPo4TXxW+/cvQxp5Lh1BZyH5GYHGoU0uTUQA/S1oZ32DDu1+CZhtrZhqEFMuxPlXVXvyvXsZLBdCkgdQ==',
+      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: 'FFF137F42421B0257CDC8B2E41F777B81A081E80',
         privateKey:
@@ -94,7 +97,7 @@ const svconfs: StaticSvConfig[] = [
       id: 'ee738517c030b42c3ff626d9f80b41dfc4b1a3b8',
       privateKey:
         'xMB8gnYbacyZqU94cgwJBK2OJO3DffO12uHgeieotVj/Q9LbZEwLue9GnG8+G5GNRDgX8z75txr/Z541Uqyb3A==',
-      retainBlocks: isDevNet ? 10000 : 700000, // sv4 starts pruning after 2 hours on devnet only for testing purposes
+      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: 'DE36D23DE022948A11200ABB9EE07F049D17D903',
         privateKey:
@@ -113,6 +116,7 @@ const svconfs: StaticSvConfig[] = [
       id: '205437468610305149d131bbf9bf1f47658d861b',
       privateKey:
         'tlDwOSTLO1tAz9qfnTTUFFwVzJmtI7qn37rsoRbHPMRW2YWZ+53OXReOPSFzG/4pUCk4zxd1GJgb2ePFiDNlQQ==',
+      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: '1A6C9E60AFD830682CBEF5496F6E5515B20B0F2D',
         privateKey:
@@ -131,6 +135,7 @@ const svconfs: StaticSvConfig[] = [
       id: '60c21490e82d6a1fb0c35b9a04e4f64ae00ce5c0',
       privateKey:
         'CtgCJPhaF9SzNIl0jMP18BIM9DseWY4Dlc8fRgBh2ygswJBWtSCcJT4YQBXrjQlpQMMl8gaYg8sK2+bbMw0LMw==',
+      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: 'DC41F08916D8C41B931F9037E6F2571C58D0E01A',
         privateKey:
@@ -149,6 +154,7 @@ const svconfs: StaticSvConfig[] = [
       id: '81f3b7d26ae796d369fbf42481a65c6265b41e8c',
       privateKey:
         'VQBBlN8oYVR4vxr8OjF/Q2YTKJVBCpa/048YDp8Gn2PtugPDFiJVxcpZ2ozkQsQ+CXl4IVEmhpLshRO/QVWz9g==',
+      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: '66FA9399FF2E7AF2517E7CE2EDCA11F51C573F61',
         privateKey:
@@ -167,6 +173,7 @@ const svconfs: StaticSvConfig[] = [
       id: '404371a5f62773ca07925555c9fbb6287861947c',
       privateKey:
         '8/AM1nf0Hf5nJre5cBTfLhCmUG6YfFNCBaXrBJNi0pYSEzTcRJ5LNZKgQpP5a9aVYzQmCVVlaV2nfOJKzTWmFA==',
+      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: '5E35AE8D464FA92525BCC408C7827A943BDF4900',
         privateKey:
@@ -185,6 +192,7 @@ const svconfs: StaticSvConfig[] = [
       id: 'aeee969d0efb0784ea36b9ad743a2e5964828325',
       privateKey:
         'a5d4ZHxQkazrjZH3R6TVZYIFkBoWflC/RmkQCmhhRInWm7Ikj9wBEvdKJuPEWv78MSmOLi3pJuYchkKkbwcvrA==',
+      retainBlocks: cometbftRetainBlocks,
       validator: {
         keyAddress: '06070D2FD47073BE1635C3DEB862A88669906847',
         privateKey:

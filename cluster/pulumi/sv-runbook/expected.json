@@ -319,7 +319,8 @@
           "externalAddress": "cometbft.svc.svrun.network.canton.global:26096",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
           "identifier": "cometbft",
-          "keysSecret": "cometbft-keys"
+          "keysSecret": "cometbft-keys",
+          "retainBlocks": 10000
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {

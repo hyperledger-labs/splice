@@ -51,34 +51,41 @@ class CometBftPreflightIntegrationTest
     }
   }
 
-  "Sv4 pruneps its CometBFT stack" in { implicit env =>
-    val RetainBlock = 10000 // check parameter configured in CometBft helm chart
+  if (sys.env.getOrElse("ENABLE_COMETBFT_PRUNING", "false") == "true") {
 
-    val sv4 = svclWithToken("sv4")
+    val RetainBlocks = sys.env("COMETBFT_RETAIN_BLOCKS").toInt
 
-    eventuallySucceeds() {
-      val status = parse(
-        sv4
-          .cometBftNodeDebugDump()
-          .status
-          .toString()
-      ).getOrElse(Json.Null)
+    "SVs prune their CometBFT stack" in { implicit env =>
+      Seq("sv1", "sv2", "sv3", "sv4").foreach(svName => {
 
-      val syncInfo = status.hcursor.downField("sync_info")
+        val sv = svclWithToken(svName)
 
-      val latestBlockHeight = syncInfo
-        .get[Int]("latest_block_height")
-        .value
+        eventuallySucceeds() {
+          val status = parse(
+            sv
+              .cometBftNodeDebugDump()
+              .status
+              .toString()
+          ).getOrElse(Json.Null)
 
-      val earliestBlockHeight = syncInfo
-        .get[Int]("earliest_block_height")
-        .value
+          val syncInfo = status.hcursor.downField("sync_info")
 
-      if (latestBlockHeight > RetainBlock) {
-        (latestBlockHeight - earliestBlockHeight) should be < (RetainBlock * 1.05).toInt
-      } else {
-        earliestBlockHeight shouldBe 1
-      }
+          val latestBlockHeight = syncInfo
+            .get[Int]("latest_block_height")
+            .value
+
+          val earliestBlockHeight = syncInfo
+            .get[Int]("earliest_block_height")
+            .value
+
+          if (latestBlockHeight > RetainBlocks) {
+            (latestBlockHeight - earliestBlockHeight) should be < (RetainBlocks * 1.05).toInt
+          } else {
+            earliestBlockHeight shouldBe 1
+          }
+        }
+
+      })
     }
   }
 

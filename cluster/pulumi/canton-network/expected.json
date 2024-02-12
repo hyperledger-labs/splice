@@ -1683,7 +1683,7 @@
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "/7L74Bs18740fTPdEL04BeO2Gs+1lzEeCjAiB1DYcysmLnU1FAkg/Ho9XsOiIp4U/KT/YNrtIi/A0prm/Ew3eQ==",
-          "retainBlocks": 700000,
+          "retainBlocks": 10000,
           "rpcPort": 26657,
           "snapshotHeightDelta": 1000,
           "validator": {
@@ -2602,7 +2602,7 @@
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "1Je33z2g+Dj2UWLqnsO+xwUwbalIS0LLcYAoj+fYuEE2le4kJjJ0h+L7FfVg+3mbgvrikdke91I2X5C2frj0Eg==",
-          "retainBlocks": 700000,
+          "retainBlocks": 10000,
           "rpcPort": 26657,
           "snapshotHeightDelta": 1000,
           "validator": {
@@ -3489,7 +3489,7 @@
           "keysSecret": "",
           "p2pPort": 26656,
           "privateKey": "DdbW/buPo4TXxW+/cvQxp5Lh1BZyH5GYHGoU0uTUQA/S1oZ32DDu1+CZhtrZhqEFMuxPlXVXvyvXsZLBdCkgdQ==",
-          "retainBlocks": 700000,
+          "retainBlocks": 10000,
           "rpcPort": 26657,
           "snapshotHeightDelta": 1000,
           "validator": {
