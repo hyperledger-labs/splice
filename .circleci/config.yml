@@ -1289,6 +1289,9 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
+      global_domain_id:
+        type: integer
+        default: 0
       send_deployment_notification:
         type: boolean
         default: true
@@ -1312,6 +1315,7 @@ jobs:
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
+            export GLOBAL_DOMAIN_ACTIVE_ID=<< parameters.global_domain_id >>
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -1488,12 +1492,15 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
+            export CN_NON_SV_NODES="true"
             if [[ << parameters.upgrade_global_domain_prepare >> == true ]]; then
-              export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
+              export CN_NON_SV_NODES="false"
+            export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
             fi
             export GLOBAL_DOMAIN_ACTIVE_ID=<< parameters.upgrade_global_domain_active_id >>
             if [[ << parameters.upgrade_global_domain_upgrade_id >> -ne 0 ]]; then
               export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
+              export CN_NON_SV_NODES="false"
               export GLOBAL_DOMAIN_UPGRADE_ID=<< parameters.upgrade_global_domain_upgrade_id >>
               if [[ << parameters.upgrade_global_domain_legacy_id >> -ne 0 ]]; then
                 export GLOBAL_DOMAIN_LEGACY_ID=<< parameters.upgrade_global_domain_legacy_id >>
@@ -2077,13 +2084,22 @@ jobs:
   backup_cluster:
     parameters:
       <<: *cluster-parameter
+      include_sv:
+        type: boolean
+        default: true
+      include_third_party:
+        type: boolean
+        default: true
+      parallelism:
+        type: integer
+        default: 3
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
-    parallelism: 3
+    parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
       - setup_vpn
@@ -2094,12 +2110,19 @@ jobs:
           cmd_name: Listing nodes for backup
           cluster: << parameters.cluster >>
           cmd: |
-            # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
-            if [[ "${IS_DEVNET-}" != false ]]; then
-              echo "sv-1 sv-2 sv-3 sv-4 validator1 splitwell" > nodes.txt
-            else
-              echo "sv-1 validator1 splitwell" > nodes.txt
+            nodes=""
+            if [[ << parameters.include_sv >> != false ]]; then
+              # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
+              if [[ "${IS_DEVNET-}" != false ]]; then
+                nodes="sv-1 sv-2 sv-3 sv-4"
+              else
+                nodes="sv-1"
+              fi
             fi
+            if [[ << parameters.include_third_party >> != false ]]; then
+              nodes="$nodes splitwell validator1"
+            fi
+            echo $nodes > nodes.txt
       - run:
           name: Split backup tasks
           command: |
@@ -3302,55 +3325,52 @@ workflows:
           upgrade_global_domain_prepare: true
           cancel_workflow_on_failure: true
           requires:
-            - docker_images_push
             - wait_for_previous_pipeline
-      - deploy_sv_runbook:
+            - docker_images_push
+      - preflight_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          wait_for_sv: false
+          wait_for_third_party: false
+          test_names_file: "test-full-class-names-core-preflight.log"
+          parallelism: 1
+          requires:
+            - docker_images_push
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          wait_for_third_party: false
+          requires:
+            - preflight_check
+            - backup_cluster
+      - deploy_cluster:
+          name: "deploy_global_domain_upgrade"
           <<: *main-branch-only
           context:
             - artifactory
             - slack-context
           cluster: "cimain"
           send_deployment_notification: false
+          update_deployment_branch: false
+          upgrade_global_domain_upgrade_id: 1
           requires:
-            - deploy_cluster
-      - deploy_validator_runbook:
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cimain"
-          requires:
-            - deploy_cluster
-      - preflight_check:
-          cluster: "cimain"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-      - preflight_sv_check:
-          <<: *main-branch-only
-          cluster: "cimain"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-      - preflight_validator_check:
-          <<: *main-branch-only
-          cluster: "cimain"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
+            - trigger_global_domain_migration
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
+          include_third_party: false
           context:
             - artifactory
             - canton-network-vpn
@@ -3366,8 +3386,80 @@ workflows:
             - canton-network-vpn
             - slack-context
           requires:
-            - backup_cluster
-            - preflight_check
+            - trigger_global_domain_migration
+      - deploy_cluster:
+          name: "switch_global_domain_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          send_deployment_notification: false
+          update_deployment_branch: false
+          upgrade_global_domain_active_id: 1
+          requires:
+            - deploy_global_domain_upgrade
+            - restore_node
+      - backup_cluster:
+          <<: *main-branch-only
+          # backup splitwell and validator1
+          name: "backup_after_global_domain_upgrade"
+          cluster: "cimain"
+          include_sv: false
+          parallelism: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - switch_global_domain_upgrade
+      - preflight_check:
+          name: "preflight_check_global_domain_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          migration_id: 1
+          requires:
+            - switch_global_domain_upgrade
+      - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          send_deployment_notification: false
+          requires:
+            - switch_global_domain_upgrade
+          global_domain_id: 1
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - switch_global_domain_upgrade
+      - deploy_validator_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - switch_global_domain_upgrade
+      - preflight_validator_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - switch_global_domain_upgrade
 
 
   auth0_user_cleanup:
@@ -3652,28 +3744,6 @@ workflows:
           requires:
             - deployment_test
             - docker_images_push
-      - hold:
-          name: runbooks_hold
-          <<: *main-branch-never
-          type: approval
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -3682,55 +3752,11 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           wait_for_sv: false
+          wait_for_third_party: false
+          test_names_file: "test-full-class-names-core-preflight.log"
+          parallelism: 1
           requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - runbooks_hold
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - runbooks_hold
-      - hold:
-          name: back_up_hold
-          <<: *main-branch-never
-          type: approval
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - back_up_hold
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - backup_cluster
-            - preflight_check
-      - hold:
-          name: hard_domain_migration_hold
-          <<: *main-branch-never
-          type: approval
+            - docker_images_push
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -3742,9 +3768,10 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
+          wait_for_third_party: false
           requires:
             - preflight_check
-            - hard_domain_migration_hold
+            - backup_cluster
       - deploy_cluster:
           name: "deploy_global_domain_upgrade"
           <<: *main-branch-never
@@ -3756,6 +3783,26 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchneta"
+          include_third_party: false
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
+      - restore_node:
+          <<: *main-branch-never
+          cluster: "scratchneta"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
           requires:
             - trigger_global_domain_migration
       - deploy_cluster:
@@ -3771,34 +3818,76 @@ workflows:
           upgrade_global_domain_active_id: 1
           requires:
             - deploy_global_domain_upgrade
+            - restore_node
+      - backup_cluster:
+          <<: *main-branch-never
+          # backup splitwell and validator1
+          name: "backup_after_global_domain_upgrade"
+          cluster: "scratchneta"
+          include_sv: false
+          parallelism: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - switch_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
-          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: "scratchneta"
-          wait_for_sv: false
-          wait_for_third_party: false
           migration_id: 1
           requires:
             - switch_global_domain_upgrade
-      - hold:
-          name: "reset_hold"
+      - deploy_sv_runbook:
           <<: *main-branch-never
-          type: approval
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - switch_global_domain_upgrade
+          global_domain_id: 1
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - switch_global_domain_upgrade
+      - deploy_validator_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - switch_global_domain_upgrade
+      - preflight_validator_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - switch_global_domain_upgrade
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchneta"
           context:
             - canton-network-vpn
           requires:
-            - preflight_check
+            - backup_after_global_domain_upgrade
             - preflight_sv_check
             - preflight_validator_check
-            - reset_hold
+            - preflight_check_global_domain_upgrade
 
   deploy_scratchnetb:
     when:
@@ -3836,28 +3925,6 @@ workflows:
           requires:
             - deployment_test
             - docker_images_push
-      - hold:
-          name: runbooks_hold
-          <<: *main-branch-never
-          type: approval
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -3866,55 +3933,11 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           wait_for_sv: false
+          wait_for_third_party: false
+          test_names_file: "test-full-class-names-core-preflight.log"
+          parallelism: 1
           requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - runbooks_hold
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - runbooks_hold
-      - hold:
-          name: back_up_hold
-          <<: *main-branch-never
-          type: approval
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - back_up_hold
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - backup_cluster
-            - preflight_check
-      - hold:
-          name: hard_domain_migration_hold
-          <<: *main-branch-never
-          type: approval
+            - docker_images_push
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -3926,9 +3949,10 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
+          wait_for_third_party: false
           requires:
             - preflight_check
-            - hard_domain_migration_hold
+            - backup_cluster
       - deploy_cluster:
           name: "deploy_global_domain_upgrade"
           <<: *main-branch-never
@@ -3940,6 +3964,26 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetb"
+          include_third_party: false
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
+      - restore_node:
+          <<: *main-branch-never
+          cluster: "scratchnetb"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
           requires:
             - trigger_global_domain_migration
       - deploy_cluster:
@@ -3955,34 +3999,76 @@ workflows:
           upgrade_global_domain_active_id: 1
           requires:
             - deploy_global_domain_upgrade
+            - restore_node
+      - backup_cluster:
+          <<: *main-branch-never
+          # backup splitwell and validator1
+          name: "backup_after_global_domain_upgrade"
+          cluster: "scratchnetb"
+          include_sv: false
+          parallelism: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - switch_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
-          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: "scratchnetb"
-          wait_for_sv: false
-          wait_for_third_party: false
           migration_id: 1
           requires:
             - switch_global_domain_upgrade
-      - hold:
-          name: "reset_hold"
+      - deploy_sv_runbook:
           <<: *main-branch-never
-          type: approval
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - switch_global_domain_upgrade
+          global_domain_id: 1
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - switch_global_domain_upgrade
+      - deploy_validator_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - switch_global_domain_upgrade
+      - preflight_validator_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - switch_global_domain_upgrade
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetb"
           context:
             - canton-network-vpn
           requires:
-            - preflight_check
+            - backup_after_global_domain_upgrade
             - preflight_sv_check
             - preflight_validator_check
-            - reset_hold
+            - preflight_check_global_domain_upgrade
 
   deploy_scratchnetc:
     when:
@@ -4020,28 +4106,6 @@ workflows:
           requires:
             - deployment_test
             - docker_images_push
-      - hold:
-          name: runbooks_hold
-          <<: *main-branch-never
-          type: approval
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -4050,55 +4114,11 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           wait_for_sv: false
+          wait_for_third_party: false
+          test_names_file: "test-full-class-names-core-preflight.log"
+          parallelism: 1
           requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - runbooks_hold
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - runbooks_hold
-      - hold:
-          name: back_up_hold
-          <<: *main-branch-never
-          type: approval
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - back_up_hold
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - backup_cluster
-            - preflight_check
-      - hold:
-          name: hard_domain_migration_hold
-          <<: *main-branch-never
-          type: approval
+            - docker_images_push
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -4110,9 +4130,10 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
+          wait_for_third_party: false
           requires:
             - preflight_check
-            - hard_domain_migration_hold
+            - backup_cluster
       - deploy_cluster:
           name: "deploy_global_domain_upgrade"
           <<: *main-branch-never
@@ -4124,6 +4145,26 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetc"
+          include_third_party: false
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
+      - restore_node:
+          <<: *main-branch-never
+          cluster: "scratchnetc"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
           requires:
             - trigger_global_domain_migration
       - deploy_cluster:
@@ -4139,34 +4180,76 @@ workflows:
           upgrade_global_domain_active_id: 1
           requires:
             - deploy_global_domain_upgrade
+            - restore_node
+      - backup_cluster:
+          <<: *main-branch-never
+          # backup splitwell and validator1
+          name: "backup_after_global_domain_upgrade"
+          cluster: "scratchnetc"
+          include_sv: false
+          parallelism: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - switch_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
-          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: "scratchnetc"
-          wait_for_sv: false
-          wait_for_third_party: false
           migration_id: 1
           requires:
             - switch_global_domain_upgrade
-      - hold:
-          name: "reset_hold"
+      - deploy_sv_runbook:
           <<: *main-branch-never
-          type: approval
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - switch_global_domain_upgrade
+          global_domain_id: 1
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - switch_global_domain_upgrade
+      - deploy_validator_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - switch_global_domain_upgrade
+      - preflight_validator_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - switch_global_domain_upgrade
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetc"
           context:
             - canton-network-vpn
           requires:
-            - preflight_check
+            - backup_after_global_domain_upgrade
             - preflight_sv_check
             - preflight_validator_check
-            - reset_hold
+            - preflight_check_global_domain_upgrade
 
   deploy_scratchnetd:
     when:
@@ -4204,28 +4287,6 @@ workflows:
           requires:
             - deployment_test
             - docker_images_push
-      - hold:
-          name: runbooks_hold
-          <<: *main-branch-never
-          type: approval
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -4234,55 +4295,11 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           wait_for_sv: false
+          wait_for_third_party: false
+          test_names_file: "test-full-class-names-core-preflight.log"
+          parallelism: 1
           requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - runbooks_hold
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - runbooks_hold
-      - hold:
-          name: back_up_hold
-          <<: *main-branch-never
-          type: approval
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - back_up_hold
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - backup_cluster
-            - preflight_check
-      - hold:
-          name: hard_domain_migration_hold
-          <<: *main-branch-never
-          type: approval
+            - docker_images_push
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -4294,9 +4311,10 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
+          wait_for_third_party: false
           requires:
             - preflight_check
-            - hard_domain_migration_hold
+            - backup_cluster
       - deploy_cluster:
           name: "deploy_global_domain_upgrade"
           <<: *main-branch-never
@@ -4308,6 +4326,26 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnetd"
+          include_third_party: false
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
+      - restore_node:
+          <<: *main-branch-never
+          cluster: "scratchnetd"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
           requires:
             - trigger_global_domain_migration
       - deploy_cluster:
@@ -4323,34 +4361,76 @@ workflows:
           upgrade_global_domain_active_id: 1
           requires:
             - deploy_global_domain_upgrade
+            - restore_node
+      - backup_cluster:
+          <<: *main-branch-never
+          # backup splitwell and validator1
+          name: "backup_after_global_domain_upgrade"
+          cluster: "scratchnetd"
+          include_sv: false
+          parallelism: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - switch_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
-          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: "scratchnetd"
-          wait_for_sv: false
-          wait_for_third_party: false
           migration_id: 1
           requires:
             - switch_global_domain_upgrade
-      - hold:
-          name: "reset_hold"
+      - deploy_sv_runbook:
           <<: *main-branch-never
-          type: approval
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - switch_global_domain_upgrade
+          global_domain_id: 1
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - switch_global_domain_upgrade
+      - deploy_validator_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - switch_global_domain_upgrade
+      - preflight_validator_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - switch_global_domain_upgrade
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetd"
           context:
             - canton-network-vpn
           requires:
-            - preflight_check
+            - backup_after_global_domain_upgrade
             - preflight_sv_check
             - preflight_validator_check
-            - reset_hold
+            - preflight_check_global_domain_upgrade
 
   deploy_scratchnete:
     when:
@@ -4388,28 +4468,6 @@ workflows:
           requires:
             - deployment_test
             - docker_images_push
-      - hold:
-          name: runbooks_hold
-          <<: *main-branch-never
-          type: approval
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - deploy_cluster
-            - runbooks_hold
       - preflight_check:
           <<: *main-branch-never
           context:
@@ -4418,55 +4476,11 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           wait_for_sv: false
+          wait_for_third_party: false
+          test_names_file: "test-full-class-names-core-preflight.log"
+          parallelism: 1
           requires:
-            - hold
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - runbooks_hold
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - runbooks_hold
-      - hold:
-          name: back_up_hold
-          <<: *main-branch-never
-          type: approval
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - back_up_hold
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - backup_cluster
-            - preflight_check
-      - hold:
-          name: hard_domain_migration_hold
-          <<: *main-branch-never
-          type: approval
+            - docker_images_push
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -4478,9 +4492,10 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
+          wait_for_third_party: false
           requires:
             - preflight_check
-            - hard_domain_migration_hold
+            - backup_cluster
       - deploy_cluster:
           name: "deploy_global_domain_upgrade"
           <<: *main-branch-never
@@ -4492,6 +4507,26 @@ workflows:
           # So we want to avoid creating them.
           update_deployment_branch: false
           upgrade_global_domain_upgrade_id: 1
+          requires:
+            - trigger_global_domain_migration
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "scratchnete"
+          include_third_party: false
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
+      - restore_node:
+          <<: *main-branch-never
+          cluster: "scratchnete"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
           requires:
             - trigger_global_domain_migration
       - deploy_cluster:
@@ -4507,31 +4542,73 @@ workflows:
           upgrade_global_domain_active_id: 1
           requires:
             - deploy_global_domain_upgrade
+            - restore_node
+      - backup_cluster:
+          <<: *main-branch-never
+          # backup splitwell and validator1
+          name: "backup_after_global_domain_upgrade"
+          cluster: "scratchnete"
+          include_sv: false
+          parallelism: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - switch_global_domain_upgrade
       - preflight_check:
           name: "preflight_check_global_domain_upgrade"
-          test_names_file: "test-full-class-names-core-preflight.log"
           <<: *main-branch-never
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
           cluster: "scratchnete"
-          wait_for_sv: false
-          wait_for_third_party: false
           migration_id: 1
           requires:
             - switch_global_domain_upgrade
-      - hold:
-          name: "reset_hold"
+      - deploy_sv_runbook:
           <<: *main-branch-never
-          type: approval
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - switch_global_domain_upgrade
+          global_domain_id: 1
+      - preflight_sv_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - switch_global_domain_upgrade
+      - deploy_validator_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - switch_global_domain_upgrade
+      - preflight_validator_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - switch_global_domain_upgrade
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnete"
           context:
             - canton-network-vpn
           requires:
-            - preflight_check
+            - backup_after_global_domain_upgrade
             - preflight_sv_check
             - preflight_validator_check
-            - reset_hold
+            - preflight_check_global_domain_upgrade

@@ -513,13 +513,22 @@ jobs:
   backup_cluster:
     parameters:
       <<: *cluster-parameter
+      include_sv:
+        type: boolean
+        default: true
+      include_third_party:
+        type: boolean
+        default: true
+      parallelism:
+        type: integer
+        default: 3
     machine:
       image: ubuntu-2004:2023.04.2
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
-    parallelism: 3
+    parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
       - setup_vpn
@@ -530,12 +539,19 @@ jobs:
           cmd_name: Listing nodes for backup
           cluster: << parameters.cluster >>
           cmd: |
-            # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
-            if [[ "${IS_DEVNET-}" != false ]]; then
-              echo "sv-1 sv-2 sv-3 sv-4 validator1 splitwell" > nodes.txt
-            else
-              echo "sv-1 validator1 splitwell" > nodes.txt
+            nodes=""
+            if [[ << parameters.include_sv >> != false ]]; then
+              # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
+              if [[ "${IS_DEVNET-}" != false ]]; then
+                nodes="sv-1 sv-2 sv-3 sv-4"
+              else
+                nodes="sv-1"
+              fi
             fi
+            if [[ << parameters.include_third_party >> != false ]]; then
+              nodes="$nodes splitwell validator1"
+            fi
+            echo $nodes > nodes.txt
       - run:
           name: Split backup tasks
           command: |

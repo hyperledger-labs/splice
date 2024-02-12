@@ -17,6 +17,9 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
+      global_domain_id:
+        type: integer
+        default: 0
       send_deployment_notification:
         type: boolean
         default: true
@@ -40,6 +43,7 @@ jobs:
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
+            export GLOBAL_DOMAIN_ACTIVE_ID=<< parameters.global_domain_id >>
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -216,12 +220,15 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
+            export CN_NON_SV_NODES="true"
             if [[ << parameters.upgrade_global_domain_prepare >> == true ]]; then
-              export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
+              export CN_NON_SV_NODES="false"
+            export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
             fi
             export GLOBAL_DOMAIN_ACTIVE_ID=<< parameters.upgrade_global_domain_active_id >>
             if [[ << parameters.upgrade_global_domain_upgrade_id >> -ne 0 ]]; then
               export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
+              export CN_NON_SV_NODES="false"
               export GLOBAL_DOMAIN_UPGRADE_ID=<< parameters.upgrade_global_domain_upgrade_id >>
               if [[ << parameters.upgrade_global_domain_legacy_id >> -ne 0 ]]; then
                 export GLOBAL_DOMAIN_LEGACY_ID=<< parameters.upgrade_global_domain_legacy_id >>

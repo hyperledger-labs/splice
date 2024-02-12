@@ -47,6 +47,11 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
 
 const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = GlobalDomainUpgradeConfig.fromEnv();
 
+const installNonSvComponents = envFlag(
+  'CN_NON_SV_NODES',
+  !globalDomainUpgradeConfig.containsUpgrade() && globalDomainUpgradeConfig.isDefaultActive()
+);
+
 const svRunbookApprovedSvIdentities = [
   {
     name: 'DA-Helm-Test-Node',
@@ -144,42 +149,37 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     globalDomainUpgradeConfig,
   });
 
-  const founder = await svc.founder;
+  const allSvs = await svc.allSvs;
 
-  // TODO(#8761) install the validator once the upgrade supports it
-  const installNonSvComponents =
-    !globalDomainUpgradeConfig.isUpgrade() && globalDomainUpgradeConfig.isDefaultActive();
-  const nonSvComponentsDependencies = [founder.scan];
-  installNonSvComponents
-    ? await installValidator1(
-        auth0Client,
-        'validator1',
-        validator1Onboarding.secret,
-        'auth0|63e3d75ff4114d87a2c1e4f5',
-        splitPostgresInstances,
-        globalDomainUpgradeConfig.activeGlobalDomainId,
-        nonSvComponentsDependencies,
-        backupConfig,
-        bootstrappingDumpConfig,
-        // x10 validator1's traffic targetThroughput for load tester -- see #9064
-        { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
-      )
-    : undefined;
+  // TODO(#8761) install the non sv nodes once the upgrade supports it
+  const nonSvComponentsDependencies = allSvs.map(sv => sv.scan);
+  if (installNonSvComponents) {
+    await installValidator1(
+      auth0Client,
+      'validator1',
+      validator1Onboarding.secret,
+      'auth0|63e3d75ff4114d87a2c1e4f5',
+      splitPostgresInstances,
+      globalDomainUpgradeConfig.activeGlobalDomainId,
+      nonSvComponentsDependencies,
+      backupConfig,
+      bootstrappingDumpConfig,
+      // x10 validator1's traffic targetThroughput for load tester -- see #9064
+      { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
+    );
 
-  // TODO(#8761) install splitwell once the upgrade supports it
-  installNonSvComponents
-    ? await installSplitwell(
-        auth0Client,
-        'auth0|63e12e0415ad881ffe914e61',
-        splitwellOnboarding.secret,
-        splitPostgresInstances,
-        globalDomainUpgradeConfig.activeGlobalDomainId,
-        nonSvComponentsDependencies,
-        backupConfig,
-        bootstrappingDumpConfig,
-        topupConfig
-      )
-    : undefined;
+    await installSplitwell(
+      auth0Client,
+      'auth0|63e12e0415ad881ffe914e61',
+      splitwellOnboarding.secret,
+      splitPostgresInstances,
+      globalDomainUpgradeConfig.activeGlobalDomainId,
+      nonSvComponentsDependencies,
+      backupConfig,
+      bootstrappingDumpConfig,
+      topupConfig
+    );
+  }
 
   installDocs();
 }

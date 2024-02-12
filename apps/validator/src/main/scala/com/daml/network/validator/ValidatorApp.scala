@@ -378,6 +378,7 @@ class ValidatorApp(
       alias,
       SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)),
     )
+    logger.info(s"Ensuring domain registered with config $domainConfig")
     participantAdminConnection.ensureDomainRegistered(
       domainConfig,
       RetryFor.WaitingOnInitDependency,
@@ -412,6 +413,7 @@ class ValidatorApp(
             ),
           )
       }
+      _ = logger.info(s"Ensuring domain registered with config from scan $domainConfig")
       _ <- participantAdminConnection.ensureDomainRegistered(
         domainConfig,
         RetryFor.WaitingOnInitDependency,

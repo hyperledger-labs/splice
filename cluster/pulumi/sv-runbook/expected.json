@@ -304,7 +304,7 @@
       "timeout": 480,
       "values": {
         "founder": {
-          "externalAddress": "svrun.network.com.network.canton.global:26016"
+          "externalAddress": "svrun.network.canton.global:26016"
         },
         "genesis": {
           "chainId": "svrun"

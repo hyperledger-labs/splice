@@ -27,55 +27,52 @@ workflow:
           upgrade_global_domain_prepare: true
           cancel_workflow_on_failure: true
           requires:
-            - docker_images_push
             - wait_for_previous_pipeline
-      - deploy_sv_runbook:
+            - docker_images_push
+      - preflight_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          wait_for_sv: false
+          wait_for_third_party: false
+          test_names_file: "test-full-class-names-core-preflight.log"
+          parallelism: 1
+          requires:
+            - docker_images_push
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          wait_for_third_party: false
+          requires:
+            - preflight_check
+            - backup_cluster
+      - deploy_cluster:
+          name: "deploy_global_domain_upgrade"
           <<: *main-branch-only
           context:
             - artifactory
             - slack-context
           cluster: "cimain"
           send_deployment_notification: false
+          update_deployment_branch: false
+          upgrade_global_domain_upgrade_id: 1
           requires:
-            - deploy_cluster
-      - deploy_validator_runbook:
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cimain"
-          requires:
-            - deploy_cluster
-      - preflight_check:
-          cluster: "cimain"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-      - preflight_sv_check:
-          <<: *main-branch-only
-          cluster: "cimain"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
-      - preflight_validator_check:
-          <<: *main-branch-only
-          cluster: "cimain"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - wait_for_previous_pipeline
+            - trigger_global_domain_migration
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
+          include_third_party: false
           context:
             - artifactory
             - canton-network-vpn
@@ -91,5 +88,77 @@ workflow:
             - canton-network-vpn
             - slack-context
           requires:
-            - backup_cluster
-            - preflight_check
+            - trigger_global_domain_migration
+      - deploy_cluster:
+          name: "switch_global_domain_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          send_deployment_notification: false
+          update_deployment_branch: false
+          upgrade_global_domain_active_id: 1
+          requires:
+            - deploy_global_domain_upgrade
+            - restore_node
+      - backup_cluster:
+          <<: *main-branch-only
+          # backup splitwell and validator1
+          name: "backup_after_global_domain_upgrade"
+          cluster: "cimain"
+          include_sv: false
+          parallelism: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - switch_global_domain_upgrade
+      - preflight_check:
+          name: "preflight_check_global_domain_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          migration_id: 1
+          requires:
+            - switch_global_domain_upgrade
+      - deploy_sv_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          send_deployment_notification: false
+          requires:
+            - switch_global_domain_upgrade
+          global_domain_id: 1
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - switch_global_domain_upgrade
+      - deploy_validator_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - switch_global_domain_upgrade
+      - preflight_validator_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - switch_global_domain_upgrade

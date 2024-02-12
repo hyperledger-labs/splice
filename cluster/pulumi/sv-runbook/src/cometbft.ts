@@ -22,6 +22,8 @@ const privValidatorKeyContent = fs.readFileSync(
   'utf-8'
 );
 
+const domainActiveId = process.env.GLOBAL_DOMAIN_ACTIVE_ID || '0';
+
 export function installCometBftNode(
   xns: ExactNamespace,
   svName: string,
@@ -52,6 +54,7 @@ export function installCometBftNode(
     },
     { dependsOn: dependencies.concat([xns.ns]) }
   );
+  const includeDomainInChainId = domainActiveId !== '0';
   return installCNRunbookHelmChart(
     xns,
     'cometbft',
@@ -71,7 +74,12 @@ export function installCometBftNode(
       genesis: {
         // for TestNet-like deployments on scratchnet, set the chainId to 'test'
         chainId:
-          `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet ? 'test' : `${CLUSTER_BASENAME}`,
+          `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
+            ? 'test'
+            : `${CLUSTER_BASENAME}` + (includeDomainInChainId ? `-${domainActiveId}` : ''),
+      },
+      founder: {
+        externalAddress: `${CLUSTER_BASENAME}.network.canton.global:26${domainActiveId}16`,
       },
     }),
     localCharts,

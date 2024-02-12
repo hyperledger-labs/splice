@@ -467,23 +467,15 @@ function subcmd_logs() {
 
     k8s_labels_for_app
 
-    if POD_SPEC=$(kubectl get pod \
-                          -n "${namespace}" \
-                          -l app="${app}" \
-                          -o jsonpath='{range .items[0].metadata}{"-n "}{@.namespace}{" "}{@.name}{"\n"}{end}'  \
-                          2> /dev/null); then
-
-        kubectl lnav "${POD_SPEC}" "${app_container}"
-    else
-        _error "No pod for app found: ${app}"
-    fi
+    echo "Getting logs for app: ${app} in namespace: ${namespace} and container ${app_container}"
+    kubectl lnav -n "${namespace}" -l app="${app}" -c "${app_container}"
 }
 
 
 function k8s_labels_for_app() {
     local non_domain_specific_namespaces=("sv" "validator1" "splitwell" "validator")
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
-    local domain_specific_apps=("participant" "sv-app" "scan-app")
+    local domain_specific_apps=("participant" "sv-app" "scan-app" "validator-app")
 
     # shellcheck disable=SC2076
     if [[ " ${global_domain_specific_apps[*]} " =~ " ${app} " && ! " ${non_domain_specific_namespaces[*]} " =~ " ${namespace} " ]]; then
@@ -2055,6 +2047,26 @@ function subcmd_restore_node() {
             _error "Unknown node $node"
             ;;
     esac
+}
+
+subcommand_whitelist[hard_domain_migration]='Run a full hard domain migration'
+
+function subcmd_hard_domain_migration() {
+  _cluster_reset
+  local version=""
+  version=$(get-snapshot-version)
+  export CN_NON_SV_NODES="false"
+  export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
+  _cluster_apply "$version"
+  subcmd_preflight_global_domain_upgrade
+  export GLOBAL_DOMAIN_UPGRADE_ID=1
+  export GLOBAL_DOMAIN_PREPARE_UPGRADE="false"
+  _cluster_apply "$version"
+  unset GLOBAL_DOMAIN_UPGRADE_ID
+  export GLOBAL_DOMAIN_ACTIVE_ID=1
+  _cluster_apply "$version"
+  export CN_NON_SV_NODES="true"
+  _cluster_apply "$version"
 }
 
 ################################

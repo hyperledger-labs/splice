@@ -73,10 +73,7 @@ class CometBftNode(
           )
         if (ourKeyIsRegistered) {
           val currentRegisteredNodes = actualConfig.svNodeConfigStates.keySet
-          if (
-            currentRegisteredNodes.sizeIs == 1 && currentRegisteredNodes
-              .contains(owningSvNode)
-          ) {
+          if (currentRegisteredNodes == Set(owningSvNode)) {
             logger.debug(
               show"Bootstrapping CometBft network configuration: $summary"
             )

@@ -36,7 +36,7 @@ export class GlobalDomainUpgradeConfig {
     );
   }
 
-  isUpgrade(): boolean {
+  containsUpgrade(): boolean {
     return this.upgradeGlobalDomainId != undefined;
   }
 
