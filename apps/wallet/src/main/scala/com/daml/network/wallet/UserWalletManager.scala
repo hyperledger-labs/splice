@@ -51,14 +51,25 @@ class UserWalletManager(
       : scala.collection.concurrent.Map[String, (RetryProvider, UserWalletService)] =
     TrieMap.empty
 
+  retryProvider.runOnShutdownWithPriority_(new RunOnShutdown {
+    override def name = s"set per-user retry providers as closed"
+    override def done = false
+    override def run() = {
+      endUserWalletsMap.values.foreach { case (userRetryProvider, _) =>
+        userRetryProvider.setAsClosing()
+      }
+    }
+  })(TraceContext.empty)
+
   retryProvider.runOnShutdown_(new RunOnShutdown {
     override def name = s"shutdown per-user retry providers"
     // this is not perfectly precise, but RetryProvider.close is idempotent
     override def done = false
-    override def run() =
+    override def run() = {
       endUserWalletsMap.values.foreach { case (userRetryProvider, _) =>
         userRetryProvider.close()
       }
+    }
   })(TraceContext.empty)
 
   /** Lookup an end-user's wallet.
@@ -93,11 +104,12 @@ class UserWalletManager(
           endUserName,
           endUserParty,
         )
+      val userLoggerFactory = loggerFactory.append("user", key.endUserName)
       // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
       // without the entire node going down.
       val userRetryProvider =
         RetryProvider(
-          loggerFactory,
+          userLoggerFactory,
           retryProvider.timeouts,
           retryProvider.futureSupervisor,
           retryProvider.metricsFactory,
@@ -112,7 +124,7 @@ class UserWalletManager(
         treasuryConfig,
         storage,
         userRetryProvider,
-        loggerFactory,
+        userLoggerFactory,
         scanConnection,
       )
 

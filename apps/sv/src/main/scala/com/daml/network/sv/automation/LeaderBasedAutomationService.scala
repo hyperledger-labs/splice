@@ -27,35 +27,38 @@ class LeaderBasedAutomationService(
       retryProvider,
     ) {
 
-  registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
-  registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
-  if (config.automation.enableSvcGovernance) {
-    registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
-    registerTrigger(new ExecuteVoteRequestActionTrigger(triggerContext, svTaskContext))
+  def start(): Unit = {
+    registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
+    registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
+    if (config.automation.enableSvcGovernance) {
+      registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
+      registerTrigger(new ExecuteVoteRequestActionTrigger(triggerContext, svTaskContext))
+    }
+    registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
+
+    if (config.automation.enableExpireCoin) {
+      registerTrigger(new ExpiredCoinTrigger(triggerContext, svTaskContext))
+    }
+
+    registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpireVoteRequestTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
+    registerTrigger(new SvcRewardTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpireStaleConfirmationsTrigger(triggerContext, svTaskContext))
+    registerTrigger(new GarbageCollectCoinPriceVotesTrigger(triggerContext, svTaskContext))
+
+    registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svTaskContext))
+    if (config.automation.enableUnclaimedRewardExpiration) {
+      registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svTaskContext))
+    }
+
+    registerTrigger(new ExpireElectionRequestsTrigger(triggerContext, svTaskContext))
+    registerTrigger(new CnsSubscriptionRenewalPaymentTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpiredCnsEntryTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpiredCnsSubscriptionTrigger(triggerContext, svTaskContext))
+    registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
   }
-  registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
 
-  if (config.automation.enableExpireCoin) {
-    registerTrigger(new ExpiredCoinTrigger(triggerContext, svTaskContext))
-  }
-
-  registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExpireVoteRequestTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
-  registerTrigger(new SvcRewardTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExpireStaleConfirmationsTrigger(triggerContext, svTaskContext))
-  registerTrigger(new GarbageCollectCoinPriceVotesTrigger(triggerContext, svTaskContext))
-
-  registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svTaskContext))
-  if (config.automation.enableUnclaimedRewardExpiration) {
-    registerTrigger(new ExpireRewardCouponsTrigger(triggerContext, svTaskContext))
-  }
-
-  registerTrigger(new ExpireElectionRequestsTrigger(triggerContext, svTaskContext))
-  registerTrigger(new CnsSubscriptionRenewalPaymentTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExpiredCnsEntryTrigger(triggerContext, svTaskContext))
-  registerTrigger(new ExpiredCnsSubscriptionTrigger(triggerContext, svTaskContext))
-  registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
 }

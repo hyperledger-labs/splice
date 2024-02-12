@@ -31,7 +31,7 @@ class UserWalletService(
     treasuryConfig: TreasuryConfig,
     storage: Storage,
     override protected[this] val retryProvider: RetryProvider,
-    loggerFactory0: NamedLoggerFactory,
+    override val loggerFactory: NamedLoggerFactory,
     scanConnection: BftScanConnection,
 )(implicit
     ec: ExecutionContext,
@@ -43,9 +43,6 @@ class UserWalletService(
     with FlagCloseable
     with NamedLogging
     with HasHealth {
-
-  override protected val loggerFactory: NamedLoggerFactory =
-    loggerFactory0.append("user", key.endUserName)
 
   val store: UserWalletStore =
     UserWalletStore(
@@ -60,7 +57,7 @@ class UserWalletService(
     ledgerClient.connection(
       this.getClass.getSimpleName,
       loggerFactory,
-      PackageIdResolver.inferFromCoinRules(clock, scanConnection, loggerFactory0),
+      PackageIdResolver.inferFromCoinRules(clock, scanConnection, loggerFactory),
     ),
     treasuryConfig,
     clock,

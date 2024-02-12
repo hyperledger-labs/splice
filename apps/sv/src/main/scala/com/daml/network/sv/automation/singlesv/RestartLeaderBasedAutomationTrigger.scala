@@ -61,6 +61,12 @@ class RestartLeaderBasedAutomationTrigger(
 
   def epochState: Option[EpochState] = epochStateVar
 
+  appLevelRetryProvider.runOnShutdownWithPriority_(new RunOnShutdown {
+    override def name = s"set per-epoch retry provider as closing"
+    override def done = false
+    override def run() = epochStateVar.foreach(_.retryProvider.setAsClosing())
+  })(TraceContext.empty)
+
   appLevelRetryProvider.runOnShutdown_(new RunOnShutdown {
     override def name = s"shutdown per-epoch retry provider"
     override def done = false
@@ -121,9 +127,13 @@ class RestartLeaderBasedAutomationTrigger(
        closeRetryProvider()
        closeService()
 
+       val leaderLoggerFactory = loggerFactory.appendUnnamedKey(
+         "isLeader",
+         (svcRules.contract.payload.leader == store.key.svParty.toProtoPrimitive).toString,
+       )
        val retryProvider =
          RetryProvider(
-           loggerFactory,
+           leaderLoggerFactory,
            timeouts,
            appLevelRetryProvider.futureSupervisor,
            context.metricsFactory,
@@ -133,7 +143,7 @@ class RestartLeaderBasedAutomationTrigger(
          config,
          svTaskContext,
          retryProvider,
-         loggerFactory,
+         leaderLoggerFactory,
        )
 
        epochStateVar = Some(
@@ -153,6 +163,10 @@ class RestartLeaderBasedAutomationTrigger(
          closeService()
          UnlessShutdown.AbortedDueToShutdown
        } else {
+         // Delay startup of tasks until here.
+         // Even if right after the else, but before starting, it starts shutdown, that's okay,
+         // because the child RetryProvider is already scheduled for shutdown.
+         leaderBasedAutomation.start()
          UnlessShutdown.Outcome(TaskSuccess(s"Started automation for epoch $epoch"))
        }
      }).onShutdown(

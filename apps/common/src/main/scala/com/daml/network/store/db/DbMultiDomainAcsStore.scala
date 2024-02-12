@@ -91,9 +91,18 @@ class DbMultiDomainAcsStore[TXE](
   // before the ACS is fully ingested. We therefore delay all queries until the ACS is ingested.
   private val finishedAcsIngestion: Promise[Unit] = Promise()
   def waitUntilAcsIngested[T](f: => Future[T]): Future[T] =
-    finishedAcsIngestion.future.flatMap(_ => f)
+    waitUntilAcsIngested().flatMap(_ => f)
+
   def waitUntilAcsIngested(): Future[Unit] =
-    finishedAcsIngestion.future
+    retryProvider
+      .waitUnlessShutdown(finishedAcsIngestion.future)
+      .failOnShutdownTo {
+        io.grpc.Status.UNAVAILABLE
+          .withDescription(
+            s"Aborted waitUntilAcsIngested, as RetryProvider(${retryProvider.loggerFactory.properties}) is shutting down in store $storeDescriptor"
+          )
+          .asRuntimeException()
+      }
 
   override def lookupContractById[C, TCid <: ContractId[_], T](companion: C)(id: ContractId[_])(
       implicit

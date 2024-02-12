@@ -87,6 +87,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
     s"restarting after ${context.config.pollingInterval}",
     context.metricsFactory,
     mc.labels,
+    context.retryProvider,
   )
 
   override def isHealthy: Boolean = pollingLoopRef.get().exists(!_.isCompleted)

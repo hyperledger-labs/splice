@@ -126,9 +126,7 @@ final class RetryProvider(
   )(implicit ec: ExecutionContext): FutureUnlessShutdown[T] = {
     val signalOrShutdown = Promise[UnlessShutdown[T]]()
     promisesRunningThatAreShutdownAware
-      .add(
-        signalOrShutdown.asInstanceOf[Promise[UnlessShutdown[?]]]
-      )
+      .add(signalOrShutdown.asInstanceOf[Promise[UnlessShutdown[?]]])
       .discard
     signalOrShutdown.completeWith(waitForSignal.map(UnlessShutdown.Outcome(_)))
     // complete in case this call raced with the shutdown of the RetryProvider
@@ -390,7 +388,10 @@ final class RetryProvider(
       retryConfig.maxDelay,
       operationName,
       resetRetriesAfter = retryConfig.resetRetriesAfter,
-    ).apply(task, mkRetryable(operationName, retryable, metricsFactory, additionalMetricsLabels))
+    ).apply(
+      task,
+      mkRetryable(operationName, retryable, metricsFactory, additionalMetricsLabels, this),
+    )
   }
 }
 
@@ -431,6 +432,7 @@ object RetryProvider {
       fatalBehavior: String,
       metricsFactory: CantonLabeledMetricsFactory,
       additionalMetricsLabels: Map[String, String],
+      flagCloseable: FlagCloseable,
   ) extends ExceptionRetryable {
     // Additional categories that are not marked as retryable but we
     // can safely retry since we know there are other apps or
@@ -474,156 +476,163 @@ object RetryProvider {
     override def retryOK(outcome: Try[_], logger: TracedLogger, lastErrorKind: Option[ErrorKind])(
         implicit tc: TraceContext
     ): ErrorKind = {
-      val errorKind = outcome match {
-        case Failure(
-              ex @ GrpcException(status @ GrpcStatus(statusCode, someDescription), trailers)
-            ) =>
-          val description = someDescription.getOrElse("No description provided")
-          val errorCategory = someDescription.flatMap(ErrorCodeUtils.errorCategoryFromString)
-          val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
-          val errorDetails = ErrorDetails.from(statusProto)
+      val errorKind = if (flagCloseable.isClosing) {
+        logger.info(
+          s"The operation ${operationName.singleQuoted} failed due to shutdown in process (full stack trace omitted): $outcome"
+        )
+        TransientErrorKind
+      } else {
+        outcome match {
+          case Failure(
+                ex @ GrpcException(status @ GrpcStatus(statusCode, someDescription), trailers)
+              ) =>
+            val description = someDescription.getOrElse("No description provided")
+            val errorCategory = someDescription.flatMap(ErrorCodeUtils.errorCategoryFromString)
+            val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
+            val errorDetails = ErrorDetails.from(statusProto)
 
-          def fatalError: ErrorKind = {
-            logger.warn(
-              Seq(
-                s"The operation ${operationName.singleQuoted} failed with a $nonTransientDescription error, $fatalBehavior:",
-                s"category=$errorCategory",
-                s"statusCode=$statusCode",
-                s"description=$description",
+            def fatalError: ErrorKind = {
+              logger.warn(
+                Seq(
+                  s"The operation ${operationName.singleQuoted} failed with a $nonTransientDescription error, $fatalBehavior:",
+                  s"category=$errorCategory",
+                  s"statusCode=$statusCode",
+                  s"description=$description",
+                )
+                  .appendedAll(errorDetails.map(_.toString))
+                  .mkString("\n"),
+                ex,
               )
-                .appendedAll(errorDetails.map(_.toString))
-                .mkString("\n"),
+              FatalErrorKind
+            }
+
+            errorCategory match {
+              case Some(cat) if cat.retryable.nonEmpty || extraRetryableCategories.contains(cat) =>
+                //  don't log the stack traces of transient gRPC exceptions to make the logs less noisy.
+                val msg =
+                  Seq(
+                    s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted):",
+                    s"category=$errorCategory",
+                  )
+                    // the message of the exception is already in the error details, so we don't need to append it
+                    .appendedAll(errorDetails.map(_.toString))
+                logger.info(msg.mkString("\n"))
+                TransientErrorKind
+              case _
+                  if retryableStatusCodes.contains(statusCode) ||
+                    (
+                      // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
+                      statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
+                        "An error occurred. Please contact the operator and inquire about the request"
+                      ) ||
+                        // This can happen if the party allocation has not yet been propagated to the new domain.
+                        statusCode == Status.Code.INVALID_ARGUMENT &&
+                        raw"No participant of the party .* has confirmation permission on both domains at respective timestamps".r
+                          .findFirstMatchIn(description)
+                          .isDefined
+                        ||
+                        // TODO (#8011) Remove me once Canton yields a different error for in-flight contracts
+                        (statusCode == Status.Code.INVALID_ARGUMENT &&
+                          errorDetails.exists {
+                            case ed: ErrorDetails.ErrorInfoDetail =>
+                              ed.errorCodeId == com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.MalformedRequest.id &&
+                              ed.metadata.get("reason").exists(_ contains "Unknown contract")
+                            case _ => false
+                          })
+                        ||
+                        // CANCELLED can also be a deliberate cancellation from the client
+                        // so we only retry if we observe RST_STREAM which we sometimes see
+                        // around Canton restarts.
+                        (statusCode == Status.Code.CANCELLED && description.contains(
+                          "RST_STREAM closed stream"
+                        )) ||
+                        // UNKNOWN channel closed can be reported by java-grpc when the connection gets torn forcefully
+                        // by toxiproxy (or a like network condition). See #4256 for details.
+                        (statusCode == Status.Code.UNKNOWN && description.contains(
+                          "channel closed"
+                        )) ||
+                        // DbStorage instance could still be in passive state during startup
+                        (statusCode == Status.Code.INTERNAL && description.contains(
+                          "DbStorage instance is not active"
+                        )) ||
+                        // additional codes subject to conditions
+                        additionalConditions
+                          .get(statusCode)
+                          .exists(_.matches(errorCategory))
+                    ) =>
+                val msg = Seq(
+                  s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): ${ex.getMessage}",
+                  s"statusCode=$statusCode",
+                )
+                logger.info(msg.mkString("\n"))
+                TransientErrorKind
+              case _ => fatalError
+            }
+
+          case Failure(
+                ex: StreamTcpException
+              ) =>
+            val msg =
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+            logger.info(msg)
+            TransientErrorKind
+          case Failure(
+                ex: BaseAppConnection.UnexpectedHttpResponse
+              ) =>
+            // TODO (tech-debt) Revisit whether we can provide more useful info here.
+            val msg =
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+            logger.info(msg)
+            TransientErrorKind
+          case Failure(ex @ HttpCommandException(_, status, _)) =>
+            if (retryableHttpStatusCodes.contains(status)) {
+              logger.info(
+                s"The operation ${operationName.singleQuoted} failed with a $transientDescription HTTP error: $ex"
+              )
+              TransientErrorKind
+            } else {
+              logger.warn(
+                s"The operation ${operationName.singleQuoted} failed with a $nonTransientDescription HTTP error, $fatalBehavior: $ex"
+              )
+              FatalErrorKind
+            }
+          // We encounter this with toxiproxy if the upstream is not yet up.
+          // The exception type is org.apache.pekko.http.impl.engine.client.OutgoingConnectionBlueprint.UnexpectedConnectionClosureException
+          // but pekko-http does not expose that so we match on the message instead.
+          case Failure(ex: RuntimeException)
+              if Option(ex.getMessage).exists(
+                _.contains(
+                  "The http server closed the connection unexpectedly before delivering responses"
+                )
+              ) =>
+            val msg =
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+            logger.info(msg)
+            TransientErrorKind
+          // IOExceptions are checked exceptions that are typically raised when external systems or devices are acting up.
+          // We add this default retry, as that is more likely to be helpful than failing fatally.
+          case Failure(ex: IOException) =>
+            val msg =
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+            logger.info(msg)
+            TransientErrorKind
+          case Failure(ex: java.util.concurrent.TimeoutException) =>
+            val msg =
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+            logger.info(msg)
+            TransientErrorKind
+          case Failure(ex: QuietNonRetryableException) =>
+            logger.info(
+              s"The operation ${operationName.singleQuoted} failed with a non retryable error, $fatalBehavior",
               ex,
             )
             FatalErrorKind
-          }
-
-          errorCategory match {
-            case Some(cat) if cat.retryable.nonEmpty || extraRetryableCategories.contains(cat) =>
-              //  don't log the stack traces of transient gRPC exceptions to make the logs less noisy.
-              val msg =
-                Seq(
-                  s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted):",
-                  s"category=$errorCategory",
-                )
-                  // the message of the exception is already in the error details, so we don't need to append it
-                  .appendedAll(errorDetails.map(_.toString))
-              logger.info(msg.mkString("\n"))
-              TransientErrorKind
-            case _
-                if retryableStatusCodes.contains(statusCode) ||
-                  (
-                    // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
-                    statusCode == Status.Code.INVALID_ARGUMENT && description.contains(
-                      "An error occurred. Please contact the operator and inquire about the request"
-                    ) ||
-                      // This can happen if the party allocation has not yet been propagated to the new domain.
-                      statusCode == Status.Code.INVALID_ARGUMENT &&
-                      raw"No participant of the party .* has confirmation permission on both domains at respective timestamps".r
-                        .findFirstMatchIn(description)
-                        .isDefined
-                      ||
-                      // TODO (#8011) Remove me once Canton yields a different error for in-flight contracts
-                      (statusCode == Status.Code.INVALID_ARGUMENT &&
-                        errorDetails.exists {
-                          case ed: ErrorDetails.ErrorInfoDetail =>
-                            ed.errorCodeId == com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.MalformedRequest.id &&
-                            ed.metadata.get("reason").exists(_ contains "Unknown contract")
-                          case _ => false
-                        })
-                      ||
-                      // CANCELLED can also be a deliberate cancellation from the client
-                      // so we only retry if we observe RST_STREAM which we sometimes see
-                      // around Canton restarts.
-                      (statusCode == Status.Code.CANCELLED && description.contains(
-                        "RST_STREAM closed stream"
-                      )) ||
-                      // UNKNOWN channel closed can be reported by java-grpc when the connection gets torn forcefully
-                      // by toxiproxy (or a like network condition). See #4256 for details.
-                      (statusCode == Status.Code.UNKNOWN && description.contains(
-                        "channel closed"
-                      )) ||
-                      // DbStorage instance could still be in passive state during startup
-                      (statusCode == Status.Code.INTERNAL && description.contains(
-                        "DbStorage instance is not active"
-                      )) ||
-                      // additional codes subject to conditions
-                      additionalConditions
-                        .get(statusCode)
-                        .exists(_.matches(errorCategory))
-                  ) =>
-              val msg = Seq(
-                s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): ${ex.getMessage}",
-                s"statusCode=$statusCode",
-              )
-              logger.info(msg.mkString("\n"))
-              TransientErrorKind
-            case _ => fatalError
-          }
-
-        case Failure(
-              ex: StreamTcpException
-            ) =>
-          val msg =
-            s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
-          logger.info(msg)
-          TransientErrorKind
-        case Failure(
-              ex: BaseAppConnection.UnexpectedHttpResponse
-            ) =>
-          // TODO (tech-debt) Revisit whether we can provide more useful info here.
-          val msg =
-            s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
-          logger.info(msg)
-          TransientErrorKind
-        case Failure(ex @ HttpCommandException(_, status, _)) =>
-          if (retryableHttpStatusCodes.contains(status)) {
-            logger.info(
-              s"The operation ${operationName.singleQuoted} failed with a $transientDescription HTTP error: $ex"
-            )
-            TransientErrorKind
-          } else {
-            logger.warn(
-              s"The operation ${operationName.singleQuoted} failed with a $nonTransientDescription HTTP error, $fatalBehavior: $ex"
-            )
+          case Failure(ex) =>
+            logger.warn(s"$operationName failed with an unknown exception, $fatalBehavior", ex)
             FatalErrorKind
-          }
-        // We encounter this with toxiproxy if the upstream is not yet up.
-        // The exception type is org.apache.pekko.http.impl.engine.client.OutgoingConnectionBlueprint.UnexpectedConnectionClosureException
-        // but pekko-http does not expose that so we match on the message instead.
-        case Failure(ex: RuntimeException)
-            if Option(ex.getMessage).exists(
-              _.contains(
-                "The http server closed the connection unexpectedly before delivering responses"
-              )
-            ) =>
-          val msg =
-            s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
-          logger.info(msg)
-          TransientErrorKind
-        // IOExceptions are checked exceptions that are typically raised when external systems or devices are acting up.
-        // We add this default retry, as that is more likely to be helpful than failing fatally.
-        case Failure(ex: IOException) =>
-          val msg =
-            s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
-          logger.info(msg)
-          TransientErrorKind
-        case Failure(ex: java.util.concurrent.TimeoutException) =>
-          val msg =
-            s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
-          logger.info(msg)
-          TransientErrorKind
-        case Failure(ex: QuietNonRetryableException) =>
-          logger.info(
-            s"The operation ${operationName.singleQuoted} failed with a non retryable error, $fatalBehavior",
-            ex,
-          )
-          FatalErrorKind
-        case Failure(ex) =>
-          logger.warn(s"$operationName failed with an unknown exception, $fatalBehavior", ex)
-          FatalErrorKind
-        case util.Success(_) =>
-          NoErrorKind
+          case util.Success(_) =>
+            NoErrorKind
+        }
       }
       val errorKindLabel = errorKind match {
         case RetryUtil.NoErrorKind => "no_kind"
@@ -646,6 +655,7 @@ object RetryProvider {
         a: A,
         metricsFactory: CantonLabeledMetricsFactory,
         additionalMetricsLabels: Map[String, String],
+        flagCloseable: FlagCloseable,
     ): ExceptionRetryable
   }
 
@@ -657,6 +667,7 @@ object RetryProvider {
             a: String => ExceptionRetryable,
             metricsFactory: CantonLabeledMetricsFactory,
             additionalMetricsLabels: Map[String, String],
+            flagCloseable: FlagCloseable,
         ) = a(operationName)
       }
 
@@ -666,6 +677,7 @@ object RetryProvider {
           additionalCodes: Seq[Status.Code],
           metricsFactory: CantonLabeledMetricsFactory,
           additionalMetricsLabels: Map[String, String],
+          flagCloseable: FlagCloseable,
       ) = RetryProvider.RetryableError(
         operationName,
         additionalCodes,
@@ -675,6 +687,7 @@ object RetryProvider {
         fatalBehavior,
         metricsFactory,
         additionalMetricsLabels,
+        flagCloseable,
       )
     }
 
@@ -685,6 +698,7 @@ object RetryProvider {
             additionalConditions: RetryableConditions,
             metricsFactory: CantonLabeledMetricsFactory,
             additionalMetricsLabels: Map[String, String],
+            flagCloseable: FlagCloseable,
         ) = RetryProvider.RetryableError(
           operationName,
           Seq.empty,
@@ -694,6 +708,7 @@ object RetryProvider {
           fatalBehavior,
           metricsFactory,
           additionalMetricsLabels,
+          flagCloseable,
         )
       }
   }
