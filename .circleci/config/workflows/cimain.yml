@@ -41,6 +41,7 @@ workflow:
           test_names_file: "test-full-class-names-core-preflight.log"
           parallelism: 1
           requires:
+            - wait_for_previous_pipeline
             - docker_images_push
       - preflight_check:
           name: "trigger_global_domain_migration"
