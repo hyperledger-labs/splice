@@ -8,7 +8,9 @@ import io.fabric8.kubernetes.api.model.{Secret, SecretBuilder}
 import com.daml.network.auth.AuthToken
 import com.digitalasset.canton.data.CantonTimestamp
 import com.typesafe.scalalogging.Logger
+import io.circe.parser.decode as circeDecode
 
+import scala.annotation.nowarn
 import scala.util.control.NonFatal
 
 object K8sUtil {
@@ -64,7 +66,6 @@ object K8sUtil {
   object PreflightTokenAccessor {
     private val preflightTokenSecretName = "auth0-preflight-token-cache"
 
-    import spray.json.*
     private case class Auth0PreflightTokenData(accessToken: String, expiresAtMillis: Long) {
       def toAuthToken: AuthToken =
         AuthToken(
@@ -73,10 +74,13 @@ object K8sUtil {
         )
     }
 
-    private object TokenDataJsonProtocol extends DefaultJsonProtocol {
-      implicit val tokenFormat: RootJsonFormat[Auth0PreflightTokenData] = jsonFormat2(
-        Auth0PreflightTokenData
-      )
+    @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
+    private object TokenDataJsonProtocol {
+      import io.circe.{Decoder, Encoder}
+      import io.circe.generic.semiauto.*
+
+      implicit val tokenDecoder: Decoder[Auth0PreflightTokenData] = deriveDecoder
+      implicit val tokenEncoder: Encoder[Auth0PreflightTokenData] = deriveEncoder
     }
     import TokenDataJsonProtocol.*
 
@@ -85,7 +89,8 @@ object K8sUtil {
         case Some(secretData) =>
           // TODO (#8039): remove try catch, logging and fallback to None (let it crash, which shouldn't happen)
           try {
-            val token = secretData.parseJson.convertTo[Auth0PreflightTokenData].toAuthToken
+            val token =
+              circeDecode[Auth0PreflightTokenData](secretData).fold(throw _, identity).toAuthToken
             if (token.expiresAt.isBefore(CantonTimestamp.now())) {
               None
             } else {
@@ -105,10 +110,11 @@ object K8sUtil {
     }
 
     def savePreflightToken(clientId: String, token: AuthToken) = {
+      import io.circe.syntax.*
       val tokenJson = Auth0PreflightTokenData(
         token.accessToken,
         expiresAtMillis = token.expiresAt.toEpochMilli,
-      ).toJson.compactPrint
+      ).asJson.noSpaces
 
       val secret = new SecretBuilder()
         .withNewMetadata()

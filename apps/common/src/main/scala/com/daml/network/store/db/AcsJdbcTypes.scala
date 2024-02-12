@@ -12,9 +12,9 @@ import com.digitalasset.canton.config.CantonRequireTypes.{String2066, String300}
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import io.circe.Json
+import io.circe.parser.parse as circeParse
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, SetParameter}
-import spray.json.*
 
 import java.sql.{PreparedStatement, ResultSet}
 import com.google.protobuf.ByteString
@@ -169,22 +169,10 @@ trait AcsJdbcTypes {
       pp.setObject(json.noSpaces, java.sql.Types.OTHER)
     }
 
-  protected implicit lazy val jsValueGetResult: GetResult[JsValue] = GetResult { rs =>
-    val value = rs.nextString()
-    if (rs.wasNull())
-      throw new IllegalStateException("Tried to deserialize as Json, but the value was null.")
-    else
-      spray.json.JsonParser(value)
-  }
-
-  protected implicit lazy val jsValueSetParameter: SetParameter[JsValue] =
-    (jsValue: JsValue, pp: PositionedParameters) =>
-      pp.setObject(jsValue.compactPrint, java.sql.Types.OTHER)
-
-  protected implicit lazy val jsValueSetParameterOption: SetParameter[Option[JsValue]] =
-    (jsValueOpt: Option[JsValue], pp: PositionedParameters) =>
+  protected implicit lazy val jsonSetParameterOption: SetParameter[Option[Json]] =
+    (jsValueOpt: Option[Json], pp: PositionedParameters) =>
       jsValueOpt match {
-        case Some(jsValue) => jsValueSetParameter(jsValue, pp)
+        case Some(jsValue) => jsonSetParameter(jsValue, pp)
         case None => pp.setNull(java.sql.Types.OTHER)
       }
 
@@ -209,7 +197,7 @@ trait AcsJdbcTypes {
 
   protected def payloadJsonFromDefinedDataType(
       data: DefinedDataType[?]
-  ): JsValue = AcsJdbcTypes.payloadJsonFromDefinedDataType(data)
+  ): Json = AcsJdbcTypes.payloadJsonFromDefinedDataType(data)
 
   /** The DB may truncate strings of unbounded length, so it's advised to use a LengthLimitedString instead.
     * We use String2066 because it's the max length of an [[com.digitalasset.canton.protocol.LfTemplateId]].
@@ -240,15 +228,16 @@ object AcsJdbcTypes {
   // comparing the same data in a data-aware way. That's why we *must* use
   // numbers-as-numbers in this codec, and why ISO-8601 strings
   // for dates and timestamps are so important.
+  @throws[io.circe.ParsingFailure]
   def payloadJsonFromDefinedDataType(
       data: DefinedDataType[?]
-  ): JsValue = {
+  ): Json = {
     val sw = new StringWriter()
     val jw = new JsonLfWriter(
       sw,
       JsonLfWriter.opts().encodeInt64AsString(false).encodeNumericAsString(false),
     )
     data.jsonEncoder.encode(jw)
-    sw.toString.parseJson
+    circeParse(sw.toString).fold(throw _, identity)
   }
 }

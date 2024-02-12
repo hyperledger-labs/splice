@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.PartyId
 import java.time.ZoneOffset
 import scala.math.BigDecimal.RoundingMode
 
-trait TxLogEntry {
+trait TxLogEntry extends Product with Serializable {
   // Scan store uses the eventId for pagination
   def eventId: String
 }

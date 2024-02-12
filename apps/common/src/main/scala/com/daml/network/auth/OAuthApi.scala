@@ -45,6 +45,7 @@ object OAuthApi {
   )
 }
 
+// we use spray rather than circe here for its interaction with pekko http
 trait OAuthApiJson extends SprayJsonSupport with DefaultJsonProtocol {
   implicit val wellKnownResponseFormat: RootJsonFormat[OAuthApi.WellKnownResponse] = jsonFormat4(
     OAuthApi.WellKnownResponse

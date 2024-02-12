@@ -9,7 +9,7 @@ import com.daml.network.sv.store.{DefiniteVoteTxLogEntry, ErrorTxLogEntry, TxLog
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{Member, PartyId}
-import spray.json.JsValue
+import io.circe.Json
 
 object SvcTables extends AcsTables with NamedLogging {
 
@@ -25,7 +25,7 @@ object SvcTables extends AcsTables with NamedLogging {
       rewardRound: Option[Long] = None,
       rewardParty: Option[PartyId] = None,
       miningRound: Option[Long] = None,
-      actionRequiringConfirmation: Option[JsValue] = None,
+      actionRequiringConfirmation: Option[Json] = None,
       confirmer: Option[PartyId] = None,
       svOnboardingToken: Option[String] = None,
       svCandidateParty: Option[PartyId] = None,

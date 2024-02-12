@@ -20,7 +20,6 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import io.circe.Json
-import spray.json.*
 
 import java.util.zip.ZipInputStream
 
@@ -107,7 +106,7 @@ class ResourceTemplateDecoder(
       entityName: Ref.TypeConName,
       json: Json,
   ): T = {
-    val sprayJson = json.noSpaces.parseJson
+    val sprayJson = JsonUtil.circeJsonToSprayJsValue(json)
     val lfValue = ApiCodecCompressed.jsValueToApiValue(
       sprayJson,
       entityName,

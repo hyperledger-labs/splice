@@ -42,6 +42,7 @@ object TxLogEntry extends StoreErrors {
     }
     (entryType, jsonValue)
   }
+
   def decode(entryType: String3, json: String): TxLogEntry = {
     import scalapb.json4s.JsonFormat.fromJsonString as from
     try {

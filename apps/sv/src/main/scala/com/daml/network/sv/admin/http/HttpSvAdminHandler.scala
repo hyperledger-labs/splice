@@ -24,7 +24,7 @@ import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
-import com.daml.network.util.{BackupDump, Codec, JsonUtil, TemplateJsonDecoder}
+import com.daml.network.util.{BackupDump, Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
@@ -308,13 +308,7 @@ class HttpSvAdminHandler(
       } yield {
         definitions.ListSvcRulesVoteResultsResponse(
           voteResults
-            .map(res =>
-              JsonUtil.sprayJsValueToCirceJson(
-                payloadJsonFromDefinedDataType(
-                  res
-                )
-              )
-            )
+            .map(payloadJsonFromDefinedDataType)
             .toVector
         )
       }

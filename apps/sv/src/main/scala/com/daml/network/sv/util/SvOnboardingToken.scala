@@ -3,42 +3,42 @@ package com.daml.network.sv.util
 import com.auth0.jwt.{JWT, JWTVerifier}
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.DecodedJWT
-import com.daml.network.util.Codec
+import com.daml.network.util.{Codec, CodecCompanion}
 import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
-import spray.json.*
+import io.circe.parser.decode as circeDecode
+import io.circe.syntax.*
 
 import java.security.interfaces.ECPrivateKey
 import scala.util.Try
 
-private object JsonProtocol extends DefaultJsonProtocol {
-  implicit object SvOnboardingTokenJsonFormat extends RootJsonFormat[SvOnboardingToken] {
-    def write(t: SvOnboardingToken) = JsObject(
-      "name" -> JsString(t.candidateName),
-      "key" -> JsString(t.candidateKey),
-      "party" -> JsString(t.candidateParty.toProtoPrimitive),
-      "participantId" -> JsString(t.candidateParticipantId.toProtoPrimitive),
-      "svc" -> JsString(t.svcParty.toProtoPrimitive),
+private object JsonProtocol {
+  import io.circe.{Decoder, Encoder, Json}
+  implicit val SvOnboardingTokenEncoder: Encoder[SvOnboardingToken] = t =>
+    Json.obj(
+      "name" -> Json.fromString(t.candidateName),
+      "key" -> Json.fromString(t.candidateKey),
+      "party" -> Json.fromString(t.candidateParty.toProtoPrimitive),
+      "participantId" -> Json.fromString(t.candidateParticipantId.toProtoPrimitive),
+      "svc" -> Json.fromString(t.svcParty.toProtoPrimitive),
     )
-    def read(value: JsValue) = {
-      value.asJsObject.getFields("name", "key", "party", "participantId", "svc") match {
-        case Seq(
-              JsString(name),
-              JsString(key),
-              JsString(partyS),
-              JsString(participantId),
-              JsString(svcS),
-            ) =>
-          (for {
-            party <- Codec.decode(Codec.Party)(partyS)
-            svc <- Codec.decode(Codec.Party)(svcS)
-            participantId <- Codec.decode(Codec.Participant)(participantId)
-          } yield new SvOnboardingToken(name, key, party, participantId, svc))
-            .getOrElse(throw new DeserializationException("Could not parse party IDs"))
-        case _ => throw new DeserializationException("Wrong fields in JSON object")
-      }
-    }
+
+  implicit val SvOnboardingTokenDecoder: Decoder[SvOnboardingToken] = { c =>
+    implicit val partyDecoder: Decoder[PartyId] = codecDecoder(Codec.Party)
+    implicit val participantDecoder: Decoder[ParticipantId] = codecDecoder(Codec.Participant)
+    for {
+      name <- c.downField("name").as[String]
+      key <- c.downField("key").as[String]
+      party <- c.downField("party").as[PartyId]
+      participantId <- c.downField("participantId").as[ParticipantId]
+      svc <- c.downField("svc").as[PartyId]
+    } yield new SvOnboardingToken(name, key, party, participantId, svc)
   }
+
+  private[this] def codecDecoder[Dec](codec: CodecCompanion[Dec])(implicit
+      json: Decoder[codec.Enc]
+  ): Decoder[Dec] =
+    json emap codec.instance.decode
 }
 import JsonProtocol.*
 
@@ -54,7 +54,7 @@ case class SvOnboardingToken(
     token <- Try(
       JWT
         .create()
-        .withClaim(SvOnboardingToken.Claim, this.toJson.toString())
+        .withClaim(SvOnboardingToken.Claim, this.asJson.noSpaces)
         .sign(Algorithm.ECDSA256(publicKey, privateKey))
     ).toEither.left.map(_.toString())
   } yield token
@@ -81,7 +81,7 @@ object SvOnboardingToken {
 
   private def extractPayload(decodedToken: DecodedJWT): Either[String, SvOnboardingToken] = {
     val payload = decodedToken.getClaim(Claim)
-    Try(payload.asString.parseJson.convertTo[SvOnboardingToken]).toEither.left.map(_.toString())
+    circeDecode[SvOnboardingToken](payload.asString).left.map(_.toString())
   }
 
   private def decodeNoVerify(token: String): Either[String, DecodedJWT] =

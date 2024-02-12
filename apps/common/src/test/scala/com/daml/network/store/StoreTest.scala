@@ -49,10 +49,11 @@ import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.protocol.LfContractId
 import com.google.protobuf.ByteString
-import spray.json.{DefaultJsonProtocol, RootJsonFormat}
+import io.circe.{Decoder, Encoder}
 
 import java.time.{Duration, Instant}
 import java.util.Optional
+import scala.annotation.nowarn
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -886,27 +887,26 @@ object StoreTest {
 
     val dbType: String3 = String3.tryCreate("tte")
     def encode(entry: TestTxLogEntry): (String3, String) = {
-      import spray.json.*
+      import io.circe.syntax.*
       import TestTxLogEntry.JsonProtocol.*
-      (TestTxLogEntry.dbType, entry.toJson.compactPrint)
+      (TestTxLogEntry.dbType, entry.asJson.noSpaces)
     }
     def decode(dbType: String3, str: String): TestTxLogEntry = {
+      import io.circe.parser.decode as jsdec
       import TestTxLogEntry.JsonProtocol.*
-      import spray.json.*
-      val json = str.parseJson
-      try {
-        dbType match {
-          case TestTxLogEntry.dbType => json.convertTo[TestTxLogEntry]
-          case _ => throw txDecodingFailed()
-        }
-      } catch {
-        case _: DeserializationException => throw txDecodingFailed()
-      }
+      (dbType match {
+        case TestTxLogEntry.dbType => jsdec[TestTxLogEntry](str)
+        case _ => throw txDecodingFailed()
+      }).fold(_ => throw txDecodingFailed(), identity)
     }
 
-    object JsonProtocol extends DefaultJsonProtocol {
-      implicit val partyBalanceChangeFormat: RootJsonFormat[TestTxLogEntry] =
-        jsonFormat1(TestTxLogEntry.apply)
+    @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
+    object JsonProtocol {
+      import io.circe.generic.semiauto.*
+      implicit val partyBalanceChangeDecoder: Decoder[TestTxLogEntry] =
+        deriveDecoder
+      implicit val partyBalanceChangeEncoder: Encoder[TestTxLogEntry] =
+        deriveEncoder
     }
   }
 

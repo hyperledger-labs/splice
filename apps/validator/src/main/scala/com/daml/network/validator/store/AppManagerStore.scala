@@ -10,6 +10,7 @@ import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.ContractWithState
 import com.daml.network.util.PrettyInstances.*
+import com.daml.network.util.JsonUtil.circeJsonToSprayJsValue
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.crypto.{Hash, HashAlgorithm, HashPurpose}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -421,10 +422,9 @@ object AppManagerStore {
   private val releaseConfigurationHashPurpose = HashPurpose(40, "ReleaseConfiguration")
 
   private def hashReleaseConfiguration(configuration: definitions.ReleaseConfiguration): Hash = {
-    import spray.json.*
     import com.digitalasset.canton.platform.apiserver.meteringreport.Jcs
     val serialized = Jcs
-      .serialize(configuration.asJson.noSpaces.parseJson)
+      .serialize(circeJsonToSprayJsValue(configuration.asJson))
       .valueOr(err =>
         throw Status.INTERNAL
           .withDescription(show"Failed to serialize release configuration as JSON: $err")
