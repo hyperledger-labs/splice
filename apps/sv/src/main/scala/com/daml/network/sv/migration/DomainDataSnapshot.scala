@@ -61,6 +61,9 @@ object DomainDataSnapshot {
     dars,
   )
 
+  /** The snapshot must be obtained only after the we have waited for participantResponseTimeout and the mediatorReactionTimeout after the timestamp provided.
+    * This must be enforced by the caller and only then is the `force = true` flag safe.
+    */
   def getDomainDataSnapshot(
       participantAdminConnection: ParticipantAdminConnection,
       svcStore: SvSvcStore,
@@ -70,14 +73,18 @@ object DomainDataSnapshot {
       tc: TraceContext,
   ): Future[DomainDataSnapshot] = for {
     globalDomain <- svcStore.getSvcRules().map(_.domain)
+    snapshotTimestamp = CantonTimestamp.tryFromInstant(timestamp)
     topologySnapshotWithProposals <- participantAdminConnection
       .getTopologySnapshot(
         globalDomain,
-        CantonTimestamp.tryFromInstant(timestamp),
+        snapshotTimestamp,
       )
     topologySnapshot = topologySnapshotWithProposals.filter(_.transaction.isProposal == false)
     acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
-      Set(svcStore.key.svParty, svcStore.key.svcParty)
+      Set(svcStore.key.svParty, svcStore.key.svcParty),
+      timestamp = Some(timestamp),
+      // flag must be enforced only after the timeouts described above
+      force = true,
     )
     darDescriptions <- participantAdminConnection.listDars()
     dars <- darDescriptions.traverse { dar =>

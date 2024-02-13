@@ -160,6 +160,7 @@ class ParticipantAdminConnection(
       parties: Set[PartyId],
       filterDomainId: Option[DomainId] = None,
       timestamp: Option[Instant] = None,
+      force: Boolean = false,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
     val requestComplete = Promise[ByteString]()
     // TODO(#3298) just concatenate the byteString here. Make it scale to 2M contracts.
@@ -171,6 +172,7 @@ class ParticipantAdminConnection(
         timestamp,
         observer,
         Map.empty,
+        force,
       )
     ).discard
     requestComplete.future

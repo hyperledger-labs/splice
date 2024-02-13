@@ -71,7 +71,6 @@ final class DomainUpgradeTrigger(
       for {
         globalDomainId <- svcStore.getSvcRules().map(_.domain)
         domainParamsTopologyResult <- ensureDomainIsPaused(globalDomainId)
-        // TODO(#8761) wait until it's safe, based on params described in the design
         _ <- waitForMediatorAndParticipantResponseTime(globalDomainId, domainParamsTopologyResult)
         _ <- exportMigrationDump(task.work.migrationId, domainParamsTopologyResult.base.validFrom)
       } yield TaskSuccess(show"Triggered domain pause and migration dump export for ${task.work}")

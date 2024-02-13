@@ -392,6 +392,7 @@ object ParticipantAdminCommands {
         timestamp: Option[Instant],
         observer: StreamObserver[ExportAcsResponse],
         contractDomainRenames: Map[DomainId, (DomainId, ProtocolVersion)],
+        force: Boolean,
     ) extends GrpcAdminCommand[
           ExportAcsRequest,
           CancellableContext,
@@ -417,6 +418,7 @@ object ParticipantAdminCommands {
 
               (source.toProtoPrimitive, targetDomain)
             },
+            force = force,
           )
         )
       }
