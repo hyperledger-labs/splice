@@ -1453,9 +1453,14 @@ subcommand_whitelist[prefresh]="Refresh the Pulumi resources in the stack"
 
 function subcmd_prefresh() {
     _production_gate
-    _prompt_to_confirm
+    if [ -n "${CI-}" ]; then
+        _prompt_to_confirm --no-lock
+    else
+        _prompt_to_confirm
+    fi
     _cluster_must_exist
 
+    _uses_pulumi_stack canton-network "canton-network.$GCP_CLUSTER_BASENAME"
     subcmd_pulumi canton-network "canton-network.$GCP_CLUSTER_BASENAME" refresh --yes --skip-preview
 }
 
