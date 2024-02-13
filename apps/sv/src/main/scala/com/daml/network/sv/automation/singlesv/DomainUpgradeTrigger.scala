@@ -33,7 +33,7 @@ final class DomainUpgradeTrigger(
     svcStore: SvSvcStore,
     participantAdminConnection: ParticipantAdminConnection,
     dumpPath: Path,
-    migrationId: Option[Long],
+    migrationId: Long,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
@@ -53,9 +53,9 @@ final class DomainUpgradeTrigger(
         // check if the domain time is after the scheduled time for migration.
         // and the migrationId configured for this SV is not the same as that of the current scheduled migration
         if (
-          domainTime.timestamp.toInstant.isAfter(schedule.time) && migrationId.forall(
-            _ != schedule.migrationId
-          ) && !BackupDump.fileExists(dumpPath)
+          domainTime.timestamp.toInstant.isAfter(schedule.time)
+          && migrationId != schedule.migrationId
+          && !BackupDump.fileExists(dumpPath)
         )
           OptionT.pure[Future](())
         else OptionT.none[Future, Unit]

@@ -89,7 +89,7 @@ class DomainMigrationInitializer(
     )
   ] = {
     val migrationDump = loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
-    if (!config.domainMigrationId.contains(migrationDump.migrationId))
+    if (config.domainMigrationId != migrationDump.migrationId)
       throw Status.INVALID_ARGUMENT
         .withDescription(
           "Migration id from the dump does not match the configured migration id in ths SV. Please check if the SV app is configured with the correct migration id"

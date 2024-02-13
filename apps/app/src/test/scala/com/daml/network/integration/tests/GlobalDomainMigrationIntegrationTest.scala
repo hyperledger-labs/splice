@@ -102,7 +102,7 @@ class GlobalDomainMigrationIntegrationTest
                           url = s"http://localhost:27${mapSvPort(sv)}08",
                         )
                       ),
-                      domainMigrationId = Some(1L),
+                      domainMigrationId = 1L,
                     )
               )
             ) + (
@@ -111,7 +111,7 @@ class GlobalDomainMigrationIntegrationTest
                   .svApps(InstanceName.tryCreate(s"sv1"))
                   .copy(
                     onboarding = None,
-                    domainMigrationId = Some(1L),
+                    domainMigrationId = 1L,
                     domains = SvDomainConfig(global =
                       SvGlobalDomainConfig(
                         alias = DomainAlias.tryCreate("global"),

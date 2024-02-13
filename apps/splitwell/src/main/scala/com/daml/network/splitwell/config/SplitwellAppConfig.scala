@@ -33,6 +33,8 @@ case class SplitwellAppBackendConfig(
     participantClient: CNParticipantClientConfig,
     scanClient: ScanAppClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long = 0L,
     domains: SplitwellDomainConfig,
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.

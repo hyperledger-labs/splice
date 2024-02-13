@@ -154,6 +154,8 @@ case class ValidatorAppBackendConfig(
     participantIdentitiesBackup: Option[BackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
     svValidator: Boolean = false,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long = 0L,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(),
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.

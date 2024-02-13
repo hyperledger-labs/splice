@@ -25,6 +25,8 @@ case class ScanAppBackendConfig(
     override val automation: AutomationConfig = AutomationConfig(),
     ingestFromParticipantBegin: Boolean = false,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long = 0L,
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
 ) extends CNNodeBackendConfig
     with BaseScanAppConfig // TODO(#736): fork or generalize this trait.
