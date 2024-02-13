@@ -88,13 +88,12 @@ jobs:
             fi
             validator_app="validator-app-<< parameters.migration_id >>"
             cncluster wait sv-1 $validator_app
-            # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
-            if [[ "${IS_DEVNET-}" != false ]]; then
+            if (env-bool IS_DEVNET); then
               cncluster wait sv-2 $validator_app
               cncluster wait sv-3 $validator_app
               cncluster wait sv-4 $validator_app
             fi
-            if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" != false ) ]]; then
+            if [[ << parameters.wait_for_sv >> == true && ( env-bool APPROVE_SV_RUNBOOK || env-bool IS_DEVNET ) ]]; then
               cncluster wait sv validator-app
             fi
             echo "Done waiting. All pods in the cluster are:"

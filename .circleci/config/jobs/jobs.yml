@@ -541,8 +541,7 @@ jobs:
           cmd: |
             nodes=""
             if [[ << parameters.include_sv >> != false ]]; then
-              # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
-              if [[ "${IS_DEVNET-}" != false ]]; then
+              if (env-bool IS_DEVNET); then
                 nodes="sv-1 sv-2 sv-3 sv-4"
               else
                 nodes="sv-1"
