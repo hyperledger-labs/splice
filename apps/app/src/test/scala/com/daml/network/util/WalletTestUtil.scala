@@ -1,5 +1,6 @@
 package com.daml.network.util
 
+import com.daml.network.admin.api.client.commands.HttpCommandException
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
@@ -22,6 +23,7 @@ import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import org.apache.pekko.http.scaladsl.model.StatusCodes
 
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
@@ -127,7 +129,16 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       validatorAppBackend: ValidatorAppBackendReference,
   ): org.scalatest.Assertion = {
     // Wallet must report that user is not onboarded
-    val status = walletAppClient.userStatus()
+    val status =
+      try {
+        walletAppClient.userStatus()
+      } catch {
+        case HttpCommandException(_, StatusCodes.ServiceUnavailable, message) =>
+          fail(
+            s"User status reported 503 unavailable: $message. " +
+              "This should be a transient error, until the user's wallet is removed from the UserWalletManager."
+          )
+      }
     status.userOnboarded shouldBe false
     status.userWalletInstalled shouldBe false
 
