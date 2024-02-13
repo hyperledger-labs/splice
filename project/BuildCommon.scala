@@ -46,7 +46,7 @@ object BuildCommon {
       taskKey[Set[File]]("common frontend bundle task to run before the app frontend bundle")
   }
 
-  // TODO(#8146): Remove once #8146 is confirmed as fixed
+  // TODO(#9940): Remove once #8146 is confirmed as fixed
   private[this] def schemasTask(key: TaskKey[_]): Def.Initialize[Task[Set[File]]] = Def.task {
     val toInclude = (key / includeFilter).value
     val toExclude = (key / excludeFilter).value
@@ -76,7 +76,7 @@ object BuildCommon {
     // and uses the nix linker.
     Compile / PB.protocExecutable := new java.io.File(s"${sys.env("PROTOC")}/bin/protoc"),
 
-    // TODO(#8146): Remove once #8146 is confirmed as fixed and we do not need the debugging logs that this provides
+    // TODO(#9940): Remove once #8146 is confirmed as fixed and we do not need the debugging logs that this provides
     Compile / PB.runProtoc := Def.taskDyn {
       val s = streams.value
       if (
