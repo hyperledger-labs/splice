@@ -1344,10 +1344,15 @@ checkErrors := {
     // Note that this will split the given file and then delete it, so it is idempotent.
     Seq(".circleci/canton-scripts/split-canton-logs.sh", logFile, logFileBefore, logFileAfter).!
 
+    import better.files.File
+    val logSpecificIgnores =
+      if (File(ignorePatternsFilename(logName)).exists()) Seq(logName) else Seq.empty
+
     val simtimeIgnorePatterns = if (usesSimtime) Seq("canton_log_simtime_extra") else Seq.empty
     val beforeIgnorePatterns =
-      Seq("canton_log") ++ simtimeIgnorePatterns
-    val afterIgnorePatterns = beforeIgnorePatterns ++ Seq("canton_log_shutdown_extra")
+      Seq("canton_log") ++ simtimeIgnorePatterns ++ logSpecificIgnores
+    val afterIgnorePatterns =
+      beforeIgnorePatterns ++ Seq("canton_log_shutdown_extra") ++ logSpecificIgnores
 
     checkLogs(logFileBefore, beforeIgnorePatterns)
     checkLogs(logFileAfter, afterIgnorePatterns)
