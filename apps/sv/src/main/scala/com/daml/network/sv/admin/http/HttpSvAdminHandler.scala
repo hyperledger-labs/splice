@@ -543,7 +543,6 @@ class HttpSvAdminHandler(
                           domainNode,
                           loggerFactory,
                           svcStore,
-                          clock,
                           scheduled.migrationId,
                           pausedAt,
                         )
@@ -588,7 +587,6 @@ class HttpSvAdminHandler(
               domainNode,
               svcStore,
               config.domains.global.alias,
-              clock,
               loggerFactory,
             )
             .map { response =>
@@ -668,7 +666,6 @@ class HttpSvAdminHandler(
                         domainNode,
                         loggerFactory,
                         svcStore,
-                        clock,
                         request.migrationId,
                         pausedAt,
                       )

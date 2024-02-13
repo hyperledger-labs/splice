@@ -15,8 +15,7 @@ import scala.concurrent.{blocking, ExecutionContext, Future}
 /** A store for accessing the node identities. */
 class NodeIdentitiesStore(
     adminConnection: TopologyAdminConnection,
-    backupDumpConfig: Option[BackupDumpConfig],
-    clock: Clock,
+    backup: Option[(BackupDumpConfig, Clock)],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -52,8 +51,8 @@ class NodeIdentitiesStore(
     * @return: the name of the file to which the backup was written
     */
   def backupNodeIdentities()(implicit traceContext: TraceContext): Future[Path] = for {
-    dumpConfig <- Future {
-      backupDumpConfig.getOrElse(
+    (dumpConfig, clock) <- Future {
+      backup.getOrElse(
         throw new IllegalStateException(
           "cannot backup identities as no backup location is configured"
         )
@@ -87,6 +86,6 @@ class NodeIdentitiesStore(
 object NodeIdentitiesStore {
   def dumpFilename(now: Instant) =
     Paths.get(
-      s"participant_identities_${now}.json"
+      s"participant_identities_$now.json"
     )
 }

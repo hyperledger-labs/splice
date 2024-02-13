@@ -105,7 +105,6 @@ final class DomainUpgradeTrigger(
         localDomainNode,
         loggerFactory,
         svcStore,
-        context.clock,
         migrationId,
         domainPausedAt,
       )

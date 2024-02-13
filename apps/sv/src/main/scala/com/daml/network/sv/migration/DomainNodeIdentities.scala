@@ -8,7 +8,6 @@ import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.Codec
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -71,14 +70,12 @@ object DomainNodeIdentities {
       domainNode: LocalDomainNode,
       svcStore: SvSvcStore,
       domainAlias: DomainAlias,
-      clock: Clock,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[DomainNodeIdentities] = {
     def getNodeIdentitiesDump(adminConnection: TopologyAdminConnection) =
       new NodeIdentitiesStore(
         adminConnection,
         None,
-        clock,
         loggerFactory,
       ).getNodeIdentitiesDump()
 

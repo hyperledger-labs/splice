@@ -8,7 +8,6 @@ import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
 import io.circe.syntax.*
@@ -50,7 +49,6 @@ object DomainMigrationDump {
       domainNode: LocalDomainNode,
       loggerFactory: NamedLoggerFactory,
       svcStore: SvSvcStore,
-      clock: Clock,
       migrationId: Long,
       domainPausedTime: Instant,
   )(implicit
@@ -63,7 +61,6 @@ object DomainMigrationDump {
         domainNode,
         svcStore,
         domainAlias,
-        clock,
         loggerFactory,
       )
       snapshot <- DomainDataSnapshot.getDomainDataSnapshot(

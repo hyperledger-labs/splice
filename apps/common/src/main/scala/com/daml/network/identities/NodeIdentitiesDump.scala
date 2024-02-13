@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.G
 import com.google.protobuf.ByteString
 import io.circe.Json
 import io.circe.syntax.*
+import cats.syntax.either.*
 
 import java.nio.file.Path
 import java.util.Base64
@@ -49,18 +50,22 @@ object NodeIdentitiesDump {
         ),
         version = response.version,
       )
-    ).toEither.left.map(_.getMessage())
+    ).toEither.leftMap(_.getMessage())
   }
+
   def fromJsonString(id: String => NodeIdentity, json: String): Either[String, NodeIdentitiesDump] =
-    io.circe.parser
-      .decode[http.NodeIdentitiesDump](json)
-      .left
-      .map(_.getMessage())
-      .flatMap(fromHttp(id, _))
+    io.circe.parser.parse(json).leftMap(_.getMessage()).flatMap(fromJson(id, _))
 
   def fromJsonFile(file: Path, id: String => NodeIdentity): Either[String, NodeIdentitiesDump] = {
-    val jsonString = Try(File(file).contentAsString).toEither.left.map(_.getMessage())
+    val jsonString = Try(File(file).contentAsString).toEither.leftMap(_.getMessage())
     jsonString.flatMap(fromJsonString(id, _))
+  }
+
+  def fromJson(id: String => NodeIdentity, json: Json): Either[String, NodeIdentitiesDump] = {
+    json
+      .as[http.NodeIdentitiesDump]
+      .leftMap(_.getMessage())
+      .flatMap(fromHttp(id, _))
   }
 
   final case class NodeKey(

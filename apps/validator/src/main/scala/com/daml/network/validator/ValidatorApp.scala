@@ -475,8 +475,7 @@ class ValidatorApp(
       }
       participantIdentitiesStore = new NodeIdentitiesStore(
         participantAdminConnection,
-        config.participantIdentitiesBackup,
-        clock,
+        config.participantIdentitiesBackup.map(_ -> clock),
         loggerFactory,
       )
       scanConnection <- appInitStep("Get scan connection") {

@@ -34,23 +34,24 @@ case class DomainDataSnapshot(
 }
 
 object DomainDataSnapshot {
+  private val base64Decoder = Base64.getDecoder()
   def fromHttp(
       src: http.DomainDataSnapshot
   ) = for {
     topologySnapshot <- {
-      val decoded = Base64.getDecoder().decode(src.topologySnapshot)
+      val decoded = base64Decoder.decode(src.topologySnapshot)
       val proto = TopologyTransactions.parseFrom(decoded)
       StoredTopologyTransactionsX
         .fromProtoV30(proto)
         .leftMap(_ => "Failed to parse Topology Transactions")
     }
     acsSnapshot = {
-      val decoded = Base64.getDecoder().decode(src.acsSnapshot)
+      val decoded = base64Decoder.decode(src.acsSnapshot)
       ByteString.copyFrom(decoded)
     }
     dars = {
       src.dars.map { dar =>
-        val decoded = Base64.getDecoder().decode(dar.content)
+        val decoded = base64Decoder.decode(dar.content)
         Dar(Hash.tryFromHexString(dar.hash), ByteString.copyFrom(decoded))
       }
     }
