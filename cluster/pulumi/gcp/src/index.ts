@@ -1,11 +1,12 @@
 import * as gcp from '@pulumi/gcp';
 import * as pulumi from '@pulumi/pulumi';
+import { GCP_PROJECT } from 'cn-pulumi-common';
 
 import { GcpProject } from './gcpProject';
 
 export const gcpProjectId = pulumi.getStack();
 
-if (gcpProjectId !== process.env.CLOUDSDK_CORE_PROJECT) {
+if (gcpProjectId !== GCP_PROJECT) {
   throw new Error(
     'The stack name does not match CLOUDSDK_CORE_PROJECT -- check your environment or active stack'
   );

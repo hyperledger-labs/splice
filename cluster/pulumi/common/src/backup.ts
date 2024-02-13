@@ -3,7 +3,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs/promises';
 import { Bucket, File, Storage } from '@google-cloud/storage';
-import { CnInput, ExactNamespace, requireEnv } from 'cn-pulumi-common';
+import { CnInput, ExactNamespace, GCP_PROJECT, requireEnv } from 'cn-pulumi-common';
 import { exit } from 'process';
 
 export type GcpBucket = {
@@ -20,12 +20,11 @@ export async function bootstrapDataBucketSpec(
   projectId: string,
   bucketName: string
 ): Promise<GcpBucket> {
-  const project = requireEnv('CLOUDSDK_CORE_PROJECT');
   const gcpSecretName = requireEnv('DATA_EXPORT_BUCKET_SA_KEY_SECRET');
 
   const cred = gcp.secretmanager.SecretVersion.get(
     'data-export-bucket-sa-key-secret',
-    `projects/${project}/secrets/${gcpSecretName}/versions/1`
+    `projects/${GCP_PROJECT}/secrets/${gcpSecretName}/versions/1`
   ).secretData;
 
   return promisifyOutput(

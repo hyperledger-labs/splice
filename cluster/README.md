@@ -1731,6 +1731,15 @@ Current caveats:
     metric, which compares the sequencing time of the latest processed sequencer message with the local
     clock of the component. High values of this metric indicate that this component is catching up.
 
+## Chaos Mesh
+
+You can configure a cluster to deploy [Chaos Mesh](https://chaos-mesh.org/) for chaos-monkey style testing.
+This is currently disabled by default. To enable it, set
+
+```
+export ENABLE_CHAOS_MESH=1
+```
+
 ## Appendix: Kubernetes and Other Deployment Resources
 
 * Kubernetes Documentation

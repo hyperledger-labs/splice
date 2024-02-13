@@ -13,6 +13,7 @@ export const HELM_CHART_TIMEOUT_SEC = Number(process.env.HELM_CHART_TIMEOUT_SEC)
 
 export const REPO_ROOT = requireEnv('REPO_ROOT', 'root directory of the repo');
 export const CLUSTER_BASENAME = requireEnv('GCP_CLUSTER_BASENAME');
+export const GCP_PROJECT = requireEnv('CLOUDSDK_CORE_PROJECT');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
 

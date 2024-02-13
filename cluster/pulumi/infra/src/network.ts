@@ -2,7 +2,7 @@ import * as gcp from '@pulumi/gcp';
 import * as k8s from '@pulumi/kubernetes';
 import * as certmanager from '@pulumi/kubernetes-cert-manager';
 import * as pulumi from '@pulumi/pulumi';
-import { btoa, publicPrometheusRemoteWrite, requireEnv } from 'cn-pulumi-common';
+import { btoa, GCP_PROJECT, publicPrometheusRemoteWrite, requireEnv } from 'cn-pulumi-common';
 
 function ipAddress(addressName: string): gcp.compute.Address {
   return new gcp.compute.Address(addressName, {
@@ -113,12 +113,11 @@ function clusterCertificate(
     }
   );
 
-  const project = requireEnv('CLOUDSDK_CORE_PROJECT');
   const gcpSecretName = requireEnv('DNS01_SA_KEY_SECRET');
 
   gcp.secretmanager.SecretVersion.get(
     'dns01-sa-key-secret',
-    `projects/${project}/secrets/${gcpSecretName}/versions/1`
+    `projects/${GCP_PROJECT}/secrets/${gcpSecretName}/versions/1`
   ).secretData.apply(dns01SaKeySecret => {
     new k8s.core.v1.Secret(
       'clouddns-dns01-solver-svc-acct',

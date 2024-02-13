@@ -11,6 +11,7 @@ import {
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
+import { installChaosMesh } from './chaosMesh';
 import { installDocs } from './docs';
 import { GlobalDomainUpgradeConfig } from './globalDomainNode';
 import { installSplitwell } from './splitwell';
@@ -35,6 +36,8 @@ if (approveSvRunbook) {
 // but not on k8s-deployed postgres (where we optimize for faster deployment).
 // One can force splitting them by setting SPLIT_POSTGRES_INSTANCES to true.
 const splitPostgresInstances = envFlag('SPLIT_POSTGRES_INSTANCES') || envFlag('ENABLE_CLOUD_SQL');
+
+const enableChaosMesh = envFlag('ENABLE_CHAOS_MESH');
 
 type BootstrapCliConfig = {
   cluster: string;
@@ -151,6 +154,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
 
   const allSvs = await svc.allSvs;
 
+  const svDependencies = allSvs.flatMap(sv => [sv.scan, sv.svApp, sv.validatorApp]);
+
   // TODO(#8761) install the non sv nodes once the upgrade supports it
   const nonSvComponentsDependencies = allSvs.map(sv => sv.scan);
   if (installNonSvComponents) {
@@ -182,4 +187,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   }
 
   installDocs();
+
+  if (enableChaosMesh) {
+    installChaosMesh({ dependsOn: svDependencies });
+  }
 }
