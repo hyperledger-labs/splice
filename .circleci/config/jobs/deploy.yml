@@ -48,7 +48,7 @@ jobs:
               export RESTORE_CLUSTER=1
             fi
             # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if (env-bool RESTORE_CLUSTER); then
+            if [[ -n "${RESTORE_CLUSTER:-}" ]]; then
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
@@ -110,7 +110,7 @@ jobs:
               export RESTORE_CLUSTER=1
             fi
             # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if (env-bool RESTORE_CLUSTER); then
+            if [[ -n "${RESTORE_CLUSTER:-}" ]]; then
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
@@ -208,7 +208,7 @@ jobs:
               export RESTORE_CLUSTER=1
             fi
             # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if (env-bool RESTORE_CLUSTER); then
+            if [[ -n "${RESTORE_CLUSTER:-}" ]]; then
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
