@@ -27,12 +27,13 @@ import com.daml.network.http.v0.sv_admin.{
   TriggerDomainMigrationDumpResponse,
 }
 import com.daml.network.http.v0.{definitions, sv_admin as http}
-import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
+import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -525,6 +526,31 @@ object HttpSvAdminAppClient {
     ) = { case http.GetDomainMigrationDumpResponse.OK(response) =>
       DomainMigrationDump.fromHttp(response)
     }
+  }
+
+  case class GetDomainDataSnapshot(timestamp: Instant)
+      extends BaseCommand[
+        http.GetDomainDataSnapshotResponse,
+        DomainDataSnapshot,
+      ] {
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetDomainDataSnapshotResponse] =
+      client.getDomainDataSnapshot(
+        body = definitions.GetDomainDataSnapshotRequest(timestamp.toString),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.GetDomainDataSnapshotResponse.OK(response) =>
+      DomainDataSnapshot.fromHttp(response.dataSnapshot)
+    }
+
   }
 
   case class GetDomainNodeIdentitiesDump()

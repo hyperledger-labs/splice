@@ -206,6 +206,27 @@ paths:
                 "$ref": "#/components/schemas/GetDomainNodeIdentitiesDumpResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/domain/data-snapshot:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "getDomainDataSnapshot"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/GetDomainDataSnapshotRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDomainDataSnapshotResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
   /v0/admin/sv/identity/approve:
     post:
       tags: [sv]
@@ -1236,3 +1257,20 @@ components:
       properties:
         identities:
           $ref: "#/components/schemas/DomainNodeIdentities"
+
+    GetDomainDataSnapshotRequest:
+      type: object
+      required:
+        - timestamp
+      properties:
+        timestamp:
+          type: string
+
+    GetDomainDataSnapshotResponse:
+      type: object
+      required:
+        - data_snapshot
+      properties:
+        data_snapshot:
+          $ref: "#/components/schemas/DomainDataSnapshot"
+

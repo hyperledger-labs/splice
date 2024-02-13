@@ -2,3 +2,4 @@
 # which don't use temp-files so that dumps are easily inspectable
 /test-outputs/
 /domain-migration-dump/
+/disaster-recovery-dump/

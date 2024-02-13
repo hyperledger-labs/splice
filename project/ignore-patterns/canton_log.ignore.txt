@@ -111,4 +111,8 @@ Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 # TODO(#8147) Remove this once this is fixed in Canton
 Received a mediator request.*with some informees not being hosted by an active participant
 
+# TODO(#9925): Make this more specific to the DisasterRecovery test (e.g. by supporting ignore-rules that are specific to a single log file)
+Request failed for sequencer. Is the server running?
+SEQUENCER_SUBSCRIPTION_LOST
+
 # Make sure to have a trailing newline

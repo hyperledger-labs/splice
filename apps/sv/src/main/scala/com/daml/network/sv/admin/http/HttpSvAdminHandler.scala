@@ -20,7 +20,7 @@ import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
+import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -36,6 +36,7 @@ import io.opentelemetry.api.trace.Tracer
 import slick.jdbc.PostgresProfile
 
 import java.nio.file.Path
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
@@ -571,6 +572,27 @@ class HttpSvAdminHandler(
             )
           )
       }
+    }(traceContext, tracer)
+  }
+
+  override def getDomainDataSnapshot(respond: SvAdminResource.GetDomainDataSnapshotResponse.type)(
+      body: definitions.GetDomainDataSnapshotRequest
+  )(
+      tuser: TracedUser
+  ): Future[SvAdminResource.GetDomainDataSnapshotResponse] = {
+    val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.getDomainNodeIdentitiesDump") { implicit tc => _ =>
+      DomainDataSnapshot
+        .getDomainDataSnapshot(
+          participantAdminConnection,
+          svcStore,
+          Instant.parse(body.timestamp),
+        )
+        .map { response =>
+          SvAdminResource.GetDomainDataSnapshotResponse.OK(
+            http.GetDomainDataSnapshotResponse(response.toHttp)
+          )
+        }
     }(traceContext, tracer)
   }
 

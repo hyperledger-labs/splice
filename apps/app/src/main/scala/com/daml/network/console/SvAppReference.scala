@@ -19,7 +19,7 @@ import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, Http
 import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.automation.singlesv.RestartLeaderBasedAutomationTrigger
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
-import com.daml.network.sv.migration.DomainNodeIdentities
+import com.daml.network.sv.migration.{DomainDataSnapshot, DomainNodeIdentities}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.health.admin.data.NodeStatus
@@ -27,6 +27,7 @@ import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem
 
+import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
 
 abstract class SvAppReference(
@@ -134,6 +135,11 @@ abstract class SvAppReference(
       httpCommand(HttpSvAdminAppClient.TriggerDomainMigrationDump(migrationId))
     }
 
+  @Help.Summary("Get a snapshot of all the dynamic data from the domain")
+  def getDomainDataSnapshot(timestamp: Instant): DomainDataSnapshot =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.GetDomainDataSnapshot(timestamp))
+    }
   @Help.Summary("Get identities of all domain node components")
   def getDomainNodeIdentitiesDump(): DomainNodeIdentities =
     consoleEnvironment.run {

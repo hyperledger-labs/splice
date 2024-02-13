@@ -13,7 +13,7 @@ import com.daml.network.config.{
   CNParticipantClientConfig,
   NetworkAppClientConfig,
 }
-import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
+import com.daml.network.console.ScanAppBackendReference
 import com.daml.network.environment.{
   CNNodeEnvironmentImpl,
   ParticipantAdminConnection,
@@ -25,19 +25,18 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.{
-  UpgradeDomainNode,
-  migrationDumpDir,
-}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
+import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.migrationDumpDir
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, SvTestUtil, WalletTestUtil}
+import com.daml.network.util.DomainMigrationUtil.{mapSvPort, testDumpDir}
+import com.daml.network.util.DomainMigrationUtil
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -49,13 +48,12 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import org.slf4j.event.Level
 import com.digitalasset.canton.time.WallClock
-import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
 
 import java.io.File
-import java.nio.file.{Path, Paths}
+import java.nio.file.Path
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.concurrent.ExecutionContextExecutor
@@ -67,6 +65,7 @@ class GlobalDomainMigrationIntegrationTest
     with ProcessTestUtil
     with SvTestUtil
     with WalletTestUtil
+    with DomainMigrationUtil
     with StandaloneCanton {
 
   override def dbsSuffix = "domain_migration"
@@ -292,10 +291,10 @@ class GlobalDomainMigrationIntegrationTest
       autoInit = false,
     )() {
       Using.resources(
-        createUpgradeNode(1, sv1Backend, retryProvider, wallClock),
-        createUpgradeNode(2, sv2Backend, retryProvider, wallClock),
-        createUpgradeNode(3, sv3Backend, retryProvider, wallClock),
-        createUpgradeNode(4, sv4Backend, retryProvider, wallClock),
+        createUpgradeNode(1, sv1Backend, sv1LocalBackend, retryProvider, wallClock),
+        createUpgradeNode(2, sv2Backend, sv2LocalBackend, retryProvider, wallClock),
+        createUpgradeNode(3, sv3Backend, sv3LocalBackend, retryProvider, wallClock),
+        createUpgradeNode(4, sv4Backend, sv4LocalBackend, retryProvider, wallClock),
       ) { case (upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4) =>
         val allNodes =
           Seq(upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
@@ -527,35 +526,6 @@ class GlobalDomainMigrationIntegrationTest
       .discard
   }
 
-  // TODO(#9757): might want to replace this function
-  private def mapSvPort(sv: Int): Int = {
-    if (sv == 1) {
-      0
-    } else {
-      sv + 4
-    }
-  }
-
-  private def createUpgradeNode(
-      sv: Int,
-      backend: SvAppBackendReference,
-      retryProvider: RetryProvider,
-      wallClock: WallClock,
-  )(implicit
-      ec: ExecutionContextExecutor
-  ) = {
-    val loggerFactoryWithKey = loggerFactory.append("updateNode", sv.toString)
-    UpgradeDomainNode(
-      new ParticipantAdminConnection(
-        ClientConfig(port = Port.tryCreate(27002 + mapSvPort(sv) * 100)),
-        loggerFactoryWithKey,
-        retryProvider,
-        wallClock,
-      ),
-      backend,
-    )
-  }
-
   private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: Double) = {
     listTransactionsFromScan(scan).count(
       _.tap.map(a => BigDecimal(a.coinAmount)).contains(BigDecimal(tapAmount))
@@ -564,80 +534,6 @@ class GlobalDomainMigrationIntegrationTest
 
   private def listTransactionsFromScan(scan: ScanAppBackendReference) = {
     scan.listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
-  }
-
-  private def checkMigrateDomainOnNodes(
-      nodes: Seq[UpgradeDomainNode]
-  )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-    withClueAndLog("party hosting is replicated on the new global domain") {
-      nodes.foreach { node =>
-        eventuallySucceeds(timeUntilSuccess = 1.minute) {
-          node.newParticipantConnection
-            .getPartyToParticipant(
-              globalDomainId,
-              svcParty,
-            )
-            .futureValue
-            .mapping
-            .participantIds
-            .size shouldBe 4
-        }
-      }
-    }
-    withClueAndLog("all topology is synced") {
-      nodes.foreach { node =>
-        val topologyTransactionsInOldStore =
-          node.oldBackend.appState.participantAdminConnection
-            .listAllTransactions(
-              Some(TopologyStoreId.DomainStore(globalDomainId))
-            )
-            .futureValue
-        eventuallySucceeds(timeUntilSuccess = 1.minute) {
-          node.newParticipantConnection
-            .listAllTransactions(
-              Some(TopologyStoreId.DomainStore(globalDomainId))
-            )
-            .futureValue
-            .size == topologyTransactionsInOldStore.size
-        }
-      }
-    }
-
-    withClueAndLog("decentralized namespace is replicated on the new global domain") {
-      val globalDomainDecentralizedNamespaceDefinition =
-        sv1Backend.appState.participantAdminConnection
-          .getDecentralizedNamespaceDefinition(globalDomainId, svcParty.uid.namespace)
-          .futureValue
-      eventuallySucceeds(timeUntilSuccess = 1.minute) {
-        nodes.foreach { node =>
-          node.newParticipantConnection
-            .getDecentralizedNamespaceDefinition(
-              globalDomainId,
-              svcParty.uid.namespace,
-            )
-            .futureValue
-            .mapping shouldBe globalDomainDecentralizedNamespaceDefinition.mapping
-        }
-      }
-    }
-    withClueAndLog("domain is unpaused on the new nodes") {
-      eventuallySucceeds() {
-        nodes.foreach(
-          _.newParticipantConnection
-            .getDomainParametersState(
-              globalDomainId
-            )
-            .futureValue
-            .mapping
-            .parameters
-            .maxRatePerParticipant should be > NonNegativeInt.zero
-        )
-      }
-    }
-  }
-
-  private def withClueAndLog[T](clueMessage: String)(fun: => T) = withClue(clueMessage) {
-    clue(clueMessage)(fun)
   }
 
   private def deleteDirectoryRecursively(directoryToBeDeleted: File): Unit = {
@@ -649,7 +545,6 @@ class GlobalDomainMigrationIntegrationTest
 }
 
 object GlobalDomainMigrationIntegrationTest extends OptionValues {
-  val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
   val migrationDumpDir: Path = testDumpDir.resolve(s"domain-migration-dump")
   // Not using temp-files so test-generated outputs are easy to inspect.
   def migrationDumpDir(node: String): Path = {
@@ -659,14 +554,4 @@ object GlobalDomainMigrationIntegrationTest extends OptionValues {
     }
     dumpDir
   }
-
-  case class UpgradeDomainNode(
-      newParticipantConnection: ParticipantAdminConnection,
-      oldBackend: SvAppBackendReference,
-  )
-
-  implicit val upgradeDomainNodeReleasable: Using.Releasable[UpgradeDomainNode] =
-    (resource: UpgradeDomainNode) => {
-      resource.newParticipantConnection.close()
-    }
 }

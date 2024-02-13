@@ -20,6 +20,7 @@ import com.daml.network.validator.config.{
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
+import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import monocle.macros.syntax.lens.*
 
@@ -387,6 +388,36 @@ object CNNodeConfigTransforms {
     })
   }
 
+  private def setPortPrefix(range: Int): Port => Port = { port =>
+    Port.tryCreate((range * 1000) + port.unwrap % 1000)
+  }
+
+  def setSomeSvAppPortsPrefix(range: Int, svApps: Seq[String]): CNNodeConfigTransform = {
+    updateAllSvAppConfigs((name, config) => {
+      if (svApps.contains(name)) {
+        config
+          .focus(_.participantClient.ledgerApi.clientConfig.port)
+          .modify(setPortPrefix(range))
+          .focus(_.participantClient.adminApi.port)
+          .modify(setPortPrefix(range))
+          .focus(_.localDomainNode)
+          .modify(_.map(c => {
+            c
+              .focus(_.sequencer.internalApi.port)
+              .modify(setPortPrefix(range))
+              .focus(_.sequencer.adminApi.port)
+              .modify(setPortPrefix(range))
+              .focus(_.mediator.adminApi.port)
+              .modify(setPortPrefix(range))
+          }))
+          .focus(_.adminApi.internalPort)
+          .modify(_.map(setPortPrefix(range)))
+      } else {
+        config
+      }
+    })
+  }
+
   def bumpSomeScanAppPortsBy(bump: Int, scanApps: Seq[String]): CNNodeConfigTransform = {
     updateAllScanAppConfigs((name, config) => {
       if (scanApps.contains(name)) {
@@ -403,6 +434,24 @@ object CNNodeConfigTransforms {
     })
   }
 
+  def setSomeScanAppPortsPrefix(range: Int, scanApps: Seq[String]): CNNodeConfigTransform = {
+    updateAllScanAppConfigs((name, config) => {
+      if (scanApps.contains(name)) {
+        config
+          .focus(_.participantClient.ledgerApi.clientConfig.port)
+          .modify(setPortPrefix(range))
+          .focus(_.participantClient.adminApi.port)
+          .modify(setPortPrefix(range))
+          .focus(_.adminApi.internalPort)
+          .modify(_.map(setPortPrefix(range)))
+          .focus(_.sequencerAdminClient.port)
+          .modify(setPortPrefix(range))
+      } else {
+        config
+      }
+    })
+  }
+
   def bumpSomeValidatorAppPortsBy(bump: Int, validatorApps: Seq[String]): CNNodeConfigTransform = {
     updateAllValidatorAppConfigs((name, config) => {
       if (validatorApps.contains(name)) {
@@ -411,6 +460,25 @@ object CNNodeConfigTransforms {
           .modify(portTransform(bump, _))
           .focus(_.adminApi)
           .modify(portTransform(bump, _))
+      } else {
+        config
+      }
+    })
+  }
+
+  def setSomeValidatorAppPortsPrefix(
+      range: Int,
+      validatorApps: Seq[String],
+  ): CNNodeConfigTransform = {
+    updateAllValidatorAppConfigs((name, config) => {
+      if (validatorApps.contains(name)) {
+        config
+          .focus(_.participantClient.ledgerApi.clientConfig.port)
+          .modify(setPortPrefix(range))
+          .focus(_.participantClient.adminApi.port)
+          .modify(setPortPrefix(range))
+          .focus(_.adminApi.internalPort)
+          .modify(_.map(setPortPrefix(range)))
       } else {
         config
       }

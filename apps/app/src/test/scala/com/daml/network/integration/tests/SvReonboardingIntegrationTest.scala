@@ -270,7 +270,7 @@ class SvReonboardingIntegrationTest
         (None, None, None, Some(sv4Backend)),
         logSuffix = "sv4-reonboarding-new",
         svs123 = false,
-        overrideDbsSuffix = Some("reonboard_new"),
+        overrideSvDbsSuffix = Some("reonboard_new"),
       )(
         "SV4_PARTICIPANT_AUTO_INIT" -> "false"
       ) {
