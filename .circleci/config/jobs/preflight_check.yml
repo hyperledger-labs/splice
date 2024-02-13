@@ -25,7 +25,7 @@ jobs:
         type: integer
         default: 0
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
@@ -156,7 +156,7 @@ jobs:
         type: string
         default: ""
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
@@ -256,7 +256,7 @@ jobs:
         type: string
         default: ""
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net

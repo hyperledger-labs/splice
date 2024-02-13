@@ -2,7 +2,7 @@ jobs:
   deploy_sv_runbook:
     circleci_ip_ranges: true
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -71,7 +71,7 @@ jobs:
   deploy_validator_runbook:
     circleci_ip_ranges: true
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
@@ -127,7 +127,7 @@ jobs:
   deploy_cluster:
     circleci_ip_ranges: true
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     resource_class: xlarge
     environment:
       <<: *env
@@ -277,7 +277,7 @@ jobs:
         # #team-canton-network-internal-ci
         default: C05DT77QF5M
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net

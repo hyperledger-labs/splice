@@ -3,7 +3,7 @@ jobs:
   # Inspired by Canton, we put the lint-like checks into their own CI job
   static_tests:
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     resource_class: "xlarge"
     environment:
       <<: *env
@@ -30,7 +30,7 @@ jobs:
   # We put our Daml tests in their own job for more parallelization
   daml_test:
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     environment:
       <<: *env
     steps:
@@ -44,7 +44,7 @@ jobs:
   # Run UI unit tests
   ui_test:
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     environment:
       <<: *env
     steps:
@@ -59,7 +59,7 @@ jobs:
   # work on anything but the Scala tests is duplicated across all parallel runs of this job
   scala_test:
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     parameters:
       test_names_file:
         type: string
@@ -108,7 +108,7 @@ jobs:
 
   bundle:
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     resource_class: xlarge
     environment:
       <<: *env
@@ -153,7 +153,7 @@ jobs:
 
   deployment_test:
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     environment:
       <<: *env
     steps:
@@ -169,7 +169,7 @@ jobs:
 
   auth0_user_cleanup:
     docker:
-    - image: cimg/base:2021.04
+    - image: cimg/base:2024.01
     environment:
       <<: *env
     steps:
@@ -193,7 +193,7 @@ jobs:
   cluster_lock_reaper:
     circleci_ip_ranges: true
     docker:
-    - image: cimg/base:2021.04
+    - image: cimg/base:2024.01
     environment:
       <<: *env
     steps:
@@ -212,7 +212,7 @@ jobs:
 
   mark_for_testnet:
     docker:
-    - image: cimg/base:2021.04
+    - image: cimg/base:2024.01
     environment:
       <<: *env
     steps:
@@ -235,7 +235,7 @@ jobs:
 
   update_pipeline_schedule:
     docker:
-    - image: cimg/base:2021.04
+    - image: cimg/base:2024.01
     environment:
       <<: *env
     steps:
@@ -252,7 +252,7 @@ jobs:
 
   docker_images_push:
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
     parameters:
@@ -316,7 +316,7 @@ jobs:
 
   publish_public_release:
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
     steps:
@@ -392,7 +392,7 @@ jobs:
 
   docker_images_build:
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     resource_class: xlarge
     environment:
       <<: *env
@@ -413,7 +413,7 @@ jobs:
 
   wait_for_previous_pipeline:
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     environment:
       <<: *env
     parameters:
@@ -443,7 +443,7 @@ jobs:
 
   cancel_if_previous_pipeline:
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     environment:
       <<: *env
     parameters:
@@ -482,7 +482,7 @@ jobs:
 
   cancel_previous_pipelines:
     docker:
-      - image: cimg/base:2021.04
+      - image: cimg/base:2024.01
     environment:
       <<: *env
     parameters:
@@ -523,7 +523,7 @@ jobs:
         type: integer
         default: 3
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
@@ -585,7 +585,7 @@ jobs:
       namespace_name:
         type: string
     machine:
-      image: ubuntu-2004:2023.04.2
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
