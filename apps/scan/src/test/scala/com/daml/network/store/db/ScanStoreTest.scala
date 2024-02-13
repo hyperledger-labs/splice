@@ -1131,7 +1131,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
   private def mkTransferSummary(
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
-      inputValidatorFaucetAmount: Double,
       inputSvRewardAmount: Double,
       inputCoinAmount: Double,
       balanceChanges: Map[String, cc.coinrules.BalanceChange],
@@ -1147,7 +1146,11 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     damlDecimal(0.0),
     damlDecimal(0.0),
     damlDecimal(coinPrice),
-    java.util.Optional.of(damlDecimal(inputValidatorFaucetAmount)),
+    // the validator faucet amount is already included in the `inputValidatorRewardAmount`,
+    // We'll set this here once we add support for showing faucet coupon rewards separately
+    // from the usage-based validator rewards.
+    // TODO(#9824): track faucet coupon inputs separately
+    java.util.Optional.empty(),
   )
 
   private def mkTransferResult(
@@ -1163,8 +1166,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       mkTransferSummary(
         inputAppRewardAmount,
         inputValidatorRewardAmount,
-        // TODO(#8819): also test for validator faucet rewards once the scan store supports them
-        0.0,
         // TODO (#9173): also test for sv rewards once the scan store supports them
         0.0,
         inputCoinAmount,
@@ -1190,8 +1191,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       mkTransferSummary(
         inputAppRewardAmount,
         inputValidatorRewardAmount,
-        // TODO(#8819): also test for validator faucet rewards once the scan store supports them
-        0.0,
         // TODO (#9173): also test for sv rewards once the scan store supports them
         0.0,
         inputCoinAmount,
