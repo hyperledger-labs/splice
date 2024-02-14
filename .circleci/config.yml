@@ -712,6 +712,35 @@ commands:
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
             ADDITIONAL_NIX_ARGS="<< parameters.additional_nix_args >>"
 
+            # Attempt to build the nix env with retries to work around transient download failures
+            MAX_RETRY_NIX_ENV=5
+            NIX_ENV_TRY_COUNT=0
+            until [ $NIX_ENV_TRY_COUNT -ge $MAX_RETRY_NIX_ENV ]
+            do
+              if [ $NIX_ENV_TRY_COUNT -gt 0 ]; then
+                SLEEP_DURATION=$((NIX_ENV_TRY_COUNT*2))
+                echo "Failed to build and enter the nix environment, retrying in $SLEEP_DURATION seconds..."
+                sleep $SLEEP_DURATION
+              fi
+              nix develop \
+                path:nix \
+                --ignore-environment \
+                --keep USER \
+                --keep HOME \
+                --keep TERM \
+                --keep CI \
+                --keep RUN_SPLITTED_TESTS_CMD \
+                --command echo "Confirmed that we can build and enter the nix environment!" \
+                && break
+              NIX_ENV_TRY_COUNT=$((NIX_ENV_TRY_COUNT+1))
+            done
+
+            if [ $NIX_ENV_TRY_COUNT -ge $MAX_RETRY_NIX_ENV ]; then
+              echo "Failed to build and enter the nix environment after $MAX_RETRY_NIX_ENV attempts"
+              exit 1
+            fi
+
+            # Run the command for real within the nix environment
             nix develop \
               path:nix \
               --ignore-environment \
