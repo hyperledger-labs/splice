@@ -51,7 +51,7 @@ class DistributedDomainIntegrationTest
             .forgetNE
         ) { case Seq(GrpcSequencerConnection(defaultSequencerEndpoint, _, _, _)) =>
           defaultSequencerEndpoint shouldBe NonEmpty
-            .mk(Seq, Endpoint("localhost", Port.tryCreate(5008)))
+            .mk(Seq, Endpoint("localhost", Port.tryCreate(5108)))
             .toVector
         }
         inside(
@@ -66,7 +66,7 @@ class DistributedDomainIntegrationTest
                 GrpcSequencerConnection(localSequencerEndpoint, _, _, _)
               ) =>
             localSequencerEndpoint shouldBe NonEmpty
-              .mk(Seq, Endpoint("localhost", Port.tryCreate(5608)))
+              .mk(Seq, Endpoint("localhost", Port.tryCreate(5208)))
               .toVector
         }
         inside(
@@ -81,7 +81,7 @@ class DistributedDomainIntegrationTest
                 GrpcSequencerConnection(localSequencerEndpoint, _, _, _)
               ) =>
             localSequencerEndpoint shouldBe NonEmpty
-              .mk(Seq, Endpoint("localhost", Port.tryCreate(5708)))
+              .mk(Seq, Endpoint("localhost", Port.tryCreate(5308)))
               .toVector
         }
         inside(
@@ -96,7 +96,7 @@ class DistributedDomainIntegrationTest
                 GrpcSequencerConnection(localSequencerEndpoint, _, _, _)
               ) =>
             localSequencerEndpoint shouldBe NonEmpty
-              .mk(Seq, Endpoint("localhost", Port.tryCreate(5808)))
+              .mk(Seq, Endpoint("localhost", Port.tryCreate(5408)))
               .toVector
         }
       }

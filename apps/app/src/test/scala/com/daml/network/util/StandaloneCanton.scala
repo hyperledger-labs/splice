@@ -1,7 +1,6 @@
 package com.daml.network.util
 
 import com.daml.network.console.SvAppBackendReference
-import com.daml.network.util.DomainMigrationUtil.mapSvPort
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.Suite
@@ -85,15 +84,11 @@ trait StandaloneCanton extends PostgresAroundAll with NamedLogging with ProcessT
       (1 to 4)
         .map(i =>
           Seq(
-            s"SV${i}_PARTICIPANT_LEDGER_API_PORT" -> (range * 1000 + mapSvPort(
-              i
-            ) * 100 + 1).toString,
-            s"SV${i}_PARTICIPANT_ADMIN_API_PORT" -> (range * 1000 + mapSvPort(
-              i
-            ) * 100 + 2).toString,
-            s"SV${i}_MEDIATOR_ADMIN_API_PORT" -> (range * 1000 + mapSvPort(i) * 100 + 7).toString,
-            s"SV${i}_SEQUENCER_PUBLIC_API_PORT" -> (range * 1000 + mapSvPort(i) * 100 + 8).toString,
-            s"SV${i}_SEQUENCER_ADMIN_API_PORT" -> (range * 1000 + mapSvPort(i) * 100 + 9).toString,
+            s"SV${i}_PARTICIPANT_LEDGER_API_PORT" -> (range * 1000 + i * 100 + 1).toString,
+            s"SV${i}_PARTICIPANT_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 2).toString,
+            s"SV${i}_MEDIATOR_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 7).toString,
+            s"SV${i}_SEQUENCER_PUBLIC_API_PORT" -> (range * 1000 + i * 100 + 8).toString,
+            s"SV${i}_SEQUENCER_ADMIN_API_PORT" -> (range * 1000 + i * 100 + 9).toString,
           )
         )
         .flatten

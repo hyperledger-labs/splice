@@ -689,7 +689,7 @@
                     },
                     "sequencer": {
                       "sequencerId": "SEQ::globalSequencerSv1::1220806545013791363039f19b5ef783f3a3b3aadd8be0489f777201108cd0d7c45a",
-                      "url": "http://localhost:15008",
+                      "url": "http://localhost:15108",
                       "availableAfter": "1970-01-01T00:00:00Z"
                     },
                     "mediator": {

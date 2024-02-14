@@ -38,11 +38,11 @@ class LocalRunbookIntegrationTest
   // Note that system properties can only be used in tests at this point.
   System.setProperty("NETWORK_APPS_ADDRESS", "localhost")
   System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
-  System.setProperty("GLOBAL_DOMAIN_URL", "http://localhost:5008")
+  System.setProperty("GLOBAL_DOMAIN_URL", "http://localhost:5108")
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
-    ("ParticipantLedgerApi", 7001),
-    ("ParticipantAdminApi", 7002),
+    ("ParticipantLedgerApi", 7101),
+    ("ParticipantAdminApi", 7102),
   )
 
   var cantonProcess: Option[Process] = None
@@ -63,8 +63,8 @@ class LocalRunbookIntegrationTest
         svDomainPath / "canton.conf",
       ),
       Seq(
-        "canton.participants.validatorParticipant.ledger-api.port=7001",
-        "canton.participants.validatorParticipant.admin-api.port=7002",
+        "canton.participants.validatorParticipant.ledger-api.port=7101",
+        "canton.participants.validatorParticipant.admin-api.port=7102",
       ),
       "local-runbook",
     )
@@ -153,7 +153,7 @@ class LocalRunbookIntegrationTest
     CNNodeConfigTransforms.updateAllValidatorConfigs_(vc =>
       vc.focus(_.onboarding)
         .modify(onboarding =>
-          onboarding.map(_.focus(_.svClient.adminApi.url).replace("http://localhost:5014"))
+          onboarding.map(_.focus(_.svClient.adminApi.url).replace("http://localhost:5114"))
         )
     )(conf)
   }

@@ -55,7 +55,7 @@ class AppManagerFrontendIntegrationTest
         click on className("release-config-add-domain-button")
         textField(className("domain-alias-input")).underlying.sendKeys("splitwell")
         textField(className("domain-url-input")).underlying
-          .sendKeys("http://localhost:5108")
+          .sendKeys("http://localhost:5708")
         find(className("register-app-release-bundle-input")).value.underlying
           .sendKeys(splitwellBundle.getAbsolutePath)
         textField(id("register-app-provider-user-input")).value =

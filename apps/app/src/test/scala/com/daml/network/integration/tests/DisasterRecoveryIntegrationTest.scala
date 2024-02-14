@@ -18,7 +18,7 @@ import com.daml.network.sv.automation.singlesv.SvRewardTrigger
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
-import com.daml.network.util.DomainMigrationUtil.{mapSvPort, testDumpDir}
+import com.daml.network.util.DomainMigrationUtil.testDumpDir
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.DomainAlias
@@ -97,7 +97,7 @@ class DisasterRecoveryIntegrationTest
                           SvGlobalDomainConfig(
                             alias = DomainAlias.tryCreate("global"),
                             // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
-                            url = s"http://localhost:28${mapSvPort(sv)}08",
+                            url = s"http://localhost:28${sv}08",
                           )
                         ),
                         domainMigrationId = 1L,
@@ -120,7 +120,7 @@ class DisasterRecoveryIntegrationTest
                     domains = ValidatorDomainConfig(global =
                       ValidatorGlobalDomainConfig(
                         alias = DomainAlias.tryCreate("global"),
-                        url = Some("http://localhost:28009"),
+                        url = Some("http://localhost:28109"),
                       )
                     ),
                   )
@@ -130,7 +130,7 @@ class DisasterRecoveryIntegrationTest
                 conf
                   .walletAppClients(InstanceName.tryCreate("sv1Wallet"))
                   .copy(
-                    adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:28003")
+                    adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:28103")
                   )
             ),
           ),

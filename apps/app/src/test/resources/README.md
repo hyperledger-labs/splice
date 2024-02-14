@@ -40,7 +40,7 @@ A port number has five digits and is of the form `<Network Index><Node Index><AP
 All CometBFT ports we use (both locally and on clusters) are of the form `266<Node Index><API Index>`,
 where `<Node Index>` defaults to 0 and `<API Index>` is one of `6` (P2P), `7` (RPC) and `0` (Prometheus metrics).
 
-### Allocated Networks
+### Allocated Networks (Network Index)
 
 To avoid collisions with our grpc-web proxy (which proxies ports `N` to `N+1000`, see below),
 all network indices must be odd numbers.
@@ -61,7 +61,17 @@ all network indices must be odd numbers.
 - `26`: Reserved for CometBFT
 - `27`: Standalone Canton instances launched in integration tests
 
-### Allocated APIs
+### Allocated Nodes (Node Index)
+
+- `1`: SV1
+- `2`: SV2
+- `3`: SV3
+- `4`: SV4
+- `5`: Alice
+- `6`: Bob
+- `7`: Splitwell
+
+### Allocated APIs (API Index)
 
 - `00`: Canton, Prometheus metrics endpoint
 - `01`: Participant, Ledger API

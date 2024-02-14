@@ -31,13 +31,13 @@ class WalletSurviveCantonRestartIntegrationTest
   )
   val cantonExtraConfig: Seq[String] =
     Seq(
-      "canton.participants.validatorParticipant.ledger-api.port=7201",
-      "canton.participants.validatorParticipant.admin-api.port=7202",
+      "canton.participants.validatorParticipant.ledger-api.port=7501",
+      "canton.participants.validatorParticipant.admin-api.port=7502",
     )
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
-    ("ParticipantLedgerApi", 7201),
-    ("ParticipantAdminApi", 7202),
+    ("ParticipantLedgerApi", 7501),
+    ("ParticipantAdminApi", 7502),
   )
 
   override def environmentDefinition

@@ -5,7 +5,7 @@ import com.digitalasset.canton.time.WallClock
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.DomainMigrationUtil.{UpgradeDomainNode, mapSvPort}
+import com.daml.network.util.DomainMigrationUtil.UpgradeDomainNode
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.BaseTest
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
@@ -114,7 +114,7 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
       ec: ExecutionContextExecutor
   ) = {
     val loggerFactoryWithKey = loggerFactory.append("updateNode", sv.toString)
-    val port = Port.tryCreate(portRange * 1000 + mapSvPort(sv) * 100 + 2)
+    val port = Port.tryCreate(portRange * 1000 + sv * 100 + 2)
     logger.debug(s"Creating upgradeDomainNode for SV ${sv.toString} with participant port $port")
     UpgradeDomainNode(
       new ParticipantAdminConnection(
@@ -144,12 +144,4 @@ object DomainMigrationUtil {
 
   val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
 
-  // TODO(#9757): might want to replace this function
-  def mapSvPort(sv: Int): Int = {
-    if (sv == 1) {
-      0
-    } else {
-      sv + 4
-    }
-  }
 }

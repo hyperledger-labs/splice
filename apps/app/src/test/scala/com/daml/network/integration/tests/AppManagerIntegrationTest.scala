@@ -66,7 +66,7 @@ class AppManagerIntegrationTest
       domains = Vector(
         Domain(
           "splitwell",
-          "http://localhost:5108",
+          "http://localhost:5708",
         )
       ),
       releaseVersion = "1.0.0",
@@ -134,7 +134,7 @@ class AppManagerIntegrationTest
       configuration.name shouldBe "splitwell"
       configuration.releaseConfigurations.loneElement.domains.loneElement shouldBe Domain(
         "splitwell",
-        "http://localhost:5108",
+        "http://localhost:5708",
       )
       val darHash = splitwellValidatorBackend
         .getAppRelease(provider, configuration.releaseConfigurations.loneElement.releaseVersion)

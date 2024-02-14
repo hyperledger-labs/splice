@@ -35,7 +35,7 @@ import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobal
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, SvTestUtil, WalletTestUtil}
-import com.daml.network.util.DomainMigrationUtil.{mapSvPort, testDumpDir}
+import com.daml.network.util.DomainMigrationUtil.testDumpDir
 import com.daml.network.util.DomainMigrationUtil
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
@@ -98,7 +98,7 @@ class GlobalDomainMigrationIntegrationTest
                         SvGlobalDomainConfig(
                           alias = DomainAlias.tryCreate("global"),
                           // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
-                          url = s"http://localhost:27${mapSvPort(sv)}08",
+                          url = s"http://localhost:27${sv}08",
                         )
                       ),
                       domainMigrationId = 1L,
@@ -114,7 +114,7 @@ class GlobalDomainMigrationIntegrationTest
                     domains = SvDomainConfig(global =
                       SvGlobalDomainConfig(
                         alias = DomainAlias.tryCreate("global"),
-                        url = s"http://localhost:27008",
+                        url = s"http://localhost:27108",
                       )
                     ),
                   )
@@ -135,7 +135,7 @@ class GlobalDomainMigrationIntegrationTest
                   domains = ValidatorDomainConfig(global =
                     ValidatorGlobalDomainConfig(
                       alias = DomainAlias.tryCreate("global"),
-                      url = Some("http://localhost:27009"),
+                      url = Some("http://localhost:27109"),
                     )
                   ),
                 )
@@ -162,7 +162,7 @@ class GlobalDomainMigrationIntegrationTest
               config
                 .walletAppClients(InstanceName.tryCreate("sv1Wallet"))
                 .copy(
-                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27003")
+                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27103")
                 )
           ),
         )

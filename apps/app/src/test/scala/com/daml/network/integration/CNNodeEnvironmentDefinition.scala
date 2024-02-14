@@ -195,7 +195,7 @@ case class CNNodeEnvironmentDefinition(
       CNNodeConfigTransforms.updateAllValidatorConfigs_(config =>
         config
           .focus(_.domains.global.url)
-          .replace(Some(s"http://localhost:${5008 + sequencerPortBump}"))
+          .replace(Some(s"http://localhost:${5108 + sequencerPortBump}"))
       )(config)
     )
 
