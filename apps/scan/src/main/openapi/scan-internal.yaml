@@ -574,6 +574,21 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/migrations/schedule:
+    get:
+      tags: [scan]
+      x-jvm-package: scan
+      operationId: "getMigrationSchedule"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/MigrationSchedule"
+        "404":
+          description: "No migration scheduled"
+
 components:
   schemas:
     GetSvcPartyIdResponse:
@@ -1354,3 +1369,15 @@ components:
           type: string
         total_coin_balance:
           type: string
+    MigrationSchedule:
+      type: object
+      required:
+        - "time"
+        - "migration_id"
+      properties:
+        time:
+          type: string
+          format: date-time
+        migration_id:
+          type: integer
+          format: int64

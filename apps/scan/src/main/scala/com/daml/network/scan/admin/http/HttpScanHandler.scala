@@ -1,5 +1,6 @@
 package com.daml.network.scan.admin.http
 
+import cats.data.OptionT
 import cats.syntax.either.*
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.admin.http.HttpErrorHandler
@@ -905,6 +906,32 @@ class HttpScanHandler(
           definitions.ListRoundPartyTotalsResponse(entries.toVector)
         )
       }
+    }
+  }
+
+  override def getMigrationSchedule(
+      respond: ScanResource.GetMigrationScheduleResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.GetMigrationScheduleResponse] = {
+    implicit val tc = extracted
+    withSpan(s"$workflowId.getMigrationSchedule") { _ => _ =>
+      OptionT(store.lookupSvcRules())
+        .map(_.payload)
+        .subflatMap { svcRules =>
+          svcRules.config.nextScheduledDomainUpgrade.toScala.map { nextUpgrade =>
+            definitions.MigrationSchedule(
+              java.time.OffsetDateTime
+                .ofInstant(nextUpgrade.time, ZoneOffset.UTC),
+              nextUpgrade.migrationId,
+            )
+          }
+        }
+        .fold(
+          ScanResource.GetMigrationScheduleResponse.NotFound
+        )(schedule =>
+          ScanResource.GetMigrationScheduleResponse.OK(
+            schedule
+          )
+        )
     }
   }
 }
