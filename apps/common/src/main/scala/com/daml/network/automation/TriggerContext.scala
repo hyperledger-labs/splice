@@ -11,6 +11,7 @@ import com.digitalasset.canton.time.Clock
 final case class TriggerContext(
     config: AutomationConfig,
     clock: Clock,
+    pollingClock: Clock,
     retryProvider: RetryProvider,
     loggerFactory: NamedLoggerFactory,
     metricsFactory: CantonLabeledMetricsFactory,

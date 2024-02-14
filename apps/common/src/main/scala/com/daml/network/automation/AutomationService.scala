@@ -5,7 +5,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
-import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.time.{Clock, WallClock}
 import com.digitalasset.canton.tracing.Spanning
 
 import java.util.concurrent.atomic.AtomicReference
@@ -33,7 +33,8 @@ abstract class AutomationService(
   protected def triggerContext: TriggerContext =
     TriggerContext(
       automationConfig,
-      clock,
+      clock = clock,
+      pollingClock = new WallClock(timeouts, loggerFactory),
       retryProvider,
       loggerFactory,
       retryProvider.metricsFactory,

@@ -63,7 +63,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       "Advancing time to close rounds",
       // TODO(#2930): Since we are reporting in getRoundOfLatestData() only the latest round for which the log contains both the open and close,
       // we must advance rounds until round 3 closes, which is the first one that sv2's scan is guaranteed to have seen opening the round opening.
-      (0 to 6).foreach(_ => advanceRoundsByOneTick),
+      (1 to 6).foreach(_ => advanceRoundsByOneTick),
     )(
       "Waiting for scan apps to report rounds as closed",
       _ => {

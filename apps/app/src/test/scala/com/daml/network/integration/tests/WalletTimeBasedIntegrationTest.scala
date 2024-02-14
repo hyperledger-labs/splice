@@ -202,7 +202,7 @@ class WalletTimeBasedIntegrationTest
             advanceTimeToRoundOpen
           }
         },
-        cancelAllSubscriptions(aliceWalletClient, aliceValidatorBackend),
+        cancelAllSubscriptions(aliceWalletClient),
       ) {
         val cnsSubscriptionRenewalPaymentTrigger =
           sv1Backend.leaderBasedAutomation.trigger[CnsSubscriptionRenewalPaymentTrigger]
@@ -605,7 +605,7 @@ class WalletTimeBasedIntegrationTest
           aliceWalletClient.tap(50.0)
           aliceWalletClient.acceptSubscriptionRequest(respond.subscriptionRequestCid)
         },
-        cancelAllSubscriptions(aliceWalletClient, aliceValidatorBackend),
+        cancelAllSubscriptions(aliceWalletClient),
       ) {
         clue("Getting Alice's new entry") {
           eventuallySucceeds() {

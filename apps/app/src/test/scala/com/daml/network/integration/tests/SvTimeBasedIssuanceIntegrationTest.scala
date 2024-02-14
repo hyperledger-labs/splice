@@ -162,7 +162,6 @@ class SvTimeBasedIssuanceIntegrationTest
     )(
       "Wait for all reward coupons to be created",
       _ => {
-        advanceTimeByPollingInterval(sv1Backend)
         getRewardCoupons(round)
           .filterNot(c =>
             leftoverRewardIds(c.id)
@@ -179,7 +178,6 @@ class SvTimeBasedIssuanceIntegrationTest
       "Wait for all unclaimed coupons to be archived and the closed round to be archived",
       _ => {
         // We need multiple polling triggers to trigger to get to the target state, which is why we advanceTime within the check
-        advanceTimeByPollingInterval(sv1Backend)
         getRewardCoupons(round) shouldBe empty
         sv1ScanBackend
           .getClosedRounds()

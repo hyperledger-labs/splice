@@ -12,6 +12,7 @@ import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
+import math.Ordering.Implicits.*
 
 class ReceiveFaucetCouponTrigger(
     override protected val context: TriggerContext,
@@ -45,8 +46,9 @@ class ReceiveFaucetCouponTrigger(
       firstOpenNotClaimed = openRounds
         .filter(round =>
           license.payload.faucetState.toScala
-            .forall(_.lastReceivedFor.number < round.payload.round.number) && round.payload.opensAt
-            .isBefore(context.clock.now.toInstant)
+            .forall(
+              _.lastReceivedFor.number < round.payload.round.number
+            ) && round.payload.opensAt <= context.clock.now.toInstant
         )
         .minByOption(_.contract.payload.opensAt)
       _ <- firstOpenNotClaimed match {

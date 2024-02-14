@@ -73,10 +73,6 @@ class WalletAppRewardsTimeBasedIntegrationTest
             eventually() {
               val currentRound =
                 sv1ScanBackend.getOpenAndIssuingMiningRounds()._1.head.contract.payload.round.number
-              // Ensure `ReceiveFaucetCouponTrigger` will do one iteration where it receives the faucet coupon.
-              // On startup, the ValidatorLicense may not yet be present, and later Scan might not yet see a newer open round.
-              // TODO (#9753): this shouldn't be required once polling triggers interval depends on wall clock.
-              advanceTimeByPollingInterval(sv1Backend)
               aliceValidatorWalletClient
                 .listValidatorFaucetCoupons()
                 .map(_.payload.round.number) should contain(currentRound)

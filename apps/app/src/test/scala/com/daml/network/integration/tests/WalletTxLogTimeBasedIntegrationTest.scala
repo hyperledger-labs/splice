@@ -41,7 +41,6 @@ class WalletTxLogTimeBasedIntegrationTest
       )(
         "Wait for SV rewards to be collected",
         _ => {
-          advanceTimeByPollingInterval(sv1Backend)
           sv1WalletClient.balance().unlockedQty should be > BigDecimal(0)
         },
       )

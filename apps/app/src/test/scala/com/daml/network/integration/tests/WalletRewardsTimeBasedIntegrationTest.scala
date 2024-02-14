@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -9,7 +8,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletRewardsTimeBasedIntegrationTest
@@ -21,13 +19,6 @@ class WalletRewardsTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          // we use advanceTimeByPollingInterval for ReceiveFaucetCouponTrigger to re-check the open round.
-          // 1ms pollingInterval vs 10s round tick duration should give enough margin.
-          _.copy(pollingInterval = NonNegativeFiniteDuration.ofMillis(1))
-        )(config)
-      )
 
   "A wallet" should {
 
@@ -46,16 +37,28 @@ class WalletRewardsTimeBasedIntegrationTest
       eventually()(bobWalletClient.list().coins should have size 1)
       p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0)
 
-      eventually() {
-        advanceTimeByPollingInterval(sv1Backend)
-        bobValidatorWalletClient.listAppRewardCoupons() should have size 1
-        bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
-        bobValidatorWalletClient.listValidatorFaucetCoupons() should have size 1
-        aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
-        aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1
-        aliceValidatorWalletClient.listValidatorFaucetCoupons() should have size 1
+      val openRounds = eventually() {
+        import math.Ordering.Implicits.*
+        val openRounds = sv1ScanBackend
+          .getOpenAndIssuingMiningRounds()
+          ._1
+          .filter(_.payload.opensAt <= env.environment.clock.now.toInstant)
+        openRounds should not be empty
+        openRounds
       }
 
+      eventually() {
+        bobValidatorWalletClient.listAppRewardCoupons() should have size 1
+        bobValidatorWalletClient.listValidatorRewardCoupons() should have size 1
+        aliceValidatorWalletClient.listAppRewardCoupons() should have size 1
+        aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1
+        bobValidatorWalletClient
+          .listValidatorFaucetCoupons() should have size openRounds.size.toLong
+        aliceValidatorWalletClient
+          .listValidatorFaucetCoupons() should have size openRounds.size.toLong
+      }
+
+      // avoid messing with the computation of balance
       bobValidatorBackend.validatorAutomation
         .trigger[ReceiveFaucetCouponTrigger]
         .pause()
@@ -78,7 +81,11 @@ class WalletRewardsTimeBasedIntegrationTest
       // We just check that the balance has increased by roughly the right amount,
       // rather then repeating the calculation for the reward amount
       // 2.85 CC (at 1CC/USD) per faucet coupon
-      assertInRange(newBalance - prevBalance, (0.1 + 2.85, 0.5 + 2.85 * 3))
+      val faucetCouponAmount = 2.85 * openRounds.size
+      assertInRange(
+        newBalance - prevBalance,
+        (0.1 + faucetCouponAmount, 0.5 + faucetCouponAmount),
+      )
     }
   }
 }

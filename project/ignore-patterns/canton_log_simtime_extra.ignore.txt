@@ -16,6 +16,9 @@ The payload to event time bound.*has been been exceeded by payload time
 # advancing time can result in the sequencer subscriptions being expired (See #7980)
 SEQUENCER_SUBSCRIPTION_LOST.*: Lost subscription to domain .* Will try to recover automatically.
 
+# It seems this happens when a transaction is in-flight and we advance time. We should just retry.
+INTERPRETATION_TIME_EXCEEDED.*: Interpretation time exceeds limit of Ledger Effective Time
+
 # TODO(#8955): investigate and remove once fixed
 INVALID_ACKNOWLEDGEMENT_TIMESTAMP.*Member.*has acknowledged the timestamp.*when only events with timestamps at most.*have been delivered
 

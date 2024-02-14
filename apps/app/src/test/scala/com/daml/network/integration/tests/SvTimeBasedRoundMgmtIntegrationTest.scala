@@ -81,11 +81,6 @@ class SvTimeBasedRoundMgmtIntegrationTest
       ) should have size 3
     )
 
-    // advance time by 2 polling intervals to ensure that the automations
-    // to create confirmation contracts for archival and then executing the confirmations
-    // have both run
-    advanceTimeByPollingInterval(sv1Backend)
-    advanceTimeByPollingInterval(sv1Backend)
     clue("Wait until the closed round is archived") {
       eventually()(
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs

@@ -593,8 +593,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       }
     }
 
-    advanceTimeByPollingInterval(sv1Backend) withClue "advancing time so follow trigger happens"
-
     clue("see whether coinrules follows svcrules") {
       eventually() {
         sv1ScanBackend.getCoinRules().state shouldBe Assigned(globalUpgradeId)

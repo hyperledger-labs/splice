@@ -257,7 +257,7 @@ class ScanFrontendTimeBasedIntegrationTest
             trafficAmount,
             env.environment.clock.now,
           )
-          (0 to 5).foreach(_ => advanceRoundsByOneTick)
+          (1 to 5).foreach(_ => advanceRoundsByOneTick)
         },
       )(
         "Wait for round to close in scan",
@@ -302,7 +302,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
       actAndCheck(
         "Advance rounds",
-        (0 to 5).foreach(_ => advanceRoundsByOneTick),
+        (1 to 5).foreach(_ => advanceRoundsByOneTick),
       )(
         "Wait for round to close in scan",
         _ => sv1ScanBackend.getRoundOfLatestData()._1 shouldBe (firstRound + 1),
@@ -347,7 +347,6 @@ class ScanFrontendTimeBasedIntegrationTest
           Seq(aliceValidatorBackend.validatorAutomation.trigger[ReceiveFaucetCouponTrigger]),
         ) {
           eventually() {
-            advanceTimeByPollingInterval(sv1Backend)
             aliceValidatorWalletClient
               .listValidatorFaucetCoupons() should have length openRounds.length.toLong
           }

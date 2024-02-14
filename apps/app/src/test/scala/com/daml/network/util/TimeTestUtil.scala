@@ -314,16 +314,17 @@ trait TimeTestUtil extends CNNodeTestCommon {
             round.contract.payload.round.number shouldBe lowestOpen
           )
         } else {
-          val Seq(lowestIssuing, middleIssuing, highestIssuing) =
-            previousIssuingRounds.map(_.contract.payload.round.number)
-          newIssuingRounds should have size 3
-          val Seq(newLowestIssuing, newMiddleIssuing, newHighestIssuing) =
-            newIssuingRounds.map(_.contract.payload.round.number)
+          inside(previousIssuingRounds.map(_.contract.payload.round.number)) {
+            case Seq(lowestIssuing, middleIssuing, highestIssuing) =>
+              newIssuingRounds should have size 3
+              val Seq(newLowestIssuing, newMiddleIssuing, newHighestIssuing) =
+                newIssuingRounds.map(_.contract.payload.round.number)
 
-          newLowestIssuing shouldBe lowestIssuing + 1
-          newLowestIssuing shouldBe middleIssuing
-          newMiddleIssuing shouldBe highestIssuing
-          newHighestIssuing shouldBe highestIssuing + 1
+              newLowestIssuing shouldBe lowestIssuing + 1
+              newLowestIssuing shouldBe middleIssuing
+              newMiddleIssuing shouldBe highestIssuing
+              newHighestIssuing shouldBe highestIssuing + 1
+          }
         }
       },
     )
@@ -344,12 +345,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
       advanceTime(Duration.between(now, earliestOpen))
     }
   }
-
-  def advanceTimeByPollingInterval(appRef: CNNodeAppBackendReference)(implicit
-      env: CNNodeTestConsoleEnvironment
-  ) = advanceTime(
-    appRef.config.automation.pollingInterval.asJava
-  )
 
   /** This function advances time sufficiently to trigger an extra traffic top-up
     * for the provided validator.
@@ -389,17 +384,10 @@ trait TimeTestUtil extends CNNodeTestCommon {
     .sortBy(_.data.round.number)
 
   def cancelAllSubscriptions(
-      walletClient: WalletAppClientReference,
-      walletBackend: CNNodeAppBackendReference,
-  )(implicit
-      env: CNNodeTestConsoleEnvironment
+      walletClient: WalletAppClientReference
   ): Assertion = {
     clue("Cancel subscription to avoid affecting other test cases") {
       eventually() {
-        // Trigger a payment->idle state transition if needed
-        // Done inside the eventually as it can go both ways: trigger a make payment or completing a payment.
-        // This assumes that our subscriptions use payment intervals that are much longer than the triggers' polling interval.
-        advanceTimeByPollingInterval(walletBackend)
         // Cancel all subscriptions that are currently idle
         walletClient
           .listSubscriptions()

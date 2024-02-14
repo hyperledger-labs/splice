@@ -109,7 +109,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
 
           def loopWithDelay(): Future[Done] = LoggerUtil.logOnThrow {
             val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
-              context.clock
+              context.pollingClock
                 .scheduleAfter(
                   _ => {
                     // No work done here, as we are only interested in the scheduling notification
