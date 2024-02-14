@@ -349,7 +349,7 @@ class GlobalDomainMigrationIntegrationTest
           },
         ) {
 
-          withClueAndLog("dump has be written in the configured location.") {
+          withClueAndLog("dump has been written in the configured location.") {
             eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
               allNodes.foreach { node =>
                 (migrationDumpDir(

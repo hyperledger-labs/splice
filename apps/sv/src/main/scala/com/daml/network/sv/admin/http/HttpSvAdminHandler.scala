@@ -1,7 +1,6 @@
 package com.daml.network.sv.admin.http
 
 import cats.implicits.catsSyntaxApplicativeId
-import com.daml.network.http.v0.definitions as http
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
@@ -20,8 +19,12 @@ import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.migration.{
+  DomainDataSnapshotGenerator,
+  DomainMigrationDump,
+  DomainNodeIdentities,
+}
+import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{BackupDump, Codec, TemplateJsonDecoder}
@@ -48,6 +51,7 @@ class HttpSvAdminHandler(
     cometBftClient: Option[CometBftClient],
     localDomainNode: Option[LocalDomainNode],
     participantAdminConnection: ParticipantAdminConnection,
+    domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
     clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -531,31 +535,17 @@ class HttpSvAdminHandler(
             svcRules.payload.config.nextScheduledDomainUpgrade.toScala match {
               case Some(scheduled) =>
                 DomainMigrationDump
-                  .getDomainPausedTime(
+                  .getDomainMigrationDump(
+                    config.domains.global.alias,
                     participantAdminConnection,
+                    domainNode,
+                    loggerFactory,
                     svcStore,
+                    scheduled.migrationId,
+                    domainDataSnapshotGenerator,
                   )
-                  .flatMap {
-                    case Some(pausedAt) =>
-                      DomainMigrationDump
-                        .getDomainMigrationDump(
-                          config.domains.global.alias,
-                          participantAdminConnection,
-                          domainNode,
-                          loggerFactory,
-                          svcStore,
-                          scheduled.migrationId,
-                          pausedAt,
-                        )
-                        .map { response =>
-                          v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(response.toHttp)
-                        }
-                    case None =>
-                      Future.failed(
-                        HttpErrorHandler.internalServerError(
-                          s"Could not get DomainMigrationDump because domain is not paused yet"
-                        )
-                      )
+                  .map { response =>
+                    v0.SvAdminResource.GetDomainMigrationDumpResponse.OK(response.toHttp)
                   }
               case None =>
                 Future.failed(
@@ -582,15 +572,13 @@ class HttpSvAdminHandler(
   ): Future[SvAdminResource.GetDomainDataSnapshotResponse] = {
     val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getDomainNodeIdentitiesDump") { implicit tc => _ =>
-      DomainDataSnapshot
+      domainDataSnapshotGenerator
         .getDomainDataSnapshot(
-          participantAdminConnection,
-          svcStore,
-          Instant.parse(body.timestamp),
+          Instant.parse(body.timestamp)
         )
         .map { response =>
           SvAdminResource.GetDomainDataSnapshotResponse.OK(
-            http.GetDomainDataSnapshotResponse(response.toHttp)
+            definitions.GetDomainDataSnapshotResponse(response.toHttp)
           )
         }
     }(traceContext, tracer)
@@ -613,7 +601,7 @@ class HttpSvAdminHandler(
             )
             .map { response =>
               SvAdminResource.GetDomainNodeIdentitiesDumpResponse.OK(
-                http.GetDomainNodeIdentitiesDumpResponse(response.toHttp())
+                definitions.GetDomainNodeIdentitiesDumpResponse(response.toHttp())
               )
             }
         case None =>
@@ -675,29 +663,16 @@ class HttpSvAdminHandler(
           optDomainMigrationDumpConfig match {
             case Some(dumpPath) =>
               for {
-                domainPausedAt <- DomainMigrationDump.getDomainPausedTime(
-                  participantAdminConnection,
-                  svcStore,
-                )
-                dump <- domainPausedAt match {
-                  case Some(pausedAt) =>
-                    DomainMigrationDump
-                      .getDomainMigrationDump(
-                        config.domains.global.alias,
-                        participantAdminConnection,
-                        domainNode,
-                        loggerFactory,
-                        svcStore,
-                        request.migrationId,
-                        pausedAt,
-                      )
-                  case None =>
-                    Future.failed(
-                      HttpErrorHandler.internalServerError(
-                        s"Could not trigger DomainMigrationDump because domain is not paused yet"
-                      )
-                    )
-                }
+                dump <- DomainMigrationDump
+                  .getDomainMigrationDump(
+                    config.domains.global.alias,
+                    participantAdminConnection,
+                    domainNode,
+                    loggerFactory,
+                    svcStore,
+                    request.migrationId,
+                    domainDataSnapshotGenerator,
+                  )
               } yield {
                 val path = BackupDump.writeToPath(
                   dumpPath,

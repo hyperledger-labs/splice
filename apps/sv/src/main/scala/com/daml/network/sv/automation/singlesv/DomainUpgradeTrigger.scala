@@ -2,10 +2,10 @@ package com.daml.network.sv.automation.singlesv
 
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
-import com.daml.network.sv.{LocalDomainNode}
-import com.daml.network.sv.migration.DomainMigrationDump
+import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.migration.{AcsExporter, DomainDataSnapshotGenerator, DomainMigrationDump}
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.BackupDump
 import com.digitalasset.canton.DomainAlias
@@ -16,14 +16,10 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.topology.transaction.DomainParametersStateX
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import java.nio.file.Path
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
-import scala.concurrent.duration.*
-import scala.jdk.DurationConverters.*
 import scala.jdk.OptionConverters.*
 
 final class DomainUpgradeTrigger(
@@ -38,6 +34,13 @@ final class DomainUpgradeTrigger(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[DomainUpgradeTrigger.Task] {
+
+  val domainDataSnapshotGenerator = new DomainDataSnapshotGenerator(
+    participantAdminConnection,
+    svcStore,
+    new AcsExporter(participantAdminConnection, context.retryProvider, loggerFactory),
+  )
+
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[DomainUpgradeTrigger.Task]] = {
@@ -70,9 +73,8 @@ final class DomainUpgradeTrigger(
       // pause domain and trigger export
       for {
         globalDomainId <- svcStore.getSvcRules().map(_.domain)
-        domainParamsTopologyResult <- ensureDomainIsPaused(globalDomainId)
-        _ <- waitForMediatorAndParticipantResponseTime(globalDomainId, domainParamsTopologyResult)
-        _ <- exportMigrationDump(task.work.migrationId, domainParamsTopologyResult.base.validFrom)
+        _ <- ensureDomainIsPaused(globalDomainId)
+        _ <- exportMigrationDump(task.work.migrationId)
       } yield TaskSuccess(show"Triggered domain pause and migration dump export for ${task.work}")
     } else
       Future.successful(TaskSuccess(show"migration dump already exists. skipping ${task.work}"))
@@ -94,7 +96,7 @@ final class DomainUpgradeTrigger(
       )
   } yield domainParamsTopologyResult
 
-  private def exportMigrationDump(migrationId: Long, domainPausedAt: Instant)(implicit
+  private def exportMigrationDump(migrationId: Long)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Unit] = {
@@ -106,7 +108,7 @@ final class DomainUpgradeTrigger(
         loggerFactory,
         svcStore,
         migrationId,
-        domainPausedAt,
+        domainDataSnapshotGenerator,
       )
       .map { dump =>
         val path = BackupDump.writeToPath(
@@ -117,38 +119,6 @@ final class DomainUpgradeTrigger(
       }
   }
 
-  private def waitForMediatorAndParticipantResponseTime(
-      globalDomainId: DomainId,
-      domainParamsTopologyResult: TopologyResult[DomainParametersStateX],
-  )(implicit
-      tc: TraceContext
-  ) = {
-    val domainDynamicParams = domainParamsTopologyResult.mapping.parameters
-    val duration = domainDynamicParams.mediatorReactionTimeout.duration
-      .plus(domainDynamicParams.participantResponseTimeout.duration)
-      .plus(5.seconds.toJava) // a small buffer to account for network latency
-
-    val readyForDumpAfter = domainParamsTopologyResult.base.validFrom.plus(duration)
-    for {
-      _ <- context.retryProvider
-        .waitUntil(
-          RetryFor.WaitingOnInitDependency,
-          "wait for mediator and participant response time after domain is paused",
-          participantAdminConnection
-            .getDomainTime(globalDomainId, timeouts.default)
-            .map(domainTimeResponse =>
-              if (domainTimeResponse.timestamp.toInstant.isBefore(readyForDumpAfter)) {
-                throw Status.FAILED_PRECONDITION
-                  .withDescription(
-                    s"we should wait until $readyForDumpAfter to let all participants catch up with the paused domain state"
-                  )
-                  .asRuntimeException()
-              }
-            ),
-          logger,
-        )
-    } yield ()
-  }
 }
 
 object DomainUpgradeTrigger {

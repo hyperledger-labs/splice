@@ -1,22 +1,15 @@
 package com.daml.network.sv.migration
 
 import cats.syntax.either.*
-import cats.syntax.traverse.*
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.sv.migration.DomainDataSnapshot.Dar
-import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.crypto.Hash
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.admin.v30.TopologyTransactions
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
-import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
 
-import java.time.Instant
 import java.util.Base64
-import scala.concurrent.{ExecutionContext, Future}
 
 case class DomainDataSnapshot(
     topologySnapshot: GenericStoredTopologyTransactionsX,
@@ -60,43 +53,6 @@ object DomainDataSnapshot {
     topologySnapshot,
     acsSnapshot,
     dars,
-  )
-
-  /** The snapshot must be obtained only after the we have waited for participantResponseTimeout and the mediatorReactionTimeout after the timestamp provided.
-    * This must be enforced by the caller and only then is the `force = true` flag safe.
-    */
-  def getDomainDataSnapshot(
-      participantAdminConnection: ParticipantAdminConnection,
-      svcStore: SvSvcStore,
-      timestamp: Instant,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[DomainDataSnapshot] = for {
-    globalDomain <- svcStore.getSvcRules().map(_.domain)
-    snapshotTimestamp = CantonTimestamp.tryFromInstant(timestamp)
-    topologySnapshotWithProposals <- participantAdminConnection
-      .getTopologySnapshot(
-        globalDomain,
-        snapshotTimestamp,
-      )
-    topologySnapshot = topologySnapshotWithProposals.filter(_.transaction.isProposal == false)
-    acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(
-      Set(svcStore.key.svParty, svcStore.key.svcParty),
-      timestamp = Some(timestamp),
-      // flag must be enforced only after the timeouts described above
-      force = true,
-    )
-    darDescriptions <- participantAdminConnection.listDars()
-    dars <- darDescriptions.traverse { dar =>
-      val hash = Hash.tryFromHexString(dar.hash)
-      participantAdminConnection.lookupDar(hash).map(_.map(Dar(hash, _)))
-    }
-
-  } yield DomainDataSnapshot(
-    topologySnapshot,
-    acsSnapshot,
-    dars.flatten,
   )
 
   final case class Dar(hash: Hash, content: ByteString)

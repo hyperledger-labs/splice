@@ -50,7 +50,7 @@ object DomainMigrationDump {
       loggerFactory: NamedLoggerFactory,
       svcStore: SvSvcStore,
       migrationId: Long,
-      domainPausedTime: Instant,
+      domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -63,11 +63,7 @@ object DomainMigrationDump {
         domainAlias,
         loggerFactory,
       )
-      snapshot <- DomainDataSnapshot.getDomainDataSnapshot(
-        participantAdminConnection,
-        svcStore,
-        domainPausedTime,
-      )
+      snapshot <- domainDataSnapshotGenerator.getDomainMigrationSnapshot()
     } yield DomainMigrationDump(
       migrationId,
       identities,

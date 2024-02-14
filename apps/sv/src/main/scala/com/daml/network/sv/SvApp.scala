@@ -74,6 +74,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import cats.syntax.foldable.*
 import cats.instances.future.*
+import com.daml.network.sv.migration.{AcsExporter, DomainDataSnapshotGenerator}
 
 class SvApp(
     override val name: InstanceName,
@@ -417,6 +418,11 @@ class SvApp(
         cometBftClient,
         localDomainNode,
         participantAdminConnection,
+        new DomainDataSnapshotGenerator(
+          participantAdminConnection,
+          svcStore,
+          new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
+        ),
         clock,
         loggerFactory,
       )
