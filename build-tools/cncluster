@@ -1910,6 +1910,76 @@ function subcmd_participant_console() {
     kill $port_forwarding_pid
 }
 
+subcommand_whitelist[sequencer_console]='Open a Canton console against a single sequencer running in the target namespace'
+
+function subcmd_sequencer_console() {
+    _cluster_must_exist
+
+    namespace="${1-}"
+    domain=${2:-0}
+
+    if [ -z "${namespace}" ]; then
+        _error "Usage: $SCRIPTNAME sequencer_console <namespace-name>"
+    fi
+
+    app="global-domain-sequencer"
+    app_container="$app"
+    k8s_labels_for_app
+
+    if ! sequencer_pod=$(_get_single_pod "$namespace" "$app"); then
+      _error "No sequencer found in namespace '$namespace'."
+    fi
+
+    if (netstat -an | grep ".1100[12].*LISTEN"); then
+      _error "Ports 11001 and/or 11002 are already in use on localhost. Please close any processes that might be listening on them."
+    fi
+
+    _info "Starting port forwarding from '$sequencer_pod'..."
+    kubectl port-forward -n "$namespace" "$sequencer_pod" 11001:5008 11002:5009 &
+    port_forwarding_pid=$!
+
+    _info "Starting Canton console..."
+    canton -v -c "$REPO_ROOT/build-tools/local-sequencer.conf"
+
+    _info "Stopping port forwarding."
+    kill $port_forwarding_pid
+}
+
+subcommand_whitelist[mediator_console]='Open a Canton console against a single mediator running in the target namespace'
+
+function subcmd_mediator_console() {
+    _cluster_must_exist
+
+    namespace="${1-}"
+    domain=${2:-0}
+
+    if [ -z "${namespace}" ]; then
+        _error "Usage: $SCRIPTNAME mediator_console <namespace-name>"
+    fi
+
+    app="global-domain-mediator"
+    app_container="$app"
+    k8s_labels_for_app
+
+    if ! mediator_pod=$(_get_single_pod "$namespace" "$app"); then
+      _error "No mediator found in namespace '$namespace'."
+    fi
+
+    if (netstat -an | grep ".11001.*LISTEN"); then
+      _error "Ports 11001 are already in use on localhost. Please close any processes that might be listening on them."
+    fi
+
+    _info "Starting port forwarding from '$mediator_pod'..."
+    kubectl port-forward -n "$namespace" "$mediator_pod" 11001:5007 &
+    port_forwarding_pid=$!
+
+    _info "Starting Canton console..."
+    canton -v -c "$REPO_ROOT/build-tools/local-mediator.conf"
+
+    _info "Stopping port forwarding."
+    kill $port_forwarding_pid
+}
+
 function _get_single_pod() {
     namespace="${1-}"
     app_name="${2-}"

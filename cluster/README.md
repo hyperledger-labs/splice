@@ -1427,7 +1427,7 @@ It is possible, although not always convenient, to access Canton and app APIs de
 This can be useful for debugging, for checking network state not yet exposed in other ways, as well as for
 [fixing a running network](#strategies-for-reacting-to-a-failed-testnet-or-devnet-deployment).
 
-### Canton Participant APIs
+### Canton Participant, Sequencer and Mediator APIs
 
 1. `cd` into a cluster directory of your choice.
 2. Run `cncluster participant_console <namespace>`,
@@ -1471,6 +1471,12 @@ Note that above example will likely not work out of the box by the time you atte
 In addition to the documentation available from within the Canton console (try hitting Tab after spelling out a command name),
 the `LedgerApiAdministration.scala` and `ParticipantAdministration.scala` files in the Canton source tree (/ our fork)
 contain helpful pointers for interacting with the Canton APIs.
+
+You can also access sequencer and mediator:
+
+1. `cd` into a cluster directory of your choice.
+2. Run `cncluster sequencer_console <namespace>` or `cncluster mediator_console <namespace>`,
+   substituting `<namespace>` with the namespace in which your target node is running in.
 
 ### App APIs without authentication
 
