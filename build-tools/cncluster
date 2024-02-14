@@ -305,7 +305,7 @@ function _get_holder_names() {
 }
 
 function _assert_lock() {
-    if [ -z "${SHARED_CLUSTER:-}" ]; then
+    if ! (env-bool SHARED_CLUSTER); then
         return
     fi
 
@@ -373,8 +373,8 @@ function _prompt_to_confirm() {
 
     _cluster_show
 
-    if [ -z "${GCP_CLUSTER_PROD_LIKE-}" ] ; then
-        if [ -n "${CNCLUSTER_AUTOCONFIRM-}" ] ; then
+    if ! (env-bool GCP_CLUSTER_PROD_LIKE) ; then
+        if (env-bool CNCLUSTER_AUTOCONFIRM) ; then
             _warning "Automatically confirmed (via environment variable): ${subcommand_whitelist[${SUBCOMMAND_NAME}]}"
             return
         fi
@@ -908,7 +908,7 @@ function subcmd_ci_apply() {
 
     # By default, this is unset and we infer the previous values based on the currently running cluster.
     # However, we allow overwriting it to account for cases where the previous cluster is broken in some way.
-    if [ -n "${RESTORE_CLUSTER:-}" ] && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
+    if (env-bool RESTORE_CLUSTER) && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
         CLUSTER="$GCP_CLUSTER_BASENAME"
         NOW="$(date +"%Y-%m-%dT%H:%M:%S.000Z")"
         export BOOTSTRAPPING_CONFIG="{\"cluster\": \"$CLUSTER\", \"date\": \"$NOW\"}"
@@ -937,7 +937,7 @@ function subcmd_ci_apply() {
 subcommand_whitelist[ci_warn_lock_expiry]='Run only by CircleCI'
 
 function subcmd_ci_warn_lock_expiry() {
-    if [ -z "${SHARED_CLUSTER:-}" ]; then
+    if ! (env-bool SHARED_CLUSTER); then
         _info "Cluster not marked as shared. No lock to check."
         exit 0
     fi
@@ -962,7 +962,7 @@ function subcmd_ci_warn_lock_expiry() {
 subcommand_whitelist[ci_assert_fresh_lock]='Run only by CircleCI'
 
 function subcmd_ci_assert_fresh_lock() {
-    if [ -z "${SHARED_CLUSTER:-}" ]; then
+    if ! (env-bool SHARED_CLUSTER); then
         _info "Cluster not marked as shared. No lock to check."
         exit 0
     fi
@@ -990,11 +990,11 @@ function subcmd_ci_reset_unlock() {
     # removes the need for manual confirmation and is executed only on shared
     # clusters (like scratchnet).
 
-    if [ -z "${CI-}" ]; then
+    if ! (env-bool CI); then
         _error "This subcommand is available to CI jobs only."
     fi
 
-    if [ -z "${SHARED_CLUSTER:-}" ]; then
+    if ! (env-bool SHARED_CLUSTER); then
         _info "Not resetting and unlocking because not on a shared cluster (like scratchnet)."
         return
     fi
@@ -1355,7 +1355,7 @@ function subcmd_pulumi() {
     esac
 
     function run_pulumi() {
-        if [[ -n "${GCP_CLUSTER_PROD_LIKE:-}" || "$pulumi_project" == "infra" ]]
+        if (env-bool GCP_CLUSTER_PROD_LIKE) || [[ "$pulumi_project" == "infra" ]]
         then
             _pulumi "$@"
         else
@@ -1416,7 +1416,7 @@ function subcmd_apply() {
         make -C "${REPO_ROOT}" cluster/build -j
 
         if [ -z "${IMAGE_TAG:-}" ]; then
-            if [ -z "${CNCLUSTER_SKIP_DOCKER_CHECK-}" ]; then
+            if ! (env-bool CNCLUSTER_SKIP_DOCKER_CHECK); then
                 _docker_must_be_running
                 if ! make -C "${REPO_ROOT}" docker-check -j; then
                     _error "Images missing from artifact registry, cannot apply."
@@ -1501,13 +1501,13 @@ function subcmd_ci_apply_sv() {
     # for manual confirmation, and also always uses the same target cluster
     # as the one the sv is deployed on.
 
-    if [ -z "${CI-}" ]; then
+    if ! (env-bool CI); then
         _error "This subcommand is available to CI jobs only."
     fi
 
     # By default, this is unset and we infer the previous values based on the currently running cluster.
     # However, we allow overwriting it to account for cases where the previous cluster is broken in some way.
-    if [ -n "${RESTORE_CLUSTER:-}" ] && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
+    if (env-bool RESTORE_CLUSTER) && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
         CLUSTER="$GCP_CLUSTER_BASENAME"
         NOW="$(date +"%Y-%m-%dT%H:%M:%S.000Z")"
         export BOOTSTRAPPING_CONFIG="{\"cluster\": \"$CLUSTER\", \"date\": \"$NOW\"}"
@@ -1548,7 +1548,7 @@ subcommand_whitelist[ci_pdown_sv]="Run only by CircleCI"
 
 function subcmd_ci_pdown_sv(){
 
-    if [ -z "${CI-}" ]; then
+    if ! (env-bool CI); then
         _error "This subcommand is available to CI jobs only."
     fi
 
@@ -1592,13 +1592,13 @@ function subcmd_ci_apply_validator() {
     # for manual confirmation, and also always uses the same target cluster
     # as the one the validator is deployed on.
 
-    if [ -z "${CI-}" ]; then
+    if ! (env-bool CI); then
         _error "This subcommand is available to CI jobs only."
     fi
 
     # By default, this is unset and we infer the previous values based on the currently running cluster.
     # However, we allow overwriting it to account for cases where the previous cluster is broken in some way.
-    if [ -n "${RESTORE_CLUSTER:-}" ] && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
+    if (env-bool RESTORE_CLUSTER) && [ -z "${BOOTSTRAPPING_CONFIG:-}" ]; then
         CLUSTER="$GCP_CLUSTER_BASENAME"
         NOW="$(date +"%Y-%m-%dT%H:%M:%S.000Z")"
         export BOOTSTRAPPING_CONFIG="{\"cluster\": \"$CLUSTER\", \"date\": \"$NOW\"}"
@@ -1639,7 +1639,7 @@ subcommand_whitelist[ci_pdown_validator]="Run only by CircleCI"
 
 function subcmd_ci_pdown_validator(){
 
-    if [ -z "${CI-}" ]; then
+    if ! (env-bool CI); then
         _error "This subcommand is available to CI jobs only."
     fi
 
@@ -2028,7 +2028,7 @@ function _get_preflight_test_names() {
 
   cd "${REPO_ROOT}" && sbt printTests 1>&2
 
-  if [ "${IS_DEVNET-}" != false ]; then
+  if (env-bool IS_DEVNET); then
     tests_filename="test-full-class-names-$hint-preflight.log"
   else
     tests_filename="test-full-class-names-$hint-preflight-non-devnet.log"

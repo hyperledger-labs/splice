@@ -1321,7 +1321,7 @@ jobs:
               export RESTORE_CLUSTER=1
             fi
             # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if [[ -n "${RESTORE_CLUSTER:-}" ]]; then
+            if (env-bool RESTORE_CLUSTER); then
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
@@ -1383,7 +1383,7 @@ jobs:
               export RESTORE_CLUSTER=1
             fi
             # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if [[ -n "${RESTORE_CLUSTER:-}" ]]; then
+            if (env-bool RESTORE_CLUSTER); then
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
@@ -1481,7 +1481,7 @@ jobs:
               export RESTORE_CLUSTER=1
             fi
             # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
-            if [[ -n "${RESTORE_CLUSTER:-}" ]]; then
+            if (env-bool RESTORE_CLUSTER); then
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
@@ -2113,8 +2113,7 @@ jobs:
           cmd: |
             nodes=""
             if [[ << parameters.include_sv >> != false ]]; then
-              # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
-              if [[ "${IS_DEVNET-}" != false ]]; then
+              if (env-bool IS_DEVNET); then
                 nodes="sv-1 sv-2 sv-3 sv-4"
               else
                 nodes="sv-1"
@@ -2278,13 +2277,12 @@ jobs:
             fi
             validator_app="validator-app-<< parameters.migration_id >>"
             cncluster wait sv-1 $validator_app
-            # note that ["${IS_DEVNET-}" = true] is not equivalent when IS_DEVNET is not defined
-            if [[ "${IS_DEVNET-}" != false ]]; then
+            if (env-bool IS_DEVNET); then
               cncluster wait sv-2 $validator_app
               cncluster wait sv-3 $validator_app
               cncluster wait sv-4 $validator_app
             fi
-            if [[ << parameters.wait_for_sv >> == true && ( "${APPROVE_SV_RUNBOOK-}" = true || "${IS_DEVNET-}" != false ) ]]; then
+            if [[ << parameters.wait_for_sv >> == true ]] && ( env-bool APPROVE_SV_RUNBOOK || env-bool IS_DEVNET ); then
               cncluster wait sv validator-app
             fi
             echo "Done waiting. All pods in the cluster are:"
