@@ -44,63 +44,102 @@ class ResetDecentralizedNamespace
             )
           )
         val store = connectedDomain.domainId.filterString
-        sv1.participantClientWithAdminToken.topology.decentralized_namespaces
-          .list(
-            store,
-            filterNamespace = decentralizedNamespace.toProtoPrimitive,
-          )
-          .headOption
-          .fold(
-            logger.info("Not resetting decentralized namespace as it doesn't exist yet")
-          ) { existingDecentralizedNamespace =>
-            logger.info("Resetting decentralized namespace to contain only sv1")
-            val ownersThatMustBeRemoved =
-              existingDecentralizedNamespace.item.owners.diff(Set(sv1ParticipantNamespace))
-            if (ownersThatMustBeRemoved.isEmpty) {
-              logger.info("Decentralized namespace contains only SV1, nothing to do")
-            } else {
-              logger.info(
-                s"The following namespaces need to be removed from the decentralized namespace: $ownersThatMustBeRemoved"
-              )
-              def proposeDecentralizedNamespaceReset(client: CNParticipantClientReference): Unit = {
-                client.topology.decentralized_namespaces
-                  .propose(
-                    Set(sv1ParticipantNamespace),
-                    PositiveInt.one,
-                    store,
-                    serial = Some(existingDecentralizedNamespace.context.serial + PositiveInt.one),
-                  )
-                  .discard
-              }
-              val usableSvs =
-                env.svs.local
-                  // SV apps that end with local or onboarded run against temporary Canton instances started
-                  // using `withCanton` so they don't need to be reset (and cannot be as Canton isn't running at this point anymore).
-                  .filterNot(_.name.endsWith("Local"))
-                  .filterNot(_.name.endsWith("Onboarded"))
-                  .map(_.participantClientWithAdminToken)
-              val usableSvsByNamespace = usableSvs.map(p => p.id.uid.namespace -> p).toMap
-              existingDecentralizedNamespace.item.owners.foreach { namespace =>
-                val sv = usableSvsByNamespace
-                  .get(namespace)
-                  .getOrElse(
+
+        def resetDecentralizedNamespace(): Unit = {
+          sv1.participantClientWithAdminToken.topology.decentralized_namespaces
+            .list(
+              store,
+              filterNamespace = decentralizedNamespace.toProtoPrimitive,
+            )
+            .headOption
+            .fold(
+              logger.info("Not resetting decentralized namespace as it doesn't exist yet")
+            ) { existingDecentralizedNamespace =>
+              logger.info("Resetting decentralized namespace to contain only sv1")
+              val ownersThatMustBeRemoved =
+                existingDecentralizedNamespace.item.owners.diff(Set(sv1ParticipantNamespace))
+              if (ownersThatMustBeRemoved.isEmpty) {
+                logger.info("Decentralized namespace contains only SV1, nothing to do")
+              } else {
+                logger.info(
+                  s"The following namespaces need to be removed from the decentralized namespace: $ownersThatMustBeRemoved"
+                )
+
+                def proposeDecentralizedNamespaceReset(
+                    client: CNParticipantClientReference
+                ): Unit = {
+                  client.topology.decentralized_namespaces
+                    .propose(
+                      Set(sv1ParticipantNamespace),
+                      PositiveInt.one,
+                      store,
+                      serial = Some(existingDecentralizedNamespace.context.serial + PositiveInt.one),
+                    )
+                    .discard
+                }
+
+                val usableSvs =
+                  env.svs.local
+                    // SV apps that end with local or onboarded run against temporary Canton instances started
+                    // using `withCanton` so they don't need to be reset (and cannot be as Canton isn't running at this point anymore).
+                    .filterNot(_.name.endsWith("Local"))
+                    .filterNot(_.name.endsWith("Onboarded"))
+                    .map(_.participantClientWithAdminToken)
+                val usableSvsByNamespace = usableSvs.map(p => p.id.uid.namespace -> p).toMap
+                existingDecentralizedNamespace.item.owners.foreach { namespace =>
+                  val sv = usableSvsByNamespace.getOrElse(
+                    namespace,
                     throw new IllegalStateException(
                       s"Failed to remove $namespace as there is no SV with that namespace, svs found: ${usableSvsByNamespace.keySet}"
-                    )
+                    ),
                   )
-                proposeDecentralizedNamespaceReset(sv)
+                  proposeDecentralizedNamespaceReset(sv)
+                }
+                logger.info(
+                  "All required proposals to reset SV namespace submitted, waiting for it to be effective"
+                )
+                try {
+                  ConsoleMacros.utils.retry_until_true {
+                    val results =
+                      sv1.participantClientWithAdminToken.topology.decentralized_namespaces
+                        .list(store, filterNamespace = decentralizedNamespace.toProtoPrimitive)
+                        .map(identity)
+                    if (results.size == 1) {
+                      val result = results.head
+                      val namespace = result.item
+                      if (namespace.owners.forgetNE == Set(sv1ParticipantNamespace)) {
+                        true
+                      } else {
+                        if (
+                          result.context.serial != existingDecentralizedNamespace.context.serial
+                        ) {
+                          throw new IllegalArgumentException(
+                            "Base serial has changed, must be retried"
+                          )
+                        }
+                        logger.info(
+                          s"Decentralized namespace still contains ${namespace.owners}, waiting for it to be reset"
+                        )
+                        false
+                      }
+                    } else false
+
+                  }(env)
+                } catch {
+                  case _: IllegalArgumentException =>
+                    logger.info(
+                      "Restarting decentralized namespace reset as base serial has changed"
+                    )
+                    resetDecentralizedNamespace()
+                  case e: IllegalStateException =>
+                    logger.error("Failed to reset decentralized namespace", e)
+                    sys.exit(1)
+                }
               }
-              logger.info(
-                "All required proposals to reset SV namespace submitted, waiting for it to be effective"
-              )
-              ConsoleMacros.utils.retry_until_true {
-                sv1.participantClientWithAdminToken.topology.decentralized_namespaces
-                  .list(store, filterNamespace = decentralizedNamespace.toProtoPrimitive)
-                  .map(_.item.owners) == Seq(Set(sv1ParticipantNamespace))
-              }(env)
-              logger.info("Decentralized namespace has been reset")
             }
-          }
+        }
+        resetDecentralizedNamespace()
+        logger.info("Decentralized namespace has been reset")
     }
   }
 }
