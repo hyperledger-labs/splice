@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.util.{CNNodeUtil, TimeTestUtil, WalletTestUtil}
@@ -21,7 +21,7 @@ class TimeBasedTreasuryIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
+        updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )

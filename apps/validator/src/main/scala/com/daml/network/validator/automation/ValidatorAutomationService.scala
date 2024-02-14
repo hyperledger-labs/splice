@@ -2,6 +2,7 @@ package com.daml.network.validator.automation
 
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.automation.{
+  AutomationServiceCompanion,
   AssignTrigger,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
@@ -61,6 +62,7 @@ class ValidatorAutomationService(
       ledgerClient,
       retryProvider,
     ) {
+  override def companion = ValidatorAutomationService
 
   val appManagerStore =
     new AppManagerStore(
@@ -161,7 +163,7 @@ class ValidatorAutomationService(
   )
 }
 
-object ValidatorAutomationService {
+object ValidatorAutomationService extends AutomationServiceCompanion {
   private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     template.moduleName match {
       // App manager storage is participant local so we can freely choose the package id.
@@ -171,4 +173,6 @@ object ValidatorAutomationService {
       case "CC.CoinImport" => Some(DarResources.cantonCoin.bootstrap.packageId)
       case _ => None
     }
+
+  override protected[this] def expectedTriggerClasses = Seq.empty
 }

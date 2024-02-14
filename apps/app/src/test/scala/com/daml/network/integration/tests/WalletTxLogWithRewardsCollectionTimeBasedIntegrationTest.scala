@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
@@ -24,7 +25,7 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       .addConfigTransforms((_, config) =>
         // without this, you can have 1 or 2 transfers in the txlog, or just 1 with different balance
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
+        updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )

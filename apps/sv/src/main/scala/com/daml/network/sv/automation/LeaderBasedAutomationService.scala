@@ -1,7 +1,8 @@
 package com.daml.network.sv.automation
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.automation.AutomationService
+import com.daml.network.automation.{AutomationServiceCompanion, AutomationService}
+import AutomationServiceCompanion.{TriggerClass, aTrigger}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.sv.automation.leaderbased.*
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -26,6 +27,8 @@ class LeaderBasedAutomationService(
       clock,
       retryProvider,
     ) {
+
+  override def companion = LeaderBasedAutomationService
 
   def start(): Unit = {
     registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
@@ -61,4 +64,32 @@ class LeaderBasedAutomationService(
     registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
   }
 
+}
+
+object LeaderBasedAutomationService extends AutomationServiceCompanion {
+  // defined because the service isn't available immediately in sv app state,
+  // but created later by the restart trigger
+  override protected[this] def expectedTriggerClasses: Seq[TriggerClass] = Seq(
+    aTrigger[AdvanceOpenMiningRoundTrigger],
+    aTrigger[CompletedSvOnboardingTrigger],
+    aTrigger[ExecuteConfirmedActionTrigger],
+    aTrigger[ExecuteVoteRequestActionTrigger],
+    aTrigger[MergeMemberTrafficContractsTrigger],
+    aTrigger[ExpiredCoinTrigger],
+    aTrigger[ExpiredLockedCoinTrigger],
+    aTrigger[ExpiredSvOnboardingRequestTrigger],
+    aTrigger[ExpireVoteRequestTrigger],
+    aTrigger[ExpiredSvOnboardingConfirmedTrigger],
+    aTrigger[SvcRewardTrigger],
+    aTrigger[ExpireIssuingMiningRoundTrigger],
+    aTrigger[ExpireStaleConfirmationsTrigger],
+    aTrigger[GarbageCollectCoinPriceVotesTrigger],
+    aTrigger[MergeUnclaimedRewardsTrigger],
+    aTrigger[ExpireRewardCouponsTrigger],
+    aTrigger[ExpireElectionRequestsTrigger],
+    aTrigger[CnsSubscriptionRenewalPaymentTrigger],
+    aTrigger[ExpiredCnsEntryTrigger],
+    aTrigger[ExpiredCnsSubscriptionTrigger],
+    aTrigger[TerminatedSubscriptionTrigger],
+  )
 }

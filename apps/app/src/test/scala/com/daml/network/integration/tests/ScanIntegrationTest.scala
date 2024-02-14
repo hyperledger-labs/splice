@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.config.CNNodeConfigTransforms
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -36,14 +37,12 @@ class ScanIntegrationTest
         { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
       )
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
+        (updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeCoinsTrigger]
-        )(config)
-      )
-      .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
-        )(config)
+        ) andThen
+          updateAutomationConfig(ConfigurableApp.Sv)(
+            _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
+          ))(config)
       )
       .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(

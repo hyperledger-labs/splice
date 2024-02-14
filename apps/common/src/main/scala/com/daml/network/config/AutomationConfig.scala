@@ -41,9 +41,9 @@ case class AutomationConfig(
       * publish/reconcile automation.
       */
     enableCometbftReconciliation: Boolean = true,
-    /** Only intended for testing. List of triggers (identified by the name of the corresponding scala class)
-      * that start in a paused state. Unless such a trigger is resumed manually, it is guaranteed to never perform
-      * any work.
+    /** List of triggers (identified by the name of the corresponding scala
+      * class) that start in a paused state. Unless such a trigger is resumed manually, it is
+      * guaranteed to never perform any work.
       */
     pausedTriggers: Set[String] = Set.empty,
 ) {

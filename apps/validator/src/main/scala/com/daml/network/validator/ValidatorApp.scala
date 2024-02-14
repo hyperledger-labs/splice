@@ -49,6 +49,7 @@ import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
+import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
@@ -849,6 +850,9 @@ class ValidatorApp(
     }
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
+
+  protected[this] override def automationServices(st: ValidatorApp.State) =
+    Seq(st.automation, UserWalletAutomationService)
 }
 
 object ValidatorApp {

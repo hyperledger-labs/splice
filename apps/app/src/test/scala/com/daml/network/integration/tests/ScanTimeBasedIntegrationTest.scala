@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.WalletAppClientReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -35,7 +36,7 @@ class ScanTimeBasedIntegrationTest
       .withoutAutomaticRewardsCollectionAndCoinMerging
       // Start ScanAggregationTrigger in paused state, calling runOnce in tests
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
+        updateAutomationConfig(ConfigurableApp.Scan)(
           _.withPausedTrigger[ScanAggregationTrigger]
         )(config)
       )

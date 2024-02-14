@@ -74,3 +74,9 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?]](
     )
   )
 }
+
+object CNNodeAppAutomationService {
+  import AutomationServiceCompanion.*
+  def expectedTriggerClasses: Seq[TriggerClass] =
+    Seq(aTrigger[DomainIngestionService])
+}

@@ -30,6 +30,16 @@ import scala.io.Source
 
 object CNNodeConfigTransforms {
 
+  sealed abstract class ConfigurableApp extends Product with Serializable
+
+  object ConfigurableApp {
+    case object Sv extends ConfigurableApp
+    case object Scan extends ConfigurableApp
+    case object Validator extends ConfigurableApp
+    case object Splitwell extends ConfigurableApp
+    val All = Seq(Sv, Scan, Validator, Splitwell)
+  }
+
   def makeAllTimeoutsBounded: CNNodeConfigTransform = {
     // make unbounded duration bounded for our test
     _.focus(_.parameters.timeouts.console.unbounded)
@@ -114,6 +124,18 @@ object CNNodeConfigTransforms {
 
   def reducePollingInterval = setPollingInterval(NonNegativeFiniteDuration.ofSeconds(1))
 
+  def updateAutomationConfig(
+      app: ConfigurableApp
+  )(transform: AutomationConfigTransform): CNNodeConfigTransform = {
+    import ConfigurableApp.*
+    app match {
+      case Sv => updateAllSvAppConfigs_(c => c.focus(_.automation).modify(transform))
+      case Scan => updateAllScanAppConfigs_(c => c.focus(_.automation).modify(transform))
+      case Validator => updateAllValidatorConfigs_(c => c.focus(_.automation).modify(transform))
+      case Splitwell => updateAllSplitwellAppConfigs_(c => c.focus(_.automation).modify(transform))
+    }
+  }
+
   def updateAllAutomationConfigs(transform: AutomationConfigTransform): CNNodeConfigTransform = {
     config =>
       val transforms = Seq(
@@ -177,7 +199,7 @@ object CNNodeConfigTransforms {
   type AutomationConfigTransform = AutomationConfig => AutomationConfig
 
   def withPauseSvDomainComponentsOffboardingTriggers(): CNNodeConfigTransform =
-    CNNodeConfigTransforms.updateAllAutomationConfigs(
+    updateAutomationConfig(ConfigurableApp.Sv)(
       _.withPausedTrigger[SvOffboardingMediatorTrigger]
         .withPausedTrigger[SvOffboardingSequencerTrigger]
     )

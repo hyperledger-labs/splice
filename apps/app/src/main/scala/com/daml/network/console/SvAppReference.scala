@@ -17,7 +17,6 @@ import com.daml.network.http.v0.definitions
 import com.daml.network.sv.{SvApp, SvAppBootstrap}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvSvcAutomationService}
-import com.daml.network.sv.automation.singlesv.RestartLeaderBasedAutomationTrigger
 import com.daml.network.sv.config.{SvAppBackendConfig, SvAppClientConfig}
 import com.daml.network.sv.migration.{DomainDataSnapshot, DomainNodeIdentities}
 import com.daml.network.util.Contract
@@ -294,9 +293,7 @@ class SvAppBackendReference(
     "Returns the current leader based automation. Do not keep references to the result, as this automation gets replaced whenever the SVC leader changes."
   )
   def leaderBasedAutomation: LeaderBasedAutomationService = {
-    appState.svcAutomation
-      .trigger[RestartLeaderBasedAutomationTrigger]
-      .epochState
+    appState.svcAutomation.restartLeaderBasedAutomationTrigger.epochState
       .getOrElse(throw new RuntimeException("LeaderBasedAutomation is not fully started up"))
       .leaderBasedAutomation
   }

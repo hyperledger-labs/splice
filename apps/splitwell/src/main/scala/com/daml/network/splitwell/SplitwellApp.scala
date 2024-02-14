@@ -205,6 +205,9 @@ class SplitwellApp(
     }
 
   override lazy val requiredPackageIds = Set(DarResources.splitwell.bootstrap.packageId)
+
+  protected[this] override def automationServices(st: SplitwellApp.State) =
+    Seq(st.automation)
 }
 
 object SplitwellApp {

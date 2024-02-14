@@ -11,6 +11,7 @@ import com.daml.network.config.{
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
 }
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
 import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingSequencerTrigger
 import com.daml.network.sv.config.MigrateSvPartyConfig
@@ -87,12 +88,9 @@ class SvReonboardingIntegrationTest
                   ))
           ),
         (_, config) =>
-          CNNodeConfigTransforms.updateAllAutomationConfigs(
+          updateAutomationConfig(ConfigurableApp.Sv)(
             _.withResumedTrigger[SvOffboardingMediatorTrigger]
-          )(config),
-        (_, config) =>
-          CNNodeConfigTransforms.updateAllAutomationConfigs(
-            _.withResumedTrigger[SvOffboardingSequencerTrigger]
+              .withResumedTrigger[SvOffboardingSequencerTrigger]
           )(config),
       )
       .withManualStart

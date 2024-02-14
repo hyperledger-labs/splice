@@ -23,7 +23,11 @@ import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
-import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
+import com.daml.network.sv.automation.{
+  LeaderBasedAutomationService,
+  SvSvAutomationService,
+  SvSvcAutomationService,
+}
 import com.daml.network.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
@@ -504,6 +508,9 @@ class SvApp(
   }
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
+
+  protected[this] override def automationServices(st: SvApp.State) =
+    Seq(LeaderBasedAutomationService, st.svAutomation, st.svcAutomation)
 
   private val darFilesToUploadDuringInit: Seq[UploadablePackage] =
     Seq(

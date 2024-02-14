@@ -15,6 +15,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.CNNodeMetrics
 import com.daml.network.admin.api.HttpRequestLogger
 import com.daml.network.auth.{AuthToken, AuthTokenManager, AuthTokenSource, AuthTokenSourceNone}
+import com.daml.network.automation.AutomationService
 import com.daml.network.config.{CNParticipantClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.util.{HasHealth, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -323,6 +324,11 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     isInitializedVar.set(true)
   }
 
+  for {
+    state <- initializeF
+    automation = automationServices(state)
+  } AutomationService.checkPausedTriggersSpelling(automation)
+
   // TODO(tech-debt): Handle cleanup in case some initialization failed mid-way.
   // For example, if we fail to get the service party we won't close the ledger client.
   // Note that we have a similar issue in app-initialization, so this should be handled
@@ -339,6 +345,8 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
       err.printStackTrace()
       sys.exit(1)
   }
+
+  protected[this] def automationServices(st: State): Seq[AutomationService.OrCompanion]
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     logger.info(s"Stopping $name node")

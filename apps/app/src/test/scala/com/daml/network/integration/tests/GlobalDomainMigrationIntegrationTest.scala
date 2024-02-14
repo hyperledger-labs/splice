@@ -13,6 +13,7 @@ import com.daml.network.config.{
   CNParticipantClientConfig,
   NetworkAppClientConfig,
 }
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.ScanAppBackendReference
 import com.daml.network.environment.{
   CNNodeEnvironmentImpl,
@@ -202,7 +203,7 @@ class GlobalDomainMigrationIntegrationTest
         // making the test check history instead of balance once our
         // stores handle hard domain migrations properly.
         (_, conf) =>
-          CNNodeConfigTransforms.updateAllAutomationConfigs(
+          updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[SvRewardTrigger]
           )(conf),
       )

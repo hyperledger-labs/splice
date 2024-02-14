@@ -3,6 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.cns as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
 import com.daml.network.config.CNNodeConfigTransforms
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -41,7 +42,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
+        updateAutomationConfig(ConfigurableApp.Sv)(
           _.withPausedTrigger[ExpiredCnsEntryTrigger]
         )(config)
       )

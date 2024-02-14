@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -28,7 +28,7 @@ class ScanFrontendTimeBasedIntegrationTest
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .withCoinPrice(coinPrice)
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
+        updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )

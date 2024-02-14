@@ -1,10 +1,12 @@
 package com.daml.network.sv.automation
 
 import com.daml.network.automation.{
+  AutomationServiceCompanion,
   AssignTrigger,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
 }
+import AutomationServiceCompanion.{TriggerClass, aTrigger}
 import com.daml.network.environment.{
   CNLedgerClient,
   DarResources,
@@ -85,6 +87,8 @@ class SvSvcAutomationService(
       retryProvider,
     ) {
 
+  override def companion = SvSvcAutomationService
+
   config.acsStoreDump.foreach(config =>
     registerTrigger(
       new PeriodicAcsStoreBackupTrigger(
@@ -107,7 +111,7 @@ class SvSvcAutomationService(
     registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
   }
 
-  registerTrigger(
+  private[network] val restartLeaderBasedAutomationTrigger =
     new RestartLeaderBasedAutomationTrigger(
       triggerContext,
       svcStore,
@@ -116,7 +120,8 @@ class SvSvcAutomationService(
       config,
       retryProvider,
     )
-  )
+
+  registerTrigger(restartLeaderBasedAutomationTrigger)
 
   registerTrigger(new SvcRulesTransferTrigger(triggerContext, svcStore, connection))
   registerTrigger(new AssignTrigger(triggerContext, svcStore, connection, store.key.svcParty))
@@ -338,7 +343,7 @@ class SvSvcAutomationService(
   }
 }
 
-object SvSvcAutomationService {
+object SvSvcAutomationService extends AutomationServiceCompanion {
   case class LocalSequencerClientContext(
       sequencerAdminConnection: SequencerAdminConnection,
       mediatorAdminConnection: MediatorAdminConnection,
@@ -362,4 +367,37 @@ object SvSvcAutomationService {
         Some(DarResources.cantonCoin.bootstrap.packageId)
       case _ => None
     }
+
+  // defined because some triggers are registered later by
+  // registerPostOnboardingTriggers
+  override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
+    CNNodeAppAutomationService.expectedTriggerClasses ++ Seq(
+      aTrigger[PeriodicAcsStoreBackupTrigger],
+      aTrigger[SummarizingMiningRoundTrigger],
+      aTrigger[SvOnboardingRequestTrigger],
+      aTrigger[SvRewardTrigger],
+      aTrigger[ArchiveClosedMiningRoundsTrigger],
+      aTrigger[ElectionRequestTrigger],
+      aTrigger[RestartLeaderBasedAutomationTrigger],
+      aTrigger[SvcRulesTransferTrigger],
+      aTrigger[AssignTrigger],
+      aTrigger[TransferFollowTrigger],
+      aTrigger[CnsSubscriptionInitialPaymentTrigger],
+      aTrigger[SvPackageVettingTrigger],
+      aTrigger[SvOffboardingPartyToParticipantProposalTrigger],
+      aTrigger[SvOffboardingMediatorTrigger],
+      aTrigger[SvOnboardingMediatorUnlimitedTrafficTrigger],
+      aTrigger[SvOffboardingSequencerTrigger],
+      aTrigger[ReconcileSequencerLimitWithMemberTrafficTrigger],
+      aTrigger[SvNamespaceMembershipTrigger],
+      aTrigger[SvOnboardingPromoteParticipantToSubmitterTrigger],
+      aTrigger[SvOnboardingPartyToParticipantProposalTrigger],
+      aTrigger[SvOnboardingSequencerProposalTrigger],
+      aTrigger[SvOnboardingMediatorProposalTrigger],
+      aTrigger[DomainUpgradeTrigger],
+      aTrigger[PublishLocalCometBftNodeConfigTrigger],
+      aTrigger[ReconcileCometBftNetworkConfigWithSvcRulesTrigger],
+      aTrigger[LocalSequencerConnectionsTrigger],
+      aTrigger[SequencerPruningTrigger],
+    )
 }

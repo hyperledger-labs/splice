@@ -1,19 +1,22 @@
 package com.daml.network.automation
 
+import cats.syntax.foldable.*
+import cats.instances.seq.*
+import cats.instances.set.*
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.RetryProvider
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.time.{Clock, WallClock}
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.reflect.ClassTag
 
 /** Shared base class for running ingestion and task-handler automation in applications. */
 abstract class AutomationService(
-    automationConfig: AutomationConfig,
+    private val automationConfig: AutomationConfig,
     clock: Clock,
     override protected[this] val retryProvider: RetryProvider,
 ) extends HasHealth
@@ -21,10 +24,13 @@ abstract class AutomationService(
     with RetryProvider.Has
     with NamedLogging
     with Spanning {
+  import AutomationService.*
 
   type BackgroundService = HasHealth & AutoCloseable
 
-  private[this] val backgroundServices: AtomicReference[Seq[BackgroundService]] =
+  def companion: AutomationServiceCompanion
+
+  private val backgroundServices: AtomicReference[Seq[BackgroundService]] =
     new AtomicReference(
       Seq.empty
     )
@@ -53,7 +59,12 @@ abstract class AutomationService(
 
   final protected def registerTrigger(trigger: Trigger): Unit = {
     registerService(trigger)
-    val paused = automationConfig.pausedTriggers.contains(trigger.getClass.getCanonicalName)
+    val triggerName = identifyTriggerByName(trigger)
+    if (companion.expectedTriggers.nonEmpty && !companion.expectedTriggers(triggerName))
+      logger.warn(
+        s"Registering unexpected trigger $triggerName; possibly missing from $companion's expectedTriggerClasses"
+      )(TraceContext.empty)
+    val paused = automationConfig.pausedTriggers contains triggerName
     trigger.run(paused)
   }
 
@@ -79,6 +90,27 @@ abstract class AutomationService(
 
   }
 
+  private def checkPausedTriggersSpelling(
+      others: Seq[OrCompanion]
+  )(implicit tc: TraceContext): Unit = {
+    val services: Seq[OrCompanion] = this +: others
+    val allPausedTriggers = services foldMap (_.oas foldMap (_.automationConfig.pausedTriggers))
+    val allRegisteredTriggers = services foldMap { oc =>
+      oc.companion.expectedTriggers union oc.oas.foldMap(
+        _.backgroundServices
+          .get()
+          .view
+          .collect { case t: Trigger => identifyTriggerByName(t) }
+          .toSet
+      )
+    }
+    val mismatchedTriggerNames = allPausedTriggers diff allRegisteredTriggers
+    if (mismatchedTriggerNames.nonEmpty)
+      logger.warn(
+        s"paused-triggers specified but not present in {${services.map(_.name) mkString ", "}} (possibly misspelled or specified for wrong app?): ${mismatchedTriggerNames mkString ", "}"
+      )
+  }
+
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
     Seq[AsyncOrSyncCloseable](
       SyncCloseable(
@@ -86,4 +118,45 @@ abstract class AutomationService(
         Lifecycle.close(backgroundServices.get(): _*)(logger),
       )
     )
+}
+
+object AutomationService {
+  import AutomationServiceCompanion.TriggerClass
+
+  private def identifyTriggerByName(trigger: Trigger): String =
+    identifyTriggerClassByName(trigger.getClass)
+
+  private[automation] def identifyTriggerClassByName(c: TriggerClass) =
+    c.getCanonicalName
+
+  // Allow variadic overloading of checkPausedTriggersSpelling
+  final class OrCompanion private (
+      private[AutomationService] val oas: Option[AutomationService],
+      private[AutomationService] val companion: AutomationServiceCompanion,
+  ) {
+    private[AutomationService] def name =
+      oas.map(_.getClass.getSimpleName) getOrElse companion.getClass.getSimpleName
+  }
+
+  object OrCompanion {
+    import language.implicitConversions
+
+    implicit def fromService(as: AutomationService): OrCompanion =
+      new OrCompanion(Some(as), as.companion)
+
+    implicit def fromCompanion(c: AutomationServiceCompanion): OrCompanion =
+      new OrCompanion(None, c)
+  }
+
+  /** Ensure every paused trigger is present either in one of the
+    * specified [[AutomationService]]s or [[AutomationServiceCompanion]]s.
+    * Log a warning if not.
+    */
+  def checkPausedTriggersSpelling(services: Seq[OrCompanion])(implicit tc: TraceContext): Unit =
+    for {
+      // there is nothing to check if there are no real AutomationServices,
+      // because there will also be no paused triggers then
+      first <- services collectFirst Function.unlift(oc => oc.oas.map((oc, _)))
+      (matchingService, firstAS) = first
+    } firstAS checkPausedTriggersSpelling services.filter(_ ne matchingService)
 }

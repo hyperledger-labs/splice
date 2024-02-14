@@ -5,6 +5,7 @@ import better.files.File.apply
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.util.{DomainMigrationUtil, ProcessTestUtil, StandaloneCanton}
 import com.daml.network.config.{CNDbConfig, CNNodeConfigTransforms, NetworkAppClientConfig}
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.{CNNodeEnvironmentImpl, RetryProvider}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -75,7 +76,7 @@ class DisasterRecoveryIntegrationTest
       )
       .addConfigTransforms(
         (_, conf) =>
-          CNNodeConfigTransforms.updateAllAutomationConfigs(
+          updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[SvRewardTrigger]
           )(conf),
         (_, conf) =>

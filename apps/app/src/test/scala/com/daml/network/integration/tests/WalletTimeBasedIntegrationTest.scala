@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionInitialPayment,
   SubscriptionRequest,
 }
-import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
@@ -61,7 +61,7 @@ class WalletTimeBasedIntegrationTest
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
+        updateAutomationConfig(ConfigurableApp.Validator)(
           // without this, the test "generate app rewards correctly" has as flaky balance.
           // None of the other tests care about it.
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]

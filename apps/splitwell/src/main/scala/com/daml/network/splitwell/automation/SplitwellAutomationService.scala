@@ -5,6 +5,7 @@ import cats.syntax.apply.*
 import com.daml.lf.data.Ref.PackageVersion
 import com.daml.network.automation.{
   AssignTrigger,
+  AutomationServiceCompanion,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
   UnassignTrigger,
@@ -54,6 +55,8 @@ class SplitwellAutomationService(
       ledgerClient,
       retryProvider,
     ) {
+
+  override def companion = SplitwellAutomationService
 
   registerTrigger(
     new AcceptedAppPaymentRequestsTrigger(
@@ -120,7 +123,10 @@ class SplitwellAutomationService(
   )
 }
 
-object SplitwellAutomationService {
+object SplitwellAutomationService extends AutomationServiceCompanion {
+
+  override protected[this] def expectedTriggerClasses =
+    Seq.empty
 
   private val walletPaymentsToSplitwell: Map[PackageVersion, DarResource] =
     DarResources.splitwell.all.map { pkg =>

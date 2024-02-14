@@ -5,9 +5,11 @@ import com.daml.network.automation.UnassignTrigger.GetTargetDomain
 import com.daml.network.automation.{
   AssignTrigger,
   CNNodeAppAutomationService,
+  AutomationServiceCompanion,
   TransferFollowTrigger,
   UnassignTrigger,
 }
+import AutomationServiceCompanion.{TriggerClass, aTrigger}
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.*
@@ -50,6 +52,7 @@ class UserWalletAutomationService(
       ledgerClient,
       retryProvider,
     ) {
+  override def companion = UserWalletAutomationService
 
   registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))
   registerTrigger(
@@ -103,11 +106,28 @@ class UserWalletAutomationService(
   )
 }
 
-object UserWalletAutomationService {
+object UserWalletAutomationService extends AutomationServiceCompanion {
   private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
     // we can hardcode this.
     Option.when(template.moduleName == "CC.CoinImport")(
       DarResources.cantonCoin.bootstrap.packageId
+    )
+
+  // defined because instances are created by UserWalletService, not immediately
+  // available in the app state
+  override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
+    CNNodeAppAutomationService.expectedTriggerClasses ++ Seq(
+      aTrigger[ExpireTransferOfferTrigger],
+      aTrigger[ExpireAcceptedTransferOfferTrigger],
+      aTrigger[ExpireBuyTrafficRequestsTrigger],
+      aTrigger[ExpireAppPaymentRequestsTrigger],
+      aTrigger[SubscriptionReadyForPaymentTrigger],
+      aTrigger[AcceptedTransferOfferTrigger],
+      aTrigger[CompleteBuyTrafficRequestTrigger],
+      aTrigger[CollectRewardsAndMergeCoinsTrigger],
+      aTrigger[UnassignTrigger.Template[?, ?]],
+      aTrigger[AssignTrigger],
+      aTrigger[TransferFollowTrigger],
     )
 }

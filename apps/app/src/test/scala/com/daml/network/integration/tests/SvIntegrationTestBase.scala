@@ -1,13 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.tests.CNNodeTests.{
-  CNNodeIntegrationTest,
-  CNNodeTestConsoleEnvironment,
-}
+import CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.util.SvTestUtil
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
 
@@ -16,8 +11,7 @@ trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
   protected val svcGovernanceDarPath =
     "daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar"
 
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+  override def environmentDefinition: CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart

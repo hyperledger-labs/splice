@@ -4,6 +4,7 @@ import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
 import com.daml.network.config.CNNodeConfigTransforms
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
@@ -50,7 +51,7 @@ class SvOffboardingIntegrationTest
       )
       .withSequencerConnectionsFromScanDisabled(22_000)
       .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
+        updateAutomationConfig(ConfigurableApp.Sv)(
           _.withResumedTrigger[SvOffboardingMediatorTrigger]
             .withResumedTrigger[SvOffboardingSequencerTrigger]
         )(config)

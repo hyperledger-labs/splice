@@ -1,7 +1,7 @@
 package com.daml.network.scan.automation
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.automation.CNNodeAppAutomationService
+import com.daml.network.automation.{AutomationServiceCompanion, CNNodeAppAutomationService}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
 import com.daml.network.scan.store.ScanStore
@@ -33,5 +33,11 @@ class ScanAutomationService(
       retryProvider,
       ingestFromParticipantBegin,
     ) {
+  override def companion = ScanAutomationService
+
   registerTrigger(new ScanAggregationTrigger(store, triggerContext))
+}
+
+object ScanAutomationService extends AutomationServiceCompanion {
+  override protected[this] def expectedTriggerClasses = Seq.empty
 }
