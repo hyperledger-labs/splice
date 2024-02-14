@@ -374,10 +374,13 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listAppRewardCouponsOnDomain" should {
+    "list & sum AppRewardCouponsOnDomain" should {
 
       "list all the app reward coupons on the domain" in {
-        val inRound = (1 to 3).map(n => appRewardCoupon(round = 3, userParty(n)))
+        val inRound =
+          (1 to 3).map(n =>
+            appRewardCoupon(round = 3, userParty(n), amount = numeric(n), featured = n % 2 == 0)
+          )
         val outOfRound = (1 to 3).map(n => appRewardCoupon(round = 2, userParty(n)))
         val inRoundOtherDomain = (1 to 3).map(n => appRewardCoupon(round = 3, userParty(n)))
         for {
@@ -389,17 +392,25 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             dummy2Domain.create(_)(store.multiDomainAcsStore)
           )
           result <- store.listAppRewardCouponsOnDomain(round = 3, dummyDomain, Limit.DefaultLimit)
+          sumResult <- store.sumAppRewardCouponsOnDomain(round = 3, dummyDomain)
         } yield {
           result should contain theSameElementsAs inRound
+          sumResult.featured should be(
+            inRound.filter(_.payload.featured).map(_.payload.amount).map(BigDecimal(_)).sum
+          )
+          sumResult.unfeatured should be(
+            inRound.filter(!_.payload.featured).map(_.payload.amount).map(BigDecimal(_)).sum
+          )
         }
       }
 
     }
 
-    "listValidatorRewardCouponsOnDomain" should {
+    "list & sum ValidatorRewardCouponsOnDomain" should {
 
       "list all the validator reward coupons on the domain" in {
-        val inRound = (1 to 3).map(n => validatorRewardCoupon(round = 3, userParty(n)))
+        val inRound =
+          (1 to 3).map(n => validatorRewardCoupon(round = 3, userParty(n), amount = numeric(n)))
         val outOfRound = (1 to 3).map(n => validatorRewardCoupon(round = 2, userParty(n)))
         val inRoundOtherDomain = (1 to 3).map(n => validatorRewardCoupon(round = 3, userParty(n)))
         for {
@@ -415,17 +426,22 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             dummyDomain,
             Limit.DefaultLimit,
           )
+          sumResult <- store.sumValidatorRewardCouponsOnDomain(
+            round = 3,
+            dummyDomain,
+          )
         } yield {
           result should contain theSameElementsAs inRound
+          sumResult should be(inRound.map(_.payload.amount).map(BigDecimal(_)).sum)
         }
       }
 
     }
 
-    "listValidatorFaucetCouponsOnDomain" should {
+    "list & sum ValidatorFaucetCouponsOnDomain" should {
 
       "list all the validator faucet coupons on the domain" in {
-        val inRound = (1 to 3).map(n => validatorFaucetCoupon(userParty(n), round = 3))
+        val inRound = (1 to 5).map(n => validatorFaucetCoupon(userParty(n), round = 3))
         val outOfRound = (1 to 3).map(n => validatorFaucetCoupon(userParty(n), round = 2))
         val inRoundOtherDomain = (1 to 3).map(n => validatorFaucetCoupon(userParty(n), round = 3))
         for {
@@ -441,8 +457,13 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             dummyDomain,
             Limit.DefaultLimit,
           )
+          countResult <- store.countValidatorFaucetCouponsOnDomain(
+            round = 3,
+            dummyDomain,
+          )
         } yield {
           result should contain theSameElementsAs inRound
+          countResult should be(inRound.size.toLong)
         }
       }
 

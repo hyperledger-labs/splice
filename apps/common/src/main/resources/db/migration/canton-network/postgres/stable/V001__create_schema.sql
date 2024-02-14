@@ -564,6 +564,12 @@ create table svc_acs_store
     -- the app provider in an AppRewardCoupon OR the user in a ValidatorRewardCoupon
     reward_party                  text,
 
+    -- the amount rewarded in an AppRewardCoupon/ValidatorRewardCoupon
+    reward_amount                 numeric,
+
+    -- whether an AppRewardCoupon is featured
+    app_reward_is_featured        boolean,
+
     -- the round in an Open/Close MiningRound contract
     mining_round                  bigint,
 
@@ -648,9 +654,9 @@ create index svc_acs_store_sid_tid_ah_c
     on svc_acs_store (store_id, template_id_qualified_name, action_requiring_confirmation, confirmer)
     where action_requiring_confirmation is not null;
 
--- list rewards
-create index svc_acs_store_sid_tid_rr_rp
-    on svc_acs_store (store_id, template_id_qualified_name, reward_round, reward_party)
+-- list, count and sum reward coupons (AppRewardCoupon, ValidatorRewardCoupon, ValidatorFaucetCoupon)
+create index svc_acs_store_coupons
+    on svc_acs_store (store_id, template_id_qualified_name, reward_round, reward_party, app_reward_is_featured)
     where reward_round is not null and reward_party is not null;
 
 -- lookup sv onboarding by token

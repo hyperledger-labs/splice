@@ -3,6 +3,7 @@ package com.daml.network.sv.store.db
 import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data as javab
+import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
@@ -26,7 +27,13 @@ import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
 import com.daml.network.sv.store.TxLogEntry.EntryType
-import com.daml.network.sv.store.{DefiniteVoteTxLogEntry, SvStore, SvSvcStore, TxLogEntry}
+import com.daml.network.sv.store.{
+  AppRewardCouponsSum,
+  DefiniteVoteTxLogEntry,
+  SvStore,
+  SvSvcStore,
+  TxLogEntry,
+}
 import com.daml.network.util.*
 import com.daml.network.util.Contract.Companion.Template
 import com.digitalasset.canton.data.CantonTimestamp
@@ -37,7 +44,9 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
+import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+import slick.jdbc.canton.SQLActionBuilder
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
@@ -191,15 +200,51 @@ class DbSvSvcStore(
   ): Future[Seq[Contract[AppRewardCoupon.ContractId, AppRewardCoupon]]] =
     listRewardCouponsOnDomain(AppRewardCoupon.COMPANION, round, domainId, limit)
 
+  override def sumAppRewardCouponsOnDomain(round: Long, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[AppRewardCouponsSum] = for {
+    sums <- selectFromRewardCouponsOnDomain[(Option[BigDecimal], Option[BigDecimal])](
+      sql"""select
+              sum(case app_reward_is_featured when true then reward_amount else 0 end),
+              sum(case app_reward_is_featured when true then 0 else reward_amount end)""",
+      AppRewardCoupon.COMPANION.TEMPLATE_ID,
+      round,
+      domainId,
+    )
+  } yield sums.headOption
+    .map { case (featured, unfeatured) =>
+      AppRewardCouponsSum(featured = featured.getOrElse(0L), unfeatured = unfeatured.getOrElse(0L))
+    }
+    .getOrElse(AppRewardCouponsSum(0L, 0L))
+
   override def listValidatorRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(
       implicit tc: TraceContext
   ): Future[Seq[Contract[ValidatorRewardCoupon.ContractId, ValidatorRewardCoupon]]] =
     listRewardCouponsOnDomain(ValidatorRewardCoupon.COMPANION, round, domainId, limit)
 
+  override def sumValidatorRewardCouponsOnDomain(round: Long, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] =
+    selectFromRewardCouponsOnDomain[Option[BigDecimal]](
+      sql"select sum(reward_amount)",
+      ValidatorRewardCoupon.COMPANION.TEMPLATE_ID,
+      round,
+      domainId,
+    ).map(_.headOption.flatten.getOrElse(BigDecimal(0)))
+
   override def listValidatorFaucetCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(
       implicit tc: TraceContext
   ): Future[Seq[Contract[ValidatorFaucetCoupon.ContractId, ValidatorFaucetCoupon]]] =
     listRewardCouponsOnDomain(ValidatorFaucetCoupon.COMPANION, round, domainId, limit)
+
+  override def countValidatorFaucetCouponsOnDomain(round: Long, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
+    sql"select count(*)",
+    ValidatorFaucetCoupon.COMPANION.TEMPLATE_ID,
+    round,
+    domainId,
+  ).map(_.headOption.flatten.getOrElse(0L))
 
   private def listRewardCouponsOnDomain[C, TCId <: ContractId[_], T](
       companion: C,
@@ -211,24 +256,43 @@ class DbSvSvcStore(
       tc: TraceContext,
   ): Future[Seq[Contract[TCId, T]]] = {
     val templateId = companionClass.typeId(companion)
-    val opName = s"list${templateId.getEntityName}OnDomain"
+    selectFromRewardCouponsOnDomain[SelectFromAcsTableResult](
+      sql"select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}",
+      templateId,
+      round,
+      domainId,
+      limit = limit,
+    ).map(_.map(contractFromRow(companion)(_)))
+  }
+
+  private def selectFromRewardCouponsOnDomain[R: GetResult](
+      selectClause: SQLActionBuilder,
+      templateId: Identifier,
+      round: Long,
+      domainId: DomainId,
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[R]] = {
+    val opName = s"selectFrom${templateId.getEntityName}OnDomain"
     waitUntilAcsIngested {
       for {
         result <- storage
           .query(
-            (selectFromAcsTable(SvcTables.acsTableName) ++
+            (selectClause ++
               sql"""
+                   from #${SvcTables.acsTableName}
                    where store_id = $storeId
                      and template_id_qualified_name = ${QualifiedName(templateId)}
                      and assigned_domain = $domainId
                      and reward_round = $round
                      and reward_party is not null -- otherwise index is not used
                    limit ${sqlLimit(limit)}
-                 """).toActionBuilder.as[SelectFromAcsTableResult],
+                 """).toActionBuilder.as[R],
             opName,
           )
         limited = applyLimit(opName, limit, result)
-      } yield limited.map(contractFromRow(companion)(_))
+      } yield limited
     }
   }
 

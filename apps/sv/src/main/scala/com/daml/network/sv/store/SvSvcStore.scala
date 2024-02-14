@@ -261,6 +261,13 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       tc: TraceContext
   ): Future[Seq[Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]]]
 
+  def sumAppRewardCouponsOnDomain(
+      round: Long,
+      domainId: DomainId,
+  )(implicit
+      tc: TraceContext
+  ): Future[AppRewardCouponsSum]
+
   def listAppRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,
@@ -276,6 +283,11 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   )(implicit tc: TraceContext): Future[
     Seq[Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]]
   ]
+
+  def sumValidatorRewardCouponsOnDomain(
+      round: Long,
+      domainId: DomainId,
+  )(implicit tc: TraceContext): Future[BigDecimal]
 
   def listValidatorRewardCouponsGroupedByCounterparty(
       roundNumber: Long,
@@ -293,6 +305,11 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       cc.validatorlicense.ValidatorFaucetCoupon,
     ]]
   ]
+
+  def countValidatorFaucetCouponsOnDomain(
+      round: Long,
+      domainId: DomainId,
+  )(implicit tc: TraceContext): Future[Long]
 
   def listValidatorFaucetCouponsGroupedByCounterparty(
       roundNumber: Long,
@@ -1088,6 +1105,8 @@ object SvSvcStore {
           contract,
           rewardRound = Some(contract.payload.round.number),
           rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+          rewardAmount = Some(contract.payload.amount),
+          appRewardIsFeatured = Some(contract.payload.featured),
         )
       },
       mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
@@ -1095,6 +1114,7 @@ object SvSvcStore {
           contract,
           rewardRound = Some(contract.payload.round.number),
           rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+          rewardAmount = Some(contract.payload.amount),
         )
       },
       mkFilter(cc.validatorlicense.ValidatorFaucetCoupon.COMPANION)(co => co.payload.svc == svc) {
@@ -1275,3 +1295,5 @@ case class ExpiredRewardCouponsBatch(
       customParam(inst => s"validatorFaucetCoupons: ${inst.validatorFaucets}"),
     )
 }
+
+case class AppRewardCouponsSum(featured: BigDecimal, unfeatured: BigDecimal)

@@ -15,10 +15,9 @@ import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.store.Limit
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.{AssignedContract, Contract}
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -117,32 +116,18 @@ class SummarizingMiningRoundTrigger(
     */
   private case class RoundRewards(
       round: Long,
-      appRewardCoupons: Seq[
-        Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]
-      ],
-      validatorRewardCoupons: Seq[
-        Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]
-      ],
-      validatorFaucetCoupons: Seq[
-        Contract[
-          cc.validatorlicense.ValidatorFaucetCoupon.ContractId,
-          cc.validatorlicense.ValidatorFaucetCoupon,
-        ]
-      ],
+      featuredAppRewardCoupons: BigDecimal,
+      unfeaturedAppRewardCoupons: BigDecimal,
+      validatorRewardCoupons: BigDecimal,
+      validatorFaucetCoupons: Long,
   ) {
     lazy val summary: cc.issuance.OpenMiningRoundSummary = new cc.issuance.OpenMiningRoundSummary(
-      validatorRewardCoupons.map[BigDecimal](c => BigDecimal(c.payload.amount)).sum.bigDecimal,
-      appRewardCoupons
-        .collect[BigDecimal] { case c if c.payload.featured => BigDecimal(c.payload.amount) }
-        .sum
-        .bigDecimal,
-      appRewardCoupons
-        .collect[BigDecimal] { case c if !c.payload.featured => BigDecimal(c.payload.amount) }
-        .sum
-        .bigDecimal,
+      validatorRewardCoupons.bigDecimal,
+      featuredAppRewardCoupons.bigDecimal,
+      unfeaturedAppRewardCoupons.bigDecimal,
       // TODO(#9173): total up SV reward coupons weights,
       0,
-      Optional.of(validatorFaucetCoupons.size.toLong),
+      Optional.of(validatorFaucetCoupons),
     )
   }
 
@@ -153,24 +138,24 @@ class SummarizingMiningRoundTrigger(
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[RoundRewards] = {
-    // TODO (#9607): this will break if there's more than DefaultLimit contracts, sum/count in DB instead.
     for {
-      appRewardCoupons <- store.listAppRewardCouponsOnDomain(round, domain, Limit.DefaultLimit)
-      validatorRewardCoupons <- store.listValidatorRewardCouponsOnDomain(
+      appRewardCoupons <- store.sumAppRewardCouponsOnDomain(
         round,
         domain,
-        Limit.DefaultLimit,
       )
-      validatorFaucetCoupons <- store
-        .listValidatorFaucetCouponsOnDomain(
-          round,
-          domain,
-          Limit.DefaultLimit,
-        )
+      validatorRewardCoupons <- store.sumValidatorRewardCouponsOnDomain(
+        round,
+        domain,
+      )
+      validatorFaucetCoupons <- store.countValidatorFaucetCouponsOnDomain(
+        round,
+        domain,
+      )
     } yield {
       RoundRewards(
         round = round,
-        appRewardCoupons = appRewardCoupons,
+        featuredAppRewardCoupons = appRewardCoupons.featured,
+        unfeaturedAppRewardCoupons = appRewardCoupons.unfeatured,
         validatorRewardCoupons = validatorRewardCoupons,
         validatorFaucetCoupons = validatorFaucetCoupons,
       )

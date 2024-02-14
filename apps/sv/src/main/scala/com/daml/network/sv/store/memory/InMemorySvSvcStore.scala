@@ -28,7 +28,13 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.TxLogEntry.mapActionName
-import com.daml.network.sv.store.{DefiniteVoteTxLogEntry, SvStore, SvSvcStore, TxLogEntry}
+import com.daml.network.sv.store.{
+  AppRewardCouponsSum,
+  DefiniteVoteTxLogEntry,
+  SvStore,
+  SvSvcStore,
+  TxLogEntry,
+}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.{
   AssignedContract,
@@ -256,6 +262,27 @@ class InMemorySvSvcStore(
       }
     } yield validatorToCoupons.toSeq.map { case (_, coupons) => coupons }
   }
+
+  override def sumAppRewardCouponsOnDomain(round: Long, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[AppRewardCouponsSum] =
+    listAppRewardCouponsOnDomain(round, domainId, Limit.DefaultLimit).map { coupons =>
+      val (featured, unfeatured) = coupons.partition(_.payload.featured)
+      AppRewardCouponsSum(
+        featured.map(_.payload.amount).map(BigDecimal(_)).sum,
+        unfeatured.map(_.payload.amount).map(BigDecimal(_)).sum,
+      )
+    }
+
+  override def sumValidatorRewardCouponsOnDomain(round: Long, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal] = listValidatorRewardCouponsOnDomain(round, domainId, Limit.DefaultLimit)
+    .map(_.map(_.payload.amount).map(BigDecimal(_)).sum)
+
+  override def countValidatorFaucetCouponsOnDomain(round: Long, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long] =
+    listValidatorFaucetCouponsOnDomain(round, domainId, Limit.DefaultLimit).map(_.size.toLong)
 
   override protected def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
