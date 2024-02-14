@@ -1256,6 +1256,7 @@ lazy val bundleTask = {
         (`canton-coin-daml` / Compile / damlBuild).value,
         (`wallet-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
+        (`splitwell-upgrade-daml` / Compile / damlBuild).value,
       )
     val args: Seq[String] = license ++ examples ++ webUis.flatMap({ case ((source, _), name) =>
       Seq[String]("-r", source.toString, s"web-uis/$name")

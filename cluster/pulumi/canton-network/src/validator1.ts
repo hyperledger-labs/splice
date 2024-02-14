@@ -87,7 +87,11 @@ export async function installValidator1(
     validatorWalletUser,
     xns,
     participant,
-    appDars: ['cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar'],
+    // We vet both versions to easily test upgrades.
+    appDars: [
+      'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar',
+      'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.2.0.dar',
+    ],
     validatorPartyHint: `${name}_validator_service_user`,
     extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     svSponsorAddress: `http://sv-app-${svActiveDomain}.sv-1:5014`,

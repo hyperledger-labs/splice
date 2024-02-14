@@ -107,10 +107,11 @@ export async function installSplitwell(
     ],
     extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     additionalConfig: [
-      'canton.validator-apps.validator_backend.app-instances.splitwise = {',
+      'canton.validator-apps.validator_backend.app-instances.splitwell = {',
       '  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
       '  wallet-user = ${?CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME}',
-      '  dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar"]',
+      // We vet both versions to easily test upgrades.
+      '  dars = ["cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar", "cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.2.0.dar"]',
       '}',
     ].join('\n'),
     onboardingSecret,
