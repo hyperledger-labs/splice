@@ -34,8 +34,8 @@ class SelfHostedPreflightIntegrationTest
   private val validatorPath: File = examplesPath / "validator"
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
-    ("ParticipantLedgerApi", 6001),
-    ("ParticipantAdminApi", 6002),
+    ("ParticipantLedgerApi", 6101),
+    ("ParticipantAdminApi", 6102),
   )
 
   // Runs against a temporary Canton instance.
@@ -69,8 +69,8 @@ class SelfHostedPreflightIntegrationTest
     withCanton(
       Seq(validatorPath / "validator-participant.conf"),
       Seq(
-        "canton.participants.validatorParticipant.admin-api.port=6002",
-        "canton.participants.validatorParticipant.ledger-api.port=6001",
+        "canton.participants.validatorParticipant.admin-api.port=6102",
+        "canton.participants.validatorParticipant.ledger-api.port=6101",
       ),
       "self-hosted-validator",
     ) {
