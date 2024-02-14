@@ -125,34 +125,46 @@ object PackageIdResolver {
       clock: Clock,
       coinRulesFetcher: HasCoinRules,
       loggerFactory0: NamedLoggerFactory,
-      extraPackageIdResolver: QualifiedName => Option[String] = _ => None,
+      // Resolver that is checked before all other resolvers. Crucially this one
+      // can work even if CoinRules cannot be fetched, e.g., during bootstrapping
+      // when CoinRules is not yet created.
+      bootstrapPackageIdResolver: QualifiedName => Option[String] = _ => None,
+      // Resolver that is checked when none of the standard packages match.
+      extraPackageIdResolver: (cc.coinconfig.PackageConfig, QualifiedName) => Option[String] =
+        (_, _) => None,
   )(implicit ec: ExecutionContext) = new PackageIdResolver with NamedLogging {
 
     override val loggerFactory = loggerFactory0
 
-    private def fromCoinRules(coinRules: cc.coinrules.CoinRules, name: QualifiedName): String = {
-      val schedule = CoinConfigSchedule(coinRules)
-      val config = schedule.getConfigAsOf(clock.now)
-      val pkg = modulePackages
+    private def fromCoinRules(
+        packageConfig: cc.coinconfig.PackageConfig,
+        name: QualifiedName,
+    ): Option[String] = {
+      modulePackages
         .get(name.moduleName)
-        .getOrElse(throw new IllegalArgumentException(s"Unknown template $name"))
-      val version = readPackageVersion(config.packageConfig, pkg)
-      DarResources
-        .lookupPackageMetadata(pkg.packageName, version)
-        .fold(
-          throw new IllegalArgumentException(
-            s"No package with name ${pkg.packageName} and version ${version} is known"
-          )
-        )(_.packageId)
+        .map { pkg =>
+          val version = readPackageVersion(packageConfig, pkg)
+          DarResources
+            .lookupPackageMetadata(pkg.packageName, version)
+            .fold(
+              throw new IllegalArgumentException(
+                s"No package with name ${pkg.packageName} and version ${version} is known"
+              )
+            )(_.packageId)
+        }
     }
 
     override def resolvePackageId(
         name: QualifiedName
     )(implicit tc: TraceContext): Future[String] = {
-      val pkgId = extraPackageIdResolver(name) match {
+      val pkgId = bootstrapPackageIdResolver(name) match {
         case None =>
           coinRulesFetcher.getCoinRules().map { coinRules =>
-            fromCoinRules(coinRules.payload, name)
+            val schedule = CoinConfigSchedule(coinRules)
+            val config = schedule.getConfigAsOf(clock.now)
+            fromCoinRules(config.packageConfig, name)
+              .orElse(extraPackageIdResolver(config.packageConfig, name))
+              .getOrElse(throw new IllegalArgumentException(s"Unknown template $name"))
           }
         case Some(pkgId) => Future.successful(pkgId)
       }

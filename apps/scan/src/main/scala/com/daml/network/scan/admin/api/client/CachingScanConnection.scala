@@ -39,6 +39,8 @@ trait CachingScanConnection extends ScanConnection {
   coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
   // and the rounds cache
   coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedRoundsCache)
+  // and also nuke everything when we get an error that we're trying to downgrade.
+  coinLedgerClient.registerContractDowngradeErrorCallback(() => signalOutdatedCache())
 
   /** We cache the CoinRules contract, but it may be come outdated if, e.g., the SVC updates the config schedule.
     * The inactive-contracts error message that the ledger returns does not specify the template-id, thus we need
@@ -64,6 +66,14 @@ trait CachingScanConnection extends ScanConnection {
       )(TraceContext.empty)
       cachedRounds.set(CachedMiningRounds())
     } else ()
+  }
+
+  private def signalOutdatedCache(): Unit = {
+    logger.debug("Invalidating CoinRules and rounds cache after a failed contract downgrade")(
+      TraceContext.empty
+    )
+    coinRulesCache.set(None)
+    cachedRounds.set(CachedMiningRounds())
   }
 
   override def getCoinRulesWithState()(implicit

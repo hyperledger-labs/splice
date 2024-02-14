@@ -2,15 +2,23 @@ package com.daml.network.splitwell.automation
 
 import org.apache.pekko.stream.Materializer
 import cats.syntax.apply.*
+import com.daml.lf.data.Ref.PackageVersion
 import com.daml.network.automation.{
   AssignTrigger,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
   UnassignTrigger,
 }
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, DarResources, PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{
+  CNLedgerClient,
+  DarResource,
+  DarResources,
+  PackageIdResolver,
+  RetryProvider,
+}
 import com.daml.network.util.QualifiedName
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore
@@ -41,7 +49,7 @@ class SplitwellAutomationService(
         clock,
         scanConnection,
         loggerFactory,
-        SplitwellAutomationService.extraPackageIdResolver,
+        extraPackageIdResolver = SplitwellAutomationService.extraPackageIdResolver,
       ),
       ledgerClient,
       retryProvider,
@@ -113,8 +121,37 @@ class SplitwellAutomationService(
 }
 
 object SplitwellAutomationService {
-  private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
-    Option.when(template.moduleName == "CN.Splitwell")(
-      DarResources.splitwell.bootstrap.packageId
-    )
+
+  private val walletPaymentsToSplitwell: Map[PackageVersion, DarResource] =
+    DarResources.splitwell.all.map { pkg =>
+      val walletPayments = pkg.dependencyPackageIds
+        .collectFirst(Function.unlift { pkgId =>
+          DarResources.walletPayments.all.find(_.packageId == pkgId)
+        })
+        .getOrElse(
+          throw new IllegalStateException(
+            s"Splitwell ${pkg.metadata} is missing a dependency on wallet-payments"
+          )
+        )
+      walletPayments.metadata.version -> pkg
+    }.toMap
+
+  private[automation] def extraPackageIdResolver(
+      packageConfig: cc.coinconfig.PackageConfig,
+      template: QualifiedName,
+  ): Option[String] =
+    Option.when(template.moduleName == "CN.Splitwell") {
+      val walletVersion = PackageIdResolver.readPackageVersion(
+        packageConfig,
+        PackageIdResolver.Package.WalletPayments,
+      )
+      walletPaymentsToSplitwell
+        .get(walletVersion)
+        .getOrElse(
+          throw new IllegalStateException(
+            s"wallet-payments version is $walletVersion but there is no splitwell version compiled against that, splitwell is only available for wallet-payments: ${walletPaymentsToSplitwell.keySet}"
+          )
+        )
+        .packageId
+    }
 }

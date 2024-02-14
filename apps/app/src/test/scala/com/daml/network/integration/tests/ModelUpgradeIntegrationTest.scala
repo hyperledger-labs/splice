@@ -5,13 +5,15 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{ARC_CoinRules}
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.{CNNodeEnvironmentImpl, DarResources}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{ConfigScheduleUtil, SvTestUtil, WalletTestUtil}
+import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
+import com.daml.network.util.{ConfigScheduleUtil, SplitwellTestUtil, SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.jdk.CollectionConverters.*
@@ -22,7 +24,11 @@ class ModelUpgradeIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with ConfigScheduleUtil
     with WalletTestUtil
+    with SplitwellTestUtil
     with SvTestUtil {
+
+  private val darPathV1 = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
+  private val darPathV2 = "daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -31,8 +37,16 @@ class ModelUpgradeIntegrationTest
       .withSequencerConnectionsFromScanDisabled()
       .withManualStart
 
+  private def uploadDar(darPath: String)(implicit
+      env: CNNodeTestConsoleEnvironment
+  ) = {
+    aliceValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
+    bobValidatorBackend.participantClient.upload_dar_unless_exists(darPath)
+  }
+
   "daml model upgrade" should {
     "support switching to new svc-governance version" in { implicit env =>
+      uploadDar(darPathV1)
       startAllSync(
         sv1Backend,
         sv2Backend,
@@ -42,6 +56,8 @@ class ModelUpgradeIntegrationTest
         sv3ValidatorBackend,
         sv1ScanBackend,
         aliceValidatorBackend,
+        splitwellBackend,
+        splitwellValidatorBackend,
       )
 
       val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
@@ -251,7 +267,77 @@ class ModelUpgradeIntegrationTest
       )
 
       // SV4 can join after the upgrade.
-      startAllSync(sv4Backend, sv4ValidatorBackend)
+      clue("SV4 can join after upgrade") {
+        startAllSync(sv4Backend, sv4ValidatorBackend)
+      }
+
+      clue("Splitwell works") {
+        // There is no auto-vetting for splitwell yet so we upload the DARs manually.
+        uploadDar(darPathV2)
+        splitwellValidatorBackend.participantClient.upload_dar_unless_exists(darPathV2)
+
+        // Note that this test atm only covers that splitwell works with upgraded wallet payment APIs.
+        // It does not cover upgrading splitwell itself to use new features beyond that.
+        // The only important step for this is the AcceptedAppPaymentsTrigger used by the splitwell
+        // provider which needs to use the new splitwell version. Other steps can still use
+        // the old splitwell version and contract up/downgrading takes care of any issues.
+        val group = "group"
+        createSplitwellInstalls(aliceSplitwellClient, alice)
+        createSplitwellInstalls(bobSplitwellClient, bob)
+        actAndCheck("Alice creates group", aliceSplitwellClient.requestGroup(group))(
+          "Alice sees group",
+          _ => aliceSplitwellClient.listGroups() should have size 1,
+        )
+        val (_, invite) =
+          actAndCheck("Alice creates group invite", aliceSplitwellClient.createGroupInvite(group))(
+            "Alice sees the group invite",
+            _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
+          )
+        val (_, acceptedInvite) =
+          actAndCheck("bob asks to join 'group1'", bobSplitwellClient.acceptInvite(invite))(
+            "Alice sees the accepted invite",
+            _ => aliceSplitwellClient.listAcceptedGroupInvites(group).loneElement,
+          )
+        actAndCheck(
+          "Alice adds bob to group",
+          aliceSplitwellClient.joinGroup(acceptedInvite.contractId),
+        )(
+          "group is updated",
+          _ =>
+            aliceSplitwellClient
+              .listGroups()
+              .loneElement
+              .contract
+              .payload
+              .members
+              .asScala shouldBe Seq(bob.toProtoPrimitive),
+        )
+
+        val key = HttpSplitwellAppClient.GroupKey(
+          group,
+          alice,
+        )
+
+        val (_, paymentRequest) = actAndCheck(
+          "Alice creates payment request",
+          aliceSplitwellClient.initiateTransfer(
+            key,
+            Seq(
+              new walletCodegen.ReceiverCCAmount(
+                bob.toProtoPrimitive,
+                BigDecimal(2.0).bigDecimal,
+              )
+            ),
+          ),
+        )("Alice sees payment request", _ => aliceWalletClient.listAppPaymentRequests().loneElement)
+        actAndCheck(
+          "Alice accepts payment request",
+          aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
+        )(
+          "Alice sees balance update",
+          _ => aliceSplitwellClient.listBalanceUpdates(key) should have size 1,
+        )
+      }
     }
   }
 }

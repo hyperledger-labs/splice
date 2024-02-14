@@ -550,6 +550,7 @@ class CNLedgerConnection(
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     inactiveContractCallbacks: AtomicReference[Seq[String => Unit]],
+    contractDowngradeErrorCallbacks: AtomicReference[Seq[() => Unit]],
     trafficBalanceServiceO: AtomicReference[Option[TrafficBalanceService]],
     completionOffsetCallback: String => Future[Unit],
     packageIdResolver: PackageIdResolver,
@@ -581,7 +582,12 @@ class CNLedgerConnection(
                   if type_ == ErrorResource.ContractId.asString =>
                 inactiveContractCallbacks.get().foreach(f => f(contractId))
             }: Unit
-
+          case Failure(ex: io.grpc.StatusRuntimeException)
+              // what even are error codes
+              if ex.getMessage.contains(
+                "An optional contract field with a value of Some may not be dropped during downgrading"
+              ) =>
+            contractDowngradeErrorCallbacks.get().foreach(f => f())
           case Failure(_) => ()
         }
       }

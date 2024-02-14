@@ -45,7 +45,7 @@ class UserWalletAutomationService(
         clock,
         scanConnection,
         loggerFactory,
-        UserWalletAutomationService.extraPackageIdResolver,
+        UserWalletAutomationService.bootstrapPackageIdResolver,
       ),
       ledgerClient,
       retryProvider,
@@ -104,7 +104,7 @@ class UserWalletAutomationService(
 }
 
 object UserWalletAutomationService {
-  private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
+  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
     // we can hardcode this.
     Option.when(template.moduleName == "CC.CoinImport")(

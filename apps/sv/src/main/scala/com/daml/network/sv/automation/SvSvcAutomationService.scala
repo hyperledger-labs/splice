@@ -79,7 +79,7 @@ class SvSvcAutomationService(
           clock,
           svcStore,
           loggerFactory,
-          SvSvcAutomationService.extraPackageIdResolver,
+          SvSvcAutomationService.bootstrapPackageIdResolver,
         ),
       ledgerClient,
       retryProvider,
@@ -351,7 +351,7 @@ object SvSvcAutomationService {
       globalDomainAlias: DomainAlias,
   )
 
-  private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
+  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     template.moduleName match {
       // SvcBootstrap is how we create CoinRules in the first place so we cannot infer the package id for that from CoinRules.
       case "CN.SvcBootstrap" =>

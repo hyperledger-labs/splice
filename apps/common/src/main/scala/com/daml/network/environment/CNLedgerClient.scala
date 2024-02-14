@@ -56,12 +56,20 @@ class CNLedgerClient(
     new LedgerClient(channel, getToken)
   }
 
-  private val callbacks = new AtomicReference[Seq[String => Unit]](Seq())
+  private val inactiveContractsCallbacks = new AtomicReference[Seq[String => Unit]](Seq())
+
+  private val contractDowngradeErrorCallbacks = new AtomicReference[Seq[() => Unit]](Seq())
 
   def registerInactiveContractsCallback(
       f: String => Unit
   ): Unit = {
-    callbacks.getAndUpdate(prev => prev :+ f)
+    inactiveContractsCallbacks.getAndUpdate(prev => prev :+ f)
+  }: Unit
+
+  def registerContractDowngradeErrorCallback(
+      f: () => Unit
+  ): Unit = {
+    contractDowngradeErrorCallbacks.getAndUpdate(prev => prev :+ f)
   }: Unit
 
   private val trafficBalanceService = new AtomicReference[Option[TrafficBalanceService]](None)
@@ -93,7 +101,8 @@ class CNLedgerClient(
       applicationId,
       baseLoggerFactory.append("connClient", connectionClient),
       retryProvider,
-      callbacks,
+      inactiveContractsCallbacks,
+      contractDowngradeErrorCallbacks,
       trafficBalanceService,
       completionOffsetCallback,
       packageIdResolver,

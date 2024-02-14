@@ -35,7 +35,7 @@ class SvSvAutomationService(
           clock,
           svcStore,
           loggerFactory,
-          SvSvAutomationService.extraPackageIdResolver,
+          SvSvAutomationService.bootstrapPackageIdResolver,
         ),
       ledgerClient,
       retryProvider,
@@ -45,7 +45,7 @@ class SvSvAutomationService(
 }
 
 object SvSvAutomationService {
-  private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
+  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     // For SV local state, we can just use whatever version we want.
     Option.when(template == QualifiedName(ApprovedSvIdentity.TEMPLATE_ID))(
       ApprovedSvIdentity.TEMPLATE_ID.getPackageId

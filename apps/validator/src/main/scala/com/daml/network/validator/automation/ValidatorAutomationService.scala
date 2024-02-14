@@ -56,7 +56,7 @@ class ValidatorAutomationService(
         clock,
         scanConnection,
         loggerFactory,
-        ValidatorAutomationService.extraPackageIdResolver,
+        ValidatorAutomationService.bootstrapPackageIdResolver,
       ),
       ledgerClient,
       retryProvider,
@@ -162,7 +162,7 @@ class ValidatorAutomationService(
 }
 
 object ValidatorAutomationService {
-  private[automation] def extraPackageIdResolver(template: QualifiedName): Option[String] =
+  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     template.moduleName match {
       // App manager storage is participant local so we can freely choose the package id.
       case "CN.AppManager.Store" => Some(DarResources.appManager.bootstrap.packageId)

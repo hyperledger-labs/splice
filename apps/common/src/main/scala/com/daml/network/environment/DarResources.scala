@@ -113,6 +113,7 @@ final case class DarResource(
     packageId: String,
     darHash: Hash,
     metadata: PackageMetadata,
+    dependencyPackageIds: Set[String],
 )
 
 object DarResource {
@@ -122,19 +123,19 @@ object DarResource {
 
   def apply(file: String): DarResource = {
     val path = s"dar/$file"
-    val pkgId = DarUtil.readPackageId(path)
-    val (darBytes, metadata) =
+    val (darBytes, dar) =
       Using.resource(getClass.getClassLoader.getResourceAsStream(path)) { resourceStream =>
         val bytes = ByteString.readFrom(resourceStream)
-        val metadata = Using.resource(bytes.newInput())(DarUtil.readDarMetadata(path, _))
+        val metadata = Using.resource(bytes.newInput())(DarUtil.readDar(path, _))
         (bytes, metadata)
       }
     val hash = hashOps.digest(HashPurpose.DarIdentifier, darBytes)
     DarResource(
       path,
-      pkgId,
+      dar.main._1,
       hash,
-      metadata,
+      dar.main._2.metadata,
+      dar.dependencies.map(_._1).toSet,
     )
   }
 }

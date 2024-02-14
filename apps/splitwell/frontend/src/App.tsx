@@ -29,7 +29,7 @@ import Home from './routes/home';
 import Root from './routes/root';
 import { useConfig } from './utils/config';
 
-// TODO(#8268) Infer the package id based on coin rules here.
+// We only support splitwell upgrades in the backend.
 class SplitwellPackageIdResolver extends PackageIdResolver {
   async resolveTemplateId(templateId: string): Promise<string> {
     switch (this.getQualifiedName(templateId)) {
