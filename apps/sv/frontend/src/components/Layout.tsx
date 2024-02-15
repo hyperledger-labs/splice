@@ -22,6 +22,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
             { name: 'Information', path: 'svc' },
             { name: 'Validator Onboarding', path: 'validator-onboarding' },
             { name: 'Canton Coin Price', path: 'cc-price' },
+            { name: 'Leader Election', path: 'leader' },
             { name: 'Governance', path: 'votes' },
           ]}
         >
