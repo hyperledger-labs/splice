@@ -498,6 +498,7 @@ commands:
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep SLACK_ACCESS_TOKEN --keep CIRCLE_BUILD_URL --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
           gce_authenticate: true
+          when: always
           cmd: |
             export KUBECONFIG=$PWD/.kubecfg
 
