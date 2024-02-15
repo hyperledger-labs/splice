@@ -8,11 +8,10 @@ import { configureStorage } from './storage';
 const network = configureNetwork(clusterBasename);
 
 export const ingressIp = network.ingressIp.address;
-export const publicIngressIp = network.publicIngressIp?.address;
 export const ingressNs = network.ingressNs.metadata.name;
 export const egressIp = network.egressIp.address;
 
-configureIstio(network.ingressNs, ingressIp, publicIngressIp);
+configureIstio(network.ingressNs, ingressIp, network.publicIngressIp?.address);
 
 // Ensures that images required from Quay for observability can be pulled
 const observabilityDependsOn = [network];
@@ -20,4 +19,4 @@ configureObservability(observabilityDependsOn);
 
 configureStorage();
 
-export const auth0 = configureAuth0();
+export const auth0 = configureAuth0(clusterBasename);

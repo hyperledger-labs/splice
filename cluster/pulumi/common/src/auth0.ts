@@ -64,15 +64,24 @@ export class Auth0Fetch implements Auth0Client {
       },
     });
 
-    const clients = await client.getClients();
     const secrets = new Map() as Auth0SecretMap;
+    let page = 0;
+    /* eslint-disable no-constant-condition */
+    while (true) {
+      const clients = await client.getClients({
+        per_page: 50, // Even though 50 is the default, if it's not given explicitly, the page argument is ignored
+        page: page++,
+      });
+      if (clients.length === 0) {
+        return secrets;
+      }
 
-    for (const client of clients) {
-      if (client.client_id && client.client_secret) {
-        secrets.set(client.client_id, client as Auth0ClientSecret);
+      for (const client of clients) {
+        if (client.client_id && client.client_secret) {
+          secrets.set(client.client_id, client as Auth0ClientSecret);
+        }
       }
     }
-    return secrets;
   }
 
   public async loadAuth0Cache(): Promise<void> {
