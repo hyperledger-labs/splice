@@ -33,6 +33,8 @@ class UserWalletService(
     override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
     scanConnection: BftScanConnection,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -50,6 +52,7 @@ class UserWalletService(
       storage,
       loggerFactory,
       retryProvider,
+      domainMigrationId,
     )
 
   val treasury: TreasuryService = new TreasuryService(

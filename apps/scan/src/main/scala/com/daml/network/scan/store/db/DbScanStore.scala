@@ -14,7 +14,6 @@ import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
 import com.daml.network.scan.store.TxLogEntry.EntryType
 import com.daml.network.scan.store.db.ScanTables.txLogTableName
 import com.daml.network.scan.store.{OpenMiningRoundTxLogEntry, ScanStore, SortOrder, TxLogEntry}
-import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
@@ -37,6 +36,8 @@ class DbScanStore(
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -51,6 +52,7 @@ class DbScanStore(
         "service_user_primary_party" -> Json.fromString(serviceUserPrimaryParty.toProtoPrimitive),
         "svc_party" -> Json.fromString(svcParty.toProtoPrimitive),
       ),
+      domainMigrationId,
     )
     with ScanStore
     with AcsTables
@@ -62,7 +64,9 @@ class DbScanStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   val aggregator: Future[ScanAggregator] =
-    waitUntilAcsIngested().map(_ => new ScanAggregator(storage, storeId, loggerFactory))
+    waitUntilAcsIngested().map(_ =>
+      new ScanAggregator(storage, storeId, loggerFactory, domainMigrationId)
+    )
 
   def aggregate()(implicit
       tc: TraceContext
@@ -83,6 +87,7 @@ class DbScanStore(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(CoinRules.TEMPLATE_ID)}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
@@ -105,6 +110,7 @@ class DbScanStore(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(CnsRules.TEMPLATE_ID)}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
@@ -127,6 +133,7 @@ class DbScanStore(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(SvcRules.TEMPLATE_ID)}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
@@ -151,6 +158,7 @@ class DbScanStore(
           selectFromAcsTableWithState(
             ScanTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
                 CnsEntry.COMPANION.TEMPLATE_ID
@@ -179,6 +187,7 @@ class DbScanStore(
           selectFromAcsTableWithState(
             ScanTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
                 CnsEntry.COMPANION.TEMPLATE_ID
@@ -205,6 +214,7 @@ class DbScanStore(
           selectFromAcsTableWithState(
             ScanTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 CnsEntry.COMPANION.TEMPLATE_ID
@@ -281,6 +291,7 @@ class DbScanStore(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(
                   ImportCrate.TEMPLATE_ID
                 )} and acs.import_crate_receiver = $receiverParty""",
@@ -307,6 +318,7 @@ class DbScanStore(
             selectFromAcsTableWithState(
               ScanTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""
                   template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
                     and featured_app_right_provider = $providerPartyId
@@ -565,12 +577,15 @@ class DbScanStore(
     for {
       rows <- storage
         .query(
-          (selectFromAcsTable(ScanTables.acsTableName) ++
-            sql"""
-                where store_id = $storeId
-                  and template_id_qualified_name = ${QualifiedName(ValidatorLicense.TEMPLATE_ID)}
-                order by validator_license_rounds_collected desc limit ${sqlLimit(limit)}
-              """).toActionBuilder.as[SelectFromAcsTableResult],
+          selectFromAcsTable(
+            ScanTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where =
+              sql"""template_id_qualified_name = ${QualifiedName(ValidatorLicense.TEMPLATE_ID)}""",
+            orderLimit =
+              sql"""order by validator_license_rounds_collected desc limit ${sqlLimit(limit)}""",
+          ),
           "getTopValidatorLicenses",
         )
     } yield applyLimit("getTopValidatorLicenses", limit, rows).map(

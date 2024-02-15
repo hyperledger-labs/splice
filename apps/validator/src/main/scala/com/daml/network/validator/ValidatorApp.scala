@@ -524,6 +524,7 @@ class ValidatorApp(
         storage,
         loggerFactory,
         retryProvider,
+        config.domainMigrationId,
       )
       walletManager =
         new UserWalletManager(
@@ -538,6 +539,7 @@ class ValidatorApp(
           retryProvider,
           scanConnection,
           loggerFactory,
+          config.domainMigrationId,
         )
       automation = new ValidatorAutomationService(
         config.automation,

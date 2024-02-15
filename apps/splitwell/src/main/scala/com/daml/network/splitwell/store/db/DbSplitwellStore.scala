@@ -32,6 +32,8 @@ class DbSplitwellStore(
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -44,6 +46,7 @@ class DbSplitwellStore(
         "store" -> Json.fromString("DbSplitwellStore"),
         "providerParty" -> Json.fromString(key.providerParty.toProtoPrimitive),
       ),
+      domainMigrationId,
     )
     with AcsTables
     with AcsQueries
@@ -70,6 +73,7 @@ class DbSplitwellStore(
           selectFromAcsTableWithStateAndOffset(
             SplitwellTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellInstall.TEMPLATE_ID
               )} and assigned_domain = $domainId
@@ -102,6 +106,7 @@ class DbSplitwellStore(
           selectFromAcsTableWithStateAndOffset(
             SplitwellTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.Group.TEMPLATE_ID
               )} and group_owner = ${owner} and group_id = ${lengthLimited(id.unpack)}""",
@@ -131,6 +136,7 @@ class DbSplitwellStore(
             selectFromAcsTableWithState(
               SplitwellTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""
               template_id_qualified_name = ${QualifiedName(
                   splitwellCodegen.Group.COMPANION.TEMPLATE_ID
@@ -158,6 +164,7 @@ class DbSplitwellStore(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.GroupInvite.COMPANION.TEMPLATE_ID
@@ -186,6 +193,7 @@ class DbSplitwellStore(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.AcceptedGroupInvite.COMPANION.TEMPLATE_ID
@@ -214,6 +222,7 @@ class DbSplitwellStore(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.BalanceUpdate.COMPANION.TEMPLATE_ID
@@ -284,6 +293,7 @@ class DbSplitwellStore(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellInstall.COMPANION.TEMPLATE_ID
@@ -313,6 +323,7 @@ class DbSplitwellStore(
           selectFromAcsTableWithState(
             SplitwellTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellRules.COMPANION.TEMPLATE_ID
@@ -343,6 +354,7 @@ class DbSplitwellStore(
           selectFromAcsTableWithStateAndOffset(
             SplitwellTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellRules.COMPANION.TEMPLATE_ID
@@ -449,6 +461,7 @@ class DbSplitwellStore(
           selectFromAcsTableWithStateAndOffset(
             SplitwellTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.TransferInProgress.COMPANION.TEMPLATE_ID

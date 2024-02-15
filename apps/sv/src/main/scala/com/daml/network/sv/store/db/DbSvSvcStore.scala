@@ -56,6 +56,8 @@ class DbSvSvcStore(
     storage: DbStorage,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
@@ -71,6 +73,7 @@ class DbSvSvcStore(
         "svParty" -> Json.fromString(key.svParty.toProtoPrimitive),
         "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),
       ),
+      domainMigrationId,
     )
     with SvSvcStore
     with AcsTables
@@ -93,6 +96,7 @@ class DbSvSvcStore(
           sql"""
               select
                        idle.store_id,
+                       idle.migration_id,
                        idle.event_number,
                        idle.contract_id,
                        idle.template_id_package_id,
@@ -102,6 +106,7 @@ class DbSvSvcStore(
                        idle.created_at,
                        idle.contract_expires_at,
                        ctx.store_id,
+                       ctx.migration_id,
                        ctx.event_number,
                        ctx.contract_id,
                        ctx.template_id_package_id,
@@ -114,7 +119,9 @@ class DbSvSvcStore(
               join     svc_acs_store ctx
               on       idle.subscription_reference_contract_id = ctx.subscription_reference_contract_id
                 and      ctx.store_id = idle.store_id
+                and      ctx.migration_id = idle.migration_id
               where    idle.store_id = $storeId
+                and      idle.migration_id = $domainMigrationId
                 and      idle.template_id_qualified_name = ${QualifiedName(
               SubscriptionIdleState.COMPANION.TEMPLATE_ID
             )}
@@ -142,12 +149,14 @@ class DbSvSvcStore(
       for {
         result <- storage
           .query(
-            (selectFromAcsTable(SvcTables.acsTableName) ++
-              sql"""
-            where store_id = $storeId
-              and template_id_qualified_name = ${QualifiedName(
+            selectFromAcsTable(
+              SvcTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""template_id_qualified_name = ${QualifiedName(
                   SvOnboardingConfirmed.TEMPLATE_ID
-                )}""").toActionBuilder.as[SelectFromAcsTableResult],
+                )}""",
+            ),
             "listSvOnboardingConfirmed",
           )
         limited = applyLimit("listSvOnboardingConfirmed", limit, result)
@@ -161,15 +170,15 @@ class DbSvSvcStore(
       for {
         result <- storage
           .querySingle(
-            (selectFromAcsTable(SvcTables.acsTableName) ++
-              sql"""
-                where store_id = $storeId
-                  and template_id_qualified_name = ${QualifiedName(
+            selectFromAcsTable(
+              SvcTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""template_id_qualified_name = ${QualifiedName(
                   SvOnboardingConfirmed.TEMPLATE_ID
-                )}
-                  and sv_candidate_party = $svParty
-                limit 1
-              """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
+                )} and sv_candidate_party = $svParty""",
+              orderLimit = sql"limit 1",
+            ).headOption,
             "lookupSvOnboardingConfirmedByParty",
           )
           .value
@@ -182,13 +191,16 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(SvcTables.acsTableName) ++
-            sql"""
-                 where store_id = $storeId
-                   and template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
-                   and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
-                 limit ${sqlLimit(limit)}
-               """).toActionBuilder.as[SelectFromAcsTableResult],
+          selectFromAcsTable(
+            SvcTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
+                   and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(
+                action
+              )}""",
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
           "listConfirmations",
         )
       limited = applyLimit("listConfirmations", limit, result)
@@ -283,6 +295,7 @@ class DbSvSvcStore(
               sql"""
                    from #${SvcTables.acsTableName}
                    where store_id = $storeId
+                     and migration_id = $domainMigrationId
                      and template_id_qualified_name = ${QualifiedName(templateId)}
                      and assigned_domain = $domainId
                      and reward_round = $round
@@ -353,6 +366,7 @@ class DbSvSvcStore(
                 select reward_party, array_agg(contract_id)
                 from svc_acs_store
                 where store_id = $storeId
+                  and migration_id = $domainMigrationId
                   and template_id_qualified_name = ${QualifiedName(templateId)}
                   and assigned_domain = $roundDomain
                   and reward_round = $roundNumber
@@ -378,6 +392,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithState(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where =
               sql"""template_id_qualified_name = ${QualifiedName(ClosedMiningRound.TEMPLATE_ID)}
               and assigned_domain = ${svcRules.domain}
@@ -401,6 +416,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                     template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                 and confirmer = $confirmer
@@ -432,6 +448,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                     and confirmer = $confirmer
@@ -466,6 +483,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                     and confirmer = $confirmer
@@ -500,6 +518,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                     and confirmer = $confirmer
@@ -524,21 +543,23 @@ class DbSvSvcStore(
       for {
         result <- storage
           .query(
-            (selectFromAcsTable(SvcTables.acsTableName) ++
-              sql"""
-                    where template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
-                      and confirmer = $confirmer
-                      and action_cns_entry_context_cid IN (
-                        select contract_id
-                        from #${SvcTables.acsTableName}
-                        where store_id = $storeId
-                          and template_id_qualified_name = ${QualifiedName(
+            selectFromAcsTable(
+              SvcTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
+                       and confirmer = $confirmer
+                       and action_cns_entry_context_cid IN (
+                         select contract_id
+                         from #${SvcTables.acsTableName}
+                         where store_id = $storeId
+                           and migration_id = $domainMigrationId
+                           and template_id_qualified_name = ${QualifiedName(
                   CnsEntryContext.TEMPLATE_ID
                 )}
-                          and cns_entry_name = ${lengthLimited(name)}
-                      )
-                    limit ${sqlLimit(limit)};
-                        """).toActionBuilder.as[SelectFromAcsTableResult],
+                           and cns_entry_name = ${lengthLimited(name)})""",
+              orderLimit = sql"""limit ${sqlLimit(limit)}""",
+            ),
             "listInitialPaymentConfirmationByCnsName",
           )
         limited = applyLimit("listInitialPaymentConfirmationByCnsName", limit, result)
@@ -556,6 +577,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                       template_id_qualified_name = ${QualifiedName(SvOnboardingRequest.TEMPLATE_ID)}
                   and sv_onboarding_token = ${lengthLimited(token)}
@@ -591,15 +613,15 @@ class DbSvSvcStore(
       for {
         result <- storage
           .query(
-            (selectFromAcsTable(SvcTables.acsTableName) ++
-              sql"""
-                 where store_id = $storeId
-                   and template_id_qualified_name = ${QualifiedName(
+            selectFromAcsTable(
+              SvcTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = (sql"""template_id_qualified_name = ${QualifiedName(
                   SvOnboardingRequest.TEMPLATE_ID
-                )}
-                   and (sv_candidate_party, sv_candidate_name) in (""" ++ svCandidates ++ sql""")
-                 limit ${sqlLimit(limit)}
-               """).toActionBuilder.as[SelectFromAcsTableResult],
+                )} and (sv_candidate_party, sv_candidate_name) in (""" ++ svCandidates ++ sql")").toActionBuilder,
+              orderLimit = sql"""limit ${sqlLimit(limit)}""",
+            ),
             "listSvOnboardingRequestsBySvcMembers",
           )
         limited = applyLimit("listSvOnboardingRequestsBySvcMembers", limit, result)
@@ -617,6 +639,7 @@ class DbSvSvcStore(
             selectFromAcsTableWithState(
               SvcTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""
                 template_id_qualified_name = ${QualifiedName(companion.TEMPLATE_ID)}
                 and assigned_domain = $domainId
@@ -624,6 +647,7 @@ class DbSvSvcStore(
                   select mining_round - 2
                   from svc_acs_store
                   where store_id = $storeId
+                    and migration_id = $domainMigrationId
                     and template_id_qualified_name = ${QualifiedName(
                   cc.round.OpenMiningRound.TEMPLATE_ID
                 )}
@@ -643,13 +667,14 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(SvcTables.acsTableName) ++
-            sql"""
-                 where store_id = $storeId
-                   and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
-                   and member_traffic_member = $memberId
-                 limit ${sqlLimit(limit)}
-               """).toActionBuilder.as[SelectFromAcsTableResult],
+          selectFromAcsTable(
+            SvcTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
+                        and member_traffic_member = $memberId""",
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
           "listMemberTrafficContracts",
         )
     } yield applyLimit("listMemberTrafficContracts", limit, result).map(
@@ -671,13 +696,14 @@ class DbSvSvcStore(
       )
       result <- storage
         .query(
-          (selectFromAcsTable(SvcTables.acsTableName) ++
-            sql"""
-               where store_id = $storeId
-                 and template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
-                 and voter in """ ++ voterParties ++ sql"""
-               limit ${sqlLimit(limit)}
-             """).toActionBuilder.as[SelectFromAcsTableResult],
+          selectFromAcsTable(
+            SvcTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = (sql"""template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
+                 and voter in """ ++ voterParties).toActionBuilder,
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
           "listMemberCoinPriceVotes",
         )
       limited = applyLimit("listMemberCoinPriceVotes", limit, result)
@@ -695,6 +721,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(
                 SvOnboardingRequest.TEMPLATE_ID
@@ -722,6 +749,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                           template_id_qualified_name = ${QualifiedName(
                 ValidatorLicense.TEMPLATE_ID
@@ -748,6 +776,7 @@ class DbSvSvcStore(
                select sum(total_traffic_purchased)
                from #${SvcTables.acsTableName}
                where store_id = $storeId
+                and migration_id = $domainMigrationId
                 and template_id_qualified_name = ${QualifiedName(MemberTraffic.TEMPLATE_ID)}
                 and member_traffic_member = ${lengthLimited(memberId.toProtoPrimitive)}
              """.as[Long].headOption,
@@ -767,13 +796,14 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(SvcTables.acsTableName) ++
-            sql"""
-                 where store_id = $storeId
-                   and template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
-                   and vote_request_cid in """ ++ voteRequestCidsSql ++ sql"""
-                 limit ${sqlLimit(limit)}
-               """).toActionBuilder.as[SelectFromAcsTableResult],
+          selectFromAcsTable(
+            SvcTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = (sql""" template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
+                      and vote_request_cid in """ ++ voteRequestCidsSql).toActionBuilder,
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
           "listVotesByVoteRequests",
         )
       limited = applyLimit("listVotesByVoteRequests", limit, result)
@@ -790,6 +820,7 @@ class DbSvSvcStore(
             selectFromAcsTableWithOffset(
               SvcTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""
                             template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
                         and vote_request_cid = $voteRequestCid
@@ -816,6 +847,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                           template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
                       and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
@@ -840,13 +872,15 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(SvcTables.acsTableName) ++
-            sql"""
-                   where store_id = $storeId
-                     and template_id_qualified_name = ${QualifiedName(Vote.TEMPLATE_ID)}
-                     and vote_request_cid = $voteRequestId
-                   limit ${sqlLimit(limit)}
-                 """).toActionBuilder.as[SelectFromAcsTableResult],
+          selectFromAcsTable(
+            SvcTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""template_id_qualified_name = ${QualifiedName(
+                Vote.TEMPLATE_ID
+              )} and vote_request_cid = $voteRequestId""",
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
           "listEligibleVotes",
         )
       limited = applyLimit("listEligibleVotes", limit, result)
@@ -859,13 +893,14 @@ class DbSvSvcStore(
     for {
       result <- storage
         .querySingle(
-          (selectFromAcsTable(SvcTables.acsTableName) ++
-            sql"""
-                     where store_id = $storeId
-                       and template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
-                       and voter = ${key.svParty}
-                     limit 1
-                   """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
+          selectFromAcsTable(
+            SvcTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
+                          and voter = ${key.svParty}""",
+            orderLimit = sql"""limit 1""",
+          ).headOption,
           "lookupCoinPriceVoteByThisSv",
         )
         .value
@@ -883,6 +918,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                             template_id_qualified_name = ${QualifiedName(
                 SvOnboardingRequest.TEMPLATE_ID
@@ -910,6 +946,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                               template_id_qualified_name = ${QualifiedName(
                 SvOnboardingConfirmed.TEMPLATE_ID
@@ -938,16 +975,16 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(SvcTables.acsTableName) ++
-            sql"""
-                     where store_id = $storeId
-                       and template_id_qualified_name = ${QualifiedName(
-                ElectionRequest.TEMPLATE_ID
-              )}
+          selectFromAcsTable(
+            SvcTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where =
+              (sql"""template_id_qualified_name = ${QualifiedName(ElectionRequest.TEMPLATE_ID)}
                        and requester IN """ ++ requesters ++ sql"""
-                       and election_request_epoch = $electionRequestEpoch
-                     limit ${sqlLimit(limit)}
-                   """).toActionBuilder.as[SelectFromAcsTableResult],
+                       and election_request_epoch = $electionRequestEpoch""").toActionBuilder,
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
           "listElectionRequests",
         )
       limited = applyLimit("listElectionRequests", limit, result)
@@ -965,6 +1002,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
                               template_id_qualified_name = ${QualifiedName(
                 ElectionRequest.TEMPLATE_ID
@@ -992,15 +1030,15 @@ class DbSvSvcStore(
     for {
       result <- storage
         .query(
-          (selectFromAcsTable(SvcTables.acsTableName) ++
-            sql"""
-                       where store_id = $storeId
-                         and template_id_qualified_name = ${QualifiedName(
+          selectFromAcsTable(
+            SvcTables.acsTableName,
+            storeId,
+            domainMigrationId,
+            where = sql"""template_id_qualified_name = ${QualifiedName(
                 ElectionRequest.TEMPLATE_ID
-              )}
-                         and election_request_epoch < $epoch
-                       limit ${sqlLimit(limit)}
-                     """).toActionBuilder.as[SelectFromAcsTableResult],
+              )} and election_request_epoch < $epoch""",
+            orderLimit = sql"""limit ${sqlLimit(limit)}""",
+          ),
           "listExpiredElectionRequests",
         )
       limited = applyLimit("listExpiredElectionRequests", limit, result)
@@ -1017,6 +1055,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithState(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(ImportCrate.TEMPLATE_ID)}
                            and import_crate_receiver = $receiver""",
             orderLimit = sql"""limit ${sqlLimit(Limit.DefaultLimit)}""",
@@ -1041,6 +1080,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithStateAndOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(CnsEntry.TEMPLATE_ID)}
                     and cns_entry_name = ${lengthLimited(name)}
                     and assigned_domain is not null""",
@@ -1069,6 +1109,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithStateAndOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 SubscriptionInitialPayment.TEMPLATE_ID
               )}
@@ -1099,6 +1140,7 @@ class DbSvSvcStore(
           selectFromAcsTableWithStateAndOffset(
             SvcTables.acsTableName,
             storeId,
+            domainMigrationId,
             where =
               sql"""template_id_qualified_name = ${QualifiedName(FeaturedAppRight.TEMPLATE_ID)}
                       and featured_app_right_provider = $providerPartyId
@@ -1184,6 +1226,7 @@ class DbSvSvcStore(
             selectFromAcsTableWithState(
               SvcTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""
                template_id_qualified_name = ${QualifiedName(CnsEntryContext.COMPANION.TEMPLATE_ID)}
            and subscription_reference_contract_id = $reference""",

@@ -33,11 +33,18 @@ trait AcsQueries extends AcsJdbcTypes {
   /** @param tableName Must be SQL-safe, as it needs to be interpolated unsafely.
     *                  This is fine, as all calls to this method should use static string constants.
     */
-  protected def selectFromAcsTable(tableName: String): SQLActionBuilder =
-    sql"""
+  protected def selectFromAcsTable(
+      tableName: String,
+      storeId: Int,
+      migrationId: Long,
+      where: SQLActionBuilder,
+      orderLimit: SQLActionBuilder = sql"",
+  ) =
+    (sql"""
        select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}
-       from #$tableName
-       """.stripMargin
+       from #$tableName acs
+       where acs.store_id = $storeId and acs.migration_id = $migrationId and """ ++ where ++ sql"""
+       """ ++ orderLimit).toActionBuilder.as[AcsQueries.SelectFromAcsTableResult]
 
   implicit val GetResultSelectFromAcsTable: GetResult[AcsQueries.SelectFromAcsTableResult] =
     GetResult { prs =>
@@ -45,6 +52,7 @@ trait AcsQueries extends AcsJdbcTypes {
       (AcsQueries.SelectFromAcsTableResult.apply _).tupled(
         (
           <<[Int],
+          <<[Long],
           <<[Long],
           <<[ContractId[Any]],
           <<[String],
@@ -61,13 +69,14 @@ trait AcsQueries extends AcsJdbcTypes {
   protected def selectFromAcsTableWithState(
       tableName: String,
       storeId: Int,
+      migrationId: Long,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
   ) =
     (sql"""
        select #${SelectFromAcsTableWithStateResult.sqlColumnsCommaSeparated()}
        from #$tableName acs
-       where acs.store_id = $storeId and """ ++ where ++ sql"""
+       where acs.store_id = $storeId and acs.migration_id = $migrationId and """ ++ where ++ sql"""
        """ ++ orderLimit).toActionBuilder.as[AcsQueries.SelectFromAcsTableWithStateResult]
 
   implicit val GetResultSelectFromContractStateResult
@@ -92,20 +101,22 @@ trait AcsQueries extends AcsJdbcTypes {
       AcsQueries.SelectFromAcsTableWithStateResult(acsRow, stateRow)
     }
 
-  /** Same as [[selectFromAcsTable]], but joins with the store_descriptors table to get the last_ingested_offset.
+  /** Same as [[selectFromAcsTable]], but joins with the store_descriptors and store_last_ingested_offsets table to get the last_ingested_offset.
     * This guarantees that the fetched contracts exist in the given offset,
     * whereas two separate queries (one to fetch the contract and one to fetch the offset) don't guarantee that.
     */
   protected def selectFromAcsTableWithOffset(
       tableName: String,
       storeId: Int,
+      migrationId: Long,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
   ) =
     (sql"""
        select
-         store_id,
-         last_ingested_offset,
+         acs.store_id,
+         acs.migration_id,
+         o.last_ingested_offset,
          event_number,
          contract_id,
          template_id_package_id,
@@ -115,31 +126,37 @@ trait AcsQueries extends AcsJdbcTypes {
          created_at,
          contract_expires_at
        from store_descriptors sd
-           left join #$tableName
-               on sd.id = store_id
+           left join store_last_ingested_offsets o
+               on sd.id = o.store_id
+           left join #$tableName acs
+               on o.store_id = acs.store_id
+               and o.migration_id = acs.migration_id
                and """ ++ where ++ sql"""
-       where sd.id = $storeId
+       where sd.id = $storeId and o.migration_id = $migrationId
        """ ++ orderLimit).toActionBuilder
       .as[AcsQueries.SelectFromAcsTableResultWithOffset]
 
   implicit val GetResultSelectFromAcsTableResultWithOffset
       : GetResult[AcsQueries.SelectFromAcsTableResultWithOffset] = { (pp: PositionedResult) =>
     val storeIdFromAcsRow = pp.<<[Option[Int]]
+    val migrationIdFromAcsRow = pp.<<[Option[Long]]
     AcsQueries.SelectFromAcsTableResultWithOffset(
       pp.<<,
-      storeIdFromAcsRow.map { storeId =>
-        AcsQueries.SelectFromAcsTableResult(
-          storeId,
-          pp.<<,
-          pp.<<,
-          pp.<<,
-          pp.<<,
-          pp.<<,
-          pp.<<,
-          pp.<<,
-          pp.<<,
-        )
-      },
+      for {
+        storeId <- storeIdFromAcsRow
+        migration_id <- migrationIdFromAcsRow
+      } yield AcsQueries.SelectFromAcsTableResult(
+        storeId,
+        migration_id,
+        pp.<<,
+        pp.<<,
+        pp.<<,
+        pp.<<,
+        pp.<<,
+        pp.<<,
+        pp.<<,
+        pp.<<,
+      ),
     )
   }
 
@@ -148,13 +165,16 @@ trait AcsQueries extends AcsJdbcTypes {
   protected def selectFromAcsTableWithStateAndOffset(
       tableName: String,
       storeId: Int,
+      // TODO(#9957): re visit if migrationId is needed.
+      migrationId: Long,
       where: SQLActionBuilder = sql"true",
       orderLimit: SQLActionBuilder = sql"",
   ) =
     (sql"""
        select
          acs.store_id,
-         sd.last_ingested_offset,
+         acs.migration_id,
+         o.last_ingested_offset,
          acs.event_number,
          acs.contract_id,
          acs.template_id_package_id,
@@ -171,10 +191,13 @@ trait AcsQueries extends AcsJdbcTypes {
          acs.reassignment_submitter,
          acs.reassignment_unassign_id
        from store_descriptors sd
+           left join store_last_ingested_offsets o
+               on sd.id = o.store_id
            left join #$tableName acs
-               on sd.id = acs.store_id
+               on o.store_id = acs.store_id
+               and o.migration_id = acs.migration_id
                and """ ++ where ++ sql"""
-       where sd.id = $storeId
+       where sd.id = $storeId and o.migration_id = $migrationId
        """ ++ orderLimit).toActionBuilder
       .as[AcsQueries.SelectFromAcsTableResultWithStateAndOffset]
 
@@ -182,32 +205,35 @@ trait AcsQueries extends AcsJdbcTypes {
       : GetResult[AcsQueries.SelectFromAcsTableResultWithStateAndOffset] = {
     (pp: PositionedResult) =>
       val storeIdFromAcsRow = pp.<<[Option[Int]]
+      val migrationIdFromAcsRow = pp.<<[Option[Long]]
       AcsQueries.SelectFromAcsTableResultWithStateAndOffset(
         pp.<<,
-        storeIdFromAcsRow.map { storeId =>
-          AcsQueries.SelectFromAcsTableWithStateResult(
-            AcsQueries.SelectFromAcsTableResult(
-              storeId,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-            ),
-            AcsQueries.SelectFromContractStateResult(
-              pp.<<,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-              pp.<<,
-            ),
-          )
-        },
+        for {
+          storeId <- storeIdFromAcsRow
+          migrationId <- migrationIdFromAcsRow
+        } yield AcsQueries.SelectFromAcsTableWithStateResult(
+          AcsQueries.SelectFromAcsTableResult(
+            storeId,
+            migrationId,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+          ),
+          AcsQueries.SelectFromContractStateResult(
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+            pp.<<,
+          ),
+        ),
       )
   }
 
@@ -279,6 +305,7 @@ trait AcsQueries extends AcsJdbcTypes {
 object AcsQueries {
   case class SelectFromAcsTableResult(
       storeId: Int,
+      migrationId: Long,
       eventNumber: Long,
       contractId: ContractId[Any],
       templateIdPackageId: String,
@@ -314,6 +341,7 @@ object AcsQueries {
   object SelectFromAcsTableResult {
     def sqlColumnsCommaSeparated(qualifier: String = "") =
       s"""${qualifier}store_id,
+          ${qualifier}migration_id,
           ${qualifier}event_number,
           ${qualifier}contract_id,
           ${qualifier}template_id_package_id,

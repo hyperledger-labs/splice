@@ -14,6 +14,8 @@ abstract class DbCNNodeAppStore[TXE](
     acsTableName: String,
     txLogTableName: String,
     storeDescriptor: io.circe.Json,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -32,6 +34,7 @@ abstract class DbCNNodeAppStore[TXE](
       loggerFactory,
       acsContractFilter,
       txLogConfig,
+      domainMigrationId,
       retryProvider,
     )
 
@@ -49,6 +52,8 @@ abstract class DbCNNodeAppStoreWithoutHistory(
     storage: DbStorage,
     acsTableName: String,
     storeDescriptor: io.circe.Json,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -67,6 +72,7 @@ abstract class DbCNNodeAppStoreWithoutHistory(
       loggerFactory,
       acsContractFilter,
       TxLogStore.Config.empty,
+      domainMigrationId,
       retryProvider,
     )
 

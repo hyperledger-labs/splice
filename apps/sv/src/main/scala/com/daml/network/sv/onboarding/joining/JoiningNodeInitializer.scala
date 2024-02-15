@@ -127,8 +127,8 @@ class JoiningNodeInitializer(
         RetryFor.WaitingOnInitDependency,
       )
       storeKey = SvStore.Key(svParty, svcPartyId)
-      svStore = newSvStore(storeKey)
-      svcStore = newSvcStore(svStore.key)
+      svStore = newSvStore(storeKey, config.domainMigrationId)
+      svcStore = newSvcStore(svStore.key, config.domainMigrationId)
       svAutomation = newSvSvAutomationService(
         svStore,
         svcStore,

@@ -13,7 +13,6 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
@@ -23,7 +22,6 @@ import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.circe.Json
@@ -36,6 +34,8 @@ class DbValidatorStore(
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -49,6 +49,7 @@ class DbValidatorStore(
         "validatorParty" -> Json.fromString(key.validatorParty.toProtoPrimitive),
         "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),
       ),
+      domainMigrationId,
     )
     with ValidatorStore
     with AcsTables
@@ -73,15 +74,15 @@ class DbValidatorStore(
   ]] = for {
     row <- storage
       .querySingle(
-        (selectFromAcsTable(ValidatorTables.acsTableName) ++
-          sql"""
-              where store_id = $storeId
-                and template_id_qualified_name = ${QualifiedName(
+        selectFromAcsTable(
+          ValidatorTables.acsTableName,
+          storeId,
+          domainMigrationId,
+          where = sql"""template_id_qualified_name = ${QualifiedName(
               walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
-            )}
-                and user_party = $endUserParty
-              limit 1
-          """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
+            )} and user_party = $endUserParty""",
+          orderLimit = sql"limit 1",
+        ).headOption,
         "lookupInstallByParty",
       )
       .value
@@ -94,15 +95,15 @@ class DbValidatorStore(
   ]] = for {
     row <- storage
       .querySingle(
-        (selectFromAcsTable(ValidatorTables.acsTableName) ++
-          sql"""
-              where store_id = $storeId
-                and template_id_qualified_name = ${QualifiedName(
+        selectFromAcsTable(
+          ValidatorTables.acsTableName,
+          storeId,
+          domainMigrationId,
+          where = sql"""template_id_qualified_name = ${QualifiedName(
               walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
-            )}
-                and user_name = ${lengthLimited(endUserName)}
-              limit 1
-          """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
+            )} and user_name = ${lengthLimited(endUserName)}""",
+          orderLimit = sql"limit 1",
+        ).headOption,
         "lookupInstallByName",
       )
       .value
@@ -115,15 +116,15 @@ class DbValidatorStore(
   ] = for {
     row <- storage
       .querySingle(
-        (selectFromAcsTable(ValidatorTables.acsTableName) ++
-          sql"""
-              where store_id = $storeId
-                and template_id_qualified_name = ${QualifiedName(
+        selectFromAcsTable(
+          ValidatorTables.acsTableName,
+          storeId,
+          domainMigrationId,
+          where = sql"""template_id_qualified_name = ${QualifiedName(
               coinCodegen.FeaturedAppRight.COMPANION.TEMPLATE_ID
-            )}
-                and provider_party = ${walletKey.validatorParty}
-              limit 1
-          """).toActionBuilder.as[SelectFromAcsTableResult].headOption,
+            )} and provider_party = ${walletKey.validatorParty}""",
+          orderLimit = sql"limit 1",
+        ).headOption,
         "lookupValidatorFeaturedAppRight",
       )
       .value
@@ -142,6 +143,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
                 walletCodegen.WalletAppInstall.COMPANION.TEMPLATE_ID
@@ -173,6 +175,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
                 validatorLicenseCodegen.ValidatorLicense.COMPANION.TEMPLATE_ID
@@ -205,6 +208,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
                 coinCodegen.ValidatorRight.COMPANION.TEMPLATE_ID
@@ -236,6 +240,7 @@ class DbValidatorStore(
           selectFromAcsTableWithState(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID
@@ -265,6 +270,7 @@ class DbValidatorStore(
             selectFromAcsTableWithState(
               ValidatorTables.acsTableName,
               storeId,
+              domainMigrationId,
               where = sql"""
                 template_id_qualified_name = ${QualifiedName(
                   appManagerCodegen.AppConfiguration.TEMPLATE_ID
@@ -298,6 +304,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 appManagerCodegen.AppConfiguration.COMPANION.TEMPLATE_ID
               )}
@@ -329,6 +336,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 appManagerCodegen.AppRelease.COMPANION.TEMPLATE_ID
               )}
@@ -361,6 +369,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 appManagerCodegen.RegisteredApp.COMPANION.TEMPLATE_ID
               )}
@@ -392,6 +401,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 appManagerCodegen.InstalledApp.COMPANION.TEMPLATE_ID
               )}
@@ -425,6 +435,7 @@ class DbValidatorStore(
           selectFromAcsTableWithState(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID
@@ -458,6 +469,7 @@ class DbValidatorStore(
           selectFromAcsTableWithStateAndOffset(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 appManagerCodegen.ApprovedReleaseConfiguration.COMPANION.TEMPLATE_ID
               )}
@@ -489,6 +501,7 @@ class DbValidatorStore(
           selectFromAcsTableWithOffset(
             ValidatorTables.acsTableName,
             storeId,
+            domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
                 topupCodegen.ValidatorTopUpState.COMPANION.TEMPLATE_ID

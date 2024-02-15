@@ -417,7 +417,13 @@ class ScanAggregatorTest
       svcParty = svcParty,
       storage,
       loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      RetryProvider(
+        loggerFactory,
+        timeouts,
+        FutureSupervisor.Noop,
+        NoOpMetricsFactory,
+      ),
+      domainMigrationId = 0,
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -436,11 +442,13 @@ class ScanAggregatorTest
       round: Long,
       balanceChangeRoundZero: BigDecimal,
       balanceChangeHoldingFees: BigDecimal,
+      migrationId: Long = 0L,
   ): Future[Int] = {
     val q = sql"""
       insert into scan_txlog_store
         (
           store_id,
+          migration_id,
           event_id,
           domain_id,
           entry_type,
@@ -452,6 +460,7 @@ class ScanAggregatorTest
         )
         select
           $storeId,
+          $migrationId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
           ${EntryType.BalanceChangeTxLogEntry},
@@ -478,11 +487,13 @@ class ScanAggregatorTest
       eventId: String,
       round: Long,
       closedRoundEffectiveAt: CantonTimestamp,
+      migrationId: Long = 0L,
   ): Future[Int] = {
     val q = sql"""
       insert into scan_txlog_store
         (
           store_id,
+          migration_id,
           event_id,
           domain_id,
           entry_type,
@@ -493,6 +504,7 @@ class ScanAggregatorTest
         )
       select
           $storeId,
+          $migrationId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
           ${EntryType.ClosedMiningRoundTxLogEntry},
@@ -520,11 +532,13 @@ class ScanAggregatorTest
       rewardAmount: BigDecimal,
       rewardedParty: String,
       dbType: CantonRequireTypes.String3,
+      migrationId: Long = 0L,
   ): Future[Int] = {
     val q = sql"""
       insert into scan_txlog_store
         (
           store_id,
+          migration_id,
           event_id,
           domain_id,
           entry_type,
@@ -536,6 +550,7 @@ class ScanAggregatorTest
         )
       select
           $storeId,
+          $migrationId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
           ${dbType},
@@ -598,11 +613,13 @@ class ScanAggregatorTest
       purchase: Long,
       spent: BigDecimal,
       party: String,
+      migrationId: Long = 0L,
   ): Future[Int] = {
     val q = sql"""
       insert into scan_txlog_store
         (
           store_id,
+          migration_id,
           event_id,
           domain_id,
           entry_type,
@@ -615,6 +632,7 @@ class ScanAggregatorTest
         )
       select
           $storeId,
+          $migrationId,
           ${lengthLimited(eventId)},
           ${lengthLimited(domain)},
           ${EntryType.ExtraTrafficPurchaseTxLogEntry},

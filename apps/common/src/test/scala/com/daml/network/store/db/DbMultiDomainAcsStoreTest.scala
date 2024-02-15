@@ -28,18 +28,31 @@ class DbMultiDomainAcsStoreTest
 
     "allow creating & deleting same contract id in different stores" in {
       val store1 = mkStore(id = 1)
+      val store1MigrationId1 = mkStore(id = 1, migrationId = 1L)
       val store2 = mkStore(id = 2)
-      val coupon = c(1)
+      val coupon1 = c(1)
+      val coupon2 = c(2)
       for {
         _ <- acs()(store1)
+        _ <- acs()(store1MigrationId1) // store1 with different migration id
+        _ = store1.storeId shouldBe store1MigrationId1.storeId
         _ <- acs()(store2)
-        _ <- d1.create(coupon)(store1)
-        _ <- d1.create(coupon)(store2)
-        _ <- assertList(coupon -> Some(d1))(store1)
-        _ <- assertList(coupon -> Some(d1))(store2)
-        _ <- d1.archive(coupon)(store1)
+        _ <- d1.create(coupon1)(store1)
+        _ <- d1.create(coupon2)(store1MigrationId1)
+        _ <- d1.create(coupon1)(store2)
+        _ <- assertList(coupon1 -> Some(d1))(
+          store1
+        ) // only fetched 1 coupon with matching migration id
+        _ <- assertList(coupon2 -> Some(d1))(
+          store1MigrationId1
+        ) // only fetched 1 coupon with matching migration id
+        _ <- assertList(coupon1 -> Some(d1))(store2)
+        _ <- d1.archive(coupon1)(store1)
         _ <- assertList()(store1) // deleted from store1
-        _ <- assertList(coupon -> Some(d1))(store2) // but not from store2
+        _ <- assertList(coupon1 -> Some(d1))(store2) // but not from store2
+        _ <- assertList(coupon2 -> Some(d1))(
+          store1MigrationId1
+        ) // and not from store1 with migrationId=1
       } yield succeed
     }
 
@@ -47,6 +60,7 @@ class DbMultiDomainAcsStoreTest
       import MultiDomainAcsStore.mkFilter
       val store = mkStoreWithAcsRowDataF(
         1,
+        0,
         MultiDomainAcsStore.SimpleContractFilter(
           svcParty,
           templateFilters = Map(
@@ -69,9 +83,14 @@ class DbMultiDomainAcsStoreTest
       .parse(raw"""{"test": "DbMultiDomainAcsStoreTest", "id": $id}""")
       .getOrElse(sys.error("Why is it so hard to define a JSON literal"))
 
-  override def mkStore(id: Int, filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData]) = {
+  override def mkStore(
+      id: Int,
+      migrationId: Long,
+      filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData],
+  ) = {
     mkStoreWithAcsRowDataF(
       id,
+      migrationId,
       filter,
       "acs_store_template",
     )
@@ -79,6 +98,7 @@ class DbMultiDomainAcsStoreTest
 
   def mkStoreWithAcsRowDataF[R <: AcsRowData](
       id: Int,
+      migrationId: Long,
       filter: MultiDomainAcsStore.ContractFilter[R],
       acsTableName: String,
   ) = {
@@ -95,6 +115,7 @@ class DbMultiDomainAcsStoreTest
       loggerFactory,
       filter,
       testTxLogConfig,
+      migrationId,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
   }

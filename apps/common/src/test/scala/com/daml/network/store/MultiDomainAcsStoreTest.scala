@@ -55,6 +55,7 @@ abstract class MultiDomainAcsStoreTest[
 
   protected def mkStore(
       id: Int = 0,
+      domainMigrationId: Long = 0,
       filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = defaultContractFilter,
   ): Store
 
@@ -730,7 +731,7 @@ abstract class MultiDomainAcsStoreTest[
           ),
         )
       }
-      implicit val store: Store = mkStore(0, contractFilter)
+      implicit val store: Store = mkStore(0, 0L, contractFilter)
       for {
         _ <- acs(coids.zipWithIndex.map { case (coid, ix) =>
           (smallestContract(coid, ix), dummyDomain, 0L)

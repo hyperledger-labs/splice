@@ -26,6 +26,7 @@ class InMemoryMultiDomainAcsStoreTest
 
   override def mkStore(
       id: Int,
+      migrationId: Long,
       filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData],
   ): InMemoryMultiDomainAcsStore[TestTxLogEntry] =
     new InMemoryMultiDomainAcsStore(

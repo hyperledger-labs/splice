@@ -633,6 +633,7 @@ class DbValidatorStoreTest
       loggerFactory = loggerFactory,
       retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      domainMigrationId = 0,
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

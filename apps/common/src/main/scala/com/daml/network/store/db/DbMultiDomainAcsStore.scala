@@ -60,6 +60,8 @@ class DbMultiDomainAcsStore[TXE](
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
     txLogConfig: TxLogStore.Config[TXE],
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
     retryProvider: RetryProvider,
 )(implicit
     ec: ExecutionContext,
@@ -110,10 +112,11 @@ class DbMultiDomainAcsStore[TXE](
       traceContext: TraceContext,
   ): Future[Option[ContractWithState[TCid, T]]] = waitUntilAcsIngested {
     storage
-      .querySingle( // index: acs_store_template_sid_cid
+      .querySingle( // index: acs_store_template_sid_mid_cid
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
+          domainMigrationId,
           where = sql"""acs.contract_id = ${lengthLimited(id.contractId)}""",
         ).headOption,
         "lookupContractById",
@@ -135,6 +138,7 @@ class DbMultiDomainAcsStore[TXE](
           selectFromAcsTableWithStateAndOffset(
             acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(templateId)}""",
             orderLimit = sql"limit 1",
           ).headOption,
@@ -154,10 +158,11 @@ class DbMultiDomainAcsStore[TXE](
       traceContext: TraceContext
   ): Future[Option[ContractState]] = waitUntilAcsIngested {
     storage
-      .querySingle( // index: acs_store_template_sid_cid
+      .querySingle( // index: acs_store_template_sid_mid_cid
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
+          domainMigrationId,
           where = sql"""acs.contract_id = ${lengthLimited(id.contractId)}""",
         ).headOption,
         "lookupContractStateById",
@@ -182,10 +187,11 @@ class DbMultiDomainAcsStore[TXE](
     val templateId = companionClass.typeId(companion)
     val opName = s"listContracts:${templateId.getEntityName}"
     for {
-      result <- storage.query( // index: acs_store_template_sid_tid_en
+      result <- storage.query( // index: acs_store_template_sid_mid_tid_en
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
+          domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(templateId)}""",
           orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
         ),
@@ -205,10 +211,11 @@ class DbMultiDomainAcsStore[TXE](
   ): Future[Seq[AssignedContract[TCid, T]]] = waitUntilAcsIngested {
     val templateId = companionClass.typeId(companion)
     for {
-      result <- storage.query( // index: acs_store_template_sid_tid_en
+      result <- storage.query( // index: acs_store_template_sid_mid_tid_en
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
+          domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(
               templateId
             )} and assigned_domain is not null""",
@@ -232,10 +239,11 @@ class DbMultiDomainAcsStore[TXE](
     for {
       _ <- waitUntilAcsIngested()
       result <- storage
-        .query( // index: acs_store_template_sid_tid_ce
+        .query( // index: acs_store_template_sid_mid_tid_ce
           selectFromAcsTableWithState(
             acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""template_id_qualified_name = ${QualifiedName(
                 templateId
               )} and acs.contract_expires_at < $now""",
@@ -262,6 +270,7 @@ class DbMultiDomainAcsStore[TXE](
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
+          domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(
               templateId
             )} and assigned_domain = $domain""",
@@ -290,6 +299,7 @@ class DbMultiDomainAcsStore[TXE](
         selectFromAcsTableWithState(
           acsTableName,
           storeId,
+          domainMigrationId,
           where =
             (sql"""template_id_qualified_name IN """ ++ templateIds ++ sql""" and assigned_domain is not null and assigned_domain != $excludedDomain""").toActionBuilder,
           // bytea comparison in PG is left-to-right unsigned ascending, shorter
@@ -350,6 +360,7 @@ class DbMultiDomainAcsStore[TXE](
                 selectFromAcsTableWithState(
                   acsTableName,
                   storeId,
+                  domainMigrationId,
                   where = (where ++ sql" and state_number >= $fromNumber").toActionBuilder,
                   orderLimit =
                     (sql"order by state_number limit ${sqlLimit(pageSize)}").toActionBuilder,
@@ -395,6 +406,7 @@ class DbMultiDomainAcsStore[TXE](
           selectFromAcsTableWithState(
             acsTableName,
             storeId,
+            domainMigrationId,
             where = sql"""acs.contract_id = ${contractId}""",
           ).headOption,
           "isReadyForAssign",
@@ -419,7 +431,7 @@ class DbMultiDomainAcsStore[TXE](
           sql"""
              select contract_id, source_domain, unassign_id
              from incomplete_reassignments
-             where store_id = $storeId
+             where store_id = $storeId and migration_id = $domainMigrationId
              """.as[(String, String, String)],
           "listIncompleteReassignments",
         )
@@ -472,17 +484,41 @@ class DbMultiDomainAcsStore[TXE](
            """.asUpdate,
             "initialize.1",
           )
-        (newStoreId, lastIngestedOffset) <- storage
+
+        newStoreId <- storage
           .querySingle(
             sql"""
-             select id, last_ingested_offset
+             select id
              from store_descriptors
              where descriptor = ${descriptorStr}::jsonb
-             """.as[(Int, Option[String])].headOption,
+             """.as[Int].headOption,
             "initialize.2",
           )
           .getOrRaise(
             new RuntimeException(s"No row for $storeDescriptor found, which was just inserted!")
+          )
+
+        _ <- storage
+          .update(
+            sql"""
+             insert into store_last_ingested_offsets (store_id, migration_id)
+             values (${newStoreId}, ${domainMigrationId})
+             on conflict do nothing
+             """.asUpdate,
+            "initialize.3",
+          )
+
+        lastIngestedOffset <- storage
+          .querySingle(
+            sql"""
+             select last_ingested_offset
+             from store_last_ingested_offsets
+             where store_id = ${newStoreId} and migration_id = $domainMigrationId
+             """.as[Option[String]].headOption,
+            "initialize.4",
+          )
+          .getOrRaise(
+            new RuntimeException(s"No row for $newStoreId found, which was just inserted!")
           )
         alreadyIngestedAcs = lastIngestedOffset.isDefined
         acsSizeInDb <-
@@ -492,7 +528,7 @@ class DbMultiDomainAcsStore[TXE](
                 sql"""
                    select count(*)
                    from #$acsTableName
-                   where store_id = $newStoreId
+                   where store_id = $newStoreId and migration_id = $domainMigrationId
                  """.as[Int].headOption,
                 "initialize.getAcsCount",
               )
@@ -527,16 +563,16 @@ class DbMultiDomainAcsStore[TXE](
     // that modifies the ACS/TxLog.
     private def updateOffset(offset: String): DBIOAction[Unit, NoStream, Effect.Write] =
       sql"""
-        update store_descriptors
+        update store_last_ingested_offsets
         set last_ingested_offset = ${lengthLimited(offset)}
-        where id = $storeId
+        where store_id = $storeId and migration_id = $domainMigrationId
       """.asUpdate.andThen(DBIO.successful(()))
 
     private def readOffset(): DBIOAction[Option[String], NoStream, Effect.Read] =
       sql"""
         select last_ingested_offset
-        from store_descriptors
-        where id = $storeId
+        from store_last_ingested_offsets
+        where store_id = $storeId and migration_id = $domainMigrationId
       """
         .as[Option[String]]
         .head
@@ -917,12 +953,16 @@ class DbMultiDomainAcsStore[TXE](
 
     private def hasAcsEntry(contractId: String) = (sql"""
            select count(*) from #$acsTableName
-           where store_id = $storeId and contract_id = ${lengthLimited(contractId)}
+           where store_id = $storeId and migration_id = $domainMigrationId and contract_id = ${lengthLimited(
+        contractId
+      )}
           """).as[Int].head.map(_ > 0)
 
     private def hasIncompleteReassignments(contractId: String) = (sql"""
            select count(*) from incomplete_reassignments
-           where store_id = $storeId and contract_id = ${lengthLimited(contractId)}
+           where store_id = $storeId and migration_id = $domainMigrationId and contract_id = ${lengthLimited(
+        contractId
+      )}
           """).as[Int].head.map(_ > 0)
 
     private def stateRowDataFromActiveContract(
@@ -1013,12 +1053,12 @@ class DbMultiDomainAcsStore[TXE](
 
           import storage.DbStorageConverters.setParameterByteArray
           (sql"""
-                insert into #$acsTableName(store_id, contract_id, template_id_package_id, template_id_qualified_name,
+                insert into #$acsTableName(store_id, migration_id, contract_id, template_id_package_id, template_id_qualified_name,
                                            create_arguments, created_event_blob, created_at, contract_expires_at,
                                            assigned_domain, reassignment_counter, reassignment_target_domain,
                                            reassignment_source_domain, reassignment_submitter, reassignment_unassign_id
                                            #$indexColumnNames)
-                values ($storeId, $contractId, $templateIdPackageId, $templateIdQualifiedName,
+                values ($storeId, $domainMigrationId, $contractId, $templateIdPackageId, $templateIdQualifiedName,
                         $createArguments, ${contract.createdEventBlob}, $createdAt, $contractExpiresAt,
                         $assignedDomain, $reassignmentCounter, $reassignmentTargetDomain,
                         $reassignmentSourceDomain, $reassignmentSubmitter, $reassignmentUnassignId
@@ -1044,9 +1084,9 @@ class DbMultiDomainAcsStore[TXE](
 
       summary.ingestedTxLogEntries.addOne(entryData)
       (sql"""
-      insert into #$txLogTableName(store_id, transaction_offset, domain_id, acs_contract_id,
+      insert into #$txLogTableName(store_id, migration_id, transaction_offset, domain_id, acs_contract_id,
       entry_type, entry_data #$indexColumnNames)
-      values ($storeId, $safeOffset, $domainId, $acsContractId,
+      values ($storeId, $domainMigrationId, $safeOffset, $domainId, $acsContractId,
               $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
     """).toActionBuilder.asUpdate
     }
@@ -1055,6 +1095,7 @@ class DbMultiDomainAcsStore[TXE](
       sqlu"""
         delete from #$acsTableName
         where store_id = $storeId
+          and migration_id = $domainMigrationId
           and contract_id = ${lengthLimited(event.getContractId)}
       """.map {
         case 1 =>
@@ -1094,7 +1135,7 @@ class DbMultiDomainAcsStore[TXE](
                 reassignment_submitter = ${event.submitter},
                 reassignment_unassign_id = $safeUnassignId
             where
-                store_id = $storeId and contract_id = ${event.contractId} and
+                store_id = $storeId and migration_id = $domainMigrationId and contract_id = ${event.contractId} and
                 #$acsTableName.reassignment_counter < ${event.counter}
       """
     }
@@ -1128,7 +1169,7 @@ class DbMultiDomainAcsStore[TXE](
                 reassignment_submitter = NULL,
                 reassignment_unassign_id = NULL
             where
-                store_id = $storeId and contract_id = $safeContractId and
+                store_id = $storeId and migration_id = $domainMigrationId and contract_id = $safeContractId and
                 #$acsTableName.reassignment_counter <= $reassignmentCounter
       """
     }
@@ -1146,7 +1187,7 @@ class DbMultiDomainAcsStore[TXE](
       // Otherwise, add a new "assign" row (register the incomplete reassignment)
       sql"""
         select count(*) from incomplete_reassignments
-        where store_id = $storeId and contract_id = $safeContractId and unassign_id = $safeUnassignId and is_assignment = ${!isAssignment}
+        where store_id = $storeId and migration_id = $domainMigrationId and contract_id = $safeContractId and unassign_id = $safeUnassignId and is_assignment = ${!isAssignment}
           """
         .as[Int]
         .head
@@ -1161,7 +1202,7 @@ class DbMultiDomainAcsStore[TXE](
             }
             sqlu"""
             delete from incomplete_reassignments
-            where store_id = $storeId and contract_id = $safeContractId and unassign_id = $safeUnassignId and is_assignment = ${!isAssignment}
+            where store_id = $storeId and migration_id = $domainMigrationId and contract_id = $safeContractId and unassign_id = $safeUnassignId and is_assignment = ${!isAssignment}
               """
           } else {
             if (isAssignment) {
@@ -1172,8 +1213,8 @@ class DbMultiDomainAcsStore[TXE](
                 .addOne(new ContractId(contractId) -> ReassignmentId(source, unassignId))
             }
             sqlu"""
-            insert into incomplete_reassignments(store_id, contract_id, source_domain, unassign_id, is_assignment)
-            values ($storeId, $safeContractId, $source, $safeUnassignId, $isAssignment)
+            insert into incomplete_reassignments(store_id, migration_id, contract_id, source_domain, unassign_id, is_assignment)
+            values ($storeId, $domainMigrationId, $safeContractId, $source, $safeUnassignId, $isAssignment)
             on conflict do nothing
               """
           }
@@ -1218,6 +1259,7 @@ class DbMultiDomainAcsStore[TXE](
           selectFromAcsTableWithOffset(
             acsTableName,
             storeId,
+            domainMigrationId,
             (sql"template_id_qualified_name not in (" ++ qualifiedNamesSql ++ sql")").toActionBuilder,
           ),
           "getJsonAcsSnapshot",

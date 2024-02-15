@@ -135,6 +135,8 @@ object SvSvStore {
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
+      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+      domainMigrationId: Long,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -144,7 +146,7 @@ object SvSvStore {
       case _: MemoryStorage =>
         new InMemorySvSvStore(key, loggerFactory, retryProvider)
       case db: DbStorage =>
-        new DbSvSvStore(key, db, loggerFactory, retryProvider)
+        new DbSvSvStore(key, db, loggerFactory, retryProvider, domainMigrationId)
     }
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =

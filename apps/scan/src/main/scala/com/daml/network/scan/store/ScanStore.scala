@@ -187,6 +187,8 @@ object ScanStore {
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
+      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+      domainMigrationId: Long,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -207,6 +209,7 @@ object ScanStore {
           db,
           loggerFactory,
           retryProvider,
+          domainMigrationId,
         )
     }
   }

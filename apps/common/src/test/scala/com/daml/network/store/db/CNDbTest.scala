@@ -60,6 +60,7 @@ trait CNDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 txlog_store_template,
                 incomplete_reassignments,
                 store_descriptors,
+                store_last_ingested_offsets,
                 round_totals,
                 round_party_totals
             RESTART IDENTITY CASCADE""".asUpdate,

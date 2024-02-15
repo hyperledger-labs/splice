@@ -24,6 +24,7 @@ final class ScanAggregator(
     storage: DbStorage,
     val storeId: Int,
     val loggerFactory: NamedLoggerFactory,
+    domainMigrationId: Long,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
@@ -193,6 +194,7 @@ final class ScanAggregator(
                 select   count(1)
                 from     incomplete_reassignments
                 where    store_id = $storeId
+                and      migration_id = $domainMigrationId
                 and      contract_id = $contractId
               """.as[Int].headOption,
             "getIncompleteRoundsByContract",
@@ -220,6 +222,7 @@ final class ScanAggregator(
               select   count(1)
               from     scan_acs_store
               where    store_id = $storeId
+              and      migration_id = $domainMigrationId
               and      round = $round
               and
               (

@@ -22,6 +22,8 @@ class DbSvSvStore(
     storage: DbStorage,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -36,6 +38,7 @@ class DbSvSvStore(
         "svParty" -> Json.fromString(key.svParty.toProtoPrimitive),
         "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),
       ),
+      domainMigrationId,
     )
     with SvSvStore
     with AcsTables
@@ -58,6 +61,7 @@ class DbSvSvStore(
           selectFromAcsTableWithOffset(
             DbSvSvStore.tableName,
             storeId,
+            domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(ValidatorOnboarding.TEMPLATE_ID)}
               and onboarding_secret = ${lengthLimited(secret)}
@@ -81,6 +85,7 @@ class DbSvSvStore(
             selectFromAcsTableWithOffset(
               DbSvSvStore.tableName,
               storeId,
+              domainMigrationId,
               sql"""
                   template_id_qualified_name = ${QualifiedName(UsedSecret.TEMPLATE_ID)}
                     and onboarding_secret = ${lengthLimited(secret)}
@@ -105,6 +110,7 @@ class DbSvSvStore(
           selectFromAcsTableWithOffset(
             DbSvSvStore.tableName,
             storeId,
+            domainMigrationId,
             sql"""
               template_id_qualified_name = ${QualifiedName(ApprovedSvIdentity.TEMPLATE_ID)}
                 and sv_candidate_name = ${lengthLimited(name)}

@@ -90,7 +90,14 @@ class SplitwellApp(
       )
     }
     storeKey = SplitwellStore.Key(providerParty = partyId)
-    store = SplitwellStore(storeKey, storage, config.domains, loggerFactory, retryProvider)
+    store = SplitwellStore(
+      storeKey,
+      storage,
+      config.domains,
+      loggerFactory,
+      retryProvider,
+      config.domainMigrationId,
+    )
     participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
       loggerFactory,

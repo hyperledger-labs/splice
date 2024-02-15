@@ -34,6 +34,8 @@ class DbUserWalletStore(
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -51,6 +53,7 @@ class DbUserWalletStore(
         "validatorParty" -> Json.fromString(key.validatorParty.toProtoPrimitive),
         "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),
       ),
+      domainMigrationId,
     )
     with UserWalletStore
     with AcsTables
@@ -168,6 +171,7 @@ class DbUserWalletStore(
                  select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}, rti.issuance
                  from #${WalletTables.acsTableName} acs join round_to_issuance rti on acs.reward_coupon_round = rti.round
                  where acs.store_id = $storeId
+                   and migration_id = $domainMigrationId
                    and acs.template_id_qualified_name = ${QualifiedName(
                 validatorCodegen.ValidatorFaucetCoupon.TEMPLATE_ID
               )}
@@ -210,6 +214,7 @@ class DbUserWalletStore(
                       select entry_number
                       from #${WalletTables.txLogTableName}
                       where store_id = $storeId
+                      and migration_id = $domainMigrationId
                       and tx_log_id = ${TxLogEntry.LogId.TransactionHistoryTxLog}
                       and event_id = ${lengthLimited(beginAfterEventId)}
                   )""",
@@ -234,6 +239,7 @@ class DbUserWalletStore(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               storeId,
+              domainMigrationId,
               sql"entry_type = ${TxLogEntry.EntryType.TransferOfferTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
             ).headOption,
@@ -260,6 +266,7 @@ class DbUserWalletStore(
             selectFromTxLogTableWithOffset(
               WalletTables.txLogTableName,
               storeId,
+              domainMigrationId,
               sql"entry_type = ${TxLogEntry.EntryType.BuyTrafficRequestTxLogEntry} and tracking_id = ${lengthLimited(trackingId)}",
               sql"order by entry_number desc limit 1",
             ).headOption,

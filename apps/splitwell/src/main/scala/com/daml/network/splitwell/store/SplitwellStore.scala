@@ -178,6 +178,8 @@ object SplitwellStore {
       domainConfig: SplitwellDomainConfig,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
+      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+      domainMigrationId: Long,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -192,7 +194,14 @@ object SplitwellStore {
           retryProvider,
         )
       case dbStorage: DbStorage =>
-        new DbSplitwellStore(key, domainConfig, dbStorage, loggerFactory, retryProvider)
+        new DbSplitwellStore(
+          key,
+          domainConfig,
+          dbStorage,
+          loggerFactory,
+          retryProvider,
+          domainMigrationId,
+        )
     }
 
   case class Key(

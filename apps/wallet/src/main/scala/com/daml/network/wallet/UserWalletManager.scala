@@ -36,6 +36,8 @@ class UserWalletManager(
     retryProvider: RetryProvider,
     scanConnection: BftScanConnection,
     override val loggerFactory: NamedLoggerFactory,
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    domainMigrationId: Long,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -126,6 +128,7 @@ class UserWalletManager(
         userRetryProvider,
         userLoggerFactory,
         scanConnection,
+        domainMigrationId,
       )
 
       val wasUserAdded = endUserWalletsMap

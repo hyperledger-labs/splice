@@ -2,10 +2,7 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.{StoreErrors, TxLogStore}
-import com.daml.network.store.db.TxLogQueries.{
-  SelectFromTxLogTableResult,
-  SelectFromTxLogTableResultWithOffset,
-}
+import com.daml.network.store.db.TxLogQueries.SelectFromTxLogTableResult
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import slick.jdbc.{GetResult, PositionedResult}
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
@@ -54,16 +51,29 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
   protected def selectFromTxLogTableWithOffset(
       tableName: String,
       storeId: Int,
+      migrationId: Long,
       where: SQLActionBuilder,
       orderLimit: SQLActionBuilder = sql"",
-  ) =
-    (sql"""select #${SelectFromTxLogTableResultWithOffset.sqlColumnsCommaSeparated()}
+  ) = {
+    // TODO(#9957): filter in across all migrationIds.
+    (sql"""select
+            tx.store_id,
+            o.last_ingested_offset,
+            tx.entry_number,
+            tx.transaction_offset,
+            tx.domain_id,
+            tx.acs_contract_id,
+            tx.entry_type,
+            tx.entry_data
        from store_descriptors sd
-           left join #$tableName
-               on sd.id = store_id
+           left join store_last_ingested_offsets o
+               on sd.id = o.store_id
+           left join #$tableName tx
+               on o.store_id = tx.store_id
                and """ ++ where ++ sql"""
-       where sd.id = $storeId
+       where sd.id = $storeId and o.migration_id = $migrationId
        """ ++ orderLimit).toActionBuilder.as[TxLogQueries.SelectFromTxLogTableResultWithOffset]
+  }
 
   implicit val GetResultSelectFromTxLogTableWithOffset
       : GetResult[TxLogQueries.SelectFromTxLogTableResultWithOffset] = { (pp: PositionedResult) =>
@@ -120,17 +130,5 @@ object TxLogQueries {
       offset: String,
       row: Option[SelectFromTxLogTableResult],
   )
-
-  object SelectFromTxLogTableResultWithOffset {
-    def sqlColumnsCommaSeparated(qualifier: String = "") =
-      s"""${qualifier}store_id,
-          ${qualifier}last_ingested_offset,
-          ${qualifier}entry_number,
-          ${qualifier}transaction_offset,
-          ${qualifier}domain_id,
-          ${qualifier}acs_contract_id,
-          ${qualifier}entry_type,
-          ${qualifier}entry_data"""
-  }
 
 }

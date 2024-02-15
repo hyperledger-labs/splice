@@ -26,7 +26,11 @@ trait NodeInitializerUtil extends NamedLogging {
   protected val cometBftNode: Option[CometBftNode]
   protected val ledgerClient: CNLedgerClient
 
-  protected def newSvStore(key: SvStore.Key)(implicit
+  protected def newSvStore(
+      key: SvStore.Key,
+      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+      domainMigrationId: Long,
+  )(implicit
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
@@ -35,6 +39,7 @@ trait NodeInitializerUtil extends NamedLogging {
     storage,
     loggerFactory,
     retryProvider,
+    domainMigrationId,
   )
 
   protected def newSvSvAutomationService(
@@ -56,7 +61,11 @@ trait NodeInitializerUtil extends NamedLogging {
       loggerFactory,
     )
 
-  protected def newSvcStore(key: SvStore.Key)(implicit
+  protected def newSvcStore(
+      key: SvStore.Key,
+      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+      domainMigrationId: Long,
+  )(implicit
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
@@ -66,6 +75,7 @@ trait NodeInitializerUtil extends NamedLogging {
       storage,
       loggerFactory,
       retryProvider,
+      domainMigrationId,
     )
   }
 

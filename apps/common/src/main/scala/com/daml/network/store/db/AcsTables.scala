@@ -2,7 +2,6 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.config.CantonRequireTypes.String255
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import io.circe.Json
 import slick.jdbc.{GetResult, PostgresProfile}
@@ -15,11 +14,11 @@ trait AcsTables extends AcsJdbcTypes {
   lazy val acsBaseSchema: profile.SchemaDescription =
     StoreDescriptors.schema
 
-  case class StoreDescriptorsRow(id: Int, descriptor: Json, lastIngestedOffset: Option[Offset])
+  case class StoreDescriptorsRow(id: Int, descriptor: Json)
 
   class StoreDescriptors(_tableTag: Tag)
       extends profile.api.Table[StoreDescriptorsRow](_tableTag, "store_descriptors") {
-    def * = (id, descriptor, lastIngestedOffset).<>(
+    def * = (id, descriptor).<>(
       StoreDescriptorsRow.tupled,
       StoreDescriptorsRow.unapply,
     )
@@ -27,8 +26,6 @@ trait AcsTables extends AcsJdbcTypes {
     val id: Rep[Int] = column[Int]("id", O.AutoInc, O.PrimaryKey)
 
     val descriptor: Rep[Json] = column[Json]("descriptor")
-
-    val lastIngestedOffset: Rep[Option[Offset]] = column[Option[Offset]]("last_ingested_offset")
   }
 
   lazy val StoreDescriptors = new TableQuery(tag => new StoreDescriptors(tag))

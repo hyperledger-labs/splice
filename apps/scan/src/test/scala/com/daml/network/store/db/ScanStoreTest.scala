@@ -1484,6 +1484,7 @@ class DbScanStoreTest
       storage,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      domainMigrationId = 0,
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {

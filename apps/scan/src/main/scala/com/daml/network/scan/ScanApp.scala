@@ -99,6 +99,7 @@ class ScanApp(
         storage,
         loggerFactory,
         retryProvider,
+        config.domainMigrationId,
       )
       participantAdminConnection = new ParticipantAdminConnection(
         config.participantClient.adminApi,
