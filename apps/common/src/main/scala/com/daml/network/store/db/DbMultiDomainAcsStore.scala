@@ -52,7 +52,7 @@ import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
 import scala.collection.mutable
 
-class DbMultiDomainAcsStore[TXE](
+final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
     acsTableName: String,
     txLogTableName: String,
@@ -63,6 +63,10 @@ class DbMultiDomainAcsStore[TXE](
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
     retryProvider: RetryProvider,
+    /** Allows processing the summary in a store-specific manner, e.g., to produce metrics
+      * on ingestion of certain contracts.
+      */
+    handleIngestionSummary: IngestionSummary => Unit = _ => (),
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -74,7 +78,6 @@ class DbMultiDomainAcsStore[TXE](
     with StoreErrors
     with NamedLogging
     with LimitHelpers {
-
   import MultiDomainAcsStore.*
   import DbMultiDomainAcsStore.*
   import profile.api.jdbcActionExtensionMethods
@@ -706,6 +709,7 @@ class DbMultiDomainAcsStore[TXE](
           .signalOffsetChanged(offset)
 
         logger.debug(show"Ingested complete ACS at offset $offset: $summary")
+        handleIngestionSummary(summary)
 
         finishedAcsIngestion.success(())
         logger.info(
@@ -735,6 +739,7 @@ class DbMultiDomainAcsStore[TXE](
                 newAcsSize = state.get().acsSize,
               )
             logger.debug(show"Ingested reassignment $summary")
+            handleIngestionSummary(summary)
           }
         case TransactionTreeUpdate(tree) =>
           ingestTransactionTreeV2(domain, tree).map { summaryState =>
@@ -753,6 +758,7 @@ class DbMultiDomainAcsStore[TXE](
                 newAcsSize = state.get().acsSize,
               )
             logger.debug(show"Ingested transaction $summary")
+            handleIngestionSummary(summary)
           }
       }
     }

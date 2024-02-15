@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
 import com.digitalasset.canton.logging.pretty.Pretty
 
-private[store] final case class IngestionSummary(
+final case class IngestionSummary(
     updateId: Option[String],
     offset: Option[String],
     newAcsSize: Int,

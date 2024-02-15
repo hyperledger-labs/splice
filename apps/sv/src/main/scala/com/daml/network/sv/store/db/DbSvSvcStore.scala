@@ -25,7 +25,13 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
-import com.daml.network.store.{AcsStoreDump, Limit, LimitHelpers, MultiDomainAcsStore}
+import com.daml.network.store.{
+  AcsStoreDump,
+  IngestionSummary,
+  Limit,
+  LimitHelpers,
+  MultiDomainAcsStore,
+}
 import com.daml.network.sv.store.TxLogEntry.EntryType
 import com.daml.network.sv.store.{
   AppRewardCouponsSum,
@@ -81,6 +87,16 @@ class DbSvSvcStore(
     with TxLogQueries[TxLogEntry]
     with LimitHelpers
     with NamedLogging {
+
+  val svcStoreMetrics = new DbSvSvcStoreMetrics(retryProvider.metricsFactory)
+
+  override def handleIngestionSummary(summary: IngestionSummary): Unit = {
+    summary.ingestedCreatedEvents.foreach { ev =>
+      Contract.fromCreatedEvent(cc.round.OpenMiningRound.COMPANION)(ev).foreach { round =>
+        svcStoreMetrics.latestOpenMiningRound.updateValue(round.payload.round.number)
+      }
+    }
+  }
 
   import multiDomainAcsStore.waitUntilAcsIngested
 
@@ -1237,4 +1253,9 @@ class DbSvSvcStore(
           .value
       } yield row.map(contractWithStateFromRow(CnsEntryContext.COMPANION)(_))
     }
+
+  override def close(): Unit = {
+    svcStoreMetrics.close()
+    super.close()
+  }
 }

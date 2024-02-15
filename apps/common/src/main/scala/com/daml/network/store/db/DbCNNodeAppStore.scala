@@ -25,6 +25,8 @@ abstract class DbCNNodeAppStore[TXE](
   protected def retryProvider: RetryProvider
   final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
 
+  protected def handleIngestionSummary(summary: IngestionSummary): Unit = ()
+
   override val multiDomainAcsStore: DbMultiDomainAcsStore[TXE] =
     new DbMultiDomainAcsStore(
       storage,
@@ -36,6 +38,7 @@ abstract class DbCNNodeAppStore[TXE](
       txLogConfig,
       domainMigrationId,
       retryProvider,
+      handleIngestionSummary,
     )
 
   override lazy val domains: InMemoryDomainStore =
@@ -63,6 +66,8 @@ abstract class DbCNNodeAppStoreWithoutHistory(
   protected def retryProvider: RetryProvider
   final protected def futureSupervisor: FutureSupervisor = retryProvider.futureSupervisor
 
+  protected def handleIngestionSummary(summary: IngestionSummary): Unit = ()
+
   override val multiDomainAcsStore: DbMultiDomainAcsStore[Nothing] =
     new DbMultiDomainAcsStore[Nothing](
       storage,
@@ -74,6 +79,7 @@ abstract class DbCNNodeAppStoreWithoutHistory(
       TxLogStore.Config.empty,
       domainMigrationId,
       retryProvider,
+      handleIngestionSummary,
     )
 
   override lazy val domains: InMemoryDomainStore =
