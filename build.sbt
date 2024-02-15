@@ -708,7 +708,6 @@ lazy val `apps-common-frontend` = {
     .in(file("apps/common/frontend"))
     .dependsOn(
       `apps-common`,
-      `apps-common-frontend-utils`,
       `apps-wallet`,
       `apps-splitwell`,
       `apps-validator`,
@@ -764,7 +763,6 @@ lazy val `apps-common-frontend` = {
         val cacheDir = streams.value.cacheDirectory
         val sourceFiles =
           (baseDirectory.value ** ("*.tsx" || "*.ts" || "*.js" || "*.json") --- baseDirectory.value / "lib" ** "*" --- baseDirectory.value / "node_modules" ** "*").get.toSet
-        val commonFrontendUtilsFiles = (`apps-common-frontend-utils` / bundle).value._2
         val cache =
           FileFunction.cached(cacheDir) { _ =>
             // openapi-generator-cli only generates .ts files so we need to
@@ -822,6 +820,12 @@ lazy val `apps-common-frontend` = {
             BuildCommon.TS.runWorkspaceCommand(
               npmRootDir.value,
               "build",
+              "common-frontend-utils",
+              log,
+            )
+            BuildCommon.TS.runWorkspaceCommand(
+              npmRootDir.value,
+              "build",
               "common-frontend",
               log,
             )
@@ -833,7 +837,7 @@ lazy val `apps-common-frontend` = {
             )
             (baseDirectory.value / "lib" ** "*").get.toSet
           }
-        (baseDirectory.value / "lib", cache(sourceFiles union commonFrontendUtilsFiles))
+        (baseDirectory.value / "lib", cache(sourceFiles))
       },
       // We could support npmLint and npmFix at the individual project level, but right now that doesn't seem very useful
       // so we just do it once for all workspaces here.
@@ -873,43 +877,6 @@ lazy val `apps-common-frontend` = {
       cleanFiles += damlTsCodegenDir.value,
       cleanFiles += baseDirectory.value / "lib",
       cleanFiles += baseDirectory.value / "../../node_modules",
-    )
-}
-
-lazy val `apps-common-frontend-utils` = {
-  project
-    .in(file("apps/common/frontend/utils"))
-    .dependsOn(
-      `apps-common`
-    )
-    .settings(
-      npmInstallDeps := Seq(baseDirectory.value / "package.json"),
-      npmInstallOpenApiDeps := Seq(),
-      npmInstall := BuildCommon.npmInstallTask.value,
-      npmRootDir := baseDirectory.value / "../../..",
-      Compile / compile := {
-        npmInstall.value
-        (Compile / compile).value
-      },
-      bundle := {
-        (Compile / compile).value
-        val log = streams.value.log
-        val cacheDir = streams.value.cacheDirectory
-        val sourceFiles =
-          (baseDirectory.value ** ("*.tsx" || "*.ts" || "*.js" || "*.json") --- baseDirectory.value / "lib" ** "*" --- baseDirectory.value / "node_modules" ** "*").get.toSet
-        val cache =
-          FileFunction.cached(cacheDir) { _ =>
-            BuildCommon.TS.runWorkspaceCommand(
-              npmRootDir.value,
-              "build",
-              "common/frontend/utils",
-              log,
-            )
-            (baseDirectory.value / "lib" ** "*").get.toSet
-          }
-        (baseDirectory.value / "lib", cache(sourceFiles))
-      },
-      cleanFiles += baseDirectory.value / "lib",
     )
 }
 
