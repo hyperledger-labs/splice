@@ -3,11 +3,6 @@
 Release Notes
 =============
 
-2024-02-19
-----------
-
-* The scan app is now initialized with last computed aggregates from other scans in the SVC.
-
 2024-02-12
 ----------
 

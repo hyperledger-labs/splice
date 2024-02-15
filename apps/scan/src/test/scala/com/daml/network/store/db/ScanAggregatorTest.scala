@@ -3,28 +3,26 @@ package com.daml.network.store.db
 import scala.concurrent.Future
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.daml.network.environment.DarResources
-import com.daml.network.scan.store.TxLogEntry
-import com.daml.network.scan.store.db.{ScanAggregator, ScanAggregatesReader, DbScanStore}
+import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.scan.store.db.ScanAggregator.*
+import com.daml.network.scan.store.db.DbScanStore
 import com.daml.network.store.StoreTest
 import com.daml.network.store.StoreErrors
 import com.daml.network.store.db.CNPostgresTest
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.HasExecutionContext
-import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.ledger.offset.Offset
-import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
-import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.config.CantonRequireTypes
 import com.daml.network.environment.RetryProvider
+import com.digitalasset.canton.concurrent.FutureSupervisor
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
+import com.digitalasset.canton.DomainAlias
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.TxLogEntry.EntryType
-import scala.concurrent.ExecutionContext
 
 class ScanAggregatorTest
     extends StoreTest
@@ -32,21 +30,9 @@ class ScanAggregatorTest
     with StoreErrors
     with CNPostgresTest {
 
-  def createReader(store: DbScanStore) = new ScanAggregatesReader() {
-    def readRoundAggregateFromSvc(
-        round: Long
-    )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Option[RoundAggregate]] = {
-      val _ = traceContext
-      val _ = store
-      val _ = round
-      Future.successful(None)
-    }
-  }
-
   "ScanAggregator" should {
     "do nothing when there is no closed round" in {
       val (aggr, _) = mkAggregator(user1, svcParty).futureValue
-      appendOpenRound(storage, aggr.storeId, "open-round-event", 0).futureValue
       val lastClosedRound = aggr.getLastCompletelyClosedRoundAfter(None).futureValue
       lastClosedRound shouldBe None
       val previousRoundTotals = aggr.getLastAggregatedRoundTotals().futureValue
@@ -55,101 +41,11 @@ class ScanAggregatorTest
       roundTotals shouldBe None
     }
 
-    "get aggregates from SVC when no previous round totals exist and not founder" in {
-      val firstOpenMiningRound = 4L
-      val svcAggregatedRound = firstOpenMiningRound - 1
-      val svcRoundTotals = RoundTotals(
-        closedRound = svcAggregatedRound,
-        closedRoundEffectiveAt = CantonTimestamp.now(),
-      )
-      val svcRoundPartyTotalsParty1 =
-        RoundPartyTotals(
-          closedRound = svcAggregatedRound,
-          party = "party1",
-        )
-      val svcRoundPartyTotalsParty2 =
-        RoundPartyTotals(
-          closedRound = svcAggregatedRound,
-          party = "party2",
-        )
-
-      def createScanAggregateReader(store: DbScanStore) = {
-        val _ = store
-        new ScanAggregatesReader() {
-          def readRoundAggregateFromSvc(
-              round: Long
-          )(implicit
-              ec: ExecutionContext,
-              traceContext: TraceContext,
-          ): Future[Option[RoundAggregate]] = {
-            val _ = traceContext
-            round shouldBe svcAggregatedRound
-            Future.successful(
-              Some(
-                RoundAggregate(
-                  svcRoundTotals,
-                  Vector(svcRoundPartyTotalsParty1, svcRoundPartyTotalsParty2),
-                )
-              )
-            )
-          }
-        }
-      }
-      val (aggr, _) =
-        mkAggregator(
-          user1,
-          svcParty,
-          ingestFromParticipantBegin = false,
-          createScanAggregateReader,
-        ).futureValue
-      val expectedRoundTotals = svcRoundTotals
-      appendOpenRound(storage, aggr.storeId, "open-round-event", firstOpenMiningRound).futureValue
-      aggr.getLastAggregatedRoundTotals().futureValue shouldBe None
-      aggr.findFirstOpenMiningRound().futureValue.value shouldBe firstOpenMiningRound
-      aggr
-        .ensureConsecutiveAggregation()
-        .futureValue
-        .value shouldBe expectedRoundTotals
-
-      aggr.getLastAggregatedRoundTotals().futureValue.value shouldBe expectedRoundTotals
-    }
-
-    "start from round zero when no previous round totals exist and founder, not read from SVC" in {
-      // Only founder sets ingestFromParticipantBegin = true
-      val (aggr, _) = mkAggregator(user1, svcParty, ingestFromParticipantBegin = true).futureValue
-      appendOpenRound(storage, aggr.storeId, "open-round-event", 0L).futureValue
-      aggr.getLastAggregatedRoundTotals().futureValue shouldBe None
-      aggr.findFirstOpenMiningRound().futureValue.value shouldBe 0L
-      // must not fail
-      aggr
-        .ensureConsecutiveAggregation()
-        .futureValue shouldBe None
-      aggr.getLastAggregatedRoundTotals().futureValue shouldBe None
-    }
-
-    "Not start from round zero when round zero closes, no first open mining round is found, not founder and no previous aggregates exist" in {
-      // Non-founder svs sets ingestFromParticipantBegin = false
-      val (aggr, _) = mkAggregator(user1, svcParty, ingestFromParticipantBegin = false).futureValue
-      appendClosedRound(
-        storage,
-        aggr.storeId,
-        s"closed-zero",
-        0,
-        CantonTimestamp.now(),
-      ).futureValue
-
-      aggr.getLastAggregatedRoundTotals().futureValue shouldBe None
-      aggr.findFirstOpenMiningRound().futureValue shouldBe None
-      aggr.ensureConsecutiveAggregation().futureValue shouldBe None
-      aggr.getLastAggregatedRoundTotals().futureValue shouldBe None
-      aggr.getLastCompletelyClosedRoundAfter(None).futureValue shouldBe None
-    }
-
     "do nothing when last closed round <= last round aggregated" in {
       val (aggr, _) = mkAggregator(user1, svcParty).futureValue
 
       val lastClosedRound = 1L
-      val previousRoundTotals = Some(RoundTotals(closedRound = 2L))
+      val previousRoundTotals = Some(RoundTotals(storeId = aggr.storeId, closedRound = 2L))
 
       val _ = aggr.appendRoundTotals(previousRoundTotals, lastClosedRound).futureValue
       val roundTotals = aggr.getLastAggregatedRoundTotals().futureValue
@@ -195,6 +91,7 @@ class ScanAggregatorTest
       val roundTotals0 = aggr.getRoundTotals(0L).futureValue.value
       roundTotals0 shouldBe
         RoundTotals(
+          storeId = aggr.storeId,
           closedRound = 0L,
           closedRoundEffectiveAt = roundsEffectiveAt(0L),
           appRewards = BigDecimal(0),
@@ -206,6 +103,7 @@ class ScanAggregatorTest
       val roundTotals1 = aggr.getRoundTotals(1L).futureValue.value
       roundTotals1 shouldBe
         RoundTotals(
+          storeId = aggr.storeId,
           closedRound = 1L,
           closedRoundEffectiveAt = roundsEffectiveAt(1L),
           appRewards = BigDecimal(1),
@@ -218,6 +116,7 @@ class ScanAggregatorTest
 
       prevTotals shouldBe
         RoundTotals(
+          storeId = aggr.storeId,
           closedRound = 2L,
           closedRoundEffectiveAt = roundsEffectiveAt(2L),
           appRewards = BigDecimal(2),
@@ -283,6 +182,7 @@ class ScanAggregatorTest
         (1 + closedRound) * BigDecimal(holdingFee)
       prevTotals shouldBe
         RoundTotals(
+          storeId = aggr.storeId,
           closedRound = 1L,
           closedRoundEffectiveAt = roundsEffectiveAt(1L),
           changeToInitialAmountAsOfRoundZero = BigDecimal(10),
@@ -307,6 +207,7 @@ class ScanAggregatorTest
         (lastRound + 1) * BigDecimal(holdingFee)
       lastTotals shouldBe
         RoundTotals(
+          storeId = aggr.storeId,
           closedRound = lastRound.toLong,
           closedRoundEffectiveAt = roundsEffectiveAt(lastRound.toLong),
           changeToInitialAmountAsOfRoundZero = BigDecimal(10),
@@ -391,6 +292,7 @@ class ScanAggregatorTest
           partyToAmount.map {
             case (party, (appAmount, validatorAmount, trafficPurchased, trafficPurchasedCcSpent)) =>
               RoundPartyTotals(
+                storeId = aggr.storeId,
                 closedRound = round,
                 party = party,
                 appRewards = appAmount,
@@ -406,8 +308,9 @@ class ScanAggregatorTest
         .map { case (party, totals) =>
           totals.foldLeft(List.empty[RoundPartyTotals]) { (acc, t) =>
             val prev =
-              acc.lastOption.getOrElse(RoundPartyTotals(party = party))
+              acc.lastOption.getOrElse(RoundPartyTotals(storeId = aggr.storeId, party = party))
             val rpt = RoundPartyTotals(
+              storeId = aggr.storeId,
               closedRound = t.closedRound,
               party = t.party,
               appRewards = t.appRewards,
@@ -499,8 +402,6 @@ class ScanAggregatorTest
   def mkAggregator(
       serviceUserPrimaryParty: PartyId,
       svcParty: PartyId,
-      ingestFromParticipantBegin: Boolean = false,
-      createReader: DbScanStore => ScanAggregatesReader = createReader,
   ): Future[(ScanAggregator, DbScanStore)] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -514,16 +415,9 @@ class ScanAggregatorTest
     val store = new DbScanStore(
       serviceUserPrimaryParty = serviceUserPrimaryParty,
       svcParty = svcParty,
-      storage = storage,
-      ingestFromParticipantBegin = ingestFromParticipantBegin,
+      storage,
       loggerFactory,
-      RetryProvider(
-        loggerFactory,
-        timeouts,
-        FutureSupervisor.Noop,
-        NoOpMetricsFactory,
-      ),
-      createReader,
+      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -578,44 +472,6 @@ class ScanAggregatorTest
       """.asUpdate
     storage.update(q, "appendAppReward")
   }
-  // TODO(#9927) use dummyDomain and go through ingestion, which is less fragile than direct DB writes for testing.
-  def appendOpenRound(
-      storage: DbStorage,
-      storeId: Int,
-      eventId: String,
-      round: Long,
-  ): Future[Int] = {
-    val q = sql"""
-      insert into scan_txlog_store
-        (
-          store_id,
-          event_id,
-          domain_id,
-          entry_type,
-          round,
-          transaction_offset,
-          entry_data
-        )
-      select
-          $storeId,
-          ${lengthLimited(eventId)},
-          ${lengthLimited(domain)},
-          ${TxLogEntry.EntryType.OpenMiningRoundTxLogEntry},
-          $round,
-          ${lengthLimited(s"offset-$eventId")},
-          '{}'::jsonb
-      where not exists (
-        select 1 from scan_txlog_store
-        where store_id = $storeId
-          and event_id = ${lengthLimited(eventId)}
-          and domain_id = ${lengthLimited(domain)}
-          and entry_type = ${TxLogEntry.EntryType.OpenMiningRoundTxLogEntry}
-          and round = $round
-      )
-      """.asUpdate
-    storage.update(q, "appendOpenRound")
-  }
-
   def appendClosedRound(
       storage: DbStorage,
       storeId: Int,
@@ -653,7 +509,7 @@ class ScanAggregatorTest
           and round = $round
       )
       """.asUpdate
-    storage.update(q, "appendClosedRound")
+    storage.update(q, "appendAppReward")
   }
 
   def appendReward(

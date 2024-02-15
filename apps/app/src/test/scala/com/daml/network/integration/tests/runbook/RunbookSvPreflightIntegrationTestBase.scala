@@ -9,7 +9,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.DomainId
 
 import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
 abstract class RunbookSvPreflightIntegrationTestBase
@@ -107,35 +106,6 @@ abstract class RunbookSvPreflightIntegrationTestBase
         asOfRound should startWith("The content on this page is computed as of round: ")
         asOfRound should not be "The content on this page is computed as of round: --"
       }
-    }
-  }
-
-  "The Scan UI shows the same total balance as sv-1" in { implicit env =>
-    val svClient = svcl("sv")
-    val sv1ScanClient = scancl("sv1Scan")
-
-    val svParty = svClient.getSvcInfo().svParty.toProtoPrimitive
-    val memberInfo = svClient.getSvcInfo().svcRules.payload.members.asScala.get(svParty).value
-    val joinedAsOfRound = memberInfo.joinedAsOfRound.number
-    val lastAggregatedRoundSv = sv1ScanClient.getRoundOfLatestData()._1
-    logger.debug(
-      s"last aggregated round from sv1: $lastAggregatedRoundSv, sv runbook joined as of round: $joinedAsOfRound"
-    )
-    if (lastAggregatedRoundSv >= joinedAsOfRound + 1) {
-      withFrontEnd("sv") { implicit webDriver =>
-        go to scanUrl
-        eventually(1.minutes) {
-          val asOfRound = find(id("as-of-round")).value.text
-          asOfRound should startWith("The content on this page is computed as of round: ")
-          asOfRound should not be "The content on this page is computed as of round: --"
-          val round = asOfRound.split(" ").last.toLong
-          val totalCoinBalanceSv = find(id("total-coin-balance-cc")).value.text
-          val totalCoinBalanceSv1 = sv1ScanClient.getTotalCoinBalance(round)
-          totalCoinBalanceSv shouldBe s"$totalCoinBalanceSv1 CC"
-        }
-      }
-    } else {
-      logger.debug("Skipping total balance test, the gap between rounds in sv and sv1 is too large")
     }
   }
 

@@ -436,28 +436,24 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           dummyRound,
         )
       )
-      val lockedCoinCid = loggerFactory.assertLogs(
-        createSampleAndEnsurePresence(cc.coin.LockedCoin.COMPANION)(
-          new cc.coin.LockedCoin(
-            new cc.coin.Coin(
-              svcParty.toProtoPrimitive,
-              provider.toProtoPrimitive,
-              new cc.fees.ExpiringAmount(
-                dummyDecimal,
-                dummyRound,
-                new cc.fees.RatePerRound(dummyDecimal),
-              ),
-              java.util.Optional.empty,
+
+      val lockedCoinCid = createSampleAndEnsurePresence(cc.coin.LockedCoin.COMPANION)(
+        new cc.coin.LockedCoin(
+          new cc.coin.Coin(
+            svcParty.toProtoPrimitive,
+            provider.toProtoPrimitive,
+            new cc.fees.ExpiringAmount(
+              dummyDecimal,
+              dummyRound,
+              new cc.fees.RatePerRound(dummyDecimal),
             ),
-            new cc.expiry.TimeLock(
-              java.util.List.of(),
-              maxTimestamp,
-            ),
-          )
-        ),
-        _.errorMessage should include(
-          "Unexpected locked coin create event"
-        ),
+            java.util.Optional.empty,
+          ),
+          new cc.expiry.TimeLock(
+            java.util.List.of(),
+            maxTimestamp,
+          ),
+        )
       )
 
       createSampleAndEnsurePresence(cc.coin.ValidatorRewardCoupon.COMPANION)(

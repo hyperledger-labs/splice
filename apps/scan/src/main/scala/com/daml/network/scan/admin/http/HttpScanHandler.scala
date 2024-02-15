@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.cc.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
+import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
@@ -532,25 +533,23 @@ class HttpScanHandler(
   )()(extracted: TraceContext): Future[v0.ScanResource.ListSvcSequencersResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.listSvcSequencers") { _ => _ =>
-      store
-        .listFromSvcRules { svcRules =>
-          for {
-            memberInfo <- svcRules.payload.members.asScala.values.toVector
-            (domainId, domainConfig) <- memberInfo.domainNodes.asScala
-            sequencer <- domainConfig.sequencer.toScala
-            availableAfter <- sequencer.availableAfter.toScala
-          } yield domainId -> definitions.SvcSequencer(
-            sequencer.sequencerId,
-            sequencer.url,
-            memberInfo.name,
-            OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
-          )
-        }
-        .map(list =>
-          definitions.ListSvcSequencersResponse(list.map { case (domainId, scans) =>
-            definitions.DomainSequencers(domainId, scans.toVector)
-          })
+      listFromSvcRules { svcRules =>
+        for {
+          memberInfo <- svcRules.payload.members.asScala.values
+          (domainId, domainConfig) <- memberInfo.domainNodes.asScala
+          sequencer <- domainConfig.sequencer.toScala
+          availableAfter <- sequencer.availableAfter.toScala
+        } yield domainId -> definitions.SvcSequencer(
+          sequencer.sequencerId,
+          sequencer.url,
+          memberInfo.name,
+          OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
         )
+      }.map(list =>
+        definitions.ListSvcSequencersResponse(list.map { case (domainId, scans) =>
+          definitions.DomainSequencers(domainId, scans.toVector)
+        })
+      )
     }
   }
 
@@ -559,16 +558,37 @@ class HttpScanHandler(
   )()(extracted: TraceContext): Future[ScanResource.ListSvcScansResponse] = {
     implicit val tc: TraceContext = extracted
     withSpan(s"$workflowId.listSvcScans") { _ => _ =>
-      store
-        .listSvcScans()
-        .map(list =>
-          definitions.ListSvcScansResponse(list.map { case (domainId, scans) =>
-            definitions.DomainScans(
-              domainId,
-              scans.map(s => definitions.ScanInfo(s.publicUrl, s.memberName)).toVector,
-            )
-          })
-        )
+      listFromSvcRules { svcRules =>
+        for {
+          memberInfo <- svcRules.payload.members.asScala.values
+          (domainId, domainConfig) <- memberInfo.domainNodes.asScala
+          scan <- domainConfig.scan.toScala
+        } yield domainId -> definitions.ScanInfo(scan.publicUrl, memberInfo.name)
+      }.map(list =>
+        definitions.ListSvcScansResponse(list.map { case (domainId, scans) =>
+          definitions.DomainScans(domainId, scans.toVector)
+        })
+      )
+    }
+  }
+
+  /** Returns all items extracted by `f` from the SvcRules ensuring that they're sorted by domainId,
+    * so that the order is deterministic.
+    */
+  private def listFromSvcRules[T](
+      f: ContractWithState[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules] => Iterable[
+        (String, T)
+      ]
+  )(implicit tc: TraceContext): Future[Vector[(String, Iterable[T])]] = {
+    for {
+      svcRulesO <- store.lookupSvcRules()
+    } yield {
+      val svcRules = svcRulesO getOrElse {
+        throw new NoSuchElementException("found no svcRules instance")
+      }
+      val items = f(svcRules)
+      val itemsByDomain = items.groupBy(_._1).view.mapValues(_.map(_._2))
+      itemsByDomain.toVector.sortBy(_._1)
     }
   }
 

@@ -438,22 +438,10 @@ class GlobalDomainMigrationIntegrationTest
             }
           }
 
-          // TODO(#9977)
-          loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
-            startAllSync(
-              sv1ScanLocalBackend,
-              sv1ValidatorLocalBackend,
-            ),
-            (
-                entries =>
-                  forAll(entries) {
-                    _.errorMessage should include(
-                      "Unexpected coin create event"
-                    )
-                  }
-            ),
+          startAllSync(
+            sv1ScanLocalBackend,
+            sv1ValidatorLocalBackend,
           )
-
           sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
 
           clue("Old wallet balance is recorded") {

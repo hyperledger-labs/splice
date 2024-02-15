@@ -763,9 +763,7 @@ object HttpScanAppClient {
     }
   }
   object GetAggregatedRounds
-      extends InternalBaseCommand[http.GetAggregatedRoundsResponse, Option[
-        ScanAggregator.RoundRange
-      ]] {
+      extends InternalBaseCommand[http.GetAggregatedRoundsResponse, ScanAggregator.RoundRange] {
     override def submitRequest(
         client: http.ScanClient,
         headers: List[HttpHeader],
@@ -778,9 +776,9 @@ object HttpScanAppClient {
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
       case http.GetAggregatedRoundsResponse.OK(response) =>
-        Right(Some(ScanAggregator.RoundRange(response.start, response.end)))
-      case http.GetAggregatedRoundsResponse.NotFound(_) =>
-        Right(None)
+        Right(ScanAggregator.RoundRange(response.start, response.end))
+      case http.GetAggregatedRoundsResponse.NotFound(err) =>
+        Left(err.error)
     }
   }
   case class ListRoundTotals(start: Long, end: Long)
@@ -803,7 +801,6 @@ object HttpScanAppClient {
         Right(response.entries)
     }
   }
-
   case class ListRoundPartyTotals(start: Long, end: Long)
       extends InternalBaseCommand[
         http.ListRoundPartyTotalsResponse,

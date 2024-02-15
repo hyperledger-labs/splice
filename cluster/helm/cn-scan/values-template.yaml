@@ -22,5 +22,3 @@ persistence:
   port: 5432
   user: cnadmin
   secretName: "postgres-secrets"
-
-ingestFromParticipantBegin: false

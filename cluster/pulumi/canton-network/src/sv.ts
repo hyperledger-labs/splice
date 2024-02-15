@@ -129,18 +129,7 @@ export async function installSvNode(
   globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
   cometBftSyncSource?: k8s.helm.v3.Release
 ): Promise<InstalledSv> {
-  const xns = exactNamespace(config.nodeName, true);
-  const loopback = installCNHelmChart(
-    xns,
-    'loopback',
-    'cn-cluster-loopback-gateway',
-    {
-      cluster: {
-        basename: CLUSTER_BASENAME,
-      },
-    },
-    { dependsOn: [xns.ns] }
-  );
+  const xns = exactNamespace(config.nodeName);
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
     await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodeName),
@@ -183,8 +172,7 @@ export async function installSvNode(
       )
     )
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
-    .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-    .concat([loopback]);
+    .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
   const defaultPostgres = config.splitPostgresInstances
     ? undefined
@@ -384,7 +372,6 @@ function installDomainSpecificComponents(
       xns,
       id,
       svConfig.nodeName,
-      svConfig.onboarding.type,
       globalDomainNode,
       svApp,
       participant,
@@ -503,7 +490,6 @@ function installScan(
   xns: ExactNamespace,
   domainId: DomainIndex,
   nodename: string,
-  svConfigOnboardingType: string,
   globalDomainNode: GlobalDomainNode,
   svApp: Release,
   participant: Release,
@@ -513,12 +499,6 @@ function installScan(
     defaultPostgres || postgres.installPostgres(xns, `scan-${domainId}-pg`, true);
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}_${domainId}`;
   // const scanDb = scanAppPostgres.createDatabase(scanDbName);
-  let ingestFromParticipantBegin;
-  if (svConfigOnboardingType == 'found-collective') {
-    ingestFromParticipantBegin = true;
-  } else {
-    ingestFromParticipantBegin = false;
-  }
   const scanValues = {
     clusterUrl,
     metrics: {
@@ -526,7 +506,6 @@ function installScan(
     },
     persistence: persistenceConfig(scanAppPostgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
-    ingestFromParticipantBegin: ingestFromParticipantBegin,
     sequencerAddress: globalDomainNode.namespaceInternalSequencerAddress,
     participantAddress: participant.name,
     domainId: domainId.toString(),

@@ -35,10 +35,8 @@ class DbScanStore(
     override val serviceUserPrimaryParty: PartyId,
     override val svcParty: PartyId,
     storage: DbStorage,
-    ingestFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
-    createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -64,24 +62,14 @@ class DbScanStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   val aggregator: Future[ScanAggregator] =
-    waitUntilAcsIngested().map(_ =>
-      new ScanAggregator(
-        storage,
-        storeId,
-        ingestFromParticipantBegin,
-        createScanAggregatesReader(this),
-        loggerFactory,
-      )
-    )
+    waitUntilAcsIngested().map(_ => new ScanAggregator(storage, storeId, loggerFactory))
 
   def aggregate()(implicit
       tc: TraceContext
-  ): Future[Option[ScanAggregator.RoundTotals]] = {
-    for {
-      a <- aggregator
-      r <- a.aggregate()
-    } yield r
-  }
+  ): Future[Option[ScanAggregator.RoundTotals]] = for {
+    a <- aggregator
+    r <- a.aggregate()
+  } yield r
 
   def storeId: Int = multiDomainAcsStore.storeId
 
@@ -614,25 +602,18 @@ class DbScanStore(
   ): Future[Option[ScanAggregator.RoundRange]] =
     waitUntilAcsIngested {
       for {
-        minMaxClosedRounds <- storage
+        rounds <- storage
           .querySingle(
             sql"""
             select min(closed_round) as min_round,
                    max(closed_round) as max_round
             from   round_totals
             where  store_id = $storeId;
-          """.as[(Option[Long], Option[Long])].headOption,
+          """.as[ScanAggregator.RoundRange].headOption,
             "getAggregatedRounds",
           )
           .value
-      } yield {
-        minMaxClosedRounds.flatMap {
-          _ match {
-            case (Some(start), Some(end)) => Some(ScanAggregator.RoundRange(start, end))
-            case _ => None
-          }
-        }
-      }
+      } yield rounds
     }
 
   override def getRoundTotals(startRound: Long, endRound: Long)(implicit

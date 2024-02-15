@@ -19,13 +19,10 @@ import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import ScanAggregator.*
 import com.daml.network.scan.store.TxLogEntry.EntryType
-import slick.dbio.{DBIO, DBIOAction, NoStream, Effect}
 
 final class ScanAggregator(
     storage: DbStorage,
     val storeId: Int,
-    ingestFromParticipantBegin: Boolean,
-    reader: ScanAggregatesReader,
     val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -36,8 +33,8 @@ final class ScanAggregator(
 
   /** Aggregates RoundTotals and RoundPartyTotals in batches and reports the most recently aggregated RoundTotals. */
   def aggregate()(implicit traceContext: TraceContext): Future[Option[RoundTotals]] = {
-    (for {
-      previousRoundTotals <- ensureConsecutiveAggregation()
+    for {
+      previousRoundTotals <- getLastAggregatedRoundTotals()
       lastClosedRoundO <- getLastCompletelyClosedRoundAfter(previousRoundTotals.map(_.closedRound))
       _ <- lastClosedRoundO match {
         case Some(lastClosedRound) =>
@@ -46,194 +43,21 @@ final class ScanAggregator(
             _ <- appendRoundPartyTotals(lastClosedRound)
           } yield ()
         case None =>
-          skipAggregation(previousRoundTotals)
+          previousRoundTotals
+            .map { lastAggregated =>
+              logger.debug(
+                s"Skipped aggregation of round totals and round party totals, no new completely closed rounds to aggregate yet, previously aggregated round: ${lastAggregated.closedRound}"
+              )
+            }
+            .getOrElse(
+              logger.debug(
+                "Skipped aggregation of round totals and round party totals, no completely closed rounds to aggregate yet"
+              )
+            )
+          Future.successful(())
       }
       lastAggregated <- getLastAggregatedRoundTotals()
-    } yield lastAggregated).recover {
-      case Skip(msg) =>
-        logger.debug(msg)
-        None
-      case CannotAdvance(msg) =>
-        logger.debug(msg)
-        None
-    }
-  }
-
-  private def skipAggregation(
-      previousRoundTotals: Option[RoundTotals]
-  ): Future[_] = {
-    previousRoundTotals
-      .map { lastAggregated =>
-        Future.failed(
-          Skip(
-            s"Skipped aggregation, no new completely closed rounds to aggregate yet, previously aggregated round: ${lastAggregated.closedRound}, store_id = $storeId"
-          )
-        )
-      }
-      .getOrElse(
-        Future.failed(
-          Skip(
-            s"Skipped aggregation, no completely closed rounds to aggregate yet, store_id = $storeId"
-          )
-        )
-      )
-  }
-
-  def ensureConsecutiveAggregation()(implicit
-      traceContext: TraceContext
-  ): Future[Option[RoundTotals]] =
-    for {
-      lastRoundTotals <- getLastAggregatedRoundTotals()
-      previousRoundTotals <- lastRoundTotals match {
-        case Some(prev) =>
-          logger.debug(
-            s"Aggregation continues from previously aggregated round: ${prev.closedRound}, store_id = $storeId"
-          )
-          Future.successful(lastRoundTotals)
-        case None =>
-          if (ingestFromParticipantBegin) {
-            logger.debug(s"Aggregation starts from round 0, store_id = $storeId")
-            Future.successful(None)
-          } else {
-            for {
-              openRound <- findFirstOpenMiningRound()
-              prev <- openRound match {
-                case Some(round) if round == 0L =>
-                  logger.debug(
-                    s"Updating aggregates from SVC for round zero, store_id = $storeId"
-                  )
-                  updateRoundAggregateFromSvc(0)
-                case Some(round) if round > 0L =>
-                  logger.debug(
-                    s"Aggregation starts from round $round once last aggregates are updated from SVC, store_id = $storeId"
-                  )
-                  logger.debug(
-                    s"Updating aggregates from SVC for round ${round - 1}, before the first detected open mining round: $round, store_id = $storeId"
-                  )
-                  updateRoundAggregateFromSvc(round - 1)
-                case Some(round) =>
-                  Future.failed(
-                    CannotAdvance(
-                      s"Unexpected negative open mining round: $round, store_id = $storeId"
-                    )
-                  )
-                case None =>
-                  // note: getLastCompletelyClosedRoundAfter checks for consecutive closed rounds, so no need to fail here.
-                  logger.debug(
-                    s"No first open mining round found yet, store_id = $storeId"
-                  )
-                  Future.successful(None)
-              }
-            } yield prev
-          }
-      }
-    } yield {
-      previousRoundTotals
-    }
-
-  def updateRoundAggregateFromSvc(
-      round: Long
-  )(implicit traceContext: TraceContext): Future[Option[RoundTotals]] = {
-    for {
-      aggregatedRound <- reader.readRoundAggregateFromSvc(round)
-      lastRoundTotals <- aggregatedRound match {
-        case Some(RoundAggregate(rt, rpt)) =>
-          for {
-            _ <- storage.update_(
-              insertRoundTotals(rt).andThen(insertRoundPartyTotals(rpt)),
-              "insert round aggregates from svc",
-            )
-            lastRoundTotals <- getLastAggregatedRoundTotals()
-          } yield lastRoundTotals
-        case None =>
-          Future.failed(
-            CannotAdvance(
-              s"Could not read aggregates for round $round from svc"
-            )
-          )
-      }
-    } yield lastRoundTotals
-  }
-
-  def insertRoundTotals(
-      rt: RoundTotals
-  ): DBIOAction[Unit, NoStream, Effect.Write] = {
-    sql"""
-      insert into round_totals (
-        store_id,
-        closed_round,
-        closed_round_effective_at,
-        app_rewards,
-        validator_rewards,
-        change_to_initial_amount_as_of_round_zero,
-        change_to_holding_fees_rate,
-        cumulative_app_rewards,
-        cumulative_validator_rewards,
-        cumulative_change_to_initial_amount_as_of_round_zero,
-        cumulative_change_to_holding_fees_rate,
-        total_coin_balance
-      )
-      values (
-        ${storeId},
-        ${rt.closedRound},
-        ${rt.closedRoundEffectiveAt},
-        ${rt.appRewards},
-        ${rt.validatorRewards},
-        ${rt.changeToInitialAmountAsOfRoundZero},
-        ${rt.changeToHoldingFeesRate},
-        ${rt.cumulativeAppRewards},
-        ${rt.cumulativeValidatorRewards},
-        ${rt.cumulativeChangeToInitialAmountAsOfRoundZero},
-        ${rt.cumulativeChangeToHoldingFeesRate},
-        ${rt.totalCoinBalance}
-      )
-      on conflict do nothing
-    """.asUpdate.andThen(DBIO.successful(()))
-  }
-
-  def insertRoundPartyTotals(
-      roundPartyTotals: Vector[RoundPartyTotals]
-  ): DBIOAction[Unit, NoStream, Effect.Write] = {
-    def insert(rpt: RoundPartyTotals) = {
-      sql"""
-      insert into round_party_totals (
-        store_id,
-        closed_round,
-        party,
-        app_rewards,
-        validator_rewards,
-        traffic_purchased,
-        traffic_purchased_cc_spent,
-        traffic_num_purchases,
-        cumulative_app_rewards,
-        cumulative_validator_rewards,
-        cumulative_traffic_purchased,
-        cumulative_traffic_purchased_cc_spent,
-        cumulative_traffic_num_purchases,
-        cumulative_change_to_initial_amount_as_of_round_zero,
-        cumulative_change_to_holding_fees_rate
-      )
-      values (
-        ${storeId},
-        ${rpt.closedRound},
-        ${lengthLimited(rpt.party)},
-        ${rpt.appRewards},
-        ${rpt.validatorRewards},
-        ${rpt.trafficPurchased},
-        ${rpt.trafficPurchasedCcSpent},
-        ${rpt.trafficNumPurchases},
-        ${rpt.cumulativeAppRewards},
-        ${rpt.cumulativeValidatorRewards},
-        ${rpt.cumulativeTrafficPurchased},
-        ${rpt.cumulativeTrafficPurchasedCcSpent},
-        ${rpt.cumulativeTrafficNumPurchases},
-        ${rpt.cumulativeChangeToInitialAmountAsOfRoundZero},
-        ${rpt.cumulativeChangeToHoldingFeesRate}
-      )
-      on conflict do nothing
-    """.asUpdate
-    }
-    DBIOAction.sequence(roundPartyTotals.map(insert)).map(_ => ()).andThen(DBIO.successful(()))
+    } yield lastAggregated
   }
 
   def getLastAggregatedRoundTotals()(implicit
@@ -243,7 +67,7 @@ final class ScanAggregator(
       select #$roundTotalsColumns
       from   round_totals
       where  store_id = $storeId
-      and    closed_round = (select coalesce(max(closed_round), 0) from round_totals where store_id = $storeId)
+      and    closed_round = (select coalesce(max(closed_round), 0) from round_totals)
     """
     storage
       .querySingle(
@@ -335,41 +159,8 @@ final class ScanAggregator(
           s"The last completely closed round: ${lastRound} is smaller than the previously aggregated round: ${lastAggregatedRound}"
         )
         None
-      } else {
-        if (lastAggregatedRound == -1) {
-          if (ingestFromParticipantBegin) {
-            // only allowed to start from round zero with no previous total rounds if the scan is reading from participant begin (the founder)
-            Some(lastRound)
-          } else {
-            logger.debug(
-              s"Cannot start from round zero when not reading from participant-begin, store_id = $storeId"
-            )
-            None
-          }
-        } else {
-          Some(lastRound)
-        }
-      }
+      } else Some(lastRound)
     }
-  }
-
-  def findFirstOpenMiningRound()(implicit
-      traceContext: TraceContext
-  ): Future[Option[Long]] = {
-    val q = sql"""
-      select   round
-      from     scan_txlog_store
-      where    store_id = $storeId
-      and      entry_type = ${EntryType.OpenMiningRoundTxLogEntry}
-      order by round asc
-      limit 1
-    """
-    storage
-      .querySingle(
-        q.as[Long].headOption,
-        "findFirstOpenMiningRound",
-      )
-      .value
   }
 
   private def getClosedMiningRoundsSinceLastAggregated(lastAggregatedRound: Long)(implicit
@@ -467,7 +258,7 @@ final class ScanAggregator(
       traceContext: TraceContext
   ): Future[Unit] = {
     val previousRoundTotals = previousRoundTotalsO.getOrElse(
-      RoundTotals(closedRound = -1L)
+      RoundTotals(storeId = storeId, closedRound = -1L)
     )
     def doQuery = {
       val q = sql"""
@@ -583,7 +374,7 @@ final class ScanAggregator(
     }
     val extraMsg = previousRoundTotalsO
       .map(pr => s", previously aggregated round: ${pr.closedRound}")
-      .getOrElse(", from the beginning")
+      .getOrElse("")
     logger.info(
       s"""Aggregating round_totals for rounds up to including round ${lastClosedRound}$extraMsg."""
     )
@@ -776,30 +567,13 @@ final class ScanAggregator(
 }
 
 object ScanAggregator {
-  sealed trait Error
-  object Skip {
-    def apply(msg: String): Skip = new Skip(msg)
-  }
-  final case class Skip(msg: String) extends RuntimeException(msg) with Error
-  object CannotAdvance {
-    def apply(msg: String): CannotAdvance = new CannotAdvance(msg)
-  }
-  final case class CannotAdvance(msg: String) extends RuntimeException(msg) with Error
 
   type Party = String
   val zero = BigDecimal(0)
 
-  final case class RoundAggregate(
-      roundTotals: RoundTotals,
-      roundPartyTotals: Vector[RoundPartyTotals],
-  ) {
-    def closedRound = roundTotals.closedRound
-  }
-
-  final case class RoundRange(start: Long, end: Long) {
-    def contains(round: Long): Boolean = round >= start && round <= end
-  }
+  final case class RoundRange(start: Long, end: Long)
   final case class RoundTotals(
+      storeId: Int,
       closedRound: Long = 0L,
       closedRoundEffectiveAt: CantonTimestamp = CantonTimestamp.MinValue,
       appRewards: BigDecimal = zero,
@@ -825,6 +599,7 @@ object ScanAggregator {
     }
 
   val roundTotalsColumns = """
+    store_id,
     closed_round,
     closed_round_effective_at,
     coalesce(app_rewards, 0),
@@ -843,6 +618,7 @@ object ScanAggregator {
       import prs.*
       (RoundTotals.apply _).tupled(
         (
+          <<[Int],
           <<[Long],
           <<[CantonTimestamp],
           <<[BigDecimal],
@@ -859,6 +635,7 @@ object ScanAggregator {
     }
 
   final case class RoundPartyTotals(
+      storeId: Int,
       closedRound: Long = 0L,
       party: String,
       appRewards: BigDecimal = zero,
@@ -879,6 +656,7 @@ object ScanAggregator {
       import prs.*
       (RoundPartyTotals.apply _).tupled(
         (
+          <<[Int],
           <<[Long],
           <<[String],
           <<[BigDecimal],
@@ -897,6 +675,7 @@ object ScanAggregator {
       )
     }
   val roundPartyTotalsColumns = """
+  store_id,
   closed_round,
   party,
   coalesce(app_rewards, 0),
