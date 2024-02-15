@@ -94,9 +94,18 @@ class ScanTxLogParser(
             State.fromOpenMiningRoundCreate(root, domainId, round)
           case ClosedMiningRoundCreate(round) =>
             State.fromClosedMiningRoundCreate(tree, root, domainId, round)
-          case CoinCreate(coin) =>
+          case CoinImportCrate(ic) =>
+            val eventId = created.getContractId
+            State(
+              entryFromCoin(eventId, domainId, ic)
+            )
+          case CoinCreate(_) =>
             throw new RuntimeException(
-              s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getUpdateId}"
+              s"Unexpected coin create event for coin ${created.getContractId} in transaction ${tree.getUpdateId}"
+            )
+          case LockedCoinCreate(_) =>
+            throw new RuntimeException(
+              s"Unexpected locked coin create event for coin ${created.getContractId} in transaction ${tree.getUpdateId}"
             )
           case _ => State.empty
         }
@@ -120,43 +129,12 @@ class ScanTxLogParser(
       incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
   )(implicit
       tc: TraceContext
-  ) = acs.flatMap { ac =>
-    // This is necessary because the CreatedEvents from the ACS might have the same eventId for different contract ids.
-    // So either:
-    // TODO (#6882): Canton fixes this, so we can just assign the eventId
-    // TODO (#8132): We end up using PQS, redesign the txlog taking this issue into account, or something else.
-    val eventId = ac.createdEvent.getContractId
-    ac.createdEvent match {
-      case CoinCreate(c) =>
-        val contractId = new cc.coin.Coin.ContractId(ac.createdEvent.getContractId)
-        Some(
-          (
-            ac.domainId,
-            Some(contractId),
-            entryFromCoin(eventId, ac.domainId, c.payload),
-          )
-        )
-      case LockedCoinCreate(lc) =>
-        val contractId = new cc.coin.LockedCoin.ContractId(ac.createdEvent.getContractId)
-        Some(
-          (
-            ac.domainId,
-            Some(contractId),
-            entryFromCoin(eventId, ac.domainId, lc.payload.coin),
-          )
-        )
-      case CoinImportCrate(ic) =>
-        val contractId = new cc.coinimport.ImportCrate.ContractId(ac.createdEvent.getContractId)
-        Some(
-          (
-            ac.domainId,
-            Some(contractId),
-            entryFromCoin(eventId, ac.domainId, ic),
-          )
-        )
-      case _ =>
-        None
-    }
+  ) = {
+    // TODO(#9977) Cleanup ignoring ACS import from SV onboarding.
+    // This is a temporary fix to ignore possible ACS imports that occur during SV onboarding.
+    // It ensures that the first open mining round we see will be on the GetUpdates stream and it will be after the initial ACS import.
+    // while we will ingest an incomplete round (i.e., the one during which we're joining), this is fine as those events will just be ignored in favor of the aggregate fetched from the other SVs for bootstrapping.
+    Seq()
   }
 
   override def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit

@@ -20,12 +20,12 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.{
   OpenMiningRoundTxLogEntry,
   ReceiverAmount,
-  ScanStore,
   SenderAmount,
   SortOrder,
   TransferTxLogEntry,
 }
-import com.daml.network.scan.store.db.DbScanStore
+import com.daml.network.scan.store.ScanStore
+import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{PageLimit, StoreErrors, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
@@ -42,6 +42,7 @@ import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 
 import java.time.Instant
@@ -51,6 +52,7 @@ import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
 import com.digitalasset.canton.util.MonadUtil
+import scala.concurrent.ExecutionContext
 
 abstract class ScanStoreTest extends StoreTest with HasExecutionContext with StoreErrors {
 
@@ -509,13 +511,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           closedMiningRound(svcParty, round = round.toLong)
         }
         val closed = closedMiningRound(svcParty, round = 2)
-        val unwantedOpen = openMiningRound(svcParty, round = 3, coinPrice = 3.0)
         for {
           store <- mkStore()
-          _ <- dummyDomain.create(
-            unwantedOpen,
-            txEffectiveAt = Instant.ofEpochSecond(2000),
-          )(store.multiDomainAcsStore)
           closeTime = Instant.ofEpochSecond(1500)
           _ <- MonadUtil.sequentialTraverse(closedBefore) { closed =>
             dummyDomain.create(closed, txEffectiveAt = closeTime)(
@@ -569,14 +566,12 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         // 4
         (userParty(4), 4.0, 10000), // excluded
       )
-      val open = openMiningRound(svcParty, round = asOfEndOfRound, coinPrice = 2.0)
       val closed = closedMiningRound(svcParty, round = asOfEndOfRound)
       val closedBefore = (0 until asOfEndOfRound.toInt).map { round =>
         closedMiningRound(svcParty, round = round.toLong)
       }
       for {
         store <- mkStore()
-        _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
         _ <- MonadUtil.sequentialTraverse(closedBefore) { closed =>
           dummyDomain.create(closed)(store.multiDomainAcsStore)
         }
@@ -593,7 +588,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             ),
           )(store.multiDomainAcsStore)
         }
-        _ <- dummyDomain.archive(open)(store.multiDomainAcsStore)
         _ <- store.aggregate()
       } yield {
         getTopProviders(store, asOfEndOfRound, 2).futureValue shouldBe Seq(
@@ -698,14 +692,12 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             ccSpent = 2222.0,
           )(_),
         )
-        val open = openMiningRound(svcParty, round = asOfEndOfRound, coinPrice = 2.0)
         val closedBefore = (0 until asOfEndOfRound.toInt).map { round =>
           closedMiningRound(svcParty, round = round.toLong)
         }
         val closed = closedMiningRound(svcParty, round = asOfEndOfRound)
         for {
           store <- mkStore()
-          _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
           _ <- MonadUtil.sequentialTraverse(closedBefore) { closed =>
             dummyDomain.create(closed)(store.multiDomainAcsStore)
           }
@@ -713,7 +705,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
           _ <- MonadUtil.sequentialTraverse(trafficPurchaseTrees)(
             dummyDomain.ingest(_)(store.multiDomainAcsStore)
           )
-          _ <- dummyDomain.archive(open)(store.multiDomainAcsStore)
           _ <- store.aggregate()
         } yield {
           store
@@ -1482,8 +1473,18 @@ class DbScanStoreTest
       serviceUserPrimaryParty = serviceUserPrimaryParty,
       svcParty = svcParty,
       storage,
+      // to allow aggregating from round zero without previous round aggregate
+      ingestFromParticipantBegin = true,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      // required to instantiate a DbScanStore, returns none not to affect this test.
+      _ =>
+        new ScanAggregatesReader() {
+          def readRoundAggregateFromSvc(round: Long)(implicit
+              ec: ExecutionContext,
+              traceContext: TraceContext,
+          ): Future[Option[ScanAggregator.RoundAggregate]] = Future.successful(None)
+        },
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {

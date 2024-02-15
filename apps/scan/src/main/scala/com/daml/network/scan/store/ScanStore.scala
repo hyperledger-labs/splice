@@ -8,7 +8,12 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.Validat
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.scan.store.db.{DbScanStore, ScanTables}
+import com.daml.network.scan.store.db.{
+  DbScanStore,
+  ScanTables,
+  ScanAggregator,
+  ScanAggregatesReader,
+}
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.util.{CoinConfigSchedule, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -18,10 +23,10 @@ import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
-
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import java.time.Instant
-import com.daml.network.scan.store.db.ScanAggregator
 
 sealed trait SortOrder
 
@@ -29,6 +34,7 @@ object SortOrder {
   case object Ascending extends SortOrder
   case object Descending extends SortOrder
 }
+final case class ScanInfo(publicUrl: String, memberName: String)
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
 trait ScanStore
@@ -71,6 +77,34 @@ trait ScanStore
       )
     )
 
+  /** Returns all items extracted by `f` from the SvcRules ensuring that they're sorted by domainId,
+    * so that the order is deterministic.
+    */
+  def listFromSvcRules[T](
+      f: ContractWithState[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules] => Vector[
+        (String, T)
+      ]
+  )(implicit tc: TraceContext): Future[Vector[(String, Vector[T])]] = {
+    for {
+      svcRulesO <- lookupSvcRules()
+    } yield {
+      val svcRules = svcRulesO getOrElse {
+        throw new NoSuchElementException("found no svcRules instance")
+      }
+      val items = f(svcRules)
+      val itemsByDomain = items.groupBy(_._1).view.mapValues(_.map(_._2))
+      itemsByDomain.toVector.sortBy(_._1)
+    }
+  }
+  def listSvcScans()(implicit tc: TraceContext): Future[Vector[(String, Vector[ScanInfo])]] = {
+    listFromSvcRules { svcRules =>
+      for {
+        memberInfo <- svcRules.payload.members.asScala.values.toVector
+        (domainId, domainConfig) <- memberInfo.domainNodes.asScala
+        scan <- domainConfig.scan.toScala
+      } yield domainId -> ScanInfo(scan.publicUrl, memberInfo.name)
+    }
+  }
   def getCoinRules()(implicit
       tc: TraceContext
   ): Future[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]] =
@@ -185,8 +219,10 @@ object ScanStore {
       serviceUserPrimaryParty: PartyId,
       svcParty: PartyId,
       storage: Storage,
+      ingestFromParticipantBegin: Boolean,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
+      createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -205,8 +241,10 @@ object ScanStore {
           serviceUserPrimaryParty = serviceUserPrimaryParty,
           svcParty = svcParty,
           db,
+          ingestFromParticipantBegin,
           loggerFactory,
           retryProvider,
+          createScanAggregatesReader,
         )
     }
   }

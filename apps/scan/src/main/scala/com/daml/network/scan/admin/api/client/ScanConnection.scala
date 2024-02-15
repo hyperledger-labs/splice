@@ -207,7 +207,6 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
       crates <- listImportCrates(party)
     } yield AcsStoreDump.ImportShipment(openRound, crates)
   }
-
 }
 
 object ScanConnection {

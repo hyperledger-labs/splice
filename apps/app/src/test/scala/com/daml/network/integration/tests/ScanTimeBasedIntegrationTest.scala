@@ -170,8 +170,10 @@ class ScanTimeBasedIntegrationTest
       val expectedLastRound = baseRoundWithLatestData + 1
       sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
       sv1ScanBackend.getRoundOfLatestData() shouldBe (expectedLastRound, ledgerTime)
-      sv1ScanBackend.getAggregatedRounds() shouldBe ScanAggregator.RoundRange(0, expectedLastRound)
-
+      sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(
+        0,
+        expectedLastRound,
+      )
     }
     clue("Data for a later round does not yet exist")({
       val lastAggregatedRound = sv1ScanBackend.getRoundOfLatestData()._1
@@ -319,7 +321,7 @@ class ScanTimeBasedIntegrationTest
       _ => {
         sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
         sv1ScanBackend.getRoundOfLatestData()._1 shouldBe 2
-        sv1ScanBackend.getAggregatedRounds() shouldBe ScanAggregator.RoundRange(0, 2)
+        sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(0, 2)
       },
     )
 
@@ -339,7 +341,7 @@ class ScanTimeBasedIntegrationTest
         tapRound1Amount - holdingFeeAfterTwoRounds +
           tapRound2Amount - holdingFeeAfterOneRound
       )
-      sv1ScanBackend.getAggregatedRounds() shouldBe ScanAggregator.RoundRange(0, 2)
+      sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(0, 2)
       sv1ScanBackend
         .listRoundTotals(0, 2)
         .map(rt => (rt.closedRound, BigDecimal(rt.totalCoinBalance))) shouldBe List(
