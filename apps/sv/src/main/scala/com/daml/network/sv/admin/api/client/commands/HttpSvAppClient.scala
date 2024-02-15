@@ -3,14 +3,13 @@ package com.daml.network.sv.admin.api.client.commands
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, StatusCodes}
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
-import com.daml.network.admin.api.client.commands.HttpClientBuilder
+import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.http.v0.{definitions, sv as http}
-import com.daml.network.sv.http.SvHttpClient.BaseCommand
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
@@ -25,6 +24,19 @@ import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpSvAppClient {
+  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = http.SvClient
+
+    def createClient(host: String)(implicit
+        httpClient: HttpRequest => Future[HttpResponse],
+        tc: TraceContext,
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client = {
+      http.SvClient.httpClient(HttpClientBuilder().buildClient(), host)
+    }
+  }
+
   final case class SvcInfo(
       svUser: String,
       svParty: PartyId,

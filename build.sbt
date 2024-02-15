@@ -54,7 +54,6 @@ val allDarsFilter = ScopeFilter(inAnyProject, inConfigurations(Compile), inTasks
 lazy val root = (project in file("."))
   .aggregate(
     `apps-common`,
-    `apps-common-sv`,
     `apps-validator`,
     `apps-scan`,
     `apps-splitwell`,
@@ -566,30 +565,13 @@ lazy val `apps-common` =
         },
     )
 
-lazy val `apps-common-sv` =
-  project
-    .in(file("apps/common/sv"))
-    .dependsOn(
-      `apps-common`
-    )
-    .settings(
-      BuildCommon.sharedAppSettings,
-      Compile / guardrailTasks := List(
-        ScalaClient(
-          new File(s"apps/sv/src/main/openapi/sv-internal.yaml"),
-          pkg = "com.daml.network.http.v0",
-          modules = List("pekko-http-v1.0.0", "circe"),
-        )
-      ),
-    )
-
 lazy val `apps-validator` =
   project
     .in(file("apps/validator"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
-      `apps-common-sv`,
       `apps-scan` % "compile->compile;test->test",
+      `apps-sv` % "compile->compile;test->test",
       `wallet-daml`,
       `apps-wallet`,
       `app-manager-daml`,
@@ -637,7 +619,6 @@ lazy val `apps-sv` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan`,
-      `apps-common-sv`,
       `validator-lifecycle-daml`,
       `svc-governance-daml`,
       `sv-local-daml`,
@@ -661,7 +642,12 @@ lazy val `apps-sv` =
             pkg = "com.daml.network.http.v0",
             modules = List("pekko-http-v1.0.0", "circe"),
             customExtraction = true,
-          )
+          ),
+          ScalaClient(
+            new File("apps/sv/src/main/openapi/sv-internal.yaml"),
+            pkg = "com.daml.network.http.v0",
+            modules = List("pekko-http-v1.0.0", "circe"),
+          ),
         ),
     )
 
