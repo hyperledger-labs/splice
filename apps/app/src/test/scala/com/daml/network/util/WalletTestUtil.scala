@@ -1,6 +1,5 @@
 package com.daml.network.util
 
-import com.daml.network.admin.api.client.commands.HttpCommandException
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
@@ -23,13 +22,13 @@ import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import org.apache.pekko.http.scaladsl.model.StatusCodes
 
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
 import java.util.{Optional, UUID}
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
+import scala.util.control.NonFatal
 
 trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   this: CommonCNNodeAppInstanceReferences =>
@@ -133,10 +132,12 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       try {
         walletAppClient.userStatus()
       } catch {
-        case HttpCommandException(_, StatusCodes.ServiceUnavailable, message) =>
+        // User-status can fail due to the offboarded user's wallet being in the process of shutdown at the time of request.
+        // Retrying would fix it.
+        case NonFatal(ex) =>
           fail(
-            s"User status reported 503 unavailable: $message. " +
-              "This should be a transient error, until the user's wallet is removed from the UserWalletManager."
+            s"User status failed. This should be a transient error, until the user's wallet is removed from the UserWalletManager.",
+            ex,
           )
       }
     status.userOnboarded shouldBe false
