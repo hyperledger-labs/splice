@@ -623,6 +623,7 @@ commands:
               --keep RUN_SPLITTED_TESTS_CMD \
               --keep GCP_DA_CN_DEVNET_KEY \
               --keep GCP_DA_CN_CI_KEY \
+              --keep GCP_DA_CN_CI_2_KEY \
               --keep GCP_DA_CN_SCRATCHNET_KEY \
               --keep GCP_DA_CN_SCRATCHNET2_KEY \
               $ADDITIONAL_NIX_ARGS \
@@ -649,6 +650,10 @@ commands:
 
                   da-cn-ci)
                     export CN_ACTIVE_ENVIRONMENT_KEY="${GCP_DA_CN_CI_KEY}"
+                    ;;
+
+                  da-cn-ci-2)
+                    export CN_ACTIVE_ENVIRONMENT_KEY="${GCP_DA_CN_CI_2_KEY}"
                     ;;
 
                   da-cn-devnet)

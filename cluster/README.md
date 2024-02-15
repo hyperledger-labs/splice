@@ -1559,6 +1559,9 @@ Network. Steps to do this are as follows:
       --role='roles/storage.objectViewer'
    ```
    TODO(#9679) -- once pulumi fully manages the cluster creation, these IAM bindings can be automated.
+7. Create a key to the CircleCI service account in GCP, copy the downloaded private key (full json) into
+   a new environment variable in CCI. Search in cci's config files for one of the existing ones (e.g. GCP_DA_CN_SCRATCHNET_KEY)
+   and add the new one.
 
 ## Cluster Data Dumps
 
