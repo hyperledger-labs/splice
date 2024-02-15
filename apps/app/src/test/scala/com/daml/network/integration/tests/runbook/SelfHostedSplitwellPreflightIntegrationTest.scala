@@ -85,8 +85,13 @@ class SelfHostedSplitwellPreflightIntegrationTest
     ) {
       runScript(validatorPath / "validator.sc")(env.environment)
 
-      v("validatorApp").participantClient.dars
-        .upload("./daml/splitwell/.daml/dist/splitwell-0.1.0.dar")
+      Seq(
+        "./daml/splitwell/.daml/dist/splitwell-0.1.0.dar",
+        "./daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar",
+      ).foreach { dar =>
+        v("validatorApp").participantClient.dars
+          .upload(dar)
+      }
 
       val aliceUserName = aliceWalletClient.config.ledgerApiUser
 
@@ -126,7 +131,19 @@ class SelfHostedSplitwellPreflightIntegrationTest
           instances.updatedWith("splitwell")(instance =>
             instance.map(
               _.focus(_.dars).modify(paths =>
-                paths.map(_.toString.replace("dars/", "./daml/splitwell/.daml/dist/").toFile.path)
+                paths.map(
+                  _.toString
+                    .replace(
+                      "dars/splitwell-0.1.0.dar",
+                      "./daml/splitwell/.daml/dist/splitwell-0.1.0.dar",
+                    )
+                    .replace(
+                      "dars/splitwell-0.2.0.dar",
+                      "./daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar",
+                    )
+                    .toFile
+                    .path
+                )
               )
             )
           )
