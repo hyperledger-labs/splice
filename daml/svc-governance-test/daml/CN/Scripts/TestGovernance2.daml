@@ -34,7 +34,7 @@ testVoteRequest = do
   [] <- query @FeaturedAppRight provider
 
   -- sv1 initiates the granting of the featured app right for the provider
-  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+  requestCid1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
     requester = sv1
     action = ARC_SvcRules with
       svcAction = SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight with
@@ -44,11 +44,11 @@ testVoteRequest = do
 
   -- sv2 rejects initially
   requestCid <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
-    requestCid
+    requestCid = requestCid1
     vote = Vote2 with
       sv = sv2
       accept = False
-      reason = Reason with url = ""; body = "the justificaiton is not good enough"
+      reason = Reason with url = ""; body = "the justification is not good enough"
 
   -- there are two votes, which is not enough to consider the vote definitive and grant the app right
   executeAllDefinitiveVotes app
@@ -62,6 +62,10 @@ testVoteRequest = do
       sv = sv2
       accept = True
       reason = Reason with url = ""; body = "OK, after rereading the materials, I agree."
+
+  -- the VoteRequest trackingCid is set to the initial requestCid
+  Some voteRequest <- queryContractId svc requestCid
+  voteRequest.trackingCid === Some requestCid1
 
   -- there are still only two votes, which is not enough to consider the vote definitive and grant the app right
   executeAllDefinitiveVotes2 app

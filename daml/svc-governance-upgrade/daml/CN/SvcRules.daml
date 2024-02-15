@@ -248,6 +248,9 @@ template VoteRequest2
     votes : Map.Map Text Vote2
     -- ^ The votes cast by current (or previous members) of the SVC. These may be previous members in case
     -- there was a membership change after the vote was requested.
+    trackingCid : Optional (ContractId VoteRequest2)
+    -- ^ An optional tracking ContractId to be used for tracking the vote request through its updates.
+    -- This is always set to the first ContractId of the original vote request (None on creation).
   where
     signatory svc
 
@@ -723,6 +726,7 @@ template SvcRules with
           reason
           voteBefore
           votes = Map.fromList [(requesterName, requesterVote)]
+          trackingCid = None
 
 
     -- Note that this choice can be used to both cast the initial vote, and update a vote.
@@ -745,6 +749,7 @@ template SvcRules with
         -- store vote
         create request with
           votes = Map.insert voterName vote request.votes
+          trackingCid = Some (fromOptional requestCid request.trackingCid)
 
     -- We expect the TxHistory log of the SV app to store the choice argument together
     -- with its result for historical reference.
