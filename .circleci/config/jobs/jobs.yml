@@ -531,10 +531,7 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
-      - setup_vpn
       - setup_nix
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Listing nodes for backup
           cluster: << parameters.cluster >>
@@ -551,6 +548,9 @@ jobs:
               nodes="$nodes splitwell validator1"
             fi
             echo $nodes > nodes.txt
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
       - run:
           name: Split backup tasks
           command: |
@@ -591,8 +591,8 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_vpn
       - setup_nix
+      - setup_vpn
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:

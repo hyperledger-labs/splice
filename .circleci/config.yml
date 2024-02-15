@@ -1110,8 +1110,6 @@ commands:
           command: |
             /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
 
-  # This is separate from setup_vpn since we need to interleave the step that sets up
-  # nix for this to work
   setup_vpn_routes:
     parameters:
       <<: *cluster-parameter
@@ -1119,17 +1117,22 @@ commands:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
           cluster: << parameters.cluster >>
+          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           gce_authenticate: true
           cmd: |
             export KUBECONFIG=$PWD/.kubecfg
             cncluster activate
-          cmd_retry_count: 5
-      - run:
-          # Separate command since running this outside of nix is easier.
-          name: Setup VPN Routes - Adding new routes
-          command: |
-            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
             /tmp/vpn-scripts/setup-vpn-routes.sh
+          cmd_retry_count: 5
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/stop-vpn.sh
+
+            echo "Starting VPN..." | tee -a /var/log/vpn.log
+            /tmp/vpn-scripts/connect-vpn.expect "$VPN_HOST_NAME" "$VPN_USER" "$VPN_PASSWORD" &
+
+            echo "Waiting for VPN to reconnect"
+            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
 
   run_todo_script:
     steps:
@@ -1587,19 +1590,25 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_vpn
-      # Needs to occur before setup_vpn_routes
       - setup_nix
+      - setup_vpn
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Reset Cluster and Free Lock (if on scratch*)
           cluster: << parameters.cluster >>
-          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET"
+          additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
+            --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           gce_authenticate: true
           cmd: |
             cncluster activate
             cncluster ci_reset_unlock
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_retry_count: 2
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/restart-vpn.sh
+            cncluster prefresh
 
 
   # Inspired by Canton, we put the lint-like checks into their own CI job
@@ -2133,10 +2142,7 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
-      - setup_vpn
       - setup_nix
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Listing nodes for backup
           cluster: << parameters.cluster >>
@@ -2153,6 +2159,9 @@ jobs:
               nodes="$nodes splitwell validator1"
             fi
             echo $nodes > nodes.txt
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
       - run:
           name: Split backup tasks
           command: |
@@ -2193,8 +2202,8 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_vpn
       - setup_nix
+      - setup_vpn
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
@@ -2261,17 +2270,13 @@ jobs:
             sysctl fs.inotify
             echo "Setting max_user_watches..."
             echo fs.inotify.max_user_watches=524288 | sudo tee -a /etc/sysctl.conf && sudo sysctl -p
-      - setup_vpn
       - when:
           condition: << parameters.cluster_version >>
           steps:
             - run:
                 name: Checkout commit << parameters.cluster_version >>
                 command: git checkout << parameters.cluster_version >>
-      # Needs to occur before setup_vpn_routes
       - setup_nix
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Activate cluster (configure kubectl)
           cluster: << parameters.cluster >>
@@ -2285,9 +2290,13 @@ jobs:
       - restore_daml_artifacts
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: wait for deployment to finish
           cluster: << parameters.cluster >>
+          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
@@ -2308,6 +2317,11 @@ jobs:
             fi
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_retry_count: 2
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/restart-vpn.sh
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
@@ -2326,24 +2340,9 @@ jobs:
           cluster: << parameters.cluster >>
           cmd_before_retry: |
             echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
-
             ./stop-frontends.sh
+            /tmp/vpn-scripts/restart-vpn.sh
 
-            /tmp/vpn-scripts/stop-vpn.sh
-
-            echo "Starting VPN..." | tee -a /var/log/vpn.log
-            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD &
-
-            echo "Waiting for VPN to reconnect"
-            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
-
-            echo "Authenticating to cluster again"
-            export KUBECONFIG=$PWD/.kubecfg
-            cncluster activate
-
-            echo "Setting VPN routes again"
-            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
-            /tmp/vpn-scripts/setup-vpn-routes.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job
@@ -2372,17 +2371,13 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_vpn
-      # Needs to occur before setup_vpn_routes
-      - setup_nix
       - when:
           condition: << parameters.cluster_version >>
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Checkout commit << parameters.cluster_version >>
                 cmd: git checkout << parameters.cluster_version >>
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Activate cluster (configure kubectl)
           cluster: << parameters.cluster >>
@@ -2399,9 +2394,13 @@ jobs:
           cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile"
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: wait for sv-runbook deployment to finish
           cluster: << parameters.cluster >>
+          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
@@ -2409,6 +2408,11 @@ jobs:
             cncluster wait sv validator-app
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_retry_count: 2
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/restart-vpn.sh
 
       - run_bash_command_in_nix:
           cmd_name: Run SV preflight tests
@@ -2426,24 +2430,8 @@ jobs:
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
           cmd_before_retry: |
             echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
-
             ./stop-frontends.sh
-
-            /tmp/vpn-scripts/stop-vpn.sh
-
-            echo "Starting VPN..." | tee -a /var/log/vpn.log
-            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD &
-
-            echo "Waiting for VPN to reconnect"
-            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
-
-            echo "Authenticating to cluster again"
-            export KUBECONFIG=$PWD/.kubecfg
-            cncluster activate
-
-            echo "Setting VPN routes again"
-            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
-            /tmp/vpn-scripts/setup-vpn-routes.sh
+            /tmp/vpn-scripts/restart-vpn.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job
@@ -2472,17 +2460,13 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - checkout_with_retry
-      - setup_vpn
-      # Needs to occur before setup_vpn_routes
-      - setup_nix
       - when:
           condition: << parameters.cluster_version >>
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Checkout commit << parameters.cluster_version >>
                 cmd: git checkout << parameters.cluster_version >>
-      - setup_vpn_routes:
-          cluster: << parameters.cluster >>
+      - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Activate cluster (configure kubectl)
           cluster: << parameters.cluster >>
@@ -2499,9 +2483,13 @@ jobs:
           cmd_retry_count: 3
       - execute_sbt_command:
           cmd: "Test/compile"
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: wait for validator-runbook deployment to finish
           cluster: << parameters.cluster >>
+          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
@@ -2509,6 +2497,11 @@ jobs:
             cncluster wait validator validator-app
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_retry_count: 2
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/restart-vpn.sh
       - run_bash_command_in_nix:
           cmd_name: Run Validator preflight tests
           additional_nix_args: "--keep VALIDATOR_WEB_UI_PASSWORD \
@@ -2525,24 +2518,8 @@ jobs:
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
           cmd_before_retry: |
             echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
-
             ./stop-frontends.sh
-
-            /tmp/vpn-scripts/stop-vpn.sh
-
-            echo "Starting VPN..." | tee -a /var/log/vpn.log
-            /tmp/vpn-scripts/connect-vpn.expect $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD &
-
-            echo "Waiting for VPN to reconnect"
-            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
-
-            echo "Authenticating to cluster again"
-            export KUBECONFIG=$PWD/.kubecfg
-            cncluster activate
-
-            echo "Setting VPN routes again"
-            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
-            /tmp/vpn-scripts/setup-vpn-routes.sh
+            /tmp/vpn-scripts/restart-vpn.sh
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job

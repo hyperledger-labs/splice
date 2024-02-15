@@ -981,8 +981,6 @@ commands:
           command: |
             /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
 
-  # This is separate from setup_vpn since we need to interleave the step that sets up
-  # nix for this to work
   setup_vpn_routes:
     parameters:
       <<: *cluster-parameter
@@ -990,17 +988,22 @@ commands:
       - run_bash_command_in_nix:
           cmd_name: Setup VPN Routes - Fetching kube config
           cluster: << parameters.cluster >>
+          additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           gce_authenticate: true
           cmd: |
             export KUBECONFIG=$PWD/.kubecfg
             cncluster activate
-          cmd_retry_count: 5
-      - run:
-          # Separate command since running this outside of nix is easier.
-          name: Setup VPN Routes - Adding new routes
-          command: |
-            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
             /tmp/vpn-scripts/setup-vpn-routes.sh
+          cmd_retry_count: 5
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/stop-vpn.sh
+
+            echo "Starting VPN..." | tee -a /var/log/vpn.log
+            /tmp/vpn-scripts/connect-vpn.expect "$VPN_HOST_NAME" "$VPN_USER" "$VPN_PASSWORD" &
+
+            echo "Waiting for VPN to reconnect"
+            /tmp/vpn-scripts/wait-for-vpn-and-del-default-route.sh
 
   run_todo_script:
     steps:
