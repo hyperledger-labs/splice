@@ -11,6 +11,10 @@ paths:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1readyz"
   /livez:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1livez"
+  /status:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
+  /version:
+    $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
   /v0/admin/validator/onboarding/ongoing:
     get:
       tags: [sv]

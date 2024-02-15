@@ -2,7 +2,7 @@ package com.daml.network.environment
 
 import com.daml.network.console.*
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.config.SvAppClientConfig
+import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.validator.config.AppManagerAppClientConfig
 import com.daml.network.validator.config.CnsAppExternalClientConfig

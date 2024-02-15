@@ -31,7 +31,6 @@ import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.setup.ParticipantInitializer
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
-import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.util.{CoinConfigSchedule, HasHealth, PackageVetting, UploadablePackage}
 import com.daml.network.validator.admin.AppManagerService
 import com.daml.network.validator.admin.http.*
@@ -313,8 +312,8 @@ class ValidatorApp(
 
   private def withSvConnection[T](
       svConfig: NetworkAppClientConfig
-  )(f: SvConnection => Future[T]): Future[T] =
-    SvConnection(svConfig, retryProvider, loggerFactory).flatMap(con =>
+  )(f: ValidatorSvConnection => Future[T]): Future[T] =
+    ValidatorSvConnection(svConfig, retryProvider, loggerFactory).flatMap(con =>
       f(con).andThen(_ => con.close())
     )
 

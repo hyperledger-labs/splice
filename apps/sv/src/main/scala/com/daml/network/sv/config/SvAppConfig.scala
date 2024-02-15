@@ -9,11 +9,10 @@ import com.daml.network.config.{
   CNNodeParametersConfig,
   CNParticipantClientConfig,
   GcpBucketConfig,
-  HttpCNNodeClientConfig,
-  NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.sv.SvAppClientConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
@@ -186,11 +185,6 @@ case class SvAppBackendConfig(
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
 
-case class SvAppClientConfig(
-    adminApi: NetworkAppClientConfig
-) extends HttpCNNodeClientConfig {
-  override def clientAdminApi: NetworkAppClientConfig = adminApi
-}
 case class CometBftConfig(
     enabled: Boolean = false,
     connectionUri: String = "",

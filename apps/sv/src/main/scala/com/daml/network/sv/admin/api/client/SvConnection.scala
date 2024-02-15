@@ -1,7 +1,5 @@
 package com.daml.network.sv.admin.api.client
 
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
-import org.apache.pekko.stream.Materializer
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{HttpAppConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
@@ -9,6 +7,8 @@ import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
@@ -23,16 +23,6 @@ final class SvConnection private (
     httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
 ) extends HttpAppConnection(config, "sv", retryProvider, loggerFactory) {
-
-  /** Ask the SV to onboard a validator identified by its validator party.
-    */
-  def onboardValidator(validator: PartyId, secret: String)(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
-      templateDecoder: TemplateJsonDecoder,
-      ec: ExecutionContext,
-      mat: Materializer,
-  ): Future[Unit] =
-    runHttpCmd(config.url, HttpSvAppClient.OnboardValidator(validator, secret))
 
   /** Ask the SV to start the onboarding of a new SV with an encoded (and signed) onboarding token.
     */

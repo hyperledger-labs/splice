@@ -20,6 +20,7 @@ import com.daml.network.splitwell.config.{
   SplitwellDomains,
 }
 import com.daml.network.sv.config.*
+import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.validator.config.*
 import com.daml.network.wallet.config.{
   TreasuryConfig,

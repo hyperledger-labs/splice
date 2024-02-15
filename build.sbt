@@ -2,6 +2,8 @@ import BuildUtil.runCommand
 import Dependencies.*
 import DamlPlugin.autoImport.*
 import BuildCommon.defs.*
+import java.io.ByteArrayInputStream
+import scala.reflect.io.Streamable
 import sbtassembly.{MergeStrategy, PathList}
 
 /*
@@ -54,6 +56,7 @@ val allDarsFilter = ScopeFilter(inAnyProject, inConfigurations(Compile), inTasks
 lazy val root = (project in file("."))
   .aggregate(
     `apps-common`,
+    `apps-common-sv`,
     `apps-validator`,
     `apps-scan`,
     `apps-splitwell`,
@@ -565,13 +568,30 @@ lazy val `apps-common` =
         },
     )
 
+lazy val `apps-common-sv` =
+  project
+    .in(file("apps/common/sv"))
+    .dependsOn(
+      `apps-common`
+    )
+    .settings(
+      BuildCommon.sharedAppSettings,
+      Compile / guardrailTasks := List(
+        ScalaClient(
+          new File(s"apps/sv/src/main/openapi/sv-internal.yaml"),
+          pkg = "com.daml.network.http.v0",
+          modules = List("pekko-http-v1.0.0", "circe"),
+        )
+      ),
+    )
+
 lazy val `apps-validator` =
   project
     .in(file("apps/validator"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
+      `apps-common-sv`,
       `apps-scan` % "compile->compile;test->test",
-      `apps-sv` % "compile->compile;test->test",
       `wallet-daml`,
       `apps-wallet`,
       `app-manager-daml`,
@@ -619,6 +639,7 @@ lazy val `apps-sv` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan`,
+      `apps-common-sv`,
       `validator-lifecycle-daml`,
       `svc-governance-daml`,
       `sv-local-daml`,
@@ -642,12 +663,7 @@ lazy val `apps-sv` =
             pkg = "com.daml.network.http.v0",
             modules = List("pekko-http-v1.0.0", "circe"),
             customExtraction = true,
-          ),
-          ScalaClient(
-            new File("apps/sv/src/main/openapi/sv-internal.yaml"),
-            pkg = "com.daml.network.http.v0",
-            modules = List("pekko-http-v1.0.0", "circe"),
-          ),
+          )
         ),
     )
 
@@ -1194,7 +1210,8 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     // and the copy of that inlined into bindings-java.
     case PathList("com", "daml", "ledger", "api", "v1" | "v2", _*) => MergeStrategy.first
     // Hack for not getting trouble with different versions of generated classes of common openapi
-    case PathList("com", "daml", "network", "http", "v0" | "commonAdmin", _*) => MergeStrategy.first
+    case x @ PathList("com", "daml", "network", "http", "v0" | "commonAdmin", _*) =>
+      MergeStrategy.first
     // this file comes in multiple flavors, from io.get-coursier:interface and from org.scala-lang.modules:scala-collection-compat. Since the content differs it is resolve this explicitly with this MergeStrategy.
     case path if path.endsWith("scala-collection-compat.properties") => MergeStrategy.first
     case x => oldStrategy(x)

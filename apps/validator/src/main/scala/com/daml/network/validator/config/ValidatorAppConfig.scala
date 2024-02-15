@@ -5,7 +5,7 @@ import com.daml.network.auth.AuthConfig
 import com.daml.network.config.*
 import com.daml.network.http.v0.definitions
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import com.daml.network.sv.config.SvAppClientConfig
+import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
