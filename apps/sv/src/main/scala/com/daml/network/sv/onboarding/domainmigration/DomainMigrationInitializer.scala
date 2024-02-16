@@ -9,6 +9,7 @@ import com.daml.network.environment.{
 }
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
+import com.daml.network.migration.DomainDataRestorer
 import com.daml.network.setup.NodeInitializer
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
@@ -22,11 +23,10 @@ import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
   DomainTopologyTransactions,
 }
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
-import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
@@ -71,10 +71,16 @@ class DomainMigrationInitializer(
     tc: TraceContext,
     tracer: Tracer,
 ) extends NodeInitializerUtil {
+
   private val readOnlyConnection = ledgerClient.readOnlyConnection(
     this.getClass.getSimpleName,
     loggerFactory,
   )
+  private val domainDataRestorer = new DomainDataRestorer(
+    participantAdminConnection,
+    loggerFactory,
+  )
+
   def migrateDomain(): Future[
     (
         DomainId,
@@ -149,70 +155,18 @@ class DomainMigrationInitializer(
       domainMigrationDump.domainDataSnapshot.topologySnapshot.result
     )
     val domainAlias = domainMigrationDump.nodeIdentities.domainAlias
-    def importDarsAndAcs() = {
-      for {
-        _ <- participantAdminConnection.disconnectFromAllDomains()
-        _ = logger.info("Disconnected from all domains")
-        // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-        _ <- MonadUtil.sequentialTraverse(domainMigrationDump.domainDataSnapshot.dars.map { dar =>
-          UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
-        }) { dar =>
-          participantAdminConnection.uploadDarFileLocally(
-            dar,
-            RetryFor.WaitingOnInitDependency,
-          )
-        }
-        _ = logger.info("uploaded all dars to the participant.")
-
-        _ <- participantAdminConnection.uploadAcsSnapshot(
-          domainMigrationDump.domainDataSnapshot.acsSnapshot
-        )
-        _ = logger.info("Acs snapshot is restored")
-
-        _ <- participantAdminConnection.reconnectDomain(domainAlias)
-
-        _ <- participantAdminConnection.modifyDomainConnectionConfig(
-          domainAlias,
-          c =>
-            Some(
-              c.copy(
-                initializeFromTrustedDomain = false,
-                manualConnect = false,
-              )
-            ),
-        )
-        _ = logger.info("domain is reconnected")
-      } yield ()
-    }
     for {
       _ <- initializeDomainNode(
         domainMigrationDump.nodeIdentities,
         domainTopologyTransactions,
       )
-      _ = logger.info("Registering and connecting to new domain")
-      _ <- participantAdminConnection
-        .lookupDomainConnectionConfig(
-          domainAlias
-        )
-        .flatMap {
-          case Some(config) if config.initializeFromTrustedDomain =>
-            importDarsAndAcs()
-          case None =>
-            participantAdminConnection
-              .ensureDomainRegistered(
-                DomainConnectionConfig(
-                  domainAlias,
-                  domainId = Some(domainMigrationDump.nodeIdentities.domainId),
-                  sequencerConnections =
-                    SequencerConnections.single(localDomainNode.sequencerConnection),
-                  initializeFromTrustedDomain = true,
-                  manualConnect = true,
-                ),
-                RetryFor.ClientCalls,
-              )
-              .flatMap(_ => importDarsAndAcs())
-          case Some(_) => Future.unit
-        }
+      _ <- domainDataRestorer.connectDomainAndRestoreData(
+        domainAlias,
+        domainMigrationDump.nodeIdentities.domainId,
+        SequencerConnections.single(localDomainNode.sequencerConnection),
+        domainMigrationDump.domainDataSnapshot.dars,
+        domainMigrationDump.domainDataSnapshot.acsSnapshot,
+      )
       _ <- retryProvider.waitUntil(
         RetryFor.Automation,
         "participant caught up with the domain state topology",

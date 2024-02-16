@@ -1,36 +1,34 @@
 package com.daml.network.validator
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.Http
-import org.apache.pekko.http.scaladsl.model.HttpMethods
-import org.apache.pekko.http.scaladsl.server.Directives.*
-import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 import cats.implicits.{catsSyntaxApplicativeByValue as _, *}
-import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
-import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.*
-import com.daml.network.config.{CNThresholds, NetworkAppClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
 import com.daml.network.environment.*
 import com.daml.network.http.v0.app_manager.AppManagerResource
 import com.daml.network.http.v0.app_manager_admin.AppManagerAdminResource
 import com.daml.network.http.v0.app_manager_public.AppManagerPublicResource
-import com.daml.network.http.v0.json_api_public.JsonApiPublicResource
+import com.daml.network.http.v0.external.cns.CnsResource
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
+import com.daml.network.http.v0.json_api_public.JsonApiPublicResource
+import com.daml.network.http.v0.scanproxy.ScanproxyResource
 import com.daml.network.http.v0.validator.ValidatorResource
 import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
 import com.daml.network.http.v0.validator_public.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
-import com.daml.network.scan.admin.api.client.MinimalScanConnection
+import com.daml.network.identities.NodeIdentitiesStore
+import com.daml.network.scan.admin.api.client
+import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
+import com.daml.network.scan.admin.api.client.{BftScanConnection, MinimalScanConnection}
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.setup.ParticipantInitializer
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{CoinConfigSchedule, HasHealth, PackageVetting, UploadablePackage}
 import com.daml.network.validator.admin.AppManagerService
 import com.daml.network.validator.admin.http.*
@@ -43,39 +41,38 @@ import com.daml.network.validator.config.{
   ValidatorAppBackendConfig,
   ValidatorOnboardingConfig,
 }
+import com.daml.network.validator.domain.DomainConnector
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
 import com.daml.network.wallet.automation.UserWalletAutomationService
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.cors.scaladsl.CorsDirectives.*
+import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
+import org.apache.pekko.http.scaladsl.Http
+import org.apache.pekko.http.scaladsl.model.HttpMethods
+import org.apache.pekko.http.scaladsl.server.Directives.*
+import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import com.daml.network.validator.admin.http.HttpExternalCnsHandler
-import com.daml.network.http.v0.external.cns.CnsResource
-import com.daml.network.http.v0.scanproxy.ScanproxyResource
-import com.daml.network.identities.NodeIdentitiesStore
-import com.daml.network.scan.admin.api.client
-import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
-import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.data.CantonTimestamp
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -143,8 +140,16 @@ class ValidatorApp(
               retryProvider,
               loggerFactory,
             )
-            _ <- ensureGlobalDomainRegistered(participantAdminConnection, scanConnection)
-            _ <- ensureExtraDomainsRegistered(participantAdminConnection)
+            domainConnector = new DomainConnector(
+              config,
+              participantAdminConnection,
+              scanConnection,
+              clock,
+              retryProvider,
+              loggerFactory,
+            )
+            _ <- domainConnector.ensureGlobalDomainRegistered()
+            _ <- domainConnector.ensureExtraDomainsRegistered()
             // Note that for the validator of an SV app, the user will be created by the SV app with a
             // primary party set to the SV app already so this is a noop.
             _ <- connection.ensureUserPrimaryPartyIsAllocated(
@@ -260,32 +265,6 @@ class ValidatorApp(
     )
   }
 
-  private def waitForSequencerConnectionsFromScan(
-      scanConnection: BftScanConnection,
-      logger: TracedLogger,
-      retryProvider: RetryProvider,
-  ) = {
-    retryProvider.waitUntil(
-      RetryFor.WaitingOnInitDependency,
-      "valid sequencer connections from scan is non empty",
-      ValidatorApp
-        .getSequencerConnectionsFromScan(
-          scanConnection,
-          logger,
-          clock.now,
-        )
-        .map { connections =>
-          if (connections.isEmpty)
-            throw Status.NOT_FOUND
-              .withDescription(
-                s"sequencer connections is empty"
-              )
-              .asRuntimeException()
-        },
-      logger,
-    )
-  }
-
   private def ensureVersionMatch(scanClientConfig: BftScanClientConfig): Future[Unit] =
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
@@ -339,86 +318,6 @@ class ValidatorApp(
       clock,
     )
     f(participantAdminConnection).andThen { _ => participantAdminConnection.close() }
-  }
-
-  private def ensureGlobalDomainRegistered(
-      participantAdminConnection: ParticipantAdminConnection,
-      scanConnection: BftScanConnection,
-  ): Future[Unit] = {
-    // TODO (#8450) config.domains.global.alias and config.domains.global.url are wrong if global has migrated
-    config.domains.global.url match {
-      case None =>
-        ensureDomainRegisteredFromScan(
-          config.domains.global.alias,
-          participantAdminConnection,
-          scanConnection,
-        )
-      case Some(url) =>
-        ensureDomainRegistered(
-          config.domains.global.alias,
-          url,
-          participantAdminConnection,
-        )
-    }
-  }
-
-  private def ensureExtraDomainsRegistered(
-      participantAdminConnection: ParticipantAdminConnection
-  ): Future[Unit] =
-    config.domains.extra.traverse_(domain =>
-      ensureDomainRegistered(domain.alias, domain.url, participantAdminConnection)
-    )
-
-  private def ensureDomainRegistered(
-      alias: DomainAlias,
-      url: String,
-      participantAdminConnection: ParticipantAdminConnection,
-  ): Future[Unit] = {
-    val domainConfig = DomainConnectionConfig(
-      alias,
-      SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)),
-    )
-    logger.info(s"Ensuring domain registered with config $domainConfig")
-    participantAdminConnection.ensureDomainRegistered(
-      domainConfig,
-      RetryFor.WaitingOnInitDependency,
-    )
-  }
-
-  private def ensureDomainRegisteredFromScan(
-      alias: DomainAlias,
-      participantAdminConnection: ParticipantAdminConnection,
-      scanConnection: BftScanConnection,
-  ): Future[Unit] = {
-    for {
-      _ <- waitForSequencerConnectionsFromScan(
-        scanConnection,
-        logger,
-        retryProvider,
-      )
-      sequencerConnections <- ValidatorApp.getSequencerConnectionsFromScan(
-        scanConnection,
-        logger,
-        clock.now,
-      )
-      domainConfig = NonEmpty.from(sequencerConnections) match {
-        case None =>
-          sys.error("sequencer connections from scan is not expected to be empty.")
-        case Some(nonEmptyConnections) =>
-          DomainConnectionConfig(
-            alias,
-            SequencerConnections.tryMany(
-              nonEmptyConnections.forgetNE,
-              CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-            ),
-          )
-      }
-      _ = logger.info(s"Ensuring domain registered with config from scan $domainConfig")
-      _ <- participantAdminConnection.ensureDomainRegistered(
-        domainConfig,
-        RetryFor.WaitingOnInitDependency,
-      )
-    } yield ()
   }
 
   private def newTrafficBalanceService(
