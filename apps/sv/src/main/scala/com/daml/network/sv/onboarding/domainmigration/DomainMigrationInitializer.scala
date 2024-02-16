@@ -17,11 +17,11 @@ import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
 import com.daml.network.sv.onboarding.{NodeInitializerUtil, SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
+  loadDomainMigrationDump,
   DomainNodeInitializer,
   DomainTopologyTransactions,
-  loadDomainMigrationDump,
 }
-import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
@@ -34,13 +34,11 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.topology.processing.SequencedTime
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
+  StoredTopologyTransactionX,
   TopologyStoreId,
 }
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionX.GenericStoredTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, TopologyMappingX}
-import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
@@ -51,7 +49,6 @@ import org.apache.pekko.stream.Materializer
 import java.io.FileNotFoundException
 import java.nio.file.Path
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.math.Ordered.orderingToOrdered
 
 /** Container for the methods required by the SvApp to initialize the SV node of upgraded domain. */
 class DomainMigrationInitializer(
@@ -456,18 +453,6 @@ object DomainMigrationInitializer {
       transactions: Seq[StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]
   ) {
 
-    @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-    private val transactionsSortedAndDeduplicatedBySignatures = transactions
-      .groupBy(transaction =>
-        transaction.transaction.mapping -> transaction.transaction.transaction.serial
-      )
-      .view
-      // keep just the entry with the most signatures, ensuring it will be accepted
-      .mapValues(_.maxBy(_.transaction.signatures.size))
-      .values
-      .toSeq
-      .sorted
-
     private val sequencerInitTransactions = Seq(
       // TODO(#8761) reduce the number of identity we import just to the nodes we actually need (sequencer most likely)
       TopologyMappingX.Code.NamespaceDelegationX,
@@ -480,7 +465,7 @@ object DomainMigrationInitializer {
     )
 
     val (sequencerInitTopologyTransactions, topologyTransactionsToSubmit) =
-      transactionsSortedAndDeduplicatedBySignatures
+      transactions
         .map { transaction =>
           if (sequencerInitTransactions.contains(transaction.mapping.code)) {
             // reset sequenced time to ensure it's included in all the init calls
@@ -511,7 +496,7 @@ object DomainMigrationInitializer {
 
     val lastDomainStateParametersState
         : StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX] =
-      transactionsSortedAndDeduplicatedBySignatures.reverse
+      transactions.reverse
         .collectFirst {
           case transaction
               if transaction.mapping.code == TopologyMappingX.Code.DomainParametersStateX =>
@@ -519,34 +504,9 @@ object DomainMigrationInitializer {
         }
         .getOrElse(
           throw new IllegalArgumentException(
-            s"Failed to find last topology transaction in $transactionsSortedAndDeduplicatedBySignatures"
+            s"Failed to find last topology transaction in $transactions"
           )
         )
   }
 
-  // TODO(#10050) - remove the sorting
-  implicit val storedTopologyTransactionOrdering: Ordering[GenericStoredTopologyTransactionX] = {
-    // it seems some topology transactions can have the same sequenced time for the same transaction type
-    // so to be able to successfully replay we need to sort by serial
-    (x: GenericStoredTopologyTransactionX, y: GenericStoredTopologyTransactionX) =>
-      {
-        val sequencerTimeCompared = x.sequenced.compare(y.sequenced)
-        if (sequencerTimeCompared == 0) {
-          val xCode = x.transaction.transaction.mapping.code
-          val yCode = y.transaction.transaction.mapping.code
-          if (xCode == yCode)
-            x.transaction.transaction.serial.compare(y.transaction.transaction.serial)
-          else {
-            // as the decentralized namespace controls the domain authorization is safer to just apply it afterwards
-            if (xCode == Code.DecentralizedNamespaceDefinitionX) {
-              1
-            } else if (yCode == Code.DecentralizedNamespaceDefinitionX) {
-              -1
-            } else 0
-          }
-        } else {
-          sequencerTimeCompared
-        }
-      }
-  }
 }
