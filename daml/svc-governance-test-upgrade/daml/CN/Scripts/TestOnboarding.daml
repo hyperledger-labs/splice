@@ -150,6 +150,8 @@ testSvOnboarding = do
     latestRoundCid
     coinRulesCid
 
+  checkSvStatusReports app
+
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
   case Map.lookup svX svcRules.members of
     None -> fail "svX is not a member of the SVC"
@@ -272,6 +274,9 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
   leaderSubmits app $ \cid -> exerciseCmd cid $
     SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
+  -- check status report invaraints
+  checkSvStatusReports app
+
 
 testSvOnboardingConfirmedExpiry : Script ()
 testSvOnboardingConfirmedExpiry = do
@@ -362,6 +367,9 @@ testSvMemberOverwriteInDevNet = do
   [(_, svcRules)] <- query @SvcRules app.svc
   svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id") (Round (-1))), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'" ("sv2-participant-id") (Round 2))]
 
+  -- status reports are OK
+  checkSvStatusReports app
+
   pure ()
 
 testSvMemberReonboarding = do
@@ -390,7 +398,9 @@ testSvMemberReonboarding = do
   [(_, svcRules)] <- query @SvcRules svc
   Map.keys svcRules.members === [sv1, sv2, sv3]
   Map.keys svcRules.offboardedMembers === [sv4]
+  checkSvStatusReports app
 
+  -- reonboard sv4
   let token = "mock-token"
 
   svSubmits app sv1 $ \cid -> exerciseCmd cid $
@@ -435,6 +445,9 @@ testSvMemberReonboarding = do
       openRoundCid = roundCid
       sv = sv4
       beneficiaries = [(sv4, 3 * bpsMultiplier)]
+
+  -- check status reports
+  checkSvStatusReports app
 
   pure ()
 

@@ -1,0 +1,48 @@
+module CN.Scripts.TestSvStatus where
+
+import DA.Assert
+
+import Daml.Script
+
+import CN.Scripts.SvcTestUtils
+import CN.SvcRules
+import CN.SVC.SvStatus
+
+
+-- test status report submission, as status report invariants are tested
+-- in the onboarding tests using 'checkSvStatusReports'
+testStatusReportSubmission : Script ()
+testStatusReportSubmission = do
+
+  (_, svc, (sv1, sv2, _, _)) <- initMainNetCollective
+
+  [(svcRulesCid, _)] <- query @SvcRules svc
+
+  now <- getTime
+
+  let dummyStatus dummyNr = SvStatus with
+        createdAt = now
+        cometBftHeight = dummyNr + 1
+        sequencerDomainTime = dummyNr + 2
+        mediatorDomainTime = dummyNr + 3
+        participantDomainTime = dummyNr + 4
+        latestOpenRound = dummyNr + 5
+  let getStatusReport sv = do
+        [report] <- queryFilter @SvStatusReport svc (\report -> report.sv == sv)
+        pure report
+  let submitStatusReport sv dummyNr = do
+        (previousReportCid, prevReport) <- getStatusReport sv
+        submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_SubmitStatusReport with
+          sv
+          previousReportCid
+          status = dummyStatus dummyNr
+        (_, actualNewReport) <- getStatusReport sv
+        let expectedNewReport = SvStatusReport with
+              svc
+              sv
+              number = prevReport.number + 1
+              status = Some (dummyStatus dummyNr)
+        expectedNewReport === actualNewReport
+
+  submitStatusReport sv1 10
+  submitStatusReport sv2 20

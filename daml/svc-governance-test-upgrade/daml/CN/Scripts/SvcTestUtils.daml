@@ -2,6 +2,7 @@ module CN.Scripts.SvcTestUtils where
 
 
 import DA.Action (unless, when, void, foldlA)
+import DA.Assert
 import DA.Foldable (forA_)
 import DA.List
 import qualified DA.Map as Map
@@ -25,6 +26,7 @@ import CN.SvcRules
 import CN.SvcBootstrap
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
+import CN.SVC.SvStatus
 import CN.Scripts.CnsRulesParameters
 
 -- | Multiplier for the SV weights, which are recorded in basis-points, i.e., 1/10000ths
@@ -131,6 +133,9 @@ initCollective initialRoundNumber isDevNet = do
       newMemberParticipantId = svName <> "-participant-id"
       joinedAsOfRound = earliestOpenRound.round
       domainId = coinConfig.globalDomain.activeDomain
+
+  -- check that the SvStatusReports are present
+  checkSvStatusReports app
 
   pure (app, svc, (sv1, sv2, sv3, sv4))
 
@@ -386,6 +391,18 @@ updateAgreedCoinPrice svc coinPrice = do
       else do
         submit svc $ archiveCmd voteCid
         submit svc $ createCmd $ vote with coinPrice = Some coinPrice
+
+
+-- | Check that there's exactly one status report per SV member both off-boarded and onboarded.
+checkSvStatusReports : CCApp -> Script ()
+checkSvStatusReports app = do
+  [(_, svcRules)] <- query @SvcRules app.svc
+  let memberParties = Map.keys svcRules.members
+  let offboardedParties = Map.keys svcRules.offboardedMembers
+  let expectedSvParties = Set.fromList $ memberParties ++ offboardedParties
+  reports <- query @SvStatusReport app.svc
+  let reportingParties = Set.fromList $ [ report.sv | (_, report) <- reports ]
+  reportingParties === expectedSvParties
 
 
 -- Pure utility functions

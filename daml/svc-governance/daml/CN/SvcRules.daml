@@ -25,6 +25,7 @@ import CN.Cns
 import CN.SvOnboarding
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
+import CN.SVC.SvStatus
 import CN.Util
 import CC.Schedule (getValueAsOf)
 
@@ -440,11 +441,19 @@ template SvcRules with
               domainNodes = noDomainNodes
         let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
         now <- getTime
+        -- TOOD(#10063): only create CoinPriceVote if the SV is a member that has not previously been onboarded
         create CoinPriceVote with
           svc
           sv = newMemberParty
           coinPrice = None
           lastUpdatedAt = now
+        -- create SvStatusReport contract if the member has not previously been onboarded
+        unless (isSome offboardedMemberInfoO) $
+          void $ create SvStatusReport with
+            svc
+            sv = newMemberParty
+            number = 0
+            status = None
         -- create traffic contracts for the initial traffic grant to the SV
         create (initialMemberTraffic svc newMemberParticipantId domainId config.initialTrafficGrant)
         create SvcRules with
@@ -491,6 +500,22 @@ template SvcRules with
               config
               initialTrafficState
               isDevNet
+
+    -- Update an SV's Status report
+    nonconsuming choice SvcRules_SubmitStatusReport : ContractId SvStatusReport
+      with
+        sv : Party
+        previousReportCid : ContractId SvStatusReport
+        status : SvStatus
+      controller sv
+      do
+        require "SV is a collective member" (sv `Map.member` members)
+        previousReport <- fetchAndArchive (ForOwner with svc; owner = sv) previousReportCid
+        create SvStatusReport with
+          svc
+          sv
+          number = previousReport.number + 1
+          status = Some status
 
     -- Challenge an SV member that seems to be non-responsive.
     -- The challenge will need to be seconded by another member after the deadine timer has elapsed before being executed.
@@ -983,6 +1008,8 @@ template SvcRules with
     --
     -- Note: we do not archive the CoinPriceVote of a member on its removal from the collective,
     -- as that would allow that member to block the removal via updating its CoinPriceVote at the right time.
+    --
+    -- TODO(#10063): drop this code in favor of just keeping CoinPriceVotes around.
     nonconsuming choice SvcRules_GarbageCollectCoinPriceVotes : ()
       with
         nonMemberVoteCids : [ContractId CoinPriceVote]

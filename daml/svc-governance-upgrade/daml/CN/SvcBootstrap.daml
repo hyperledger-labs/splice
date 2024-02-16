@@ -12,6 +12,7 @@ import CC.Types
 import CN.Cns
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
+import CN.SVC.SvStatus
 import CN.SvcRules
 
 -- | A template for bootstrapping the collective and CoinRules.
@@ -53,13 +54,19 @@ template SvcBootstrap with
           initialRoundNumber
           round0Duration
           coinPrice
-      -- create initial coin price vote of founder
+        -- create initial coin price vote of the founder
         now <- getTime
         _ <- create CoinPriceVote with
           svc
           sv = founderParty
           coinPrice = Some coinPrice
           lastUpdatedAt = now
+        -- create initial status report of the founder
+        _ <- create SvStatusReport with
+          svc
+          sv = founderParty
+          number = 0
+          status = None
         -- create the SVC rules with the founding member as the sole member
         let founderInfo = MemberInfo with
               name = founderName

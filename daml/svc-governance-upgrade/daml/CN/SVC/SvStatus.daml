@@ -1,0 +1,41 @@
+module CN.SVC.SvStatus where
+
+import CC.Types
+import CN.Util
+
+-- | The status of an SV as seen from their SV node's perspective.
+-- We generally add values here that are expected to regularly increase, so that
+-- SV node operators can run alerting off of them.
+data SvStatus = SvStatus with
+    createdAt : Time
+    -- ^ The wall clock time of the SV node at the time when the SV node started to
+    -- gather the data points in this report to submit them.
+    cometBftHeight : Int
+    -- ^ The height of the CometBFT chain at the time of submission
+    sequencerDomainTime : Int
+    -- ^ The latest domain time observed on the sequencer at the time of submission
+    mediatorDomainTime : Int
+    -- ^ The latest domain time observed on the mediator at the time of submission
+    participantDomainTime : Int
+    -- ^ The latest domain time observed on the participant at the time of submission
+    latestOpenRound : Int
+    -- ^ The maximum round number of the OpenMiningRound contracts at the time of submission
+  deriving (Eq, Show)
+
+-- | A singleton contract per SV that is used to regularly submit status reports.
+--
+-- Individual status reports serve as a heartbeat for an SV; and to distribute
+-- that SVs view on the network to all other SVC members.
+template SvStatusReport with
+    svc : Party
+    sv : Party
+    -- ^ The SV party that submitted this report.
+    number : Int
+    -- ^ The number of this report, starting from 0.
+    status : Optional SvStatus
+    -- ^ None is used when initially creating the contract upon member addition.
+  where
+    signatory svc
+
+instance HasCheckedFetch SvStatusReport ForOwner where
+  contractGroupId SvStatusReport {..} = ForOwner with svc; owner = sv
