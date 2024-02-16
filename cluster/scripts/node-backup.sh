@@ -212,16 +212,12 @@ function main() {
   elif [ "$1" == "sv" ]; then
     _info "Backing up SV node $namespace"
 
-    backup_component "$namespace" "validator-0" "$requested_component"
-    backup_component "$namespace" "scan-0" "$requested_component"
-    backup_component "$namespace" "sv-app-0" "$requested_component"
+    backup_component "$namespace" "cn-apps-0" "$requested_component"
     backup_component "$namespace" "mediator-0" "$requested_component"
     backup_component "$namespace" "sequencer-0" "$requested_component"
     backup_component "$namespace" "cometbft-0" "$requested_component"
 
-    wait_for_backup "$namespace" "validator-0" "$requested_component"
-    wait_for_backup "$namespace" "scan-0" "$requested_component"
-    wait_for_backup "$namespace" "sv-app-0" "$requested_component"
+    wait_for_backup "$namespace" "cn-apps-0" "$requested_component"
 
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
     backup_component "$namespace" "participant-0" "$requested_component"

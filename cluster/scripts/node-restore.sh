@@ -6,16 +6,14 @@ set -euo pipefail
 source "${TOOLS_LIB}/libcli.source"
 source "${REPO_ROOT}/cluster/scripts/utils.source"
 
-declare -A component_to_deployment
-component_to_deployment["sequencer-0"]="global-domain-0-sequencer"
-component_to_deployment["mediator-0"]="global-domain-0-mediator"
-component_to_deployment["participant"]="participant"
-component_to_deployment["participant-0"]="participant-0"
-component_to_deployment["cometbft-0"]="global-domain-0-cometbft"
-component_to_deployment["validator-0"]="validator-app-0"
-component_to_deployment["validator"]="validator-app"
-component_to_deployment["sv-app-0"]="sv-app-0"
-component_to_deployment["scan-0"]="scan-app-0"
+declare -A component_to_deployments
+component_to_deployments["sequencer-0"]="global-domain-0-sequencer"
+component_to_deployments["mediator-0"]="global-domain-0-mediator"
+component_to_deployments["participant"]="participant"
+component_to_deployments["participant-0"]="participant-0"
+component_to_deployments["cometbft-0"]="global-domain-0-cometbft"
+component_to_deployments["cn-apps-0"]="validator-app-0 scan-app-0 sv-app-0"
+component_to_deployments["validator"]="validator-app"
 
 function create_pvc_from_snapshot() {
   local -r snapshot_name=$1
@@ -70,31 +68,36 @@ function restore_pvc_from_snapshot() {
 
 function down() {
   local -r component=$1
-  local -r deployment_name="${component_to_deployment[$component]}"
+  local -r deployment_names="${component_to_deployments[$component]}"
 
-  _info "Scaling down $component deployment"
-  kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=0
+  for deployment_name in $deployment_names; do
+    _info "Scaling down $component deployment $deployment_name"
+    kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=0
+  done
 }
 
 function wait_down() {
   local -r component=$1
-  local -r deployment_name="${component_to_deployment[$component]}"
+  local -r deployment_names="${component_to_deployments[$component]}"
 
-  _info "Waiting for all pods of $deployment_name to get deleted"
-  kubectl wait pods -n "$namespace" -l "app=$deployment_name" --for delete --timeout=180s
+  for deployment_name in $deployment_names; do
+    _info "Waiting for all pods of $deployment_name to get deleted"
+    kubectl wait pods -n "$namespace" -l "app=$deployment_name" --for delete --timeout=180s
+  done
 }
 
 function up() {
   local -r component=$1
-  local -r deployment_name="${component_to_deployment[$component]}"
+  local -r deployment_names="${component_to_deployments[$component]}"
 
-  _info "Scaling up $component deployment"
-  kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=1
+  for deployment_name in $deployment_names; do
+    _info "Scaling up $component deployment $deployment_name"
+    kubectl scale deployment -n "$namespace" "$deployment_name" --replicas=1
+  done
 }
 
 function restore_pvc_postgres() {
   local -r component=$1
-  local -r deployment_name="${component_to_deployment[$component]}"
 
   local -r template_name="pg-data"
   local -r ss_name="$component-pg"
@@ -143,9 +146,9 @@ function restore_component() {
 
   if [ "$component" == "cometbft-0" ]; then
     _info "Restoring cometbft"
-    kubectl scale deployment -n "$namespace" "${component_to_deployment[$component]}" --replicas=0
+    kubectl scale deployment -n "$namespace" "${component_to_deployments[$component]}" --replicas=0
     restore_pvc_from_snapshot "global-domain-0-cometbft-cometbft-data-$run_id" "global-domain-0-cometbft-cometbft-data"
-    kubectl scale deployment -n "$namespace" "${component_to_deployment[$component]}" --replicas=1
+    kubectl scale deployment -n "$namespace" "${component_to_deployments[$component]}" --replicas=1
   else
     _info "Restoring $component"
     type=$(get_postgres_type "$namespace-$component-pg")
@@ -238,7 +241,7 @@ function main() {
   readonly run_id=$2
 
   for component in "${@:3}"; do
-    if [[ ! -v component_to_deployment["$component"] ]]; then
+    if [[ ! -v component_to_deployments["$component"] ]]; then
       _error "Unknown component: $component"
     fi
   done

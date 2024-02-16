@@ -22,7 +22,7 @@ function main() {
   local component="validator"
   case "$namespace" in
       sv-1|sv-2|sv-3|sv-4)
-          component="validator-0"
+          component="cn-apps-0"
           ;;
   esac
   local full_instance="$namespace-$component-pg"

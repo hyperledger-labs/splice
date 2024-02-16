@@ -711,28 +711,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sv-app-0-pg-secrets",
-        "namespace": "sv-1"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-1-sv-app-0-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "secret": "c3BsaXR3ZWxsc2VjcmV0"
         }
       },
@@ -844,28 +822,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sv-app-0-pg-secrets",
-        "namespace": "sv-2"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-2-sv-app-0-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "private": "c3YzLWlkLXByaXZhdGUta2V5",
           "public": "c3YzLWlkLXB1YmxpYy1rZXk="
         }
@@ -911,28 +867,6 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sv-app-0-pg-secrets",
-        "namespace": "sv-3"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-3-sv-app-0-pg-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
           "private": "c3Y0LWlkLXByaXZhdGUta2V5",
           "public": "c3Y0LWlkLXB1YmxpYy1rZXk="
         }
@@ -967,28 +901,6 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-4-postgres-secrets",
-    "provider": "",
-    "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "apiVersion": "v1",
-      "data": {
-        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
-        "value": {
-          "postgresPassword": ""
-        }
-      },
-      "kind": "Secret",
-      "metadata": {
-        "name": "sv-app-0-pg-secrets",
-        "namespace": "sv-4"
-      },
-      "type": "Opaque"
-    },
-    "name": "cn-app-sv-4-sv-app-0-pg-secrets",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -2115,6 +2027,37 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
+      "name": "postgres-sv-1-0-e",
+      "namespace": "sv-1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "databaseName": "sv_1_0",
+          "host": "postgres.sv-1.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
+        }
+      }
+    },
+    "name": "sv-1-postgres-sv-1-0-e",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
       "name": "postgres-validator-sv-1-0-e",
       "namespace": "sv-1",
       "timeout": 480,
@@ -2241,100 +2184,6 @@
       }
     },
     "name": "sv-1-scan-0",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-1-sv-app-0-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-app-0-pg-sv-1-0-e",
-      "namespace": "sv-1",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "databaseName": "sv_1_0",
-          "host": "sv-app-0-pg.sv-1.svc.cluster.local",
-          "port": "5432",
-          "secretName": "sv-app-0-pg-secrets"
-        }
-      }
-    },
-    "name": "sv-1-sv-app-0-pg-sv-1-0-e",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-1-sv-app-0-pg",
-    "provider": "",
-    "type": "canton:network:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "sv-app-0-pg",
-      "namespace": "sv-1",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "db": {
-          "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
-          "volumeStorageClass": "standard-rwo"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "secretName": "sv-app-0-pg-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "8Gi"
-          },
-          "requests": {
-            "cpu": "0.5",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "sv-1-sv-app-0-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2471,10 +2320,10 @@
         "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_1_0",
-          "host": "sv-app-0-pg.sv-1.svc.cluster.local",
+          "host": "postgres.sv-1.svc.cluster.local",
           "port": 5432,
           "schema": "sv_1_0",
-          "secretName": "sv-app-0-pg-secrets",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
         "resources": {
@@ -3064,6 +2913,37 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
+      "name": "postgres-sv-2-0-e",
+      "namespace": "sv-2",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "databaseName": "sv_2_0",
+          "host": "postgres.sv-2.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
+        }
+      }
+    },
+    "name": "sv-2-postgres-sv-2-0-e",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
       "name": "postgres-validator-sv-2-0-e",
       "namespace": "sv-2",
       "timeout": 480,
@@ -3197,100 +3077,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-2-sv-app-0-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-app-0-pg-sv-2-0-e",
-      "namespace": "sv-2",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "databaseName": "sv_2_0",
-          "host": "sv-app-0-pg.sv-2.svc.cluster.local",
-          "port": "5432",
-          "secretName": "sv-app-0-pg-secrets"
-        }
-      }
-    },
-    "name": "sv-2-sv-app-0-pg-sv-2-0-e",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-2-sv-app-0-pg",
-    "provider": "",
-    "type": "canton:network:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "sv-app-0-pg",
-      "namespace": "sv-2",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "db": {
-          "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
-          "volumeStorageClass": "standard-rwo"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "secretName": "sv-app-0-pg-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "8Gi"
-          },
-          "requests": {
-            "cpu": "0.5",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "sv-2-sv-app-0-pg",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
       "name": "sv-app-0",
@@ -3392,10 +3178,10 @@
         "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_2_0",
-          "host": "sv-app-0-pg.sv-2.svc.cluster.local",
+          "host": "postgres.sv-2.svc.cluster.local",
           "port": 5432,
           "schema": "sv_2_0",
-          "secretName": "sv-app-0-pg-secrets",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
         "resources": {
@@ -3985,6 +3771,37 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
+      "name": "postgres-sv-3-0-e",
+      "namespace": "sv-3",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "databaseName": "sv_3_0",
+          "host": "postgres.sv-3.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
+        }
+      }
+    },
+    "name": "sv-3-postgres-sv-3-0-e",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
       "name": "postgres-validator-sv-3-0-e",
       "namespace": "sv-3",
       "timeout": 480,
@@ -4118,100 +3935,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-3-sv-app-0-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-app-0-pg-sv-3-0-e",
-      "namespace": "sv-3",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "databaseName": "sv_3_0",
-          "host": "sv-app-0-pg.sv-3.svc.cluster.local",
-          "port": "5432",
-          "secretName": "sv-app-0-pg-secrets"
-        }
-      }
-    },
-    "name": "sv-3-sv-app-0-pg-sv-3-0-e",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-3-sv-app-0-pg",
-    "provider": "",
-    "type": "canton:network:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "sv-app-0-pg",
-      "namespace": "sv-3",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "db": {
-          "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
-          "volumeStorageClass": "standard-rwo"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "secretName": "sv-app-0-pg-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "8Gi"
-          },
-          "requests": {
-            "cpu": "0.5",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "sv-3-sv-app-0-pg",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
       "name": "sv-app-0",
@@ -4313,10 +4036,10 @@
         "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_3_0",
-          "host": "sv-app-0-pg.sv-3.svc.cluster.local",
+          "host": "postgres.sv-3.svc.cluster.local",
           "port": 5432,
           "schema": "sv_3_0",
-          "secretName": "sv-app-0-pg-secrets",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
         "resources": {
@@ -4906,6 +4629,37 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
+      "name": "postgres-sv-4-0-e",
+      "namespace": "sv-4",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "databaseName": "sv_4_0",
+          "host": "postgres.sv-4.svc.cluster.local",
+          "port": "5432",
+          "secretName": "postgres-secrets"
+        }
+      }
+    },
+    "name": "sv-4-postgres-sv-4-0-e",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres-metrics/",
+      "compat": "true",
       "name": "postgres-validator-sv-4-0-e",
       "namespace": "sv-4",
       "timeout": 480,
@@ -5039,100 +4793,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "length": 16,
-      "overrideSpecial": "_%@",
-      "special": true
-    },
-    "name": "sv-4-sv-app-0-pg-passwd",
-    "provider": "",
-    "type": "random:index/randomPassword:RandomPassword"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "sv-app-0-pg-sv-4-0-e",
-      "namespace": "sv-4",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "databaseName": "sv_4_0",
-          "host": "sv-app-0-pg.sv-4.svc.cluster.local",
-          "port": "5432",
-          "secretName": "sv-app-0-pg-secrets"
-        }
-      }
-    },
-    "name": "sv-4-sv-app-0-pg-sv-4-0-e",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "sv-4-sv-app-0-pg",
-    "provider": "",
-    "type": "canton:network:postgres"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "sv-app-0-pg",
-      "namespace": "sv-4",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "db": {
-          "pvcTemplateName": "pg-data",
-          "volumeSize": "240Gi",
-          "volumeStorageClass": "standard-rwo"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "secretName": "sv-app-0-pg-secrets"
-        },
-        "resources": {
-          "limits": {
-            "cpu": "2",
-            "memory": "8Gi"
-          },
-          "requests": {
-            "cpu": "0.5",
-            "memory": "1Gi"
-          }
-        }
-      }
-    },
-    "name": "sv-4-sv-app-0-pg",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
       "name": "sv-app-0",
@@ -5234,10 +4894,10 @@
         "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "sv_4_0",
-          "host": "sv-app-0-pg.sv-4.svc.cluster.local",
+          "host": "postgres.sv-4.svc.cluster.local",
           "port": 5432,
           "schema": "sv_4_0",
-          "secretName": "sv-app-0-pg-secrets",
+          "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
         "resources": {
