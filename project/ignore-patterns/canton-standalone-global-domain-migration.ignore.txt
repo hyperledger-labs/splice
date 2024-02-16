@@ -1,0 +1,5 @@
+# Extra patterns to ignore from the canton-standalone-disaster-recovery log file
+# See 'canton_log.ignore.txt' for details on how to write these.
+
+# TODO(#10052) Remove this if we can import without connecting to the domain
+ACS_COMMITMENT_MISMATCH
