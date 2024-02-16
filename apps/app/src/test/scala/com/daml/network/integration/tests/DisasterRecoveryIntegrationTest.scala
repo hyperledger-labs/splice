@@ -27,10 +27,12 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{NonNegativeDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.topology.DomainId
 import io.circe.syntax.EncoderOps
 import org.scalatest.time.{Minute, Span}
+import org.slf4j.event.Level
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
@@ -245,7 +247,7 @@ class DisasterRecoveryIntegrationTest
 
           withClueAndLog("Starting new SV apps") {
             // TODO(#9977)
-            loggerFactory.assertLogs(
+            loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
               startAllSync(
                 sv1LocalBackend,
                 sv2LocalBackend,
@@ -254,9 +256,12 @@ class DisasterRecoveryIntegrationTest
                 sv1ScanLocalBackend,
                 sv1ValidatorLocalBackend,
               ),
-              _.errorMessage should include(
-                "Unexpected coin create event"
-              ),
+              entries =>
+                forAll(entries) {
+                  _.errorMessage should include(
+                    "Unexpected coin create event"
+                  )
+                },
             )
           }
 
