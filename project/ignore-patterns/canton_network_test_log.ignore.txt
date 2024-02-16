@@ -71,6 +71,7 @@ Noticed an SvcRules epoch change.*GlobalDomainMigrationIntegrationTest
 # Shows up during global domain migration test, when the domain is frozen
 GlobalDomainMigrationIntegrationTest.*io.grpc.StatusRuntimeException: ABORTED: DOMAIN_BACKPRESSURE.*: The domain is overloaded
 
+# TODO (#9979): this only applies to simtime.
 # In simtime tests where the rounds are advanced too quickly, this trigger might not have enough time to receive the coupon.
 # Nevertheless, it is still useful to have the warning in production environments, where this should never happen.
 Skipped.*faucet coupons from last claimed round.*to current round

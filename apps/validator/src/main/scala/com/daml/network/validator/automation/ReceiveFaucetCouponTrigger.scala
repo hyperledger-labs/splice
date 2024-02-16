@@ -58,15 +58,20 @@ class ReceiveFaucetCouponTrigger(
           )
           Future.unit
         case Some(unclaimedRound) =>
-          val lastReceivedFor = license.payload.faucetState.toScala
-            .map(_.lastReceivedFor.number.longValue())
-            .getOrElse(-1L)
-          val skippedCount = unclaimedRound.payload.round.number - lastReceivedFor - 1
-          if (skippedCount > 0)
-            logger.warn(
-              s"Skipped $skippedCount faucet coupons from last claimed round $lastReceivedFor to current round ${unclaimedRound.payload.round.number}. " +
-                s"This is expected in case of validator inactivity."
-            )
+          license.payload.faucetState.toScala
+            .map(_.lastReceivedFor.number.longValue()) match {
+            case None =>
+              logger.info(
+                s"Validator never received faucet coupons, it will start now at round ${unclaimedRound.payload.round.number}."
+              )
+            case Some(lastReceivedFor) =>
+              val skippedCount = unclaimedRound.payload.round.number - lastReceivedFor - 1
+              if (skippedCount > 0)
+                logger.warn(
+                  s"Skipped $skippedCount faucet coupons from last claimed round $lastReceivedFor to current round ${unclaimedRound.payload.round.number}. " +
+                    s"This is expected in case of validator inactivity."
+                )
+          }
           cnLedgerConnection
             .submit(
               actAs = Seq(validatorParty),
