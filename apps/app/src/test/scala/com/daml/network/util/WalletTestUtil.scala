@@ -130,7 +130,9 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     // Wallet must report that user is not onboarded
     val status =
       try {
-        walletAppClient.userStatus()
+        loggerFactory.suppressWarningsAndErrors { // fine, we're failing below.
+          walletAppClient.userStatus()
+        }
       } catch {
         // User-status can fail due to the offboarded user's wallet being in the process of shutdown at the time of request.
         // Retrying would fix it.
