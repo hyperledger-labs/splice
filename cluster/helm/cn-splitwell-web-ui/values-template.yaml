@@ -6,3 +6,9 @@ resources:
   limits:
     cpu: "1"
     memory: 1536Mi
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:

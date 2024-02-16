@@ -66,6 +66,8 @@ genesis:
 db:
   volumeSize: 240Gi
   volumeStorageClass: standard-rwo
+  # k8s nodeAffinity for the persistent volume (optional)
+  # volumeNodeAffinity:
 
 resources:
   limits:
@@ -79,3 +81,9 @@ metrics:
   enable: false
   release: prometheus-grafana-monitoring
   interval: 30s
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:

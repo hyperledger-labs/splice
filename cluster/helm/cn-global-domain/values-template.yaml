@@ -30,3 +30,9 @@ metrics:
   interval: 30s
 
 disableAutoInit: false
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:

@@ -1,3 +1,9 @@
 cluster:
   imageTag: IMAGE_TAG
 imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:

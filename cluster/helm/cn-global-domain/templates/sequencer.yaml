@@ -107,6 +107,14 @@ spec:
                 echo "trying to create postgres database {{ .Values.sequencer.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

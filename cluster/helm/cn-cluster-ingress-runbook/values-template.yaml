@@ -14,3 +14,9 @@ ingress:
   globalDomain:
     globalDomainId: ""
     activeGlobalDomainId: ""
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:

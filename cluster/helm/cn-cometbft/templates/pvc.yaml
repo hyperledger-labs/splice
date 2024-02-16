@@ -14,3 +14,7 @@ spec:
       storage: {{ $.Values.db.volumeSize }}
   storageClassName: {{ $.Values.db.volumeStorageClass }}
   volumeMode: Filesystem
+  {{- with .Values.db.volumeNodeAffinity }}
+  nodeAffinity:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}

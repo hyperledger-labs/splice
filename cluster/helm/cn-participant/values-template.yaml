@@ -30,3 +30,9 @@ metrics:
 persistence:
   secretName: "postgres-secrets"
   databaseName: cantonnet_participant
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:

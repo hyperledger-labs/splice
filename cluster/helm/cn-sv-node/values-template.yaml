@@ -30,3 +30,9 @@ persistence:
 #globalDomainUpgrade:
 #  isActiveNode: true # specifies that this node is current active node, the one that manages the PV
 #  storageClassName: standard
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:

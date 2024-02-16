@@ -13,6 +13,14 @@ db:
   volumeSize: 480Gi
   volumeStorageClass: standard-rwo
   pvcTemplateName: pg-data
+  # k8s nodeAffinity for the persistent volume (optional)
+  # volumeNodeAffinity:
 
 persistence:
   secretName: "postgres-secrets"
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:

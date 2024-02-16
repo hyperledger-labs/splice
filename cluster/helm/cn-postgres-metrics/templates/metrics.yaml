@@ -57,6 +57,14 @@ spec:
                 echo "Waiting for database {{ .Values.persistence.databaseName }}, at hostname {{ .Values.persistence.host }}, port {{ .Values.persistence.port }} to be accessible. Last error: $errmsg"
                 sleep 2;
             done
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service

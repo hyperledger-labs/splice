@@ -14,3 +14,9 @@ metrics:
   enable: false
   release: prometheus-grafana-monitoring
   interval: 30s
+
+# k8s affinity for all deployed pods (optional)
+# affinity:
+
+# k8s nodeSelector for all deployed pods (optional)
+# nodeSelector:
