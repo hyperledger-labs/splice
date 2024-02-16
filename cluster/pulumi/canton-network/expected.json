@@ -1886,6 +1886,37 @@
     "custom": true,
     "id": "",
     "inputs": {
+      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "compat": "true",
+      "name": "loopback",
+      "namespace": "sv-1",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ingress": "istio-ingress.cluster-ingress",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "cometbftPorts": {
+          "domains": 5,
+          "nodes": 10
+        },
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+      }
+    },
+    "name": "sv-1-loopback",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
       "name": "participant-0",
@@ -2182,6 +2213,7 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingestFromParticipantBegin": true,
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -2535,7 +2567,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv-1"
       }
     },
@@ -2794,6 +2828,37 @@
       }
     },
     "name": "sv-2-ingress-sv",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "compat": "true",
+      "name": "loopback",
+      "namespace": "sv-2",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ingress": "istio-ingress.cluster-ingress",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "cometbftPorts": {
+          "domains": 5,
+          "nodes": 10
+        },
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+      }
+    },
+    "name": "sv-2-loopback",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3097,6 +3162,7 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingestFromParticipantBegin": false,
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3422,7 +3488,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv-2"
       }
     },
@@ -3681,6 +3749,37 @@
       }
     },
     "name": "sv-3-ingress-sv",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "compat": "true",
+      "name": "loopback",
+      "namespace": "sv-3",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ingress": "istio-ingress.cluster-ingress",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "cometbftPorts": {
+          "domains": 5,
+          "nodes": 10
+        },
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+      }
+    },
+    "name": "sv-3-loopback",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3984,6 +4083,7 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingestFromParticipantBegin": false,
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -4309,7 +4409,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv-3"
       }
     },
@@ -4568,6 +4670,37 @@
       }
     },
     "name": "sv-4-ingress-sv",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
+      "compat": "true",
+      "name": "loopback",
+      "namespace": "sv-4",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "ingress": "istio-ingress.cluster-ingress",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "cometbftPorts": {
+          "domains": 5,
+          "nodes": 10
+        },
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+      }
+    },
+    "name": "sv-4-loopback",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4871,6 +5004,7 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
         "domainId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingestFromParticipantBegin": false,
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -5196,7 +5330,9 @@
       "apiVersion": "v1",
       "kind": "Namespace",
       "metadata": {
-        "labels": {},
+        "labels": {
+          "istio-injection": "enabled"
+        },
         "name": "sv-4"
       }
     },

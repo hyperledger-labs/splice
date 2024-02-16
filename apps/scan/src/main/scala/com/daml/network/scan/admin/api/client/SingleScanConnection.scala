@@ -8,7 +8,8 @@ import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.scan.store.db.ScanAggregator
+import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
@@ -20,6 +21,7 @@ import org.apache.pekko.stream.Materializer
 import com.google.protobuf.ByteString
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import com.digitalasset.canton.data.CantonTimestamp
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
@@ -213,6 +215,142 @@ class SingleScanConnection private[client] (
       config.adminApi.url,
       HttpScanAppClient.GetAcsSnapshot(partyId),
     )
+  }
+  def listRoundTotals(
+      start: Long,
+      end: Long,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[com.daml.network.http.v0.definitions.RoundTotals]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListRoundTotals(start, end),
+    )
+  }
+  def listRoundPartyTotals(
+      start: Long,
+      end: Long,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[com.daml.network.http.v0.definitions.RoundPartyTotals]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.ListRoundPartyTotals(start, end),
+    )
+  }
+  def getAggregatedRounds()(implicit
+      tc: TraceContext
+  ): Future[Option[ScanAggregator.RoundRange]] = {
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetAggregatedRounds,
+    )
+  }
+
+  def getRoundAggregate(round: Long)(implicit
+      tc: TraceContext
+  ): Future[Option[ScanAggregator.RoundAggregate]] = {
+    for {
+      roundTotals <- listRoundTotals(round, round).flatMap { roundTotals =>
+        roundTotals.headOption
+          .map { rt =>
+            decodeRoundTotal(rt).fold(
+              err =>
+                Future.failed(ScanAggregator.CannotAdvance(s"Failed to decode round totals: $err")),
+              rt => Future.successful(Some(rt)),
+            )
+          }
+          .getOrElse(Future.successful(None))
+      }
+      roundPartyTotals <- listRoundPartyTotals(round, round).flatMap { roundPartyTotals =>
+        val (errors, totals) = roundPartyTotals.partitionMap { rt =>
+          decodeRoundPartyTotals(rt)
+        }
+        if (errors.nonEmpty) {
+          Future.failed(
+            ScanAggregator.CannotAdvance(
+              s"""Failed to decode round party totals: ${errors.mkString(", ")}"""
+            )
+          )
+        } else {
+          Future.successful(totals.toVector)
+        }
+      }
+    } yield {
+      roundTotals.map { rt =>
+        ScanAggregator.RoundAggregate(roundTotals = rt, roundPartyTotals = roundPartyTotals)
+      }
+    }
+  }
+
+  private def decodeRoundTotal(
+      rt: com.daml.network.http.v0.definitions.RoundTotals
+  ): Either[String, ScanAggregator.RoundTotals] = {
+    (for {
+      closedRoundEffectiveAt <- CantonTimestamp.fromInstant(rt.closedRoundEffectiveAt.toInstant)
+      appRewards <- Codec.decode(Codec.BigDecimal)(rt.appRewards)
+      validatorRewards <- Codec.decode(Codec.BigDecimal)(rt.validatorRewards)
+      changeToInitialAmountAsOfRoundZero <- Codec
+        .decode(Codec.BigDecimal)(rt.changeToInitialAmountAsOfRoundZero)
+      changeToHoldingFeesRate <- Codec.decode(Codec.BigDecimal)(rt.changeToHoldingFeesRate)
+      cumulativeAppRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeAppRewards)
+      cumulativeValidatorRewards <- Codec
+        .decode(Codec.BigDecimal)(rt.cumulativeValidatorRewards)
+      cumulativeChangeToInitialAmountAsOfRoundZero <- Codec
+        .decode(Codec.BigDecimal)(rt.cumulativeChangeToInitialAmountAsOfRoundZero)
+      cumulativeChangeToHoldingFeesRate <- Codec
+        .decode(Codec.BigDecimal)(rt.cumulativeChangeToHoldingFeesRate)
+      totalCoinBalance <- Codec.decode(Codec.BigDecimal)(rt.totalCoinBalance)
+    } yield {
+      ScanAggregator.RoundTotals(
+        closedRound = rt.closedRound,
+        closedRoundEffectiveAt = closedRoundEffectiveAt,
+        appRewards = appRewards,
+        validatorRewards = validatorRewards,
+        changeToInitialAmountAsOfRoundZero = changeToInitialAmountAsOfRoundZero,
+        changeToHoldingFeesRate = changeToHoldingFeesRate,
+        cumulativeAppRewards = cumulativeAppRewards,
+        cumulativeValidatorRewards = cumulativeValidatorRewards,
+        cumulativeChangeToInitialAmountAsOfRoundZero = cumulativeChangeToInitialAmountAsOfRoundZero,
+        cumulativeChangeToHoldingFeesRate = cumulativeChangeToHoldingFeesRate,
+        totalCoinBalance = totalCoinBalance,
+      )
+    })
+  }
+
+  private def decodeRoundPartyTotals(
+      rt: com.daml.network.http.v0.definitions.RoundPartyTotals
+  ): Either[String, ScanAggregator.RoundPartyTotals] = {
+    (for {
+      appRewards <- Codec.decode(Codec.BigDecimal)(rt.appRewards)
+      validatorRewards <- Codec.decode(Codec.BigDecimal)(rt.validatorRewards)
+      trafficPurchasedCcSpent <- Codec.decode(Codec.BigDecimal)(rt.trafficPurchasedCcSpent)
+      cumulativeAppRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeAppRewards)
+      cumulativeValidatorRewards <- Codec.decode(Codec.BigDecimal)(rt.cumulativeValidatorRewards)
+      cumulativeChangeToInitialAmountAsOfRoundZero <- Codec
+        .decode(Codec.BigDecimal)(rt.cumulativeChangeToInitialAmountAsOfRoundZero)
+      cumulativeChangeToHoldingFeesRate <- Codec
+        .decode(Codec.BigDecimal)(rt.cumulativeChangeToHoldingFeesRate)
+      cumulativeTrafficPurchasedCcSpent <- Codec
+        .decode(Codec.BigDecimal)(rt.cumulativeTrafficPurchasedCcSpent)
+    } yield {
+      ScanAggregator.RoundPartyTotals(
+        closedRound = rt.closedRound,
+        party = rt.party,
+        appRewards = appRewards,
+        validatorRewards = validatorRewards,
+        trafficPurchased = rt.trafficPurchased,
+        trafficPurchasedCcSpent = trafficPurchasedCcSpent,
+        trafficNumPurchases = rt.trafficNumPurchases,
+        cumulativeAppRewards = cumulativeAppRewards,
+        cumulativeValidatorRewards = cumulativeValidatorRewards,
+        cumulativeChangeToInitialAmountAsOfRoundZero = cumulativeChangeToInitialAmountAsOfRoundZero,
+        cumulativeChangeToHoldingFeesRate = cumulativeChangeToHoldingFeesRate,
+        cumulativeTrafficPurchased = rt.cumulativeTrafficPurchased,
+        cumulativeTrafficPurchasedCcSpent = cumulativeTrafficPurchasedCcSpent,
+        cumulativeTrafficNumPurchases = rt.cumulativeTrafficNumPurchases,
+      )
+    })
   }
 }
 

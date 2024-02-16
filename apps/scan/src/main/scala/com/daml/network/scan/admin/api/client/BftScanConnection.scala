@@ -15,6 +15,7 @@ import com.daml.network.scan.admin.api.client.BftScanConnection.ScanList
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcScan
 import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
@@ -38,7 +39,7 @@ import scala.util.{Failure, Random, Success, Try}
 class BftScanConnection(
     override protected val coinLedgerClient: CNLedgerClient,
     override protected val coinRulesCacheTimeToLive: NonNegativeFiniteDuration,
-    scanList: ScanList,
+    val scanList: ScanList,
     protected val clock: Clock,
     val retryProvider: RetryProvider,
     val loggerFactory: NamedLoggerFactory,
@@ -139,6 +140,85 @@ class BftScanConnection(
     bftCall(_.listImportCrates(party))
   }
 
+  // TODO(#9841) BFT
+  def getRoundAggregate(round: Long)(implicit
+      tc: TraceContext
+  ): Future[Option[ScanAggregator.RoundAggregate]] = {
+    logger.debug(s"Getting round aggregate for round $round")
+    // gets aggregated rounds from all scans, ignoring calls that fail
+    val scansWithRounds: Future[Map[SingleScanConnection, ScanAggregator.RoundRange]] = Future
+      .sequence(scanList.scanConnections().map { scan =>
+        scan
+          .getAggregatedRounds()
+          .map(_.map(scan -> _))
+          .recover { case e: Throwable =>
+            logger.info(s"Failed to get aggregated rounds from scan ${scan.config.adminApi.url}", e)
+            None
+          }
+      })
+      .map(_.flatten.toMap)
+    // for calls that succeeded, get the round aggregates for the round from the scans that reported that they can serve it
+    scansWithRounds.flatMap { scansWithRounds =>
+      val roundsPerScan = scansWithRounds
+        .map { case (s, r) => s.config.adminApi.url -> r }
+      logger.debug(s"Aggregate rounds per scan: ${roundsPerScan}")
+      if (scansWithRounds.isEmpty) {
+        Future.failed(ScanAggregator.CannotAdvance("No scans have any aggregated rounds available"))
+      } else {
+        getRoundAggregatesWithinRound(scansWithRounds, round).flatMap { roundAggregates =>
+          if (roundAggregates.isEmpty) {
+            Future.failed(
+              ScanAggregator.CannotAdvance(
+                s"No RoundAggregates reported by ${scansWithRounds.size} scans"
+              )
+            )
+          } else if (roundAggregates.toList.distinct.size == 1) {
+            Future.successful(roundAggregates.headOption)
+          } else {
+            logger.warn(
+              s"""The RoundAggregates reported by ${scansWithRounds.size} scans (${roundsPerScan.keys}) do not match:\n ${roundAggregates}"""
+            )
+            Future.successful(roundAggregates.headOption)
+          }
+        }
+      }
+    }
+  }
+
+  private def getRoundAggregatesWithinRound(
+      scansWithRounds: Map[SingleScanConnection, ScanAggregator.RoundRange],
+      round: Long,
+  )(implicit
+      tc: TraceContext
+  ): Future[Iterable[ScanAggregator.RoundAggregate]] = {
+    val scansHavingRound = scansWithRounds
+      .filter(_._2.contains(round))
+      .keys
+      .toSeq
+    def getRoundAggregateFromScan(scan: SingleScanConnection) = {
+      logger
+        .debug(
+          s"Getting RoundAggregate for round $round from scan ${scan.config.adminApi.url}"
+        )
+      scan
+        .getRoundAggregate(round)
+        .flatMap {
+          _.map(Future.successful).getOrElse(
+            Future
+              .failed(ScanAggregator.CannotAdvance(s"No RoundAggregate found for round $round"))
+          )
+        }
+        .recoverWith { case e: Throwable =>
+          logger.warn(
+            s"Failed to get RoundAggregate for round $round from scan ${scan.config.adminApi.url}",
+            e,
+          )
+          Future.failed(e)
+        }
+    }
+    Future.traverse(scansHavingRound)(getRoundAggregateFromScan)
+  }
+
   private def bftCall[T](
       call: SingleScanConnection => Future[T]
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
@@ -146,6 +226,15 @@ class BftScanConnection(
     val f = (connections.size - 1) / 3
     val nTargetSuccess = f + 1
     val nRequestsToDo = 2 * f + 1
+    executeCall(call, nTargetSuccess, nRequestsToDo)
+  }
+
+  private def executeCall[T](
+      call: SingleScanConnection => Future[T],
+      nTargetSuccess: Int,
+      nRequestsToDo: Int,
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
+    val connections = scanList.scanConnections()
     val requestFrom = Random.shuffle(connections).take(nRequestsToDo)
 
     val responses =
@@ -180,7 +269,6 @@ class BftScanConnection(
                 logDisagreements(consensusResponse, responses)
             }
           }
-
         }
     }
 

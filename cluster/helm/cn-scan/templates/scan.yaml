@@ -48,6 +48,13 @@ spec:
               name: {{ $.Values.persistence.secretName }}
               key: postgresPassword
         {{- end }}
+        {{- if .Values.ingestFromParticipantBegin }}
+        - name: ADDITIONAL_CONFIG_SCAN_APP
+          value: |
+            canton.scan-apps.scan-app {
+              ingest-from-participant-begin = {{ .Values.ingestFromParticipantBegin }}
+            }
+        {{- end }}
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: CN_APP_SCAN_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | default "participant" | quote }}

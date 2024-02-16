@@ -25,6 +25,7 @@ import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.scan.store.ScanStore
+import com.daml.network.scan.store.db.{ScanAggregatesReaderContext, ScanAggregatesReader}
 import com.daml.network.store.PageLimit
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -43,6 +44,7 @@ import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import org.apache.pekko.stream.Materializer
 
 /** Class representing a Scan app instance.
   *
@@ -93,12 +95,28 @@ class ScanApp(
           )
           .getSvcPartyFromUserMetadata(config.svUser)
       }
+      scanAggregatesReaderContext = new ScanAggregatesReaderContext(
+        clock,
+        ledgerClient,
+        loggerFactory,
+        retryProvider,
+        ec,
+        Materializer(ac),
+        httpClient,
+        templateDecoder,
+      )
+
       store = ScanStore(
         serviceUserPrimaryParty = serviceUserPrimaryParty,
         svcParty = svcParty,
         storage,
+        // Only the founder is configured to ingest from participant begin
+        ingestFromParticipantBegin = config.ingestFromParticipantBegin,
         loggerFactory,
         retryProvider,
+        { store =>
+          ScanAggregatesReader(store, scanAggregatesReaderContext)
+        },
         config.domainMigrationId,
       )
       participantAdminConnection = new ParticipantAdminConnection(

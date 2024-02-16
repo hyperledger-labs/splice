@@ -13,6 +13,11 @@ Release Notes
   For all of these fields, the standard Kubernetes configuration syntax applies.
   See also the examples given (as commented-out lines) in `cometbft-values.yaml`.
 
+2024-02-19
+----------
+
+* The scan app is now initialized with last computed aggregates from other scans in the SVC.
+
 2024-02-12
 ----------
 

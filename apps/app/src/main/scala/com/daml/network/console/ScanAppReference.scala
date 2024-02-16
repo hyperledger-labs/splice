@@ -311,12 +311,14 @@ abstract class ScanAppReference(
         HttpScanAppClient.GetAcsSnapshot(party)
       )
     }
-  def getAggregatedRounds(): ScanAggregator.RoundRange =
+
+  def getAggregatedRounds(): Option[ScanAggregator.RoundRange] =
     consoleEnvironment.run {
       httpCommand(
         HttpScanAppClient.GetAggregatedRounds
       )
     }
+
   def listRoundTotals(start: Long, end: Long) =
     consoleEnvironment.run {
       httpCommand(

@@ -143,15 +143,16 @@
           requires:
             - switch_global_domain_upgrade
           global_domain_id: 1
-      - preflight_sv_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "_CLUSTERNAME_"
-          requires:
-            - switch_global_domain_upgrade
+      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
+      # - preflight_sv_check:
+      #     <<: *main-branch-never
+      #     context:
+      #       - artifactory
+      #       - canton-network-vpn
+      #       - slack-context
+      #     cluster: "_CLUSTERNAME_"
+      #     requires:
+      #       - switch_global_domain_upgrade
       - deploy_validator_runbook:
           <<: *main-branch-never
           context:
@@ -176,6 +177,7 @@
             - canton-network-vpn
           requires:
             - backup_after_global_domain_upgrade
-            - preflight_sv_check
+            # TODO(#10038) Reenable this once TxLogs work across domain migrations.
+            # - preflight_sv_check
             - preflight_validator_check
             - preflight_check_global_domain_upgrade

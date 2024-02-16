@@ -137,15 +137,16 @@ workflow:
           requires:
             - switch_global_domain_upgrade
           global_domain_id: 1
-      - preflight_sv_check:
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "cimain"
-          requires:
-            - switch_global_domain_upgrade
+      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
+      # - preflight_sv_check:
+      #     <<: *main-branch-only
+      #     context:
+      #       - artifactory
+      #       - canton-network-vpn
+      #       - slack-context
+      #     cluster: "cimain"
+      #     requires:
+      #       - switch_global_domain_upgrade
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:

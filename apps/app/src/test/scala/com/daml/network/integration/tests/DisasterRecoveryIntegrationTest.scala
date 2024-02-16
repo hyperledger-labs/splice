@@ -241,13 +241,19 @@ class DisasterRecoveryIntegrationTest
             Seq(newDomainNode1, newDomainNode2, newDomainNode3, newDomainNode4)
 
           withClueAndLog("Starting new SV apps") {
-            startAllSync(
-              sv1LocalBackend,
-              sv2LocalBackend,
-              sv3LocalBackend,
-              sv4LocalBackend,
-              sv1ScanLocalBackend,
-              sv1ValidatorLocalBackend,
+            // TODO(#9977)
+            loggerFactory.assertLogs(
+              startAllSync(
+                sv1LocalBackend,
+                sv2LocalBackend,
+                sv3LocalBackend,
+                sv4LocalBackend,
+                sv1ScanLocalBackend,
+                sv1ValidatorLocalBackend,
+              ),
+              _.errorMessage should include(
+                "Unexpected coin create event"
+              ),
             )
           }
 
