@@ -78,7 +78,8 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import cats.syntax.foldable.*
 import cats.instances.future.*
-import com.daml.network.sv.migration.{AcsExporter, DomainDataSnapshotGenerator}
+import com.daml.network.migration.AcsExporter
+import com.daml.network.sv.migration.DomainDataSnapshotGenerator
 
 class SvApp(
     override val name: InstanceName,

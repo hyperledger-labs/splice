@@ -824,4 +824,28 @@ object HttpScanAppClient {
         Right(response.entries)
     }
   }
+
+  case class GetMigrationSchedule()
+      extends InternalBaseCommand[
+        http.GetMigrationScheduleResponse,
+        Option[definitions.MigrationSchedule],
+      ] {
+
+    override def submitRequest(
+        client: http.ScanClient,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetMigrationScheduleResponse] = {
+      client.getMigrationSchedule(headers)
+    }
+
+    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
+      case http.GetMigrationScheduleResponse.OK(response) =>
+        Right(Some(response))
+      case http.GetMigrationScheduleResponse.NotFound =>
+        Right(None)
+    }
+  }
 }

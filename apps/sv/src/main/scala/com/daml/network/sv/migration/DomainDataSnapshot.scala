@@ -2,7 +2,7 @@ package com.daml.network.sv.migration
 
 import cats.syntax.either.*
 import com.daml.network.http.v0.definitions as http
-import com.daml.network.sv.migration.DomainDataSnapshot.Dar
+import com.daml.network.migration.Dar
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.topology.admin.v30.TopologyTransactions
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
@@ -55,5 +55,4 @@ object DomainDataSnapshot {
     dars,
   )
 
-  final case class Dar(hash: Hash, content: ByteString)
 }

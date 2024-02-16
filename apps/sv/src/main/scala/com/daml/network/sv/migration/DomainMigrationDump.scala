@@ -1,18 +1,17 @@
 package com.daml.network.sv.migration
 
+import cats.implicits.toBifunctorOps
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.migration.DomainNodeIdentities.getDomainNodeIdentities
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.Json
+import io.circe.{Codec, Decoder}
 import io.circe.syntax.*
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 case class DomainMigrationDump(
@@ -25,13 +24,20 @@ case class DomainMigrationDump(
     nodeIdentities.toHttp(),
     domainDataSnapshot.toHttp,
   )
-
-  def toJson: Json = {
-    toHttp.asJson
-  }
 }
 
 object DomainMigrationDump {
+
+  implicit val domainMigrationDumpCodec: Codec[DomainMigrationDump] = Codec.from(
+    Decoder.decodeJson.emap(json =>
+      json
+        .as[http.GetDomainMigrationDumpResponse]
+        .leftMap(err => s"Failed to decode: ${err.message}")
+        .flatMap(fromHttp)
+    ),
+    (a: DomainMigrationDump) => a.toHttp.asJson,
+  )
+
   def fromHttp(
       response: http.GetDomainMigrationDumpResponse
   ): Either[String, DomainMigrationDump] = for {
@@ -70,22 +76,5 @@ object DomainMigrationDump {
       snapshot,
     )
   }
-
-  def getDomainPausedTime(
-      participantAdminConnection: ParticipantAdminConnection,
-      svcStore: SvSvcStore,
-  )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Option[Instant]] = for {
-    globalDomain <- svcStore.getSvcRules().map(_.domain)
-    domainParamsTopologyResult <- participantAdminConnection.getDomainParametersState(
-      globalDomain
-    )
-    isDomainPaused =
-      domainParamsTopologyResult.mapping.parameters.maxRatePerParticipant == NonNegativeInt.zero
-  } yield
-    if (isDomainPaused) Some(domainParamsTopologyResult.base.validFrom)
-    else None
 
 }

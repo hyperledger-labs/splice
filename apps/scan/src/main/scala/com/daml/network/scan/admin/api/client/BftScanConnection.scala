@@ -1,6 +1,6 @@
 package com.daml.network.scan.admin.api.client
 
-import cats.data.NonEmptyList
+import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.PackageIdResolver.HasCoinRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
+import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.BftScanConnection.ScanList
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcScan
@@ -218,6 +219,11 @@ class BftScanConnection(
     }
     Future.traverse(scansHavingRound)(getRoundAggregateFromScan)
   }
+
+  override def getMigrationSchedule()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): OptionT[Future, MigrationSchedule] = OptionT(bftCall(_.getMigrationSchedule().value))
 
   private def bftCall[T](
       call: SingleScanConnection => Future[T]

@@ -2,8 +2,8 @@ package com.daml.network.validator.automation
 
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.automation.{
-  AutomationServiceCompanion,
   AssignTrigger,
+  AutomationServiceCompanion,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
 }
@@ -13,6 +13,7 @@ import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.QualifiedName
 import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
+import com.daml.network.validator.migration.GlobalDomainMigrationTrigger
 import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
@@ -25,6 +26,7 @@ import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
+import java.nio.file.Path
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class ValidatorAutomationService(
@@ -42,6 +44,7 @@ class ValidatorAutomationService(
     ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     participantIdentitiesStore: NodeIdentitiesStore,
+    domainMigrationDumpPath: Option[Path],
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -161,6 +164,21 @@ class ValidatorAutomationService(
       triggerContext,
     )
   )
+
+  domainMigrationDumpPath.fold(
+    logger.info(
+      "Not starting DomainUpgradeTrigger, as no domain migration dump path is configured."
+    )(TraceContext.empty)
+  ) { path =>
+    registerTrigger(
+      new GlobalDomainMigrationTrigger(
+        triggerContext,
+        participantAdminConnection,
+        path,
+        scanConnection,
+      )
+    )
+  }
 }
 
 object ValidatorAutomationService extends AutomationServiceCompanion {

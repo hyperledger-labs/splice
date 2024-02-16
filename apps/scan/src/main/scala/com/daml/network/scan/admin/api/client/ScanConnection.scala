@@ -1,5 +1,6 @@
 package com.daml.network.scan.admin.api.client
 
+import cats.data.OptionT
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
@@ -13,6 +14,7 @@ import com.daml.network.environment.{
   RetryFor,
   RetryProvider,
 }
+import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
@@ -207,6 +209,12 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
       crates <- listImportCrates(party)
     } yield AcsStoreDump.ImportShipment(openRound, crates)
   }
+
+  def getMigrationSchedule()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): OptionT[Future, MigrationSchedule]
+
 }
 
 object ScanConnection {

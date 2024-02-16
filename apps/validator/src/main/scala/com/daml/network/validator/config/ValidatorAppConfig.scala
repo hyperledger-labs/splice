@@ -154,6 +154,7 @@ case class ValidatorAppBackendConfig(
     participantIdentitiesBackup: Option[BackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
     svValidator: Boolean = false,
+    domainMigrationPath: Option[Path] = None,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5),

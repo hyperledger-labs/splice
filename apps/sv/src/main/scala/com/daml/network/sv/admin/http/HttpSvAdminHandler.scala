@@ -34,6 +34,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.circe.syntax.EncoderOps
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import slick.jdbc.PostgresProfile
@@ -676,7 +677,7 @@ class HttpSvAdminHandler(
               } yield {
                 val path = BackupDump.writeToPath(
                   dumpPath,
-                  dump.toJson.noSpaces,
+                  dump.asJson.noSpaces,
                 )
                 logger.info(s"Wrote domain migration dump at path $path")
                 SvAdminResource.TriggerDomainMigrationDumpResponseOK

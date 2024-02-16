@@ -1,11 +1,13 @@
 package com.daml.network.scan.admin.api.client
 
+import cats.data.OptionT
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
+import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.scan.store.db.ScanAggregator
@@ -15,10 +17,10 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.google.protobuf.ByteString
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
-import com.google.protobuf.ByteString
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -352,6 +354,17 @@ class SingleScanConnection private[client] (
       )
     })
   }
+
+  override def getMigrationSchedule()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): OptionT[Future, MigrationSchedule] =
+    OptionT(
+      runHttpCmd(
+        config.adminApi.url,
+        HttpScanAppClient.GetMigrationSchedule(),
+      )
+    )
 }
 
 class CachedScanConnection private[client] (
@@ -403,5 +416,15 @@ class CachedScanConnection private[client] (
       cachedOpenRounds,
       cachedIssuingRounds,
     ),
+  )
+
+  override def getMigrationSchedule()(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): OptionT[Future, MigrationSchedule] = OptionT(
+    runHttpCmd(
+      config.adminApi.url,
+      HttpScanAppClient.GetMigrationSchedule(),
+    )
   )
 }

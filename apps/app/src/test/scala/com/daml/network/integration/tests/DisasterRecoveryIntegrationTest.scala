@@ -2,32 +2,35 @@ package com.daml.network.integration.tests
 
 import better.files.File
 import better.files.File.apply
-import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
-import com.daml.network.util.{DomainMigrationUtil, ProcessTestUtil, StandaloneCanton}
 import com.daml.network.config.{CNDbConfig, CNNodeConfigTransforms, NetworkAppClientConfig}
-import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
 import com.daml.network.environment.{CNNodeEnvironmentImpl, RetryProvider}
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.http.v0.definitions.TransactionHistoryRequest
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
+}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import org.scalatest.time.{Minute, Span}
-import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
-import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.sv.automation.singlesv.SvRewardTrigger
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
+import com.daml.network.util.{DomainMigrationUtil, ProcessTestUtil, StandaloneCanton}
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{NonNegativeDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.topology.DomainId
+import io.circe.syntax.EncoderOps
+import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
@@ -316,7 +319,7 @@ class DisasterRecoveryIntegrationTest
       ids,
       dump,
     )
-    fullDumpFile.write(fullDump.toJson.spaces2)
+    fullDumpFile.write(fullDump.asJson.spaces2)
   }
 
   private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: Double) = {

@@ -1,9 +1,9 @@
-package com.daml.network.sv.migration
+package com.daml.network.migration
 
 import cats.data.EitherT
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
-import com.daml.network.sv.migration.AcsExporter.AcsExportFailure
+import com.daml.network.migration.AcsExporter.AcsExportFailure
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -33,7 +33,25 @@ class AcsExporter(
     )
   }
 
-  def safeExportAcsFromPausedDomain(domain: DomainId, parties: PartyId*)(implicit
+  def safeExportParticipantPartiesAcsFromPausedDomain(domain: DomainId)(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): EitherT[Future, AcsExportFailure, ByteString] = {
+    EitherT {
+      for {
+        participantId <- participantAdminConnection.getId()
+        parties <- participantAdminConnection
+          .listPartyToParticipant(
+            filterStore = domain.filterString,
+            filterParticipant = participantId.toProtoPrimitive,
+          )
+          .map(_.map(_.mapping.partyId))
+        acs <- safeExportAcsFromPausedDomain(domain, parties *).value
+      } yield acs
+    }
+  }
+
+  private def safeExportAcsFromPausedDomain(domain: DomainId, parties: PartyId*)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): EitherT[Future, AcsExportFailure, ByteString] = {

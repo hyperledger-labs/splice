@@ -1,12 +1,12 @@
 package com.daml.network.sv.automation
 
 import com.daml.network.automation.{
-  AutomationServiceCompanion,
   AssignTrigger,
+  AutomationServiceCompanion,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
 }
-import AutomationServiceCompanion.{TriggerClass, aTrigger}
+import com.daml.network.automation.AutomationServiceCompanion.{aTrigger, TriggerClass}
 import com.daml.network.environment.{
   CNLedgerClient,
   DarResources,
@@ -40,11 +40,12 @@ import com.daml.network.sv.automation.singlesv.membership.onboarding.{
   SvOnboardingPromoteParticipantToSubmitterTrigger,
   SvOnboardingSequencerProposalTrigger,
 }
-import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
 import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger
+import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
+import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ClientConfig
@@ -254,14 +255,13 @@ class SvSvcAutomationService(
     (localDomainNode, config.domainMigrationDumpPath) match {
       case (Some(domainNode), Some(dumpPath)) =>
         registerTrigger(
-          new DomainUpgradeTrigger(
+          new GlobalDomainMigrationTrigger(
             triggerContext,
             config.domains.global.alias,
             domainNode,
             svcStore,
             participantAdminConnection,
             dumpPath: Path,
-            config.domainMigrationId,
           )
         )
       case _ => ()
@@ -290,24 +290,25 @@ class SvSvcAutomationService(
 
   }
 
-  val localSequencerClientContext: Option[LocalSequencerClientContext] = localDomainNode.map(cfg =>
-    LocalSequencerClientContext(
-      cfg.sequencerAdminConnection,
-      cfg.mediatorAdminConnection,
-      Some(
-        LocalSequencerClientConfig(
-          cfg.sequencerInternalConfig,
-          config.domains.global.alias,
-        )
-      ),
-      cfg.sequencerPruningConfig.map(pruningConfig =>
-        SequencerPruningConfig(
-          pruningConfig.pruningInterval,
-          pruningConfig.retentionPeriod,
-        )
-      ),
+  private val localSequencerClientContext: Option[LocalSequencerClientContext] =
+    localDomainNode.map(cfg =>
+      LocalSequencerClientContext(
+        cfg.sequencerAdminConnection,
+        cfg.mediatorAdminConnection,
+        Some(
+          LocalSequencerClientConfig(
+            cfg.sequencerInternalConfig,
+            config.domains.global.alias,
+          )
+        ),
+        cfg.sequencerPruningConfig.map(pruningConfig =>
+          SequencerPruningConfig(
+            pruningConfig.pruningInterval,
+            pruningConfig.retentionPeriod,
+          )
+        ),
+      )
     )
-  )
 
   localSequencerClientContext.flatMap(_.internalClientConfig).foreach { internalClientConfig =>
     registerTrigger(
@@ -394,7 +395,7 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
       aTrigger[SvOnboardingPartyToParticipantProposalTrigger],
       aTrigger[SvOnboardingSequencerProposalTrigger],
       aTrigger[SvOnboardingMediatorProposalTrigger],
-      aTrigger[DomainUpgradeTrigger],
+      aTrigger[GlobalDomainMigrationTrigger],
       aTrigger[PublishLocalCometBftNodeConfigTrigger],
       aTrigger[ReconcileCometBftNetworkConfigWithSvcRulesTrigger],
       aTrigger[LocalSequencerConnectionsTrigger],

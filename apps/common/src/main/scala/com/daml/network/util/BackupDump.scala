@@ -4,8 +4,11 @@ import better.files.File
 import com.daml.network.config.BackupDumpConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
+import io.circe.Decoder
 
+import java.io.FileNotFoundException
 import java.nio.file.{Path, Paths}
+import scala.util.Try
 
 object BackupDump {
 
@@ -42,4 +45,21 @@ object BackupDump {
     import better.files.File
     File(path).exists
   }
+
+  def readFromPath[T: Decoder](path: Path): Try[T] = Try {
+    val dumpFile = better.files.File(path)
+    if (!dumpFile.exists) {
+      throw new FileNotFoundException(s"Failed to find dump file at $path")
+    } else {
+      val jsonString: String = dumpFile.contentAsString
+      io.circe.parser.decode[T](jsonString) match {
+        case Left(error) =>
+          throw new IllegalArgumentException(
+            s"Failed to parse dump file at $path: $error"
+          )
+        case Right(dump) => dump
+      }
+    }
+  }
+
 }

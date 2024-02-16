@@ -1,10 +1,8 @@
 package com.daml.network.sv.migration
 
-import cats.implicits.toTraverseOps
 import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.sv.migration.DomainDataSnapshot.Dar
+import com.daml.network.migration.{AcsExporter, DarExporter}
 import com.daml.network.sv.store.SvSvcStore
-import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -18,6 +16,8 @@ class DomainDataSnapshotGenerator(
     svcStore: SvSvcStore,
     acsExporter: AcsExporter,
 ) {
+
+  private val darExporter = new DarExporter(participantAdminConnection)
 
   def getDomainDataSnapshot(
       timestamp: Instant
@@ -34,11 +34,11 @@ class DomainDataSnapshotGenerator(
         svcStore.key.svParty,
         svcStore.key.svcParty,
       )
-    dars <- getDars()
+    dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
     topologySnapshot,
     acsSnapshot,
-    dars.flatten,
+    dars,
   )
 
   def getDomainMigrationSnapshot()(implicit
@@ -49,21 +49,18 @@ class DomainDataSnapshotGenerator(
     domainParamsStateTopology <- participantAdminConnection.getDomainParametersState(globalDomain)
     topologySnapshot <- getTopologySnapshot(globalDomain, domainParamsStateTopology.base.validFrom)
     acsSnapshot <- acsExporter
-      .safeExportAcsFromPausedDomain(
-        globalDomain,
-        svcStore.key.svParty,
-        svcStore.key.svcParty,
+      .safeExportParticipantPartiesAcsFromPausedDomain(
+        globalDomain
       )
-      .fold(
-        failure =>
-          throw Status.FAILED_PRECONDITION.withDescription(failure.toString).asRuntimeException(),
-        identity,
+      .leftMap(failure =>
+        Status.FAILED_PRECONDITION.withDescription(failure.toString).asRuntimeException()
       )
-    dars <- getDars()
+      .rethrowT
+    dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
     topologySnapshot,
     acsSnapshot,
-    dars.flatten,
+    dars,
   )
 
   private def getTopologySnapshot(domainId: DomainId, timestamp: Instant)(implicit
@@ -79,16 +76,6 @@ class DomainDataSnapshotGenerator(
         )
       topologySnapshot = topologySnapshotWithProposals.filter(_.transaction.isProposal == false)
     } yield { topologySnapshot }
-  }
-
-  private def getDars()(implicit tc: TraceContext, ec: ExecutionContext) = {
-    for {
-      darDescriptions <- participantAdminConnection.listDars()
-      dars <- darDescriptions.traverse { dar =>
-        val hash = Hash.tryFromHexString(dar.hash)
-        participantAdminConnection.lookupDar(hash).map(_.map(Dar(hash, _)))
-      }
-    } yield dars
   }
 
 }

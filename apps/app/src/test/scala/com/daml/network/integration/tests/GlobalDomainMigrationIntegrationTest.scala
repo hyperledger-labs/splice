@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.network.sv.automation.singlesv.{DomainUpgradeTrigger, SvRewardTrigger}
+import com.daml.network.sv.automation.singlesv.SvRewardTrigger
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
@@ -13,8 +13,12 @@ import com.daml.network.config.{
   CNParticipantClientConfig,
   NetworkAppClientConfig,
 }
-import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.console.ScanAppBackendReference
+import CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import com.daml.network.console.{
+  ScanAppBackendReference,
+  ValidatorAppBackendReference,
+  WalletAppClientReference,
+}
 import com.daml.network.environment.{
   CNNodeEnvironmentImpl,
   ParticipantAdminConnection,
@@ -34,6 +38,7 @@ import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientCon
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
+import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, SvTestUtil, WalletTestUtil}
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
@@ -84,27 +89,25 @@ class GlobalDomainMigrationIntegrationTest
         config.copy(
           svApps = config.svApps ++
             Seq(1, 2, 3, 4).map(sv =>
-              (
-                InstanceName.tryCreate(s"sv${sv}Local") ->
-                  config
-                    .svApps(InstanceName.tryCreate(s"sv${sv}"))
-                    .copy(
-                      onboarding = Some(
-                        DomainMigration(
-                          name = s"Canton-Foundation-${sv}",
-                          dumpFilePath = Path.of(""),
-                        )
-                      ),
-                      domains = SvDomainConfig(global =
-                        SvGlobalDomainConfig(
-                          alias = DomainAlias.tryCreate("global"),
-                          // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
-                          url = s"http://localhost:27${sv}08",
-                        )
-                      ),
-                      domainMigrationId = 1L,
-                    )
-              )
+              InstanceName.tryCreate(s"sv${sv}Local") ->
+                config
+                  .svApps(InstanceName.tryCreate(s"sv$sv"))
+                  .copy(
+                    onboarding = Some(
+                      DomainMigration(
+                        name = s"Canton-Foundation-$sv",
+                        dumpFilePath = Path.of(""),
+                      )
+                    ),
+                    domains = SvDomainConfig(global =
+                      SvGlobalDomainConfig(
+                        alias = DomainAlias.tryCreate("global"),
+                        // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
+                        url = s"http://localhost:27${sv}08",
+                      )
+                    ),
+                    domainMigrationId = 1L,
+                  )
             ) + (
               InstanceName.tryCreate(s"sv1LocalOnboarded") ->
                 config
@@ -179,6 +182,18 @@ class GlobalDomainMigrationIntegrationTest
           CNNodeConfigTransforms
             .bumpSomeValidatorAppPortsBy(22_000, Seq("sv1ValidatorLocal")))(conf)
       )
+      .addConfigTransform(
+        // update validator app config for the bobValidator to set the migrationDumpPath
+        (_, conf) =>
+          CNNodeConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
+            if (name == "bobValidator")
+              validatorConfig.copy(
+                domainMigrationPath =
+                  Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
+              )
+            else validatorConfig
+          )(conf)
+      )
       .addConfigTransforms(
         (_, conf) =>
           CNNodeConfigTransforms.updateAllSvAppConfigs((name, c) =>
@@ -243,23 +258,32 @@ class GlobalDomainMigrationIntegrationTest
       },
     )
 
-    val aliceValidatorLocalBackend = v("aliceValidatorLocal")
+    def startValidatorAndTapCoin(
+        validatorBackend: ValidatorAppBackendReference,
+        walletClient: WalletAppClientReference,
+    ) = {
+      startAllSync(validatorBackend)
+      val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
+      walletClient.tap(50.0)
+      withClueAndLog(s"${validatorBackend.name} has tapped a coin") {
+        checkWallet(walletUserParty, walletClient, Seq((50, 50)))
+      }
+      validatorBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
+        true
+      )
+    }
+
+    val aliceValidatorLocalBackend: ValidatorAppBackendReference = v("aliceValidatorLocal")
 
     withCanton(
-      Seq(testResourcesPath / "unavailable-validator-topology-canton.conf"),
+      Seq(
+        testResourcesPath / "unavailable-validator-topology-canton.conf"
+      ),
       Seq(),
       "stop-alice-validator-before-domain-migration",
       "VALIDATOR_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
     ) {
-      startAllSync(aliceValidatorLocalBackend)
-      val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorLocalBackend)
-      aliceWalletClient.tap(50.0)
-      withClueAndLog("alice has tapped a coin") {
-        checkWallet(aliceUserParty, aliceWalletClient, Seq((50, 50)))
-      }
-      aliceValidatorLocalBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
-        true
-      )
+      startValidatorAndTapCoin(aliceValidatorLocalBackend, aliceWalletClient)
       aliceValidatorLocalBackend.stop()
     }
 
@@ -291,6 +315,7 @@ class GlobalDomainMigrationIntegrationTest
       logSuffix = "global-domain-migration",
       autoInit = false,
     )() {
+      startValidatorAndTapCoin(bobValidatorBackend, bobWalletClient)
       Using.resources(
         createUpgradeNode(1, sv1Backend, sv1LocalBackend, retryProvider, wallClock),
         createUpgradeNode(2, sv2Backend, sv2LocalBackend, retryProvider, wallClock),
@@ -299,7 +324,8 @@ class GlobalDomainMigrationIntegrationTest
       ) { case (upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4) =>
         val allNodes =
           Seq(upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
-        val svcPartyDecentralizedNamespace = sv1Backend.appState.svcStore.key.svcParty.uid.namespace
+        val svcPartyDecentralizedNamespace =
+          sv1Backend.appState.svcStore.key.svcParty.uid.namespace
 
         val domainDynamicParams =
           sv1Backend.participantClientWithAdminToken.topology.domain_parameters
@@ -334,7 +360,7 @@ class GlobalDomainMigrationIntegrationTest
             // pausing DomainUpgradeTrigger of all all old SV to avoid them from setting the maxRatePerParticipant back to zero.
             allNodes.foreach { node =>
               node.oldBackend.svcAutomation
-                .trigger[DomainUpgradeTrigger]
+                .trigger[GlobalDomainMigrationTrigger]
                 .pause()
                 .futureValue
             }
@@ -350,13 +376,21 @@ class GlobalDomainMigrationIntegrationTest
           },
         ) {
 
-          withClueAndLog("dump has been written in the configured location.") {
+          withClueAndLog("dump has been written in the configured location for the sv.") {
             eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
               allNodes.foreach { node =>
                 (migrationDumpDir(
                   node.oldBackend.name
                 ) / "domain_migration_dump.json").path.exists shouldBe true
               }
+            }
+          }
+
+          withClueAndLog("dump has been written in the configured location for the validator.") {
+            eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
+              (migrationDumpDir(
+                bobValidatorBackend.name
+              ) / "domain_migration_dump.json").path.exists shouldBe true
             }
           }
 
@@ -374,14 +408,15 @@ class GlobalDomainMigrationIntegrationTest
                 val connection = upgradeNode.newParticipantConnection
                 for {
                   id <- connection.getId()
-                  _ <- connection.ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
-                    "keep just sv1",
-                    globalDomainId,
-                    svcPartyDecentralizedNamespace,
-                    _ => NonEmpty(Set, sv1Party.uid.namespace),
-                    id.namespace.fingerprint,
-                    RetryFor.WaitingOnInitDependency,
-                  )
+                  _ <- connection
+                    .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
+                      "keep just sv1",
+                      globalDomainId,
+                      svcPartyDecentralizedNamespace,
+                      _ => NonEmpty(Set, sv1Party.uid.namespace),
+                      id.namespace.fingerprint,
+                      RetryFor.WaitingOnInitDependency,
+                    )
                 } yield {}
               }
               .futureValue
@@ -498,7 +533,9 @@ class GlobalDomainMigrationIntegrationTest
             "VoteRequest and Vote should be there",
             _ =>
               inside(sv1LocalBackend.listVoteRequests()) { case Seq(onlyReq) =>
-                sv1LocalBackend.listVotes(Vector(onlyReq.contractId.contractId)) should have size 1
+                sv1LocalBackend.listVotes(
+                  Vector(onlyReq.contractId.contractId)
+                ) should have size 1
               },
           )
 

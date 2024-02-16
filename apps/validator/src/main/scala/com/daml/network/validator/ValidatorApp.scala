@@ -556,6 +556,7 @@ class ValidatorApp(
         ledgerClient,
         participantAdminConnection,
         participantIdentitiesStore,
+        config.domainMigrationPath,
         retryProvider,
         loggerFactory,
       )
