@@ -51,6 +51,7 @@ A security-sensitive error has been received.*TransactionProcessingSteps:partici
 # TODO(#7924): remove once txs in-flight during party migrations do not produce any more warnings
 # Made as specific as possible to avoid ignoring other SYNC_SERVICE_ALARMS
 SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*PAR::sv.*Participant::.*Discarding.*with all ancestors
+SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*PAR::sv.*Participant::.*Continue processing
 LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients
 
 # TODO(#5706): investigate and remove once fixed
