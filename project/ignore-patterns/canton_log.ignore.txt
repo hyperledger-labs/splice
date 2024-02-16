@@ -113,4 +113,7 @@ Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 # TODO(#8147) Remove this once this is fixed in Canton
 Received a mediator request.*with some informees not being hosted by an active participant
 
+# TODO(#9852) Remove once Canton fixes the log level for this
+Unable to get topology snapshot to check whether informees are hosted on the domain
+
 # Make sure to have a trailing newline
