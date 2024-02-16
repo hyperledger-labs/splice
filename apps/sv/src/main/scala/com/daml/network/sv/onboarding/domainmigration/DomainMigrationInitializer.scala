@@ -524,6 +524,7 @@ object DomainMigrationInitializer {
         )
   }
 
+  // TODO(#10050) - remove the sorting
   implicit val storedTopologyTransactionOrdering: Ordering[GenericStoredTopologyTransactionX] = {
     // it seems some topology transactions can have the same sequenced time for the same transaction type
     // so to be able to successfully replay we need to sort by serial
@@ -535,11 +536,14 @@ object DomainMigrationInitializer {
           val yCode = y.transaction.transaction.mapping.code
           if (xCode == yCode)
             x.transaction.transaction.serial.compare(y.transaction.transaction.serial)
-          else if (xCode == Code.DecentralizedNamespaceDefinitionX) {
+          else {
             // as the decentralized namespace controls the domain authorization is safer to just apply it afterwards
-            -1
-          } else 1
-
+            if (xCode == Code.DecentralizedNamespaceDefinitionX) {
+              1
+            } else if (yCode == Code.DecentralizedNamespaceDefinitionX) {
+              -1
+            } else 0
+          }
         } else {
           sequencerTimeCompared
         }
