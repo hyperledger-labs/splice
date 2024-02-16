@@ -1562,7 +1562,30 @@ Network. Steps to do this are as follows:
 7. Create a key to the CircleCI service account in GCP, copy the downloaded private key (full json) into
    a new environment variable in CCI. Search in cci's config files for one of the existing ones (e.g. GCP_DA_CN_SCRATCHNET_KEY)
    and add the new one.
+8. Grant permissions to the CCI account to access the DNS secret (todo: do this in Pulumi)
 
+   ```
+   gcloud projects add-iam-policy-binding $CLOUDSDK_CORE_PROJECT \
+      --member='serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com' \
+      --condition='expression=resource.name.endsWith("secrets/dns01-sa-key-secret/versions/1"),title=DNS SA Key Secret' \
+      --role='roles/secretmanager.secretAccessor'
+   ```
+
+9. Similar to 6, grant permissions also to the new CCI account:
+
+   ```
+   gcloud projects add-iam-policy-binding da-cn-shared \
+      --member='serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com' \
+      --role='roles/storage.objectViewer'
+   ```
+10. Grant permissions to the shared kms to the new CCI account:
+
+   ```
+   gcloud projects add-iam-policy-binding da-cn-shared \
+      --member serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com \
+      --role "roles/cloudkms.cryptoKeyEncrypterDecrypter" \
+      --condition=expression='resource.type == "cloudkms.googleapis.com/CryptoKey" && resource.name.startsWith("projects/da-cn-shared/locations/'${CLOUDSDK_COMPUTE_REGION}'/keyRings/pulumi")',title="pulumi kms"
+   ```
 ## Cluster Data Dumps
 
 At the time of writing, only TestNet style deployments (i.e.,
