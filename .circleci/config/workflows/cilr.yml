@@ -41,25 +41,26 @@ workflow:
           cluster: "cilr"
           requires:
             - deploy_cluster
-      - preflight_check:
-          cluster: "cilr"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          # require deploy_cluster and deploy_sv_runbook for stability and reliability
-          requires:
-            - docker_images_push
-            - deploy_cluster
-            - deploy_sv_runbook
-      - publish_public_release:
-          <<: *main-branch-only
-          requires:
-            - preflight_check
-          context:
-            - artifactory
-            - slack-context
+       # TODO(#10017): See if we want to re-enable them at some point
+#      - preflight_check:
+#          cluster: "cilr"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          # require deploy_cluster and deploy_sv_runbook for stability and reliability
+#          requires:
+#            - docker_images_push
+#            - deploy_cluster
+#            - deploy_sv_runbook
+#      - publish_public_release:
+#          <<: *main-branch-only
+#          requires:
+#            - preflight_check
+#          context:
+#            - artifactory
+#            - slack-context
       - preflight_sv_check:
           <<: *main-branch-only
           context:
