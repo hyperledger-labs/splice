@@ -173,7 +173,8 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
           val coins = getCoins(participant, party, _.data.owner == sv4Party.toProtoPrimitive)
           inside(coins) { case Seq(coin) =>
             coin.data.svc shouldBe svcPartyStr
-            coin.data.amount.initialAmount shouldBe BigDecimal(100.0).bigDecimal.setScale(10)
+            // the amount might diverge slightly due to (merged) SV rewards and fees
+            BigDecimal(coin.data.amount.initialAmount) should beAround(BigDecimal(100.0))
             coin.data.owner shouldBe sv4Party.toProtoPrimitive
           }
         }

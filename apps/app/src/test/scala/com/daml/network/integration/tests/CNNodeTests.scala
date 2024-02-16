@@ -261,6 +261,8 @@ object CNNodeTests {
     val smallAmount: BigDecimal = BigDecimal(1.0)
     def beWithin(lower: BigDecimal, upper: BigDecimal): Matcher[BigDecimal] =
       be >= lower and be <= upper
+    def beAround(value: BigDecimal): Matcher[BigDecimal] =
+      beWithin(value - smallAmount, value + smallAmount)
 
     /** Asserts two BigDecimals are equal up to `n` decimal digits. */
     def beEqualUpTo(right: BigDecimal, n: Int): Matcher[BigDecimal] =
