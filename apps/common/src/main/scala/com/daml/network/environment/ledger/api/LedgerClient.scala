@@ -9,9 +9,8 @@ import com.daml.ledger.api.v2.*
 import com.daml.ledger.javaapi.data.{
   Command,
   CreateUserResponse,
-  LedgerOffset,
   ListUserRightsResponse,
-  TransactionTreeV2,
+  ParticipantOffset,
   User,
 }
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -35,7 +34,6 @@ import com.daml.ledger.api.v1.admin.party_management_service.{
 }
 import com.daml.ledger.api.v1.admin.user_management_service as v1User
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
 import com.daml.ledger.api.v2 as lapi
 import com.daml.ledger.javaapi.data.User.Right
@@ -132,7 +130,9 @@ private[environment] class LedgerClient(
 
   override def close(): Unit = GrpcChannel.close(channel)
 
-  def ledgerEnd()(implicit traceContext: TraceContext): Future[ParticipantOffset.Value.Absolute] = {
+  def ledgerEnd()(implicit
+      traceContext: TraceContext
+  ): Future[lapi.participant_offset.ParticipantOffset.Value.Absolute] = {
     val req = lapi.state_service.GetLedgerEndRequest()
     for {
       stub <- withCredentialsAndTraceContext(stateServiceStub)
@@ -143,7 +143,7 @@ private[environment] class LedgerClient(
         val absolute = participantOffset.value.absolute
           .getOrElse(throw new RuntimeException("Ledger end should return absolute value"))
 
-        ParticipantOffset.Value.Absolute(absolute)
+        lapi.participant_offset.ParticipantOffset.Value.Absolute(absolute)
       }
     } yield offset
   }
@@ -161,7 +161,7 @@ private[environment] class LedgerClient(
   def tryGetTransactionTreeByEventId(
       parties: Seq[String],
       id: String,
-  )(implicit traceContext: TraceContext): Future[TransactionTreeV2] = {
+  )(implicit traceContext: TraceContext): Future[com.daml.ledger.javaapi.data.TransactionTree] = {
     val req =
       lapi.update_service.GetTransactionByEventIdRequest(eventId = id, requestingParties = parties)
     for {
@@ -457,7 +457,7 @@ private[environment] class LedgerClient(
   def completions(
       applicationId: String,
       parties: Seq[PartyId],
-      begin: Option[ParticipantOffset],
+      begin: Option[lapi.participant_offset.ParticipantOffset],
   ): Source[CompletionStreamResponse, NotUsed] =
     toSource(
       for {
@@ -538,8 +538,8 @@ object LedgerClient {
   }
 
   final case class GetUpdatesRequest(
-      begin: ParticipantOffset,
-      end: Option[ParticipantOffset],
+      begin: lapi.participant_offset.ParticipantOffset,
+      end: Option[lapi.participant_offset.ParticipantOffset],
       filter: IngestionFilter,
   ) {
     private[LedgerClient] def toProto: lapi.update_service.GetUpdatesRequest =
@@ -570,9 +570,9 @@ object LedgerClient {
         }
       )
 
-    val Transaction: SubmitAndWaitFor[jdata.TransactionV2] =
+    val Transaction: SubmitAndWaitFor[jdata.Transaction] =
       impl((response: CSOC.SubmitAndWaitForTransactionResponse) =>
-        jdata.TransactionV2.fromProto(response.getTransaction)
+        jdata.Transaction.fromProto(response.getTransaction)
       ) {
         { case (stub, r, ec) =>
           stub
@@ -581,9 +581,9 @@ object LedgerClient {
         }
       }
 
-    val TransactionTree: SubmitAndWaitFor[jdata.TransactionTreeV2] =
+    val TransactionTree: SubmitAndWaitFor[jdata.TransactionTree] =
       impl((response: CSOC.SubmitAndWaitForTransactionTreeResponse) =>
-        jdata.TransactionTreeV2.fromProto(response.getTransaction)
+        jdata.TransactionTree.fromProto(response.getTransaction)
       ) {
         { case (stub, r, ec) =>
           stub
@@ -611,9 +611,11 @@ object LedgerClient {
       update: TreeUpdate,
       domainId: DomainId,
   )
-  def lapiTreeToJavaTree(tree: lapi.transaction.TransactionTree): TransactionTreeV2 = {
+  def lapiTreeToJavaTree(
+      tree: lapi.transaction.TransactionTree
+  ): com.daml.ledger.javaapi.data.TransactionTree = {
     val treeProto = scalapbToJava(tree)(_.companion)
-    TransactionTreeV2.fromProto(treeProto)
+    com.daml.ledger.javaapi.data.TransactionTree.fromProto(treeProto)
   }
 
   object GetTreeUpdatesResponse {
@@ -713,7 +715,7 @@ object LedgerClient {
     }
   }
 
-  final case class CompletionStreamResponse(laterOffset: LedgerOffset, completion: Completion)
+  final case class CompletionStreamResponse(laterOffset: ParticipantOffset, completion: Completion)
 
   object CompletionStreamResponse {
     def fromProto(
@@ -726,7 +728,7 @@ object LedgerClient {
         .getOrElse(throw new IllegalArgumentException("missing offset in CompletionStreamResponse"))
       // ignoring checkpoint.record_time
       CompletionStreamResponse(
-        LedgerOffset fromProto scalapbToJava(offset)(_.companion),
+        ParticipantOffset.fromProto(scalapbToJava(offset)(_.companion)),
         Completion.fromProto(spb.getCompletion),
       )
     }

@@ -32,7 +32,7 @@ class ScanTxLogParser(
 
   import ScanTxLogParser.*
 
-  private def parseTree(tree: TransactionTreeV2, domainId: DomainId, root: TreeEvent)(implicit
+  private def parseTree(tree: TransactionTree, domainId: DomainId, root: TreeEvent)(implicit
       tc: TraceContext
   ): State = {
     // TODO(#2930) add more checks on the nodes, at least that the SVC party is correct
@@ -106,7 +106,7 @@ class ScanTxLogParser(
     }
   }
 
-  private def parseTrees(tree: TransactionTreeV2, domainId: DomainId, rootsEventIds: List[String])(
+  private def parseTrees(tree: TransactionTree, domainId: DomainId, rootsEventIds: List[String])(
       implicit tc: TraceContext
   ): State = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
@@ -159,7 +159,7 @@ class ScanTxLogParser(
     }
   }
 
-  override def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit
+  override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
     val ret = parseTrees(tx, domain, tx.getRootEventIds.asScala.toList).entries
@@ -174,7 +174,7 @@ class ScanTxLogParser(
     )
 
   private def fromCnsEntryPaymentCollection(
-      tree: TransactionTreeV2,
+      tree: TransactionTree,
       exercised: ExercisedEvent,
       domainId: DomainId,
   )(implicit tc: TraceContext) = {
@@ -247,7 +247,7 @@ object ScanTxLogParser {
     }
 
     private def getCoinFromSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         ccsum: CoinCreateSummary[T],
     ) = {
       val coinCid = ccsum.coin.contractId
@@ -266,7 +266,7 @@ object ScanTxLogParser {
     }
 
     def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: TreeEvent,
         domainId: DomainId,
         ccsum: CoinCreateSummary[T],
@@ -367,7 +367,7 @@ object ScanTxLogParser {
     }
 
     def fromTransfer(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: TreeEvent,
         domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
@@ -422,7 +422,7 @@ object ScanTxLogParser {
     }
 
     def transferTxLogEntry(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: TreeEvent,
         domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
@@ -541,7 +541,7 @@ object ScanTxLogParser {
     }
 
     def fromCollectEntryPayment(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: ExercisedEvent,
         domainId: DomainId,
         stateFromPaymentCollection: State,
@@ -555,7 +555,7 @@ object ScanTxLogParser {
     }
 
     def fromCoinArchiveEvent(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: TreeEvent,
         domainId: DomainId,
         rootEventId: Option[String] = None,
@@ -625,7 +625,7 @@ object ScanTxLogParser {
     }
 
     def fromClosedMiningRoundCreate(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: TreeEvent,
         domainId: DomainId,
         round: ClosedMiningRoundCreate.ContractType,

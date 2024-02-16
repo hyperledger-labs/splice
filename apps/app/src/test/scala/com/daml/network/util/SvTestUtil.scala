@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.ledger.javaapi.data.TransactionTreeV2
+import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
@@ -57,7 +57,7 @@ trait SvTestUtil extends CNNodeTestCommon {
   def confirmActionByAllMembers(
       confirmingSvs: Seq[ConfirmingSv],
       action: ActionRequiringConfirmation,
-  )(implicit env: CNNodeTestConsoleEnvironment): Seq[TransactionTreeV2] = {
+  )(implicit env: CNNodeTestConsoleEnvironment): Seq[TransactionTree] = {
     confirmingSvs.map { case ConfirmingSv(participantClient, svPartyId) =>
       confirmAction(participantClient, svPartyId, action)
     }
@@ -148,7 +148,7 @@ trait SvTestUtil extends CNNodeTestCommon {
       participantClient: CNParticipantClientReference,
       svPartyId: PartyId,
       action: ActionRequiringConfirmation,
-  )(implicit env: CNNodeTestConsoleEnvironment): TransactionTreeV2 = {
+  )(implicit env: CNNodeTestConsoleEnvironment): TransactionTree = {
     eventuallySucceeds() {
       val svcRulesCid = participantClient.ledger_api_extensions.acs
         .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)

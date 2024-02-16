@@ -13,9 +13,9 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
   ExercisedEvent,
-  LedgerOffset,
-  TransactionV2,
-  TransactionTreeV2,
+  ParticipantOffset,
+  Transaction,
+  TransactionTree,
   User,
 }
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
@@ -40,8 +40,6 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.ledger.api.v2.participant_offset.ParticipantOffset.Value
 import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
@@ -78,12 +76,14 @@ class BaseLedgerConnection(
 
   import BaseLedgerConnection.*
 
-  def ledgerEnd()(implicit traceContext: TraceContext): Future[Value.Absolute] =
+  def ledgerEnd()(implicit
+      traceContext: TraceContext
+  ): Future[lapi.participant_offset.ParticipantOffset.Value.Absolute] =
     client.ledgerEnd()
 
   def activeContracts(
       filter: IngestionFilter,
-      offset: ParticipantOffset.Value.Absolute,
+      offset: lapi.participant_offset.ParticipantOffset.Value.Absolute,
   ): Future[
     (
         Seq[ActiveContract],
@@ -122,7 +122,7 @@ class BaseLedgerConnection(
     client.getConnectedDomains(party)
 
   def updates(
-      beginOffset: ParticipantOffset,
+      beginOffset: lapi.participant_offset.ParticipantOffset,
       filter: IngestionFilter,
   ): Source[LedgerClient.GetTreeUpdatesResponse, NotUsed] =
     client
@@ -131,7 +131,7 @@ class BaseLedgerConnection(
   def tryGetTransactionTreeByEventId(
       parties: Seq[PartyId],
       id: String,
-  )(implicit traceContext: TraceContext): Future[TransactionTreeV2] =
+  )(implicit traceContext: TraceContext): Future[TransactionTree] =
     client.tryGetTransactionTreeByEventId(parties.map(_.toProtoPrimitive), id)
 
   def getOptionalPrimaryParty(
@@ -756,7 +756,7 @@ class CNLedgerConnection(
         dom: DomainIdRequired,
         dedup: SubmitDedup[CmdId],
         commandOut: SubmitCommands[C],
-    ): Future[TransactionV2] = go()
+    ): Future[Transaction] = go()
 
     @annotation.nowarn("cat=unused&msg=pickT")
     def yieldResult[Z]()(implicit
@@ -865,7 +865,7 @@ class CNLedgerConnection(
       .waitUnlessShutdown(completion)
       .flatMap { case ((offset, _), ()) =>
         FutureUnlessShutdown.outcomeF(offset match {
-          case absolute: LedgerOffset.Absolute =>
+          case absolute: ParticipantOffset.Absolute =>
             completionOffsetCallback(absolute.getOffset).map(_ => ())
           case other =>
             logger.warn(s"Encountered unexpected non-absolute ledger offset $other")
@@ -889,7 +889,7 @@ class CNLedgerConnection(
   )(implicit
       traceContext: TraceContext
   ): Sink[LedgerClient.CompletionStreamResponse, Future[
-    (LedgerOffset, LedgerClient.Completion)
+    (ParticipantOffset, LedgerClient.Completion)
   ]] = {
     import io.grpc.Status.{DEADLINE_EXCEEDED, UNAVAILABLE}
     val howLongToWait = timeouts.network.asFiniteApproximation
@@ -910,7 +910,7 @@ class CNLedgerConnection(
       .wireTap(cpl => logger.debug(s"selected completion for $commandId: $cpl"))
       .toMat(
         Sink
-          .headOption[(LedgerOffset, LedgerClient.Completion)]
+          .headOption[(ParticipantOffset, LedgerClient.Completion)]
           .mapMaterializedValue(_ map (_ map { case result @ (_, completion) =>
             if (completion.status.isOk) result
             else throw completion.status.asRuntimeException()
@@ -1008,7 +1008,7 @@ object CNLedgerConnection {
 
   def decodeExerciseResult[T](
       update: Update[T],
-      transaction: TransactionTreeV2,
+      transaction: TransactionTree,
   ): T = {
     val rootEventIds = transaction.getRootEventIds.asScala.toSeq
     if (rootEventIds.size == 1) {
@@ -1121,8 +1121,8 @@ object CNLedgerConnection {
   object SubmitResult {
     private[CNLedgerConnection] final class Ignored extends SubmitResult[Any, Unit]
     implicit val Ignored: SubmitResult[Any, Unit] = new Ignored
-    private[CNLedgerConnection] final class JustTransaction extends SubmitResult[Any, TransactionV2]
-    implicit val JustTransaction: SubmitResult[Any, TransactionV2] = new JustTransaction
+    private[CNLedgerConnection] final class JustTransaction extends SubmitResult[Any, Transaction]
+    implicit val JustTransaction: SubmitResult[Any, Transaction] = new JustTransaction
     implicit def resultAndOffset[T]: SubmitResult[Update[T], (String, T)] = new ResultAndOffset()
     implicit def onlyResult[T]: SubmitResult[Update[T], T] = new ResultAndOffset((_, t) => t)
     implicit def exercising[T, Z](implicit

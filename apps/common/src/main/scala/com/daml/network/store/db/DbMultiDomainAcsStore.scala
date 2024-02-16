@@ -4,7 +4,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import cats.data.OptionT
 import cats.implicits.*
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTreeV2}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
@@ -742,7 +742,7 @@ final class DbMultiDomainAcsStore[TXE](
             handleIngestionSummary(summary)
           }
         case TransactionTreeUpdate(tree) =>
-          ingestTransactionTreeV2(domain, tree).map { summaryState =>
+          ingestTransactionTree(domain, tree).map { summaryState =>
             state
               .getAndUpdate(s =>
                 s.withUpdate(
@@ -879,9 +879,9 @@ final class DbMultiDomainAcsStore[TXE](
       } yield summary
     }
 
-    private def ingestTransactionTreeV2(
+    private def ingestTransactionTree(
         domainId: DomainId,
-        tree: TransactionTreeV2,
+        tree: TransactionTree,
     )(implicit tc: TraceContext): Future[MutableIngestionSummary] = {
       val summary = MutableIngestionSummary.empty
 
@@ -952,7 +952,7 @@ final class DbMultiDomainAcsStore[TXE](
                     )
                 ),
             ),
-            "ingestTransactionTreeV2",
+            "ingestTransactionTree",
           )
       } yield summary
     }

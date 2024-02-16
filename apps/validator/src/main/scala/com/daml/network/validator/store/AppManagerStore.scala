@@ -419,7 +419,8 @@ object AppManagerStore {
       appManagerUri.withPath(appManagerUri.path / "dars" / hash)
   }
 
-  private val releaseConfigurationHashPurpose = HashPurpose(40, "ReleaseConfiguration")
+  // Intentionally using a very large value for the HashPurpose to avoid clashes with newly added purposes by Canton.
+  private val releaseConfigurationHashPurpose = HashPurpose(42_000, "ReleaseConfiguration")
 
   private def hashReleaseConfiguration(configuration: definitions.ReleaseConfiguration): Hash = {
     import com.digitalasset.canton.platform.apiserver.meteringreport.Jcs

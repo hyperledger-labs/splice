@@ -3,7 +3,7 @@
 
 package com.daml.network.util
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTreeV2, TreeEvent}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
 
 import scala.collection.mutable
 import scala.jdk.CollectionConverters.*
@@ -14,7 +14,7 @@ object Trees {
 
   @SuppressWarnings(Array("org.wartremover.warts.While", "org.wartremover.warts.Var"))
   def foldTree[State](
-      tree: TransactionTreeV2,
+      tree: TransactionTree,
       initialState: State,
   )(
       onCreate: (State, CreatedEvent, Seq[TreeEvent]) => State,

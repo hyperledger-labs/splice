@@ -228,11 +228,6 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         new RemoteClock(
           clientConfig,
           config.parameters.timeouts.processing,
-          // Canton determine whether to get time from the X node by checking canton config:
-          // `config.participantsX.nonEmpty || config.sequencersX.nonEmpty || config.mediatorsX.nonEmpty,`
-          // We don't have these x nodes configured in our topology config as we have a separate canton config for these X nodes.
-          // Setting this to true because we use X nodes in our test and deployment.
-          getTimeFromXNode = true,
           clockLoggerFactory,
         )
       case ClockConfig.WallClock(skewW) =>

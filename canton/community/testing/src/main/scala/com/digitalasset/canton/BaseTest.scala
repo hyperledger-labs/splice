@@ -10,9 +10,8 @@ import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervi
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger, SuppressionRule}
+import com.digitalasset.canton.logging.{NamedLogging, SuppressionRule, SuppressingLogger}
 import com.digitalasset.canton.protocol.{CatchUpConfig, StaticDomainParameters}
-import com.digitalasset.canton.topology.transaction.SignedTopologyTransaction
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.CheckedT
 import com.digitalasset.canton.util.FutureInstances.*
@@ -20,7 +19,6 @@ import com.digitalasset.canton.version.{
   ProtocolVersion,
   ProtocolVersionValidation,
   ReleaseProtocolVersion,
-  RepresentativeProtocolVersion,
 }
 import io.opentelemetry.api.trace.Tracer
 import org.mockito.{ArgumentMatchers, ArgumentMatchersSugar}
@@ -70,10 +68,6 @@ trait TestEssentials
     BaseTest.testedReleaseProtocolVersion
   protected lazy val defaultStaticDomainParameters: StaticDomainParameters =
     BaseTest.defaultStaticDomainParameters
-
-  protected def signedTransactionProtocolVersionRepresentative
-      : RepresentativeProtocolVersion[SignedTopologyTransaction.type] =
-    SignedTopologyTransaction.protocolVersionRepresentativeFor(testedProtocolVersion)
 
   // default to providing an empty trace context to all tests
   protected implicit def traceContext: TraceContext = TraceContext.empty

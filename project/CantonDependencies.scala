@@ -8,7 +8,7 @@ object CantonDependencies {
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
   val daml_libraries_version = version
-  val daml_compiler_version = "3.0.0-snapshot.20240207.12714.0.v2ff3f7c3"
+  val daml_compiler_version = version
   val daml_java_codegen_version = version
   val use_custom_daml_version = false
 

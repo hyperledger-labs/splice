@@ -6,7 +6,7 @@ import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi
-import com.daml.ledger.javaapi.data.TransactionTreeV2 as JavaTransactionTree
+import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver}
 import com.daml.network.util.{Contract, JavaDecodeUtil, PackageQualifiedName}
@@ -90,7 +90,7 @@ trait LedgerApiExtensions {
               )
             )
           }
-          javaapi.data.TransactionTreeV2.fromProto(
+          JavaTransactionTree.fromProto(
             TransactionTree.toJavaProto(ledgerApi.optionallyAwait(tx, tx.updateId, optTimeout))
           )
         }
@@ -194,11 +194,11 @@ trait LedgerApiExtensions {
             endOffset: Option[ParticipantOffset] = None,
             verbose: Boolean = true,
             timeout: NonNegativeDuration = ledgerApi.timeouts.ledgerCommand,
-        ): Seq[javaapi.data.TransactionTreeV2] = {
+        ): Seq[JavaTransactionTree] = {
           ledgerApi.ledger_api.updates
             .trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout)
             .collect { case LedgerApiV2Commands.UpdateService.TransactionTreeWrapper(tree) =>
-              javaapi.data.TransactionTreeV2.fromProto(TransactionTree.toJavaProto(tree))
+              JavaTransactionTree.fromProto(TransactionTree.toJavaProto(tree))
             }
         }
       }

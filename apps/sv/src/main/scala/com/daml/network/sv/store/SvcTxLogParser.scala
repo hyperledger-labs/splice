@@ -33,7 +33,7 @@ class SvcTxLogParser(
 
   import SvcTxLogParser.*
 
-  private def parseTree(tree: TransactionTreeV2, domainId: DomainId, root: TreeEvent)(implicit
+  private def parseTree(tree: TransactionTree, domainId: DomainId, root: TreeEvent)(implicit
       tc: TraceContext
   ): State = {
 
@@ -54,7 +54,7 @@ class SvcTxLogParser(
     }
   }
 
-  private def parseTrees(tree: TransactionTreeV2, domainId: DomainId, rootsEventIds: List[String])(
+  private def parseTrees(tree: TransactionTree, domainId: DomainId, rootsEventIds: List[String])(
       implicit tc: TraceContext
   ): State = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
@@ -70,7 +70,7 @@ class SvcTxLogParser(
   ): Seq[(DomainId, Option[codegen.ContractId[?]], TxLogEntry)] =
     Seq.empty
 
-  override def tryParse(tx: TransactionTreeV2, domain: DomainId)(implicit
+  override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
     val ret = parseTrees(tx, domain, tx.getRootEventIds.asScala.toList).entries

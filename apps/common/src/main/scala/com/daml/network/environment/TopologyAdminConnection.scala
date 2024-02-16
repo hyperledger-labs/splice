@@ -36,7 +36,7 @@ import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{
   StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
-  TimeQueryX,
+  TimeQuery,
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
@@ -83,7 +83,7 @@ abstract class TopologyAdminConnection(
       operation: Option[TopologyChangeOpX] = None,
       filterParty: String = "",
       filterParticipant: String = "",
-      timeQuery: TimeQueryX = TimeQueryX.HeadState,
+      timeQuery: TimeQuery = TimeQuery.HeadState,
       proposals: TopologyTransactionType = AuthorizedState,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipantX]]] = {
     runCmd(
@@ -133,7 +133,7 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = proposals,
-          timeQuery = TimeQueryX.HeadState,
+          timeQuery = TimeQuery.HeadState,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
@@ -176,7 +176,7 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = proposals,
-          timeQuery = TimeQueryX.HeadState,
+          timeQuery = TimeQuery.HeadState,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
@@ -215,7 +215,7 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = proposals.proposals,
-          timeQuery = TimeQueryX.HeadState,
+          timeQuery = TimeQuery.HeadState,
           ops = None,
           filterSigningKey = proposals.signingKey.getOrElse(""),
           protocolVersion = None,
@@ -239,7 +239,7 @@ abstract class TopologyAdminConnection(
 
   def listAllTransactions(
       store: Option[TopologyStoreId],
-      timeQuery: TimeQueryX = TimeQueryX.HeadState,
+      timeQuery: TimeQuery = TimeQuery.HeadState,
       proposals: Boolean = false,
   )(implicit
       tc: TraceContext
@@ -287,7 +287,7 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           filterStore = domainId.map(_.filterString).getOrElse(AuthorizedStore.filterName),
           proposals = false,
-          timeQuery = TimeQueryX.HeadState,
+          timeQuery = TimeQuery.HeadState,
           ops = None,
           filterSigningKey = id.namespace.fingerprint.toProtoPrimitive,
           protocolVersion = None,
@@ -349,7 +349,7 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           filterStore = AuthorizedStore.filterName,
           proposals = false,
-          timeQuery = TimeQueryX.HeadState,
+          timeQuery = TimeQuery.HeadState,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
@@ -375,7 +375,7 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = proposals,
-          timeQuery = TimeQueryX.Range(from = None, until = None),
+          timeQuery = TimeQuery.Range(from = None, until = None),
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
@@ -416,7 +416,7 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = false,
-          timeQuery = TimeQueryX.HeadState,
+          timeQuery = TimeQuery.HeadState,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
@@ -777,7 +777,7 @@ abstract class TopologyAdminConnection(
         "Topology transaction are added",
         listAllTransactions(
           domainId.map(TopologyStoreId.DomainStore(_)),
-          TimeQueryX.Range(None, None),
+          TimeQuery.Range(None, None),
         ).map { stored =>
           val signedStoredTransactions = stored.map(_.transaction.transaction)
           // filter just based on the transaction, ignoring signature differences
@@ -1215,7 +1215,7 @@ abstract class TopologyAdminConnection(
         BaseQueryX(
           domainId.filterString,
           proposals = proposals.proposals,
-          TimeQueryX.HeadState,
+          TimeQuery.HeadState,
           None,
           filterSigningKey = proposals.signingKey.getOrElse(""),
           protocolVersion = None,
@@ -1259,7 +1259,7 @@ abstract class TopologyAdminConnection(
   def listVettedPackages(
       participantId: ParticipantId,
       domainId: DomainId,
-      timeQuery: TimeQueryX = TimeQueryX.HeadState,
+      timeQuery: TimeQuery = TimeQuery.HeadState,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[VettedPackagesX]]] = {
     runCmd(
       TopologyAdminCommandsX.Read.ListVettedPackages(

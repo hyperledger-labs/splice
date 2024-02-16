@@ -6,7 +6,10 @@ stdenv.mkDerivation rec {
   version = sources.version;
   src = builtins.fetchurl {
     url = "https://digitalasset.jfrog.io/artifactory/assembly/daml/${sources.sdk_version}/daml-sdk-${sources.sdk_version}-${if stdenv.isDarwin then "macos" else "linux"}.tar.gz";
-    sha256 = if stdenv.isDarwin then "sha256:0mzx2bza2dmcnsjil2mb0pcwdhhkxcvchg2f9m08pk5j7qd26g76" else "sha256:1vi81hjpwixgw026ql4mh6ry93961fihdfr5hs7sadlqyxkj623n";
+    sha256 =
+      if stdenv.isDarwin
+      then "sha256:0wkih1h9pdgx5a2dqjsfg1d4rk05alczhg2iz4650lmap0q35ryl"
+      else "sha256:1cr6vf1gvyyk7b497zw0jw5349za7sr9hr82b61nf0458z4qjshw";
   };
   dontUnpack = true;
   installPhase = ''

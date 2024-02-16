@@ -15,7 +15,7 @@ import com.digitalasset.canton.console.commands.{
   HealthAdministrationX,
   KeyAdministrationGroup,
   PartiesAdministrationGroupX,
-  TopologyAdministrationGroupX,
+  TopologyAdministrationGroup,
 }
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
@@ -68,7 +68,7 @@ trait CNNodeAppReference extends InstanceReference {
   override def clear_cache(): Unit = ()
 
   // Doesn't make sense for CN
-  override def topology: TopologyAdministrationGroupX = ???
+  override def topology: TopologyAdministrationGroup = ???
 
   // Doesn't make sense for CN
   override def parties: PartiesAdministrationGroupX = ???

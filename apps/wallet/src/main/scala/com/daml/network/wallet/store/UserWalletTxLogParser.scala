@@ -73,7 +73,7 @@ class UserWalletTxLogParser(
     with NamedLogging {
   import UserWalletTxLogParser.*
 
-  private def parseTree(tree: TransactionTreeV2, root: TreeEvent, domainId: DomainId)(implicit
+  private def parseTree(tree: TransactionTree, root: TreeEvent, domainId: DomainId)(implicit
       tc: TraceContext
   ): Eval[State] = {
     import Eval.{now, defer}
@@ -699,7 +699,7 @@ class UserWalletTxLogParser(
         sys.error("The above match should be exhaustive")
     }
   }
-  private def parseTrees(tree: TransactionTreeV2, rootsEventIds: List[String], domainId: DomainId)(
+  private def parseTrees(tree: TransactionTree, rootsEventIds: List[String], domainId: DomainId)(
       implicit tc: TraceContext
   ): Eval[State] = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
@@ -718,7 +718,7 @@ class UserWalletTxLogParser(
     acs.collect(ac => ac.createdEvent match { case CoinCreate(c) => State.fromAcsCoin(ac, c) })
   }
 
-  override def tryParse(tx: TransactionTreeV2, domainId: DomainId)(implicit
+  override def tryParse(tx: TransactionTree, domainId: DomainId)(implicit
       tc: TraceContext
   ): Seq[TxLogEntry] = {
     parseTrees(tx, tx.getRootEventIds.asScala.toList, domainId).value
@@ -730,7 +730,7 @@ class UserWalletTxLogParser(
     Some(UnknownTxLogEntry(eventId))
 
   private def fromCnsEntryPaymentCollection(
-      tree: TransactionTreeV2,
+      tree: TransactionTree,
       exercised: ExercisedEvent,
       domainId: DomainId,
       transactionSubtype: TransferTransactionSubtype,
@@ -881,7 +881,7 @@ object UserWalletTxLogParser {
         a.appended(b)
     }
     def fromCoinExpire(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: TreeEvent,
         owner: String,
         transactionSubtype: BalanceChangeTransactionSubtype,
@@ -899,7 +899,7 @@ object UserWalletTxLogParser {
       )
     }
     def fromCreateTransferOffer(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: ExercisedEvent,
     ): State = {
       val (offerCid, transferOffer) = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
@@ -926,7 +926,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransferOfferAccept(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: ExercisedEvent,
     ): State = {
       val (acceptedCid, acceptedTransferOffer) =
@@ -967,7 +967,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransferOfferComplete(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         node: ExerciseNode[?, AcceptedTransferOffer_Complete.Res],
     ): State = {
       val trackingInfo = node.result.value._1._2
@@ -1008,7 +1008,7 @@ object UserWalletTxLogParser {
     }
 
     def fromTransfer(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: TreeEvent,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
         transactionSubtype: TransferTransactionSubtype,
@@ -1032,7 +1032,7 @@ object UserWalletTxLogParser {
     }
 
     def fromCreateBuyTrafficRequest(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: ExercisedEvent,
     ): State = {
       val buyTrafficRequest = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
@@ -1053,7 +1053,7 @@ object UserWalletTxLogParser {
     }
 
     def fromBuyTrafficRequestComplete(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         node: ExerciseNode[?, BuyTrafficRequest_Complete.Res],
     ): State = {
       val trackingInfo = node.result.value._1._2
@@ -1095,7 +1095,7 @@ object UserWalletTxLogParser {
 
     def fromBuyMemberTraffic(
         node: ExerciseNode[CoinRules_BuyMemberTraffic.Arg, CoinRules_BuyMemberTraffic.Res],
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: ExercisedEvent,
     ): State = {
       val sender = node.argument.value.provider
@@ -1126,7 +1126,7 @@ object UserWalletTxLogParser {
     }
 
     def fromCollectEntryPayment(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: ExercisedEvent,
         stateFromPaymentCollection: State,
         transactionSubtype: TransferTransactionSubtype,
@@ -1147,7 +1147,7 @@ object UserWalletTxLogParser {
       * These are choices that create exactly one new coin in their transaction subtree.
       */
     def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: TreeEvent,
         ccsum: CoinCreateSummary[T],
         transactionSubtype: BalanceChangeTransactionSubtype,
@@ -1172,7 +1172,7 @@ object UserWalletTxLogParser {
     }
 
     def fromNotification(
-        tx: TransactionTreeV2,
+        tx: TransactionTree,
         event: TreeEvent,
         transactionSubtype: NotificationTransactionSubtype,
         details: String,
@@ -1225,7 +1225,7 @@ object UserWalletTxLogParser {
       )
     )
 
-    private def getCoinCreateEvent(tx: TransactionTreeV2, cid: String) = {
+    private def getCoinCreateEvent(tx: TransactionTree, cid: String) = {
       tx.getEventsById.asScala
         .collectFirst {
           case (_, c: CreatedEvent) if c.getContractId == cid =>

@@ -5,7 +5,7 @@ import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TimeQueryX
+import com.digitalasset.canton.topology.store.TimeQuery
 import com.digitalasset.canton.topology.transaction.{PartyToParticipantX, TopologyChangeOpX}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -42,7 +42,7 @@ class SvcPartyHosting(
       party: PartyId,
       domain: DomainId,
       participantId: Option[ParticipantId],
-      timeQuery: TimeQueryX = TimeQueryX.HeadState,
+      timeQuery: TimeQuery = TimeQuery.HeadState,
   )(implicit traceContext: TraceContext): Future[Seq[TopologyResult[PartyToParticipantX]]] =
     participantAdminConnection
       .listPartyToParticipant(
@@ -96,7 +96,7 @@ class SvcPartyHosting(
         svcParty,
         domain,
         None,
-        TimeQueryX.Range(None, None),
+        TimeQuery.Range(None, None),
       )
     } yield {
       // topology read service _should_ sort this but given that we assume everything
