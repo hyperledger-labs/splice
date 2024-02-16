@@ -3,20 +3,19 @@
 Release Notes
 =============
 
-2024-02-26
-----------
-
-* You can now configure Kubernetes affinity and node selection rules for pods deployed as part of CN helm charts.
-  This is done by setting the `affinity` and `nodeSelector` fields in the Helm values files, respectively.
-  For helm charts that deploy persistent volumes, you can additionally configure Kubernetes node affinity for those volumes.
-  This is done by setting the `db.volumeNodeAffinity` field in the respective Helm values files.
-  For all of these fields, the standard Kubernetes configuration syntax applies.
-  See also the examples given (as commented-out lines) in `cometbft-values.yaml`.
-
 2024-02-19
 ----------
 
 * The scan app is now initialized with last computed aggregates from other scans in the SVC.
+
+* Deployment
+
+  * You can now configure Kubernetes affinity and node selection rules for pods deployed as part of CN helm charts.
+    This is done by setting the `affinity` and `nodeSelector` fields in the Helm values files, respectively.
+    For helm charts that deploy persistent volumes, you can additionally configure Kubernetes node affinity for those volumes.
+    This is done by setting the `db.volumeNodeAffinity` field in the respective Helm values files.
+    For all of these fields, the standard Kubernetes configuration syntax applies.
+    See also the examples given (as commented-out lines) in `cometbft-values.yaml`.
 
 2024-02-12
 ----------
