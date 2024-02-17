@@ -131,6 +131,19 @@ workflow:
           parallelism: 1
           requires:
             - cancel_previous_pipelines
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test disaster recovery"
+          test_names_file: "test-full-class-names-disaster-recovery.log"
+          start_canton_options: "-w"
+          resource_class: "xlarge"
+          parallelism: 1
+          requires:
+            - cancel_previous_pipelines
       - ui_test:
           <<: *notify-fail
           context:

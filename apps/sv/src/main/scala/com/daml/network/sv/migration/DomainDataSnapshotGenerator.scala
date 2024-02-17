@@ -4,7 +4,7 @@ import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.migration.{AcsExporter, DarExporter}
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -20,7 +20,8 @@ class DomainDataSnapshotGenerator(
   private val darExporter = new DarExporter(participantAdminConnection)
 
   def getDomainDataSnapshot(
-      timestamp: Instant
+      timestamp: Instant,
+      partyId: Option[PartyId],
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -31,8 +32,7 @@ class DomainDataSnapshotGenerator(
       .exportAcsAtTimestamp(
         globalDomain,
         timestamp,
-        svcStore.key.svParty,
-        svcStore.key.svcParty,
+        partyId.fold(Seq(svcStore.key.svcParty, svcStore.key.svParty))(Seq(_)): _*
       )
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(

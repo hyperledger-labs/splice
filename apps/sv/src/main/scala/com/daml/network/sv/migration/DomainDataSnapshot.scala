@@ -54,5 +54,4 @@ object DomainDataSnapshot {
     acsSnapshot,
     dars,
   )
-
 }

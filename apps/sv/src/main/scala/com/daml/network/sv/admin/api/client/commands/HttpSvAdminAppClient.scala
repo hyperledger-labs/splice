@@ -31,6 +31,7 @@ import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, D
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
@@ -528,7 +529,7 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class GetDomainDataSnapshot(timestamp: Instant)
+  case class GetDomainDataSnapshot(timestamp: Instant, partyId: Option[PartyId])
       extends BaseCommand[
         http.GetDomainDataSnapshotResponse,
         DomainDataSnapshot,
@@ -541,7 +542,8 @@ object HttpSvAdminAppClient {
       HttpResponse,
     ], http.GetDomainDataSnapshotResponse] =
       client.getDomainDataSnapshot(
-        body = definitions.GetDomainDataSnapshotRequest(timestamp.toString),
+        body = definitions
+          .GetDomainDataSnapshotRequest(timestamp.toString, partyId.map(_.toProtoPrimitive)),
         headers = headers,
       )
 

@@ -5,7 +5,7 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.Suite
 
-trait StandaloneCanton extends PostgresAroundAll with NamedLogging with ProcessTestUtil {
+trait StandaloneCanton extends PostgresAroundEach with NamedLogging with ProcessTestUtil {
   self: Suite =>
 
   // While tests do not run in parallel, their initialization does, so we force using unique DB names

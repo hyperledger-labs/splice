@@ -1,14 +1,14 @@
 package com.daml.network.util
 
 import org.postgresql.ds.PGSimpleDataSource
-import org.scalatest.{BeforeAndAfterAll, Suite}
+import org.scalatest.{BeforeAndAfterEach, Suite}
 import org.slf4j.LoggerFactory
 
 import java.sql.Statement
 import scala.util.{Try, Using}
 import cats.syntax.traverse.*
 
-trait PostgresAroundAll extends BeforeAndAfterAll {
+trait PostgresAroundEach extends BeforeAndAfterEach {
   self: Suite =>
 
   def usesDbs: Seq[String]
@@ -28,15 +28,15 @@ trait PostgresAroundAll extends BeforeAndAfterAll {
 
   private val cantonUser = "canton"
 
-  override protected def beforeAll(): Unit = {
+  override protected def beforeEach(): Unit = {
     logger.debug(s"Using postgres on ${hostName}:${port}")
     dropAll()
     usesDbs.foreach(createDb(_))
-    super.beforeAll()
+    super.beforeEach()
   }
 
-  override protected def afterAll(): Unit = {
-    super.afterAll()
+  override protected def afterEach(): Unit = {
+    super.afterEach()
     dropAll().fold(
       err => logger.warn(s"Failed to drop database: $err"),
       _ => logger.debug("Dropped all databases"),

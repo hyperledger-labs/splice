@@ -1210,7 +1210,7 @@ components:
           type: string
         acs_snapshot:
           description: |
-            base64 encoded string of acs snapshot
+            base64 encoded string of acs snapshot for the requested party id, or for the svc and sv parties by default
           type: string
         dars:
           type: array
@@ -1268,6 +1268,8 @@ components:
         - timestamp
       properties:
         timestamp:
+          type: string
+        party_id:
           type: string
 
     GetDomainDataSnapshotResponse:

@@ -575,7 +575,8 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.getDomainNodeIdentitiesDump") { implicit tc => _ =>
       domainDataSnapshotGenerator
         .getDomainDataSnapshot(
-          Instant.parse(body.timestamp)
+          Instant.parse(body.timestamp),
+          body.partyId.map(Codec.tryDecode(Codec.Party)(_)),
         )
         .map { response =>
           SvAdminResource.GetDomainDataSnapshotResponse.OK(
