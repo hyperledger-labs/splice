@@ -144,7 +144,7 @@ class CometBftHttpRpcClient(
           val response = decode[CometBftCallResponse[T]](responseBody)
           response.leftMap(decodeError =>
             // Errors are sometimes propagated with status 200, so we try to decode the error as well
-            decode[CometBftErrorResponse](responseBody)
+            decode[CometBftJsonErrorResponse](responseBody)
               .fold[CometBftError](
                 errDecodingFailure =>
                   CometBftDecodeError(
@@ -159,14 +159,24 @@ class CometBftHttpRpcClient(
               )
           )
         } else {
-          decode[CometBftErrorResponse](responseBody)
+          decode[CometBftJsonErrorResponse](responseBody)
             .fold[CometBftError](
               err =>
-                CometBftDecodeError(
-                  s"Failed to parse json response: $err.",
-                  responseBody,
-                  response.statusCode(),
-                ),
+                // in some cases (eg. if the cometbft api server is down), we can receive a 5xx response from the proxy/load balancer
+                if (response.statusCode() >= 500) {
+                  CometBftHttpError(
+                    response.statusCode(),
+                    CometBftHttpErrorResponse(responseBody),
+                  )
+                } else {
+                  // raise a decode error if we could neither decode a json error response nor is it a 5xx status code
+                  CometBftDecodeError(
+                    s"Failed to parse json response: $err.",
+                    responseBody,
+                    response.statusCode(),
+                  )
+                },
+              // the response body could be successfully decoded as a JSON error response
               CometBftHttpError(
                 response.statusCode(),
                 _,
@@ -206,17 +216,30 @@ object CometBftHttpRpcClient {
     def id: CometBftJsonRpcRequestId // id could be a string (auto-generated UUID in our code) or a number (used by the CometBft Light client during state sync)
   }
 
+  private[cometbft] sealed trait CometBftErrorResponse {
+    def errMessage: String
+  }
+
+  private[cometbft] case class CometBftHttpErrorResponse(
+      error: String
+  ) extends CometBftErrorResponse {
+    def errMessage: String = error
+  }
+
   // Ideally error should be a `String`, as defined by the API spec, but it seems that it's not really enforced and sometimes it's an object
-  private[cometbft] case class CometBftErrorResponse(
+  private[cometbft] case class CometBftJsonErrorResponse(
       jsonrpc: String,
       id: CometBftJsonRpcRequestId,
       error: Json,
   ) extends CometBftJsonHttpResponse
-
-  private[cometbft] object CometBftErrorResponse {
-    implicit val errorDecoder: Decoder[CometBftErrorResponse] =
-      deriveDecoder[CometBftErrorResponse]
+      with CometBftErrorResponse {
+    def errMessage: String = error.noSpaces
   }
+  private[cometbft] object CometBftJsonErrorResponse {
+    implicit val jsonErrorDecoder: Decoder[CometBftJsonErrorResponse] =
+      deriveDecoder[CometBftJsonErrorResponse]
+  }
+
   private[cometbft] case class CometBftCallResponse[T](
       jsonrpc: String,
       id: CometBftJsonRpcRequestId,

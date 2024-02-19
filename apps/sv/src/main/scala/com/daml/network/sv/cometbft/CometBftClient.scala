@@ -4,12 +4,6 @@ import cats.data.EitherT
 import cats.implicits.catsSyntaxTuple4Semigroupal
 import com.daml.network.http.v0.definitions.CometBftJsonRpcRequestId
 import com.daml.network.sv.cometbft.CometBftClient.{CometBftNodeDump, GovernanceAbciQueryParams}
-import com.daml.network.sv.cometbft.CometBftHttpRpcClient.{
-  CometBftError,
-  CometBftErrorResponse,
-  CometBftHttpError,
-  NodeStatus,
-}
 import com.digitalasset.canton.drivers.cometbft.data.CometBftTx
 import com.digitalasset.canton.drivers.cometbft.{
   GetNetworkConfigResponse,
@@ -53,7 +47,7 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
   def nodeStatus()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[NodeStatus] =
+  ): Future[CometBftHttpRpcClient.NodeStatus] =
     client
       .nodeStatus()
       .rethrowAsGrpcException("node status")
@@ -103,25 +97,25 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
 
   private def cometBftErrorToGrpcStatus(error: CometBftHttpRpcClient.CometBftError) = {
     error match {
-      case CometBftHttpError(_, CometBftErrorResponse(_, _, error))
-          if error.noSpaces.contains("tx already exists in cache") =>
-        Status.ABORTED.withDescription(error.noSpaces)
+      case CometBftHttpRpcClient.CometBftHttpError(_, error)
+          if error.errMessage.contains("tx already exists in cache") =>
+        Status.ABORTED.withDescription(error.errMessage)
       case CometBftHttpRpcClient.CometBftHttpError(code, error) if code > 500 =>
-        Status.UNAVAILABLE.withDescription(error.error.noSpaces)
+        Status.UNAVAILABLE.withDescription(error.errMessage)
       case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 500 =>
-        Status.UNKNOWN.withDescription(error.error.noSpaces)
+        Status.UNKNOWN.withDescription(error.errMessage)
       case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 429 =>
-        Status.ABORTED.withDescription(error.error.noSpaces)
+        Status.ABORTED.withDescription(error.errMessage)
       case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 404 =>
-        Status.NOT_FOUND.withDescription(error.error.noSpaces)
+        Status.NOT_FOUND.withDescription(error.errMessage)
       case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 403 =>
-        Status.PERMISSION_DENIED.withDescription(error.error.noSpaces)
+        Status.PERMISSION_DENIED.withDescription(error.errMessage)
       case CometBftHttpRpcClient.CometBftHttpError(code, error) if code == 401 =>
-        Status.UNAUTHENTICATED.withDescription(error.error.noSpaces)
+        Status.UNAUTHENTICATED.withDescription(error.errMessage)
       case CometBftHttpRpcClient.CometBftHttpError(code, error) if code >= 400 =>
-        Status.FAILED_PRECONDITION.withDescription(error.error.noSpaces)
+        Status.FAILED_PRECONDITION.withDescription(error.errMessage)
       case CometBftHttpRpcClient.CometBftHttpError(_, error) =>
-        Status.INTERNAL.withDescription(error.error.noSpaces)
+        Status.INTERNAL.withDescription(error.errMessage)
       case CometBftHttpRpcClient.CometBftDecodeError(message, _, _) =>
         Status.INTERNAL.withDescription(message)
       case CometBftHttpRpcClient.CometBftAbciAppError(message) =>
@@ -131,7 +125,9 @@ class CometBftClient(client: CometBftHttpRpcClient, val loggerFactory: NamedLogg
     }
   }
 
-  implicit class CometBftRethrowExtension[T](response: EitherT[Future, CometBftError, T]) {
+  implicit class CometBftRethrowExtension[T](
+      response: EitherT[Future, CometBftHttpRpcClient.CometBftError, T]
+  ) {
 
     def rethrowAsGrpcException(
         cometBftCall: String
