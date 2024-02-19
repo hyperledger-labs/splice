@@ -6,6 +6,41 @@ export type ChaosMeshArguments = {
   dependsOn: Resource[];
 };
 
+export const podKillSchedule = (
+  chaosMeshNs: k8s.core.v1.Namespace,
+  appName: string,
+  appNs: string,
+  dependsOn: Resource[]
+): k8s.apiextensions.CustomResource =>
+  new k8s.apiextensions.CustomResource(
+    `kill-pod-${appNs}-${appName}`,
+    {
+      apiVersion: 'chaos-mesh.org/v1alpha1',
+      kind: 'Schedule',
+      metadata: {
+        name: `kill-${appNs}-${appName}`,
+        namespace: chaosMeshNs.metadata.name,
+      },
+      spec: {
+        schedule: '@every 5m',
+        historyLimit: 2,
+        concurrencyPolicy: 'Forbid',
+        type: 'PodChaos',
+        podChaos: {
+          action: 'pod-kill',
+          mode: 'one',
+          selector: {
+            labelSelectors: {
+              app: appName,
+            },
+            namespaces: [appNs],
+          },
+        },
+      },
+    },
+    { dependsOn }
+  );
+
 export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3.Release => {
   // chaos-mesh needs custom permissions https://chaos-mesh.org/docs/faqs/#the-default-administrator-google-cloud-user-account-is-forbidden-to-create-chaos-experiments-how-to-fix-it
   const role = new k8s.rbac.v1.ClusterRole('chaos-mesh-role', {
@@ -133,33 +168,14 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
       dependsOn: [ns],
     }
   );
-  new k8s.apiextensions.CustomResource(
-    `kill-pod-sv-4-cometbft`,
-    {
-      apiVersion: 'chaos-mesh.org/v1alpha1',
-      kind: 'Schedule',
-      metadata: {
-        name: 'kill-sv4-cometbft',
-        namespace: ns.metadata.name,
-      },
-      spec: {
-        schedule: '@every 5m',
-        historyLimit: 2,
-        concurrencyPolicy: 'Forbid',
-        type: 'PodChaos',
-        podChaos: {
-          action: 'pod-kill',
-          mode: 'one',
-          selector: {
-            labelSelectors: {
-              app: 'global-domain-0-cometbft',
-            },
-            namespaces: ['sv-4'],
-          },
-        },
-      },
-    },
-    { dependsOn: [roleBinding, ...dependsOn] }
-  );
+  [
+    'global-domain-0-cometbft',
+    'global-domain-0-mediator',
+    'global-domain-0-sequencer',
+    'participant-0',
+    'scan-app-0',
+    'sv-app-0',
+    'validator-app-0',
+  ].forEach(name => podKillSchedule(ns, name, 'sv-4', [roleBinding, ...dependsOn]));
   return chaosMesh;
 };
