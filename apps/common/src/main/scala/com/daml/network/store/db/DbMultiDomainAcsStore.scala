@@ -619,6 +619,7 @@ final class DbMultiDomainAcsStore[TXE](
           case None =>
             action.andThen(updateOffset(offset))
           case Some(_) =>
+            // TODO(#10122) Fail on readOffset > offset
             action.andThen(updateOffset(offset))
         })
         .transactionally

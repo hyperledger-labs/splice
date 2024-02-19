@@ -54,6 +54,7 @@ import io.circe.{Decoder, Encoder}
 import java.time.{Duration, Instant}
 import java.util.Optional
 import scala.annotation.nowarn
+import scala.concurrent.blocking
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -551,12 +552,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected def mkValidatorRewardCoupon(i: Int) = validatorRewardCoupon(i, userParty(i))
 
-  private var offsetCounter = 0
+  private var offsetCounter = 1
 
-  private def nextOffset: String = {
-    val offset = "%08d".format(offsetCounter)
-    offsetCounter += 1
-    offset
+  protected def nextOffset(): String = blocking {
+    synchronized {
+      val offset = "%08d".format(offsetCounter)
+      offsetCounter += 1
+      offset
+    }
   }
 
   protected def mkCreateTx[TCid <: ContractId[T], T](
@@ -578,7 +581,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       acs: Seq[(Contract[?, ?], DomainId, Long)] = Seq.empty,
       incompleteOut: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
       incompleteIn: Seq[(Contract[?, ?], DomainId, DomainId, String, Long)] = Seq.empty,
-      acsOffset: String = nextOffset,
+      acsOffset: String = nextOffset(),
   )(implicit store: MultiDomainAcsStore): Future[Unit] = for {
     _ <- store.ingestionSink.initialize()
     _ <- store.ingestionSink.ingestAcs(
@@ -616,7 +619,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
     def create[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
-        offset: String = nextOffset,
+        offset: String = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(svcParty),
         workflowId: String = "",
@@ -640,7 +643,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
     def createMulti[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
-        offset: String = nextOffset,
+        offset: String = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(svcParty),
         workflowId: String = "",
@@ -669,7 +672,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         c: Contract[TCid, T],
         txEffectiveAt: Instant = defaultEffectiveAt,
     )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
-      val tx = mkTx(nextOffset, Seq(toArchivedEvent(c)), domain, txEffectiveAt)
+      val tx = mkTx(nextOffset(), Seq(toArchivedEvent(c)), domain, txEffectiveAt)
       store.ingestionSink
         .ingestUpdate(
           domain,
@@ -683,7 +686,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def ingest(
         makeTx: String => TransactionTree
     )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
-      val tx = makeTx(nextOffset)
+      val tx = makeTx(nextOffset())
       store.ingestionSink
         .ingestUpdate(
           domain,
@@ -697,7 +700,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def ingestMulti(
         makeTx: String => TransactionTree
     )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
-      val tx = makeTx(nextOffset)
+      val tx = makeTx(nextOffset())
       val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests
       stores
@@ -716,7 +719,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         counter: Long,
     )(implicit store: MultiDomainAcsStore): Future[Reassignment[ReassignmentEvent.Unassign]] = {
       val reassignment = mkReassignment(
-        nextOffset,
+        nextOffset(),
         toUnassignEvent(
           contractAndDomain._1.contractId,
           reassignmentId,
@@ -740,7 +743,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         counter: Long,
     )(implicit store: MultiDomainAcsStore): Future[Reassignment[ReassignmentEvent.Assign]] = {
       val reassignment = mkReassignment(
-        nextOffset,
+        nextOffset(),
         toAssignEvent(
           contractAndDomain._1,
           reassignmentId,
@@ -764,7 +767,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         choiceName: String,
         choiceArgument: damlValue,
         exerciseResult: damlValue,
-        offset: String = nextOffset,
+        offset: String = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
     )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
       val tx = mkTx(

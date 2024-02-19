@@ -38,7 +38,6 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.Fingerprint
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
@@ -54,7 +53,11 @@ import scala.reflect.ClassTag
 import com.digitalasset.canton.util.MonadUtil
 import scala.concurrent.ExecutionContext
 
-abstract class ScanStoreTest extends StoreTest with HasExecutionContext with StoreErrors {
+abstract class ScanStoreTest
+    extends StoreTest
+    with HasExecutionContext
+    with StoreErrors
+    with CoinTransferUtil {
 
   "ScanStore" should {
 
@@ -87,7 +90,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               ),
               coinPrice = 0.0005,
             ),
-            "011",
+            nextOffset(),
           )(
             store.multiDomainAcsStore
           )
@@ -128,7 +131,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               changeToInitialAmountAsOfRoundZero,
               holdingFee,
             ),
-            "011",
+            nextOffset(),
           )(
             store.multiDomainAcsStore
           )
@@ -172,7 +175,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               changeToInitialAmountAsOfRoundZero,
               holdingFee,
             ),
-            "011",
+            nextOffset(),
           )(
             store.multiDomainAcsStore
           )
@@ -252,7 +255,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               ),
               coinPrice = 0.0005,
             ),
-            "011",
+            nextOffset(),
           )(
             store.multiDomainAcsStore
           )
@@ -313,7 +316,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               expireAmount1,
               holdingFee,
             ),
-            "011",
+            nextOffset(),
           )(store.multiDomainAcsStore)
           // "the round where the locked coin expired and for the rounds before and after
           lockedCoinContract = lockedCoin(user2, mintAmount2, 2, holdingFee)
@@ -328,7 +331,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
               expireAmount2,
               holdingFee,
             ),
-            "012",
+            nextOffset(),
           )(
             store.multiDomainAcsStore
           )
@@ -788,7 +791,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
 
     "lookupSvcRules" should {
       "find the latest Svc rules" in {
-        val sr = svcRules()
+        val sr = svcRules(user1)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(sr)(store.multiDomainAcsStore)
@@ -911,9 +914,10 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         val round = 1L
         val now = java.time.Instant.EPOCH
         val zero = BigDecimal(0)
+        val fakeOffset = "0"
         val txs: List[TransferTxLogEntry] = (1 to nrTransfers).map { i =>
           TransferTxLogEntry(
-            offset = s"$i",
+            offset = fakeOffset,
             eventId = s"$i",
             domainId = dummyDomain,
             date = Some(now),
@@ -936,7 +940,8 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             coinPrice = BigDecimal(1.0),
           )
         }.toList
-        def stripEventId(tx: TransferTxLogEntry) = tx.copy(eventId = "")
+        def stripEventIdAndOffset(tx: TransferTxLogEntry) =
+          tx.copy(eventId = "", offset = fakeOffset)
         val expectedFirstPage = txs.reverse.take(limit).toList
         val expectedSecondPage = txs.reverse.drop(limit).take(limit).toList
 
@@ -944,7 +949,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             store: ScanStore,
             coinRulesContract: Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules],
             tx: TransferTxLogEntry,
-            offset: String,
         ) = {
           val senderParty = tx.sender.getOrElse(throw txMissingField()).party
           val senderAmount = tx.sender.getOrElse(throw txMissingField()).inputCoinAmount
@@ -971,7 +975,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
                 balanceChanges = Map(),
                 coinPrice = tx.coinPrice.toDouble,
               ),
-              offset = offset,
             )(
               store.multiDomainAcsStore
             )
@@ -987,7 +990,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
                 store,
                 coinRulesContract,
                 tx,
-                tx.offset,
               )
             }
           }
@@ -998,9 +1000,9 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             .toList
 
           firstPageDescending
-            .map(stripEventId) should be(
+            .map(stripEventIdAndOffset) should be(
             expectedFirstPage
-              .map(stripEventId)
+              .map(stripEventIdAndOffset)
           )
           val nextPageDescending = store
             .listByType[TransferTxLogEntry](
@@ -1012,9 +1014,9 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
             .toList
 
           nextPageDescending
-            .map(stripEventId) should be(
+            .map(stripEventIdAndOffset) should be(
             expectedSecondPage
-              .map(stripEventId)
+              .map(stripEventIdAndOffset)
           )
 
           val firstPageAscending = store
@@ -1059,13 +1061,15 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         }.toSeq)
     }
   }
-  private def mkInputCoin() = {
+}
+trait CoinTransferUtil { self: StoreTest =>
+  def mkInputCoin() = {
     new cc.coinrules.transferinput.InputCoin(
       new cc.coin.Coin.ContractId(nextCid())
     )
   }
 
-  private def mkTransferOutput(
+  def mkTransferOutput(
       receiver: PartyId,
       amount: BigDecimal,
       receiverFeeRatio: BigDecimal = BigDecimal(0.0),
@@ -1077,7 +1081,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Optional.empty(),
     )
 
-  private def mkTransfer(receiver: PartyId, amount: Double) =
+  def mkTransfer(receiver: PartyId, amount: Double) =
     new cc.coinrules.Transfer(
       receiver.toProtoPrimitive,
       receiver.toProtoPrimitive,
@@ -1086,14 +1090,14 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Optional.empty(),
     )
 
-  private def mkTransferContext() = new cc.coinrules.TransferContext(
+  def mkTransferContext() = new cc.coinrules.TransferContext(
     new roundCodegen.OpenMiningRound.ContractId(nextCid()),
     java.util.Map.of(),
     java.util.Map.of(),
     Optional.empty(),
   )
 
-  private def mkTransferInputOutput(
+  def mkTransferInputOutput(
       sender: PartyId,
       provider: PartyId,
       transferInputs: List[cc.coinrules.TransferInput],
@@ -1107,19 +1111,19 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Optional.empty(),
     )
 
-  private def mkCoinRules_Transfer(transfer: cc.coinrules.Transfer) =
+  def mkCoinRules_Transfer(transfer: cc.coinrules.Transfer) =
     new cc.coinrules.CoinRules_Transfer(
       transfer,
       mkTransferContext(),
     ).toValue
 
-  private def mkCoinRulesTransfer(receiver: PartyId, amount: Double) =
+  def mkCoinRulesTransfer(receiver: PartyId, amount: Double) =
     new cc.coinrules.CoinRules_Transfer(
       mkTransfer(receiver, amount),
       mkTransferContext(),
     ).toValue
 
-  private def mkTransferSummary(
+  def mkTransferSummary(
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
       inputSvRewardAmount: Double,
@@ -1144,7 +1148,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     java.util.Optional.empty(),
   )
 
-  private def mkTransferResult(
+  def mkTransferResult(
       round: Long,
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
@@ -1168,7 +1172,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Optional.empty(),
     ).toValue
 
-  private def mkBuyMemberTrafficResult(
+  def mkBuyMemberTrafficResult(
       round: Long,
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
@@ -1193,7 +1197,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       Optional.empty(),
     ).toValue
 
-  private def coinRulesBuyMemberTrafficTransaction(
+  def coinRulesBuyMemberTrafficTransaction(
       provider: PartyId,
       memberId: Member,
       round: Long,
@@ -1254,7 +1258,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
   }
 
   /** A CoinRules_Mint exercise event with one child Coin create event */
-  private def mintTransaction(
+  def mintTransaction(
       receiver: PartyId,
       amount: Double,
       round: Long,
@@ -1294,17 +1298,17 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     )
   }
 
-  private def mkCoinExpire() =
+  def mkCoinExpire() =
     new coinCodegen.Coin_Expire(
       new roundCodegen.OpenMiningRound.ContractId(nextCid())
     ).toValue
 
-  private def mkLockedCoinExpireCoin() =
+  def mkLockedCoinExpireCoin() =
     new coinCodegen.LockedCoin_ExpireCoin(
       new roundCodegen.OpenMiningRound.ContractId(nextCid())
     ).toValue
 
-  private def mkCoinExpireSummary(
+  def mkCoinExpireSummary(
       owner: PartyId,
       round: Long,
       changeToInitialAmountAsOfRoundZero: Double,
@@ -1317,7 +1321,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       new java.math.BigDecimal(changeToHoldingFeesRate),
     ).toValue
 
-  private def importCrate(receiver: PartyId, n: Int) = {
+  def importCrate(receiver: PartyId, n: Int) = {
     val template = new ImportCrate(
       svcParty.toProtoPrimitive,
       receiver.toProtoPrimitive,
@@ -1330,7 +1334,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     )
   }
 
-  private def coinTemplate(amount: Double, owner: PartyId) = {
+  def coinTemplate(amount: Double, owner: PartyId) = {
     new Coin(
       svcParty.toProtoPrimitive,
       owner.toProtoPrimitive,
@@ -1339,13 +1343,14 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     )
   }
 
-  private def expiringAmount(amount: Double) = new cc.fees.ExpiringAmount(
+  def expiringAmount(amount: Double) = new cc.fees.ExpiringAmount(
     numeric(amount),
     new cc.types.Round(0L),
     new cc.fees.RatePerRound(numeric(amount)),
   )
 
-  private def svcRules(
+  def svcRules(
+      party: PartyId,
       members: java.util.Map[String, svcrulesCodegen.MemberInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
@@ -1356,7 +1361,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
       epoch,
       members,
       Collections.emptyMap(),
-      user1.toProtoPrimitive,
+      party.toProtoPrimitive,
       new svcrulesCodegen.SvcRulesConfig(
         1,
         1,
@@ -1387,7 +1392,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     )
   }
 
-  private def cnsEntry(n: Int, name: String) = {
+  def cnsEntry(n: Int, name: String) = {
     val template = new CnsEntry(
       userParty(n).toProtoPrimitive,
       svcParty.toProtoPrimitive,
@@ -1404,7 +1409,7 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     )
   }
 
-  private def memberTraffic(member: Member, totalPurchased: Long) = {
+  def memberTraffic(member: Member, totalPurchased: Long) = {
     val template = new MemberTraffic(
       svcParty.toProtoPrimitive,
       member.toProtoPrimitive,
@@ -1422,7 +1427,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
     )
   }
 
-  lazy val offset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive
 }
 
@@ -1440,7 +1444,7 @@ class InMemoryScanStoreTest extends ScanStoreTest {
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )
@@ -1490,7 +1494,7 @@ class DbScanStoreTest
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
       _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+        .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )
