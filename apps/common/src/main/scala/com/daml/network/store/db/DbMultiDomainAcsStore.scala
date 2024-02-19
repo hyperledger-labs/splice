@@ -1334,7 +1334,7 @@ object DbMultiDomainAcsStore {
         !offset.exists(inMemoryOffset =>
           lastIngestedOffset.exists(dbOffset => inMemoryOffset > dbOffset)
         ),
-        "Cached offset was newer than offset stored in the database",
+        s"Cached offset ${offset} newer than offset stored in the database ${lastIngestedOffset}",
       )
       val nextOffsetChanged = if (offset == lastIngestedOffset) offsetChanged else Promise[Unit]()
       this.copy(
