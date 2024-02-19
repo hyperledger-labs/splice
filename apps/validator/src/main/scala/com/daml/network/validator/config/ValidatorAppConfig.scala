@@ -159,6 +159,7 @@ case class ValidatorAppBackendConfig(
     domainMigrationId: Long = 0L,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(5),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(),
+    ingestFromParticipantBegin: Boolean = false,
 ) extends CNNodeBackendConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

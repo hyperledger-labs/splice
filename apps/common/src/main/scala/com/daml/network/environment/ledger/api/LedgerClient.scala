@@ -55,6 +55,8 @@ final case object NoDedup extends DedupConfig
 
 final case class DedupOffset(offset: String) extends DedupConfig
 
+final case object DedupBeginOffset extends DedupConfig
+
 final case class DedupDuration(duration: Duration) extends DedupConfig
 
 /** Ledger client built on top of the Java bindings. The Java equivalent of
@@ -208,6 +210,7 @@ private[environment] class LedgerClient(
         commandsBuilder.setDeduplicationOffset(offset)
       case DedupDuration(duration) =>
         commandsBuilder.setDeduplicationDuration(duration)
+      case DedupBeginOffset =>
       case NoDedup =>
     }
 

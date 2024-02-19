@@ -9,7 +9,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
 import com.daml.metrics.api.MetricsContext
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.environment.ParticipantAdminConnection
+import com.daml.network.environment.{BaseLedgerConnection, ParticipantAdminConnection}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -594,22 +594,18 @@ object MultiDomainAcsStore {
     ): Future[Unit]
   }
 
-  // We use a synthetic 0 offset here. This is easier to manage than having to use ParticpantOffset
-  // in the store APIs everywhere instead of a plain string.
-  private val PARTICIPANT_BEGIN_OFFSET = "0"
-
   def fromParticipantOffset(offset: ParticipantOffset): String =
     offset.value match {
       case ParticipantOffset.Value.Boundary(
             ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN
           ) =>
-        PARTICIPANT_BEGIN_OFFSET
+        BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET
       case ParticipantOffset.Value.Absolute(offset) => offset
       case offset => throw new IllegalArgumentException(s"Cannot convert $offset to string")
     }
 
   def toParticipantOffset(offset: String): ParticipantOffset =
-    if (offset == PARTICIPANT_BEGIN_OFFSET)
+    if (offset == BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET)
       ParticipantOffset(
         ParticipantOffset.Value.Boundary(ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN)
       )

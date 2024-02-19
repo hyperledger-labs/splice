@@ -28,7 +28,7 @@ import io.grpc.Status
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future, Promise}
-import ParticipantAdminConnection.HasParticipantId
+import ParticipantAdminConnection.{HasParticipantId, IMPORT_ACS_WORKFLOW_ID_PREFIX}
 import com.digitalasset.canton.admin.participant.v30.{DarDescription, ExportAcsResponse}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 
@@ -184,7 +184,8 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     runCmd(
-      ParticipantAdminCommands.ParticipantRepairManagement.ImportAcs(acsBytes, "")
+      ParticipantAdminCommands.ParticipantRepairManagement
+        .ImportAcs(acsBytes, IMPORT_ACS_WORKFLOW_ID_PREFIX)
     )
   }
 
@@ -468,6 +469,8 @@ object ParticipantAdminConnection {
   import com.digitalasset.canton.admin.participant.v30.*
   import com.digitalasset.canton.admin.participant.v30.PackageServiceGrpc.PackageServiceStub
   import io.grpc.ManagedChannel
+
+  final val IMPORT_ACS_WORKFLOW_ID_PREFIX = "canton-network-acs-import"
 
   // The Canton APIs insist on writing the bytestring to a file so we define
   // our own variant.

@@ -8,6 +8,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, Tra
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
+import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
@@ -51,6 +52,7 @@ import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
 import scala.collection.mutable
+import scala.reflect.ClassTag
 
 final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
@@ -336,6 +338,21 @@ final class DbMultiDomainAcsStore[TXE](
       .map(assignedContractFromRow(companion)(_))
   }
 
+  def listTxLogEntries()(implicit tc: TraceContext, tag: ClassTag[TXE]): Future[Seq[TXE]] = {
+    storage
+      .query(
+        selectFromTxLogTable(
+          txLogTableName,
+          storeId,
+          where = sql"true",
+        ),
+        "listTextLogEntry",
+      )
+      .map { rows =>
+        rows.map(txLogEntryFromRow[TXE](txLogConfig))
+      }
+  }
+
   private val defaultPageSizeForContractStream = PageLimit.tryCreate(100)
 
   /** Returns a stream of contracts with their current state.
@@ -552,7 +569,7 @@ final class DbMultiDomainAcsStore[TXE](
         lastIngestedOffset.foreach(oldState.signalOffsetChanged)
 
         if (alreadyIngestedAcs) {
-          logger.info(s"Store $storeDescriptor resumed with storeId $newStoreId")
+          logger.info(s"Store $storeDescriptor resumed with storeId $newStoreId domainMigrationId")
           finishedAcsIngestion.trySuccess(()).discard
         } else {
           logger.info(s"Store $storeDescriptor initialized with storeId $newStoreId")
@@ -916,7 +933,10 @@ final class DbMultiDomainAcsStore[TXE](
         )
         .toVector
         .map(_._2)
-      val txLogEntries = txLogConfig.parser.parse(tree, domainId, logger)
+      val txLogEntries =
+        if (!tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX))
+          txLogConfig.parser.parse(tree, domainId, logger)
+        else Seq.empty // do not parse events imported from acs
 
       for {
         _ <- storage

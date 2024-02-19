@@ -35,6 +35,7 @@ class UserWalletService(
     scanConnection: BftScanConnection,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
+    ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -81,6 +82,7 @@ class UserWalletService(
     clock,
     scanConnection,
     retryProvider,
+    ingestFromParticipantBegin,
     loggerFactory,
   )
 

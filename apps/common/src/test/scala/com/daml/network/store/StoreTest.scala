@@ -565,11 +565,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       effectiveAt: Instant,
       createdEventSignatories: Seq[PartyId],
       domainId: DomainId,
+      workflowId: String,
   ) = mkTx(
     offset,
     createRequests.map[TreeEvent](toCreatedEvent(_, createdEventSignatories)),
     domainId,
     effectiveAt,
+    workflowId,
   )
 
   protected def acs(
@@ -617,6 +619,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         offset: String = nextOffset,
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(svcParty),
+        workflowId: String = "",
     )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
@@ -624,6 +627,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         txEffectiveAt,
         createdEventSignatories,
         domain,
+        workflowId,
       )
 
       store.ingestionSink
@@ -639,6 +643,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         offset: String = nextOffset,
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(svcParty),
+        workflowId: String = "",
     )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
@@ -646,6 +651,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         txEffectiveAt,
         createdEventSignatories,
         domain,
+        workflowId,
       )
       val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests
@@ -783,6 +789,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       events: Seq[TreeEvent],
       domainId: DomainId,
       effectiveAt: Instant = defaultEffectiveAt,
+      workflowId: String = "",
   ): TransactionTree = {
     val updateId = nextUpdateId()
     val eventsWithId = events.zipWithIndex.map { case (e, i) =>
@@ -793,7 +800,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     new TransactionTree(
       updateId,
       "",
-      "",
+      workflowId,
       effectiveAt,
       offset,
       eventsById.asJava,

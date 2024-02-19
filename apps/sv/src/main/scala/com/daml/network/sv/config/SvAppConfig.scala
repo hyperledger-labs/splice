@@ -179,6 +179,7 @@ case class SvAppBackendConfig(
     domainMigrationId: Long = 0L,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
+    ingestFromParticipantBegin: Boolean = false,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

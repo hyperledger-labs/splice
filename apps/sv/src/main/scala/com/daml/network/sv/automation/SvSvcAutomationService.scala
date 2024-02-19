@@ -86,6 +86,7 @@ class SvSvcAutomationService(
         ),
       ledgerClient,
       retryProvider,
+      config.ingestFromParticipantBegin,
     ) {
 
   override def companion = SvSvcAutomationService

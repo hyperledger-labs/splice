@@ -441,6 +441,7 @@ class ValidatorApp(
           scanConnection,
           loggerFactory,
           config.domainMigrationId,
+          config.ingestFromParticipantBegin,
         )
       automation = new ValidatorAutomationService(
         config.automation,
@@ -459,6 +460,7 @@ class ValidatorApp(
         participantIdentitiesStore,
         config.domainMigrationPath,
         retryProvider,
+        config.ingestFromParticipantBegin,
         loggerFactory,
       )
       domainId <- appInitStep(s"Wait for domain connection on ${config.domains.global.alias}") {

@@ -46,6 +46,7 @@ class ValidatorAutomationService(
     participantIdentitiesStore: NodeIdentitiesStore,
     domainMigrationDumpPath: Option[Path],
     retryProvider: RetryProvider,
+    ingestFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -64,6 +65,7 @@ class ValidatorAutomationService(
       ),
       ledgerClient,
       retryProvider,
+      ingestFromParticipantBegin,
     ) {
   override def companion = ValidatorAutomationService
 

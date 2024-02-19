@@ -43,6 +43,7 @@ class SvSvAutomationService(
         ),
       ledgerClient,
       retryProvider,
+      config.ingestFromParticipantBegin,
     ) {
   override def companion = SvSvAutomationService
   registerTrigger(new ExpireValidatorOnboardingTrigger(triggerContext, svStore, connection))

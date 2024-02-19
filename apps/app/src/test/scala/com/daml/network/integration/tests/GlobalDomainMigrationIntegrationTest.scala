@@ -8,12 +8,11 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
 import com.daml.network.codegen.java.cn.svcrules.{DomainUpgradeSchedule, SvcRules_AddMember}
 import com.daml.network.config.{
-  CNDbConfig,
   CNNodeConfigTransforms,
   CNParticipantClientConfig,
   NetworkAppClientConfig,
 }
-import CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.{
   ScanAppBackendReference,
   ValidatorAppBackendReference,
@@ -31,7 +30,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.migrationDumpDir
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
@@ -77,8 +75,6 @@ class GlobalDomainMigrationIntegrationTest
   override def dbsSuffix = "domain_migration"
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
-  // TODO(#9014) make it work with persistent stores
-  registerPlugin(new UseInMemoryStores(loggerFactory))
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -127,14 +123,13 @@ class GlobalDomainMigrationIntegrationTest
             InstanceName.tryCreate("sv1ScanLocal") ->
               config
                 .scanApps(InstanceName.tryCreate("sv1Scan"))
-                .copy()
+                .copy(domainMigrationId = 1L)
           ),
           validatorApps = config.validatorApps + (
             InstanceName.tryCreate("sv1ValidatorLocal") ->
               config
                 .validatorApps(InstanceName.tryCreate("sv1Validator"))
                 .copy(
-                  storage = CNDbConfig.Memory(),
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
                   domains = ValidatorDomainConfig(global =
                     ValidatorGlobalDomainConfig(
@@ -142,6 +137,7 @@ class GlobalDomainMigrationIntegrationTest
                       url = Some("http://localhost:27109"),
                     )
                   ),
+                  domainMigrationId = 1L,
                 )
           ) + (
             InstanceName.tryCreate("aliceValidatorLocal") -> {
@@ -157,7 +153,8 @@ class GlobalDomainMigrationIntegrationTest
                           port = Port.tryCreate(5901)
                         )
                     ),
-                  )
+                  ),
+                  domainMigrationId = 1L,
                 )
             }
           ),
@@ -221,6 +218,15 @@ class GlobalDomainMigrationIntegrationTest
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[SvRewardTrigger]
           )(conf),
+      )
+      .addConfigTransforms(
+        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInSv(c) }
+      )
+      .addConfigTransformsToFront(
+        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
+      )
+      .addConfigTransformsToFront(
+        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInValidator(c) }
       )
       .withManualStart
 
@@ -501,20 +507,9 @@ class GlobalDomainMigrationIntegrationTest
             }
           }
 
-          // TODO(#9977)
-          loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
-            startAllSync(
-              sv1ScanLocalBackend,
-              sv1ValidatorLocalBackend,
-            ),
-            (
-                entries =>
-                  forAll(entries) {
-                    _.errorMessage should include(
-                      "Unexpected coin create event"
-                    )
-                  }
-            ),
+          startAllSync(
+            sv1ScanLocalBackend,
+            sv1ValidatorLocalBackend,
           )
 
           sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
@@ -522,16 +517,14 @@ class GlobalDomainMigrationIntegrationTest
           clue("Old wallet balance is recorded") {
             assertInRange(sv1WalletLocalClient.balance().unlockedQty, (1000, 2000))
           }
-          // TODO(#9014) make this work (with persistent stores)
-          // clue("Old scan transaction history is recorded"){
-          //   countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual (1)
-          //   countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual (0)
-          // }
+          clue("Old scan transaction history is recorded") {
+            countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
+            countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 0
+          }
           actAndCheck("Create some new transaction history", sv1WalletLocalClient.tap(1338))(
             "New transaction history is recorded and balance is updated",
             _ => {
-              // TODO(#9014) make this work (with persistent stores)
-              // countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual (1)
+              countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
               countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 1
               assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 4000))
             },

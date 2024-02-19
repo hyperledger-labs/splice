@@ -38,6 +38,7 @@ class UserWalletManager(
     override val loggerFactory: NamedLoggerFactory,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
+    ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -129,6 +130,7 @@ class UserWalletManager(
         userLoggerFactory,
         scanConnection,
         domainMigrationId,
+        ingestFromParticipantBegin,
       )
 
       val wasUserAdded = endUserWalletsMap

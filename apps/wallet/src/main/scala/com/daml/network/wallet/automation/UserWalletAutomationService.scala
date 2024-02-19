@@ -34,6 +34,7 @@ class UserWalletAutomationService(
     clock: Clock,
     scanConnection: BftScanConnection,
     retryProvider: RetryProvider,
+    ingestFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -51,6 +52,7 @@ class UserWalletAutomationService(
       ),
       ledgerClient,
       retryProvider,
+      ingestFromParticipantBegin,
     ) {
   override def companion = UserWalletAutomationService
 

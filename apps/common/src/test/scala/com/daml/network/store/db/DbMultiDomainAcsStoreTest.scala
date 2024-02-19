@@ -2,6 +2,7 @@ package com.daml.network.store.db
 
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
+import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.StoreTest.{TestTxLogEntry, testTxLogConfig}
 import com.daml.network.store.{MultiDomainAcsStore, MultiDomainAcsStoreTest}
@@ -32,6 +33,7 @@ class DbMultiDomainAcsStoreTest
       val store2 = mkStore(id = 2)
       val coupon1 = c(1)
       val coupon2 = c(2)
+      val coupon3 = c(3)
       for {
         _ <- acs()(store1)
         _ <- acs()(store1MigrationId1) // store1 with different migration id
@@ -39,18 +41,25 @@ class DbMultiDomainAcsStoreTest
         _ <- acs()(store2)
         _ <- d1.create(coupon1)(store1)
         _ <- d1.create(coupon2)(store1MigrationId1)
+        txLogs <- store1MigrationId1.listTxLogEntries()
+        _ = txLogs should have size 2 // tx log entries of coupon 1 and coupon 2
+        _ <- d1.create(coupon3, workflowId = IMPORT_ACS_WORKFLOW_ID_PREFIX)(store1MigrationId1)
+        txLogsAfterCreatingCoupon3 <- store1MigrationId1.listTxLogEntries()
+        _ =
+          // number of tx event remains unchanged as the acs import of the create event is skipped
+          txLogsAfterCreatingCoupon3 should have size 2
         _ <- d1.create(coupon1)(store2)
         _ <- assertList(coupon1 -> Some(d1))(
           store1
         ) // only fetched 1 coupon with matching migration id
-        _ <- assertList(coupon2 -> Some(d1))(
+        _ <- assertList(coupon2 -> Some(d1), coupon3 -> Some(d1))(
           store1MigrationId1
-        ) // only fetched 1 coupon with matching migration id
+        ) // fetched 2 coupons with matching migration id
         _ <- assertList(coupon1 -> Some(d1))(store2)
         _ <- d1.archive(coupon1)(store1)
         _ <- assertList()(store1) // deleted from store1
         _ <- assertList(coupon1 -> Some(d1))(store2) // but not from store2
-        _ <- assertList(coupon2 -> Some(d1))(
+        _ <- assertList(coupon2 -> Some(d1), coupon3 -> Some(d1))(
           store1MigrationId1
         ) // and not from store1 with migrationId=1
       } yield succeed

@@ -619,6 +619,20 @@ object CNNodeConfigTransforms {
       )
     })
 
+  def ingestFromParticipantBeginInSv: CNNodeConfigTransform =
+    updateAllSvAppConfigs_(c =>
+      c.copy(
+        ingestFromParticipantBegin = true
+      )
+    )
+
+  def ingestFromParticipantBeginInValidator: CNNodeConfigTransform =
+    updateAllValidatorAppConfigs_(c =>
+      c.copy(
+        ingestFromParticipantBegin = true
+      )
+    )
+
   def ingestFromParticipantBeginInScan: CNNodeConfigTransform =
     updateAllScanAppConfigs_(c =>
       c.copy(

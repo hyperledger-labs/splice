@@ -21,6 +21,7 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, HasCommands, Update}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
+  DedupBeginOffset,
   DedupConfig,
   DedupOffset,
   IncompleteReassignmentEvent,
@@ -40,6 +41,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.daml.ledger.api.v2 as lapi
+import com.daml.network.environment.BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET
 import com.digitalasset.canton.topology.{DomainId, Identifier, Namespace, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
@@ -949,6 +951,10 @@ object BaseLedgerConnection {
 
   val APP_MANAGER_ISSUER: String = "app_manager"
 
+  // We use a synthetic 0 offset here. This is easier to manage than having to use ParticpantOffset
+  // in the store APIs everywhere instead of a plain string.
+  val PARTICIPANT_BEGIN_OFFSET = "0"
+
   /** In a number of places we want to use a user id in a place where a `PartyString` expected, e.g.,
     * in party id hints and in workflow ids. However, the allowed set of characters is slightly different so
     * this function can be used to perform the necessary escaping. Note that PartyString is more restrictive than
@@ -1049,10 +1055,13 @@ object CNLedgerConnection {
       private[CNLedgerConnection] val split: CmdId => (String, DedupConfig)
   )
   object SubmitDedup {
-    implicit val dedupOffset: SubmitDedup[(CommandId, String)] = SubmitDedup { case (cid, offset) =>
-      (cid.commandIdForSubmission, DedupOffset(offset))
+    implicit val dedupOffset: SubmitDedup[(CommandId, String)] = SubmitDedup {
+      case (cid, PARTICIPANT_BEGIN_OFFSET) => (cid.commandIdForSubmission, DedupBeginOffset)
+      case (cid, offset) => (cid.commandIdForSubmission, DedupOffset(offset))
     }
     implicit val dedupConfig: SubmitDedup[(CommandId, DedupConfig)] = SubmitDedup {
+      case (cid, DedupOffset(PARTICIPANT_BEGIN_OFFSET)) =>
+        (cid.commandIdForSubmission, DedupBeginOffset)
       case (cid, dc) =>
         (cid.commandIdForSubmission, dc)
     }
