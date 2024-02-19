@@ -108,7 +108,7 @@ class JoiningNodeInitializer(
           )
         },
         for {
-          _ <- participantAdminConnection.ensureDomainRegistered(
+          _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
             domainConfig,
             RetryFor.WaitingOnInitDependency,
           )

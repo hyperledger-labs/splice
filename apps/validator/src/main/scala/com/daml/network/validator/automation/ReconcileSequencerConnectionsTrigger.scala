@@ -50,7 +50,7 @@ class ReconcileSequencerConnectionsTrigger(
               logger,
               domainTime,
             )
-            _ <- participantAdminConnection.modifyDomainConnectionConfig(
+            _ <- participantAdminConnection.modifyDomainConnectionConfigAndReconnect(
               globalDomainAlias, // TODO (#8450) how?
               modifySequencerConnections(sequencerConnections),
             )

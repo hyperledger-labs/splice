@@ -114,7 +114,7 @@ class ParticipantAdminConnection(
   ): Future[Unit] =
     runCmd(ParticipantAdminCommands.DomainConnectivity.DisconnectDomain(alias))
 
-  def ensureDomainRegistered(
+  def ensureDomainRegisteredAndConnected(
       config: DomainConnectionConfig,
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] = for {
@@ -219,7 +219,7 @@ class ParticipantAdminConnection(
       ParticipantAdminCommands.DomainConnectivity.ModifyDomainConnection(config)
     )
 
-  def modifyDomainConnectionConfig(
+  def modifyDomainConnectionConfigAndReconnect(
       domain: DomainAlias,
       f: DomainConnectionConfig => Option[DomainConnectionConfig],
   )(implicit traceContext: TraceContext): Future[Unit] =

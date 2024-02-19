@@ -47,7 +47,7 @@ class LocalSequencerConnectionsTrigger(
         )
         Future.unit
       } { publishedSequencerInfo =>
-        participantAdminConnection.modifyDomainConnectionConfig(
+        participantAdminConnection.modifyDomainConnectionConfigAndReconnect(
           globalDomainAlias,
           setLocalSequencerConnection(
             publishedSequencerInfo,

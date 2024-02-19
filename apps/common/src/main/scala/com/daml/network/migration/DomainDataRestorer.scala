@@ -19,7 +19,7 @@ class DomainDataRestorer(
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  /** We assume the domain was not registered prior to trying to restore the data.
+  /** We assume the domain was not register prior to trying to restore the data.
     * We will register the domain with the manualConnect and initializeFromTrustedDomain flags set to true and use that as a check if the import failed after registering the domain so we know we can retry
     */
   def connectDomainAndRestoreData(
@@ -39,47 +39,58 @@ class DomainDataRestorer(
         )
         .flatMap {
           case Some(config) if config.initializeFromTrustedDomain =>
-            importDarsAndAcs(dars, acsSnapshot)
+            importAcs(acsSnapshot)
+          case Some(config) if config.manualConnect =>
+            importAcs(acsSnapshot)
           case None =>
-            // TODO(#10052) do not connect to the domain before importing the ACS
-            participantAdminConnection
-              .ensureDomainRegistered(
-                DomainConnectionConfig(
-                  domainAlias,
-                  domainId = Some(domainId),
-                  sequencerConnections = sequencerConnections,
-                  initializeFromTrustedDomain = true,
-                  manualConnect = true,
-                ),
-                RetryFor.ClientCalls,
-              )
-              .flatMap(_ => importDarsAndAcs(dars, acsSnapshot))
+            val domainConnectionConfig = DomainConnectionConfig(
+              domainAlias,
+              domainId = Some(domainId),
+              sequencerConnections = sequencerConnections,
+              manualConnect = true,
+            )
+            for {
+              _ <- importDars(dars)
+              _ = logger.info("Imported all the dars.")
+              _ <-
+                // TODO(#10052) do not connect to the domain before importing the ACS
+                participantAdminConnection
+                  .ensureDomainRegisteredAndConnected(
+                    domainConnectionConfig,
+                    RetryFor.ClientCalls,
+                  )
+              _ <- participantAdminConnection.disconnectDomain(domainAlias)
+              _ = logger.info("Importing the ACS")
+              _ <- importAcs(acsSnapshot)
+              _ = logger.info("Imported the ACS")
+            } yield ()
           case Some(_) =>
             logger.info("Domain is already registered and initialized")
             Future.unit
         }
-      _ <- participantAdminConnection.modifyDomainConnectionConfig(
+      _ <- participantAdminConnection.modifyDomainConnectionConfigAndReconnect(
         domainAlias,
         c =>
           Some(
             c.copy(
-              initializeFromTrustedDomain = false,
-              manualConnect = false,
+              manualConnect = false
             )
           ),
       )
-      _ <- participantAdminConnection.reconnectDomain(domainAlias)
       _ = logger.info("domain is reconnected")
     } yield ()
   }
 
-  private def importDarsAndAcs(dars: Seq[Dar], acs: ByteString)(implicit tc: TraceContext) = {
-    for {
-      // TODO(#10052) do not connect to the domain before importing the ACS
-      _ <- participantAdminConnection.disconnectFromAllDomains()
-      _ = logger.info(s"Disconnected from all domains")
-      // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
-      _ <- MonadUtil.sequentialTraverse(dars.map { dar =>
+  private def importAcs(acs: ByteString)(implicit tc: TraceContext) = {
+    participantAdminConnection.uploadAcsSnapshot(
+      acs
+    )
+  }
+
+  private def importDars(dars: Seq[Dar])(implicit tc: TraceContext) = {
+    // TODO(#5141): allow limit parallel upload once Canton deals with concurrent uploads
+    MonadUtil
+      .sequentialTraverse(dars.map { dar =>
         UploadablePackage.fromByteString(dar.hash.toHexString, dar.content)
       }) { dar =>
         participantAdminConnection.uploadDarFileLocally(
@@ -87,14 +98,9 @@ class DomainDataRestorer(
           RetryFor.WaitingOnInitDependency,
         )
       }
-      _ = logger.info("uploaded all dars to the participant.")
-
-      _ <- participantAdminConnection.uploadAcsSnapshot(
-        acs
-      )
-      _ = logger.info("Acs snapshot is restored")
-
-    } yield ()
+      .map { _ =>
+        ()
+      }
   }
 
 }

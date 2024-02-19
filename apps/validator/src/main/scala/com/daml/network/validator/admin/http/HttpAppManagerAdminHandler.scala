@@ -192,7 +192,7 @@ class HttpAppManagerAdminHandler(
         // TODO(#7206) Consider switching this to a reconciliation trigger to avoid
         // partial changes where we change domain config/dars but don't store the ApprovedReleaseConfiguration.
         _ <- releaseConfig.domains.traverse_ { domain =>
-          participantAdminConnection.ensureDomainRegistered(
+          participantAdminConnection.ensureDomainRegisteredAndConnected(
             DomainConnectionConfig(
               // TODO(#6839) Fix the alias here, we can't assume that app providers use distinct aliases.
               DomainAlias.tryCreate(domain.alias),

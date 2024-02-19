@@ -111,7 +111,7 @@ class FoundingNodeInitializer(
     for {
       (namespace, domainId) <- bootstrapDomain(localDomainNode)
       _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
-      _ <- participantAdminConnection.ensureDomainRegistered(
+      _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
         DomainConnectionConfig(
           config.domains.global.alias,
           sequencerConnections = SequencerConnections.single(

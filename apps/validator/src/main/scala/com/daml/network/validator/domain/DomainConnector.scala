@@ -55,7 +55,7 @@ class DomainConnector(
       SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)),
     )
     logger.info(s"Ensuring domain registered with config $domainConfig")
-    participantAdminConnection.ensureDomainRegistered(
+    participantAdminConnection.ensureDomainRegisteredAndConnected(
       domainConfig,
       RetryFor.WaitingOnInitDependency,
     )
@@ -89,7 +89,7 @@ class DomainConnector(
           )
       }
       _ = logger.info(s"Ensuring domain registered with config from scan $domainConfig")
-      _ <- participantAdminConnection.ensureDomainRegistered(
+      _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
         domainConfig,
         RetryFor.WaitingOnInitDependency,
       )
