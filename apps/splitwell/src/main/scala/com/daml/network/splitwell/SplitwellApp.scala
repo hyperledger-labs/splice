@@ -100,6 +100,7 @@ class SplitwellApp(
     )
     participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
+      coinAppParameters.loggingConfig.api,
       loggerFactory,
       retryProvider,
       clock,

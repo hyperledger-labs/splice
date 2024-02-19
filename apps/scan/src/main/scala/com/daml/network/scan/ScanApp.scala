@@ -121,12 +121,14 @@ class ScanApp(
       )
       participantAdminConnection = new ParticipantAdminConnection(
         config.participantClient.adminApi,
+        coinAppParameters.loggingConfig.api,
         loggerFactory,
         retryProvider,
         clock,
       )
       sequencerAdminConnection = new SequencerAdminConnection(
         config.sequencerAdminClient,
+        coinAppParameters.loggingConfig.api,
         loggerFactory,
         retryProvider,
         clock,

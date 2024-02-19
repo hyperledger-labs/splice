@@ -115,6 +115,7 @@ class SvApp(
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
+      coinAppParameters.loggingConfig.api,
       loggerFactory,
       retryProvider,
       clock,
@@ -158,6 +159,7 @@ class SvApp(
   ): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
+      coinAppParameters.loggingConfig.api,
       loggerFactory,
       retryProvider,
       clock,
@@ -168,12 +170,14 @@ class SvApp(
         new LocalDomainNode(
           new SequencerAdminConnection(
             config.sequencer.adminApi,
+            coinAppParameters.loggingConfig.api,
             loggerFactory,
             retryProvider,
             clock,
           ),
           new MediatorAdminConnection(
             config.mediator.adminApi,
+            coinAppParameters.loggingConfig.api,
             loggerFactory,
             retryProvider,
             clock,

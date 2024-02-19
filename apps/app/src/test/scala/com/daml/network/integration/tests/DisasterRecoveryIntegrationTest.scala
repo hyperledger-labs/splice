@@ -257,10 +257,42 @@ class DisasterRecoveryIntegrationTest
       ) {
 
         Using.resources(
-          createUpgradeNode(1, sv1Backend, sv1LocalBackend, retryProvider, wallClock, 28),
-          createUpgradeNode(2, sv1Backend, sv2LocalBackend, retryProvider, wallClock, 28),
-          createUpgradeNode(3, sv1Backend, sv3LocalBackend, retryProvider, wallClock, 28),
-          createUpgradeNode(4, sv1Backend, sv4LocalBackend, retryProvider, wallClock, 28),
+          createUpgradeNode(
+            1,
+            sv1Backend,
+            sv1LocalBackend,
+            retryProvider,
+            wallClock,
+            env.environment.config.monitoring.logging.api,
+            28,
+          ),
+          createUpgradeNode(
+            2,
+            sv1Backend,
+            sv2LocalBackend,
+            retryProvider,
+            wallClock,
+            env.environment.config.monitoring.logging.api,
+            28,
+          ),
+          createUpgradeNode(
+            3,
+            sv1Backend,
+            sv3LocalBackend,
+            retryProvider,
+            wallClock,
+            env.environment.config.monitoring.logging.api,
+            28,
+          ),
+          createUpgradeNode(
+            4,
+            sv1Backend,
+            sv4LocalBackend,
+            retryProvider,
+            wallClock,
+            env.environment.config.monitoring.logging.api,
+            28,
+          ),
         ) { case (newDomainNode1, newDomainNode2, newDomainNode3, newDomainNode4) =>
           val allNodes =
             Seq(newDomainNode1, newDomainNode2, newDomainNode3, newDomainNode4)

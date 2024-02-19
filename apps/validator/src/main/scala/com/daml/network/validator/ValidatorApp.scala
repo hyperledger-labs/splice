@@ -313,6 +313,7 @@ class ValidatorApp(
   private def withParticipantAdminConnection[T](f: ParticipantAdminConnection => Future[T]) = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
+      coinAppParameters.loggingConfig.api,
       loggerFactory,
       retryProvider,
       clock,
@@ -354,6 +355,7 @@ class ValidatorApp(
       _ <- Future.successful(())
       participantAdminConnection = new ParticipantAdminConnection(
         config.participantClient.adminApi,
+        coinAppParameters.loggingConfig.api,
         loggerFactory,
         retryProvider,
         clock,

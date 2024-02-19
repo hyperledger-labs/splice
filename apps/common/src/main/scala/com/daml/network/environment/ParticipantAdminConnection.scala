@@ -10,7 +10,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   StatusAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeDuration}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -37,12 +37,14 @@ import com.digitalasset.canton.config.RequireTypes.PositiveInt
   */
 class ParticipantAdminConnection(
     config: ClientConfig,
+    apiLoggingConfig: ApiLoggingConfig,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends TopologyAdminConnection(
       config,
+      apiLoggingConfig,
       loggerFactory,
       retryProvider,
       clock,

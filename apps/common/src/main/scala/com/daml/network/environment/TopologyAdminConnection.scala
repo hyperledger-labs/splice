@@ -21,7 +21,7 @@ import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListOwnerToKeyMappingResult,
   ListSequencerDomainStateResult,
 }
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
 import com.digitalasset.canton.crypto.{Fingerprint, PublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -58,12 +58,14 @@ import scala.reflect.ClassTag
   */
 abstract class TopologyAdminConnection(
     config: ClientConfig,
+    apiLoggingConfig: ApiLoggingConfig,
     loggerFactory: NamedLoggerFactory,
     override protected[this] val retryProvider: RetryProvider,
     clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends AppConnection(
       config,
+      apiLoggingConfig,
       loggerFactory,
     )
     with RetryProvider.Has {

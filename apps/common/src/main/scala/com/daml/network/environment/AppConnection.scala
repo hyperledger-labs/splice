@@ -2,13 +2,14 @@ package com.daml.network.environment
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import org.apache.pekko.stream.Materializer
+import com.daml.network.admin.api.client.ApiClientRequestLogger
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
@@ -72,6 +73,7 @@ object BaseAppConnection {
   */
 abstract class AppConnection(
     config: ClientConfig,
+    apiLoggingConfig: ApiLoggingConfig,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContextExecutor)
     extends BaseAppConnection(loggerFactory)
@@ -96,7 +98,13 @@ abstract class AppConnection(
     val svc =
       cmd
         .createService(channel.channel)
-        .withInterceptors(TraceContextGrpc.clientInterceptor)
+        .withInterceptors(
+          TraceContextGrpc.clientInterceptor,
+          new ApiClientRequestLogger(
+            loggerFactory,
+            apiLoggingConfig,
+          ),
+        )
 
     val svcAuth = credentials match {
       case Some(creds) => svc.withCallCredentials(creds)

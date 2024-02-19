@@ -5,7 +5,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   SequencerAdminCommands,
   StatusAdminCommands,
 }
-import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponseX
 import com.digitalasset.canton.domain.sequencing.sequencer.{
@@ -29,12 +29,14 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   */
 class SequencerAdminConnection(
     config: ClientConfig,
+    apiLoggingConfig: ApiLoggingConfig,
     loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends TopologyAdminConnection(
       config,
+      apiLoggingConfig,
       loggerFactory,
       retryProvider,
       clock,

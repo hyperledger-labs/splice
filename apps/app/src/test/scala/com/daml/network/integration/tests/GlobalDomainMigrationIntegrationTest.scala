@@ -317,10 +317,38 @@ class GlobalDomainMigrationIntegrationTest
     )() {
       startValidatorAndTapCoin(bobValidatorBackend, bobWalletClient)
       Using.resources(
-        createUpgradeNode(1, sv1Backend, sv1LocalBackend, retryProvider, wallClock),
-        createUpgradeNode(2, sv2Backend, sv2LocalBackend, retryProvider, wallClock),
-        createUpgradeNode(3, sv3Backend, sv3LocalBackend, retryProvider, wallClock),
-        createUpgradeNode(4, sv4Backend, sv4LocalBackend, retryProvider, wallClock),
+        createUpgradeNode(
+          1,
+          sv1Backend,
+          sv1LocalBackend,
+          retryProvider,
+          wallClock,
+          env.environment.config.monitoring.logging.api,
+        ),
+        createUpgradeNode(
+          2,
+          sv2Backend,
+          sv2LocalBackend,
+          retryProvider,
+          wallClock,
+          env.environment.config.monitoring.logging.api,
+        ),
+        createUpgradeNode(
+          3,
+          sv3Backend,
+          sv3LocalBackend,
+          retryProvider,
+          wallClock,
+          env.environment.config.monitoring.logging.api,
+        ),
+        createUpgradeNode(
+          4,
+          sv4Backend,
+          sv4LocalBackend,
+          retryProvider,
+          wallClock,
+          env.environment.config.monitoring.logging.api,
+        ),
       ) { case (upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4) =>
         val allNodes =
           Seq(upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
