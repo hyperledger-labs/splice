@@ -445,8 +445,9 @@ object RetryProvider {
         ErrorCategory.InvalidGivenCurrentSystemStateSeekAfterEnd,
       )
 
-    // TODO (#2770) Remove the need to retry on UNIMPLEMENTED.
     private val retryableStatusCodes = Seq(
+      // Canton registers its services after starting the top-level gRPC server, which means we get UNIMPLEMENTED errors
+      // for a short period of during the startup of Canton.
       Status.Code.UNIMPLEMENTED,
       Status.Code.UNAVAILABLE,
       Status.Code.NOT_FOUND,
