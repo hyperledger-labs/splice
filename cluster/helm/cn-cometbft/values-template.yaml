@@ -66,8 +66,6 @@ genesis:
 db:
   volumeSize: 240Gi
   volumeStorageClass: standard-rwo
-  # k8s nodeAffinity for the persistent volume (optional)
-  # volumeNodeAffinity:
 
 resources:
   limits:

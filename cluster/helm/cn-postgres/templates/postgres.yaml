@@ -67,6 +67,14 @@ spec:
           - mountPath: /var/lib/postgresql/data
             name: {{ $.Values.db.pvcTemplateName }}
       restartPolicy: Always
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
   volumeClaimTemplates:
   - apiVersion: v1
     kind: PersistentVolumeClaim
@@ -80,10 +88,6 @@ spec:
           storage: {{ $.Values.db.volumeSize }}
       storageClassName: {{ $.Values.db.volumeStorageClass }}
       volumeMode: Filesystem
-      {{- with .Values.db.volumeNodeAffinity }}
-      nodeAffinity:
-        {{- toYaml . | nindent 8 }}
-      {{- end }}
 ---
 apiVersion: v1
 kind: Service

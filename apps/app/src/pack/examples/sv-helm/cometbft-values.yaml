@@ -19,18 +19,6 @@ stateSync:
   # Note that the port number is significant in the list of rpcServers
   rpcServers: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
 
-# k8s nodeAffinity for the persistent volume (optional)
-# db:
-#   volumeNodeAffinity:
-#     requiredDuringSchedulingIgnoredDuringExecution:
-#       nodeSelectorTerms:
-#       - matchExpressions:
-#         - key: topology.kubernetes.io/zone
-#           operator: In
-#           values:
-#             - antarctica-east1
-#             - antarctica-west1
-
 # k8s affinity for all deployed pods (optional)
 # affinity:
 #   nodeAffinity:

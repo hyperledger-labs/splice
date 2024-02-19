@@ -3,6 +3,15 @@
 Release Notes
 =============
 
+2024-02-26
+----------
+
+* Deployment
+
+  * Removed option to configure Kubernetes node affinity for PVCs due to a faulty implementation.
+    For controlling the provisioning of PVCs, you can define custom storage classes and configure them via the respective `db.volumeStorageClass` Helm chart field.
+  * Fix the `affinity` and `nodeSelector` field on the `cn-postgres` Helm chart so they are applied as expected.
+
 2024-02-19
 ----------
 
