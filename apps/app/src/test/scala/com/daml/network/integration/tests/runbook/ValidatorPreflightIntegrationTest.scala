@@ -412,7 +412,7 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
 
   override protected val isDevNet = true
   override protected val auth0 =
-    auth0UtilFromEnvVars("https://canton-network-validator-test.us.auth0.com", Some("validator"))
+    auth0UtilFromEnvVars("https://canton-network-validator-test.us.auth0.com", "validator")
 
   override protected val validatorName = "validator"
   override protected val validatorAuth0Secret = "cznBUeB70fnpfjaq9TzblwiwjkVyvh5z"
@@ -426,7 +426,8 @@ class RunbookValidatorPreflightIntegrationTest extends ValidatorPreflightIntegra
 class Validator1PreflightIntegrationTest extends ValidatorPreflightIntegrationTestBase {
 
   override protected val isDevNet = true
-  override protected val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com")
+  override protected val auth0 =
+    auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com", "dev")
 
   override protected val validatorName = "validator1"
   override protected val validatorAuth0Secret = "cf0cZaTagQUN59C1HBL2udiIBdFh2CWq"

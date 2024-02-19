@@ -941,11 +941,7 @@ export AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET=…
 Note that [Running The Preflight Check](#running-the-preflight-check)
 also requires Auth0 management API credentials, but for a different
 tenant. Following the linked instructions above will provide
-definitions in `.envrc.private`. To switch tenants, run `sbt
--DAUTH0_TENANT=dev`. The tests will then read the environment
-variables without the `_TESTS` suffix. `cncluster preflight` sets this
-automatically so in most cases you should not have to do this
-manually.
+definitions in `.envrc.private`.
 
 ```
 export AUTH0_CN_MANAGEMENT_API_CLIENT_ID=…
