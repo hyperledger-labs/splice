@@ -40,7 +40,7 @@ import com.digitalasset.canton.protocol.messages.{
 }
 import com.digitalasset.canton.protocol.{CatchUpConfig, LfContractId, LfHash, WithContractHash}
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError.RequestRefused
-import com.digitalasset.canton.sequencing.client.{SendType, SequencerClient}
+import com.digitalasset.canton.sequencing.client.{SendType, SequencerClientSend}
 import com.digitalasset.canton.sequencing.protocol.{Batch, OpenEnvelope, Recipients, SendAsyncError}
 import com.digitalasset.canton.store.SequencerCounterTrackerStore
 import com.digitalasset.canton.time.PositiveSeconds
@@ -148,7 +148,7 @@ import scala.math.Ordering.Implicits.*
 class AcsCommitmentProcessor(
     domainId: DomainId,
     participantId: ParticipantId,
-    val sequencerClient: SequencerClient,
+    sequencerClient: SequencerClientSend,
     domainCrypto: SyncCryptoClient[SyncCryptoApi],
     sortedReconciliationIntervalsProvider: SortedReconciliationIntervalsProvider,
     store: AcsCommitmentStore,
@@ -1152,7 +1152,13 @@ class AcsCommitmentProcessor(
         EitherT(
           FutureUtil.logOnFailure(
             sequencerClient
-              .sendAsync(batch, SendType.Other, None)
+              .sendAsync(
+                batch,
+                SendType.Other,
+                None,
+                // ACS commitments are best effort, so no need to amplify them
+                amplify = false,
+              )
               .leftMap {
                 case RequestRefused(SendAsyncError.ShuttingDown(msg)) =>
                   logger.info(

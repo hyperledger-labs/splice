@@ -43,12 +43,12 @@ import com.digitalasset.canton.topology.{
   TestingTopologyX,
   UniqueIdentifier,
 }
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{BaseTest, ProtocolVersionChecksAsyncWordSpec}
 import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
 
 class DefaultVerdictSenderTest
     extends AsyncWordSpec
@@ -274,28 +274,15 @@ class DefaultVerdictSenderTest
         identityFactory.forOwnerAndDomain(mediatorId, domainId)
       }
 
-    val interceptedMessages: java.util.concurrent.BlockingQueue[
-      (Batch[DefaultOpenEnvelope], Option[AggregationRule])
-    ] =
-      new java.util.concurrent.LinkedBlockingQueue()
+    private val sequencerClientSend: TestSequencerClientSend = new TestSequencerClientSend
+
+    def interceptedMessages: Seq[(Batch[DefaultOpenEnvelope], Option[AggregationRule])] =
+      sequencerClientSend.requestsQueue.asScala.map { request =>
+        (request.batch, request.aggregationRule)
+      }.toSeq
 
     val verdictSender = new DefaultVerdictSender(
-      new SequencerClientSend {
-        override def sendAsync(
-            batch: Batch[DefaultOpenEnvelope],
-            sendType: SendType,
-            topologyTimestamp: Option[CantonTimestamp],
-            maxSequencingTime: CantonTimestamp,
-            messageId: MessageId,
-            aggregationRule: Option[AggregationRule],
-            callback: SendCallback,
-        )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncClientError, Unit] = {
-          interceptedMessages.add((batch, aggregationRule))
-          EitherT.pure(())
-        }
-
-        override def generateMaxSequencingTime: CantonTimestamp = ???
-      },
+      sequencerClientSend,
       domainSyncCryptoApi,
       mediatorId,
       testedProtocolVersion,

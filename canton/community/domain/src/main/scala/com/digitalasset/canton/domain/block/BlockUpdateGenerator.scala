@@ -1177,9 +1177,7 @@ class BlockUpdateGenerator(
           case InFlightAggregation.AlreadyDelivered(deliveredAt) =>
             val message =
               s"The aggregatable request with aggregation ID $aggregationId was previously delivered at $deliveredAt"
-            refuse(
-              SequencerErrors.AggregateSubmissionAlreadySent(message)
-            )
+            refuse(SequencerErrors.AggregateSubmissionAlreadySent(message))
           case InFlightAggregation.AggregationStuffing(_, at) =>
             val message =
               s"The sender ${submissionRequest.sender} previously contributed to the aggregatable submission with ID $aggregationId at $at"
@@ -1271,7 +1269,7 @@ class BlockUpdateGenerator(
                 topologySnapshot
                   .sequencerGroup()
                   .map(
-                    _.map(group => (group.active ++ group.passive).toSet[Member])
+                    _.map(group => (group.active.forgetNE ++ group.passive).toSet[Member])
                       .getOrElse(Set.empty[Member])
                   )
             } yield Map((SequencersOfDomain: GroupRecipient) -> sequencers)
@@ -1409,7 +1407,7 @@ class BlockUpdateGenerator(
                     _.fold[Either[SubmissionRequestOutcome, Set[Member]]](
                       // TODO(#14322): review if still applicable and consider an error code (SequencerDeliverError)
                       Left(refuse("No sequencer group found"))
-                    )(group => Right((group.active ++ group.passive).toSet))
+                    )(group => Right((group.active.forgetNE ++ group.passive).toSet))
                   )
               )
               _ <- {

@@ -83,6 +83,7 @@ class LocalSequencerConnectionsTrigger(
           val newConnections = SequencerConnections.tryMany(
             Seq(localSequencerConnection),
             PositiveInt.tryCreate(1),
+            submissionRequestAmplification = PositiveInt.tryCreate(1),
           )
           if (conf.sequencerConnections == newConnections) {
             logger.trace(

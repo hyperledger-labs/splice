@@ -54,7 +54,7 @@ import com.digitalasset.canton.sequencing.client.{
   SendAsyncClientError,
   SendCallback,
   SendType,
-  SequencerClient,
+  SequencerClientSend,
 }
 import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
@@ -130,7 +130,7 @@ class ProtocolProcessorTest
   private val crypto =
     TestingIdentityFactoryX(topology, loggerFactory, TestDomainParameters.defaultDynamic)
       .forOwnerAndDomain(participant, domain)
-  private val mockSequencerClient = mock[SequencerClient]
+  private val mockSequencerClient = mock[SequencerClientSend]
   when(
     mockSequencerClient.sendAsync(
       any[Batch[DefaultOpenEnvelope]],
@@ -140,6 +140,7 @@ class ProtocolProcessorTest
       any[MessageId],
       any[Option[AggregationRule]],
       any[SendCallback],
+      any[Boolean],
     )(anyTraceContext)
   )
     .thenAnswer(
@@ -217,7 +218,7 @@ class ProtocolProcessorTest
       overrideConstructedPendingRequestDataO: Option[TestPendingRequestData] = None,
       startingPoints: ProcessingStartingPoints = ProcessingStartingPoints.default,
       pendingSubmissionMap: concurrent.Map[Int, Unit] = TrieMap[Int, Unit](),
-      sequencerClient: SequencerClient = mockSequencerClient,
+      sequencerClient: SequencerClientSend = mockSequencerClient,
       crypto: DomainSyncCryptoClient = crypto,
       overrideInFlightSubmissionTrackerO: Option[InFlightSubmissionTracker] = None,
       submissionDataForTrackerO: Option[SubmissionTracker.SubmissionData] = None,
@@ -432,7 +433,7 @@ class ProtocolProcessorTest
 
     "clean up the pending submissions when send request fails" in {
       val submissionMap = TrieMap[Int, Unit]()
-      val failingSequencerClient = mock[SequencerClient]
+      val failingSequencerClient = mock[SequencerClientSend]
       val sendError = SendAsyncClientError.RequestFailed("no thank you")
       when(
         failingSequencerClient.sendAsync(
@@ -443,6 +444,7 @@ class ProtocolProcessorTest
           any[MessageId],
           any[Option[AggregationRule]],
           any[SendCallback],
+          any[Boolean],
         )(anyTraceContext)
       )
         .thenReturn(EitherT.leftT[Future, Unit](sendError))

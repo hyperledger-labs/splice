@@ -7,6 +7,7 @@ import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.validator.ValidatorApp
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -87,6 +88,8 @@ class ReconcileSequencerConnectionsTrigger(
                 sequencerConnections = SequencerConnections.tryMany(
                   nonEmptyConnections.forgetNE,
                   CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+                  // TODO(#10116) Make this configurable.
+                  submissionRequestAmplification = PositiveInt.tryCreate(1),
                 )
               )
             )

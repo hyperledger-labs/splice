@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.domain.mediator
 
-import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.CachingConfigs
@@ -135,30 +134,10 @@ abstract class ConfirmationResponseProcessorTestV5Base(minimumPV: ProtocolVersio
   protected lazy val decisionTime = requestIdTs.plusSeconds(120)
 
   class Fixture(syncCryptoApi: DomainSyncCryptoClient = domainSyncCryptoApi) {
-    val interceptedBatchesQueue: java.util.concurrent.BlockingQueue[
-      (Batch[DefaultOpenEnvelope], Option[AggregationRule])
-    ] =
-      new java.util.concurrent.LinkedBlockingQueue()
-
-    private val sequencerSend: SequencerClientSend = new SequencerClientSend {
-      override def sendAsync(
-          batch: Batch[DefaultOpenEnvelope],
-          sendType: SendType,
-          topologyTimestamp: Option[CantonTimestamp],
-          maxSequencingTime: CantonTimestamp,
-          messageId: MessageId,
-          aggregationRule: Option[AggregationRule],
-          callback: SendCallback,
-      )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncClientError, Unit] = {
-        interceptedBatchesQueue.add((batch, aggregationRule))
-        EitherT.pure(())
-      }
-
-      override def generateMaxSequencingTime: CantonTimestamp = ???
-    }
+    private val sequencerSend: TestSequencerClientSend = new TestSequencerClientSend
 
     def interceptedBatches: Iterable[Batch[DefaultOpenEnvelope]] =
-      interceptedBatchesQueue.asScala.map(_._1)
+      sequencerSend.requestsQueue.asScala.map(_.batch)
 
     val verdictSender: TestVerdictSender =
       new TestVerdictSender(

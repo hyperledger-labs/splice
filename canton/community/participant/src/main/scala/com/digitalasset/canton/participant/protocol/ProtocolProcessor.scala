@@ -97,7 +97,7 @@ abstract class ProtocolProcessor[
     inFlightSubmissionTracker: InFlightSubmissionTracker,
     ephemeral: SyncDomainEphemeralState,
     crypto: DomainSyncCryptoClient,
-    sequencerClient: SequencerClient,
+    sequencerClient: SequencerClientSend,
     domainId: DomainId,
     protocolVersion: ProtocolVersion,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -462,6 +462,7 @@ abstract class ProtocolProcessor[
           callback = res => sendResultP.trySuccess(res).discard,
           maxSequencingTime = maxSequencingTime,
           messageId = messageId,
+          amplify = true,
         )
         .mapK(FutureUnlessShutdown.outcomeK)
         .leftMap { err =>

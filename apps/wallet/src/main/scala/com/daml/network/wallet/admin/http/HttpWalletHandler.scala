@@ -30,9 +30,9 @@ import com.daml.network.wallet.store.{TxLogEntry, UserWalletStore}
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.error.MediatorError.Timeout
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.participant.sync.TransactionRoutingError.MalformedInputErrors.InvalidDomainId
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.UnknownInformees
-import com.digitalasset.canton.participant.traffic.TrafficStateController.TrafficControlError.DomainIdNotFound
 import com.digitalasset.canton.protocol.messages.LocalReject
 import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
 import com.digitalasset.canton.tracing.TraceContext
@@ -741,7 +741,7 @@ object HttpWalletHandler {
   private def isDomainNotConnected(ex: io.grpc.StatusRuntimeException): Boolean = {
     (ex.getStatus.getCode == Status.Code.FAILED_PRECONDITION &&
       ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-        case ErrorInfoDetail(DomainIdNotFound.id, _) => true
+        case ErrorInfoDetail(InvalidDomainId.id, _) => true
         case _ => false
       }) ||
     (ex.getStatus.getCode == Status.Code.NOT_FOUND &&

@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.participant.pruning
 
-import cats.data.EitherT
 import cats.syntax.functor.*
 import cats.syntax.option.*
 import cats.syntax.parallel.*
@@ -231,24 +230,12 @@ sealed trait AcsCommitmentProcessorBaseTest
   )(implicit ec: ExecutionContext): (
       AcsCommitmentProcessor,
       AcsCommitmentStore,
-      SequencerClient,
+      TestSequencerClientSend,
       List[(CantonTimestamp, RequestCounter, AcsChange)],
   ) = {
     val domainCrypto = cryptoSetup(localId, topology)
 
-    val sequencerClient = mock[SequencerClient]
-    when(
-      sequencerClient.sendAsync(
-        any[Batch[DefaultOpenEnvelope]],
-        any[SendType],
-        any[Option[CantonTimestamp]],
-        any[CantonTimestamp],
-        any[MessageId],
-        any[Option[AggregationRule]],
-        any[SendCallback],
-      )(anyTraceContext)
-    )
-      .thenReturn(EitherT.rightT[Future, SendAsyncClientError](()))
+    val sequencerClient = new TestSequencerClientSend
 
     val changeTimes =
       (timeProofs.map(ts => TimeOfChange(RequestCounter(0), ts)) ++ contractSetup.values.toList
@@ -306,7 +293,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       ] = None,
   )(implicit
       ec: ExecutionContext
-  ): (AcsCommitmentProcessor, AcsCommitmentStore, SequencerClient) = {
+  ): (AcsCommitmentProcessor, AcsCommitmentStore, TestSequencerClientSend) = {
 
     val (acsCommitmentProcessor, store, sequencerClient, changes) =
       testSetupDontPublish(
@@ -1103,7 +1090,8 @@ class AcsCommitmentProcessorTest
         remoteId2 -> Set(carol),
       )
 
-      val (processor, store, _, changes) = testSetupDontPublish(timeProofs, contractSetup, topology)
+      val (processor, store, sequencerClient, changes) =
+        testSetupDontPublish(timeProofs, contractSetup, topology)
 
       val remoteCommitments = List(
         (remoteId1, Map((coid(0, 0), initialTransferCounter)), ts(0), ts(5)),
@@ -1131,15 +1119,7 @@ class AcsCommitmentProcessorTest
         computed <- store.searchComputedBetween(CantonTimestamp.Epoch, timeProofs.lastOption.value)
         received <- store.searchReceivedBetween(CantonTimestamp.Epoch, timeProofs.lastOption.value)
       } yield {
-        verify(processor.sequencerClient, times(2)).sendAsync(
-          any[Batch[DefaultOpenEnvelope]],
-          any[SendType],
-          any[Option[CantonTimestamp]],
-          any[CantonTimestamp],
-          any[MessageId],
-          any[Option[AggregationRule]],
-          any[SendCallback],
-        )(anyTraceContext)
+        sequencerClient.requests.size shouldBe 2
         assert(computed.size === 2)
         assert(received.size === 2)
       }
@@ -1974,15 +1954,7 @@ class AcsCommitmentProcessorTest
           // the participant catches up to ticks 10, 20, 30
           // the only ticks with non-empty commitments are at 20 and 30, and they match the remote ones,
           // therefore there are 2 sends of commitments
-          verify(processor.sequencerClient, times(2)).sendAsync(
-            any[Batch[DefaultOpenEnvelope]],
-            any[SendType],
-            any[Option[CantonTimestamp]],
-            any[CantonTimestamp],
-            any[MessageId],
-            any[Option[AggregationRule]],
-            any[SendCallback],
-          )(anyTraceContext)
+          sequencerClient.requests.size shouldBe 2
           assert(computed.size === 4)
           assert(received.size === 5)
           // all local commitments were matched and can be pruned
@@ -2062,15 +2034,7 @@ class AcsCommitmentProcessorTest
           )
         } yield {
           // regular sends (no catch-up) at ticks 5, 15, 20, 25, 30 (tick 10 has an empty commitment)
-          verify(processor.sequencerClient, times(5)).sendAsync(
-            any[Batch[DefaultOpenEnvelope]],
-            any[SendType],
-            any[Option[CantonTimestamp]],
-            any[CantonTimestamp],
-            any[MessageId],
-            any[Option[AggregationRule]],
-            any[SendCallback],
-          )(anyTraceContext)
+          sequencerClient.requests.size shouldBe 5
           assert(computed.size === 5)
           assert(received.size === 4)
           // all local commitments were matched and can be pruned
@@ -2177,15 +2141,7 @@ class AcsCommitmentProcessorTest
           // there should be one mismatch, with carol, for the interval 15-20
           // which means we send the fine-grained commitment 10-15
           // therefore, there should be 3 async sends in total
-          verify(processor.sequencerClient, times(3)).sendAsync(
-            any[Batch[DefaultOpenEnvelope]],
-            any[SendType],
-            any[Option[CantonTimestamp]],
-            any[CantonTimestamp],
-            any[MessageId],
-            any[Option[AggregationRule]],
-            any[SendCallback],
-          )(anyTraceContext)
+          sequencerClient.requests.size shouldBe 3
           assert(computed.size === 4)
           assert(received.size === 5)
           // cannot prune past the mismatch
@@ -2295,15 +2251,7 @@ class AcsCommitmentProcessorTest
           // however, there is no commitment to send for the interval 20-25, because we never observed this interval;
           // we only observed the interval 20-30, for which we already sent a commitment.
           // therefore, there should be 3 async sends in total
-          verify(processor.sequencerClient, times(3)).sendAsync(
-            any[Batch[DefaultOpenEnvelope]],
-            any[SendType],
-            any[Option[CantonTimestamp]],
-            any[CantonTimestamp],
-            any[MessageId],
-            any[Option[AggregationRule]],
-            any[SendCallback],
-          )(anyTraceContext)
+          sequencerClient.requests.size shouldBe 3
           assert(computed.size === 4)
           assert(received.size === 5)
           // cannot prune past the mismatch 25-30, because there are no commitments that match past this point

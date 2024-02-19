@@ -960,16 +960,16 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       mediators
         .filter(!_.health.initialized())
         .foreach(
-          _.setup
-            .assign(
-              domainId,
-              staticDomainParameters,
-              SequencerConnections.tryMany(
-                sequencers
-                  .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
-                PositiveInt.tryCreate(1),
-              ),
-            )
+          _.setup.assign(
+            domainId,
+            staticDomainParameters,
+            SequencerConnections.tryMany(
+              sequencers
+                .map(s => s.sequencerConnection.withAlias(SequencerAlias.tryCreate(s.name))),
+              PositiveInt.one,
+              PositiveInt.one,
+            ),
+          )
         )
 
       domainId

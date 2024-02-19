@@ -149,8 +149,8 @@ final class SyncStateInspection(
       timeouts.inspection.await("findContracts") {
         syncDomainPersistentStateManager
           .getByAlias(domain)
-          .map(AcsInspection.findContracts(_, filterId, filterPackage, filterTemplate, limit))
-          .sequence
+          .traverse(AcsInspection.findContracts(_, filterId, filterPackage, filterTemplate, limit))
+
       },
       domain,
     )
