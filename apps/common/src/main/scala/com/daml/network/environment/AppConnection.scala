@@ -99,11 +99,10 @@ abstract class AppConnection(
       cmd
         .createService(channel.channel)
         .withInterceptors(
-          TraceContextGrpc.clientInterceptor,
           new ApiClientRequestLogger(
             loggerFactory,
             apiLoggingConfig,
-          ),
+          )
         )
 
     val svcAuth = credentials match {
