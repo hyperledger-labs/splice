@@ -2379,9 +2379,9 @@ jobs:
       - when:
           condition: << parameters.cluster_version >>
           steps:
-            - run_bash_command_in_nix:
-                cmd_name: Checkout commit << parameters.cluster_version >>
-                cmd: git checkout << parameters.cluster_version >>
+            - run:
+                name: Checkout commit << parameters.cluster_version >>
+                command: git checkout << parameters.cluster_version >>
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Activate cluster (configure kubectl)
@@ -2468,9 +2468,9 @@ jobs:
       - when:
           condition: << parameters.cluster_version >>
           steps:
-            - run_bash_command_in_nix:
-                cmd_name: Checkout commit << parameters.cluster_version >>
-                cmd: git checkout << parameters.cluster_version >>
+            - run:
+                name: Checkout commit << parameters.cluster_version >>
+                command: git checkout << parameters.cluster_version >>
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Activate cluster (configure kubectl)
