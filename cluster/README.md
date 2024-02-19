@@ -1586,6 +1586,11 @@ Network. Steps to do this are as follows:
       --role "roles/cloudkms.cryptoKeyEncrypterDecrypter" \
       --condition=expression='resource.type == "cloudkms.googleapis.com/CryptoKey" && resource.name.startsWith("projects/da-cn-shared/locations/'${CLOUDSDK_COMPUTE_REGION}'/keyRings/pulumi")',title="pulumi kms"
    ```
+
+11. Grant `Editor` permissions to the GKE node pool account
+
+This is required for logging to work among other things. <!-- TODO(#10061) Automate this -->
+
 ## Cluster Data Dumps
 
 At the time of writing, only TestNet style deployments (i.e.,
