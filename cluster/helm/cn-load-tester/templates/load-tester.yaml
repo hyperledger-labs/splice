@@ -18,3 +18,5 @@ spec:
                   value: {{ .Values.config | quote }}
                 - name: K6_PROMETHEUS_RW_SERVER_URL
                   value: "{{ .Values.prometheusRw }}"
+                - name: K6_PROMETHEUS_RW_TREND_STATS
+                  value: "p(95),p(99),min,max"
