@@ -2134,11 +2134,11 @@ function subcmd_hard_domain_migration() {
   export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
   _cluster_apply "$version"
   subcmd_preflight_global_domain_upgrade
-  export GLOBAL_DOMAIN_UPGRADE_ID=1
+  export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_PREPARE_UPGRADE="false"
   _cluster_apply "$version"
-  unset GLOBAL_DOMAIN_UPGRADE_ID
-  export GLOBAL_DOMAIN_ACTIVE_ID=1
+  unset GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID
+  export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
   _cluster_apply "$version"
   export CN_NON_SV_NODES="true"
   _cluster_apply "$version"

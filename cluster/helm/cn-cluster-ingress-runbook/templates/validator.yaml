@@ -1,5 +1,5 @@
 {{/*Used by the sv runbook, which is not aware of multiple domains yet, and by validators which are not multi-domain aware*/}}
-{{- if and (empty ((.Values.ingress).globalDomain).activeGlobalDomainId) (empty ((.Values.ingress).globalDomain).globalDomainId) }}
+{{- if and (empty ((.Values.ingress).globalDomain).activeMigrationId) (empty ((.Values.ingress).globalDomain).migrationId) }}
   {{- if .Values.ingress.wallet }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService

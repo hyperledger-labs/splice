@@ -46,7 +46,7 @@ export class Svc extends pulumi.ComponentResource {
   private joinViaSv1(sv1: pulumi.Resource, keys: CnInput<SvIdKey>): SvOnboarding {
     return {
       type: 'join-with-key',
-      sponsorApiUrl: `http://sv-app-${this.args.globalDomainUpgradeConfig.activeGlobalDomainId}.sv-1:5014`,
+      sponsorApiUrl: `http://sv-app-${this.args.globalDomainUpgradeConfig.activeMigrationId}.sv-1:5014`,
       sponsorRelease: sv1,
       keys,
     };

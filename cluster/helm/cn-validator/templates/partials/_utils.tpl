@@ -1,8 +1,8 @@
 {{- define "appLabel" -}}
 {{- $values := index . 0 -}}
 {{- $name := index . 1 -}}
-{{- if $values.domainId }}
-{{- printf "%s-%s" $name $values.domainId }}
+{{- if $values.domainMigrationId }}
+{{- printf "%s-%s" $name $values.domainMigrationId }}
 {{- else }}
 {{- $name }}
 {{- end }}

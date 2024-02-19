@@ -24,7 +24,7 @@ workflow:
           cluster: "cimain"
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for cimain
-          upgrade_global_domain_prepare: true
+          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - wait_for_previous_pipeline
@@ -67,7 +67,7 @@ workflow:
           cluster: "cimain"
           send_deployment_notification: false
           update_deployment_branch: false
-          upgrade_global_domain_upgrade_id: 1
+          global_domain_upgrade_migration_id: 1
           requires:
             - trigger_global_domain_migration
       - backup_cluster:
@@ -99,7 +99,7 @@ workflow:
           cluster: "cimain"
           send_deployment_notification: false
           update_deployment_branch: false
-          upgrade_global_domain_active_id: 1
+          global_domain_active_migration_id: 1
           requires:
             - deploy_global_domain_upgrade
             - restore_node
@@ -136,7 +136,7 @@ workflow:
           send_deployment_notification: false
           requires:
             - switch_global_domain_upgrade
-          global_domain_id: 1
+          global_domain_migration_id: 1
       # TODO(#10038) Reenable this once TxLogs work across domain migrations.
       # - preflight_sv_check:
       #     <<: *main-branch-only

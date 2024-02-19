@@ -1,4 +1,4 @@
-{{- if ((.Values.ingress).globalDomain).activeGlobalDomainId }}
+{{- if ((.Values.ingress).globalDomain).activeMigrationId }}
   {{- if .Values.ingress.sequencer }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
@@ -17,7 +17,7 @@ spec:
         - destination:
             port:
               number: 5008
-            host: global-domain-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: global-domain-{{ .Values.ingress.globalDomain.activeMigrationId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
   {{- if .Values.ingress.sv }}
@@ -40,14 +40,14 @@ spec:
         - destination:
             port:
               number: 5014
-            host: sv-app-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: sv-app-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
     - match:
         - port: 443
       route:
         - destination:
             port:
               number: 80
-            host: sv-web-ui-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: sv-web-ui-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
   {{- if .Values.ingress.scan }}
@@ -70,14 +70,14 @@ spec:
         - destination:
             port:
               number: 5012
-            host: scan-app-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: scan-app-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
     - match:
         - port: 443
       route:
         - destination:
             port:
               number: 80
-            host: scan-web-ui-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: scan-web-ui-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
   {{- if .Values.ingress.wallet }}
@@ -100,14 +100,14 @@ spec:
         - destination:
             port:
               number: 5003
-            host: validator-app-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: validator-app-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
     - match:
         - port: 443
       route:
         - destination:
             port:
               number: 80
-            host: wallet-web-ui-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: wallet-web-ui-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
 {{- if .Values.ingress.cns }}
@@ -130,14 +130,14 @@ spec:
         - destination:
             port:
               number: 5003
-            host: validator-app-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: validator-app-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
     - match:
         - port: 443
       route:
         - destination:
             port:
               number: 80
-            host: cns-web-ui-{{ .Values.ingress.globalDomain.activeGlobalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: cns-web-ui-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
 {{- end }}
 {{- end }}

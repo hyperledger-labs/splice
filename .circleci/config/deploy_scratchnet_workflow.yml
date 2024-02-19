@@ -30,7 +30,7 @@
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_prepare: true
+          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -73,7 +73,7 @@
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_upgrade_id: 1
+          global_domain_upgrade_migration_id: 1
           requires:
             - trigger_global_domain_migration
       - backup_cluster:
@@ -106,7 +106,7 @@
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_active_id: 1
+          global_domain_active_migration_id: 1
           requires:
             - deploy_global_domain_upgrade
             - restore_node
@@ -142,7 +142,7 @@
           cluster: "_CLUSTERNAME_"
           requires:
             - switch_global_domain_upgrade
-          global_domain_id: 1
+          global_domain_migration_id: 1
       # TODO(#10038) Reenable this once TxLogs work across domain migrations.
       # - preflight_sv_check:
       #     <<: *main-branch-never

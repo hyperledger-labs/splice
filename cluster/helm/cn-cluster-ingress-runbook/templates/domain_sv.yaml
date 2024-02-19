@@ -1,13 +1,13 @@
-{{- if and .Values.withSvIngress ((.Values.ingress).globalDomain).globalDomainId }}
+{{- if and .Values.withSvIngress ((.Values.ingress).globalDomain).migrationId }}
   {{- if .Values.ingress.sequencer }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: sequencer-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.globalDomainId }}
+  name: sequencer-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.migrationId }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "sequencer-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "sequencer-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -17,18 +17,18 @@ spec:
         - destination:
             port:
               number: 5008
-            host: global-domain-{{ .Values.ingress.globalDomain.globalDomainId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: global-domain-{{ .Values.ingress.globalDomain.migrationId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
   {{- if .Values.ingress.sv }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: sv-sv-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.globalDomainId }}
+  name: sv-sv-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.migrationId }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "sv-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "sv-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -40,25 +40,25 @@ spec:
         - destination:
             port:
               number: 5014
-            host: sv-app-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: sv-app-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
     - match:
         - port: 443
       route:
         - destination:
             port:
               number: 80
-            host: sv-web-ui-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: sv-web-ui-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
   {{- if .Values.ingress.scan }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: scan-sv-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.globalDomainId }}
+  name: scan-sv-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.migrationId }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "scan-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "scan-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -70,25 +70,25 @@ spec:
         - destination:
             port:
               number: 5012
-            host: scan-app-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: scan-app-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
     - match:
         - port: 443
       route:
         - destination:
             port:
               number: 80
-            host: scan-web-ui-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: scan-web-ui-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
   {{- if .Values.ingress.wallet }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: wallet-sv-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.globalDomainId }}
+  name: wallet-sv-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.migrationId }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "wallet-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "wallet-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -100,25 +100,25 @@ spec:
         - destination:
             port:
               number: 5003
-            host: validator-app-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: validator-app-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
     - match:
         - port: 443
       route:
         - destination:
             port:
               number: 80
-            host: wallet-web-ui-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: wallet-web-ui-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
   {{- if .Values.ingress.cns }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: cns-sv-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.globalDomainId }}
+  name: cns-sv-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.migrationId }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "cns-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "cns-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -130,14 +130,14 @@ spec:
         - destination:
             port:
               number: 5003
-            host: validator-app-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: validator-app-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
     - match:
         - port: 443
       route:
         - destination:
             port:
               number: 80
-            host: cns-web-ui-{{ .Values.ingress.globalDomain.globalDomainId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: cns-web-ui-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
 {{- end }}

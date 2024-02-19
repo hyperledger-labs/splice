@@ -1,7 +1,7 @@
 import { Output } from '@pulumi/pulumi';
 import { cometbftRetainBlocks, isDevNet } from 'cn-pulumi-common';
 
-import { DomainIndex } from './globalDomainNode';
+import { DomainMigrationIndex } from './globalDomainNode';
 
 export interface StaticSvConfig {
   nodeName: string;
@@ -18,7 +18,7 @@ export type StaticCometBftConfig = {
     privateKey: Output<string> | string;
     publicKey: Output<string> | string;
   };
-  nodeIndex: DomainIndex;
+  nodeIndex: DomainMigrationIndex;
   retainBlocks: number;
   id: Output<string> | string;
 };

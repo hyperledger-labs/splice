@@ -12,8 +12,8 @@ ingress:
   sequencer: true
   splitwell: false
   globalDomain:
-    globalDomainId: ""
-    activeGlobalDomainId: ""
+    migrationId: ""
+    activeMigrationId: ""
 
 # k8s affinity for all deployed pods (optional)
 # affinity:

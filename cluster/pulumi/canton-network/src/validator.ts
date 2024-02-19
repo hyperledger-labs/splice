@@ -24,7 +24,7 @@ import {
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { PersistenceConfig } from '../../common';
-import { DomainIndex } from './globalDomainNode';
+import { DomainMigrationIndex } from './globalDomainNode';
 
 export type ExtraDomain = {
   alias: string;
@@ -63,14 +63,14 @@ export type ValidatorConfig = {
   participantAddress: Output<string> | string;
   globalDomainUrl: string;
   scanAddress: Output<string> | string;
-  domainId?: DomainIndex;
+  domainMigrationId?: DomainMigrationIndex;
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
 };
 
 export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
   function maybeDomainSuffixed(value: string) {
-    if (config.domainId != undefined) {
-      return `${value}-${config.domainId}`;
+    if (config.domainMigrationId != undefined) {
+      return `${value}-${config.domainMigrationId}`;
     } else {
       return value;
     }
@@ -122,7 +122,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
     maybeDomainSuffixed('validator-' + config.xns.logicalName),
     'cn-validator',
     {
-      domainId: config.domainId?.toString(),
+      domainMigrationId: config.domainMigrationId?.toString(),
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],

@@ -122,7 +122,7 @@ spec:
                 _onboarding {
                   dump-file-path = "/domain-upgrade-dump/domain_migration_dump.json"
                 }
-                canton.sv-apps.sv.domain-migration-id = {{ .Values.domainId }}
+                canton.sv-apps.sv.domain-migration-id = {{ .Values.domainMigrationId }}
             {{- end }}
             {{- if $isActiveNode }}
             - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH

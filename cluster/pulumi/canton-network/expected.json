@@ -1040,8 +1040,8 @@
         "ingress": {
           "cns": true,
           "globalDomain": {
-            "activeGlobalDomainId": "",
-            "globalDomainId": ""
+            "activeMigrationId": "",
+            "migrationId": ""
           },
           "scan": true,
           "sequencer": true,
@@ -1736,8 +1736,8 @@
         "ingress": {
           "cns": false,
           "globalDomain": {
-            "activeGlobalDomainId": "",
-            "globalDomainId": "0"
+            "activeMigrationId": "",
+            "migrationId": "0"
           },
           "scan": true,
           "sequencer": true,
@@ -1778,8 +1778,8 @@
         "ingress": {
           "cns": true,
           "globalDomain": {
-            "activeGlobalDomainId": "0",
-            "globalDomainId": ""
+            "activeMigrationId": "0",
+            "migrationId": ""
           },
           "scan": true,
           "sequencer": true,
@@ -2154,7 +2154,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "domainId": "0",
+        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": true,
         "metrics": {
@@ -2273,7 +2273,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global"
         },
-        "domainId": "0",
+        "domainMigrationId": "0",
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",
@@ -2367,7 +2367,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
-        "domainId": "0",
+        "domainMigrationId": "0",
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2622,8 +2622,8 @@
         "ingress": {
           "cns": false,
           "globalDomain": {
-            "activeGlobalDomainId": "",
-            "globalDomainId": "0"
+            "activeMigrationId": "",
+            "migrationId": "0"
           },
           "scan": true,
           "sequencer": true,
@@ -2664,8 +2664,8 @@
         "ingress": {
           "cns": true,
           "globalDomain": {
-            "activeGlobalDomainId": "0",
-            "globalDomainId": ""
+            "activeMigrationId": "0",
+            "migrationId": ""
           },
           "scan": true,
           "sequencer": true,
@@ -3040,7 +3040,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "domainId": "0",
+        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
@@ -3159,7 +3159,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-2.svc.mock.network.canton.global"
         },
-        "domainId": "0",
+        "domainMigrationId": "0",
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -3225,7 +3225,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
-        "domainId": "0",
+        "domainMigrationId": "0",
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3480,8 +3480,8 @@
         "ingress": {
           "cns": false,
           "globalDomain": {
-            "activeGlobalDomainId": "",
-            "globalDomainId": "0"
+            "activeMigrationId": "",
+            "migrationId": "0"
           },
           "scan": true,
           "sequencer": true,
@@ -3522,8 +3522,8 @@
         "ingress": {
           "cns": true,
           "globalDomain": {
-            "activeGlobalDomainId": "0",
-            "globalDomainId": ""
+            "activeMigrationId": "0",
+            "migrationId": ""
           },
           "scan": true,
           "sequencer": true,
@@ -3898,7 +3898,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "domainId": "0",
+        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
@@ -4017,7 +4017,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-3.svc.mock.network.canton.global"
         },
-        "domainId": "0",
+        "domainMigrationId": "0",
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -4083,7 +4083,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
-        "domainId": "0",
+        "domainMigrationId": "0",
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -4338,8 +4338,8 @@
         "ingress": {
           "cns": false,
           "globalDomain": {
-            "activeGlobalDomainId": "",
-            "globalDomainId": "0"
+            "activeMigrationId": "",
+            "migrationId": "0"
           },
           "scan": true,
           "sequencer": true,
@@ -4380,8 +4380,8 @@
         "ingress": {
           "cns": true,
           "globalDomain": {
-            "activeGlobalDomainId": "0",
-            "globalDomainId": ""
+            "activeMigrationId": "0",
+            "migrationId": ""
           },
           "scan": true,
           "sequencer": true,
@@ -4756,7 +4756,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "domainId": "0",
+        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
@@ -4875,7 +4875,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-4.svc.mock.network.canton.global"
         },
-        "domainId": "0",
+        "domainMigrationId": "0",
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -4941,7 +4941,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "disableAllocateLedgerApiUserParty": true,
-        "domainId": "0",
+        "domainMigrationId": "0",
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -5034,8 +5034,8 @@
         "ingress": {
           "cns": true,
           "globalDomain": {
-            "activeGlobalDomainId": "",
-            "globalDomainId": ""
+            "activeMigrationId": "",
+            "migrationId": ""
           },
           "scan": true,
           "sequencer": true,

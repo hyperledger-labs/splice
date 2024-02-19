@@ -23,7 +23,7 @@ const privValidatorKeyContent = fs.readFileSync(
   'utf-8'
 );
 
-const domainActiveId = process.env.GLOBAL_DOMAIN_ACTIVE_ID || '0';
+const domainActiveMigrationId = process.env.GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID || '0';
 
 export function installCometBftNode(
   xns: ExactNamespace,
@@ -55,7 +55,7 @@ export function installCometBftNode(
     },
     { dependsOn: dependencies.concat([xns.ns]) }
   );
-  const includeDomainInChainId = domainActiveId !== '0';
+  const includeMigrationIdInChainId = domainActiveMigrationId !== '0';
   return installCNRunbookHelmChart(
     xns,
     'cometbft',
@@ -78,10 +78,11 @@ export function installCometBftNode(
         chainId:
           `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
             ? 'test'
-            : `${CLUSTER_BASENAME}` + (includeDomainInChainId ? `-${domainActiveId}` : ''),
+            : `${CLUSTER_BASENAME}` +
+              (includeMigrationIdInChainId ? `-${domainActiveMigrationId}` : ''),
       },
       founder: {
-        externalAddress: `${CLUSTER_BASENAME}.network.canton.global:26${domainActiveId}16`,
+        externalAddress: `${CLUSTER_BASENAME}.network.canton.global:26${domainActiveMigrationId}16`,
       },
     }),
     localCharts,

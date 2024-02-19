@@ -1328,7 +1328,7 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
-      global_domain_id:
+      global_domain_migration_id:
         type: integer
         default: 0
       send_deployment_notification:
@@ -1354,7 +1354,7 @@ jobs:
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
-            export GLOBAL_DOMAIN_ACTIVE_ID=<< parameters.global_domain_id >>
+            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_migration_id >>
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -1460,17 +1460,17 @@ jobs:
       send_deployment_notification:
         type: boolean
         default: true
-      upgrade_global_domain_prepare:
+      prepare_global_domain_upgrade:
         type: boolean
         default: false
         description: "If true, it will set the env GLOBAL_DOMAIN_PREPARE_UPGRADE to true, and the deployment will attach the required PVC for the global domain migration dump to the sv app"
-      upgrade_global_domain_active_id:
+      global_domain_active_migration_id:
         type: integer
         default: 0
-      upgrade_global_domain_upgrade_id:
+      global_domain_upgrade_migration_id:
         type: integer
         default: 0
-      upgrade_global_domain_legacy_id:
+      global_domain_legacy_migration_id:
         type: integer
         default: 0
       cancel_workflow_on_failure:
@@ -1532,20 +1532,20 @@ jobs:
               VERSION=$(get-snapshot-version)
             fi
             export CN_NON_SV_NODES="true"
-            if [[ << parameters.upgrade_global_domain_prepare >> == true ]]; then
+            if [[ << parameters.prepare_global_domain_upgrade >> == true ]]; then
               export CN_NON_SV_NODES="false"
             export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
             fi
-            export GLOBAL_DOMAIN_ACTIVE_ID=<< parameters.upgrade_global_domain_active_id >>
-            if [[ << parameters.upgrade_global_domain_upgrade_id >> -ne 0 ]]; then
+            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
+            if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
               export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
               export CN_NON_SV_NODES="false"
-              export GLOBAL_DOMAIN_UPGRADE_ID=<< parameters.upgrade_global_domain_upgrade_id >>
-              if [[ << parameters.upgrade_global_domain_legacy_id >> -ne 0 ]]; then
-                export GLOBAL_DOMAIN_LEGACY_ID=<< parameters.upgrade_global_domain_legacy_id >>
+              export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
+              if [[ << parameters.global_domain_legacy_migration_id >> -ne 0 ]]; then
+                export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
               fi
               cncluster ci_apply --skip-reset
-            elif [[ << parameters.upgrade_global_domain_active_id >> -ne 0 ]]; then
+            elif [[ << parameters.global_domain_active_migration_id >> -ne 0 ]]; then
               cncluster ci_apply --skip-reset
             elif [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
               cncluster ci_apply
@@ -3337,7 +3337,7 @@ workflows:
           cluster: "cimain"
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for cimain
-          upgrade_global_domain_prepare: true
+          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - wait_for_previous_pipeline
@@ -3380,7 +3380,7 @@ workflows:
           cluster: "cimain"
           send_deployment_notification: false
           update_deployment_branch: false
-          upgrade_global_domain_upgrade_id: 1
+          global_domain_upgrade_migration_id: 1
           requires:
             - trigger_global_domain_migration
       - backup_cluster:
@@ -3412,7 +3412,7 @@ workflows:
           cluster: "cimain"
           send_deployment_notification: false
           update_deployment_branch: false
-          upgrade_global_domain_active_id: 1
+          global_domain_active_migration_id: 1
           requires:
             - deploy_global_domain_upgrade
             - restore_node
@@ -3449,7 +3449,7 @@ workflows:
           send_deployment_notification: false
           requires:
             - switch_global_domain_upgrade
-          global_domain_id: 1
+          global_domain_migration_id: 1
       # TODO(#10038) Reenable this once TxLogs work across domain migrations.
       # - preflight_sv_check:
       #     <<: *main-branch-only
@@ -3756,7 +3756,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_prepare: true
+          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -3799,7 +3799,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_upgrade_id: 1
+          global_domain_upgrade_migration_id: 1
           requires:
             - trigger_global_domain_migration
       - backup_cluster:
@@ -3832,7 +3832,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_active_id: 1
+          global_domain_active_migration_id: 1
           requires:
             - deploy_global_domain_upgrade
             - restore_node
@@ -3868,7 +3868,7 @@ workflows:
           cluster: "scratchneta"
           requires:
             - switch_global_domain_upgrade
-          global_domain_id: 1
+          global_domain_migration_id: 1
       # TODO(#10038) Reenable this once TxLogs work across domain migrations.
       # - preflight_sv_check:
       #     <<: *main-branch-never
@@ -3939,7 +3939,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_prepare: true
+          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -3982,7 +3982,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_upgrade_id: 1
+          global_domain_upgrade_migration_id: 1
           requires:
             - trigger_global_domain_migration
       - backup_cluster:
@@ -4015,7 +4015,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_active_id: 1
+          global_domain_active_migration_id: 1
           requires:
             - deploy_global_domain_upgrade
             - restore_node
@@ -4051,7 +4051,7 @@ workflows:
           cluster: "scratchnetb"
           requires:
             - switch_global_domain_upgrade
-          global_domain_id: 1
+          global_domain_migration_id: 1
       # TODO(#10038) Reenable this once TxLogs work across domain migrations.
       # - preflight_sv_check:
       #     <<: *main-branch-never
@@ -4122,7 +4122,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_prepare: true
+          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -4165,7 +4165,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_upgrade_id: 1
+          global_domain_upgrade_migration_id: 1
           requires:
             - trigger_global_domain_migration
       - backup_cluster:
@@ -4198,7 +4198,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_active_id: 1
+          global_domain_active_migration_id: 1
           requires:
             - deploy_global_domain_upgrade
             - restore_node
@@ -4234,7 +4234,7 @@ workflows:
           cluster: "scratchnetc"
           requires:
             - switch_global_domain_upgrade
-          global_domain_id: 1
+          global_domain_migration_id: 1
       # TODO(#10038) Reenable this once TxLogs work across domain migrations.
       # - preflight_sv_check:
       #     <<: *main-branch-never
@@ -4305,7 +4305,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_prepare: true
+          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -4348,7 +4348,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_upgrade_id: 1
+          global_domain_upgrade_migration_id: 1
           requires:
             - trigger_global_domain_migration
       - backup_cluster:
@@ -4381,7 +4381,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_active_id: 1
+          global_domain_active_migration_id: 1
           requires:
             - deploy_global_domain_upgrade
             - restore_node
@@ -4417,7 +4417,7 @@ workflows:
           cluster: "scratchnetd"
           requires:
             - switch_global_domain_upgrade
-          global_domain_id: 1
+          global_domain_migration_id: 1
       # TODO(#10038) Reenable this once TxLogs work across domain migrations.
       # - preflight_sv_check:
       #     <<: *main-branch-never
@@ -4488,7 +4488,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_prepare: true
+          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -4531,7 +4531,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_upgrade_id: 1
+          global_domain_upgrade_migration_id: 1
           requires:
             - trigger_global_domain_migration
       - backup_cluster:
@@ -4564,7 +4564,7 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          upgrade_global_domain_active_id: 1
+          global_domain_active_migration_id: 1
           requires:
             - deploy_global_domain_upgrade
             - restore_node
@@ -4600,7 +4600,7 @@ workflows:
           cluster: "scratchnete"
           requires:
             - switch_global_domain_upgrade
-          global_domain_id: 1
+          global_domain_migration_id: 1
       # TODO(#10038) Reenable this once TxLogs work across domain migrations.
       # - preflight_sv_check:
       #     <<: *main-branch-never

@@ -12,7 +12,7 @@ import {
 import type { Auth0Client, ExactNamespace } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { DomainIndex } from './globalDomainNode';
+import { DomainMigrationIndex } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { installPostgresMetrics } from './postgres';
 import { installValidatorApp } from './validator';
@@ -23,7 +23,7 @@ export async function installValidator1(
   onboardingSecret: string,
   validatorWalletUser: string,
   splitPostgresInstances: boolean,
-  svActiveDomain: DomainIndex,
+  svActiveMigrationId: DomainMigrationIndex,
   dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
@@ -81,7 +81,7 @@ export async function installValidator1(
     validatorPostgres,
   ]);
   const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
-  const scanAddress = `http://scan-app-${svActiveDomain}.sv-1:5012`;
+  const scanAddress = `http://scan-app-${svActiveMigrationId}.sv-1:5012`;
 
   const validator = installValidatorApp({
     validatorWalletUser,
@@ -94,7 +94,7 @@ export async function installValidator1(
     ],
     validatorPartyHint: `${name}_validator_service_user`,
     extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
-    svSponsorAddress: `http://sv-app-${svActiveDomain}.sv-1:5014`,
+    svSponsorAddress: `http://sv-app-${svActiveMigrationId}.sv-1:5014`,
     onboardingSecret,
     persistenceConfig: {
       host: validatorPostgres.address,

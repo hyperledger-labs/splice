@@ -11,7 +11,7 @@ import {
   isDevNet,
 } from 'cn-pulumi-common';
 
-import { DefaultGlobalDomainId, DomainIndex } from './globalDomainNode';
+import { DefaultMigrationId, DomainMigrationIndex } from './globalDomainNode';
 import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './svconfs';
 
 /**
@@ -32,16 +32,16 @@ export function installCometBftNode(
     founder: StaticCometBftConfigWithNodeName;
     peers: StaticCometBftConfigWithNodeName[];
   },
-  domain: DomainIndex,
+  migrationId: DomainMigrationIndex,
   syncSource?: Release,
   opts?: CustomResourceOptions
 ): Service {
-  const configs = new CometBftNodeConfig(domain, nodeConfigs);
+  const configs = new CometBftNodeConfig(migrationId, nodeConfigs);
   const nodeConfig = configs.nodeConfigs[nodename];
   let stateSyncConfig;
   if (syncSource) {
     const rpcServer = syncSource.status.namespace.apply(namespace =>
-      rpcServiceAddress(namespace, domain)
+      rpcServiceAddress(namespace, migrationId)
     );
     stateSyncConfig = {
       enable: true,
@@ -51,10 +51,10 @@ export function installCometBftNode(
     stateSyncConfig = { enable: false };
   }
   // for backwards compatibility, we keep the old chainId for the default global domain
-  const includeDomainInChainId = domain !== DefaultGlobalDomainId;
+  const includeMigrationIdInChainId = migrationId !== DefaultMigrationId;
   const cometbftRelease = installCNHelmChart(
     xns,
-    `cometbft-global-domain-${domain}`,
+    `cometbft-global-domain-${migrationId}`,
     'cn-cometbft',
     {
       nodeName: onboardingName,
@@ -86,7 +86,7 @@ export function installCometBftNode(
         chainId:
           `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
             ? 'test'
-            : `${CLUSTER_BASENAME}` + (includeDomainInChainId ? `-${domain}` : ''),
+            : `${CLUSTER_BASENAME}` + (includeMigrationIdInChainId ? `-${migrationId}` : ''),
       },
       metrics: {
         enable: true,
@@ -101,7 +101,7 @@ export function installCometBftNode(
     }
   );
   return Service.get(
-    `${nodename}-${domain}-cometbft-rpc`,
+    `${nodename}-${migrationId}-cometbft-rpc`,
     pulumi.interpolate`${cometbftRelease.status.namespace}/${nodeConfig.identifier}-cometbft-rpc`
   );
 }
@@ -112,8 +112,8 @@ interface NodeConfig extends Omit<StaticCometBftConfig, 'nodeIndex'> {
   identifier: string;
 }
 
-function rpcServiceAddress(namespace: string, domain: DomainIndex): string {
-  return `http://sv-app-${domain}.${namespace}.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc`;
+function rpcServiceAddress(namespace: string, migrationId: DomainMigrationIndex): string {
+  return `http://sv-app-${migrationId}.${namespace}.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc`;
 }
 
 class CometBftNodeConfig {
@@ -183,11 +183,11 @@ class CometBftNodeConfig {
     }, {});
   }
 
-  private p2pExternalAddress(nodeIndex: DomainIndex): string {
+  private p2pExternalAddress(nodeIndex: DomainMigrationIndex): string {
     return `${CLUSTER_DNS_NAME}:${this.istioExternalPort(nodeIndex)}`;
   }
 
-  private istioExternalPort(nodeIndex: DomainIndex) {
+  private istioExternalPort(nodeIndex: DomainMigrationIndex) {
     return Number(`26${this._domain}${nodeIndex}6`);
   }
 }

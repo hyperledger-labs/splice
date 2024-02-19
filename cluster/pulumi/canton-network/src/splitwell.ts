@@ -14,7 +14,7 @@ import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulu
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
-import { DomainIndex } from './globalDomainNode';
+import { DomainMigrationIndex } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { Postgres, installPostgresMetrics } from './postgres';
 import { installValidatorApp } from './validator';
@@ -24,7 +24,7 @@ export async function installSplitwell(
   providerWalletUser: string,
   onboardingSecret: string,
   splitPostgresInstances: boolean,
-  svActiveDomain: DomainIndex,
+  svActiveMigrationId: DomainMigrationIndex,
   dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
@@ -73,7 +73,7 @@ export async function installSplitwell(
     : domainPostgres;
 
   const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
-  const scanAddress = `http://scan-app-${svActiveDomain}.sv-1:5012`;
+  const scanAddress = `http://scan-app-${svActiveMigrationId}.sv-1:5012`;
   installCNHelmChart(
     xns,
     'splitwell-app',
@@ -116,7 +116,7 @@ export async function installSplitwell(
     ].join('\n'),
     onboardingSecret,
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
-    svSponsorAddress: `http://sv-app-${svActiveDomain}.sv-1:5014`,
+    svSponsorAddress: `http://sv-app-${svActiveMigrationId}.sv-1:5014`,
     participantBootstrapDump,
     participantAddress: 'participant',
     topupConfig: topupConfig,
