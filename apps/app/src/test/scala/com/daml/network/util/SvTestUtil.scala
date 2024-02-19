@@ -182,7 +182,6 @@ trait SvTestUtil extends CNNodeTestCommon {
     svcRulesConfig.domainNodeConfigLimits,
     svcRulesConfig.maxTextLength,
     svcRulesConfig.initialTrafficGrant,
-    svcRulesConfig.svChallengeDeadline,
     svcRulesConfig.globalDomain,
     domainUpgradeSchedule.toJava,
   )

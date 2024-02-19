@@ -68,7 +68,6 @@ initCollective initialRoundNumber isDevNet = do
         domainNodeConfigLimits = defaultDomainNodeConfigLimits
         maxTextLength = 1024
         initialTrafficGrant = 1_000_000
-        svChallengeDeadline = minutes 30
         globalDomain = initialSvcGlobalDomainConfig
         nextScheduledDomainUpgrade = None
   let coinConfig = defaultCoinConfig

@@ -1370,7 +1370,6 @@ abstract class ScanStoreTest extends StoreTest with HasExecutionContext with Sto
         ),
         1,
         1,
-        new RelTime(1),
         new globaldomainCodegen.SvcGlobalDomainConfig(
           Collections.emptyMap(),
           newDomainId,

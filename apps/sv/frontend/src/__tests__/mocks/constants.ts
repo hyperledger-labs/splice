@@ -266,9 +266,6 @@ export const svcInfo: GetSvcInfoResponse = {
         leaderInactiveTimeout: {
           microseconds: '70000000',
         },
-        svChallengeDeadline: {
-          microseconds: '1800000000',
-        },
         voteRequestTimeout: {
           microseconds: '604800000000',
         },

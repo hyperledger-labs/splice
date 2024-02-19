@@ -183,7 +183,6 @@ object SvUtil {
     defaultDomainNodeConfigLimits,
     1024, // maxTextLength
     defaultInitialTrafficGrant,
-    new RelTime(TimeUnit.MINUTES.toMicros(30)), // svChallengeDeadline
     defaultSvcGlobalDomainConfig(domainId), // globalDomainConfig
     Optional.empty(), // nextScheduledHardDomainMigration
   )

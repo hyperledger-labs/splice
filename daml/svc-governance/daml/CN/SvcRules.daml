@@ -169,38 +169,6 @@ template ElectionRequest with
     -- the confirmation of the 'svc'.
     signatory svc
 
--- | A challenge from one SV to another to prove that they are online and can submit
-template FirstSvChallenge with
-    svc : Party
-    challenged : Party
-    firstChallenger : Party
-    deadline : Time
-    -- ^ Earliest time after which another SVC member can second the challenge
-  where
-    signatory svc
-
-    choice SvChallenge_Answer : ()
-      controller challenged
-      do
-        pure ()
-
--- | A challenge that has reached the second stage, where a second SV joins the challenge.
--- We use a two-step approach for challenging SVs as a safety measure, to guarantee that the challenged
--- SV has a fair chance of answering. If the second SV succeeded in reading the first challenge
--- and writing the second challenge, that guarantees that both reads and writes are functional,
--- and the challenged SV should also be able to answer the challenge.
-template SecondSvChallenge with
-    svc : Party
-    challenged : Party
-    deadline : Time
-  where
-    signatory svc
-
-    choice SecondSvChallenge_Answer : ()
-      controller challenged
-      do
-        pure ()
-
 -- | A note that an SV was issued part of the SvcReward in a specific round.
 template SvReward with
     svc : Party
@@ -362,7 +330,6 @@ data SvcRulesConfig = SvcRulesConfig with
     domainNodeConfigLimits : DomainNodeConfigLimits  -- ^ Limits to enforce on the members' `DomainNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
     initialTrafficGrant: Int -- ^ Extra traffic granted to SVs at the time of joining
-    svChallengeDeadline : RelTime -- ^ Deadline for each stage of the two-stage SV challenging protocol
     globalDomain : SvcGlobalDomainConfig
     nextScheduledDomainUpgrade: Optional DomainUpgradeSchedule
   deriving (Eq, Show)
@@ -516,58 +483,6 @@ template SvcRules with
           sv
           number = previousReport.number + 1
           status = Some status
-
-    -- Challenge an SV member that seems to be non-responsive.
-    -- The challenge will need to be seconded by another member after the deadine timer has elapsed before being executed.
-    -- The member itself can archive the challenge if it is functional.
-    nonconsuming choice SvcRules_ChallengeMember : ContractId FirstSvChallenge
-      with
-        challenged : Party
-        firstChallenger : Party
-      controller firstChallenger
-      do
-        require "IsDevnet is true" isDevNet
-        require "Challenger is a collective member" (firstChallenger `Map.member` members)
-        require "Challenged is a collective member" (challenged `Map.member` members)
-        now <- getTime
-        let deadline = now `addRelTime` config.svChallengeDeadline
-        create FirstSvChallenge with
-          ..
-
-    -- Second an SV challenge.
-    -- If by the time the deadline elapses, the challenged SV does not archive this,
-    -- then any member can use this to immediately remove the non-responsive challenged member.
-    nonconsuming choice SvcRules_SecondChallengeMember : ContractId SecondSvChallenge
-      with
-        firstChallengeCid : ContractId FirstSvChallenge
-        secondChallenger : Party
-      controller secondChallenger
-      do
-        require "Second challenger is a collective member" (secondChallenger `Map.member` members)
-        firstChallenge <- fetchAndArchive (ForSvc with svc) firstChallengeCid
-        require "The two challengers are different" (secondChallenger /= firstChallenge.firstChallenger)
-        now <- getTime
-        require "Deadline elapsed" (now > firstChallenge.deadline)
-        let deadline = now `addRelTime` config.svChallengeDeadline
-        create SecondSvChallenge with
-          challenged = firstChallenge.challenged
-          ..
-
-    nonconsuming choice SvcRules_RemoveChallengedMember : ContractId SvcRules
-      with
-        secondChallengeCid : ContractId SecondSvChallenge
-        executer : Party
-      controller executer
-      do
-        require "Executor is a collective member" (executer `Map.member` members)
-        secondChallenge <- fetchAndArchive (ForSvc with svc) secondChallengeCid
-        now <- getTime
-        require "Deadline elapsed" (now > secondChallenge.deadline)
-        if (secondChallenge.challenged `Map.member` members)
-          then
-            exercise self SvcRules_RemoveMember with
-              member = secondChallenge.challenged
-          else pure self
 
     -- Called by SV candidates to add themselves to the SvcRules once they are confirmed and ready.
     -- We use the passed rounds for reliably determining the earliest open round, which will be
@@ -1561,12 +1476,6 @@ actionRequiringConfirmationEffectiveAt action =
 
 -- instances
 ------------
-
-instance HasCheckedFetch SecondSvChallenge ForSvc where
-  contractGroupId SecondSvChallenge {..} = ForSvc with svc
-
-instance HasCheckedFetch FirstSvChallenge ForSvc where
-  contractGroupId FirstSvChallenge {..} = ForSvc with svc
 
 instance HasCheckedFetch ElectionRequest ForSvc where
   contractGroupId ElectionRequest {..} = ForSvc with svc
