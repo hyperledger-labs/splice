@@ -36,29 +36,36 @@ class MergeMemberTrafficContractsTrigger(
   override def completeTaskAsLeader(
       memberTraffic: AssignedContract[MemberTraffic.ContractId, MemberTraffic]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    for {
-      svcRules <- store.getSvcRules()
-      threshold = svcRules.payload.config.numMemberTrafficContractsThreshold
-      memberId = Member
-        .fromProtoPrimitive_(memberTraffic.payload.memberId)
-        .fold(e => throw new IllegalArgumentException(e), identity)
-      domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
-      memberTraffics <- store.listMemberTrafficContracts(
-        memberId,
-        domainId,
-        PageLimit.tryCreate(2 * threshold.toInt),
-      )
-      outcome <-
-        if (memberTraffics.length > threshold)
-          mergeMemberTrafficContracts(memberId, memberTraffics)
-        else
-          Future.successful(
-            TaskSuccess(
-              s"More than ${threshold} member traffic contracts are required for $memberId on domain $domainId " +
-                s"in order to merge them. Currently, there are only ${memberTraffics.length}."
+    Member
+      .fromProtoPrimitive_(memberTraffic.payload.memberId)
+      .fold(
+        err => {
+          // Skip contracts with invalid member ids
+          Future.successful(TaskSuccess(s"Skipping MemberTraffic with invalid memberId: ${err}"))
+        },
+        memberId => {
+          for {
+            svcRules <- store.getSvcRules()
+            threshold = svcRules.payload.config.numMemberTrafficContractsThreshold
+            domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
+            memberTraffics <- store.listMemberTrafficContracts(
+              memberId,
+              domainId,
+              PageLimit.tryCreate(2 * threshold.toInt),
             )
-          )
-    } yield outcome
+            outcome <-
+              if (memberTraffics.length > threshold)
+                mergeMemberTrafficContracts(memberId, memberTraffics)
+              else
+                Future.successful(
+                  TaskSuccess(
+                    s"More than ${threshold} member traffic contracts are required for $memberId on domain $domainId " +
+                      s"in order to merge them. Currently, there are only ${memberTraffics.length}."
+                  )
+                )
+          } yield outcome
+        },
+      )
   }
 
   def mergeMemberTrafficContracts(

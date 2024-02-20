@@ -1,12 +1,14 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
+import com.daml.network.http.v0.definitions as d0
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.DomainFeesTestUtil
+import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
+import com.daml.network.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.Member
@@ -15,7 +17,8 @@ import org.slf4j.event.Level
 class MemberTrafficIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
-    with DomainFeesTestUtil {
+    with DomainFeesTestUtil
+    with WalletTestUtil {
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
@@ -25,6 +28,51 @@ class MemberTrafficIntegrationTest
   }
 
   "SV automation" should {
+
+    "handle contracts with an invalid member id" in { implicit env =>
+      val now = env.environment.clock.now
+      val globalDomainConfig = sv1ScanBackend.getCoinConfigAsOf(now).globalDomain
+      val trafficAmount = Math.max(globalDomainConfig.fees.minTopupAmount.toLong, 1_000_000L)
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      aliceWalletClient.tap(100)
+
+      def purchaseTrafficForMember(memberId: String, trackingId: String): Unit = {
+        clue(s"Purchase traffic for member ${memberId}") {
+          createBuyTrafficRequest(
+            aliceValidatorBackend,
+            aliceParty,
+            memberId,
+            trafficAmount,
+            trackingId,
+          )
+        }
+        clue("Traffic request is ingested into wallet tx log") {
+          // we use eventually succeeds to ensure error 404s are not logged
+          eventuallySucceeds() {
+            aliceWalletClient.getTrafficRequestStatus(trackingId)
+          }
+        }
+        clue("Wallet automation completes the request") {
+          eventually() {
+            inside(aliceWalletClient.getTrafficRequestStatus(trackingId)) {
+              case d0.GetBuyTrafficRequestStatusResponse.members.BuyTrafficRequestCompletedResponse(
+                    d0.BuyTrafficRequestCompletedResponse(status, _)
+                  ) =>
+                status shouldBe BuyTrafficRequestStatus.Completed
+            }
+          }
+        }
+      }
+
+      purchaseTrafficForMember("bad", "bad")
+
+      // The "bad" contract should be ignored and not blow up the ACS ingestion pipeline or
+      // the triggers that consume MemberTraffic contracts.
+      // To test this, we try to create another MemberTraffic contract and see it succeed.
+
+      purchaseTrafficForMember("PAR::validator::dummy", "good")
+
+    }
 
     "merge duplicate member traffic contracts" in { implicit env =>
       val now = env.environment.clock.now
@@ -67,6 +115,7 @@ class MemberTrafficIntegrationTest
           }
         }
       }
+
     }
   }
 

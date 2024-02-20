@@ -333,7 +333,12 @@ object ScanStore {
             contract,
             memberTrafficMember = Member
               .fromProtoPrimitive_(contract.payload.memberId)
-              .fold(e => throw new IllegalArgumentException(e), Some(_)),
+              .fold(
+                // we ignore cases where the member id is invalid instead of throwing an exception
+                // to avoid killing the entire ingestion pipeline as a result
+                _ => None,
+                Some(_),
+              ),
             totalTrafficPurchased = Some(contract.payload.totalPurchased),
           )
         },

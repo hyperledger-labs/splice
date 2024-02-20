@@ -40,51 +40,58 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
         cc.globaldomain.MemberTraffic,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val memberId = Member
+    Member
       .fromProtoPrimitive_(memberTraffic.payload.memberId)
-      .fold(e => throw new IllegalArgumentException(e), identity)
-    val domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
-    for {
-      // Compute new extra traffic limit
-      svcRules <- store.getSvcRules()
-      trafficLimitOffset = svcRules.payload.initialTrafficState.asScala
-        .get(memberId.toProtoPrimitive)
-        .fold(0L)(_.consumedTraffic)
-      totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, domainId)
-      newExtraTrafficLimit = trafficLimitOffset + totalPurchasedTraffic
+      .fold(
+        err => {
+          // Skip contracts with invalid member ids
+          Future.successful(TaskSuccess(s"Skipping MemberTraffic with invalid memberId: ${err}"))
+        },
+        memberId => {
+          val domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
+          for {
+            // Compute new extra traffic limit
+            svcRules <- store.getSvcRules()
+            trafficLimitOffset = svcRules.payload.initialTrafficState.asScala
+              .get(memberId.toProtoPrimitive)
+              .fold(0L)(_.consumedTraffic)
+            totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, domainId)
+            newExtraTrafficLimit = trafficLimitOffset + totalPurchasedTraffic
 
-      // Fetch current extra traffic limit
-      currentExtraTrafficLimit <- participantAdminConnection
-        .lookupTrafficControlState(domainId, memberId)
-        .map(_.fold(0L)(_.mapping.totalExtraTrafficLimit.value))
+            // Fetch current extra traffic limit
+            currentExtraTrafficLimit <- participantAdminConnection
+              .lookupTrafficControlState(domainId, memberId)
+              .map(_.fold(0L)(_.mapping.totalExtraTrafficLimit.value))
 
-      // Compare and reconcile old and new limits
-      taskOutcome <-
-        if (currentExtraTrafficLimit < newExtraTrafficLimit) {
-          participantAdminConnection
-            .getParticipantId()
-            .flatMap(svParticipantId =>
-              participantAdminConnection
-                .ensureTrafficControlState(
-                  domainId,
-                  memberId,
-                  newExtraTrafficLimit,
-                  svParticipantId.uid.namespace.fingerprint,
-                )
-                .map(_ =>
+            // Compare and reconcile old and new limits
+            taskOutcome <-
+              if (currentExtraTrafficLimit < newExtraTrafficLimit) {
+                participantAdminConnection
+                  .getParticipantId()
+                  .flatMap(svParticipantId =>
+                    participantAdminConnection
+                      .ensureTrafficControlState(
+                        domainId,
+                        memberId,
+                        newExtraTrafficLimit,
+                        svParticipantId.uid.namespace.fingerprint,
+                      )
+                      .map(_ =>
+                        TaskSuccess(
+                          s"Updated extra traffic limit for member ${memberId} from ${currentExtraTrafficLimit} to ${newExtraTrafficLimit}"
+                        )
+                      )
+                  )
+              } else {
+                Future(
                   TaskSuccess(
-                    s"Updated extra traffic limit for member ${memberId} from ${currentExtraTrafficLimit} to ${newExtraTrafficLimit}"
+                    s"Skipping since traffic limit is already up to date (previous limit = ${currentExtraTrafficLimit}, new limit = ${newExtraTrafficLimit})."
                   )
                 )
-            )
-        } else {
-          Future(
-            TaskSuccess(
-              s"Skipping since traffic limit is already up to date (previous limit = ${currentExtraTrafficLimit}, new limit = ${newExtraTrafficLimit})."
-            )
-          )
-        }
-    } yield taskOutcome
+              }
+          } yield taskOutcome
+        },
+      )
   }
 
 }

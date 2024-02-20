@@ -407,7 +407,7 @@ class WalletBuyTrafficRequestIntegrationTest
     // getTrafficRequestStatus should return 404 in this case
     val notFoundError =
       s"HTTP 404 Not Found POST at '/api/validator/v0/wallet/buy-traffic-requests/$tid/status'. " +
-        s"Command failed, message: Couldn't find transfer offer with tracking id $tid"
+        s"Command failed, message: Couldn't find buy traffic request with tracking id $tid"
     assertThrowsAndLogsCommandFailures(
       buyer.getTrafficRequestStatus(tid),
       _.message should include(notFoundError),

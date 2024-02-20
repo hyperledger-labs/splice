@@ -5,6 +5,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.cn.wallet.buytrafficrequest.BuyTrafficRequest
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyMemberTraffic
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperation,
@@ -22,7 +23,7 @@ import com.daml.network.validator.util.ExtraTrafficTopupParameters
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.CoinPosition
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.SequencedEventTrafficState
-import com.digitalasset.canton.topology.{DomainId, Member}
+import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 
 import java.time.Instant
 import java.util.Optional
@@ -162,6 +163,47 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     ) { case Seq(outcome) =>
       outcome
     }
+  }
+
+  def createBuyTrafficRequest(
+      validatorApp: ValidatorAppBackendReference,
+      buyer: PartyId,
+      memberId: String,
+      trafficAmount: Long,
+      trackingId: String,
+  )(implicit
+      env: CNNodeTestConsoleEnvironment
+  ): Contract[BuyTrafficRequest.ContractId, BuyTrafficRequest] = {
+    val now = env.environment.clock.now
+    val domainId =
+      DomainId.tryFromString(sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.activeDomain)
+    val validatorParty = validatorApp.getValidatorPartyId()
+    val walletInstall = inside(
+      validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(WalletAppInstall.COMPANION)(
+          validatorApp.getValidatorPartyId(),
+          c => c.data.endUserParty == buyer.toProtoPrimitive,
+        )
+    ) { case Seq(install) => install }
+    val cmd = walletInstall.id.exerciseWalletAppInstall_CreateBuyTrafficRequest(
+      memberId,
+      domainId.toProtoPrimitive,
+      trafficAmount,
+      now.plus(java.time.Duration.ofMinutes(1)).toInstant,
+      trackingId,
+    )
+    validatorApp.participantClientWithAdminToken.ledger_api_extensions.commands
+      .submitWithCreate(BuyTrafficRequest.COMPANION)(
+        validatorApp.config.ledgerApiUser,
+        Seq(validatorParty),
+        Seq(buyer),
+        cmd,
+        None,
+        disclosedContracts = DisclosedContracts(
+          sv1ScanBackend.getCoinRules(),
+          sv1ScanBackend.getLatestOpenMiningRound(now),
+        ).toLedgerApiDisclosedContracts,
+      )
   }
 
   def getTopupParameters(validatorApp: ValidatorAppBackendReference, ts: CantonTimestamp)(implicit
