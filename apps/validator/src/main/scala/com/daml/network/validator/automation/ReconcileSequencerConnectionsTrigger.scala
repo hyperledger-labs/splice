@@ -26,6 +26,7 @@ class ReconcileSequencerConnectionsTrigger(
     participantAdminConnection: ParticipantAdminConnection,
     scanConnection: BftScanConnection,
     globalDomainAlias: DomainAlias,
+    submissionRequestAmplification: PositiveInt,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -88,8 +89,7 @@ class ReconcileSequencerConnectionsTrigger(
                 sequencerConnections = SequencerConnections.tryMany(
                   nonEmptyConnections.forgetNE,
                   CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-                  // TODO(#10116) Make this configurable.
-                  submissionRequestAmplification = PositiveInt.tryCreate(1),
+                  submissionRequestAmplification = submissionRequestAmplification,
                 )
               )
             )

@@ -84,6 +84,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
       sequencerConnections.connections.size shouldBe 4
       sequencerConnections.sequencerTrustThreshold shouldBe PositiveInt.tryCreate(2)
+      sequencerConnections.submissionRequestAmplification shouldBe PositiveInt.tryCreate(2)
     }
   }
 

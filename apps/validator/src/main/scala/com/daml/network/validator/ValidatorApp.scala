@@ -449,6 +449,7 @@ class ValidatorApp(
         config.domains.global.buyExtraTraffic,
         config.appManager,
         config.domains.global.url.isEmpty,
+        config.domains.global.submissionRequestAmplification,
         config.prevetDuration,
         config.domains.global.alias,
         clock,

@@ -9,7 +9,11 @@ import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.wallet.config.TreasuryConfig
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, NonNegativeNumeric}
+import com.digitalasset.canton.config.RequireTypes.{
+  NonNegativeLong,
+  NonNegativeNumeric,
+  PositiveInt,
+}
 
 import java.nio.file.Path
 
@@ -109,6 +113,13 @@ case class ValidatorGlobalDomainConfig(
       */
     trafficBalanceCacheTimeToLive: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(1),
+
+    /** The number of concurrent sequencer submissions that the validator will send.
+      * Increasing this increases reliability in the presence of faulty sequencers
+      * at the cost of higher domain fees.
+      * This is capped at the number of healthy sequencer connections.
+      */
+    submissionRequestAmplification: PositiveInt = PositiveInt.tryCreate(2),
 ) {
 
   /** Converts the trafficReservedForTopups into an Option that is set to None if the validator is not

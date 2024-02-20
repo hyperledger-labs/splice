@@ -34,6 +34,7 @@ class DomainConnector(
       case None =>
         ensureDomainRegisteredFromScan(
           config.domains.global.alias,
+          config.domains.global.submissionRequestAmplification,
           scanConnection,
         )
       case Some(url) =>
@@ -64,6 +65,7 @@ class DomainConnector(
 
   private def ensureDomainRegisteredFromScan(
       alias: DomainAlias,
+      submissionRequestAmplification: PositiveInt,
       scanConnection: BftScanConnection,
   )(implicit tc: TraceContext): Future[Unit] = {
     for {
@@ -86,8 +88,7 @@ class DomainConnector(
             SequencerConnections.tryMany(
               nonEmptyConnections.forgetNE,
               CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-              // TODO(#10116) Make this configurable.
-              submissionRequestAmplification = PositiveInt.tryCreate(1),
+              submissionRequestAmplification = submissionRequestAmplification,
             ),
           )
       }
