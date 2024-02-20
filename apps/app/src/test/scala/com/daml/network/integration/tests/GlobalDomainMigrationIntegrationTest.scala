@@ -581,11 +581,15 @@ class GlobalDomainMigrationIntegrationTest
           sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
 
           clue("Old wallet balance is recorded") {
-            assertInRange(sv1WalletLocalClient.balance().unlockedQty, (1000, 2000))
+            eventually() {
+              assertInRange(sv1WalletLocalClient.balance().unlockedQty, (1000, 2000))
+            }
           }
           clue("Old scan transaction history is recorded") {
-            countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
-            countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 0
+            eventually() {
+              countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
+              countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 0
+            }
           }
           actAndCheck("Create some new transaction history", sv1WalletLocalClient.tap(1338))(
             "New transaction history is recorded and balance is updated",
