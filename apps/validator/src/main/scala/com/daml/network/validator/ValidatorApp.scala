@@ -21,15 +21,22 @@ import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
 import com.daml.network.http.v0.validator_public.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
 import com.daml.network.identities.NodeIdentitiesStore
+import com.daml.network.migration.DomainDataRestorer
 import com.daml.network.scan.admin.api.client
-import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.admin.api.client.{BftScanConnection, MinimalScanConnection}
+import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.setup.ParticipantInitializer
+import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.{CoinConfigSchedule, HasHealth, PackageVetting, UploadablePackage}
+import com.daml.network.util.{
+  BackupDump,
+  CoinConfigSchedule,
+  HasHealth,
+  PackageVetting,
+  UploadablePackage,
+}
 import com.daml.network.validator.admin.AppManagerService
 import com.daml.network.validator.admin.http.*
 import com.daml.network.validator.automation.{
@@ -43,6 +50,7 @@ import com.daml.network.validator.config.{
 }
 import com.daml.network.validator.domain.DomainConnector
 import com.daml.network.validator.metrics.ValidatorAppMetrics
+import com.daml.network.validator.migration.DomainMigrationDump
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
 import com.daml.network.wallet.UserWalletManager
@@ -73,6 +81,7 @@ import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success}
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -108,12 +117,21 @@ class ValidatorApp(
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
     _ <- ensureVersionMatch(config.scanClient)
     _ <- withParticipantAdminConnection { participantAdminConnection =>
-      ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
-        participantAdminConnection,
-        config.participantBootstrappingDump,
-        loggerFactory,
-        retryProvider,
-      )
+      readRestoreDump match {
+        case Some(migrationDump) =>
+          val nodeInitializer =
+            new NodeInitializer(participantAdminConnection, retryProvider, loggerFactory)
+          nodeInitializer.initializeAndWait(
+            migrationDump.participant
+          )
+        case None =>
+          ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+            participantAdminConnection,
+            config.participantBootstrappingDump,
+            loggerFactory,
+            retryProvider,
+          )
+      }
     }
   } yield ()
 
@@ -148,7 +166,25 @@ class ValidatorApp(
               retryProvider,
               loggerFactory,
             )
-            _ <- domainConnector.ensureGlobalDomainRegistered()
+            _ <- readRestoreDump match {
+              case Some(migrationDump) =>
+                val globalDomainInitializer = new DomainDataRestorer(
+                  participantAdminConnection,
+                  loggerFactory,
+                )
+                domainConnector.getGlobalDomainSequencerConnections.flatMap {
+                  sequencerConnections =>
+                    globalDomainInitializer.connectDomainAndRestoreData(
+                      config.domains.global.alias,
+                      migrationDump.domainId,
+                      sequencerConnections,
+                      migrationDump.dars,
+                      migrationDump.acsSnapshot,
+                    )
+                }
+              case None =>
+                domainConnector.ensureGlobalDomainRegistered()
+            }
             _ <- domainConnector.ensureExtraDomainsRegistered()
             // Note that for the validator of an SV app, the user will be created by the SV app with a
             // primary party set to the SV app already so this is a noop.
@@ -163,6 +199,23 @@ class ValidatorApp(
           } yield ()
         }
     } yield ()
+
+  private def readRestoreDump = config.restoreFromMigrationDump.map { path =>
+    val migrationDump = BackupDump.readFromPath[DomainMigrationDump](path) match {
+      case Failure(exception) =>
+        throw Status.INVALID_ARGUMENT
+          .withDescription(s"Failed to read migration dump from $path: ${exception.getMessage}")
+          .asRuntimeException()
+      case Success(value) => value
+    }
+    if (migrationDump.migrationId != config.domainMigrationId)
+      throw Status.INVALID_ARGUMENT
+        .withDescription(
+          "Migration id from the dump does not match the configured migration id in the validator. Please check if the SV app is configured with the correct migration id"
+        )
+        .asRuntimeException()
+    migrationDump
+  }
 
   private def setupWalletDars(
       participantAdminConnection: ParticipantAdminConnection
@@ -460,6 +513,7 @@ class ValidatorApp(
         participantAdminConnection,
         participantIdentitiesStore,
         config.domainMigrationPath,
+        config.domainMigrationId,
         retryProvider,
         config.ingestFromParticipantBegin,
         loggerFactory,

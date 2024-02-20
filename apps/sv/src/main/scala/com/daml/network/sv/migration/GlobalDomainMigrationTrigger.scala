@@ -19,6 +19,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
 final class GlobalDomainMigrationTrigger(
+    override protected val currentMigrationId: Long,
     override protected val context: TriggerContext,
     domainAlias: DomainAlias,
     localDomainNode: LocalDomainNode,

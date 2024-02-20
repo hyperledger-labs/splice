@@ -24,6 +24,7 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
 ) extends ScheduledTaskTrigger[DomainMigrationTrigger.Task] {
   protected val participantAdminConnection: ParticipantAdminConnection
   protected val dumpPath: Path
+  protected val currentMigrationId: Long
 
   protected def getSchedule(implicit
       tc: TraceContext
@@ -50,10 +51,12 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
         // and the dump does not exist or the dump exists and the migrationId is different compared to the scheduled one
         if (
           domainTimeIsAfterTheScheduledTime
-          && (!BackupDump
-            .fileExists(dumpPath) || !readMigrationIdFromExistingDump().contains(schedule.id))
+          && currentMigrationId + 1 == schedule.migrationId && (!BackupDump
+            .fileExists(dumpPath) || !readMigrationIdFromExistingDump().contains(
+            schedule.migrationId
+          ))
         )
-          OptionT.pure[Future](DomainMigrationTrigger.Task(domainId, schedule.id))
+          OptionT.pure[Future](DomainMigrationTrigger.Task(domainId, schedule.migrationId))
         else OptionT.none[Future, DomainMigrationTrigger.Task]
     } yield task).value.map(_.toList)
   }
@@ -107,7 +110,7 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
 
 object DomainMigrationTrigger {
 
-  case class ScheduledMigration(time: Instant, id: Long)
+  case class ScheduledMigration(time: Instant, migrationId: Long)
 
   case class Task(domainId: DomainId, migrationId: Long) extends PrettyPrinting {
 

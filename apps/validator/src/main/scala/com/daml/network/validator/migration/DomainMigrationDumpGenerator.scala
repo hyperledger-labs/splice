@@ -40,6 +40,7 @@ class DomainMigrationDumpGenerator(
       dars <- darExporter.exportAllDars()
     } yield {
       DomainMigrationDump(
+        domainId = domain,
         migrationId = migrationId,
         participant = nodeIdentities,
         acsSnapshot = acsSnapshot,

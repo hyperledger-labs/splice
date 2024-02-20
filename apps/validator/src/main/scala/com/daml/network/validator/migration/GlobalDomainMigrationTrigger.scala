@@ -14,6 +14,7 @@ import java.nio.file.Path
 import scala.concurrent.{ExecutionContext, Future}
 
 final class GlobalDomainMigrationTrigger(
+    override protected val currentMigrationId: Long,
     override protected val context: TriggerContext,
     override protected val participantAdminConnection: ParticipantAdminConnection,
     override protected val dumpPath: Path,

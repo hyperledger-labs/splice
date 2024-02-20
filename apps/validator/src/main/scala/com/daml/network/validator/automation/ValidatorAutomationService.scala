@@ -47,6 +47,7 @@ class ValidatorAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     participantIdentitiesStore: NodeIdentitiesStore,
     domainMigrationDumpPath: Option[Path],
+    domainMigrationId: Long,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -177,6 +178,7 @@ class ValidatorAutomationService(
   ) { path =>
     registerTrigger(
       new GlobalDomainMigrationTrigger(
+        domainMigrationId,
         triggerContext,
         participantAdminConnection,
         path,

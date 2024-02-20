@@ -1,6 +1,6 @@
 package com.daml.network.validator.domain
 
-import cats.implicits.toFoldableOps
+import cats.implicits.{catsSyntaxApplicativeId, toFoldableOps}
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.scan.admin.api.client.BftScanConnection
@@ -29,75 +29,67 @@ class DomainConnector(
     extends NamedLogging {
 
   def ensureGlobalDomainRegistered()(implicit tc: TraceContext): Future[Unit] = {
+    val globalDomainAlias = config.domains.global.alias
+    getGlobalDomainSequencerConnections.flatMap(ensureDomainRegistered(globalDomainAlias, _))
+  }
+
+  def getGlobalDomainSequencerConnections(implicit
+      tc: TraceContext
+  ): Future[SequencerConnections] = {
     // TODO (#8450) config.domains.global.alias and config.domains.global.url are wrong if global has migrated
     config.domains.global.url match {
       case None =>
-        ensureDomainRegisteredFromScan(
-          config.domains.global.alias,
-          config.domains.global.submissionRequestAmplification,
-          scanConnection,
-        )
+        getSequencerConnectionsFromScan(config.domains.global.submissionRequestAmplification)
       case Some(url) =>
-        ensureDomainRegistered(
-          config.domains.global.alias,
-          url,
-        )
+        SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)).pure[Future]
     }
   }
 
   def ensureExtraDomainsRegistered()(implicit tc: TraceContext): Future[Unit] =
-    config.domains.extra.traverse_(domain => ensureDomainRegistered(domain.alias, domain.url))
+    config.domains.extra.traverse_(domain =>
+      ensureDomainRegistered(
+        domain.alias,
+        SequencerConnections.single(GrpcSequencerConnection.tryCreate(domain.url)),
+      )
+    )
 
   private def ensureDomainRegistered(
       alias: DomainAlias,
-      url: String,
+      sequencerConnections: SequencerConnections,
   )(implicit tc: TraceContext): Future[Unit] = {
     val domainConfig = DomainConnectionConfig(
       alias,
-      SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)),
+      sequencerConnections,
     )
-    logger.info(s"Ensuring domain registered with config $domainConfig")
+    logger.info(s"Ensuring domain $alias registered with config $domainConfig")
     participantAdminConnection.ensureDomainRegisteredAndConnected(
       domainConfig,
       RetryFor.WaitingOnInitDependency,
     )
   }
 
-  private def ensureDomainRegisteredFromScan(
-      alias: DomainAlias,
-      submissionRequestAmplification: PositiveInt,
-      scanConnection: BftScanConnection,
-  )(implicit tc: TraceContext): Future[Unit] = {
-    for {
-      _ <- waitForSequencerConnectionsFromScan(
-        scanConnection,
-        logger,
-        retryProvider,
+  private def getSequencerConnectionsFromScan(
+      submissionRequestAmplification: PositiveInt
+  )(implicit tc: TraceContext) = for {
+    _ <- waitForSequencerConnectionsFromScan(
+      scanConnection,
+      logger,
+      retryProvider,
+    )
+    sequencerConnections <- ValidatorApp.getSequencerConnectionsFromScan(
+      scanConnection,
+      logger,
+      clock.now,
+    )
+  } yield NonEmpty.from(sequencerConnections) match {
+    case None =>
+      sys.error("sequencer connections from scan is not expected to be empty.")
+    case Some(nonEmptyConnections) =>
+      SequencerConnections.tryMany(
+        nonEmptyConnections.forgetNE,
+        CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
+        submissionRequestAmplification = submissionRequestAmplification,
       )
-      sequencerConnections <- ValidatorApp.getSequencerConnectionsFromScan(
-        scanConnection,
-        logger,
-        clock.now,
-      )
-      domainConfig = NonEmpty.from(sequencerConnections) match {
-        case None =>
-          sys.error("sequencer connections from scan is not expected to be empty.")
-        case Some(nonEmptyConnections) =>
-          DomainConnectionConfig(
-            alias,
-            SequencerConnections.tryMany(
-              nonEmptyConnections.forgetNE,
-              CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-              submissionRequestAmplification = submissionRequestAmplification,
-            ),
-          )
-      }
-      _ = logger.info(s"Ensuring domain registered with config from scan $domainConfig")
-      _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
-        domainConfig,
-        RetryFor.WaitingOnInitDependency,
-      )
-    } yield ()
   }
 
   private def waitForSequencerConnectionsFromScan(

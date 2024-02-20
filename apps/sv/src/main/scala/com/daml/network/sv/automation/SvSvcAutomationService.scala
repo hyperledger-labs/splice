@@ -257,6 +257,7 @@ class SvSvcAutomationService(
       case (Some(domainNode), Some(dumpPath)) =>
         registerTrigger(
           new GlobalDomainMigrationTrigger(
+            config.domainMigrationId,
             triggerContext,
             config.domains.global.alias,
             domainNode,

@@ -3,3 +3,6 @@
 
 # TODO(#10052) Remove this if we can import without connecting to the domain
 ACS_COMMITMENT_MISMATCH
+
+# TODO(#10137) Remove once we have a fix for this
+Claims do not authorize to read data for party 'bob__wallet__user.*

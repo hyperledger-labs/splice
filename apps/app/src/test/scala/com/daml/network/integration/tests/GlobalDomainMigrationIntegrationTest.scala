@@ -1,18 +1,17 @@
 package com.daml.network.integration.tests
 
 import better.files.File.apply
-import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.network.sv.automation.singlesv.SvRewardTrigger
+import cats.implicits.{catsSyntaxOptionId, catsSyntaxParallelTraverse1}
 import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.cn.svcrules.{DomainUpgradeSchedule, SvcRules_AddMember}
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
-import com.daml.network.codegen.java.cn.svcrules.{DomainUpgradeSchedule, SvcRules_AddMember}
 import com.daml.network.config.{
   CNNodeConfigTransforms,
   CNParticipantClientConfig,
   NetworkAppClientConfig,
 }
-import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
 import com.daml.network.console.{
   ScanAppBackendReference,
   ValidatorAppBackendReference,
@@ -33,28 +32,34 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.migrationDumpDir
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
+import com.daml.network.sv.automation.singlesv.SvRewardTrigger
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
-import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
-import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, SvTestUtil, WalletTestUtil}
+import com.daml.network.util.{
+  DomainMigrationUtil,
+  ProcessTestUtil,
+  StandaloneCanton,
+  SvTestUtil,
+  WalletTestUtil,
+}
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
-import com.daml.network.util.DomainMigrationUtil
+import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
-import org.slf4j.event.Level
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
+import org.slf4j.event.Level
 
 import java.io.File
 import java.nio.file.Path
@@ -157,6 +162,44 @@ class GlobalDomainMigrationIntegrationTest
                   domainMigrationId = 1L,
                 )
             }
+          ) + (
+            InstanceName.tryCreate("bobValidatorLocal") -> {
+              val bobValidatorConfig = config
+                .validatorApps(InstanceName.tryCreate("bobValidator"))
+              bobValidatorConfig
+                .copy(
+                  adminApi =
+                    bobValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
+                  scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
+                  domains = ValidatorDomainConfig(global =
+                    ValidatorGlobalDomainConfig(
+                      alias = DomainAlias.tryCreate("global"),
+                      url = Some("http://localhost:27108"),
+                    )
+                  ),
+                  participantClient = CNParticipantClientConfig(
+                    ClientConfig(port = Port.tryCreate(27502)),
+                    bobValidatorConfig.participantClient.ledgerApi.copy(
+                      clientConfig =
+                        bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                          port = Port.tryCreate(27501)
+                        )
+                    ),
+                  ),
+                  restoreFromMigrationDump = Some(
+                    (migrationDumpDir("bobValidator") / "domain_migration_dump.json").path
+                  ),
+                  onboarding = bobValidatorConfig.onboarding.map(onboarding =>
+                    onboarding.copy(
+                      svClient = onboarding.svClient.copy(adminApi =
+                        NetworkAppClientConfig(url = "http://localhost:27114")
+                      )
+                    )
+                  ),
+                  domainMigrationId = 1L,
+                )
+
+            }
           ),
           walletAppClients = config.walletAppClients + (
             InstanceName.tryCreate("sv1WalletLocal") ->
@@ -164,6 +207,13 @@ class GlobalDomainMigrationIntegrationTest
                 .walletAppClients(InstanceName.tryCreate("sv1Wallet"))
                 .copy(
                   adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27103")
+                )
+          ) + (
+            InstanceName.tryCreate("bobWalletLocal") ->
+              config
+                .walletAppClients(InstanceName.tryCreate("bobWallet"))
+                .copy(
+                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27603")
                 )
           ),
         )
@@ -268,12 +318,14 @@ class GlobalDomainMigrationIntegrationTest
     def startValidatorAndTapCoin(
         validatorBackend: ValidatorAppBackendReference,
         walletClient: WalletAppClientReference,
+        tapAmount: BigDecimal = 50.0,
+        expectedCoins: Range = 50 to 50,
     ) = {
       startAllSync(validatorBackend)
       val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
-      walletClient.tap(50.0)
+      walletClient.tap(tapAmount)
       withClueAndLog(s"${validatorBackend.name} has tapped a coin") {
-        checkWallet(walletUserParty, walletClient, Seq((50, 50)))
+        checkWallet(walletUserParty, walletClient, Seq((expectedCoins.start, expectedCoins.end)))
       }
       validatorBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
         true
@@ -321,6 +373,8 @@ class GlobalDomainMigrationIntegrationTest
       ),
       logSuffix = "global-domain-migration",
       autoInit = false,
+      extraParticipant = true,
+      extraParticipantUser = bobValidatorBackend.config.ledgerApiUser.some,
     )() {
       startValidatorAndTapCoin(bobValidatorBackend, bobWalletClient)
       Using.resources(
@@ -429,11 +483,13 @@ class GlobalDomainMigrationIntegrationTest
             }
           }
 
-          startAllSync(
-            sv2LocalBackend,
-            sv3LocalBackend,
-            sv4LocalBackend,
-          )
+          withClueAndLog("starting sv2-4 upgraded nodes") {
+            startAllSync(
+              sv2LocalBackend,
+              sv3LocalBackend,
+              sv4LocalBackend,
+            )
+          }
 
           checkMigrateDomainOnNodes(majorityUpgradeNodes)
 
@@ -512,6 +568,15 @@ class GlobalDomainMigrationIntegrationTest
             sv1ScanLocalBackend,
             sv1ValidatorLocalBackend,
           )
+
+          withClueAndLog("validator can migrate to the new domain") {
+            val validatorThatMigrates = v("bobValidatorLocal")
+            startValidatorAndTapCoin(
+              validatorThatMigrates,
+              uwc("bobWalletLocal"),
+              expectedCoins = 99 to 100,
+            )
+          }
 
           sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
 
