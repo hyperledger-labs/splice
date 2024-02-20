@@ -7,6 +7,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   Contract as CodegenContract,
   ContractCompanion as TemplateCompanion,
 }
+import com.daml.network.automation.{AssignTrigger, TransferFollowTrigger}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{
   cns,
@@ -19,10 +20,13 @@ import com.daml.network.codegen.java.cn.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms.{
+  ConfigurableApp,
+  updateAutomationConfig,
   updateAllAutomationConfigs,
   updateAllValidatorConfigs,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
+import com.daml.network.sv.automation.singlesv.SvcRulesTransferTrigger
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.{
   AssignedContract,
@@ -50,14 +54,18 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     super.environmentDefinition
       .addConfigTransforms(
         (_, config) =>
-          updateAllAutomationConfigs(c =>
+          (updateAllAutomationConfigs(c =>
             c.copy(
               // Need to disable triggers so workflows stay open
               enableSvcGovernance = false,
               enableClosedRoundArchival = false,
               enableSvRewards = false,
             )
-          )(config),
+          ) andThen updateAutomationConfig(ConfigurableApp.Sv)(
+            _.withResumedTrigger[AssignTrigger]
+              .withResumedTrigger[SvcRulesTransferTrigger]
+              .withResumedTrigger[TransferFollowTrigger]
+          ))(config),
         (_, config) =>
           updateAllValidatorConfigs { case (name, c) =>
             // Enable app manager so migration kicks in.

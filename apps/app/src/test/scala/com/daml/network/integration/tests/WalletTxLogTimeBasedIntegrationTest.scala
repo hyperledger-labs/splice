@@ -3,7 +3,8 @@ package com.daml.network.integration.tests
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
+import com.daml.network.sv.automation.leaderbased.{ExpiredCoinTrigger, ExpiredLockedCoinTrigger}
+import com.daml.network.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.{
   BalanceChangeTxLogEntry,
   TransferTxLogEntry,
@@ -18,7 +19,8 @@ class WalletTxLogTimeBasedIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil
-    with WalletTxLogTestUtil {
+    with WalletTxLogTestUtil
+    with TriggerTestUtil {
 
   private val coinPrice = BigDecimal(1.25).setScale(10)
 
@@ -259,13 +261,18 @@ class WalletTxLogTimeBasedIntegrationTest
         _ => aliceWalletClient.list().coins should have size (1),
       )
 
-      actAndCheck(
-        "Advance 4 ticks to expire the coin",
-        Range(0, 4).foreach(_ => advanceRoundsByOneTick),
-      )(
-        "Wait for coin to disappear",
-        _ => aliceWalletClient.list().coins should have size (0),
-      )
+      setTriggersWithin(
+        Seq.empty,
+        triggersToResumeAtStart = Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredCoinTrigger]),
+      ) {
+        actAndCheck(
+          "Advance 4 ticks to expire the coin",
+          Range(0, 4).foreach(_ => advanceRoundsByOneTick),
+        )(
+          "Wait for coin to disappear",
+          _ => aliceWalletClient.list().coins should have size (0),
+        )
+      }
 
       checkTxHistory(
         aliceWalletClient,
@@ -309,13 +316,19 @@ class WalletTxLogTimeBasedIntegrationTest
         _ => aliceWalletClient.list().lockedCoins should have size (1),
       )
 
-      actAndCheck(
-        "Advance 4 ticks to expire the locked coin",
-        Range(0, 4).foreach(_ => advanceRoundsByOneTick),
-      )(
-        "Wait for locked coin to disappear",
-        _ => aliceWalletClient.list().lockedCoins should have size (0),
-      )
+      setTriggersWithin(
+        Seq.empty,
+        triggersToResumeAtStart =
+          Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredLockedCoinTrigger]),
+      ) {
+        actAndCheck(
+          "Advance 4 ticks to expire the locked coin",
+          Range(0, 4).foreach(_ => advanceRoundsByOneTick),
+        )(
+          "Wait for locked coin to disappear",
+          _ => aliceWalletClient.list().lockedCoins should have size (0),
+        )
+      }
 
       checkTxHistory(
         aliceWalletClient,

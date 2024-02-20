@@ -18,7 +18,11 @@ import com.daml.network.sv.config.InitialCnsConfig
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
 import cats.syntax.parallel.*
-import com.daml.network.sv.automation.leaderbased.ExpiredCnsEntryTrigger
+import com.daml.network.automation.Trigger
+import com.daml.network.sv.automation.leaderbased.{
+  ExpiredCnsEntryTrigger,
+  ExpiredCnsSubscriptionTrigger,
+}
 import com.daml.network.wallet.automation.SubscriptionReadyForPaymentTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
@@ -209,7 +213,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       }
     }
 
-    "archives terminated CnsEntryContext contracts" in { implicit env =>
+    "archive terminated CnsEntryContext contracts" in { implicit env =>
       val aliceStaticRefs = StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
       val aliceRefs = setupUser(aliceStaticRefs)
       val (subscriptionRequest, _) = actAndCheck(
@@ -326,7 +330,10 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
       setTriggersWithin[Assertion](
         triggersToPauseAtStart = Seq(aliceSubscriptionReadyForPaymentTrigger),
-        triggersToResumeAtStart = Seq(leaderExpiredCnsEntryTrigger),
+        triggersToResumeAtStart = Seq[Trigger](
+          leaderExpiredCnsEntryTrigger,
+          sv1Backend.leaderBasedAutomation.trigger[ExpiredCnsSubscriptionTrigger],
+        ),
       ) {
 
         val cnsRules = sv1ScanBackend.getCnsRules()

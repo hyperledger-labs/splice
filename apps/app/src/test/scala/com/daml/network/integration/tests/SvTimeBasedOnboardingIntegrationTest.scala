@@ -12,30 +12,34 @@ import com.daml.network.codegen.java.cn.svcrules.{
   SvcRules_ConfirmSvOnboarding,
   SvcRules_SetConfig,
 }
+import com.daml.network.console.CNNodeAppBackendReference
 import com.daml.network.sv.automation.confirmation.SvOnboardingRequestTrigger
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cn.svcrules
+import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
+import com.daml.network.util.TriggerTestUtil
 
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
 
 class SvTimeBasedOnboardingIntegrationTest
-    extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment {
+    extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
+    with TriggerTestUtil {
   "expire stale `SvOnboardingRequest`, `SvOnboardingConfirmed`,`ValidatorOnboarding` and `VoteRequest` contracts" in {
     implicit env =>
       implicit val ec = env.executionContext
+      def activeSvBackends = Seq(sv1Backend, sv2Backend, sv3Backend)
       clue("Initialize SVC with 3 SVs") {
         startAllSync(
-          sv1ScanBackend,
-          sv2ScanBackend,
-          sv1Backend,
-          sv2Backend,
-          sv3Backend,
-          sv1ValidatorBackend,
-          sv2ValidatorBackend,
-          sv3ValidatorBackend,
+          Seq[CNNodeAppBackendReference](sv1ScanBackend, sv2ScanBackend) ++
+            activeSvBackends ++
+            Seq(
+              sv1ValidatorBackend,
+              sv2ValidatorBackend,
+              sv3ValidatorBackend,
+            ): _*
         )
         sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
       }
@@ -117,42 +121,49 @@ class SvTimeBasedOnboardingIntegrationTest
         )
       }
 
-      clue("archive expired `ValidatorOnboarding` contracts") {
-        val testCandidateSecret = Random.alphanumeric.take(10).mkString
-        actAndCheck(
-          "create a new `ValidatorOnboarding` contract", {
-            val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
-              sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
-              testCandidateSecret,
-              sv1Backend.participantClientWithAdminToken.ledger_api.time
-                .get()
-                .toInstant
-                .plusSeconds(3600),
-            ).create.commands.asScala.toSeq
+      setTriggersWithin(
+        Seq.empty,
+        triggersToResumeAtStart = activeSvBackends.map(
+          _.appState.svAutomation.trigger[ExpireValidatorOnboardingTrigger]
+        ),
+      ) {
+        clue("archive expired `ValidatorOnboarding` contracts") {
+          val testCandidateSecret = Random.alphanumeric.take(10).mkString
+          actAndCheck(
+            "create a new `ValidatorOnboarding` contract", {
+              val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
+                sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+                testCandidateSecret,
+                sv1Backend.participantClientWithAdminToken.ledger_api.time
+                  .get()
+                  .toInstant
+                  .plusSeconds(3600),
+              ).create.commands.asScala.toSeq
 
-            sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-              actAs = Seq(sv1Backend.getSvcInfo().svParty),
-              optTimeout = None,
-              commands = validatorOnboarding,
-            )
-          },
-        )(
-          "The `ValidatorOnboarding` contract exists.",
-          _ =>
-            sv1Backend
-              .listOngoingValidatorOnboardings()
-              .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 1,
-        )
-        actAndCheck(
-          "No confirmation happens within 2h",
-          advanceTime(JavaDuration.ofHours(2)),
-        )(
-          "The `ValidatorOnboarding` contract expires and is archived",
-          _ =>
-            sv1Backend
-              .listOngoingValidatorOnboardings()
-              .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 0,
-        )
+              sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
+                actAs = Seq(sv1Backend.getSvcInfo().svParty),
+                optTimeout = None,
+                commands = validatorOnboarding,
+              )
+            },
+          )(
+            "The `ValidatorOnboarding` contract exists.",
+            _ =>
+              sv1Backend
+                .listOngoingValidatorOnboardings()
+                .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 1,
+          )
+          actAndCheck(
+            "No confirmation happens within 2h",
+            advanceTime(JavaDuration.ofHours(2)),
+          )(
+            "The `ValidatorOnboarding` contract expires and is archived",
+            _ =>
+              sv1Backend
+                .listOngoingValidatorOnboardings()
+                .filter(e => e.payload.candidateSecret == testCandidateSecret) should have size 0,
+          )
+        }
       }
 
       clue("archive expired `VoteRequest` contracts") {

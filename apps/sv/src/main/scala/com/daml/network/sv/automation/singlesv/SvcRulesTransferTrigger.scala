@@ -16,7 +16,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import SvcRulesTransferTrigger.*
 import com.daml.network.environment.ledger.api.LedgerClient.ReassignmentCommand.Out.pretty
 
-private[automation] final class SvcRulesTransferTrigger(
+final class SvcRulesTransferTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     connection: CNLedgerConnection,

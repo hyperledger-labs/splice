@@ -22,7 +22,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.sv.automation.confirmation.CnsSubscriptionInitialPaymentTrigger
-import com.daml.network.sv.automation.leaderbased.CnsSubscriptionRenewalPaymentTrigger
+import com.daml.network.sv.automation.leaderbased.{
+  CnsSubscriptionRenewalPaymentTrigger,
+  ExpiredCoinTrigger,
+  ExpiredLockedCoinTrigger,
+}
 import com.daml.network.util.{
   Contract,
   SplitwellTestUtil,
@@ -436,8 +440,13 @@ class WalletTimeBasedIntegrationTest
       advanceRoundsByOneTick
       advanceRoundsByOneTick
 
-      clue("Check wallet after advancing to next 2 rounds") {
-        eventually()(aliceWalletClient.list().coins shouldBe empty)
+      setTriggersWithin(
+        Seq.empty,
+        triggersToResumeAtStart = Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredCoinTrigger]),
+      ) {
+        clue("Check wallet after advancing to next 2 rounds") {
+          eventually()(aliceWalletClient.list().coins shouldBe empty)
+        }
       }
     }
 
@@ -498,8 +507,14 @@ class WalletTimeBasedIntegrationTest
       advanceRoundsByOneTick
       advanceRoundsByOneTick
 
-      clue("Check wallet after advancing to next 2 rounds") {
-        eventually()(aliceWalletClient.list().lockedCoins shouldBe empty)
+      setTriggersWithin(
+        Seq.empty,
+        triggersToResumeAtStart =
+          Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredLockedCoinTrigger]),
+      ) {
+        clue("Check wallet after advancing to next 2 rounds") {
+          eventually()(aliceWalletClient.list().lockedCoins shouldBe empty)
+        }
       }
     }
 
