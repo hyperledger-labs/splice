@@ -43,12 +43,57 @@ class BftScanConnectionTest
 
   val clock = new SimClock(loggerFactory = loggerFactory)
 
-  def getMockedConnections(n: Int): Seq[SingleScanConnection] = (0 until n).map { n =>
-    val m = mock[SingleScanConnection]
-    when(m.config).thenReturn(
-      ScanAppClientConfig(NetworkAppClientConfig(s"https://$n.example.com"))
-    )
-    m
+  val domainId = DomainId.tryFromString("domain::id")
+
+  def getMockedConnections(n: Int): Seq[SingleScanConnection] = {
+    val connections = (0 until n).map { n =>
+      val m = mock[SingleScanConnection]
+      when(m.config).thenReturn(
+        ScanAppClientConfig(NetworkAppClientConfig(s"https://$n.example.com"))
+      )
+      m
+    }
+    connections.foreach { connection =>
+      // all of this is noise...
+      when(connection.getCoinRulesWithState(eqTo(None))(any[ExecutionContext], any[TraceContext]))
+        .thenReturn(
+          Future.successful(
+            ContractWithState(
+              Contract(
+                coinrulesCodegen.CoinRules.TEMPLATE_ID,
+                new coinrulesCodegen.CoinRules.ContractId("whatever"),
+                new coinrulesCodegen.CoinRules(
+                  partyIdA.toProtoPrimitive,
+                  CNNodeUtil.defaultCoinConfigSchedule(
+                    NonNegativeFiniteDuration(Duration.ofMinutes(10)),
+                    10,
+                    domainId,
+                  ),
+                  false,
+                  Optional.empty(),
+                ),
+                ByteString.EMPTY,
+                Instant.EPOCH,
+              ),
+              ContractState.Assigned(domainId), // ...except this
+            )
+          )
+        )
+      when(connection.listSvcScans()(any[TraceContext])).thenReturn(
+        Future.successful(
+          Seq(
+            DomainScans(
+              domainId,
+              scans = connections.zipWithIndex.map { case (_, n) =>
+                SvcScan(s"https://$n.example.com", n.toString)
+              },
+              Map.empty,
+            )
+          )
+        )
+      )
+    }
+    connections
   }
   def makeMockReturn(mock: SingleScanConnection, returns: PartyId): Unit = {
     when(mock.getSvcPartyId()).thenReturn(Future.successful(returns))
@@ -60,12 +105,14 @@ class BftScanConnectionTest
       initialConnections: Seq[SingleScanConnection],
       connectionBuilder: Uri => Future[SingleScanConnection] = _ =>
         Future.failed(new RuntimeException("Shouldn't be refreshing!")),
+      initialFailedConnections: Map[Uri, Throwable] = Map.empty,
   ) = {
     new BftScanConnection(
       mock[CNLedgerClient],
       NonNegativeFiniteDuration.ofSeconds(1),
       new BftScanConnection.Bft(
         initialConnections,
+        initialFailedConnections,
         connectionBuilder,
         NonNegativeFiniteDuration.ofSeconds(1),
         retryProvider,
@@ -142,51 +189,9 @@ class BftScanConnectionTest
     }
 
     "periodically refresh the list of scans" in {
-      val domainId = DomainId.tryFromString("domain::id")
       val connections = getMockedConnections(n = 2)
 
       connections.foreach(makeMockReturn(_, partyIdA))
-
-      connections.foreach { connection =>
-        // all of this is noise...
-        when(connection.getCoinRulesWithState(eqTo(None))(any[ExecutionContext], any[TraceContext]))
-          .thenReturn(
-            Future.successful(
-              ContractWithState(
-                Contract(
-                  coinrulesCodegen.CoinRules.TEMPLATE_ID,
-                  new coinrulesCodegen.CoinRules.ContractId("whatever"),
-                  new coinrulesCodegen.CoinRules(
-                    partyIdA.toProtoPrimitive,
-                    CNNodeUtil.defaultCoinConfigSchedule(
-                      NonNegativeFiniteDuration(Duration.ofMinutes(10)),
-                      10,
-                      domainId,
-                    ),
-                    false,
-                    Optional.empty(),
-                  ),
-                  ByteString.EMPTY,
-                  Instant.EPOCH,
-                ),
-                ContractState.Assigned(domainId), // ...except this
-              )
-            )
-          )
-        when(connection.listSvcScans()(any[TraceContext])).thenReturn(
-          Future.successful(
-            Seq(
-              DomainScans(
-                domainId,
-                scans = connections.zipWithIndex.map { case (_, n) =>
-                  SvcScan(s"https://$n.example.com", n.toString)
-                },
-                Map.empty,
-              )
-            )
-          )
-        )
-      }
 
       // we initialize with just the first one, and the second one will be "built" when we refresh
       val bft = getBft(connections.take(1), _ => Future.successful(connections(1)))
@@ -201,6 +206,47 @@ class BftScanConnectionTest
       }
     }
 
+    "fail if some Scans failed to connect" in {
+      // f = (2ok + 2bad - 1) / 3 = 1
+      val connections = getMockedConnections(n = 2)
+      val bft = getBft(
+        connections,
+        initialFailedConnections = Map(
+          Uri("https://failure1.example.com") -> new RuntimeException("Failed"),
+          Uri("https://failure2.example.com") -> new RuntimeException("Failed"),
+        ),
+      )
+
+      loggerFactory.assertLogs(
+        for {
+          failure <- bft.getSvcPartyId().failed
+        } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
+          code should be(StatusCodes.BadGateway)
+          message should include(
+            s"Could not connect to 2/4 Scans, which is above the threshold f=1."
+          )
+        },
+        _.warningMessage should include(
+          s"Could not connect to 2/4 Scans, which is above the threshold f=1."
+        ),
+      )
+    }
+
+    "work with partial failures" in {
+      // f = (3ok + 1bad - 1) / 3 = 1
+      val connections = getMockedConnections(n = 3)
+      connections.foreach(makeMockReturn(_, partyIdA))
+      val bft = getBft(
+        connections,
+        initialFailedConnections = Map(
+          Uri("https://failure1.example.com") -> new RuntimeException("Failed")
+        ),
+      )
+
+      for {
+        svcPartyId <- bft.getSvcPartyId()
+      } yield svcPartyId should be(partyIdA)
+    }
   }
 
 }

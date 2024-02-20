@@ -12,7 +12,7 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.PackageIdResolver.HasCoinRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
 import com.daml.network.http.v0.definitions.MigrationSchedule
-import com.daml.network.scan.admin.api.client.BftScanConnection.ScanList
+import com.daml.network.scan.admin.api.client.BftScanConnection.{ScanConnections, ScanList}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcScan
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -64,9 +64,21 @@ class BftScanConnection(
           retryProvider.timeouts,
           "refresh_scan_list",
         )({ tc =>
-          bft.refresh(this)(tc).andThen { case Failure(ex) =>
-            logger.warn("Failed to refresh scan list", ex)(tc)
-          }
+          // This retry makes sure any partial or complete failures are immediately retried with a backoff.
+          retryProvider.retry(
+            RetryFor.LongRunningAutomation,
+            "refresh_scan_list",
+            bft.refresh(this)(tc).flatMap { connections =>
+              if (connections.failed > 0)
+                Future.failed(
+                  io.grpc.Status.UNAVAILABLE
+                    .withDescription("Deliberately enforcing a retry on failed scans.")
+                    .asRuntimeException()
+                )
+              else Future.unit
+            },
+            logger,
+          )(implicitly, TraceContext.empty, implicitly)
         })
       )
   }
@@ -148,7 +160,7 @@ class BftScanConnection(
     logger.debug(s"Getting round aggregate for round $round")
     // gets aggregated rounds from all scans, ignoring calls that fail
     val scansWithRounds: Future[Map[SingleScanConnection, ScanAggregator.RoundRange]] = Future
-      .sequence(scanList.scanConnections().map { scan =>
+      .sequence(scanList.scanConnections.open.map { scan =>
         scan
           .getAggregatedRounds()
           .map(_.map(scan -> _))
@@ -228,21 +240,31 @@ class BftScanConnection(
   private def bftCall[T](
       call: SingleScanConnection => Future[T]
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
-    val connections = scanList.scanConnections()
-    val f = (connections.size - 1) / 3
-    val nTargetSuccess = f + 1
-    val nRequestsToDo = 2 * f + 1
-    executeCall(call, nTargetSuccess, nRequestsToDo)
+    val connections @ ScanConnections(open, failed) = scanList.scanConnections
+    val totalNumber = connections.totalNumber
+    val f = connections.f
+    if (failed > f) {
+      val msg =
+        s"Could not connect to $failed/$totalNumber Scans, which is above the threshold f=$f."
+      val exception = HttpErrorWithHttpCode(
+        StatusCodes.BadGateway,
+        msg,
+      )
+      logger.warn(msg, exception)
+      Future.failed(exception)
+    } else {
+      val nTargetSuccess = f + 1
+      val nRequestsToDo = 2 * f + 1
+      val requestFrom = Random.shuffle(open).take(nRequestsToDo)
+      executeCall(call, requestFrom, nTargetSuccess)
+    }
   }
 
   private def executeCall[T](
       call: SingleScanConnection => Future[T],
+      requestFrom: Seq[SingleScanConnection],
       nTargetSuccess: Int,
-      nRequestsToDo: Int,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
-    val connections = scanList.scanConnections()
-    val requestFrom = Random.shuffle(connections).take(nRequestsToDo)
-
     val responses =
       new ConcurrentHashMap[BftScanConnection.ScanResponse, List[Uri]]()
     val nResponsesDone = new AtomicInteger(0)
@@ -262,12 +284,12 @@ class BftScanConnection(
             finalResponse.tryComplete(response): Unit
           }
 
-          if (nResponsesDone.incrementAndGet() == nRequestsToDo) { // all Scans are done
+          if (nResponsesDone.incrementAndGet() == requestFrom.size) { // all Scans are done
             finalResponse.future.value match {
               case None =>
                 val exception = HttpErrorWithHttpCode(
                   StatusCodes.BadGateway,
-                  s"Failed to reach consensus from $nRequestsToDo Scan nodes.",
+                  s"Failed to reach consensus from ${requestFrom.size} Scan nodes.",
                 )
                 logger.warn(s"Consensus not reached. Responses: $responses", exception)
                 finalResponse.tryFailure(exception): Unit
@@ -333,45 +355,132 @@ class BftScanConnection(
 
 object BftScanConnection {
 
+  case class ScanConnections(open: Seq[SingleScanConnection], failed: Int) {
+    val totalNumber: Int = open.size + failed
+    val f: Int = (totalNumber - 1) / 3
+  }
+
   private[BftScanConnection] sealed trait ScanList
       extends FlagCloseableAsync
       with NamedLogging
       with RetryProvider.Has {
-    def scanConnections(): Seq[SingleScanConnection]
+    def scanConnections: ScanConnections
   }
   class TrustSingle(
       scanConnection: SingleScanConnection,
       val retryProvider: RetryProvider,
       val loggerFactory: NamedLoggerFactory,
   ) extends ScanList {
-    override def scanConnections(): Seq[SingleScanConnection] = Seq(scanConnection)
+    override def scanConnections: ScanConnections = ScanConnections(Seq(scanConnection), 0)
+
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
       SyncCloseable("scan_connection", scanConnection.close())
     )
   }
+
+  type SvName = String
+  case class BftState(
+      openConnections: Map[Uri, (SingleScanConnection, SvName)],
+      failedConnections: Map[Uri, (Throwable, SvName)],
+  ) {
+    def scanConnections: ScanConnections =
+      ScanConnections(openConnections.values.map(_._1).toSeq, failedConnections.size)
+  }
+
   class Bft(
       initialScanConnections: Seq[SingleScanConnection],
+      initialFailedConnections: Map[Uri, Throwable],
       connectionBuilder: Uri => Future[SingleScanConnection],
       val scansRefreshInterval: NonNegativeFiniteDuration,
       val retryProvider: RetryProvider,
       val loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext)
       extends ScanList {
-    type SvName = String
-    private val currentScanConnectionsRef
-        : AtomicReference[Map[Uri, (SingleScanConnection, SvName)]] =
+
+    private val currentScanConnectionsRef: AtomicReference[BftState] =
       new AtomicReference(
-        initialScanConnections.zipWithIndex.map { case (conn, n) =>
-          (conn.config.adminApi.url, (conn, s"Seed URL #$n"))
-        }.toMap
+        BftState(
+          initialScanConnections.zipWithIndex.map { case (conn, n) =>
+            (conn.config.adminApi.url, (conn, s"Seed URL #$n"))
+          }.toMap,
+          initialFailedConnections.zipWithIndex.map { case ((uri, err), n) =>
+            uri -> (err, s"FAILED Seed URL #$n")
+          }.toMap,
+        )
       )
 
-    /** This method should only be called once when creating a BftScanConnection and periodically by PeriodicAction,
+    /** Updates the scan list according to the scans present in the SvcRules.
+      * Additionally, if any previous connections to a Scan failed, they're retried.
+      * This method should only be called once when creating a BftScanConnection and periodically by PeriodicAction,
       *  which ensures that there's never two concurrent calls to it.
       */
-    def refresh(connection: BftScanConnection)(implicit tc: TraceContext): Future[Unit] = {
-      val currentScanConnections = currentScanConnectionsRef.get()
-      logger.info(s"Started refreshing scan list from ${currentScanConnections.keys}")
+    def refresh(
+        connection: BftScanConnection
+    )(implicit tc: TraceContext): Future[ScanConnections] = {
+      val currentState @ BftState(currentScanConnections, currentFailed) =
+        currentScanConnectionsRef.get()
+      val currentScans = (currentScanConnections.keys ++ currentFailed.keys).toSet
+      logger.info(s"Started refreshing scan list from $currentState")
+      getScansInSvcRules(connection).flatMap { scansInSvcRules =>
+        val newScans = scansInSvcRules.filter(scan => !currentScans.contains(scan.publicUrl))
+        val removedScans = currentScans.filter(url => !scansInSvcRules.exists(_.publicUrl == url))
+        if (scansInSvcRules.isEmpty) {
+          // This is expected on app init, and is retried when building the BftScanConnection
+          Future.failed(
+            new IllegalStateException(
+              s"Scan list in SvcRules is empty. Last known list: $currentState"
+            )
+          )
+        } else if (newScans.isEmpty && removedScans.isEmpty && currentFailed.isEmpty) {
+          logger.debug("Not updating scan list as there are no changes.")
+          Future.successful(currentState.scanConnections)
+        } else {
+          for {
+            (newScansFailedConnections, newScansSuccessfulConnections) <- attemptConnections(
+              newScans
+            )
+            toRetry = currentFailed -- removedScans
+            (retriedScansFailedConnections, retriedScansSuccessfulConnections) <-
+              attemptConnections(
+                toRetry.map { case (url, (_, svName)) => SvcScan(url, svName) }.toSeq
+              )
+          } yield {
+            removedScans.foreach { url =>
+              currentScanConnections.get(url).foreach { case (connection, svName) =>
+                logger.info(
+                  s"Closing connection to scan of $svName ($url) as it's been removed from the SvcRules scan list."
+                )
+                attemptToClose(connection)
+              }
+            }
+            (newScansFailedConnections ++ retriedScansFailedConnections).foreach {
+              case (url, (err, svName)) =>
+                logger.warn(s"Failed to connect to scan of $svName ($url).", err)
+            }
+
+            val newState = BftState(
+              currentScanConnections -- removedScans ++ newScansSuccessfulConnections ++ retriedScansSuccessfulConnections,
+              (retriedScansFailedConnections ++ newScansFailedConnections).toMap,
+            )
+            currentScanConnectionsRef.set(newState)
+            logger.info(s"Updated scan list to $newState")
+
+            val connections = newState.scanConnections
+            if (connections.failed > connections.f) {
+              throw io.grpc.Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"There are not enough Scans to satisfy f=${connections.f}. Will be retried. State: $newState"
+                )
+                .asRuntimeException()
+            } else {
+              connections
+            }
+          }
+        }
+      }
+    }
+
+    private def getScansInSvcRules(connection: BftScanConnection)(implicit tc: TraceContext) = {
       for {
         globalDomainId <- connection.getCoinRulesDomain()(tc)
         scans <- connection.listSvcScans()
@@ -385,73 +494,29 @@ object BftScanConnection {
               )
             )
           )
-        addedScans <- connectToAllScansOrFail(
-          domainScans.filter(scan => !currentScanConnections.contains(scan.publicUrl))
-        )
-        (alreadyPresentScans, removedScans) = currentScanConnections.partition { case (url, _) =>
-          domainScans.exists(_.publicUrl == url)
-        }
-        finalScans = alreadyPresentScans ++ addedScans
-        _ <-
-          if (finalScans.isEmpty) {
-            // This is expected on app init, and is retried when building the BftScanConnection
-            val lastKnown = currentScanConnections.map { case (url, (_, svName)) =>
-              SvcScan(url, svName)
-            }
-            Future.failed(
-              new IllegalStateException(
-                s"Scan list in SvcRules is empty. Last known list: $lastKnown"
-              )
-            )
-          } else Future.unit
-      } yield {
-        removedScans.foreach { case (url, (connection, svName)) =>
-          logger.info(
-            s"Closing connection to scan of $svName ($url) as it's been removed from the SvcRules scan list."
-          )
-          attemptToClose(connection)
-        }
-        if (currentScanConnections.keySet != finalScans.keySet) {
-          currentScanConnectionsRef.set(finalScans)
-          logger.info(s"Updated scan list to $finalScans")
-        }
-      }
+      } yield domainScans
     }
 
-    private def connectToAllScansOrFail(
+    /** Attempts to connect to all passed scans, returning two tuples containing the ones that failed to connect
+      * and the ones that succeeded, respectively.
+      */
+    private def attemptConnections(
         scans: Seq[SvcScan]
-    )(implicit tc: TraceContext): Future[Seq[(Uri, (SingleScanConnection, SvName))]] = {
-      for {
-        addedScans <- scans
-          .traverse { scan =>
-            logger.info(s"New Scan in SvcRules scan list: $scan, creating connection.")
-            connectionBuilder(scan.publicUrl)
-              .map { connection =>
-                (connection, scan.svName)
-              }
-              .transformWith(result =>
-                Future.successful(result.toEither.bimap(scan.publicUrl -> _, scan.publicUrl -> _))
-              )
-          }
-        (failedToConnect, successfullyConnected) = addedScans.partitionMap(identity)
-        _ <-
-          if (failedToConnect.nonEmpty) {
-            failedToConnect.foreach { case (uri, failure) =>
-              logger.warn(s"Failed to create connection to scan $uri", failure)
-            }
-            successfullyConnected.foreach { case (url, (connection, svName)) =>
-              logger.info(
-                s"Closing connection to scan of $svName ($url), to avoid resource leakage."
-              )
-              attemptToClose(connection)
-            }
-            Future.failed(
-              new RuntimeException(
-                s"Failed to connect to all scans from scan list: $failedToConnect."
+    )(implicit
+        tc: TraceContext
+    ): Future[(Seq[(Uri, (Throwable, SvName))], Seq[(Uri, (SingleScanConnection, SvName))])] = {
+      scans
+        .traverse { scan =>
+          logger.info(s"Attempting to connect to Scan: $scan.")
+          connectionBuilder(scan.publicUrl)
+            .transformWith(result =>
+              Future.successful(
+                result.toEither
+                  .bimap(scan.publicUrl -> (_, scan.svName), scan.publicUrl -> (_, scan.svName))
               )
             )
-          } else Future.unit
-      } yield successfullyConnected
+        }
+        .map(_.partitionEither(identity))
     }
 
     private def attemptToClose(
@@ -465,8 +530,9 @@ object BftScanConnection {
       }
     }
 
-    override def scanConnections(): Seq[SingleScanConnection] =
-      currentScanConnectionsRef.get().values.map(_._1).toSeq
+    override def scanConnections: ScanConnections = {
+      currentScanConnectionsRef.get().scanConnections
+    }
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
       initialScanConnections.zipWithIndex.map { case (connection, i) =>
@@ -490,6 +556,7 @@ object BftScanConnection {
     val builder = buildScanConnection(clock, retryProvider, loggerFactory)
     config match {
       case BftScanClientConfig.TrustSingle(url, coinRulesCacheTimeToLive) =>
+        // If this fails to connect, fail and let it retry
         val connectionF = builder(url, coinRulesCacheTimeToLive)
         connectionF
           .map(conn =>
@@ -505,16 +572,23 @@ object BftScanConnection {
       case BftScanClientConfig.Bft(seedUrls, scansRefreshInterval, coinRulesCacheTimeToLive) =>
         for {
           bft <- seedUrls
-            .traverse(builder(_, coinRulesCacheTimeToLive))
-            .map(cs =>
+            .traverse(uri =>
+              builder(uri, coinRulesCacheTimeToLive).transformWith {
+                case Success(conn) => Future.successful(Right(conn))
+                case Failure(err) => Future.successful(Left(uri -> err))
+              }
+            )
+            .map { cs =>
+              val (failed, connections) = cs.toList.partitionEither(identity)
               new Bft(
-                cs.toList,
+                connections,
+                failed.toMap,
                 uri => builder(uri, coinRulesCacheTimeToLive),
                 scansRefreshInterval,
                 retryProvider,
                 loggerFactory,
               )
-            )
+            }
           bftConnection = new BftScanConnection(
             cnLedgerClient,
             coinRulesCacheTimeToLive,
@@ -527,14 +601,17 @@ object BftScanConnection {
           _ <- retryProvider.waitUntil(
             RetryFor.WaitingOnInitDependency,
             "Scan list is refreshed.",
-            bft.refresh(bftConnection).recoverWith { case NonFatal(ex) =>
-              Future.failed(
-                Status.UNAVAILABLE
-                  .withDescription("Failed to refresh scan list on init")
-                  .withCause(ex)
-                  .asException()
-              )
-            },
+            bft
+              .refresh(bftConnection)
+              .recoverWith { case NonFatal(ex) =>
+                Future.failed(
+                  Status.UNAVAILABLE
+                    .withDescription("Failed to refresh scan list on init")
+                    .withCause(ex)
+                    .asException()
+                )
+              }
+              .map(_ => ()),
             loggerFactory.getTracedLogger(classOf[BftScanConnection]),
           )
         } yield bftConnection
