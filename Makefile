@@ -28,6 +28,7 @@ $(load-tester):
 .PHONY: clean
 clean: cluster/clean
 	rm -rf apps/app/target/release
+	rm -rf $(load-tester)
 
 .PHONY: clean-all
 clean-all: clean ## Completely clean all local build state, including model codegen.

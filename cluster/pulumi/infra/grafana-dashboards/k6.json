@@ -20,7 +20,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 19665,
   "graphTooltip": 0,
-  "id": 59,
+  "id": 57,
   "links": [
     {
       "asDropdown": false,
@@ -87,7 +87,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -155,7 +157,9 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -348,7 +352,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "code",
-          "expr": "k6_create_offer_latency_p99",
+          "expr": "histogram_quantile(0.99, sum(rate(k6_create_offer_latency_seconds[5m])))",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -363,7 +367,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "k6_accept_offer_latency_p99",
+          "expr": "histogram_quantile(0.99, sum(rate(k6_accept_offer_latency_seconds[5m])))",
           "hide": false,
           "instant": false,
           "legendFormat": "accept",
@@ -376,7 +380,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "k6_complete_transfer_latency_p99",
+          "expr": "histogram_quantile(0.99, sum(rate(k6_complete_transfer_latency_seconds[5m])))",
           "hide": false,
           "instant": false,
           "legendFormat": "complete",
@@ -443,7 +447,9 @@
       "options": {
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": ["lastNotNull"],
+          "calcs": [
+            "lastNotNull"
+          ],
           "fields": "",
           "values": false
         },
@@ -655,7 +661,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               },
@@ -693,7 +702,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               }
@@ -1738,7 +1750,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               }
@@ -1760,7 +1775,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               }
@@ -1775,7 +1793,10 @@
               {
                 "id": "custom.lineStyle",
                 "value": {
-                  "dash": [10, 10],
+                  "dash": [
+                    10,
+                    10
+                  ],
                   "fill": "dash"
                 }
               },
@@ -1981,7 +2002,9 @@
           "countRows": false,
           "enablePagination": true,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "frameIndex": 2,
@@ -2057,19 +2080,27 @@
           "options": {
             "fields": {
               "Value #B": {
-                "aggregations": ["min"],
+                "aggregations": [
+                  "min"
+                ],
                 "operation": "aggregate"
               },
               "Value #C": {
-                "aggregations": ["max"],
+                "aggregations": [
+                  "max"
+                ],
                 "operation": "aggregate"
               },
               "Value #D": {
-                "aggregations": ["mean"],
+                "aggregations": [
+                  "mean"
+                ],
                 "operation": "aggregate"
               },
               "Value #E": {
-                "aggregations": ["mean"],
+                "aggregations": [
+                  "mean"
+                ],
                 "operation": "aggregate"
               },
               "method": {
@@ -2153,8 +2184,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           }
@@ -2215,7 +2245,9 @@
           "countRows": false,
           "enablePagination": true,
           "fields": "",
-          "reducer": ["sum"],
+          "reducer": [
+            "sum"
+          ],
           "show": false
         },
         "frameIndex": 2,
@@ -2249,7 +2281,10 @@
         {
           "id": "labelsToFields",
           "options": {
-            "keepLabels": ["__name__", "check"],
+            "keepLabels": [
+              "__name__",
+              "check"
+            ],
             "mode": "columns"
           }
         },
@@ -2258,7 +2293,9 @@
           "options": {
             "fields": {
               "Value": {
-                "aggregations": ["mean"],
+                "aggregations": [
+                  "mean"
+                ],
                 "operation": "aggregate"
               },
               "check": {
@@ -2266,7 +2303,10 @@
                 "operation": "groupby"
               },
               "k6_checks_rate": {
-                "aggregations": ["sum", "count"],
+                "aggregations": [
+                  "sum",
+                  "count"
+                ],
                 "operation": "aggregate"
               }
             }
@@ -2347,8 +2387,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               }
             ]
           },
@@ -2420,7 +2459,10 @@
   "refresh": "5s",
   "schemaVersion": 38,
   "style": "dark",
-  "tags": ["prometheus", "k6"],
+  "tags": [
+    "prometheus",
+    "k6"
+  ],
   "templating": {
     "list": [
       {
@@ -2446,8 +2488,12 @@
       {
         "current": {
           "selected": true,
-          "text": ["All"],
-          "value": ["$__all"]
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -2522,6 +2568,6 @@
   "timezone": "",
   "title": "k6 Load Tester",
   "uid": "ccbb2351-2ae2-462f-ae0e-f2c893ad1028",
-  "version": 3,
+  "version": 2,
   "weekStart": ""
 }

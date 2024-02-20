@@ -27,7 +27,7 @@ function createConfigMapForFolder(
   const files: { [key: string]: string } = {};
   dirFiles.forEach(file => {
     const filePath = path.join(folderPath, file);
-    if (fs.statSync(filePath).isFile()) {
+    if (fs.statSync(filePath).isFile() && filePath.endsWith('.json')) {
       files[file] = fs.readFileSync(filePath, 'utf-8');
     }
   });
