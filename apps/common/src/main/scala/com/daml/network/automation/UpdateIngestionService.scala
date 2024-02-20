@@ -1,7 +1,6 @@
 package com.daml.network.automation
 
 import org.apache.pekko.stream.Materializer
-import org.apache.pekko.stream.scaladsl.Flow
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
@@ -69,7 +68,7 @@ class UpdateIngestionService(
       }
     } yield new CNLedgerSubscription(
       source = connection.updates(subscribeFrom, filter),
-      mapOperator = Flow[GetTreeUpdatesResponse].mapAsync(1)(process),
+      map = process,
       retryProvider = retryProvider,
       loggerFactory = baseLoggerFactory.append("subsClient", this.getClass.getSimpleName),
     )

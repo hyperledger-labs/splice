@@ -55,7 +55,7 @@ import java.security.MessageDigest
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.implicitNotFound
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
@@ -493,7 +493,7 @@ class BaseLedgerConnection(
 /** Subscription for reading the ledger */
 class CNLedgerSubscription[S](
     source: Source[S, NotUsed],
-    mapOperator: Flow[S, ?, ?],
+    map: S => Future[Unit],
     override protected[this] val retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, mat: Materializer)
@@ -502,6 +502,10 @@ class CNLedgerSubscription[S](
     with NamedLogging {
 
   import TraceContext.Implicits.Empty.*
+
+  private val lastFutureFinished: AtomicReference[Promise[Done]] = new AtomicReference(
+    Promise.successful(Done)
+  )
 
   private val (killSwitch, completed_) = PekkoUtil.runSupervised(
     ex =>
@@ -514,13 +518,25 @@ class CNLedgerSubscription[S](
       // we place the kill switch before the map operator, such that
       // we can shut down the operator quickly and signal upstream to cancel further sending
       .viaMat(KillSwitches.single)(Keep.right)
-      .viaMat(mapOperator)(Keep.left)
+      .viaMat(Flow[S].mapAsync(1) { el =>
+        // map(el) *immediately* launches the future, so:
+        // - `lastFutureFinished.set(map(el))` has a tiny chance of racing
+        // - `lastFutureFinished.updateAndGet` shouldn't contain side-effects, such as, starting a Future
+        val promise = lastFutureFinished.updateAndGet(_ => Promise())
+        map(el).andThen { case _ =>
+          promise.success(Done)
+        }
+      })(Keep.left)
       // and we get the Future[Done] as completed from the sink so we know when the last message
-      // was processed
+      // was processed... except when a Failure from the source happens (e.g., `STALE_STREAM_AUTHORIZATION`),
+      // in which case the stream will be reported as completed with a failure, while the Future is running.
+      // Therefore, we also keep track of the last running future and include that in the completed check.
+      // If we didn't, we'd get situations where e.g. two ingestions are running simultaneously (and break a lot).
+      // For more information, see https://github.com/DACH-NY/canton-network-node/issues/10126.
       .toMat(Sink.ignore)(Keep.both),
   )
 
-  def completed: Future[Done] = completed_
+  def completed: Future[Done] = completed_.flatMap(_ => lastFutureFinished.get().future)
 
   def initiateShutdown() =
     killSwitch.shutdown()
