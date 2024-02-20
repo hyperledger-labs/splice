@@ -121,7 +121,7 @@ function _cluster_apply() {
     _info "Applying Pulumi Stack"
 
     subcmd_install_data_export_bucket_key
-    subcmd_pulumi canton-network "canton-network.$GCP_CLUSTER_BASENAME" up --yes --skip-preview --show-sames "${args[@]}"
+    subcmd_pulumi canton-network up --yes --skip-preview --show-sames "${args[@]}"
 }
 
 function _cluster_show() {
@@ -158,7 +158,7 @@ function _pulumi() {
 function _uses_pulumi_stack() {
 
     pulumi_project=$1
-    pulumi_stack="$2"
+    pulumi_stack=$(_resolve_pulumi_stack "$pulumi_project")
 
     _pulumi --stack "organization/${pulumi_project}/$pulumi_stack" \
             --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
@@ -174,6 +174,16 @@ function _uses_pulumi_stack() {
                 --cwd "${REPO_ROOT}/cluster/pulumi/${pulumi_project}" \
                 stack change-secrets-provider "gcpkms://projects/${PULUMI_BACKEND_GCPKMS_PROJECT}/locations/${CLOUDSDK_COMPUTE_REGION}/keyRings/pulumi/cryptoKeys/${PULUMI_BACKEND_GCPKMS_NAME}"
     fi
+}
+
+function _resolve_pulumi_stack() {
+    pulumi_project=$1
+    if [[ $pulumi_project == "gcp" ]]; then
+        pulumi_stack="$CLOUDSDK_CORE_PROJECT"
+    else
+        pulumi_stack="$pulumi_project.$GCP_CLUSTER_BASENAME"
+    fi
+    echo "$pulumi_stack"
 }
 
 function _retry_until_success() {
@@ -706,9 +716,9 @@ function subcmd_infra_up() {
 
     subcmd_install_dns01_key
 
-    _uses_pulumi_stack infra "infra.$GCP_CLUSTER_BASENAME"
+    _uses_pulumi_stack infra
 
-    subcmd_pulumi infra "infra.$GCP_CLUSTER_BASENAME" up --yes --skip-preview
+    subcmd_pulumi infra up --yes --skip-preview
 }
 
 ###
@@ -721,7 +731,7 @@ function subcmd_infra_down() {
 
     _info "Deactivating infrastructure Pulumi stack"
 
-    subcmd_pulumi infra "infra.$GCP_CLUSTER_BASENAME" down --yes --skip-preview
+    subcmd_pulumi infra down --yes --skip-preview
 }
 
 ###
@@ -731,9 +741,9 @@ subcommand_whitelist[gcp_up]='Apply the gcp Pulumi stack.'
 function subcmd_gcp_up() {
     _info "Activating gcp Pulumi stack"
 
-    _uses_pulumi_stack gcp "$CLOUDSDK_CORE_PROJECT"
+    _uses_pulumi_stack gcp
 
-    subcmd_pulumi gcp "$CLOUDSDK_CORE_PROJECT" up --yes --skip-preview
+    subcmd_pulumi gcp up --yes --skip-preview
 }
 
 ###
@@ -745,7 +755,7 @@ function subcmd_gcp_down() {
 
     _info "Deactivating gcp Pulumi stack"
 
-    subcmd_pulumi gcp "$CLOUDSDK_CORE_PROJECT" down --yes --skip-preview
+    subcmd_pulumi gcp down --yes --skip-preview
 }
 
 ###
@@ -837,16 +847,15 @@ subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank sta
 function _cluster_reset() {
     _info "Uninstalling Pulumi canton-network-gateway stack"
 
-    _down_stack canton-network "canton-network.$GCP_CLUSTER_BASENAME"
-    _down_stack sv-runbook "sv-runbook.$GCP_CLUSTER_BASENAME"
-    _down_stack validator-runbook "validator-runbook.$GCP_CLUSTER_BASENAME"
+    _down_stack canton-network
+    _down_stack sv-runbook
+    _down_stack validator-runbook
 
     _info "Cluster in reset/idle state."
 }
 
 function _down_stack() {
     PROJECT=$1
-    STACK=$2
 
     _info "Uninstalling Pulumi ${PROJECT} stack"
 
@@ -856,7 +865,7 @@ function _down_stack() {
 
     touch "$ERRFILE"
 
-    subcmd_pulumi "$PROJECT" "$STACK" down --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || { RETCODE="$?"; ERRMSG=$(cat "$ERRFILE")
+    subcmd_pulumi "$PROJECT" down --yes --skip-preview 2> >(tee ${ERRFILE} >&2) || { RETCODE="$?"; ERRMSG=$(cat "$ERRFILE")
     }
 
     rm -rf "$ERRFILE"
@@ -865,9 +874,9 @@ function _down_stack() {
         case "${ERRMSG}" in
             *"the stack is currently locked"*)
                 echo "Retrying because of lock on stack $PROJECT"
-                subcmd_pulumi "$PROJECT" "$STACK" cancel --yes
-                subcmd_pulumi "$PROJECT" "$STACK" refresh --yes --skip-preview
-                _down_stack "$PROJECT" "$STACK"
+                subcmd_pulumi "$PROJECT" cancel --yes
+                subcmd_pulumi "$PROJECT" refresh --yes --skip-preview
+                _down_stack "$PROJECT"
 
                 echo "Reset complete. In case a subsequent 'cncluster apply' fails, refer to the documentation on manual cleanup (https://github.com/DACH-NY/canton-network-node/tree/main/cluster#manually-deploying-via-ci)"
                 ;;
@@ -1018,7 +1027,7 @@ function subcmd_delete() {
     _cluster_must_exist
 
     _info "Taking down pulumi infrastructure stack."
-    subcmd_pulumi infra "infra.$GCP_CLUSTER_BASENAME" down --yes --skip-preview
+    subcmd_pulumi infra down --yes --skip-preview
 
     _info "Deleting GKE cluster."
     gcloud container clusters delete --quiet "${GCP_CLUSTER_NAME}"
@@ -1309,14 +1318,14 @@ subcommand_whitelist[pulumi]="Execute a Pulumi command in the context of the cur
 
 function subcmd_pulumi() {
 
-    if [ "$#" -lt 3 ]; then
-       _error "Usage: $0 <project> <stack> <cmd> [args]"
+    if [ "$#" -lt 2 ]; then
+       _error "Usage: $0 <project> <cmd> [args]"
     fi
 
     pulumi_project="$1"
-    pulumi_stack="$2"
-    pulumi_cmd="$3"
-    shift 3
+    pulumi_cmd="$2"
+    pulumi_stack=$(_resolve_pulumi_stack "$pulumi_project")
+    shift 2
 
     if [ -z "${pulumi_cmd}" ] || [ -z "${pulumi_project}" ]; then
         _error "Usage: $SCRIPTNAME pulumi <pulumi-project> <pulumi-cmd> [options...]"
@@ -1350,7 +1359,7 @@ function subcmd_pulumi() {
 
     case "${pulumi_cmd}" in
         up|down|config)
-            _uses_pulumi_stack "${pulumi_project}" "$pulumi_stack"
+            _uses_pulumi_stack "${pulumi_project}"
             ;;
         *)
             ;;
@@ -1410,9 +1419,9 @@ function subcmd_apply() {
     if [ -n "${preview:-}" ]; then
         make -C "${REPO_ROOT}" cluster/helm/build -j
         _info "Previewing apply for infra:"
-        subcmd_pulumi infra "infra.$GCP_CLUSTER_BASENAME" preview --show-sames --json "${args[@]}"
+        subcmd_pulumi infra preview --show-sames --json "${args[@]}"
         _info "Previewing apply for canton-network:"
-        subcmd_pulumi canton-network "canton-network.$GCP_CLUSTER_BASENAME" preview --show-sames --json "${args[@]}"
+        subcmd_pulumi canton-network preview --show-sames --json "${args[@]}"
     else
         _prompt_to_confirm
         make -C "${REPO_ROOT}" cluster/build -j
@@ -1433,7 +1442,7 @@ function subcmd_apply() {
         else
             _info "Skipping infra deployment"
         fi
-        subcmd_pulumi canton-network "canton-network.$GCP_CLUSTER_BASENAME" up --yes --skip-preview "${args[@]}"
+        subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
     fi
 }
 
@@ -1446,7 +1455,7 @@ function subcmd_pdown() {
     _prompt_to_confirm
     _cluster_must_exist
 
-    subcmd_pulumi canton-network "canton-network.$GCP_CLUSTER_BASENAME" down --yes --skip-preview
+    subcmd_pulumi canton-network down --yes --skip-preview
 }
 
 ###
@@ -1462,8 +1471,8 @@ function subcmd_prefresh() {
     fi
     _cluster_must_exist
 
-    _uses_pulumi_stack canton-network "canton-network.$GCP_CLUSTER_BASENAME"
-    subcmd_pulumi canton-network "canton-network.$GCP_CLUSTER_BASENAME" refresh --yes --skip-preview
+    _uses_pulumi_stack canton-network
+    subcmd_pulumi canton-network refresh --yes --skip-preview
 }
 
 ###
@@ -1484,11 +1493,11 @@ function subcmd_apply_sv(){
 
     local -x CHARTS_VERSION="${2-}"
 
-    _uses_pulumi_stack sv-runbook "sv-runbook.$GCP_CLUSTER_BASENAME"
+    _uses_pulumi_stack sv-runbook
 
     subcmd_install_data_export_bucket_key
 
-    subcmd_pulumi sv-runbook "sv-runbook.$GCP_CLUSTER_BASENAME" up --yes --skip-preview --show-sames "${args[@]}"
+    subcmd_pulumi sv-runbook up --yes --skip-preview --show-sames "${args[@]}"
 }
 
 ###
@@ -1525,11 +1534,11 @@ function subcmd_ci_apply_sv() {
 
     local -x CHARTS_VERSION="${1-}"
 
-    _uses_pulumi_stack sv-runbook "sv-runbook.$GCP_CLUSTER_BASENAME"
+    _uses_pulumi_stack sv-runbook
 
     subcmd_install_data_export_bucket_key
 
-    subcmd_pulumi sv-runbook "sv-runbook.$GCP_CLUSTER_BASENAME" up --yes --skip-preview "${args[@]}"
+    subcmd_pulumi sv-runbook up --yes --skip-preview "${args[@]}"
 }
 
 ###
@@ -1541,7 +1550,7 @@ function subcmd_pdown_sv(){
     _prompt_to_confirm
     _cluster_must_exist
 
-    subcmd_pulumi sv-runbook "sv-runbook.$GCP_CLUSTER_BASENAME" down --yes --skip-preview
+    subcmd_pulumi sv-runbook down --yes --skip-preview
 }
 
 ###
@@ -1554,7 +1563,7 @@ function subcmd_ci_pdown_sv(){
         _error "This subcommand is available to CI jobs only."
     fi
 
-    subcmd_pulumi sv-runbook "sv-runbook.$GCP_CLUSTER_BASENAME" down --yes --skip-preview
+    subcmd_pulumi sv-runbook down --yes --skip-preview
 }
 
 ###
@@ -1575,11 +1584,11 @@ function subcmd_apply_validator(){
 
     local -x CHARTS_VERSION="${2-}"
 
-    _uses_pulumi_stack validator-runbook "validator-runbook.$GCP_CLUSTER_BASENAME"
+    _uses_pulumi_stack validator-runbook
 
     subcmd_install_data_export_bucket_key
 
-    subcmd_pulumi validator-runbook "validator-runbook.$GCP_CLUSTER_BASENAME" up --yes --skip-preview --show-sames "${args[@]}"
+    subcmd_pulumi validator-runbook up --yes --skip-preview --show-sames "${args[@]}"
 }
 
 ###
@@ -1616,11 +1625,11 @@ function subcmd_ci_apply_validator() {
 
     local -x CHARTS_VERSION="${1-}"
 
-    _uses_pulumi_stack validator-runbook "validator-runbook.$GCP_CLUSTER_BASENAME"
+    _uses_pulumi_stack validator-runbook
 
     subcmd_install_data_export_bucket_key
 
-    subcmd_pulumi validator-runbook "validator-runbook.$GCP_CLUSTER_BASENAME" up --yes --skip-preview "${args[@]}"
+    subcmd_pulumi validator-runbook up --yes --skip-preview "${args[@]}"
 }
 
 ###
@@ -1632,7 +1641,7 @@ function subcmd_pdown_validator(){
     _prompt_to_confirm
     _cluster_must_exist
 
-    subcmd_pulumi validator-runbook "validator-runbook.$GCP_CLUSTER_BASENAME" down --yes --skip-preview
+    subcmd_pulumi validator-runbook down --yes --skip-preview
 }
 
 ###
@@ -1645,7 +1654,7 @@ function subcmd_ci_pdown_validator(){
         _error "This subcommand is available to CI jobs only."
     fi
 
-    subcmd_pulumi validator-runbook "validator-runbook.$GCP_CLUSTER_BASENAME" down --yes --skip-preview
+    subcmd_pulumi validator-runbook down --yes --skip-preview
 }
 
 ###

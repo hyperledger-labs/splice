@@ -293,7 +293,7 @@ infrastructure script.
      - *Secrets not containing the right values*: decode the secret using something like
        `kubectl get secret -n sv-1 cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps -o 'jsonpath={.data.json-credentials}' | base64 -d`
        or use `k9s` to navigate to the secrets overview using `:secrets` and press `x` on the secret of interest.
-     - *Cancelled pulumi holding the lock*: release the lock using `cncluster pulumi canton-network "canton-network.$GCP_CLUSTER_BASENAME" cancel`. `cncluster reset` will also cancel and retry the reset on detecting a held Pulumi lock. See also the section on [Manual Cleanup for an Interrupted Deployment](#manual_cleanup_for_an_interrupted_deployment)
+     - *Cancelled pulumi holding the lock*: release the lock using `cncluster pulumi canton-network cancel`. `cncluster reset` will also cancel and retry the reset on detecting a held Pulumi lock. See also the section on [Manual Cleanup for an Interrupted Deployment](#manual_cleanup_for_an_interrupted_deployment)
      - See also the section on [Modifying a Deployed Cluster](#modifying-a-deployed-cluster)
 1. The Pulumi and Helm charts may now be edited and `cncluster apply`
    once again used to apply only the changes to the cluster.
@@ -1068,14 +1068,14 @@ configuration that have a longer lifecycle than any one deployment of
 the Canton Network software. This configuration includes the cluster
 ingress IP address, DNS records, and the certificate used for incoming
 traffic. From within a deployment directory for a cluster, this stack
-can be managed with the `cncluster infra_*` commands or with `cncluster pulumi infra "infra.$GCP_CLUSTER_BASENAME"`.
+can be managed with the `cncluster infra_*` commands or with `cncluster pulumi infra`.
 The following commands cover the typical lifecycle of a Canton Network cluster.
 
-* `cncluster infra_up` / `cncluster pulumi infra "infra.$GCP_CLUSTER_BASENAME" up` - Apply the infrastructure
+* `cncluster infra_up` / `cncluster pulumi infra up` - Apply the infrastructure
   configuration to the cluster.
-* `cncluster infra_down` / `cncluster pulumi infra "infra.$GCP_CLUSTER_BASENAME" down` - Remove the configured
+* `cncluster infra_down` / `cncluster pulumi infra down` - Remove the configured
   infrastructure for the cluster.
-* `cncluster pulumi infra "infra.$GCP_CLUSTER_BASENAME" refresh` - Refresh Pulumi's infrastructure
+* `cncluster pulumi infra refresh` - Refresh Pulumi's infrastructure
   state database based on the current cluster infrastructure. This
   is useful when a cluster configuration is updated externally.
 
