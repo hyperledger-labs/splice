@@ -1,4 +1,4 @@
-{{- define "domainOrDefaultValue" -}}
+{{- define "domainMigrationIdOrDefaultValue" -}}
 {{- $values := index . 0 -}}
 {{- $name := index . 1 -}}
 {{- if $values.domainMigrationId }}

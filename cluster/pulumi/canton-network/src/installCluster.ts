@@ -9,11 +9,11 @@ import {
   requireEnv,
   sequencerPruningConfig,
   ValidatorTopupConfig,
+  GlobalDomainUpgradeConfig,
 } from 'cn-pulumi-common';
 
 import { installChaosMesh } from './chaosMesh';
 import { installDocs } from './docs';
-import { GlobalDomainUpgradeConfig } from './globalDomainNode';
 import { installSplitwell } from './splitwell';
 import { Svc } from './svc';
 import svconfs from './svconfs';

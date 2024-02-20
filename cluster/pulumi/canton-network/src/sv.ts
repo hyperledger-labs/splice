@@ -27,16 +27,14 @@ import {
   SvIdKey,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
+  DomainMigrationIndex,
+  GlobalDomainUpgradeConfig,
+  installMigrationIdSpecificComponent,
 } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
-import {
-  DomainMigrationIndex,
-  GlobalDomainNode,
-  GlobalDomainUpgradeConfig,
-  installDomainSpecificComponent,
-} from './globalDomainNode';
+import { GlobalDomainNode } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { installPostgresMetrics, Postgres } from './postgres';
 import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svconfs';
@@ -196,7 +194,7 @@ export async function installSvNode(
     auth0AppName: config.auth0ValidatorAppName,
   });
 
-  const domainSpecificComponents = await installDomainSpecificComponents(
+  const migrationIdSpecificComponents = await installMigrationIdSpecificComponents(
     xns,
     globalDomainUpgradeConfig,
     defaultPostgres,
@@ -223,7 +221,7 @@ export async function installSvNode(
       withSvIngress: true,
       ingress: {
         globalDomain: {
-          activeMigrationId: domainSpecificComponents.globalDomain.migrationId.toString(),
+          activeMigrationId: migrationIdSpecificComponents.globalDomain.migrationId.toString(),
         },
       },
       cluster: {
@@ -234,7 +232,7 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
-  return domainSpecificComponents;
+  return migrationIdSpecificComponents;
 }
 
 function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {
@@ -289,7 +287,7 @@ async function installValidator(
   return validator;
 }
 
-function installDomainSpecificComponents(
+function installMigrationIdSpecificComponents(
   xns: ExactNamespace,
   globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
   defaultPostgres: Postgres | undefined,
@@ -308,7 +306,7 @@ function installDomainSpecificComponents(
   backupConfigSecret: pulumi.Resource | undefined,
   validatorSecrets: ValidatorSecrets
 ) {
-  return installDomainSpecificComponent(
+  return installMigrationIdSpecificComponent(
     globalDomainUpgradeConfig,
     async (migrationId, isActive) => {
       const sequencerPostgres =

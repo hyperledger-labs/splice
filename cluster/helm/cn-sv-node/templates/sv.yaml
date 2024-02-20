@@ -1,5 +1,5 @@
 ---
-{{- $appIdentifier := include "domainOrDefaultValue" (list .Values "sv-app") }}
+{{- $appIdentifier := include "domainMigrationIdOrDefaultValue" (list .Values "sv-app") }}
 {{ $isActiveNode := ((.Values.globalDomainUpgrade).isActiveNode) }}
 {{ $isRestoringNode := and (.Values.globalDomainUpgrade) (not $isActiveNode) }}
 apiVersion: apps/v1

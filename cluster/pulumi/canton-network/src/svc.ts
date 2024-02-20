@@ -11,10 +11,10 @@ import {
   ValidatorTopupConfig,
   loadYamlFromFile,
   svKeyFromSecret,
+  GlobalDomainUpgradeConfig,
 } from 'cn-pulumi-common';
 import _ from 'lodash';
 
-import { GlobalDomainUpgradeConfig } from './globalDomainNode';
 import {
   ApprovedSvIdentity,
   InstalledSv,

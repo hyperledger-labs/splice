@@ -2132,13 +2132,17 @@ function subcmd_hard_domain_migration() {
   _cluster_reset
   local version=""
   version=$(get-snapshot-version)
+  # deploy original domain and prepare upgrade
   export CN_NON_SV_NODES="false"
   export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
   _cluster_apply "$version"
+  # trigger upgrade
   subcmd_preflight_global_domain_upgrade
+  # deploy new domain
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_PREPARE_UPGRADE="false"
   _cluster_apply "$version"
+  # switch to the new domain
   unset GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
   _cluster_apply "$version"

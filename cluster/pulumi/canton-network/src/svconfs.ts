@@ -1,7 +1,5 @@
 import { Output } from '@pulumi/pulumi';
-import { cometbftRetainBlocks, isDevNet } from 'cn-pulumi-common';
-
-import { DomainMigrationIndex } from './globalDomainNode';
+import { DomainMigrationIndex, cometbftRetainBlocks, isDevNet } from 'cn-pulumi-common';
 
 export interface StaticSvConfig {
   nodeName: string;

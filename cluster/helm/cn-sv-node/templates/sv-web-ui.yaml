@@ -1,4 +1,4 @@
-{{- $appIdentifier := include "domainOrDefaultValue" (list .Values "sv-web-ui") }}
+{{- $appIdentifier := include "domainMigrationIdOrDefaultValue" (list .Values "sv-web-ui") }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:

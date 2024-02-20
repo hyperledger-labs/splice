@@ -25,8 +25,10 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
       this.getClass.getSimpleName
     )
 
-  "Global domain is paused and dump is created" in { implicit env =>
+  "Global domain upgrade is scheduled" in { implicit env =>
     import env.executionContext
+
+    // This triggers the pausing of the domain and the creation of dumps later on
 
     val svsWithAuth = env.svs.remote.map { sv =>
       svclWithToken(sv.name)

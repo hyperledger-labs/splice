@@ -8,11 +8,11 @@ import {
   BootstrappingDumpConfig,
   ValidatorTopupConfig,
   CLUSTER_BASENAME,
+  DomainMigrationIndex,
 } from 'cn-pulumi-common';
 import type { Auth0Client, ExactNamespace } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { DomainMigrationIndex } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { installPostgresMetrics } from './postgres';
 import { installValidatorApp } from './validator';

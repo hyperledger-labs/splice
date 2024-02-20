@@ -20,11 +20,11 @@ import {
   participantBootstrapDumpSecretName,
   installValidatorOnboardingSecret,
   validatorOnboardingSecretName,
+  DomainMigrationIndex,
 } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import { PersistenceConfig } from '../../common';
-import { DomainMigrationIndex } from './globalDomainNode';
 
 export type ExtraDomain = {
   alias: string;

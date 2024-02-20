@@ -9,9 +9,10 @@ import {
   ExactNamespace,
   installCNHelmChart,
   isDevNet,
+  DefaultMigrationId,
+  DomainMigrationIndex,
 } from 'cn-pulumi-common';
 
-import { DefaultMigrationId, DomainMigrationIndex } from './globalDomainNode';
 import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './svconfs';
 
 /**
@@ -117,7 +118,7 @@ function rpcServiceAddress(namespace: string, migrationId: DomainMigrationIndex)
 }
 
 class CometBftNodeConfig {
-  private readonly _domain: number;
+  private readonly _domainMigrationId: number;
   private readonly _nodeConfigs: {
     self: StaticCometBftConfigWithNodeName;
     founder: StaticCometBftConfigWithNodeName;
@@ -125,14 +126,14 @@ class CometBftNodeConfig {
   };
 
   constructor(
-    domain: number,
+    domainMigrationId: number,
     nodeConfigs: {
       self: StaticCometBftConfigWithNodeName;
       founder: StaticCometBftConfigWithNodeName;
       peers: StaticCometBftConfigWithNodeName[];
     }
   ) {
-    this._domain = domain;
+    this._domainMigrationId = domainMigrationId;
     this._nodeConfigs = nodeConfigs;
   }
 
@@ -161,7 +162,7 @@ class CometBftNodeConfig {
   }
 
   get nodeIdentifier() {
-    return `global-domain-${this._domain}-cometbft`;
+    return `global-domain-${this._domainMigrationId}-cometbft`;
   }
 
   get founder() {
@@ -188,6 +189,6 @@ class CometBftNodeConfig {
   }
 
   private istioExternalPort(nodeIndex: DomainMigrationIndex) {
-    return Number(`26${this._domain}${nodeIndex}6`);
+    return Number(`26${this._domainMigrationId}${nodeIndex}6`);
   }
 }

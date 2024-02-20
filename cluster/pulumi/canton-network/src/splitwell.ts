@@ -9,12 +9,12 @@ import {
   ValidatorTopupConfig,
   ExactNamespace,
   sanitizedForPostgres,
+  DomainMigrationIndex,
 } from 'cn-pulumi-common';
 import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
-import { DomainMigrationIndex } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { Postgres, installPostgresMetrics } from './postgres';
 import { installValidatorApp } from './validator';

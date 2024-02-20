@@ -1,4 +1,4 @@
-{{- $appIdentifier := include "domainOrDefaultValue" (list .Values "sv-app") }}
+{{- $appIdentifier := include "domainMigrationIdOrDefaultValue" (list .Values "sv-app") }}
 {{- if .Values.metrics.enable }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
