@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
@@ -11,12 +12,14 @@ import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import scala.jdk.OptionConverters.*
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
+import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.transaction.ParticipantPermissionX
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
 
-class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
+class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletTestUtil {
 
   "SVs can onboard new SVs" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
@@ -344,4 +347,84 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase {
         },
       )
   }
+
+  "fail to submit command with actAs = svc if there are more than 1 SV onboarded" in {
+    implicit env =>
+      startAllSync(
+        sv1ScanBackend,
+        sv1Backend,
+        sv1ValidatorBackend,
+      )
+      sv1Backend.getSvcInfo().svcRules.payload.members should have size 1
+
+      val sv1UserId = sv1WalletClient.config.ledgerApiUser
+      val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
+      val coinAmount = BigDecimal(42)
+
+      clue("create a coin with actAs = SVC") {
+        loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(
+          () => {
+            val coinCid = createCoin(
+              sv1ValidatorBackend.participantClientWithAdminToken,
+              sv1UserId,
+              sv1UserParty,
+              amount = coinAmount,
+            )
+            eventually() {
+              inside(
+                sv1ScanBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+                  .filterJava(Coin.COMPANION)(sv1UserParty)
+              ) { case Seq(coin) =>
+                coin.id shouldBe coinCid
+              }
+            }
+          },
+          lines => {
+            forAll(lines)(line =>
+              line.message should
+                include(
+                  "Unexpected coin create event"
+                )
+            )
+          },
+        )
+      }
+
+      startAllSync(
+        sv2ScanBackend,
+        sv2Backend,
+        sv2ValidatorBackend,
+      )
+      sv1Backend.getSvcInfo().svcRules.payload.members should have size 2
+
+      inside(
+        sv1Backend.participantClientWithAdminToken.topology.party_to_participant_mappings.list(
+          filterStore = globalDomainId.filterString,
+          filterParty = svcParty.toProtoPrimitive,
+        )
+      ) { case Seq(mapping) =>
+        inside(mapping.item.participants) { case Seq(sv1Participant, sv2Participant) =>
+          sv1Participant.participantId shouldBe sv1Backend.participantClientWithAdminToken.id
+          sv1Participant.permission shouldBe ParticipantPermissionX.Submission
+          sv2Participant.participantId shouldBe sv2Backend.participantClientWithAdminToken.id
+          sv2Participant.permission shouldBe ParticipantPermissionX.Submission
+        }
+      }
+      clue("create a coin again with actAs = SVC") {
+        assertThrowsAndLogsCommandFailures(
+          createCoin(
+            sv1ValidatorBackend.participantClientWithAdminToken,
+            sv1UserId,
+            sv1UserParty,
+            amount = coinAmount,
+          ),
+          _.errorMessage should (include(
+            s"INVALID_ARGUMENT/An error occurred. Please contact the operator and inquire about the request"
+          ) or include(
+            s"This participant can not submit as the given submitter on any connected domain"
+          )),
+        )
+      }
+  }
+
 }

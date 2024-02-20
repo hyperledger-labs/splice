@@ -117,4 +117,7 @@ Received a mediator request.*with some informees not being hosted by an active p
 # TODO(#9852) Remove once Canton fixes the log level for this
 Unable to get topology snapshot to check whether informees are hosted on the domain
 
+# Shows up during the test case in SvOnboardingAddlIntegrationTest when submitting command with actAs = SVC and there are more than 1 SV onboarded
+Received a request with id RequestId\(.*\) with a view that is not correctly authorized.*is not authorized to submit on behalf of the submitting parties SVC-.*
+
 # Make sure to have a trailing newline
