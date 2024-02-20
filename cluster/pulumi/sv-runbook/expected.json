@@ -693,7 +693,7 @@
           "host": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "scanAddress": "https://scan.sv-1.svc.svrun.network.com.network.canton.global",
+        "scanAddress": "https://scan.sv-1.svc.svrun.network.canton.global",
         "svValidator": true,
         "topup": {
           "enabled": true,

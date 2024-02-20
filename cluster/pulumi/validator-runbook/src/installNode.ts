@@ -214,6 +214,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       TARGET_CLUSTER: TARGET_CLUSTER,
       OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
+      TRUSTED_SCAN_URL: `https://scan.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,

@@ -37,6 +37,9 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     clue("Starting joining SV's SV app") {
       sv2Backend.startSync()
     }
+    clue("Starting joining SV's Scan app") {
+      sv2ScanBackend.startSync() // without this, sv2&4's validator will fail.
+    }
     clue("Starting joining SV's validator app") {
       sv2ValidatorBackend.startSync()
     }

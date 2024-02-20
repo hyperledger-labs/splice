@@ -26,7 +26,14 @@ class SvOnboardingConfigIntegrationTest extends CNNodeIntegrationTest with SvTes
 
   "start previously onboarded participant without onboarding config" in { implicit env =>
     val svcInfoFromSv2 = clue("Start sv1, sv2 and get SvcInfo from sv2") {
-      startAllSync(sv1ScanBackend, sv1ValidatorBackend, sv1Backend, sv2ValidatorBackend, sv2Backend)
+      startAllSync(
+        sv1ScanBackend,
+        sv1ValidatorBackend,
+        sv1Backend,
+        sv2ScanBackend,
+        sv2ValidatorBackend,
+        sv2Backend,
+      )
       sv2Backend.getSvcInfo()
     }
     clue("stop sv2") {

@@ -41,6 +41,7 @@ class SvcElectionTimeBasedIntegrationTest
     val svcRulesBeforeElection = clue("Initialize SVC with 4 SVs") {
       startAllSync(
         sv1ScanBackend,
+        sv2ScanBackend,
         sv1Backend,
         sv2Backend,
         sv3Backend,

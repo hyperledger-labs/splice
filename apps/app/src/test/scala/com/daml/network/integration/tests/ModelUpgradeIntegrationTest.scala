@@ -55,6 +55,7 @@ class ModelUpgradeIntegrationTest
         sv2ValidatorBackend,
         sv3ValidatorBackend,
         sv1ScanBackend,
+        sv2ScanBackend,
         aliceValidatorBackend,
         splitwellBackend,
         splitwellValidatorBackend,

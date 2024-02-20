@@ -35,6 +35,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
       clue("Initialize SVC with 3 SVs") {
         startAllSync(
           sv1ScanBackend,
+          sv2ScanBackend,
           sv1Backend,
           sv2Backend,
           sv3Backend,

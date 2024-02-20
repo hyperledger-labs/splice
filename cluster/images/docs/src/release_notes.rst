@@ -11,6 +11,7 @@ Release Notes
   * Removed option to configure Kubernetes node affinity for PVCs due to a faulty implementation.
     For controlling the provisioning of PVCs, you can define custom storage classes and configure them via the respective `db.volumeStorageClass` Helm chart field.
   * Fix the `affinity` and `nodeSelector` field on the `cn-postgres` Helm chart so they are applied as expected.
+  * The ``scanAddress`` in ``validator-values.yaml`` should be an address to a trusted Scan instance that is reachable by your Validator.
 
 2024-02-19
 ----------

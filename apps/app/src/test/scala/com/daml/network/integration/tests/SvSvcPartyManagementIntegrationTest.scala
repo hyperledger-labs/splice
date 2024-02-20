@@ -47,16 +47,16 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
   "The SVC Party can be setup in the participant after SV has been confirmed to be part of the SVC" in {
     implicit env =>
       clue("Starting SVC app and SV1 app") {
-        startAllSync(sv1ScanBackend, sv1Backend, sv4Backend, sv1ValidatorBackend)
+        startAllSync(sv1ScanBackend, sv1Backend, sv3Backend, sv1ValidatorBackend)
       }
 
       val svcParty = sv1Backend.getSvcInfo().svcParty
       val svcPartyStr: String = svcParty.toProtoPrimitive
       val sv1Participant = sv1Backend.participantClient
-      val sv4Participant = sv4Backend.participantClient
+      val sv3Participant = sv3Backend.participantClient
 
       val sv1Party = sv1Backend.getSvcInfo().svParty
-      val sv4Party = sv4Backend.getSvcInfo().svParty
+      val sv3Party = sv3Backend.getSvcInfo().svParty
 
       val publicKey =
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA=="
@@ -69,7 +69,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         val randomParty = allocateRandomSvParty("random")
         assertThrowsAndLogsCommandFailures(
           sv1Backend.onboardSvPartyMigrationAuthorize(
-            sv4Backend.participantClient.id,
+            sv3Backend.participantClient.id,
             randomParty,
           ),
           _.errorMessage should include(
@@ -82,14 +82,14 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         "SVC party hosting authorization request with party which is not hosted on the target participant"
       ) {
         val unAuthorizedParty =
-          PartyId(UniqueIdentifier(id = sv1Party.uid.id, namespace = sv4Party.uid.namespace))
+          PartyId(UniqueIdentifier(id = sv1Party.uid.id, namespace = sv3Party.uid.namespace))
         assertThrowsAndLogsCommandFailures(
           sv1Backend.startSvOnboarding(
             SvOnboardingToken(
               "Canton-Foundation-1",
               publicKey,
               unAuthorizedParty,
-              sv4Backend.participantClient.id,
+              sv3Backend.participantClient.id,
               svcParty,
             ).signAndEncode(SvUtil.parsePrivateKey(privateKey).value).value
           ),
@@ -102,15 +102,15 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       clue(
         "SV party namespace matches the namespace of its participant."
       ) {
-        val sv4PartyWithWrongNamespace =
-          PartyId(UniqueIdentifier(id = sv4Party.uid.id, namespace = sv1Party.uid.namespace))
+        val sv3PartyWithWrongNamespace =
+          PartyId(UniqueIdentifier(id = sv3Party.uid.id, namespace = sv1Party.uid.namespace))
         assertThrowsAndLogsCommandFailures(
-          sv4Backend.startSvOnboarding(
+          sv3Backend.startSvOnboarding(
             SvOnboardingToken(
               "Canton-Foundation-4",
               publicKey,
-              sv4PartyWithWrongNamespace,
-              sv4Backend.participantClient.id,
+              sv3PartyWithWrongNamespace,
+              sv3Backend.participantClient.id,
               svcParty,
             ).signAndEncode(
               SvUtil
@@ -121,7 +121,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
             ).value
           ),
           _.errorMessage should include(
-            s"Party $sv4PartyWithWrongNamespace does not have the same namespace than its participant"
+            s"Party $sv3PartyWithWrongNamespace does not have the same namespace than its participant"
           ),
         )
       }
@@ -129,13 +129,13 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
       sv1WalletClient.tap(1.0)
 
       clue("start onboarding new SV and SVC party setup on new SV's dedicated participant") {
-        // SV4 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
-        startAllSync(sv4ValidatorBackend, sv4Backend, sv4ValidatorBackend)
+        // sv3 is configured to join the SVC. After the SV is onboarded, it will start the SVC party hosting on its own dedicated participant
+        startAllSync(sv3ValidatorBackend, sv3Backend, sv3ValidatorBackend)
       }
 
       sv1WalletClient.tap(2.0)
 
-      val globalDomainId = inside(sv4Participant.domains.list_connected()) { case Seq(domain) =>
+      val globalDomainId = inside(sv3Participant.domains.list_connected()) { case Seq(domain) =>
         domain.domainId
       }
 
@@ -145,49 +145,49 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
             operation = Some(TopologyChangeOpX.Replace),
             filterStore = globalDomainId.filterString,
             filterParty = svcPartyStr,
-            filterParticipant = sv4Participant.id.toProtoPrimitive,
+            filterParticipant = sv3Participant.id.toProtoPrimitive,
           ) should have size 1
 
-        sv4Participant.topology.party_to_participant_mappings
+        sv3Participant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOpX.Replace),
             filterStore = globalDomainId.filterString,
             filterParty = svcPartyStr,
-            filterParticipant = sv4Participant.id.toProtoPrimitive,
+            filterParticipant = sv3Participant.id.toProtoPrimitive,
           ) should have size 1
-        val coinFromSv4Participant = getCoins(sv4Participant, svcParty)
+        val coinFromsv3Participant = getCoins(sv3Participant, svcParty)
         val coinFromSv1Participant = getCoins(sv1Participant, svcParty)
 
-        coinFromSv4Participant should have size 2
-        coinFromSv4Participant shouldBe coinFromSv1Participant
+        coinFromsv3Participant should have size 2
+        coinFromsv3Participant shouldBe coinFromSv1Participant
 
-        sv4Participant.ledger_api.state.acs.of_party(svcParty) should not be empty
+        sv3Participant.ledger_api.state.acs.of_party(svcParty) should not be empty
       }
 
-      clue("sv4 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {
-        val sv4Party = sv4Backend.getSvcInfo().svParty
+      clue("sv3 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {
+        val sv3Party = sv3Backend.getSvcInfo().svParty
 
-        wc("sv4Wallet").tap(100.0)
+        wc("sv3Wallet").tap(100.0)
 
-        def checkSv4CoinContract(participant: CNParticipantClientReference, party: PartyId) = {
-          val coins = getCoins(participant, party, _.data.owner == sv4Party.toProtoPrimitive)
+        def checksv3CoinContract(participant: CNParticipantClientReference, party: PartyId) = {
+          val coins = getCoins(participant, party, _.data.owner == sv3Party.toProtoPrimitive)
           inside(coins) { case Seq(coin) =>
             coin.data.svc shouldBe svcPartyStr
             // the amount might diverge slightly due to (merged) SV rewards and fees
             BigDecimal(coin.data.amount.initialAmount) should beAround(BigDecimal(100.0))
-            coin.data.owner shouldBe sv4Party.toProtoPrimitive
+            coin.data.owner shouldBe sv3Party.toProtoPrimitive
           }
         }
 
         eventually() {
-          checkSv4CoinContract(sv1Participant, svcParty)
-          checkSv4CoinContract(sv4Participant, sv4Party)
+          checksv3CoinContract(sv1Participant, svcParty)
+          checksv3CoinContract(sv3Participant, sv3Party)
         }
       }
 
-      clue("sv4 can restart") {
-        sv4Backend.stop()
-        sv4Backend.startSync()
+      clue("sv3 can restart") {
+        sv3Backend.stop()
+        sv3Backend.startSync()
       }
   }
 

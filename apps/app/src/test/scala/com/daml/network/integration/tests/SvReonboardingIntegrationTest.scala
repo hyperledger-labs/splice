@@ -122,6 +122,7 @@ class SvReonboardingIntegrationTest
       )() {
         startAllSync(
           sv1ScanBackend,
+          sv2ScanBackend,
           sv1Backend,
           sv2Backend,
           sv3Backend,

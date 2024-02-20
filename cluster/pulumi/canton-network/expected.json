@@ -3252,7 +3252,7 @@
             "memory": "4Gi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-1:5012",
+        "scanAddress": "http://scan-app-0.sv-2:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -4110,7 +4110,7 @@
             "memory": "4Gi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-1:5012",
+        "scanAddress": "http://scan-app-0.sv-3:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -4968,7 +4968,7 @@
             "memory": "4Gi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-1:5012",
+        "scanAddress": "http://scan-app-0.sv-4:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,

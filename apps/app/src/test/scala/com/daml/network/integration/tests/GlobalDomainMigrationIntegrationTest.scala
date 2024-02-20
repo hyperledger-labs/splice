@@ -245,7 +245,8 @@ class GlobalDomainMigrationIntegrationTest
     )
 
     startAllSync(
-      sv1ScanBackend,
+      sv1ScanBackend, // Used by SV 1 & 3
+      sv2ScanBackend, // Used by SV 2 & 4
       sv1Backend,
       sv2Backend,
       sv3Backend,

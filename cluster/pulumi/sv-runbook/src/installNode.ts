@@ -335,6 +335,7 @@ async function installSvAndValidator(config: SvConfig) {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
+      TRUSTED_SCAN_URL: `https://scan.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
     }),
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
     participantIdentitiesDumpPeriodicBackup: backupConfig,

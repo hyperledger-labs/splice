@@ -282,7 +282,7 @@ async function installValidator(
     svValidator: true,
     participantAddress: participant.name,
     globalDomainUrl: globalDomainUrl,
-    scanAddress: pulumi.interpolate`http://scan-app-${migrationId}.sv-1:5012`,
+    scanAddress: pulumi.interpolate`http://scan-app-${migrationId}.${svConfig.nodeName}:5012`,
     secrets: validatorSecrets,
   });
   installPostgresMetrics(postgres, validatorDbName, [validator]);
