@@ -12,8 +12,6 @@ data SvStatus = SvStatus with
     -- gather the data points in this report to submit them.
     cometBftHeight : Int
     -- ^ The height of the CometBFT chain at the time of submission
-    sequencerDomainTime : Time
-    -- ^ The latest domain time observed on the sequencer at the time of submission
     mediatorDomainTime : Time
     -- ^ The latest domain time observed on the mediator at the time of submission
     participantDomainTime : Time

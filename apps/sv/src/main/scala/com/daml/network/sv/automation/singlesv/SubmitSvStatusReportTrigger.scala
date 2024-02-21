@@ -6,7 +6,6 @@ import com.daml.network.environment.{
   CNLedgerConnection,
   MediatorAdminConnection,
   ParticipantAdminConnection,
-  SequencerAdminConnection,
 }
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
@@ -18,17 +17,13 @@ import cats.syntax.traverse.*
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.digitalasset.canton.data.CantonTimestamp
 
-import scala.annotation.nowarn
-
 /** A trigger that regularly submits the status report of the SV to the SVC. */
-@nowarn("cat=unused") // TODO(#10119): remove once we fetch the sequencer domain time
 class SubmitSvStatusReportTrigger(
     svAppConfig: SvAppBackendConfig,
     baseContext: TriggerContext,
     store: SvSvcStore,
     ledgerApiConnection: CNLedgerConnection,
     cometBft: Option[CometBftNode],
-    sequencerAdminConnection: Option[SequencerAdminConnection],
     mediatorAdminConnection: Option[MediatorAdminConnection],
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
@@ -49,10 +44,8 @@ class SubmitSvStatusReportTrigger(
       statusReport <- store.getSvStatusReport(store.key.svParty)
       openMiningRounds <- store.getOpenMiningRoundTriple()
       cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
-      // TODO(#10119): grab from the sequencer once it supports it, and drop the 'nowarn(usued) above'
-      // sequencerDomainTime <- sequencerAdminConnection.traverse(_.getDomainTime(svcRules.domain, timeouts.network))
       mediatorDomainTime <- mediatorAdminConnection.traverse(
-        // TODO(#10167): we must use `shutdownShort` as the timeout to avoid shutdown flakes in case the remote service is shutting down
+        // TODO(#10189): only request a time-proof more recent than the status report interval
         _.getDomainTime(svcRules.domain, timeouts.shutdownShort)
       )
       participantDomainTime <- participantAdminConnection.getDomainTime(
@@ -65,8 +58,6 @@ class SubmitSvStatusReportTrigger(
         // Production deployments always define all of these values, which is why we don't embed the 'Option' value
         // into the status report. We'll only see the magic default values in our tests.
         cometBftHeight.getOrElse[Long](-1L),
-        CantonTimestamp.MinValue.toInstant, // TODO(#10119): remove once we fetch the sequencer domain time
-        // sequencerDomainTime.fold(CantonTimestamp.MinValue)(_.timestamp).toInstant,
         mediatorDomainTime.fold(CantonTimestamp.MinValue)(_.timestamp).toInstant,
         participantDomainTime.timestamp.toInstant,
         openMiningRounds.newest.payload.round,

@@ -26,10 +26,9 @@ testStatusReportSubmission = do
   let dummyStatus dummyNr = SvStatus with
         createdAt = now
         cometBftHeight = dummyNr + 1
-        sequencerDomainTime = mkTime $ dummyNr + 2
-        mediatorDomainTime = mkTime $ dummyNr + 3
-        participantDomainTime = mkTime $ dummyNr + 4
-        latestOpenRound = Round (dummyNr + 5)
+        mediatorDomainTime = mkTime $ dummyNr + 2
+        participantDomainTime = mkTime $ dummyNr + 3
+        latestOpenRound = Round (dummyNr + 4)
   let getStatusReport sv = do
         [report] <- queryFilter @SvStatusReport svc (\report -> report.sv == sv)
         pure report

@@ -1,51 +1,31 @@
 package com.daml.network.sv.automation
 
+import com.daml.network.automation.AutomationServiceCompanion.{TriggerClass, aTrigger}
 import com.daml.network.automation.{
   AssignTrigger,
   AutomationServiceCompanion,
   CNNodeAppAutomationService,
   TransferFollowTrigger,
 }
-import com.daml.network.automation.AutomationServiceCompanion.{aTrigger, TriggerClass}
-import com.daml.network.environment.{
-  CNLedgerClient,
-  DarResources,
-  MediatorAdminConnection,
-  PackageIdResolver,
-  ParticipantAdminConnection,
-  RetryProvider,
-  SequencerAdminConnection,
-}
+import com.daml.network.environment.*
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.SvSvcAutomationService.{
   LocalSequencerClientConfig,
   LocalSequencerClientContext,
 }
-import com.daml.network.sv.automation.confirmation.{
-  ArchiveClosedMiningRoundsTrigger,
-  CnsSubscriptionInitialPaymentTrigger,
-  ElectionRequestTrigger,
-  SummarizingMiningRoundTrigger,
-  SvOnboardingRequestTrigger,
-}
+import com.daml.network.sv.automation.confirmation.*
 import com.daml.network.sv.automation.singlesv.*
+import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger
 import com.daml.network.sv.automation.singlesv.membership.offboarding.{
   SvOffboardingPartyToParticipantProposalTrigger,
   SvOffboardingSequencerTrigger,
 }
-import com.daml.network.sv.automation.singlesv.membership.onboarding.{
-  SvOnboardingMediatorProposalTrigger,
-  SvOnboardingMediatorUnlimitedTrafficTrigger,
-  SvOnboardingPartyToParticipantProposalTrigger,
-  SvOnboardingPromoteParticipantToSubmitterTrigger,
-  SvOnboardingSequencerProposalTrigger,
-}
-import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger
+import com.daml.network.sv.automation.singlesv.membership.onboarding.*
 import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
-import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ClientConfig
@@ -180,9 +160,14 @@ class SvSvcAutomationService(
       svcStore,
       connection,
       cometBft,
-      localDomainNode.map(_.sequencerAdminConnection),
       localDomainNode.map(_.mediatorAdminConnection),
       participantAdminConnection,
+    )
+  )
+  registerTrigger(
+    new SvStatusReportMetricsExportTrigger(
+      triggerContext,
+      svcStore,
     )
   )
 
@@ -417,5 +402,6 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
       aTrigger[LocalSequencerConnectionsTrigger],
       aTrigger[SequencerPruningTrigger],
       aTrigger[SubmitSvStatusReportTrigger],
+      aTrigger[SvStatusReportMetricsExportTrigger],
     )
 }
