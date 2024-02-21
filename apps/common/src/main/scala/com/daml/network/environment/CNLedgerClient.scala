@@ -53,7 +53,7 @@ class CNLedgerClient(
       )
 
     val channel = builder.build
-    new LedgerClient(channel, getToken)
+    new LedgerClient(channel, applicationId, getToken, loggerFactory)
   }
 
   private val inactiveContractsCallbacks = new AtomicReference[Seq[String => Unit]](Seq())

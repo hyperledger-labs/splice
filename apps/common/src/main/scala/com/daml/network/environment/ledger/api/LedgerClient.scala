@@ -22,7 +22,7 @@ import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.ledger.client.{GrpcChannel, LedgerCallCredentials}
-import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.daml.ledger.api.v1.admin.package_management_service.{
   PackageManagementServiceGrpc,
@@ -69,18 +69,34 @@ final case class DedupDuration(duration: Duration) extends DedupConfig
   */
 private[environment] class LedgerClient(
     channel: Channel,
+    expectedTokenUser: String,
     getToken: () => Future[Option[AuthToken]],
+    override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     esf: ExecutionSequencerFactory,
     ec: ExecutionContext,
-) extends Closeable {
+) extends Closeable
+    with NamedLogging {
   import LedgerClient.{CompletionStreamResponse, GetUpdatesRequest, SubmitAndWaitFor}
+
+  private def checkTokenUser(
+      token: AuthToken
+  )(implicit tc: TraceContext): Unit = {
+    token.user.foreach(actualTokenUser => {
+      if (actualTokenUser != expectedTokenUser) {
+        logger.error(
+          s"Token user $actualTokenUser does not match expected user $expectedTokenUser. Check your application configuration to make sure the auth-config setting is correct."
+        )
+      }
+    })
+  }
 
   private def withCredentials[T <: AbstractStub[T]](
       stub: T
   ): Future[T] = {
     getToken().map { token =>
       token.fold(stub) { token =>
+        checkTokenUser(token)(TraceContext.empty)
         stub.withCallCredentials(new LedgerCallCredentials(token.accessToken))
       }
     }
@@ -94,6 +110,7 @@ private[environment] class LedgerClient(
   )(implicit tc: TraceContext): Future[T] = {
     getToken().map { token =>
       token.fold(stub) { token =>
+        checkTokenUser(token)
         TraceContextGrpc.addTraceContextToCallOptions(
           stub
             .withCallCredentials(new LedgerCallCredentials(token.accessToken))
