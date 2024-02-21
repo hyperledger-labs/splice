@@ -13,6 +13,10 @@ Release Notes
   * Fix the `affinity` and `nodeSelector` field on the `cn-postgres` Helm chart so they are applied as expected.
   * The ``scanAddress`` in ``validator-values.yaml`` should be an address to a trusted Scan instance that is reachable by your Validator.
 
+* Documentation
+
+  * Added instructions for fetching and backing up node identities from an SV node in the :ref:`Backups section <sv_backups>`.
+
 2024-02-19
 ----------
 
