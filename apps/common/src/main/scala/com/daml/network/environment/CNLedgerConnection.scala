@@ -503,8 +503,10 @@ class CNLedgerSubscription[S](
 
   import TraceContext.Implicits.Empty.*
 
-  private val lastFutureFinished: AtomicReference[Promise[Done]] = new AtomicReference(
-    Promise.successful(Done)
+  case object SubscriptionShutDown
+  private val lastFutureFinished
+      : AtomicReference[Either[SubscriptionShutDown.type, Promise[Done]]] = new AtomicReference(
+    Right(Promise.successful(Done))
   )
 
   private val (killSwitch, completed_) = PekkoUtil.runSupervised(
@@ -519,12 +521,17 @@ class CNLedgerSubscription[S](
       // we can shut down the operator quickly and signal upstream to cancel further sending
       .viaMat(KillSwitches.single)(Keep.right)
       .viaMat(Flow[S].mapAsync(1) { el =>
-        // map(el) *immediately* launches the future, so:
-        // - `lastFutureFinished.set(map(el))` has a tiny chance of racing
-        // - `lastFutureFinished.updateAndGet` shouldn't contain side-effects, such as, starting a Future
-        val promise = lastFutureFinished.updateAndGet(_ => Promise())
-        map(el).andThen { case _ =>
-          promise.success(Done)
+        // map(el) *immediately* launches the future, so it needs to be done after setting the promise,
+        // and only if we're not shutting down.
+        val myPromise = Promise[Done]()
+        val previousState = lastFutureFinished.getAndSet(Right(myPromise))
+        previousState match {
+          case Left(SubscriptionShutDown) =>
+            Future.successful(Done)
+          case Right(_) =>
+            map(el).andThen { case _ =>
+              myPromise.success(Done)
+            }
         }
       })(Keep.left)
       // and we get the Future[Done] as completed from the sink so we know when the last message
@@ -536,7 +543,17 @@ class CNLedgerSubscription[S](
       .toMat(Sink.ignore)(Keep.both),
   )
 
-  def completed: Future[Done] = completed_.flatMap(_ => lastFutureFinished.get().future)
+  def completed: Future[Done] =
+    completed_.transformWith { result =>
+      (lastFutureFinished.getAndSet(Left(SubscriptionShutDown)) match {
+        case Left(_) => Future.successful(Done)
+        case Right(runningFuture) => runningFuture.future
+      }).transformWith(_ =>
+        Future.fromTry(result)
+      ) // Keep whatever the original reason for failure was
+    }
+
+  def isActive: Boolean = !completed_.isCompleted
 
   def initiateShutdown() =
     killSwitch.shutdown()

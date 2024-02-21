@@ -96,7 +96,7 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
 
   final override def isHealthy: Boolean =
     // Healthy if there's an active subscription
-    currentSubscription.get().exists(subscription => !subscription.completed.isCompleted)
+    currentSubscription.get().exists(_.isActive)
 
   final override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     implicit def traceContext: TraceContext = TraceContext.empty
