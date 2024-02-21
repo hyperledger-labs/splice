@@ -17,6 +17,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
+import com.digitalasset.canton.sequencing.protocol.SequencerErrors
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.{Backoff, RetryUtil, Success}
@@ -540,6 +541,12 @@ object RetryProvider {
                               ed.metadata.get("reason").exists(_ contains "Unknown contract")
                             case _ => false
                           })
+                        ||
+                        // TODO(#10160) Remove this once Canton fixes the error code.
+                        (statusCode == Status.Code.INVALID_ARGUMENT &&
+                          description.contains(
+                            SequencerErrors.MaxSequencingTimeTooFar.id
+                          ))
                         ||
                         // CANCELLED can also be a deliberate cancellation from the client
                         // so we only retry if we observe RST_STREAM which we sometimes see
