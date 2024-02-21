@@ -8,6 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
@@ -35,7 +36,8 @@ class SvOnboardingSequencerProposalTrigger(
       tc: TraceContext
   ): Future[Seq[SequencerId]] = {
     for {
-      svcRules <- svcStore.getSvcRules()
+      qSvcRules <- svcStore.getSvcRulesWithOffset()
+      QueryResult(svcRulesOffset, svcRules) = qSvcRules
       sequencerDomainState <- participantAdminConnection.getSequencerDomainState(svcRules.domain)
     } yield {
       val currentDomainConfigs =
@@ -55,7 +57,14 @@ class SvOnboardingSequencerProposalTrigger(
                 Some(_),
               )
           )
-      configuredSequencers.filterNot(sequencerDomainState.mapping.active.contains)
+      val sequencersToAdd =
+        configuredSequencers.filterNot(sequencerDomainState.mapping.active.contains)
+      logger.info {
+        import com.digitalasset.canton.util.ShowUtil.showPretty
+        import com.daml.network.util.PrettyInstances.prettyCodegenContractId
+        show"Planning to add sequencers $sequencersToAdd to match SvcRules ${svcRules.contractId} at $svcRulesOffset"
+      }
+      sequencersToAdd
     }
   }
 

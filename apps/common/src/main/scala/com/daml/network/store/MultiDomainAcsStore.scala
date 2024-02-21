@@ -438,6 +438,9 @@ object MultiDomainAcsStore {
       value: A,
   ) {
     def map[B](f: A => B): QueryResult[B] = copy(value = f(value))
+
+    def sequence[B](implicit B: A <:< Option[B]): Option[QueryResult[B]] =
+      value.map(b => copy(value = b))
   }
 
   object QueryResult {

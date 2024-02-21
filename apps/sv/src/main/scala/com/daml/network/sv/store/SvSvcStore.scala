@@ -39,7 +39,7 @@ import com.daml.network.store.MultiDomainAcsStore.{
   TemplateFilter,
 }
 import com.daml.network.store.db.AcsJdbcTypes
-import com.daml.network.sv.store.SvSvcStore.ignoredContractsForAcsDump
+import com.daml.network.sv.store.SvSvcStore.{ignoredContractsForAcsDump, noActiveSvcRules}
 import com.daml.network.sv.store.db.{DbSvSvcStore, SvcTables}
 import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
@@ -106,14 +106,14 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   ): Future[Option[AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]] =
     lookupSvcRulesWithOffset().map(_.value)
 
+  def getSvcRulesWithOffset()(implicit tc: TraceContext): Future[QueryResult[
+    AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
+  ]] = lookupSvcRulesWithOffset().map(_.sequence getOrElse (throw noActiveSvcRules))
+
   def getSvcRules()(implicit
       tc: TraceContext
   ): Future[AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
-    lookupSvcRules().map(
-      _.getOrElse(
-        throw Status.NOT_FOUND.withDescription("No active SvcRules contract").asRuntimeException()
-      )
-    )
+    lookupSvcRules().map(_.getOrElse(throw noActiveSvcRules))
 
   def lookupSvStatusReport(svPartyId: PartyId)(implicit
       tc: TraceContext
@@ -1309,6 +1309,9 @@ object SvSvcStore {
     override def pretty: Pretty[this.type] =
       prettyOfClass(param("state", _.state), param("context", _.context))
   }
+
+  private def noActiveSvcRules =
+    Status.NOT_FOUND.withDescription("No active SvcRules contract").asRuntimeException()
 }
 
 case class ExpiredRewardCouponsBatch(

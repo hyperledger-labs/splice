@@ -10,6 +10,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, SequencerAdminConnection}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
@@ -42,7 +43,8 @@ class SvOffboardingSequencerTrigger(
       tc: TraceContext
   ): Future[Seq[SequencerId]] = {
     for {
-      svcRules <- svcStore.getSvcRules()
+      qSvcRules <- svcStore.getSvcRulesWithOffset()
+      QueryResult(svcRulesOffset, svcRules) = qSvcRules
       currentSequencerState <- participantAdminConnection.getSequencerDomainState(
         svcRules.domain
       )
@@ -54,10 +56,16 @@ class SvOffboardingSequencerTrigger(
           .asScala
           .flatMap(_.domainNodes.values().asScala)
       )
-      currentSequencerState.mapping.active
+      val sequencersToRemove = currentSequencerState.mapping.active
         // TODO(#9813) Consider removing the filter for our own sequencer
         // once Canton is fixed.
         .filterNot(e => svcRulesCurrentSequencers.contains(e) || ourSequencerId.contains(e))
+      logger.info {
+        import com.digitalasset.canton.util.ShowUtil.showPretty
+        import com.daml.network.util.PrettyInstances.prettyCodegenContractId
+        show"Planning to remove sequencers $sequencersToRemove to match SvcRules ${svcRules.contractId} at $svcRulesOffset"
+      }
+      sequencersToRemove
     }
   }
 
