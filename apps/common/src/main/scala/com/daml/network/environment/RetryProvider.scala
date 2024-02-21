@@ -548,6 +548,12 @@ object RetryProvider {
                             SequencerErrors.MaxSequencingTimeTooFar.id
                           ))
                         ||
+                        // This can occur when we try to get the domain time while still being disconnected from the domain
+                        statusCode == Status.Code.INVALID_ARGUMENT &&
+                        raw"Time tracker for domain .* not found".r
+                          .findFirstMatchIn(description)
+                          .isDefined
+                        ||
                         // CANCELLED can also be a deliberate cancellation from the client
                         // so we only retry if we observe RST_STREAM which we sometimes see
                         // around Canton restarts.
