@@ -902,6 +902,8 @@ Your identites may be fetched from your node through the following endpoint:
 
     curl 'https://sv.sv.svc.YOUR_HOSTNAME/api/sv/v0/admin/domain/identities-dump' -H 'authorization: Bearer <token>'
 
+where `<token>` is a OAuth2 Bearer Token obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
+
 Backup of Postgres Instances
 ++++++++++++++++++++++++++++
 

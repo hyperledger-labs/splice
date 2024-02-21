@@ -40,6 +40,8 @@ The ``Contract`` schema defined in ``common.yaml`` includes the
 ``payload`` of the given contract. This payload is encoded using the
 same `schema used by the HTTP JSON API <https://docs.daml.com/json-api/lf-value-specification.html>`_.
 
+.. _app-auth:
+
 Authentication
 --------------
 
