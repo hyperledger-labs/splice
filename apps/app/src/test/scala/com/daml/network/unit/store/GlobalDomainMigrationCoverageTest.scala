@@ -15,6 +15,8 @@ import org.scalatest.wordspec.AnyWordSpec
   * filter in some app also has a declared global domain migration strategy.
   * If your PR fails this, you have probably added a new template without also
   * declaring that strategy.
+  *
+  *  Grep for 'templatesMoved' to find the appropriate locations.
   */
 class GlobalDomainMigrationCoverageTest
     extends AnyWordSpec

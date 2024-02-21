@@ -1,13 +1,17 @@
 package com.daml.network.integration.tests
 
 import cats.implicits.catsSyntaxParallelTraverse1
+import com.daml.network.codegen.java.cn.svc.svstatus.SvStatusReport
+import com.daml.network.config.CNNodeConfigTransforms.updateAllSvAppConfigs_
 import com.daml.network.console.{
   ScanAppBackendReference,
   SvAppBackendReference,
   ValidatorAppBackendReference,
 }
 import com.daml.network.environment.RetryFor
+import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.transaction.ParticipantPermissionX
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
@@ -15,6 +19,14 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 class SvInitializationIntegrationTest extends SvIntegrationTestBase {
+
+  override def environmentDefinition: CNNodeEnvironmentDefinition =
+    super.environmentDefinition
+      .addConfigTransforms((_, config) =>
+        updateAllSvAppConfigs_ { c =>
+          c.copy(onLedgerStatusReportInterval = NonNegativeFiniteDuration.ofSeconds(1))
+        }(config)
+      )
 
   "start and restart cleanly" in { implicit env =>
     initSvc()
@@ -163,6 +175,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     val svParties = clue("We have four sv parties and their apps are online") {
       svs.map(_.getSvcInfo().svParty.toProtoPrimitive)
     }
+    val svPartiesSet = svParties.toSet
     clue("The four SV apps are all SVC members and there are no other SVC members") {
       sv1Backend.getSvcInfo().svcRules.payload.members.keySet() should equal(svParties.toSet.asJava)
     }
@@ -217,6 +230,19 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .participants
         svcHostingParticipants should have length 4
         svcHostingParticipants.foreach(_.permission shouldBe ParticipantPermissionX.Submission)
+      }
+    }
+    clue("Each SV is submitting status reports") {
+      for (backend <- svs) {
+        clue(s"The SV status reports are visible to ${backend.config.svPartyHint}") {
+          eventually() {
+            val svReports = backend.participantClient.ledger_api_extensions.acs
+              .filterJava(SvStatusReport.COMPANION)(svcParty, c => c.data.status.isPresent)
+            inside(svReports)(reports => {
+              reports.map(r => r.data.sv).toSet should equal(svPartiesSet)
+            })
+          }
+        }
       }
     }
   }

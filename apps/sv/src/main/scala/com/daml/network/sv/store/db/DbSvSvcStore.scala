@@ -14,6 +14,7 @@ import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext}
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
+import com.daml.network.codegen.java.cn.svc.svstatus.SvStatusReport
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
@@ -1252,6 +1253,28 @@ class DbSvSvcStore(
           )
           .value
       } yield row.map(contractWithStateFromRow(CnsEntryContext.COMPANION)(_))
+    }
+
+  override def lookupSvStatusReport(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[AssignedContract[SvStatusReport.ContractId, SvStatusReport]]] =
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            selectFromAcsTableWithState(
+              SvcTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""
+             template_id_qualified_name = ${QualifiedName(SvStatusReport.COMPANION.TEMPLATE_ID)}
+         and sv_status_report_sv = $svPartyId""",
+              orderLimit = sql"""limit 1""",
+            ).headOption,
+            "lookupSvStatusReport",
+          )
+          .value
+      } yield row.map(assignedContractFromRow(SvStatusReport.COMPANION)(_))
     }
 
   override def close(): Unit = {

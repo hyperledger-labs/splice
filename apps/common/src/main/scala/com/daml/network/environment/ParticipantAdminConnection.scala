@@ -5,7 +5,6 @@ import cats.syntax.traverse.*
 import com.daml.lf.archive.DarParser
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.admin.api.client.commands.{
-  DomainTimeCommands,
   ParticipantAdminCommands,
   StatusAdminCommands,
 }
@@ -15,7 +14,7 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.time.{Clock, FetchTimeResponse, NonNegativeFiniteDuration}
+import com.digitalasset.canton.time.{Clock, FetchTimeResponse}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -448,17 +447,6 @@ class ParticipantAdminConnection(
       res <- getDomainTime(domainId, timeout)
     } yield res
   }
-
-  def getDomainTime(domainId: DomainId, timeout: NonNegativeDuration)(implicit
-      traceContext: TraceContext
-  ): Future[FetchTimeResponse] =
-    runCmd(
-      DomainTimeCommands.FetchTime(
-        Some(domainId),
-        NonNegativeFiniteDuration.Zero,
-        timeout,
-      )
-    )
 
   override def identity()(implicit traceContext: TraceContext): Future[NodeIdentity] =
     getParticipantId()

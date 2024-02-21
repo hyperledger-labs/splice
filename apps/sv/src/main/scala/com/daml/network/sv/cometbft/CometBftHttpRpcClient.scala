@@ -276,7 +276,7 @@ object CometBftHttpRpcClient {
     implicit val validatorInfoDecoder: Decoder[ValidatorInfo] =
       Decoder.forProduct2("voting_power", "pub_key")(ValidatorInfo.apply)
 
-    case class SyncInfo(latestBlockHeight: Int, catchingUp: Boolean)
+    case class SyncInfo(latestBlockHeight: Long, catchingUp: Boolean)
 
     implicit val syncInfoDecoder: Decoder[SyncInfo] =
       Decoder.forProduct2("latest_block_height", "catching_up")(SyncInfo.apply)

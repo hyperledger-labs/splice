@@ -27,6 +27,7 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import MultiDomainAcsStore.QueryResult
+import com.daml.network.codegen.java.cn.svc.svstatus.SvStatusReport
 import com.daml.network.sv.store.TxLogEntry.mapActionName
 import com.daml.network.sv.store.{
   AppRewardCouponsSum,
@@ -711,6 +712,16 @@ class InMemorySvSvcStore(
     multiDomainAcsStore.findContract(cn.cns.CnsEntryContext.COMPANION)(c =>
       c.payload.reference == reference
     )
+
+  override def lookupSvStatusReport(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[AssignedContract[SvStatusReport.ContractId, SvStatusReport]]] =
+    multiDomainAcsStore
+      .findContract(SvStatusReport.COMPANION)(
+        (c: Contract[SvStatusReport.ContractId, SvStatusReport]) =>
+          c.payload.sv == svPartyId.toProtoPrimitive
+      )
+      .map(_.flatMap(_.toAssignedContract))
 }
 
 private[memory] object InMemorySvSvcStore {

@@ -172,6 +172,20 @@ class SvSvcAutomationService(
     )
   )
 
+  // SV status report triggers
+  registerTrigger(
+    new SubmitSvStatusReportTrigger(
+      config,
+      triggerContext,
+      svcStore,
+      connection,
+      cometBft,
+      localDomainNode.map(_.sequencerAdminConnection),
+      localDomainNode.map(_.mediatorAdminConnection),
+      participantAdminConnection,
+    )
+  )
+
   // requires namespace permissions to run these triggers, can only be run after onboarding
   def registerPostOnboardingTriggers(): Unit = {
     // required for triggers that must run in sim time as well
@@ -402,5 +416,6 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
       aTrigger[ReconcileCometBftNetworkConfigWithSvcRulesTrigger],
       aTrigger[LocalSequencerConnectionsTrigger],
       aTrigger[SequencerPruningTrigger],
+      aTrigger[SubmitSvStatusReportTrigger],
     )
 }

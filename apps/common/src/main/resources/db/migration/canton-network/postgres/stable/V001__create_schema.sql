@@ -652,7 +652,10 @@ create table svc_acs_store
     subscription_next_payment_due_at bigint,
 
     -- the provider partyid of a FeaturedAppRight contract
-    featured_app_right_provider   text
+    featured_app_right_provider   text,
+
+    -- the sv of an sv status report (not index-supported as there are not many)
+    sv_status_report_sv           text
 );
 
 -- ordered mining rounds

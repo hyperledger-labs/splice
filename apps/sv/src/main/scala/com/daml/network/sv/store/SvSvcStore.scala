@@ -53,6 +53,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
 import java.time.Instant
@@ -114,8 +115,24 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       )
     )
 
-  def svIsLeader()(implicit tc: TraceContext): Future[Boolean] =
-    getSvcRules().map(_.payload.leader == key.svParty.toProtoPrimitive)
+  def lookupSvStatusReport(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[
+    AssignedContract[cn.svc.svstatus.SvStatusReport.ContractId, cn.svc.svstatus.SvStatusReport]
+  ]]
+
+  def getSvStatusReport(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[
+    AssignedContract[cn.svc.svstatus.SvStatusReport.ContractId, cn.svc.svstatus.SvStatusReport]
+  ] =
+    lookupSvStatusReport(svPartyId).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(show"No SvStatusReport found for $svPartyId")
+          .asRuntimeException()
+      )
+    )
 
   def lookupCoinRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
@@ -949,6 +966,7 @@ object SvSvcStore {
       svcr.ElectionRequest.COMPANION,
       so.SvOnboardingRequest.COMPANION,
       so.SvOnboardingConfirmed.COMPANION,
+      cn.svc.svstatus.SvStatusReport.COMPANION,
     )
   }
 
@@ -1055,6 +1073,12 @@ object SvSvcStore {
       mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc)(
         SvcAcsStoreRowData(_)
       ),
+      mkFilter(cn.svc.svstatus.SvStatusReport.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          svStatusReportSv = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
+        )
+      },
       mkFilter(cn.svcrules.SvReward.COMPANION)(co => co.payload.svc == svc && co.payload.sv == sv)(
         SvcAcsStoreRowData(_)
       ),

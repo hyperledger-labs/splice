@@ -12,13 +12,13 @@ data SvStatus = SvStatus with
     -- gather the data points in this report to submit them.
     cometBftHeight : Int
     -- ^ The height of the CometBFT chain at the time of submission
-    sequencerDomainTime : Int
+    sequencerDomainTime : Time
     -- ^ The latest domain time observed on the sequencer at the time of submission
-    mediatorDomainTime : Int
+    mediatorDomainTime : Time
     -- ^ The latest domain time observed on the mediator at the time of submission
-    participantDomainTime : Int
+    participantDomainTime : Time
     -- ^ The latest domain time observed on the participant at the time of submission
-    latestOpenRound : Int
+    latestOpenRound : Round
     -- ^ The maximum round number of the OpenMiningRound contracts at the time of submission
   deriving (Eq, Show)
 

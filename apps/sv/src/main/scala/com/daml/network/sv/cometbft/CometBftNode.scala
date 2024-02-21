@@ -158,6 +158,12 @@ class CometBftNode(
         )
       }
   }
+
+  def getLatestBlockHeight()(implicit tc: TraceContext): Future[Long] = {
+    cometBftClient
+      .nodeStatus()
+      .map(_.syncInfo.latestBlockHeight)
+  }
 }
 
 object CometBftNode {

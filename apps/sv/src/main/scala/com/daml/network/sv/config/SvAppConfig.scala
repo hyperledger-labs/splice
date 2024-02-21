@@ -178,6 +178,8 @@ case class SvAppBackendConfig(
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long = 0L,
     prevetDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofHours(6),
+    onLedgerStatusReportInterval: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofMinutes(1),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
     ingestFromParticipantBegin: Boolean = false,
 ) extends CNNodeBackendConfig {

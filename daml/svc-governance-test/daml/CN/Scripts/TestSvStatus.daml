@@ -1,9 +1,11 @@
 module CN.Scripts.TestSvStatus where
 
 import DA.Assert
+import DA.Time
 
 import Daml.Script
 
+import CC.Types
 import CN.Scripts.SvcTestUtils
 import CN.SvcRules
 import CN.SVC.SvStatus
@@ -20,13 +22,14 @@ testStatusReportSubmission = do
 
   now <- getTime
 
+  let mkTime i = addRelTime now (convertMicrosecondsToRelTime i)
   let dummyStatus dummyNr = SvStatus with
         createdAt = now
         cometBftHeight = dummyNr + 1
-        sequencerDomainTime = dummyNr + 2
-        mediatorDomainTime = dummyNr + 3
-        participantDomainTime = dummyNr + 4
-        latestOpenRound = dummyNr + 5
+        sequencerDomainTime = mkTime $ dummyNr + 2
+        mediatorDomainTime = mkTime $ dummyNr + 3
+        participantDomainTime = mkTime $ dummyNr + 4
+        latestOpenRound = Round (dummyNr + 5)
   let getStatusReport sv = do
         [report] <- queryFilter @SvStatusReport svc (\report -> report.sv == sv)
         pure report
