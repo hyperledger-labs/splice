@@ -24,11 +24,11 @@ import com.daml.network.sv.migration.{
   DomainMigrationDump,
   DomainNodeIdentities,
 }
-import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{BackupDump, Codec, TemplateJsonDecoder}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.config.{DefaultProcessingTimeouts, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
@@ -40,7 +40,7 @@ import io.opentelemetry.api.trace.Tracer
 import slick.jdbc.PostgresProfile
 
 import java.nio.file.Path
-import java.time.Instant
+import java.time.{Instant, OffsetDateTime, ZoneOffset}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
@@ -583,6 +583,25 @@ class HttpSvAdminHandler(
             definitions.GetDomainDataSnapshotResponse(response.toHttp)
           )
         }
+    }(traceContext, tracer)
+  }
+
+  override def getDomainTime(
+      respond: SvAdminResource.GetDomainTimeResponse.type
+  )()(tuser: TracedUser): Future[SvAdminResource.GetDomainTimeResponse] = {
+    val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.getDomainTime") { implicit tc => _ =>
+      for {
+        globalDomain <- svcStore.getSvcRules().map(_.domain)
+        time <- participantAdminConnection.getDomainTime(
+          globalDomain,
+          DefaultProcessingTimeouts.default,
+        )
+      } yield SvAdminResource.GetDomainTimeResponse.OK(
+        definitions.GetDomainTimeResponse(
+          OffsetDateTime.ofInstant(time.timestamp.toInstant, ZoneOffset.UTC)
+        )
+      )
     }(traceContext, tracer)
   }
 

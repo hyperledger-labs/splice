@@ -29,7 +29,6 @@ import com.digitalasset.canton.config.{NonNegativeDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
-import com.digitalasset.canton.topology.DomainId
 import io.circe.syntax.EncoderOps
 import org.scalatest.time.{Minute, Span}
 import org.slf4j.event.Level
@@ -225,14 +224,16 @@ class DisasterRecoveryIntegrationTest
           },
         )
 
-        val domainId = identities.head.domainId
-        val timestampBeforeDisaster = getDomainTimeOnParticipant(sv1Backend, domainId).toInstant
-
-        waitForSvParticipantsToCatchpup(timestampBeforeDisaster, domainId)
+        // In a real disaster, we would take the minimum of getDomainTime on a majority of SVs,
+        // but for this test we are guaranteed here only that sv1 is caught up on the tap that
+        // we're testing with, so instead, we take the domain time from SV1, and wait for all
+        // to catch up before killing the domain.
+        val timestampBeforeDisaster = sv1Backend.getDomainTime()
+        waitForSvParticipantsToCatchup(timestampBeforeDisaster)
 
         // Tap some more coin and wait for SVs to see it (even though we're going to recover to a point before it)
         sv1WalletClient.tap(1338)
-        waitForSvParticipantsToCatchpup(Instant.now(), domainId)
+        waitForSvParticipantsToCatchup(Instant.now())
 
         // Tap yet more coin without waiting for it to necessarily be ingested on all SVs
         sv1WalletClient.tap(1339)
@@ -331,28 +332,19 @@ class DisasterRecoveryIntegrationTest
     }
   }
 
-  private def waitForSvParticipantsToCatchpup(timestamp: Instant, domainId: DomainId)(implicit
+  private def waitForSvParticipantsToCatchup(timestamp: Instant)(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
     withClue("Waiting for SV participants to catchup") {
       eventually() {
         Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(backend => {
-          getDomainTimeOnParticipant(backend, domainId).toInstant.isAfter(
-            timestamp
-          ) shouldBe true withClue s"${backend.name} should be caught up"
+          backend
+            .getDomainTime()
+            .isAfter(timestamp) shouldBe true withClue s"${backend.name} should be caught up"
         })
       }
     }
   }
-
-  private def getDomainTimeOnParticipant(svBackend: SvAppBackendReference, domainId: DomainId) =
-    svBackend.appState.participantAdminConnection
-      .getDomainTime(
-        domainId,
-        NonNegativeDuration.tryFromDuration(10.seconds),
-      )
-      .futureValue
-      .timestamp
 
   private def writeMigrationDumpFile(
       sv: SvAppBackendReference,

@@ -142,10 +142,17 @@ abstract class SvAppReference(
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetDomainDataSnapshot(timestamp, partyId))
     }
+
   @Help.Summary("Get identities of all domain node components")
   def getDomainNodeIdentitiesDump(): DomainNodeIdentities =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.GetDomainNodeIdentitiesDump())
+    }
+
+  @Help.Summary("Get the domain time as reported by the SV's participant")
+  def getDomainTime(): Instant =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.GetDomainTime())
     }
 
   @Help.Summary("Create a vote request (via admin API)")

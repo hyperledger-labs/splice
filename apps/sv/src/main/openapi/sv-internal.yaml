@@ -230,6 +230,21 @@ paths:
                 "$ref": "#/components/schemas/GetDomainDataSnapshotResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+  /v0/admin/domain/domain-time:
+    get:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "getDomainTime"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetDomainTimeResponse"
+        "500":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
+
 
   /v0/admin/sv/identity/approve:
     post:
@@ -1279,4 +1294,13 @@ components:
       properties:
         data_snapshot:
           $ref: "#/components/schemas/DomainDataSnapshot"
+
+    GetDomainTimeResponse:
+      type: object
+      required:
+        - domain_time
+      properties:
+        domain_time:
+          type: string
+          format: date-time
 
