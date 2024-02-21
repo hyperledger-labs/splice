@@ -901,16 +901,7 @@ function subcmd_ci_apply() {
     _assert_lock --for-ci
 
     # A CI-specific variant of 'cncluster apply' that removes the need
-    # for manual confirmation and ensures that all pods are deleted
-    # and recreated during the apply. With current (September 2022)
-    # DevNet, the ledger is stored in memory and the pod reset
-    # has the effect of clearing out all ledger state.
-
-    if [ "${1-}" == "--skip-reset" ]; then
-      skip_reset=yes
-      shift
-    fi
-
+    # for manual confirmation
     if [ -z "${CI-}" ]; then
       _error "This subcommand is available to CI jobs only."
     fi
@@ -927,11 +918,6 @@ function subcmd_ci_apply() {
 
     if [ -n "${BOOTSTRAPPING_CONFIG:-}" ]; then
        _info "Bootstrapping cluster from ${BOOTSTRAPPING_CONFIG}"
-    fi
-
-    if [ -z "${skip_reset:-}" ]; then
-      _info "Resetting cluster for CI deployment."
-      _cluster_reset
     fi
 
     source_image_tag=$(get-snapshot-version)

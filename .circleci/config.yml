@@ -1494,6 +1494,33 @@ jobs:
           cmd: |
             make cluster/build
           cmd_retry_count: 2
+      - when:
+          condition:
+            equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Reset cluster
+                cluster: << parameters.cluster >>
+                additional_nix_args: >
+                  --keep GITHUB_TOKEN
+                  --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+                  --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+                  --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+                  --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+                  --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+                  --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+                  --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+                  --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+                  --keep CIRCLECI_TOKEN
+                  --keep CIRCLE_WORKFLOW_ID
+                  --keep K6_USERS_PASSWORD
+                  --keep K6_VALIDATOR_ADMIN_USERNAME
+                  --keep K6_VALIDATOR_ADMIN_PASSWORD
+                  --keep SLACK_ACCESS_TOKEN
+                gce_authenticate: true
+                cmd: |
+                  cncluster activate
+                  cncluster reset
       - run_bash_command_in_nix:
           cmd_name: Apply Pulumi configuration to cluster
           cluster: << parameters.cluster >>
@@ -1515,6 +1542,7 @@ jobs:
             --keep SLACK_ACCESS_TOKEN
           gce_authenticate: true
           cmd: |
+            cncluster activate
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -1526,7 +1554,6 @@ jobs:
             fi
             # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=1
-            cncluster activate
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
@@ -1544,14 +1571,8 @@ jobs:
               if [[ << parameters.global_domain_legacy_migration_id >> -ne 0 ]]; then
                 export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
               fi
-              cncluster ci_apply --skip-reset
-            elif [[ << parameters.global_domain_active_migration_id >> -ne 0 ]]; then
-              cncluster ci_apply --skip-reset
-            elif [[ << pipeline.parameters.reset-before-deploy >> == true ]]; then
-              cncluster ci_apply
-            else
-              cncluster ci_apply --skip-reset
             fi
+            cncluster ci_apply
       - when:
           condition: << parameters.update_deployment_branch >>
           steps:
