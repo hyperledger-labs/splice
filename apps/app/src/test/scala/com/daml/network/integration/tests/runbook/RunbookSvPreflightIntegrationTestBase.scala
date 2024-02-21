@@ -129,7 +129,10 @@ abstract class RunbookSvPreflightIntegrationTestBase
           val asOfRound = find(id("as-of-round")).value.text
           asOfRound should startWith("The content on this page is computed as of round: ")
           asOfRound should not be "The content on this page is computed as of round: --"
-          val round = asOfRound.split(" ").last.toLong
+          asOfRound should not be "The content on this page is computed as of round: ??"
+          val round =
+            Try(asOfRound.split(" ").last.toLong)
+              .getOrElse(fail(s"Failed parsing round number from: $asOfRound"))
           val totalCoinBalanceSv = find(id("total-coin-balance-cc")).value.text
           val totalCoinBalanceSv1 = sv1ScanClient.getTotalCoinBalance(round)
           totalCoinBalanceSv shouldBe s"$totalCoinBalanceSv1 CC"
