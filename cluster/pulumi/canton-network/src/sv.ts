@@ -6,6 +6,7 @@ import {
   Auth0Client,
   auth0UserNameEnvVarSource,
   BackupConfig,
+  BackupLocation,
   BootstrappingDumpConfig,
   btoa,
   ChartValues,
@@ -97,7 +98,8 @@ export interface SvConfig extends StaticSvConfig {
   approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[];
   isDevNet: boolean;
-  backupConfig?: BackupConfig;
+  periodicBackupConfig?: BackupConfig;
+  identitiesBackupLocation: BackupLocation;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   sequencerPruningConfig: SequencerPruningConfig;
@@ -148,15 +150,23 @@ export async function installSvNode(
     await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodeName),
   ];
 
-  config.backupConfig = config.backupConfig
-    ? {
-        ...config.backupConfig,
-        prefix: config.backupConfig.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`,
-      }
-    : undefined;
+  if (config.periodicBackupConfig) {
+    config.periodicBackupConfig.location.prefix =
+      config.periodicBackupConfig.location.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`;
+  }
 
-  const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
-    ? installBootstrapDataBucketSecret(xns, config.backupConfig.bucket)
+  config.identitiesBackupLocation.prefix =
+    config.identitiesBackupLocation.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`;
+
+  const identitiesBackupConfigSecret = installBootstrapDataBucketSecret(
+    xns,
+    config.identitiesBackupLocation.bucket
+  );
+
+  const backupConfigSecret: pulumi.Resource | undefined = config.periodicBackupConfig
+    ? config.periodicBackupConfig.location.bucket != config.identitiesBackupLocation.bucket
+      ? installBootstrapDataBucketSecret(xns, config.periodicBackupConfig.location.bucket)
+      : identitiesBackupConfigSecret
     : undefined;
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined = config.bootstrappingDumpConfig
@@ -180,6 +190,7 @@ export async function installSvNode(
         installValidatorOnboardingSecret(xns, onboarding.name, onboarding.secret)
       )
     )
+    .concat([identitiesBackupConfigSecret])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
     .concat([loopback]);
@@ -269,9 +280,9 @@ async function installValidator(
     disableAllocateLedgerApiUserParty: true,
     topupConfig: svConfig.topupConfig,
     backupConfig:
-      svConfig.backupConfig && backupConfigSecret
+      svConfig.periodicBackupConfig && backupConfigSecret
         ? {
-            config: svConfig.backupConfig,
+            config: svConfig.periodicBackupConfig,
             secret: backupConfigSecret,
           }
         : undefined,
@@ -379,7 +390,8 @@ function installMigrationIdSpecificComponents(
         globalDomainUpgradeConfig.prepareUpgrade ||
           globalDomainUpgradeConfig.upgradeMigrationId != undefined,
         appsPostgres,
-        svConfig.backupConfig
+        svConfig.identitiesBackupLocation,
+        svConfig.periodicBackupConfig
       );
       const scan = installScan(
         xns,
@@ -423,6 +435,7 @@ function installSvApp(
   globalDomain: GlobalDomainNode,
   mustIncludeUpgradeConfig: boolean,
   postgres: Postgres,
+  identitiesBackupLocation: BackupLocation,
   backupConfig?: BackupConfig
 ) {
   const svAppName = sanitizedForPostgres(`${config.nodeName}-${domainMigrationId}`);
@@ -463,6 +476,7 @@ function installSvApp(
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
     persistence: persistenceConfig(postgres, svAppName),
+    identitiesExport: identitiesBackupLocation,
     acsDumpPeriodicExport: backupConfig,
     acsDumpImport:
       config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'

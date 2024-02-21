@@ -1,14 +1,16 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.BackupDumpConfig
+import com.daml.network.config.{BackupDumpConfig, PeriodicBackupDumpConfig}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 final class CombinedDumpDirectoryExportTimeBasedIntegrationTest
-    extends AcsStoreDumpExportTimeBasedIntegrationTestBase[BackupDumpConfig.Directory] {
+    extends AcsStoreDumpExportTimeBasedIntegrationTestBase {
   override def acsStoreDumpConfig(testContext: String) =
-    BackupDumpConfig.Directory(
-      AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir,
+    PeriodicBackupDumpConfig(
+      location = BackupDumpConfig.Directory(
+        AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir
+      ),
       NonNegativeFiniteDuration.ofMinutes(10),
     )
 

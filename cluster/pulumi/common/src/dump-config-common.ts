@@ -97,6 +97,17 @@ export function initDumpConfig(): void {
                 ...args.inputs,
                 secretData: `{"publicKey": "${args.inputs.secret}-public-key", "privateKey": "${args.inputs.secret}-private-key"}`,
               };
+            } else if (args.inputs.secret == 'gcp-bucket-sa-key-secret') {
+              const secretData = JSON.stringify({
+                projectId: args.inputs.project,
+                bucketName: 'data-export-bucket-name',
+                secretName: 'data-export-bucket-sa-key-secret',
+                jsonCredentials: 'data-export-bucket-sa-key-secret-creds',
+              });
+              return {
+                ...args.inputs,
+                secretData,
+              };
             } else {
               console.error(
                 `WARN gcp secret not supported for mocking in setMockOptions: ${args.inputs.secret}`

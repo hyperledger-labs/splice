@@ -1,6 +1,11 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.{BackupDumpConfig, CNNodeConfigTransforms, GcpBucketConfig}
+import com.daml.network.config.{
+  BackupDumpConfig,
+  CNNodeConfigTransforms,
+  GcpBucketConfig,
+  PeriodicBackupDumpConfig,
+}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
@@ -23,7 +28,9 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
 
   protected val backupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10)
 
-  protected def backupDumpConfig: T
+  protected def backupDumpConfig = PeriodicBackupDumpConfig(backupDumpLocation, backupInterval)
+
+  protected def backupDumpLocation: T
 
   protected def readDump(filename: String): String
 
@@ -114,15 +121,15 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
 final class DirectoryPeriodicBackupIntegrationTest
     extends PeriodicBackupIntegrationTestBase[BackupDumpConfig.Directory] {
 
-  override def backupDumpConfig =
+  override def backupDumpLocation = {
     BackupDumpConfig.Directory(
-      AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir,
-      backupInterval,
+      AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir
     )
+  }
 
   override def readDump(filename: String) = {
     import better.files.File
-    val dumpDir = File(backupDumpConfig.directory)
+    val dumpDir = File(backupDumpLocation.directory)
     val dumpFile = dumpDir / filename
     dumpFile.contentAsString
   }
@@ -131,9 +138,9 @@ final class DirectoryPeriodicBackupIntegrationTest
 
 final class GcpBucketPeriodicBackupIntegrationTest
     extends PeriodicBackupIntegrationTestBase[BackupDumpConfig.Gcp] {
-  override def backupDumpConfig =
-    BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None, backupInterval)
-  val bucket = new GcpBucket(backupDumpConfig.bucket, loggerFactory)
+  override def backupDumpLocation =
+    BackupDumpConfig.Gcp(GcpBucketConfig.inferForTesting, None)
+  val bucket = new GcpBucket(backupDumpLocation.bucket, loggerFactory)
   override def readDump(filename: String) = {
     bucket.readStringFromBucket(Paths.get(filename))
   }

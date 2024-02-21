@@ -1,7 +1,7 @@
 package com.daml.network.validator.automation
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.config.BackupDumpConfig
+import com.daml.network.config.PeriodicBackupDumpConfig
 import com.daml.network.environment.RetryFor
 import com.daml.network.identities.NodeIdentitiesStore
 import com.digitalasset.canton.tracing.TraceContext
@@ -10,7 +10,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class PeriodicParticipantIdentitiesBackupTrigger(
-    config: BackupDumpConfig,
+    config: PeriodicBackupDumpConfig,
     triggerContext: TriggerContext,
     participantIdentitiesStore: NodeIdentitiesStore,
 )(implicit
@@ -28,7 +28,7 @@ class PeriodicParticipantIdentitiesBackupTrigger(
     triggerContext.retryProvider
       .retry(
         RetryFor.Automation,
-        s"backup participant identities to: ${config.locationDescription}",
+        s"backup participant identities to: ${config.location.locationDescription}",
         participantIdentitiesStore.backupNodeIdentities(),
         logger,
       )

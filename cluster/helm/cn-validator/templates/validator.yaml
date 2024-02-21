@@ -139,23 +139,25 @@ spec:
         - name: ADDITIONAL_CONFIG_CN_APP_VALIDATOR_PARTICIPANT_IDENTITIES_DUMP_PERIODIC_BACKUP
           value: |
             canton.validator-apps.validator_backend.participant-identities-backup = {
-              type = gcp
-              bucket {
-                project-id = {{ .bucket.projectId }}
-                bucket-name = {{ .bucket.bucketName }}
-                credentials {
-                  type = service-account
-                  json-credentials = ${CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+              location {
+                type = gcp
+                bucket {
+                  project-id = {{ .location.bucket.projectId }}
+                  bucket-name = {{ .location.bucket.bucketName }}
+                  credentials {
+                    type = service-account
+                    json-credentials = ${CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+                  }
                 }
+                prefix = {{ .location.prefix | quote }}
               }
-              prefix = {{ .prefix | quote }}
               backup-interval = {{ .backupInterval }}
             }
         - name: CN_APP_VALIDATOR_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
           valueFrom:
             secretKeyRef:
               key: "json-credentials"
-              name: {{ .bucket.secretName }}
+              name: {{ .location.bucket.secretName }}
         {{- end }}
         {{- with .Values.participantIdentitiesDumpImport }}
         - name: ADDITIONAL_CONFIG_CN_APP_SV_PARTICIPANT_IDENTITIES_DUMP_IMPORT

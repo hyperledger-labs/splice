@@ -333,14 +333,6 @@
     "type": "kubernetes:helm.sh/v3:Release"
   },
   {
-    "custom": false,
-    "id": "projects/da-cn-scratchnet/secrets/gcp-bucket-sa-key-secret/versions/1",
-    "inputs": {},
-    "name": "data-export-bucket-sa-key-secret",
-    "provider": "",
-    "type": "gcp:secretmanager/secretVersion:SecretVersion"
-  },
-  {
     "custom": true,
     "id": "",
     "inputs": {

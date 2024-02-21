@@ -3,6 +3,7 @@ import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
   BackupConfig,
+  BackupLocation,
   BootstrappingDumpConfig,
   CnInput,
   ExpectedValidatorOnboarding,
@@ -31,7 +32,8 @@ interface SvcArgs {
   approvedSvIdentities: ApprovedSvIdentity[];
   expectedValidatorOnboardings: ExpectedValidatorOnboarding[]; // Only used by the founder
   isDevNet: boolean;
-  backupConfig?: BackupConfig;
+  periodicBackupConfig?: BackupConfig;
+  identitiesBackupLocation: BackupLocation;
   bootstrappingDumpConfig?: BootstrappingDumpConfig;
   topupConfig?: ValidatorTopupConfig;
   splitPostgresInstances: boolean;
@@ -95,7 +97,8 @@ export class Svc extends pulumi.ComponentResource {
         approvedSvIdentities,
         expectedValidatorOnboardings,
         isDevNet: this.args.isDevNet,
-        backupConfig: this.args.backupConfig,
+        periodicBackupConfig: this.args.periodicBackupConfig,
+        identitiesBackupLocation: this.args.identitiesBackupLocation,
         bootstrappingDumpConfig: this.args.bootstrappingDumpConfig,
         topupConfig: this.args.topupConfig,
         splitPostgresInstances: this.args.splitPostgresInstances,

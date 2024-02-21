@@ -689,6 +689,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "sv-1"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-1-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "postgresPassword": ""
         }
       },
@@ -777,6 +799,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "sv-2"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-2-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "private": "c3YyLWlkLXByaXZhdGUta2V5",
           "public": "c3YyLWlkLXB1YmxpYy1rZXk="
         }
@@ -822,6 +866,28 @@
       "data": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "sv-3"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-3-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
           "private": "c3YzLWlkLXByaXZhdGUta2V5",
           "public": "c3YzLWlkLXB1YmxpYy1rZXk="
         }
@@ -856,6 +922,28 @@
       "type": "Opaque"
     },
     "name": "cn-app-sv-3-postgres-secrets",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "sv-4"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-4-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -947,14 +1035,6 @@
     "name": "cn-app-validator1-validator-onboarding-validator",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
-  },
-  {
-    "custom": false,
-    "id": "projects/da-cn-scratchnet/secrets/gcp-bucket-sa-key-secret/versions/1",
-    "inputs": {},
-    "name": "data-export-bucket-sa-key-secret",
-    "provider": "",
-    "type": "gcp:secretmanager/secretVersion:SecretVersion"
   },
   {
     "custom": false,
@@ -2308,6 +2388,15 @@
         ],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
+        "identitiesExport": {
+          "bucket": {
+            "bucketName": "da-cn-data-dumps",
+            "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+            "projectId": "da-cn-devnet",
+            "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+          },
+          "prefix": "mock/sv-1"
+        },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,
         "metrics": {
@@ -3163,6 +3252,15 @@
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
+        "identitiesExport": {
+          "bucket": {
+            "bucketName": "da-cn-data-dumps",
+            "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+            "projectId": "da-cn-devnet",
+            "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+          },
+          "prefix": "mock/sv-1"
+        },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
@@ -4021,6 +4119,15 @@
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
+        "identitiesExport": {
+          "bucket": {
+            "bucketName": "da-cn-data-dumps",
+            "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+            "projectId": "da-cn-devnet",
+            "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+          },
+          "prefix": "mock/sv-1"
+        },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
@@ -4879,6 +4986,15 @@
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
+        "identitiesExport": {
+          "bucket": {
+            "bucketName": "da-cn-data-dumps",
+            "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+            "projectId": "da-cn-devnet",
+            "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+          },
+          "prefix": "mock/sv-1"
+        },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,
         "joinWithKeyOnboarding": {

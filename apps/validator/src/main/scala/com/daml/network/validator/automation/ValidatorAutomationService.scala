@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   CNNodeAppAutomationService,
   TransferFollowTrigger,
 }
-import com.daml.network.config.{AutomationConfig, BackupDumpConfig}
+import com.daml.network.config.{AutomationConfig, PeriodicBackupDumpConfig}
 import com.daml.network.environment.*
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.BftScanConnection
@@ -32,7 +32,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class ValidatorAutomationService(
     automationConfig: AutomationConfig,
-    backupDumpConfig: Option[BackupDumpConfig],
+    backupDumpConfig: Option[PeriodicBackupDumpConfig],
     buyExtraTrafficConfig: BuyExtraTrafficConfig,
     appManagerConfig: Option[AppManagerConfig],
     sequencerConnectionFromScan: Boolean,

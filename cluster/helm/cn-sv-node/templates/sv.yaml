@@ -190,19 +190,42 @@ spec:
             - name: ADDITIONAL_CONFIG_CN_APP_SV_ACS_DUMP_PERIODIC_EXPORT
               value: |
                 canton.sv-apps.sv.acs-store-dump = {
+                  location {
+                    type = gcp
+                    bucket {
+                      project-id = {{ .location.bucket.projectId }}
+                      bucket-name = {{ .location.bucket.bucketName }}
+                      credentials {
+                        type = service-account
+                        json-credentials = ${CN_APP_SV_ACS_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+                      }
+                    }
+                    prefix = {{ .location.prefix | quote }}
+                  }
+                  backup-interval = {{ .backupInterval }}
+                }
+            - name: CN_APP_SV_ACS_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
+              valueFrom:
+                secretKeyRef:
+                  key: "json-credentials"
+                  name: {{ .location.bucket.secretName }}
+            {{- end }}
+            {{- with .Values.identitiesExport }}
+            - name: ADDITIONAL_CONFIG_CN_APP_SV_IDENTITIES_EXPORT
+              value: |
+                canton.sv-apps.sv.identities-dump = {
                   type = gcp
                   bucket {
                     project-id = {{ .bucket.projectId }}
                     bucket-name = {{ .bucket.bucketName }}
                     credentials {
                       type = service-account
-                      json-credentials = ${CN_APP_SV_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
+                      json-credentials = ${CN_APP_SV_IDS_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
                     }
                   }
                   prefix = {{ .prefix | quote }}
-                  backup-interval = {{ .backupInterval }}
                 }
-            - name: CN_APP_SV_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
+            - name: CN_APP_SV_IDS_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
               valueFrom:
                 secretKeyRef:
                   key: "json-credentials"

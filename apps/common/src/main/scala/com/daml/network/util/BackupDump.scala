@@ -23,10 +23,10 @@ object BackupDump {
       loggerFactory: NamedLoggerFactory,
   )(implicit tc: TraceContext): Path =
     config match {
-      case BackupDumpConfig.Directory(directory, _) =>
+      case BackupDumpConfig.Directory(directory) =>
         val file = directory.resolve(filename)
         writeToPath(file, content).path
-      case BackupDumpConfig.Gcp(bucketConfig, prefix, _) =>
+      case BackupDumpConfig.Gcp(bucketConfig, prefix) =>
         val gcpBucket = new GcpBucket(bucketConfig, loggerFactory)
         val path = prefix.fold(filename)(prefix => Paths.get(prefix).resolve(filename))
         gcpBucket.dumpStringToBucket(content, path)

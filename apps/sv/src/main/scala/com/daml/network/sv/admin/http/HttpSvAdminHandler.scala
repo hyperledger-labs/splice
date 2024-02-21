@@ -4,7 +4,7 @@ import cats.implicits.catsSyntaxApplicativeId
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
-import com.daml.network.config.BackupDumpConfig
+import com.daml.network.config.PeriodicBackupDumpConfig
 import com.daml.network.environment.{
   CNNodeStatus,
   MediatorAdminConnection,
@@ -448,11 +448,11 @@ class HttpSvAdminHandler(
               .withDescription("No ACS store dump directory configured")
               .asRuntimeException()
           )
-        case Some(acsDumpConfig: BackupDumpConfig) =>
+        case Some(acsDumpConfig: PeriodicBackupDumpConfig) =>
           for {
             // Note: we expect the snapshots to be small enough to be delivered within the request timeout.
             (filename, snapshot) <- SvUtil.writeAcsStoreDump(
-              acsDumpConfig,
+              acsDumpConfig.location,
               loggerFactory,
               svcStore,
               clock,

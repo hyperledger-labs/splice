@@ -81,7 +81,7 @@ const standaloneValidatorOnboarding = {
   expiresIn: '24h',
 };
 
-let backupConfig: BackupConfig | undefined;
+let periodicBackupConfig: BackupConfig | undefined;
 let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
 
 function getSvcSize(): number {
@@ -111,8 +111,9 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   const bootstrapBucketSpec = await bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
 
   if (!isDevNet) {
-    backupConfig = { backupInterval: '10m', bucket: bootstrapBucketSpec };
+    periodicBackupConfig = { backupInterval: '10m', location: { bucket: bootstrapBucketSpec } };
   }
+  const identitiesBackupLocation = { bucket: bootstrapBucketSpec };
 
   const topupConfig: ValidatorTopupConfig = {
     targetThroughput: domainFeesConfig.targetThroughput,
@@ -144,7 +145,8 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       standaloneValidatorOnboarding,
     ],
     isDevNet,
-    backupConfig,
+    periodicBackupConfig,
+    identitiesBackupLocation,
     bootstrappingDumpConfig,
     topupConfig,
     splitPostgresInstances,
@@ -167,7 +169,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       splitPostgresInstances,
       globalDomainUpgradeConfig.activeMigrationId,
       nonSvComponentsDependencies,
-      backupConfig,
+      periodicBackupConfig,
       bootstrappingDumpConfig,
       // x10 validator1's traffic targetThroughput for load tester -- see #9064
       { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
@@ -180,7 +182,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       splitPostgresInstances,
       globalDomainUpgradeConfig.activeMigrationId,
       nonSvComponentsDependencies,
-      backupConfig,
+      periodicBackupConfig,
       bootstrappingDumpConfig,
       topupConfig
     );

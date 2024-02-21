@@ -86,19 +86,15 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       ? await fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
       : undefined;
 
-  const backupConfig: BackupConfig | undefined = config.backupConfig
-    ? {
-        ...config.backupConfig.config,
-        prefix: config.backupConfig.config.prefix
-          ? config.backupConfig.config.prefix
-          : `${CLUSTER_BASENAME}/${config.xns.logicalName}`,
-      }
-    : undefined;
+  if (config.backupConfig) {
+    config.backupConfig.config.location.prefix =
+      config.backupConfig.config.location.prefix || `${CLUSTER_BASENAME}/${config.xns.logicalName}`;
+  }
 
   const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
     ? config.backupConfig.secret
       ? config.backupConfig.secret
-      : installBootstrapDataBucketSecret(config.xns, config.backupConfig.config.bucket)
+      : installBootstrapDataBucketSecret(config.xns, config.backupConfig.config.location.bucket)
     : undefined;
 
   const validatorOnboardingSecret = config.onboardingSecret
@@ -143,7 +139,7 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
       topup: config.topupConfig ? { enabled: true, ...config.topupConfig } : { enabled: false },
       persistence: config.persistenceConfig,
       disableAllocateLedgerApiUserParty: config.disableAllocateLedgerApiUserParty,
-      participantIdentitiesDumpPeriodicBackup: backupConfig,
+      participantIdentitiesDumpPeriodicBackup: config.backupConfig?.config,
       additionalConfig: config.additionalConfig,
       participantIdentitiesDumpImport: config.participantBootstrapDump
         ? { secretName: participantBootstrapDumpSecretName }

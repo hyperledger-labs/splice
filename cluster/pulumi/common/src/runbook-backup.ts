@@ -60,11 +60,13 @@ export async function setupBootstrapping(config: BootstrapParams): Promise<Boots
 
   if (bootstrappingConfig || !isDevNet) {
     backupConfig = {
-      prefix: `${CLUSTER_BASENAME}/${RUNBOOK_NAMESPACE}`,
       backupInterval: '10m',
-      bucket: bootstrapBucketSpec,
+      location: {
+        bucket: bootstrapBucketSpec,
+        prefix: `${CLUSTER_BASENAME}/${RUNBOOK_NAMESPACE}`,
+      },
     };
-    backupConfigSecret = installBootstrapDataBucketSecret(xns, backupConfig.bucket);
+    backupConfigSecret = installBootstrapDataBucketSecret(xns, backupConfig.location.bucket);
   }
 
   if (participantIdentitiesFile) {

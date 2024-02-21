@@ -24,7 +24,7 @@ final case class NodeIdentitiesDump(
     http.NodeIdentitiesDump(
       id.toProtoPrimitive,
       keys
-        .map(key => http.NodeKey(Base64.getEncoder.encodeToString(key.keyPair), key.name))
+        .map(key => http.NodeKey(Base64.getEncoder.encodeToString(key.keyPair.toArray), key.name))
         .toVector,
       bootstrapTxs.map(tx => Base64.getEncoder.encodeToString(tx.toByteArray)).toVector,
       version,
@@ -42,7 +42,8 @@ object NodeIdentitiesDump {
     Try(
       NodeIdentitiesDump(
         id = id(response.id),
-        keys = response.keys.toSeq.map(k => NodeKey(Base64.getDecoder.decode(k.keyPair), k.name)),
+        keys =
+          response.keys.toSeq.map(k => NodeKey(Base64.getDecoder.decode(k.keyPair).toSeq, k.name)),
         bootstrapTxs = response.bootstrapTxs.toSeq.map(t =>
           SignedTopologyTransactionX
             .fromByteStringUnsafe(ByteString.copyFrom(Base64.getDecoder.decode(t)))
@@ -69,7 +70,7 @@ object NodeIdentitiesDump {
   }
 
   final case class NodeKey(
-      keyPair: Array[Byte],
+      keyPair: Seq[Byte],
       name: Option[String],
   )
 }

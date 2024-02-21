@@ -2,7 +2,12 @@ package com.daml.network.integration.tests
 
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.config.{BackupDumpConfig, CNNodeConfigTransforms, GcpBucketConfig}
+import com.daml.network.config.{
+  BackupDumpConfig,
+  CNNodeConfigTransforms,
+  GcpBucketConfig,
+  PeriodicBackupDumpConfig,
+}
 import com.daml.network.environment.{CNNodeEnvironmentImpl, DarResources}
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -12,8 +17,8 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.util.Contract.Companion
 import com.daml.network.util.{
-  Contract,
   CnsEntryTestUtil,
+  Contract,
   GcpBucket,
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
@@ -27,7 +32,7 @@ import org.scalatest.Assertion
 import java.nio.file.{Path, Paths}
 import java.time.Duration
 
-abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDumpConfig]
+abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase
     extends CNNodeIntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil
@@ -234,7 +239,7 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
     }
   }
 
-  protected def acsStoreDumpConfig(testContext: String): Config
+  protected def acsStoreDumpConfig(testContext: String): PeriodicBackupDumpConfig
 
   protected def readDump(filename: String): String
 
@@ -281,15 +286,15 @@ abstract class AcsStoreDumpExportTimeBasedIntegrationTestBase[Config <: BackupDu
 // triggering of dump to directory is tested in CombinedDumpDirectoryExportTimeBasedIntegrationTest
 
 final class GcpBucketAcsStoreDumpExportTimeBasedIntegrationTest
-    extends AcsStoreDumpExportTimeBasedIntegrationTestBase[BackupDumpConfig.Gcp] {
+    extends AcsStoreDumpExportTimeBasedIntegrationTestBase {
   val bucketConfig = GcpBucketConfig.inferForTesting
 
-  override def acsStoreDumpConfig(testContext: String) =
-    BackupDumpConfig.Gcp(
-      bucketConfig,
-      prefix = Some(testContext),
+  override def acsStoreDumpConfig(testContext: String) = {
+    PeriodicBackupDumpConfig(
+      location = BackupDumpConfig.Gcp(bucketConfig, prefix = Some(testContext)),
       NonNegativeFiniteDuration.ofMinutes(10),
     )
+  }
 
   override def readDump(filename: String) = {
     val bucket = new GcpBucket(bucketConfig, loggerFactory)

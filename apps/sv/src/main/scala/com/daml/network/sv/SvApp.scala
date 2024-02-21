@@ -40,9 +40,15 @@ import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
-import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
-import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{
+  BackupDump,
+  Contract,
+  HasHealth,
+  TemplateJsonDecoder,
+  UploadablePackage,
+}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   CommunityCryptoConfig,
@@ -73,13 +79,15 @@ import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.{HttpMethods, HttpRequest, HttpResponse}
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import java.nio.file.Paths
+import io.circe.syntax.*
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import cats.syntax.foldable.*
 import cats.instances.future.*
 import com.daml.network.migration.AcsExporter
-import com.daml.network.sv.migration.DomainDataSnapshotGenerator
+import com.daml.network.sv.migration.{DomainDataSnapshotGenerator, DomainNodeIdentities}
 
 class SvApp(
     override val name: InstanceName,
@@ -393,6 +401,18 @@ class SvApp(
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
+      }
+
+      _ <- appInitStep("Dump identities") {
+        SvApp.backupNodeIdentities(
+          config,
+          localDomainNode,
+          svcStore,
+          participantAdminConnection,
+          clock,
+          logger,
+          loggerFactory,
+        )
       }
 
       // Start the servers for the SvApp's APIs
@@ -1364,6 +1384,47 @@ object SvApp {
         Seq(User.Right.ParticipantAdmin.INSTANCE),
       )
     } yield ()
+  }
+
+  private def backupNodeIdentities(
+      config: SvAppBackendConfig,
+      localDomainNode: Option[LocalDomainNode],
+      svcStore: SvSvcStore,
+      participantAdminConnection: ParticipantAdminConnection,
+      clock: Clock,
+      logger: TracedLogger,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
+    config.identitiesDump.fold(Future.successful(()))(backupConfig => {
+      val now = clock.now.toInstant
+      val filename = Paths.get(
+        s"sv_identities_${now}.json"
+      )
+      logger.debug(
+        s"Attempting to write node identities to ${backupConfig.locationDescription} at path: $filename"
+      )
+      for {
+        identities <- DomainNodeIdentities.getDomainNodeIdentities(
+          participantAdminConnection,
+          localDomainNode.getOrElse(
+            sys.error("Cannot dump identities with no localDomainNode")
+          ),
+          svcStore,
+          config.domains.global.alias,
+          loggerFactory,
+        )
+        _ <- Future {
+          blocking {
+            BackupDump.write(
+              backupConfig,
+              filename,
+              identities.toHttp().asJson.noSpaces,
+              loggerFactory,
+            )
+          }
+        }
+      } yield ()
+    })
   }
 
   val coinPackage: UploadablePackage =

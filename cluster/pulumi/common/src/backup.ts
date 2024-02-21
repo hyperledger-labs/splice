@@ -3,7 +3,7 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs/promises';
 import { Bucket, File, Storage } from '@google-cloud/storage';
-import { CnInput, ExactNamespace, GCP_PROJECT, requireEnv } from 'cn-pulumi-common';
+import { CnInput, ExactNamespace, requireEnv } from 'cn-pulumi-common';
 import { exit } from 'process';
 
 export type GcpBucket = {
@@ -13,36 +13,32 @@ export type GcpBucket = {
   jsonCredentials: string;
 };
 
-function promisifyOutput<T>(output: pulumi.Output<T>): Promise<T> {
-  return new Promise(resolve => output.apply(resolve));
-}
 export async function bootstrapDataBucketSpec(
   projectId: string,
   bucketName: string
 ): Promise<GcpBucket> {
   const gcpSecretName = requireEnv('DATA_EXPORT_BUCKET_SA_KEY_SECRET');
 
-  const cred = gcp.secretmanager.SecretVersion.get(
-    'data-export-bucket-sa-key-secret',
-    `projects/${GCP_PROJECT}/secrets/${gcpSecretName}/versions/1`
-  ).secretData;
+  const cred = await gcp.secretmanager.getSecretVersion({
+    secret: gcpSecretName,
+  });
 
-  return promisifyOutput(
-    cred.apply(c => {
-      return {
-        projectId,
-        bucketName,
-        secretName: `cn-gcp-bucket-${projectId}-${bucketName}`,
-        jsonCredentials: c,
-      };
-    })
-  );
+  return {
+    projectId,
+    bucketName,
+    secretName: `cn-gcp-bucket-${projectId}-${bucketName}`,
+    jsonCredentials: cred.secretData,
+  };
 }
 
-export type BackupConfig = {
+export type BackupLocation = {
   bucket: GcpBucket;
-  backupInterval: string;
   prefix?: string;
+};
+
+export type BackupConfig = {
+  backupInterval: string;
+  location: BackupLocation;
 };
 
 // Install the bucket's secret into a namespace so apps in there can access the GCP bucket

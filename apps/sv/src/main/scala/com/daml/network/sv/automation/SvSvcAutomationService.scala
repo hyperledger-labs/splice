@@ -71,10 +71,10 @@ class SvSvcAutomationService(
 
   override def companion = SvSvcAutomationService
 
-  config.acsStoreDump.foreach(config =>
+  config.acsStoreDump.foreach(backupConfig =>
     registerTrigger(
       new PeriodicAcsStoreBackupTrigger(
-        config,
+        backupConfig,
         triggerContext,
         svcStore,
       )

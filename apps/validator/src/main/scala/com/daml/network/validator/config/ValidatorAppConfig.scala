@@ -162,7 +162,7 @@ case class ValidatorAppBackendConfig(
     onboarding: Option[ValidatorOnboardingConfig],
     treasury: TreasuryConfig = TreasuryConfig(),
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
-    participantIdentitiesBackup: Option[BackupDumpConfig] = None,
+    participantIdentitiesBackup: Option[PeriodicBackupDumpConfig] = None,
     appManager: Option[AppManagerConfig] = None,
     svValidator: Boolean = false,
     domainMigrationPath: Option[Path] = None,

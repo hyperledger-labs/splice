@@ -446,14 +446,16 @@ object CNNodeConfig {
       deriveReader[SvGlobalDomainConfig]
     implicit val svDomainConfigReader: ConfigReader[SvDomainConfig] =
       deriveReader[SvDomainConfig]
-    implicit val backupDumpConfigHint: FieldCoproductHint[BackupDumpConfig] =
-      new FieldCoproductHint[BackupDumpConfig]("type")
+    implicit val backupDumpConfigHint: FieldCoproductHint[PeriodicBackupDumpConfig] =
+      new FieldCoproductHint[PeriodicBackupDumpConfig]("type")
     implicit val backupDumpConfigDirectoryReader: ConfigReader[BackupDumpConfig.Directory] =
       deriveReader[BackupDumpConfig.Directory]
     implicit val backupDumpConfigGcpReader: ConfigReader[BackupDumpConfig.Gcp] =
       deriveReader[BackupDumpConfig.Gcp]
     implicit val backupDumpConfigReader: ConfigReader[BackupDumpConfig] =
       deriveReader[BackupDumpConfig]
+    implicit val periodicBackupDumpConfigReader: ConfigReader[PeriodicBackupDumpConfig] =
+      deriveReader[PeriodicBackupDumpConfig]
     implicit val migrateSvPartyConfigReader: ConfigReader[MigrateSvPartyConfig] =
       deriveReader[MigrateSvPartyConfig]
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
@@ -689,14 +691,16 @@ object CNNodeConfig {
       deriveWriter[SvGlobalDomainConfig]
     implicit val svDomainConfigWriter: ConfigWriter[SvDomainConfig] =
       deriveWriter[SvDomainConfig]
-    implicit val backupDumpConfigHint: FieldCoproductHint[BackupDumpConfig] =
-      new FieldCoproductHint[BackupDumpConfig]("type")
+    implicit val backupDumpConfigHint: FieldCoproductHint[PeriodicBackupDumpConfig] =
+      new FieldCoproductHint[PeriodicBackupDumpConfig]("type")
     implicit val backupDumpConfigDirectoryWriter: ConfigWriter[BackupDumpConfig.Directory] =
       deriveWriter[BackupDumpConfig.Directory]
     implicit val backupDumpConfigGcpWriter: ConfigWriter[BackupDumpConfig.Gcp] =
       deriveWriter[BackupDumpConfig.Gcp]
     implicit val backupDumpConfigWriter: ConfigWriter[BackupDumpConfig] =
       deriveWriter[BackupDumpConfig]
+    implicit val periodicBackupDumpConfigWriter: ConfigWriter[PeriodicBackupDumpConfig] =
+      deriveWriter[PeriodicBackupDumpConfig]
     implicit val migrateSvPartyConfigWriter: ConfigWriter[MigrateSvPartyConfig] =
       deriveWriter[MigrateSvPartyConfig]
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =

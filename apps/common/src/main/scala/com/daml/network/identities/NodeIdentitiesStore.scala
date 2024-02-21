@@ -1,7 +1,7 @@
 package com.daml.network.identities
 
 import cats.syntax.traverse.*
-import com.daml.network.config.BackupDumpConfig
+import com.daml.network.config.PeriodicBackupDumpConfig
 import com.daml.network.environment.{BuildInfo, TopologyAdminConnection}
 import com.daml.network.util.BackupDump
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -15,7 +15,7 @@ import scala.concurrent.{blocking, ExecutionContext, Future}
 /** A store for accessing the node identities. */
 class NodeIdentitiesStore(
     adminConnection: TopologyAdminConnection,
-    backup: Option[(BackupDumpConfig, Clock)],
+    backup: Option[(PeriodicBackupDumpConfig, Clock)],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -31,7 +31,7 @@ class NodeIdentitiesStore(
           .exportKeyPair(keyM.publicKeyWithName.publicKey.id)
           .map(keyBytes =>
             NodeIdentitiesDump.NodeKey(
-              keyBytes.toByteArray,
+              keyBytes.toByteArray.toSeq,
               keyM.publicKeyWithName.name.map(_.unwrap),
             )
           )
@@ -68,10 +68,10 @@ class NodeIdentitiesStore(
         // then makes all the logging stuff below very confusing.
         val filename = NodeIdentitiesStore.dumpFilename(now)
         val fileDesc =
-          s"node identities dump containing ${dump.keys.size} keys to ${dumpConfig.locationDescription} at path: $filename"
+          s"node identities dump containing ${dump.keys.size} keys to ${dumpConfig.location.locationDescription} at path: $filename"
         logger.debug(s"Attempting to write $fileDesc")
         val path = BackupDump.write(
-          dumpConfig,
+          dumpConfig.location,
           filename,
           dump.toJson.noSpaces,
           loggerFactory,
