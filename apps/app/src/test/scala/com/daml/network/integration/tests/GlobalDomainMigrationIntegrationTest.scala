@@ -11,7 +11,7 @@ import com.daml.network.config.{
   CNParticipantClientConfig,
   NetworkAppClientConfig,
 }
-import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.{
   ScanAppBackendReference,
   ValidatorAppBackendReference,
@@ -24,6 +24,7 @@ import com.daml.network.environment.{
   RetryProvider,
 }
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
+import com.daml.network.http.v0.definitions.TransactionHistoryRequest.SortOrder
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
@@ -597,6 +598,15 @@ class GlobalDomainMigrationIntegrationTest
               countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
               countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 1
               assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 4000))
+              val activities =
+                sv1ScanLocalBackend
+                  .listTransactions(None, SortOrder.Asc, 100)
+                  .flatMap(_.tap)
+                  .filter(_.coinOwner == sv1Party.toProtoPrimitive)
+              inside(activities) { case Seq(formerTap, laterTap) =>
+                BigDecimal(formerTap.coinAmount) shouldBe BigDecimal(1337)
+                BigDecimal(laterTap.coinAmount) shouldBe BigDecimal(1338)
+              }
             },
           )
 
