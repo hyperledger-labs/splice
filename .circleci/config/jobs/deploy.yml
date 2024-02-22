@@ -185,7 +185,10 @@ jobs:
           cmd_retry_count: 2
       - when:
           condition:
-            equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
+            and:
+              - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
+              - equal: [ 0, <<parameters.global_domain_upgrade_migration_id>> ]
+              - equal: [ 0, <<parameters.global_domain_active_migration_id>> ]
           steps:
             - run_bash_command_in_nix:
                 cmd_name: Reset cluster
