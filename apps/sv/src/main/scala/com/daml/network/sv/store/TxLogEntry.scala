@@ -20,6 +20,7 @@ object TxLogEntry extends StoreErrors {
     val entryType = entry match {
       case _: ErrorTxLogEntry => EntryType.ErrorTxLogEntry
       case _: DefiniteVoteTxLogEntry => EntryType.DefiniteVoteTxLogEntry
+      case _: VoteRequestTxLogEntry => EntryType.VoteRequestTxLogEntry
       case _ => throw txEncodingFailed()
     }
     val jsonValue = entry match {
@@ -34,6 +35,7 @@ object TxLogEntry extends StoreErrors {
       entryType match {
         case EntryType.ErrorTxLogEntry => from[ErrorTxLogEntry](json)
         case EntryType.DefiniteVoteTxLogEntry => from[DefiniteVoteTxLogEntry](json)
+        case EntryType.VoteRequestTxLogEntry => from[VoteRequestTxLogEntry](json)
         case _ => throw txDecodingFailed()
       }
     } catch {
@@ -44,6 +46,7 @@ object TxLogEntry extends StoreErrors {
   object EntryType {
     val ErrorTxLogEntry: String3 = String3.tryCreate("err")
     val DefiniteVoteTxLogEntry: String3 = String3.tryCreate("dv")
+    val VoteRequestTxLogEntry: String3 = String3.tryCreate("v")
   }
 
   def mapActionName(
@@ -72,6 +75,26 @@ object TxLogEntry extends StoreErrors {
         val javaProto = com.google.protobuf.struct.Struct.toJavaProto(x)
         val string = com.google.protobuf.util.JsonFormat.printer().print(javaProto)
         com.daml.network.codegen.java.cn.svcrules.VoteResult.fromJson(string)
+      })(x => {
+        val string = x.toJson
+        val builder = com.google.protobuf.Struct.newBuilder()
+        com.google.protobuf.util.JsonFormat
+          .parser()
+          .merge(string, builder)
+        com.google.protobuf.struct.Struct.fromJavaProto(builder.build())
+      })
+
+    protected implicit val voteRequestResult2Type: TypeMapper[
+      com.google.protobuf.struct.Struct,
+      com.daml.network.codegen.java.cn.svcrules.VoteRequestResult2,
+    ] =
+      TypeMapper[
+        com.google.protobuf.struct.Struct,
+        com.daml.network.codegen.java.cn.svcrules.VoteRequestResult2,
+      ](x => {
+        val javaProto = com.google.protobuf.struct.Struct.toJavaProto(x)
+        val string = com.google.protobuf.util.JsonFormat.printer().print(javaProto)
+        com.daml.network.codegen.java.cn.svcrules.VoteRequestResult2.fromJson(string)
       })(x => {
         val string = x.toJson
         val builder = com.google.protobuf.Struct.newBuilder()

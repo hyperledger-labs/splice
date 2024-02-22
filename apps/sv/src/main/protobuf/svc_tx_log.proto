@@ -19,6 +19,13 @@ message DefiniteVoteTxLogEntry {
   google.protobuf.Struct result = 1 [(scalapb.field).type = "com.daml.network.codegen.java.cn.svcrules.VoteResult"];
 }
 
+message VoteRequestTxLogEntry {
+  option (scalapb.message).extends = "com.daml.network.sv.store.TxLogEntry";
+  option (scalapb.message).companion_extends = "com.daml.network.sv.store.TxLogEntry.TypeMappers";
+
+  google.protobuf.Struct result = 1 [(scalapb.field).type = "com.daml.network.codegen.java.cn.svcrules.VoteRequestResult2"];
+}
+
 message ErrorTxLogEntry {
   option (scalapb.message).extends = "com.daml.network.sv.store.TxLogEntry";
   option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";

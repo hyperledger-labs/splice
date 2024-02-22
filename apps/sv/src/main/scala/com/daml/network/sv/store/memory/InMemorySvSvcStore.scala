@@ -113,6 +113,19 @@ class InMemorySvSvcStore(
     } yield applyLimit("listVoteResults", limit, records)
   }
 
+  override def listVoteRequestResults2(
+      actionName: Option[String],
+      executed: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[VoteRequestResult2]] = {
+    throw new NotImplementedError("Not gonna bother.")
+  }
+
   override protected def listExpiredRoundBased[Id <: ContractId[T], T <: Template](
       companion: TemplateCompanion[Id, T]
   )(coin: T => Coin): ListExpiredContracts[Id, T] = (_, limit) =>
@@ -458,6 +471,23 @@ class InMemorySvSvcStore(
       .map(_ map (_.contract))
   }
 
+  override def listVotesByVoteRequests2(
+      voteRequestCids: Seq[VoteRequest2.ContractId],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit tc: TraceContext): Future[Seq[Vote2]] = {
+    throw new NotImplementedError("Not gonna bother.")
+  }
+
+  def lookupVoteRequest2(contractId: cn.svcrules.VoteRequest2.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Option[Contract[cn.svcrules.VoteRequest2.ContractId, cn.svcrules.VoteRequest2]]] =
+    throw new NotImplementedError("Not gonna bother.")
+
+  override def lookupVoteByThisSvAndVoteRequestWithOffset2(voteRequestCid: VoteRequest2.ContractId)(
+      implicit tc: TraceContext
+  ): Future[QueryResult[Option[Vote2]]] =
+    throw new NotImplementedError("Not gonna bother.")
+
   override def lookupVoteByThisSvAndVoteRequestWithOffset(voteRequestCid: VoteRequest.ContractId)(
       implicit tc: TraceContext
   ): Future[QueryResult[Option[Contract[Vote.ContractId, Vote]]]] =
@@ -477,6 +507,12 @@ class InMemorySvSvcStore(
         co.payload.requester == key.svParty.toProtoPrimitive && co.payload.action.toValue == action.toValue
     }
   } yield ct map (_ map (_.contract))
+
+  override def lookupVoteRequestByThisSvAndActionWithOffset2(
+      action: ActionRequiringConfirmation
+  )(implicit tc: TraceContext): Future[
+    QueryResult[Option[Contract[VoteRequest2.ContractId, VoteRequest2]]]
+  ] = throw new NotImplementedError("Not gonna bother.")
 
   /** List the votes that are eligible to determine the outcome of a vote request;
     * - the vote must refer to that request

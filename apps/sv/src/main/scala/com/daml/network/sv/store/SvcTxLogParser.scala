@@ -9,8 +9,10 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
 }
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
+  SvcRules_CloseVoteRequest2,
   SvcRules_ExecuteDefiniteVote,
   SvcRules_VoteRequest_Expire,
+  VoteRequestResult2,
   VoteResult,
 }
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
@@ -44,6 +46,8 @@ class SvcTxLogParser(
             State.fromExecuteDefiniteVote(node)
           case SvcRulesVoteRequestExpire(node) =>
             State.fromVoteRequestExpire(node)
+          case SvcRulesCloseVoteRequest2(node) =>
+            State.fromCloseVoteRequest2(node)
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
 
@@ -102,6 +106,18 @@ object SvcTxLogParser {
       State(
         immutable.Queue(
           DefiniteVoteTxLogEntry(
+            result = Some(node.result.value)
+          )
+        )
+      )
+    }
+
+    def fromCloseVoteRequest2(
+        node: ExerciseNode[SvcRules_CloseVoteRequest2, VoteRequestResult2]
+    ): State = {
+      State(
+        immutable.Queue(
+          VoteRequestTxLogEntry(
             result = Some(node.result.value)
           )
         )

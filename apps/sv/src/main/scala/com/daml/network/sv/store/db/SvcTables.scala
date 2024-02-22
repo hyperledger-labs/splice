@@ -2,10 +2,16 @@ package com.daml.network.sv.store.db
 
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.cn.svcrules.VoteRequest2
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
-import com.daml.network.store.StoreErrors
+import com.daml.network.store.{Executed, StoreErrors, VoteRequestOutcome}
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
-import com.daml.network.sv.store.{DefiniteVoteTxLogEntry, ErrorTxLogEntry, TxLogEntry}
+import com.daml.network.sv.store.{
+  DefiniteVoteTxLogEntry,
+  ErrorTxLogEntry,
+  TxLogEntry,
+  VoteRequestTxLogEntry,
+}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{Member, PartyId}
@@ -36,7 +42,9 @@ object SvcTables extends AcsTables with NamedLogging {
       totalTrafficPurchased: Option[Long] = None,
       voter: Option[PartyId] = None,
       voteRequestCid: Option[cn.svcrules.VoteRequest.ContractId] = None,
+      trackingCid: Option[VoteRequest2.ContractId] = None,
       requester: Option[PartyId] = None,
+      requesterName: Option[String] = None,
       electionRequestEpoch: Option[Long] = None,
       importCrateReceiver: Option[PartyId] = None,
       memberTrafficMember: Option[Member] = None,
@@ -65,7 +73,9 @@ object SvcTables extends AcsTables with NamedLogging {
       "total_traffic_purchased" -> totalTrafficPurchased,
       "voter" -> voter,
       "vote_request_cid" -> voteRequestCid,
+      "vote_request_tracking_cid" -> trackingCid,
       "requester" -> requester,
+      "requester_name" -> requesterName.map(lengthLimited),
       "election_request_epoch" -> electionRequestEpoch,
       "import_crate_receiver" -> importCrateReceiver,
       "member_traffic_member" -> memberTrafficMember,
@@ -119,6 +129,22 @@ object SvcTables extends AcsTables with NamedLogging {
             requester = Some(result.requester),
             effectiveAt = Some(result.effectiveAt.toString),
             votedAt = Some(result.votedAt.toString),
+          )
+        case vr: VoteRequestTxLogEntry =>
+          val result = vr.result.getOrElse(throw txMissingField())
+          SvcTxLogRowData(
+            entry = vr,
+            actionName = Some(TxLogEntry.mapActionName(result.request.action)),
+            executed = Some(VoteRequestOutcome.parse(result.outcome) match {
+              case _: Executed => true
+              case _ => false
+            }),
+            requester = Some(result.request.requester),
+            effectiveAt = VoteRequestOutcome.parse(result.outcome).effectiveAt match {
+              case Some(effectiveAt) => Some(effectiveAt.toString)
+              case None => None
+            },
+            votedAt = Some(result.completedAt.toString),
           )
         case _ => throw txLogIsOfWrongType()
       }

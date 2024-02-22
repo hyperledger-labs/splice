@@ -34,6 +34,7 @@ import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirm
   SRARC_AddMember,
   SRARC_RemoveMember,
 }
+import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome2.VRO_Accepted
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
@@ -50,7 +51,7 @@ import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
-import com.daml.network.sv.history.SvcRulesExecuteDefiniteVote
+import com.daml.network.sv.history.{SvcRulesCloseVoteRequest2, SvcRulesExecuteDefiniteVote}
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
@@ -1376,7 +1377,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def svcRules(
+  def svcRules(
       members: java.util.Map[String, MemberInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
@@ -1652,6 +1653,256 @@ class DbSvSvcStoreTest
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )
     } yield store
+  }
+
+  "listVoteRequestResults2" should {
+
+    "list all past VoteRequestResult2" in {
+      for {
+        store <- mkStore()
+        voteRequestContract = voteRequest2(
+          requester = userParty(1),
+          votes = (1 to 4)
+            .map(n => new Vote2(userParty(n).toProtoPrimitive, true, new Reason("", ""))),
+        )
+        _ <- dummyDomain.create(voteRequestContract)(store.multiDomainAcsStore)
+        result = mkVoteRequestResult2(voteRequestContract)
+        _ <- dummyDomain.exercise(
+          contract = svcRules(),
+          interfaceId = Some(SvcRules.TEMPLATE_ID),
+          choiceName = SvcRulesCloseVoteRequest2.choice.name,
+          mkCloseVoteRequest2(
+            voteRequestContract.contractId
+          ),
+          result.toValue,
+        )(
+          store.multiDomainAcsStore
+        )
+      } yield {
+        store
+          .listVoteRequestResults2(
+            Some("AddMember"),
+            Some(true),
+            None,
+            None,
+            None,
+            PageLimit.tryCreate(1),
+          )
+          .futureValue
+          .toList
+          .loneElement shouldBe result
+        store
+          .listVoteRequestResults2(
+            Some("SRARC_AddMember"),
+            Some(false),
+            None,
+            None,
+            None,
+            PageLimit.tryCreate(1),
+          )
+          .futureValue
+          .toList
+          .size shouldBe (0)
+        store
+          .listVoteRequestResults2(
+            None,
+            None,
+            None,
+            None,
+            None,
+            PageLimit.tryCreate(1),
+          )
+          .futureValue
+          .toList
+          .size shouldBe (1)
+        store
+          .listVoteRequestResults2(
+            None,
+            None,
+            None,
+            Some(Instant.now().plusSeconds(3600).toString),
+            None,
+            PageLimit.tryCreate(1),
+          )
+          .futureValue
+          .toList
+          .size shouldBe (0)
+        store
+          .listVoteRequestResults2(
+            None,
+            None,
+            None,
+            Some(Instant.now().minusSeconds(3600).toString),
+            None,
+            PageLimit.tryCreate(1),
+          )
+          .futureValue
+          .toList
+          .size shouldBe (1)
+      }
+    }
+  }
+
+  "listExpiredVoteRequests2" should {
+
+    "return all vote requests 2 that are expired as of now" in {
+      val expired = (1 to 3).map(n =>
+        voteRequest2(
+          requester = userParty(n),
+          votes = Seq.empty,
+          expiry = Instant.now.minusSeconds(n.toLong * 3600),
+        )
+      )
+      val notExpired =
+        (4 to 6).map(n => voteRequest2(requester = userParty(n), votes = Seq.empty))
+      for {
+        store <- mkStore()
+        _ <- MonadUtil.sequentialTraverse(expired ++ notExpired)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        result <- store.listExpiredVoteRequests2()(
+          CantonTimestamp.now(),
+          PageLimit.tryCreate(100),
+        )(traceContext)
+      } yield {
+        val contracts = result.map(_.contract)
+        contracts should contain theSameElementsAs expired
+      }
+    }
+  }
+
+  "listVotesByVoteRequests2" should {
+
+    "return all votes by their VoteRequest2 contract ids" in {
+      val goodVotes = (1 to 3).map(n =>
+        Seq(n, n + 3)
+          .map(i => new Vote2(userParty(i).toProtoPrimitive, true, new Reason("", "")))
+      )
+      val badVotes = (1 to 3).map(n =>
+        Seq(n)
+          .map(i => new Vote2(userParty(i).toProtoPrimitive, true, new Reason("", "")))
+      )
+      val goodVoteRequests =
+        (1 to 3).map(n =>
+          voteRequest2(
+            requester = userParty(n),
+            votes = goodVotes(n - 1),
+          )
+        )
+      val badVoteRequests =
+        (4 to 6).map(n => voteRequest2(requester = userParty(n), votes = badVotes(n - 4)))
+      for {
+        store <- mkStore()
+        _ <- MonadUtil.sequentialTraverse(goodVoteRequests ++ badVoteRequests)(
+          dummyDomain.create(_)(store.multiDomainAcsStore)
+        )
+        result <- store.listVotesByVoteRequests2(goodVoteRequests.map(_.contractId))
+      } yield {
+        result should contain theSameElementsAs (goodVotes.flatten)
+      }
+    }
+  }
+
+  "lookupVoteRequestByThisSvAndActionWithOffset2" should {
+
+    "find the vote request 2 done by this SV and with the passed action" in {
+      val goodAction = addUser666Action
+      val goodVoteRequest =
+        voteRequest2(
+          action = goodAction,
+          requester = storeSvParty,
+          votes = Seq.empty,
+        )
+      val doneByAnotherSV =
+        voteRequest2(
+          action = goodAction,
+          requester = providerParty(1234),
+          votes = Seq.empty,
+        )
+      val differentAction =
+        voteRequest2(
+          action = addUser667Action,
+          requester = storeSvParty,
+          votes = Seq.empty,
+        )
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(doneByAnotherSV)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(differentAction)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(goodVoteRequest)(store.multiDomainAcsStore)
+        result <- store.lookupVoteRequestByThisSvAndActionWithOffset2(goodAction)
+      } yield {
+        result.value should be(Some(goodVoteRequest))
+      }
+    }
+
+  }
+
+  "lookupVoteByThisSvAndVoteRequestWithOffset2" should {
+
+    "find the vote by vote request done by this SV" in {
+      val goodVote =
+        new Vote2(storeSvParty.toProtoPrimitive, true, new Reason("", ""))
+      val goodRequest = voteRequest2(
+        requester = storeSvParty,
+        votes = Seq(goodVote),
+      )
+      val badRequest = voteRequest2(
+        requester = providerParty(1234),
+        votes = Seq(goodVote),
+      )
+      for {
+        store <- mkStore()
+        _ <- dummyDomain.create(goodRequest)(store.multiDomainAcsStore)
+        _ <- dummyDomain.create(badRequest)(store.multiDomainAcsStore)
+        result <- store.lookupVoteByThisSvAndVoteRequestWithOffset2(goodRequest.contractId)
+      } yield {
+        result.value should be(Some(goodVote))
+      }
+    }
+  }
+
+  private def mkCloseVoteRequest2(
+      requestId: VoteRequest2.ContractId
+  ): DamlRecord = {
+    new SvcRules_CloseVoteRequest2(
+      requestId,
+      Optional.empty(),
+    ).toValue
+  }
+
+  private def mkVoteRequestResult2(
+      voteRequestContract: Contract[VoteRequest2.ContractId, VoteRequest2]
+  ): VoteRequestResult2 = new VoteRequestResult2(
+    voteRequestContract.payload,
+    Instant.now(),
+    util.List.of(),
+    util.List.of(),
+    new VRO_Accepted(Instant.now()),
+  )
+
+  private def voteRequest2(
+      requester: PartyId,
+      votes: Seq[Vote2],
+      expiry: Instant = Instant.now().plusSeconds(3600L),
+      action: ActionRequiringConfirmation = addUser666Action,
+  ) = {
+    val cid = new VoteRequest2.ContractId(nextCid())
+    val template = new VoteRequest2(
+      svcParty.toProtoPrimitive,
+      requester.toProtoPrimitive,
+      action,
+      new Reason("https://www.example.com", ""),
+      expiry,
+      votes.map(e => (e.sv, e)).toMap.asJava,
+      Optional.of(cid),
+    )
+
+    contract(
+      VoteRequest2.TEMPLATE_ID,
+      cid,
+      template,
+    )
   }
 
   override protected def cleanDb(storage: DbStorage): Future[?] =

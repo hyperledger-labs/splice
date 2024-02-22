@@ -616,8 +616,14 @@ create table svc_acs_store
     -- the contract id of a VoteRequest in a Vote contract
     vote_request_cid              text,
 
+    -- the trackingCid in a VoteRequest2 contract
+    vote_request_tracking_cid     text,
+
     -- the requester in a VoteRequest or ElectionRequest contract
     requester                     text,
+
+    -- the requester in a VoteRequest2
+    requester_name                text,
 
     -- the epoch in an ElectionRequest
     election_request_epoch        bigint,
@@ -662,6 +668,11 @@ create table svc_acs_store
 create index svc_acs_store_sid_tid_mr
     on svc_acs_store (store_id, migration_id,  template_id_qualified_name, mining_round)
     where mining_round is not null;
+
+-- ordered trackingCid
+create index svc_acs_store_sid_tid_tcid
+    on svc_acs_store (store_id, migration_id,  template_id_qualified_name, vote_request_tracking_cid)
+    where vote_request_tracking_cid is not null;
 
 -- list expired coins
 create index svc_acs_store_sid_tid_croe
