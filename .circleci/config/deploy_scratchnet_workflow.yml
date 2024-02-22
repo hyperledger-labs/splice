@@ -1,5 +1,5 @@
 
-  deploy__CLUSTERNAME_:
+  deploy_CLUSTERNAME_:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
@@ -22,6 +22,7 @@
           requires:
             - hold
       - deploy_cluster:
+          name: "deploy_cluster_for_migration"
           <<: *main-branch-never
           context:
             - artifactory
@@ -36,6 +37,7 @@
             - deployment_test
             - docker_images_push
       - preflight_check:
+          name: "preflight_check_core"
           <<: *main-branch-never
           context:
             - artifactory
@@ -48,6 +50,17 @@
           parallelism: 1
           requires:
             - docker_images_push
+      - backup_cluster:
+          name: "backup_before_migration"
+          <<: *main-branch-never
+          cluster: "_CLUSTERNAME_"
+          include_non_sv_nodes: false
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -61,8 +74,8 @@
           wait_for_sv: false
           wait_for_third_party: false
           requires:
-            - preflight_check
-            - backup_cluster
+            - preflight_check_core
+            - backup_before_migration
       - deploy_cluster:
           name: "deploy_global_domain_upgrade"
           <<: *main-branch-never
@@ -76,17 +89,8 @@
           global_domain_upgrade_migration_id: 1
           requires:
             - trigger_global_domain_migration
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "_CLUSTERNAME_"
-          include_non_sv_nodes: false
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
       - restore_node:
+          name: "restore_node_after_migration_created"
           <<: *main-branch-never
           cluster: "_CLUSTERNAME_"
           namespace_name: "sv-3"
@@ -109,7 +113,7 @@
           global_domain_active_migration_id: 1
           requires:
             - deploy_global_domain_upgrade
-            - restore_node
+            - restore_node_after_migration_created
       - backup_cluster:
           <<: *main-branch-never
           # backup splitwell and validator1
@@ -135,6 +139,7 @@
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
+          name: "deploy_migrated_sv_runbook"
           <<: *main-branch-never
           context:
             - artifactory
@@ -154,6 +159,7 @@
       #     requires:
       #       - switch_global_domain_upgrade
       - deploy_validator_runbook:
+          name: "deploy_migrated_validator_runbook"
           <<: *main-branch-never
           context:
             - artifactory
@@ -162,6 +168,7 @@
           requires:
             - switch_global_domain_upgrade
       - preflight_validator_check:
+          name: "preflight_validator_check_migrated"
           <<: *main-branch-never
           context:
             - artifactory
@@ -179,5 +186,117 @@
             - backup_after_global_domain_upgrade
             # TODO(#10038) Reenable this once TxLogs work across domain migrations.
             # - preflight_sv_check
-            - preflight_validator_check
+            - preflight_validator_check_migrated
             - preflight_check_global_domain_upgrade
+      # Simple deployment with no migration
+      - hold:
+          name: "hold_basic"
+          <<: *main-branch-never
+          type: approval
+      # Deployment
+      - docker_images_push:
+          name: "docker_images_push_basic"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_basic
+      - deployment_test:
+          name: "deployment_test_basic"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_basic
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          cancel_workflow_on_failure: true
+          requires:
+            - deployment_test_basic
+            - docker_images_push_basic
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          parallelism: 1
+          requires:
+            - docker_images_push_basic
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "_CLUSTERNAME_"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
+            - deploy_sv_runbook
+      - restore_node:
+          <<: *main-branch-never
+          cluster: "_CLUSTERNAME_"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_check
+            - preflight_sv_check
+            - preflight_validator_check
+            - backup_cluster
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - deploy_cluster
+      - preflight_sv_check:
+           <<: *main-branch-never
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "_CLUSTERNAME_"
+           requires:
+             - deploy_cluster
+      - deploy_validator_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - deploy_cluster
+      - preflight_validator_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - deploy_cluster
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "_CLUSTERNAME_"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_validator_check
+            - preflight_check
+            - preflight_sv_check
+            - restore_node
