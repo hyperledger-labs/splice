@@ -1570,6 +1570,21 @@ Network. Steps to do this are as follows:
       --condition='expression=resource.name.endsWith("secrets/dns01-sa-key-secret/versions/1"),title=DNS SA Key Secret' \
       --role='roles/secretmanager.secretAccessor'
    ```
+9. Grant permissions to the CCI account to access the GCP bucket secret.
+
+   ```
+   gcloud projects add-iam-policy-binding $CLOUDSDK_CORE_PROJECT \
+      --member='serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com' \
+      --condition='expression=resource.name.endsWith("secrets/gcp-bucket-sa-key-secret/versions/1"),title=GCP bucket Secret (version 1)' \
+      --role='roles/secretmanager.secretAccessor'
+   ```
+
+   ```
+   gcloud projects add-iam-policy-binding $CLOUDSDK_CORE_PROJECT \
+      --member='serviceAccount:circleci@${CLOUDSDK_CORE_PROJECT}.iam.gserviceaccount.com' \
+      --condition='expression=resource.name.endsWith("secrets/gcp-bucket-sa-key-secret/versions/latest"),title=GCP bucket Secret (latest version)' \
+      --role='roles/secretmanager.secretAccessor'
+   ```
 
 9. Similar to 6, grant permissions also to the new CCI account:
 
