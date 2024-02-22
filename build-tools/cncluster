@@ -321,7 +321,7 @@ function _assert_lock() {
 
     lockholder=$(_current_lockholder)
     if [ -n "$lockholder" ]; then
-        if [ "${1-}" != "--for-ci" ]; then
+        if ! (env-bool CI); then
             if [ "${lockholder}" != "$(whoami)" ]; then
                 _error "Cluster already locked by: ${lockholder}"
             fi
@@ -845,7 +845,7 @@ function subcmd_create() {
 subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank state. Clears all data.'
 
 function _cluster_reset() {
-    _info "Uninstalling Pulumi canton-network-gateway stack"
+    _info "Uninstalling Pulumi canton-network and runbook stacks"
 
     _down_stack canton-network
     _down_stack sv-runbook
@@ -898,7 +898,7 @@ function subcmd_reset() {
 subcommand_whitelist[ci_apply]='Run only by CircleCI'
 
 function subcmd_ci_apply() {
-    _assert_lock --for-ci
+    _assert_lock
 
     # A CI-specific variant of 'cncluster apply' that removes the need
     # for manual confirmation
@@ -1492,7 +1492,7 @@ subcommand_whitelist[ci_apply_sv]='Run only by CircleCI'
 
 function subcmd_ci_apply_sv() {
     _needs_auth0_sv_management_api_creds
-    _assert_lock --for-ci
+    _assert_lock
 
     # A CI-specific variant of 'cncluster apply_sv' that removes the need
     # for manual confirmation, and also always uses the same target cluster
@@ -1583,7 +1583,7 @@ subcommand_whitelist[ci_apply_validator]='Run only by CircleCI'
 
 function subcmd_ci_apply_validator() {
     _needs_auth0_validator_management_api_creds
-    _assert_lock --for-ci
+    _assert_lock
 
     # A CI-specific variant of 'cncluster apply_validator' that removes the need
     # for manual confirmation, and also always uses the same target cluster
