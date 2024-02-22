@@ -1,7 +1,8 @@
 workflow:
   deploy_cimain:
     when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
+      # TODO(#10235) Reenable this
+      equal: [ true, false ]
     jobs:
       - docker_images_push:
           <<: *notify-fail
