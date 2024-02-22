@@ -125,11 +125,11 @@ export type InstalledSv = {
 };
 
 export async function installSvNode(
-  config: SvConfig,
+  baseConfig: SvConfig,
   globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
   cometBftSyncSource?: k8s.helm.v3.Release
 ): Promise<InstalledSv> {
-  const xns = exactNamespace(config.nodeName, true);
+  const xns = exactNamespace(baseConfig.nodeName, true);
   const loopback = installCNHelmChart(
     xns,
     'loopback',
@@ -143,20 +143,28 @@ export async function installSvNode(
   );
 
   const auth0BackendSecrets: CnInput<pulumi.Resource>[] = [
-    await installAuth0Secret(config.auth0Client, xns, 'sv', config.nodeName),
+    await installAuth0Secret(baseConfig.auth0Client, xns, 'sv', baseConfig.nodeName),
   ];
 
   const auth0UISecrets: pulumi.Resource[] = [
-    await installAuth0UISecret(config.auth0Client, xns, 'sv', config.nodeName),
+    await installAuth0UISecret(baseConfig.auth0Client, xns, 'sv', baseConfig.nodeName),
   ];
 
-  if (config.periodicBackupConfig) {
-    config.periodicBackupConfig.location.prefix =
-      config.periodicBackupConfig.location.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`;
-  }
+  const periodicBackupConfig = baseConfig.periodicBackupConfig
+    ? {
+        ...baseConfig.periodicBackupConfig,
+        prefix:
+          baseConfig.periodicBackupConfig.location.prefix ||
+          `${CLUSTER_BASENAME}/${xns.logicalName}`,
+      }
+    : undefined;
 
-  config.identitiesBackupLocation.prefix =
-    config.identitiesBackupLocation.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`;
+  const identitiesBackupLocation = {
+    ...baseConfig.identitiesBackupLocation,
+    prefix: baseConfig.identitiesBackupLocation.prefix || `${CLUSTER_BASENAME}/${xns.logicalName}`,
+  };
+
+  const config = { ...baseConfig, periodicBackupConfig, identitiesBackupLocation };
 
   const identitiesBackupConfigSecret = installBootstrapDataBucketSecret(
     xns,

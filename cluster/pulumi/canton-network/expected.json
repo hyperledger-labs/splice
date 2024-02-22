@@ -3259,7 +3259,7 @@
             "projectId": "da-cn-devnet",
             "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
           },
-          "prefix": "mock/sv-1"
+          "prefix": "mock/sv-2"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,
@@ -4126,7 +4126,7 @@
             "projectId": "da-cn-devnet",
             "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
           },
-          "prefix": "mock/sv-1"
+          "prefix": "mock/sv-3"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,
@@ -4993,7 +4993,7 @@
             "projectId": "da-cn-devnet",
             "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
           },
-          "prefix": "mock/sv-1"
+          "prefix": "mock/sv-4"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,

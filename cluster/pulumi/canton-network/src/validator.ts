@@ -67,7 +67,24 @@ export type ValidatorConfig = {
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
 };
 
-export async function installValidatorApp(config: ValidatorConfig): Promise<pulumi.Resource> {
+export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<pulumi.Resource> {
+  const backupConfig = baseConfig.backupConfig
+    ? {
+        ...baseConfig.backupConfig,
+        config: {
+          ...baseConfig.backupConfig.config,
+          location: {
+            ...baseConfig.backupConfig.config.location,
+            prefix:
+              baseConfig.backupConfig.config.location.prefix ||
+              `${CLUSTER_BASENAME}/${baseConfig.xns.logicalName}`,
+          },
+        },
+      }
+    : undefined;
+
+  const config = { ...baseConfig, backupConfig };
+
   function maybeDomainSuffixed(value: string) {
     if (config.domainMigrationId != undefined) {
       return `${value}-${config.domainMigrationId}`;
@@ -85,11 +102,6 @@ export async function installValidatorApp(config: ValidatorConfig): Promise<pulu
     config.participantBootstrapDump
       ? await fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
       : undefined;
-
-  if (config.backupConfig) {
-    config.backupConfig.config.location.prefix =
-      config.backupConfig.config.location.prefix || `${CLUSTER_BASENAME}/${config.xns.logicalName}`;
-  }
 
   const backupConfigSecret: pulumi.Resource | undefined = config.backupConfig
     ? config.backupConfig.secret
