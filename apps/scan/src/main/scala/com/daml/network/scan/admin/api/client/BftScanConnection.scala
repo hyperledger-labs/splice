@@ -222,7 +222,8 @@ class BftScanConnection(
           )
         }
         .recoverWith { case e: Throwable =>
-          logger.warn(
+          // TODO(#9841) Revisit this log level when looking into proper BFT reads.
+          logger.info(
             s"Failed to get RoundAggregate for round $round from scan ${scan.config.adminApi.url}",
             e,
           )
