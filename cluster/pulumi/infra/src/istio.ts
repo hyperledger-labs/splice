@@ -25,6 +25,11 @@ function configureIstioBase(ns: k8s.core.v1.Namespace): k8s.helm.v3.Release {
       repositoryOpts: {
         repo: 'https://istio-release.storage.googleapis.com/charts',
       },
+      values: {
+        global: {
+          istioNamespace: 'cluster-ingress',
+        },
+      },
     },
     {
       dependsOn: [ns],
