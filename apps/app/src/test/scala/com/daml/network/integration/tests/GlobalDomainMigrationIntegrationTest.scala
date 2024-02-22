@@ -24,7 +24,6 @@ import com.daml.network.environment.{
   RetryProvider,
 }
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
-import com.daml.network.http.v0.definitions.TransactionHistoryRequest.SortOrder
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
@@ -57,6 +56,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.time.WallClock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
@@ -598,14 +598,10 @@ class GlobalDomainMigrationIntegrationTest
               countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
               countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 1
               assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 4000))
-              val activities =
-                sv1ScanLocalBackend
-                  .listTransactions(None, SortOrder.Asc, 100)
-                  .flatMap(_.tap)
-                  .filter(_.coinOwner == sv1Party.toProtoPrimitive)
-              inside(activities) { case Seq(formerTap, laterTap) =>
-                BigDecimal(formerTap.coinAmount) shouldBe BigDecimal(1337)
-                BigDecimal(laterTap.coinAmount) shouldBe BigDecimal(1338)
+              inside(listTapsFromScan(sv1ScanLocalBackend, sv1Party, 1337, 1338)) {
+                case Seq(formerTap, laterTap) =>
+                  BigDecimal(formerTap.coinAmount) shouldBe BigDecimal(1337)
+                  BigDecimal(laterTap.coinAmount) shouldBe BigDecimal(1338)
               }
             },
           )
@@ -681,6 +677,21 @@ class GlobalDomainMigrationIntegrationTest
     listTransactionsFromScan(scan).count(
       _.tap.map(a => BigDecimal(a.coinAmount)).contains(BigDecimal(tapAmount))
     )
+  }
+
+  private def listTapsFromScan(
+      scan: ScanAppBackendReference,
+      owner: PartyId,
+      fromTapAmount: Double,
+      toTapAmount: Double,
+  ) = {
+    listTransactionsFromScan(scan)
+      .flatMap(_.tap)
+      .filter { tx =>
+        tx.coinOwner == owner.toProtoPrimitive &&
+        BigDecimal(tx.coinAmount) >= BigDecimal(fromTapAmount) &&
+        BigDecimal(tx.coinAmount) <= BigDecimal(toTapAmount)
+      }
   }
 
   private def listTransactionsFromScan(scan: ScanAppBackendReference) = {
