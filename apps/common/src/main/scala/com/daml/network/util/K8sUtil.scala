@@ -71,7 +71,6 @@ object K8sUtil {
         AuthToken(
           accessToken,
           expiresAt = CantonTimestamp.assertFromLong(micros = expiresAtMillis * 1000),
-          user = AuthToken.guessLedgerApiUser(accessToken),
         )
     }
 

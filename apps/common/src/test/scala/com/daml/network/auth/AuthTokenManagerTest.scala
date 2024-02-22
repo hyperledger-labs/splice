@@ -19,8 +19,8 @@ object AuthTokenManagerTest extends org.mockito.MockitoSugar with ArgumentMatche
 class AuthTokenManagerTest extends AsyncWordSpec with BaseTest {
 
   val now = CantonTimestamp.Epoch
-  val token1: AuthToken = AuthToken("foo", now.plusSeconds(20), None)
-  val token2: AuthToken = AuthToken("bar", now.plusSeconds(40), None)
+  val token1: AuthToken = AuthToken("foo", now.plusSeconds(20))
+  val token2: AuthToken = AuthToken("bar", now.plusSeconds(40))
 
   "first call to getToken will obtain it" in {
     val (tokenManager, mock, _) = setup()
