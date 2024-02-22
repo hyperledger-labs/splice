@@ -685,7 +685,7 @@
           "host": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "scanAddress": "https://scan.sv-1.svc.svrun.network.canton.global",
+        "scanAddress": "http://scan-app.sv:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
