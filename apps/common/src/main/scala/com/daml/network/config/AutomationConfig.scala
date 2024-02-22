@@ -25,6 +25,8 @@ case class AutomationConfig(
     /** Only intended for testing. Disables the generation of SV rewards.
       */
     enableSvRewards: Boolean = true,
+    // TODO (#9149): this flag becomes unnecessary once we switch to the new system entirely
+    useNewSvRewardIssuance: Boolean = false,
     /** Only intended for testing. Disables the expiration of Coin.
       */
     enableExpireCoin: Boolean = false,

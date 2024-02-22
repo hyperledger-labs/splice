@@ -84,7 +84,11 @@ class SvSvcAutomationService(
   registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
   registerTrigger(new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, connection))
   if (config.automation.enableSvRewards) {
-    registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
+    if (config.automation.useNewSvRewardIssuance) {
+      // TODO (#9973): registerTrigger(new ReceiveSvRewardCouponTrigger(...))
+    } else {
+      registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
+    }
   }
   if (config.automation.enableClosedRoundArchival)
     registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))
