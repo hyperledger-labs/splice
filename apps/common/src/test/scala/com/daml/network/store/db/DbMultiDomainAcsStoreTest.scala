@@ -4,13 +4,19 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.{DarResources, RetryProvider}
-import com.daml.network.store.StoreTest.{TestTxLogEntry, testTxLogConfig}
-import com.daml.network.store.{MultiDomainAcsStore, MultiDomainAcsStoreTest}
+import com.daml.network.store.StoreTest.testTxLogConfig
+import com.daml.network.store.{
+  HardLimit,
+  MultiDomainAcsStore,
+  MultiDomainAcsStoreTest,
+  TestTxLogEntry,
+}
 import com.daml.network.util.{Contract, ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.util.MonadUtil
 import slick.jdbc.JdbcProfile
 
 import scala.concurrent.Future
@@ -84,6 +90,35 @@ class DbMultiDomainAcsStoreTest
         _ <- d1.create(coupon)(store)
         _ <- assertList(coupon -> Some(d1))(store)
       } yield succeed
+    }
+
+    "preserves daml numeric values in the ACS" in {
+      implicit val store = mkStore()
+      val values = specialNumericValues()
+      val expected = values.map(appRewardCoupon(1, svcParty, false, _))
+      for {
+        _ <- acs()
+        _ <- MonadUtil.sequentialTraverse(expected)(d1.create(_))
+        actual <- store.listContracts(
+          AppRewardCoupon.COMPANION,
+          limit = HardLimit.tryCreate(expected.length),
+        )
+      } yield {
+        actual.map(_.contract.payload.amount) should contain theSameElementsInOrderAs values
+      }
+    }
+
+    "preserves daml numeric values in the TxLog" in {
+      implicit val store = mkStore()
+      val values = specialNumericValues()
+      val expected = values.map(appRewardCoupon(1, svcParty, false, _))
+      for {
+        _ <- acs()
+        _ <- MonadUtil.sequentialTraverse(expected)(d1.create(_))
+        actual <- store.listTxLogEntries()
+      } yield {
+        actual.map(_.numericValue.bigDecimal) should contain theSameElementsInOrderAs values
+      }
     }
   }
 

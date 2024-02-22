@@ -7,8 +7,9 @@ import com.daml.network.store.{
   InMemoryMultiDomainAcsStore,
   MultiDomainAcsStore,
   MultiDomainAcsStoreTest,
+  TestTxLogEntry,
 }
-import com.daml.network.store.StoreTest.{TestTxLogEntry, testTxLogConfig}
+import com.daml.network.store.StoreTest.testTxLogConfig
 import com.daml.network.util.Contract
 import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor

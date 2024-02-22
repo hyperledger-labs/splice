@@ -13,13 +13,13 @@ import com.daml.ledger.javaapi.data.{
   Value as damlValue,
 }
 import com.daml.network.codegen.java.cc.{
-  validatorlicense as validatorLicenseCodegen,
   coin as coinCodegen,
   coinrules as coinrulesCodegen,
   expiry as expiryCodegen,
   fees as feesCodegen,
   round as roundCodegen,
   schedule as scheduleCodegen,
+  validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
@@ -44,16 +44,15 @@ import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.history.{AppRewardCreate, CoinCreate}
 import com.daml.network.store.db.TxLogRowData
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.protocol.LfContractId
 import com.google.protobuf.ByteString
-import io.circe.{Decoder, Encoder}
 
 import java.time.{Duration, Instant}
 import java.util.Optional
-import scala.annotation.nowarn
 import scala.concurrent.blocking
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -883,40 +882,68 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     ByteString.EMPTY,
     Instant.EPOCH,
   )
+
+  // Numbers in daml have 10 decimal places
+  protected lazy val damlNumericScale: Numeric.Scale = Numeric.Scale.assertFromInt(10)
+
+  /** A list of special numeric values of the given scale,
+    * suitable for testing whether serialization/deserialization code preserves the exact values
+    */
+  protected def specialNumericValues(
+      scale: Numeric.Scale = damlNumericScale
+  ): Seq[Numeric.Numeric] = {
+    Seq(
+      // 0 (zero)
+      Numeric.assertFromBigDecimal(scale, java.math.BigDecimal.ZERO),
+      // +999999.999999 (maximum value)
+      Numeric.maxValue(scale),
+      // -999999.999999 (minimum value)
+      Numeric.minValue(scale),
+      // +0.0000001 (smallest positive value)
+      Numeric.assertFromBigDecimal(
+        scale,
+        new java.math.BigDecimal(java.math.BigInteger.ONE, scale),
+      ),
+      // -0.0000001 (largest negative value)
+      Numeric.assertFromBigDecimal(
+        scale,
+        new java.math.BigDecimal(java.math.BigInteger.ONE.negate(), scale),
+      ),
+      // +0.3333333 (tests for decimal encoding instead of a binary one)
+      Numeric.assertFromString("0." + "3".repeat(scale)),
+      // -0.3333333 (tests for decimal encoding instead of a binary one)
+      Numeric.assertFromString("-0." + "3".repeat(scale)),
+    )
+  }
 }
 
 object StoreTest {
 
   val dummyDomain = DomainId.tryFromString("dummy::domain")
 
-  case class TestTxLogEntry(
-      payload: String
-  )
+  object TxLogEntry extends StoreErrors {
 
-  object TestTxLogEntry extends StoreErrors {
-
-    val dbType: String3 = String3.tryCreate("tte")
     def encode(entry: TestTxLogEntry): (String3, String) = {
-      import io.circe.syntax.*
-      import TestTxLogEntry.JsonProtocol.*
-      (TestTxLogEntry.dbType, entry.asJson.noSpaces)
-    }
-    def decode(dbType: String3, str: String): TestTxLogEntry = {
-      import io.circe.parser.decode as jsdec
-      import TestTxLogEntry.JsonProtocol.*
-      (dbType match {
-        case TestTxLogEntry.dbType => jsdec[TestTxLogEntry](str)
-        case _ => throw txDecodingFailed()
-      }).fold(_ => throw txDecodingFailed(), identity)
+      import scalapb.json4s.JsonFormat
+      val entryType = EntryType.TestTxLogEntry
+      val jsonValue = JsonFormat.toJsonString(entry)
+      (entryType, jsonValue)
     }
 
-    @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
-    object JsonProtocol {
-      import io.circe.generic.semiauto.*
-      implicit val partyBalanceChangeDecoder: Decoder[TestTxLogEntry] =
-        deriveDecoder
-      implicit val partyBalanceChangeEncoder: Encoder[TestTxLogEntry] =
-        deriveEncoder
+    def decode(entryType: String3, json: String): TestTxLogEntry = {
+      import scalapb.json4s.JsonFormat.fromJsonString as from
+      try {
+        entryType match {
+          case EntryType.TestTxLogEntry => from[TestTxLogEntry](json)
+          case _ => throw txDecodingFailed()
+        }
+      } catch {
+        case _: RuntimeException => throw txDecodingFailed()
+      }
+    }
+
+    object EntryType {
+      val TestTxLogEntry: String3 = String3.tryCreate("tte")
     }
   }
 
@@ -929,16 +956,35 @@ object StoreTest {
         tc: TraceContext
     ): Seq[(DomainId, Option[ContractId[?]], TestTxLogEntry)] = Seq.empty
 
+    private def parseCreatedEvent(event: CreatedEvent): TestTxLogEntry = {
+      // Note: coins and app reward coupons are heavily used in MultiDomainAcsStoreTest
+      event match {
+        case CoinCreate(coin) =>
+          TestTxLogEntry(
+            eventId = event.getEventId,
+            contractId = event.getContractId,
+            numericValue = coin.payload.amount.initialAmount,
+          )
+        case AppRewardCreate(coin) =>
+          TestTxLogEntry(
+            eventId = event.getEventId,
+            contractId = event.getContractId,
+            numericValue = coin.payload.amount,
+          )
+        case _ =>
+          TestTxLogEntry(
+            eventId = event.getEventId,
+            contractId = event.getContractId,
+            numericValue = BigDecimal(0),
+          )
+      }
+    }
+
     override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
         tc: TraceContext
     ): Seq[TestTxLogEntry] = {
       Trees.foldTree(tx, Seq.empty[TestTxLogEntry])(
-        onCreate = (res, event, _) => {
-          res :+
-            TestTxLogEntry(
-              payload = event.getEventId
-            )
-        },
+        onCreate = (res, event, _) => res :+ parseCreatedEvent(event),
         onExercise = (res, _, _) => res,
       )
     }
@@ -953,7 +999,7 @@ object StoreTest {
   val testTxLogConfig = new TxLogStore.Config[TestTxLogEntry] {
     override def parser = TestTxLogStoreParser
     override def entryToRow = _ => TxLogRowData.noIndices
-    override def encodeEntry = TestTxLogEntry.encode
-    override def decodeEntry = TestTxLogEntry.decode
+    override def encodeEntry = StoreTest.TxLogEntry.encode
+    override def decodeEntry = StoreTest.TxLogEntry.decode
   }
 }

@@ -317,11 +317,26 @@ object OpenMiningRoundCreate {
   }
 }
 
+// TODO(#2930): This is not really a Coin event - consider either renaming the file, or splitting it into different ones based on event "types"
 object ClosedMiningRoundCreate {
   type TCid = ClosedMiningRound.ContractId
   type T = ClosedMiningRound
   type ContractType = Contract[TCid, T]
   val companion = ClosedMiningRound.COMPANION
+
+  def unapply(
+      event: CreatedEvent
+  ): Option[ContractType] = {
+    Contract.fromCreatedEvent(companion)(event)
+  }
+}
+
+// TODO(#2930): This is not really a Coin event - consider either renaming the file, or splitting it into different ones based on event "types"
+object AppRewardCreate {
+  type TCid = coinCodegen.AppRewardCoupon.ContractId
+  type T = coinCodegen.AppRewardCoupon
+  type ContractType = Contract[TCid, T]
+  val companion = coinCodegen.AppRewardCoupon.COMPANION
 
   def unapply(
       event: CreatedEvent
