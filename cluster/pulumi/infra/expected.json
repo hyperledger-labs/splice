@@ -566,11 +566,6 @@
       "repositoryOpts": {
         "repo": "https://istio-release.storage.googleapis.com/charts"
       },
-      "values": {
-        "global": {
-          "istioNamespace": "cluster-ingress"
-        }
-      },
       "version": "1.20.0"
     },
     "name": "istio-base",
