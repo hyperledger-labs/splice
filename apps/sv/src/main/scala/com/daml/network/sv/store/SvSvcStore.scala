@@ -73,7 +73,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
     outerLoggerFactory.append("store", "svcParty")
 
   override lazy val acsContractFilter =
-    SvSvcStore.contractFilter(key.svcParty, key.svParty)
+    SvSvcStore.contractFilter(key.svcParty, key.svParty, domainMigrationId)
 
   override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
     override val parser = new SvcTxLogParser(loggerFactory)
@@ -83,6 +83,8 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   }
 
   def key: SvStore.Key
+
+  def domainMigrationId: Long
 
   def lookupSvcRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
@@ -981,6 +983,7 @@ object SvSvcStore {
           key,
           loggerFactory,
           retryProvider,
+          domainMigrationId,
         )
       case db: DbStorage =>
         new DbSvSvcStore(
@@ -1047,6 +1050,7 @@ object SvSvcStore {
   def contractFilter(
       svcParty: PartyId,
       svParty: PartyId,
+      domainMigrationId: Long,
   ): MultiDomainAcsStore.ContractFilter[SvcAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
@@ -1245,7 +1249,9 @@ object SvSvcStore {
           validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
         )
       },
-      mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt => vt.payload.svc == svc) { contract =>
+      mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt =>
+        vt.payload.svc == svc && vt.payload.migrationId == domainMigrationId
+      ) { contract =>
         SvcAcsStoreRowData(
           contract,
           memberTrafficMember = Member

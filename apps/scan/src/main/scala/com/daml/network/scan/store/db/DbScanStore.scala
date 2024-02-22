@@ -39,7 +39,7 @@ class DbScanStore(
     override protected val retryProvider: RetryProvider,
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    override val domainMigrationId: Long,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,

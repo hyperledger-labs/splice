@@ -63,7 +63,7 @@ template CoinRules
     -- Global domain usage
     ----------------------
 
-    -- Returns a `TransferResult` to aid parsing the transaction in Scan
+    -- Returns a `BuyMemberTrafficResult` to aid parsing the transaction in Scan
     nonconsuming choice CoinRules_BuyMemberTraffic : BuyMemberTrafficResult
       with
         inputs : [TransferInput]
@@ -71,6 +71,7 @@ template CoinRules
         provider : Party
         memberId : Text
         domainId : Text
+        migrationId : Int
         trafficAmount : Int
       controller provider
       do
@@ -111,6 +112,7 @@ template CoinRules
           svc
           memberId
           domainId
+          migrationId
           totalPurchased = trafficAmount
           numPurchases = 1
           ccSpent = trafficCostCc
@@ -137,6 +139,7 @@ template CoinRules
                 svc
                 memberId = first.memberId
                 domainId = first.domainId
+                migrationId = first.migrationId
           fetchAndArchive expectedTrafficContract trafficCid
         let traffics = first::rest
 
@@ -145,11 +148,12 @@ template CoinRules
                 svc
                 memberId = acc.memberId
                 domainId = acc.domainId
+                migrationId = acc.migrationId
                 totalPurchased = acc.totalPurchased + traffic.totalPurchased
                 numPurchases = acc.numPurchases + traffic.numPurchases
                 usdSpent = acc.usdSpent + traffic.usdSpent
                 ccSpent = acc.ccSpent + traffic.ccSpent
-              ) (initialMemberTraffic svc first.memberId first.domainId 0) traffics
+              ) (initialMemberTraffic svc first.memberId first.domainId first.migrationId 0) traffics
         create mergedTraffic
 
     -- Coin usage

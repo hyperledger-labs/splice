@@ -94,6 +94,7 @@ class ValidatorAutomationService(
         clock,
         walletManager,
         scanConnection,
+        domainMigrationId,
       )
     )
   else

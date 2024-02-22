@@ -1230,6 +1230,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         "user666ParticipantId",
         new Round(1L),
         dummyDomain.toProtoPrimitive,
+        domainMigrationId,
       )
     )
   )
@@ -1243,6 +1244,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         "user667ParticipantId",
         new Round(1L),
         dummyDomain.toProtoPrimitive,
+        domainMigrationId,
       )
     )
   )
@@ -1430,6 +1432,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       svcParty.toProtoPrimitive,
       member.toProtoPrimitive,
       dummyDomain.toProtoPrimitive,
+      domainMigrationId,
       totalPurchased,
       1,
       numeric(1.0),
@@ -1609,6 +1612,7 @@ class InMemorySvSvcStoreTest extends SvSvcStoreTest {
       SvStore.Key(storeSvParty, svcParty),
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      domainMigrationId,
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -1643,7 +1647,7 @@ class DbSvSvcStoreTest
       storage,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId = 0,
+      domainMigrationId,
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

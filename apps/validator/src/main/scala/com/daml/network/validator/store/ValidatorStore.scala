@@ -37,6 +37,8 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
   /** The key identifying the parties considered by this store. */
   val key: ValidatorStore.Key
 
+  def domainMigrationId: Long
+
   def lookupWalletInstallByNameWithOffset(
       endUserName: String
   )(implicit tc: TraceContext): Future[QueryResult[
@@ -242,7 +244,7 @@ object ValidatorStore {
   ): ValidatorStore =
     storage match {
       case _: MemoryStorage =>
-        new InMemoryValidatorStore(key, loggerFactory, retryProvider)
+        new InMemoryValidatorStore(key, loggerFactory, retryProvider, domainMigrationId)
       case storage: DbStorage =>
         new DbValidatorStore(key, storage, loggerFactory, retryProvider, domainMigrationId)
     }
@@ -277,7 +279,10 @@ object ValidatorStore {
           else Seq.empty)
 
   /** Contract of a wallet store for a specific validator party. */
-  def contractFilter(key: Key): MultiDomainAcsStore.ContractFilter[ValidatorAcsStoreRowData] = {
+  def contractFilter(
+      key: Key,
+      domainMigrationId: Long,
+  ): MultiDomainAcsStore.ContractFilter[ValidatorAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
     val validator = key.validatorParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
@@ -323,7 +328,7 @@ object ValidatorStore {
           )
         },
         mkFilter(topUpCodegen.ValidatorTopUpState.COMPANION)(co =>
-          co.payload.validator == validator
+          co.payload.validator == validator && co.payload.migrationId == domainMigrationId
         ) { contract =>
           ValidatorAcsStoreRowData(
             contract = contract,

@@ -29,6 +29,7 @@ template SvcBootstrap with
     coinPrice : Decimal
     cnsRulesConfig: CnsRulesConfig
     config : SvcRulesConfig
+    migrationId : Int
     initialTrafficState: Map.Map Text TrafficState
     isDevNet : Bool
   where
@@ -88,6 +89,6 @@ template SvcBootstrap with
         -- create initial traffic contracts for the founding member based on configured initial traffic grant
         let domainId = coinConfig.globalDomain.activeDomain
         let trafficAmount = config.initialTrafficGrant
-        _ <- create (initialMemberTraffic svc founderParticipantId domainId trafficAmount)
+        _ <- create (initialMemberTraffic svc founderParticipantId domainId migrationId trafficAmount)
 
         pure ()

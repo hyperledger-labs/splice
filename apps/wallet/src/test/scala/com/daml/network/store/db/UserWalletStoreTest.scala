@@ -984,6 +984,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       trafficAmount,
       memberId.toProtoPrimitive,
       domainId.toProtoPrimitive,
+      domainMigrationId,
     )
     contract(
       identifier = templateId,
@@ -1346,6 +1347,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         new WalletAppInstall_CreateBuyTrafficRequest(
           memberId.toProtoPrimitive,
           domainId.toProtoPrimitive,
+          domainMigrationId,
           trafficAmount,
           Instant.now().plusSeconds(60),
           trackingId,
@@ -1413,6 +1415,7 @@ class InMemoryUserWalletStoreTest extends UserWalletStoreTest {
       loggerFactory = loggerFactory,
       retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      domainMigrationId,
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -1450,7 +1453,7 @@ class DbUserWalletStoreTest
       loggerFactory = loggerFactory,
       retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId = 0,
+      domainMigrationId,
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

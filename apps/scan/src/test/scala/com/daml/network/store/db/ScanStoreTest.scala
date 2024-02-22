@@ -1235,6 +1235,7 @@ trait CoinTransferUtil { self: StoreTest =>
           provider.toProtoPrimitive,
           memberId.toProtoPrimitive,
           dummyDomain.toProtoPrimitive,
+          domainMigrationId,
           extraTraffic,
         ).toValue,
         mkBuyMemberTrafficResult(
@@ -1414,6 +1415,7 @@ trait CoinTransferUtil { self: StoreTest =>
       svcParty.toProtoPrimitive,
       member.toProtoPrimitive,
       dummyDomain.toProtoPrimitive,
+      domainMigrationId,
       totalPurchased,
       1,
       numeric(1.0),
@@ -1440,6 +1442,7 @@ class InMemoryScanStoreTest extends ScanStoreTest {
       svcParty = svcParty,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      domainMigrationId,
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -1488,7 +1491,7 @@ class DbScanStoreTest
               traceContext: TraceContext,
           ): Future[Option[ScanAggregator.RoundAggregate]] = Future.successful(None)
         },
-      domainMigrationId = 0,
+      domainMigrationId,
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {

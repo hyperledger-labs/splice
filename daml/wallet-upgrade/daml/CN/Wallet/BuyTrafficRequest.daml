@@ -23,6 +23,7 @@ template BuyTrafficRequest
     trafficAmount : Int
     memberId : Text
     domainId : Text
+    migrationId : Int
   where
     signatory endUserParty
 
@@ -36,7 +37,7 @@ template BuyTrafficRequest
       do
         now <- getTime
         require "Contract has not expired" (now < expiresAt)
-        result <- exercise context.coinRules (CoinRules_BuyMemberTraffic inputs context.context endUserParty memberId domainId trafficAmount)
+        result <- exercise context.coinRules (CoinRules_BuyMemberTraffic inputs context.context endUserParty memberId domainId migrationId trafficAmount)
         let trackingInfo = BuyTrafficRequestTrackingInfo with ..
         pure ((result.purchasedTraffic, trackingInfo), result.senderChangeCoin)
 

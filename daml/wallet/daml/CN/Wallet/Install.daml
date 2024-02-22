@@ -45,8 +45,8 @@ executeCoinOperationRec execContext inputs prevResults (operation::remainingOper
     CO_CompleteAcceptedTransfer cid -> handle AcceptedTransferOffer_Complete COO_CompleteAcceptedTransfer cid
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
-    CO_BuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCid -> do
-      resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCid
+    CO_BuyMemberTraffic trafficAmount memberId domainId migrationId minTopupInterval topupStateCid -> do
+      resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId domainId migrationId minTopupInterval topupStateCid
       handleResult COO_BuyMemberTraffic resultE
     CO_CompleteBuyTrafficRequest cid -> handle BuyTrafficRequest_Complete COO_CompleteBuyTrafficRequest cid
     CO_MergeTransferInputs -> do
@@ -91,12 +91,12 @@ executeCoinOperationRec execContext inputs prevResults (operation::remainingOper
     handleLeft : InvalidTransferReason -> Update [CoinOperationOutcome]
     handleLeft errorMsg = executeCoinOperationRec execContext inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
 
-    handleBuyMemberTraffic: Int -> Text -> Text -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId Coin))
-    handleBuyMemberTraffic trafficAmount memberId domainId minTopupInterval topupStateCidO = do
+    handleBuyMemberTraffic: Int -> Text -> Text -> Int -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId Coin))
+    handleBuyMemberTraffic trafficAmount memberId domainId migrationId minTopupInterval topupStateCidO = do
       now <- getTime
       -- validate and update topupState if provided
       forA_ topupStateCidO $ \topupStateCid -> do
-        topupState <- fetchAndArchive (ForMemberTraffic with svc = execContext.svc; memberId, domainId)  topupStateCid
+        topupState <- fetchAndArchive (ForMemberTraffic with svc = execContext.svc; memberId, domainId, migrationId)  topupStateCid
         require "validator party and ValidatorTopUpState match" (execContext.validator== topupState.validator)
         -- protect against successive topups being too close together
         require "enough time has elapsed since the last topup" (addRelTime topupState.lastPurchasedAt minTopupInterval <= now)
@@ -126,7 +126,7 @@ executeCoinOperationRec execContext inputs prevResults (operation::remainingOper
             pure inputs
       -- purchase extra traffic for given member
       result <- exercise coinRulesCid
-        (CoinRules_BuyMemberTraffic newInputs context.context execContext.validator memberId domainId trafficAmount)
+        (CoinRules_BuyMemberTraffic newInputs context.context execContext.validator memberId domainId migrationId trafficAmount)
       pure (result.purchasedTraffic, result.senderChangeCoin)
 
 executeCoinOperationRec _execContext _inputs prevResults [] = do
@@ -155,6 +155,7 @@ data CoinOperation
       trafficAmount : Int
       memberId : Text
       domainId : Text
+      migrationId : Int
       minTopupInterval: RelTime
       topupStateCid : Optional (ContractId ValidatorTopUpState)
   | CO_CompleteBuyTrafficRequest with
@@ -304,6 +305,7 @@ template WalletAppInstall
       with
         memberId : Text
         domainId : Text
+        migrationId : Int
         trafficAmount : Int
         expiresAt : Time
         trackingId : Text

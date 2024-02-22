@@ -42,6 +42,7 @@ class TopupMemberTrafficTrigger(
     clock: Clock,
     walletManager: UserWalletManager,
     scanConnection: BftScanConnection,
+    domainMigrationId: Long,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -116,6 +117,7 @@ class TopupMemberTrafficTrigger(
       topupParameters.topupAmount,
       topupState.payload.memberId,
       topupState.payload.domainId,
+      topupState.payload.migrationId,
       new RelTime(topupParameters.minTopupInterval.duration.toMillis * 1000),
       Optional.of(topupState.contractId),
     )
@@ -187,6 +189,7 @@ class TopupMemberTrafficTrigger(
                 validator.toProtoPrimitive,
                 participantId.toProtoPrimitive,
                 activeDomainId.toProtoPrimitive,
+                domainMigrationId,
                 Instant.ofEpochSecond(0),
               ),
               priority = CommandPriority.High,

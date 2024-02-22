@@ -54,7 +54,8 @@ validCoinGlobalDomainConfig config =
 template MemberTraffic with
     svc : Party
     memberId : Text -- ^ The id of the sequencer member (participant or mediator) for which traffic has been purchased
-    domainId : Text -- ^ The id of the domain for which this contract tracks purchased extra traffic.
+    domainId : Text -- ^ The id of the domain for which this contract tracks purchased extra traffic
+    migrationId : Int -- ^ The migration id of the domain for which this contract tracks purchased extra traffic
     totalPurchased : Int -- ^ The number of bytes of extra traffic purchased
     numPurchases : Int -- ^ Number of times extra traffic has been purchased
     ccSpent : Decimal -- ^ Total CC spent on extra traffic
@@ -66,12 +67,14 @@ template MemberTraffic with
       && numPurchases >= 0
       && ccSpent >= 0.0
       && usdSpent >= 0.0
+      && migrationId >= 0
 
 
-initialMemberTraffic : Party -> Text -> Text -> Int -> MemberTraffic
-initialMemberTraffic svc memberId domainId amount = MemberTraffic with
-    svc = svc
-    memberId = memberId
+initialMemberTraffic : Party -> Text -> Text -> Int -> Int -> MemberTraffic
+initialMemberTraffic svc memberId domainId migrationId amount = MemberTraffic with
+    svc
+    memberId
+    migrationId
     domainId
     totalPurchased = amount
     numPurchases = 0
@@ -82,6 +85,7 @@ data ForMemberTraffic = ForMemberTraffic with
     svc : Party
     memberId : Text
     domainId : Text
+    migrationId: Int
   deriving (Eq, Show)
 
 instance HasCheckedFetch MemberTraffic ForSvc where

@@ -46,6 +46,8 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
+  def domainMigrationId: Long
+
   final def lookupInstall()(implicit tc: TraceContext): Future[
     Option[
       ContractWithState[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
@@ -485,6 +487,7 @@ object UserWalletStore {
           key,
           loggerFactory,
           retryProvider,
+          domainMigrationId,
         )
       case dbStorage: DbStorage =>
         new DbUserWalletStore(
@@ -539,7 +542,10 @@ object UserWalletStore {
   }
 
   /** Contract of a wallet store for a specific user party. */
-  def contractFilter(key: Key): ContractFilter[UserWalletAcsStoreRowData] = {
+  def contractFilter(
+      key: Key,
+      domainMigrationId: Long,
+  ): ContractFilter[UserWalletAcsStoreRowData] = {
     val endUser = key.endUserParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
@@ -655,7 +661,7 @@ object UserWalletStore {
         ),
         // Buy traffic requests
         mkFilter(trafficRequestCodegen.BuyTrafficRequest.COMPANION)(co =>
-          co.payload.svc == svc && co.payload.endUserParty == endUser
+          co.payload.svc == svc && co.payload.endUserParty == endUser && co.payload.migrationId == domainMigrationId
         )(contract =>
           UserWalletAcsStoreRowData(
             contract,

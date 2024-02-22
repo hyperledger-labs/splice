@@ -612,6 +612,7 @@ class ValidatorApp(
         loggerFactory,
         retryProvider,
         participantAdminConnection,
+        config.domainMigrationId,
       )
 
       cnsExternalHandler = new HttpExternalCnsHandler(

@@ -50,10 +50,12 @@ trait ScanStore
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 
+  def domainMigrationId: Long
+
   def serviceUserPrimaryParty: PartyId
 
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] =
-    ScanStore.contractFilter(svcParty)
+    ScanStore.contractFilter(svcParty, domainMigrationId)
 
   override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
     override val parser = new ScanTxLogParser(loggerFactory)
@@ -237,6 +239,7 @@ object ScanStore {
           svcParty = svcParty,
           loggerFactory,
           retryProvider,
+          domainMigrationId,
         )
       case db: DbStorage =>
         new DbScanStore(
@@ -253,7 +256,8 @@ object ScanStore {
   }
 
   def contractFilter(
-      svcParty: PartyId
+      svcParty: PartyId,
+      domainMigrationId: Long,
   ): MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
@@ -328,7 +332,9 @@ object ScanStore {
             cnsEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
           )
         },
-        mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt => vt.payload.svc == svc) { contract =>
+        mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt =>
+          vt.payload.svc == svc && vt.payload.migrationId == domainMigrationId
+        ) { contract =>
           ScanAcsStoreRowData(
             contract,
             memberTrafficMember = Member

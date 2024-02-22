@@ -162,6 +162,7 @@ testRequiredNumOfConfirmation = do
 
   coinConfig <- getCoinConfig app
   let domainId = coinConfig.globalDomain.activeDomain
+  let migrationId = 0
 
   [(coinRulesCid, _)] <- query @CoinRules svc
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
@@ -179,6 +180,8 @@ testRequiredNumOfConfirmation = do
           newMemberParticipantId = "svX-participant-id"
           joinedAsOfRound = (Round 3)
           domainId
+          migrationId
+
   confirmationCids <- forA [sv1, sv2, sv3] $ \svParty -> do
     submitMulti [svParty] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
       confirmer = svParty
@@ -211,6 +214,7 @@ testConfirmationExpiry = do
   [(svcRulesCid, _)] <- query @SvcRules svc
   coinConfig <- getCoinConfig app
   let domainId = coinConfig.globalDomain.activeDomain
+  let migrationId = 0
 
   -- create a single confirmation which will not suffice to initiate an action
   svConfirmationCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
@@ -223,6 +227,7 @@ testConfirmationExpiry = do
         newMemberParticipantId = "svX-participant-id"
         joinedAsOfRound = (Round 3)
         domainId
+        migrationId
 
   -- leader tries to expire the confirmation, but it's too early
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $

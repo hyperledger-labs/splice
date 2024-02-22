@@ -159,8 +159,7 @@ class GlobalDomainMigrationIntegrationTest
                           port = Port.tryCreate(5901)
                         )
                     ),
-                  ),
-                  domainMigrationId = 1L,
+                  )
                 )
             }
           ) + (
@@ -619,6 +618,7 @@ class GlobalDomainMigrationIntegrationTest
                     "alice-participant-id",
                     new Round(42),
                     globalDomainId.toProtoPrimitive,
+                    sv1LocalBackend.config.domainMigrationId,
                   )
                 )
               ),

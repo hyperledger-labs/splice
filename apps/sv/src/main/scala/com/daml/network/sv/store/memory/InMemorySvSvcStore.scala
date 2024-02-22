@@ -57,6 +57,7 @@ class InMemorySvSvcStore(
     override val key: SvStore.Key,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    override val domainMigrationId: Long,
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,

@@ -48,6 +48,7 @@ class InMemoryScanStore(
     override val svcParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    override val domainMigrationId: Long,
 )(implicit
     ec: ExecutionContext
 ) extends InMemoryCNNodeAppStore[TxLogEntry]

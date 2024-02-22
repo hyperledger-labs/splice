@@ -553,6 +553,7 @@ class FoundingNodeInitializer(
                           foundingConfig.initialCnsConfig.entryFee,
                         ),
                         svcRulesConfig,
+                        config.domainMigrationId,
                         trafficStateForAllMembers
                           .map(m =>
                             m.member.toProtoPrimitive -> new cn.svcrules.TrafficState(

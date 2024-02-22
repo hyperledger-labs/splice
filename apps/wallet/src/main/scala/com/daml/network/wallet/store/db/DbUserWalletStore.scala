@@ -35,7 +35,7 @@ class DbUserWalletStore(
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    override val domainMigrationId: Long,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -67,7 +67,7 @@ class DbUserWalletStore(
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 
-  override protected def acsContractFilter = UserWalletStore.contractFilter(key)
+  override protected def acsContractFilter = UserWalletStore.contractFilter(key, domainMigrationId)
 
   /** Returns the validator reward coupon sorted by their round in ascending order. Optionally limited by `maxNumInputs`
     * and optionally filtered by a set of issuing rounds.

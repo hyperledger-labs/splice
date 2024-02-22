@@ -27,6 +27,7 @@ class InMemoryValidatorStore(
     override val key: ValidatorStore.Key,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    override val domainMigrationId: Long,
 )(implicit override protected val ec: ExecutionContext)
     extends InMemoryCNNodeAppStoreWithoutHistory
     with ValidatorStore {
@@ -36,7 +37,7 @@ class InMemoryValidatorStore(
     key.svcParty,
   )
 
-  override lazy val acsContractFilter = ValidatorStore.contractFilter(key)
+  override lazy val acsContractFilter = ValidatorStore.contractFilter(key, domainMigrationId)
 
   override def lookupInstallByParty(
       endUserParty: PartyId

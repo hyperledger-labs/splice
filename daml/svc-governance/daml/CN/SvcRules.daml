@@ -378,6 +378,7 @@ template SvcRules with
         newMemberParticipantId : Text
         joinedAsOfRound : Round
         domainId : Text
+        migrationId : Int
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
@@ -422,7 +423,7 @@ template SvcRules with
             number = 0
             status = None
         -- create traffic contracts for the initial traffic grant to the SV
-        create (initialMemberTraffic svc newMemberParticipantId domainId config.initialTrafficGrant)
+        create (initialMemberTraffic svc newMemberParticipantId domainId migrationId config.initialTrafficGrant)
         create SvcRules with
           svc
           epoch
@@ -496,6 +497,7 @@ template SvcRules with
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
         coinRulesCid: ContractId CoinRules
+        migrationId : Int
       controller sv
       do
 
@@ -518,6 +520,7 @@ template SvcRules with
           newMemberParticipantId = svOnboardingConfirmed.svParticipantId
           joinedAsOfRound = earliestRound.round
           domainId = coinConfig.globalDomain.activeDomain
+          migrationId
 
 
     -- Global domain config management

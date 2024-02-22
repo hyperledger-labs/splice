@@ -487,6 +487,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       validator.toProtoPrimitive,
       sequencerMemberId,
       domainId.toProtoPrimitive,
+      domainMigrationId,
       lastPurchasedAt,
     )
     contract(
@@ -598,6 +599,7 @@ class InMemoryValidatorStoreTest extends ValidatorStoreTest {
       loggerFactory = loggerFactory,
       retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
+      domainMigrationId,
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
@@ -633,7 +635,7 @@ class DbValidatorStoreTest
       loggerFactory = loggerFactory,
       retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId = 0,
+      domainMigrationId,
     )
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

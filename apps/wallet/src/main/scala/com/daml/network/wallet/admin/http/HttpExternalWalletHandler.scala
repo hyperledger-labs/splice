@@ -34,6 +34,7 @@ class HttpExternalWalletHandler(
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: RetryProvider,
     participantAdminConnection: ParticipantAdminConnection,
+    domainMigrationId: Long,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
@@ -217,6 +218,7 @@ class HttpExternalWalletHandler(
                         .exerciseWalletAppInstall_CreateBuyTrafficRequest(
                           participantId.toProtoPrimitive,
                           domainId.toProtoPrimitive,
+                          domainMigrationId,
                           trafficAmount.value,
                           expiresAt.toInstant,
                           request.trackingId,

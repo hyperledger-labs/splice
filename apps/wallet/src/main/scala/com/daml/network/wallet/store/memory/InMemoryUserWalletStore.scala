@@ -25,6 +25,7 @@ class InMemoryUserWalletStore(
     override val key: UserWalletStore.Key,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    override val domainMigrationId: Long,
 )(implicit
     ec: ExecutionContext
 ) extends InMemoryCNNodeAppStore[TxLogEntry]
@@ -33,7 +34,7 @@ class InMemoryUserWalletStore(
 
   override def toString: String = show"InMemoryUserWalletStore(endUserParty=${key.endUserParty})"
 
-  override protected def acsContractFilter = UserWalletStore.contractFilter(key)
+  override protected def acsContractFilter = UserWalletStore.contractFilter(key, domainMigrationId)
 
   /** Returns the validator reward coupon sorted by their round in ascending order. Optionally limited by `maxNumInputs`
     * and optionally filtered by a set of issuing rounds.

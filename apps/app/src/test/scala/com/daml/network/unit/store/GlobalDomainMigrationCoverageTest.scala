@@ -104,6 +104,7 @@ object GlobalDomainMigrationCoverageTest {
   import wallet.store.UserWalletStore
 
   private val dummyParty = PartyId.tryFromProtoPrimitive("foo::dummy")
+  private val domainMigrationId = 0L
 
   private val filtersAndMoveLists
       : Seq[(Object, ContractFilter[_ <: AcsRowData], Seq[ContractTypeCompanion[?, ?, ?, ?]])] =
@@ -115,13 +116,14 @@ object GlobalDomainMigrationCoverageTest {
             svcParty = dummyParty,
             validatorParty = dummyParty,
             appManagerEnabled = true,
-          )
+          ),
+          domainMigrationId,
         ),
         ValidatorStore.templatesMovedByMyAutomation(true),
       ),
       (
         SvSvcStore,
-        SvSvcStore.contractFilter(dummyParty, dummyParty),
+        SvSvcStore.contractFilter(dummyParty, dummyParty, domainMigrationId),
         SvSvcStore.templatesMovedByMyAutomation,
       ),
       (
@@ -132,11 +134,12 @@ object GlobalDomainMigrationCoverageTest {
       (
         UserWalletStore,
         UserWalletStore.contractFilter(
-          UserWalletStore.Key(dummyParty, dummyParty, "irrelevant username", dummyParty)
+          UserWalletStore.Key(dummyParty, dummyParty, "irrelevant username", dummyParty),
+          domainMigrationId,
         ),
         UserWalletStore.templatesMovedByMyAutomation,
       ),
-      (ScanStore, ScanStore.contractFilter(dummyParty), Seq.empty),
+      (ScanStore, ScanStore.contractFilter(dummyParty, domainMigrationId), Seq.empty),
     )
 
   // How do we ensure that new templates get migration added somewhere?  If

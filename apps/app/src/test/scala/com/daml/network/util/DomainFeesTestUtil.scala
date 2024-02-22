@@ -78,6 +78,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
           validatorParty.toProtoPrimitive,
           memberId.toProtoPrimitive,
           domainId.toProtoPrimitive,
+          validatorApp.config.domainMigrationId,
           Instant.ofEpochSecond(0),
         )
         val topupStateCid =
@@ -139,6 +140,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
           trafficAmount,
           memberId.toProtoPrimitive,
           domainId.toProtoPrimitive,
+          validatorApp.config.domainMigrationId,
           new RelTime(1),
           Optional.of(topupStateCid),
         )
@@ -188,6 +190,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     val cmd = walletInstall.id.exerciseWalletAppInstall_CreateBuyTrafficRequest(
       memberId,
       domainId.toProtoPrimitive,
+      validatorApp.config.domainMigrationId,
       trafficAmount,
       now.plus(java.time.Duration.ofMinutes(1)).toInstant,
       trackingId,
