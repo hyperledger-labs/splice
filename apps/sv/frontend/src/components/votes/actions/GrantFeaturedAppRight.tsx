@@ -18,7 +18,7 @@ const GrantFeaturedAppRight: React.FC<{
   }
 
   if (svcInfosQuery.isError) {
-    return <p>Not yet implemented.</p>;
+    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
   }
 
   function setProviderAction(provider: string) {

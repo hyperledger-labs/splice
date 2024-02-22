@@ -10,35 +10,41 @@ import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker
 
 import { Tuple2 } from '@daml.js/87530dd1038863bad7bdf02c59ae851bc00f469edb2d7dbc8be3172daafa638c/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin/lib/CC/CoinConfig';
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvcInfos } from '../../../contexts/SvContext';
+import { ActionFromForm } from '../VoteRequest';
 
 dayjs.extend(utc);
 
 const AddFutureCoinConfigSchedule: React.FC<{
-  chooseAction: (action: ActionRequiringConfirmation) => void;
+  chooseAction: (action: ActionFromForm) => void;
 }> = ({ chooseAction }) => {
   const svcInfosQuery = useSvcInfos();
 
   const [date, setDate] = useState<Dayjs | null>(dayjs());
+  // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
   const [configuration, setConfiguration] = useState<Record<string, JSONValue>>();
 
   useEffect(() => {
     if (date != null && configuration != null) {
-      const newItem: Tuple2<string, CoinConfig<'USD'>> = {
-        _1: dayjs.utc(date).format('YYYY-MM-DDTHH:mm:00[Z]'),
-        _2: CoinConfig(USD).decoder.runWithException(configuration),
-      };
-      chooseAction({
-        tag: 'ARC_CoinRules',
-        value: {
-          coinRulesAction: {
-            tag: 'CRARC_AddFutureCoinConfigSchedule',
-            value: { newScheduleItem: newItem },
+      const decoded = CoinConfig(USD).decoder.run(configuration);
+      if (decoded.ok) {
+        const newItem: Tuple2<string, CoinConfig<'USD'>> = {
+          _1: dayjs.utc(date).format('YYYY-MM-DDTHH:mm:00[Z]'),
+          _2: decoded.result,
+        };
+        chooseAction({
+          tag: 'ARC_CoinRules',
+          value: {
+            coinRulesAction: {
+              tag: 'CRARC_AddFutureCoinConfigSchedule',
+              value: { newScheduleItem: newItem },
+            },
           },
-        },
-      });
+        });
+      } else {
+        chooseAction({ formError: decoded.error });
+      }
     }
   }, [date, configuration, chooseAction]);
 
@@ -47,7 +53,7 @@ const AddFutureCoinConfigSchedule: React.FC<{
   }
 
   if (svcInfosQuery.isError) {
-    return <p>Not yet implemented.</p>;
+    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
   }
 
   if (!svcInfosQuery.data) {

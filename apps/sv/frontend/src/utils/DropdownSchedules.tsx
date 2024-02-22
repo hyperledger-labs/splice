@@ -20,6 +20,15 @@ const PrettyJsonPrint: React.FC<{
   );
 };
 
+type DropdownState =
+  | { label: 'No Selection' }
+  | { label: string; value: Record<string, JSONValue> };
+function stateHasValue(
+  state: DropdownState
+): state is { label: string; value: Record<string, JSONValue> } {
+  return state.label !== 'No Selection';
+}
+// TODO (#10209): this component is handling both the PrettyPrint and the JsonEditor. Split into two components.
 export const DropdownSchedules: React.FC<{
   futureValues: Tuple2<string, CoinConfig<USD>>[];
   initialValue?: CoinConfig<USD>;
@@ -30,6 +39,9 @@ export const DropdownSchedules: React.FC<{
     value: Record<string, JSONValue> | null;
     label: string;
   }
+
+  // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
+  const [selectedOption, setSelectedOption] = useState<DropdownState>({ label: 'No Selection' });
 
   const dropdownOptions: DropdownOption[] = [
     { value: null, label: 'No Selection' },
@@ -46,26 +58,30 @@ export const DropdownSchedules: React.FC<{
     });
   }
 
-  const [selectedOption, setSelectedOption] = useState<string>('No Selection');
-
   const handleOptionChange = (optionDate: string) => {
-    setSelectedOption(optionDate);
     const convertedDate = dayjs
       .utc(optionDate.replace('UTC', 'GMT'))
       .format('YYYY-MM-DDTHH:mm:00[Z]');
+    if (optionDate === 'No Selection') {
+      setSelectedOption({ label: 'No Selection' });
+    } else {
+      const valueForLabel = dropdownOptions.filter(e => e.label === optionDate)[0].value!;
+      setSelectedOption({ label: optionDate, value: valueForLabel });
+    }
     if (onChange) {
       onChange(convertedDate);
     }
   };
 
   async function updateFutureCoinConfigScheduleAction(config: Record<string, JSONValue>) {
-    if (onChangeEditor && selectedOption !== 'No Selection') {
-      onChangeEditor(selectedOption, config);
+    if (onChangeEditor && selectedOption.label !== 'No Selection') {
+      setSelectedOption({ label: selectedOption.label, value: config });
+      onChangeEditor(selectedOption.label, config);
     }
   }
 
   return (
-    <Stack key={selectedOption}>
+    <Stack key={selectedOption.label}>
       <NativeSelect
         inputProps={{ id: 'dropdown-display-schedules-datetime' }}
         value={selectedOption}
@@ -78,21 +94,10 @@ export const DropdownSchedules: React.FC<{
             </option>
           ))}
       </NativeSelect>
-      {onChange &&
-        dropdownOptions.filter(e => e.label === selectedOption).length > 0 &&
-        dropdownOptions.filter(e => e.label === selectedOption)[0].value !== null && (
-          <PrettyJsonPrint
-            data={dropdownOptions.filter(e => e.label === selectedOption)[0].value!}
-          />
-        )}
-      {onChangeEditor &&
-        dropdownOptions.filter(e => e.label === selectedOption).length > 0 &&
-        dropdownOptions.filter(e => e.label === selectedOption)[0].value !== null && (
-          <JsonEditor
-            data={dropdownOptions.filter(e => e.label === selectedOption)[0].value!}
-            onChange={updateFutureCoinConfigScheduleAction}
-          />
-        )}
+      {onChange && stateHasValue(selectedOption) && <PrettyJsonPrint data={selectedOption.value} />}
+      {onChangeEditor && stateHasValue(selectedOption) && (
+        <JsonEditor data={selectedOption.value} onChange={updateFutureCoinConfigScheduleAction} />
+      )}
     </Stack>
   );
 };

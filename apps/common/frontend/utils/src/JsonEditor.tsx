@@ -1,34 +1,31 @@
-import React, { useState } from 'react';
+import React from 'react';
 
 import { Table } from '@mui/material';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 
-import { JSONValue } from './JsonType';
+import { JSONObject } from './JsonType';
 
 interface JsonEditorProps {
-  data: Record<string, JSONValue>;
-  time?: string;
-  onChange: (updatedJson: Record<string, JSONValue>, time?: string) => void;
+  data: JSONObject;
+  onChange: (updatedJson: JSONObject) => void;
 }
 
-export const JsonEditor: React.FC<JsonEditorProps> = ({ data, time, onChange }) => {
-  const [json, setJson] = useState(data);
-
-  const handleValueChange = (key: string, value: JSONValue) => {
+export const JsonEditor: React.FC<JsonEditorProps> = ({ data, onChange }) => {
+  const handleValueChange = (key: string, rawInputValue: string) => {
+    const value = rawInputValue === '' ? null : rawInputValue;
     const keys = key.split('.');
     const lastKey = keys.pop();
 
-    let nestedObject: Record<string, JSONValue> = json;
+    const newJson: JSONObject = { ...data };
+    let nestedObject: JSONObject = newJson;
     for (const nestedKey of keys) {
-      nestedObject = nestedObject[nestedKey] as Record<string, JSONValue>;
+      nestedObject = nestedObject[nestedKey] as JSONObject;
     }
-
-    // @ts-ignore
     nestedObject[lastKey!] = value;
-    setJson(previousJson => ({ ...previousJson }));
-    time === 'undefined' ? onChange(json) : onChange(json, time);
+
+    onChange(newJson);
   };
 
   const renderJsonValue = (value: object, keyPath: string[] = []) => {
@@ -37,8 +34,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({ data, time, onChange }) 
         <React.Fragment key={key}>{renderJsonValue(nestedValue, [...keyPath, key])}</React.Fragment>
       ));
     }
-    // TODO(#8819): remove this hack once the JsonEditor supports optional values
-    const cleanedValue = value === null ? 'null' : value;
+    const cleanedValue = value === null ? '' : value;
 
     const nestedKey = keyPath.join('.');
     return (
@@ -64,7 +60,7 @@ export const JsonEditor: React.FC<JsonEditorProps> = ({ data, time, onChange }) 
   return (
     <>
       <Table style={{ tableLayout: 'fixed' }}>
-        <TableBody>{renderJsonValue(json)}</TableBody>
+        <TableBody>{renderJsonValue(data)}</TableBody>
       </Table>
     </>
   );

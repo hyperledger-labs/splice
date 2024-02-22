@@ -27,7 +27,7 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
   }
 
   if (svcInfosQuery.isError) {
-    return <p>Not yet implemented.</p>;
+    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
   }
 
   if (!svcInfosQuery.data) {
@@ -188,7 +188,10 @@ const PrettyJsonPrint: React.FC<{
   data?: SvcRulesConfig | CoinConfig<USD> | string;
 }> = ({ data }) => {
   return (
-    <pre style={{ whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+    <pre
+      id="pretty-json"
+      style={{ whiteSpace: 'pre-wrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
+    >
       {typeof data !== 'string' ? JSON.stringify(data, null, 2) : data}
     </pre>
   );

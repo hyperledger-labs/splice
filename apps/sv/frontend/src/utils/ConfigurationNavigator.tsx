@@ -103,8 +103,7 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
         >
           <JsonEditor
             data={CoinConfig(USD).encode(Component._2) as Record<string, JSONValue>}
-            time={Component._1}
-            onChange={addCoinConfigSchedule}
+            onChange={newJson => addCoinConfigSchedule(newJson, Component._1)}
           />
         </CardComponent>
       ))}

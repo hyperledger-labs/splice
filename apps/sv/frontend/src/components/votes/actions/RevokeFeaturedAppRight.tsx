@@ -20,7 +20,7 @@ const RevokeFeaturedAppRight: React.FC<{
   }
 
   if (svcInfosQuery.isError) {
-    return <p>Not yet implemented.</p>;
+    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
   }
 
   function setRightCidAction(rightCid: string) {

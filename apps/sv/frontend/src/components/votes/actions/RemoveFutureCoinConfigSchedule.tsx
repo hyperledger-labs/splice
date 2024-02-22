@@ -22,7 +22,7 @@ const RemoveFutureCoinConfigSchedule: React.FC<{
   }
 
   if (svcInfosQuery.isError) {
-    return <p>Not yet implemented.</p>;
+    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
   }
 
   if (!svcInfosQuery.data) {

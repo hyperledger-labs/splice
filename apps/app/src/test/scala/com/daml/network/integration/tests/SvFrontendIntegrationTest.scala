@@ -17,6 +17,11 @@ import java.time.format.DateTimeFormatter
 import java.time.{LocalDateTime, ZoneOffset}
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
+import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
+import com.daml.network.codegen.java.cc.coinconfig.CoinConfig
+import com.daml.network.codegen.java.cn.wallet.payment.Currency
+
+import java.util.Optional
 
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
@@ -889,6 +894,7 @@ class SvFrontendIntegrationTest
          * - tests if the modal closes when the last voter votes
          * */
         val requestNewTransferConfigFeeValue = "42"
+        val optValidatorFaucetValue = "420"
         val requestReasonUrl = "This is a request reason url."
         val requestReasonBody = "This is a request reason."
 
@@ -916,8 +922,30 @@ class SvFrontendIntegrationTest
               setCoinConfigDate("sv1", "07/12/2032 12:12 AM")
 
               clue("sv1 modifies one value") {
-                find(id("transferConfig.createFee.fee-value")).value.underlying
-                  .sendKeys(requestNewTransferConfigFeeValue)
+                val input = find(id("transferConfig.createFee.fee-value")).value.underlying
+                input.clear()
+                input.sendKeys(requestNewTransferConfigFeeValue)
+              }
+
+              clue("sv1 modifies one optional value") {
+                val input = find(
+                  id("issuanceCurve.futureValues.0._2.optValidatorFaucetCap-value")
+                ).value.underlying
+                input.clear()
+                input.sendKeys(optValidatorFaucetValue)
+              }
+
+              clue("sv1 modifies another optional value") {
+                val input = find(
+                  id("issuanceCurve.initialValue.optValidatorFaucetCap-value")
+                ).value.underlying
+                input.clear()
+                input.sendKeys(optValidatorFaucetValue)
+              }
+
+              clue("sv1 reconsiders and sets the value back to null") {
+                find(id("issuanceCurve.initialValue.optValidatorFaucetCap-value")).value.underlying
+                  .clear()
               }
 
               clue("sv1 modifies the url") {
@@ -937,6 +965,8 @@ class SvFrontendIntegrationTest
           )(
             "sv1 can see the new vote request",
             _ => {
+              // if the modal was open due to a previous eventually-call, close it
+              scala.util.Try(click on "vote-request-modal-close-button")
               click on "tab-panel-in-progress"
 
               val tbody = find(id("sv-voting-in-progress-table-body"))
@@ -952,6 +982,25 @@ class SvFrontendIntegrationTest
                 inside(find(id("vote-request-modal-content-contract-id"))) { case Some(tb) =>
                   tb.text
                 }
+
+              inside(find(id("pretty-json"))) { case Some(json) =>
+                val coinConfig =
+                  CoinConfig.jsonDecoder(Currency.jsonDecoder()).decode(new JsonLfReader(json.text))
+                BigDecimal(coinConfig.transferConfig.createFee.fee) should be(
+                  BigDecimal(requestNewTransferConfigFeeValue)
+                )
+                coinConfig.issuanceCurve.initialValue.optValidatorFaucetCap should be(
+                  Optional.empty
+                )
+                coinConfig.issuanceCurve.futureValues
+                  .get(0)
+                  ._2
+                  .optValidatorFaucetCap
+                  .map(BigDecimal(_)) should be(
+                  Optional.of(BigDecimal(optValidatorFaucetValue))
+                )
+              }
+
               requestId
             },
           )

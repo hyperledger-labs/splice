@@ -1,3 +1,4 @@
+import { DecoderError } from '@mojotech/json-type-validation/dist/types/decoder';
 import { useMutation } from '@tanstack/react-query';
 import { DisableConditionally, SvClientProvider } from 'common-frontend';
 import { getUTCWithOffset } from 'common-frontend-utils';
@@ -42,6 +43,12 @@ import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
 import UpdateFutureCoinConfigSchedule from './actions/UpdateFutureCoinConfigSchedule';
 
 dayjs.extend(utc);
+
+export type ActionFromForm = ActionRequiringConfirmation | { formError: DecoderError };
+
+function actionFromFormIsError(action: ActionFromForm): action is { formError: DecoderError } {
+  return !!(action as { formError: DecoderError }).formError;
+}
 
 const VoteRequest: React.FC = () => {
   // States related to vote requests
@@ -103,33 +110,35 @@ const VoteRequest: React.FC = () => {
     },
   ];
 
-  const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
+  const [action, setAction] = useState<ActionFromForm | undefined>(undefined);
 
   function max(time1: Dayjs, time2: Dayjs): Dayjs {
     return time1 > time2 ? time1 : time2;
   }
 
-  const chooseAction = (action: ActionRequiringConfirmation) => {
+  const chooseAction = (action: ActionFromForm) => {
     setAction(action);
-    if (action.tag === 'ARC_CoinRules') {
-      switch (action.value.coinRulesAction.tag) {
-        case 'CRARC_AddFutureCoinConfigSchedule': {
-          setMaxDateTimeIfAddFutureCoinConfigSchedule(
-            max(dayjs(), dayjs(action.value.coinRulesAction.value.newScheduleItem._1))
-          );
-          return;
-        }
-        case 'CRARC_UpdateFutureCoinConfigSchedule': {
-          setMaxDateTimeIfAddFutureCoinConfigSchedule(
-            max(dayjs(), dayjs(action.value.coinRulesAction.value.scheduleItem._1))
-          );
-          return;
-        }
-        case 'CRARC_RemoveFutureCoinConfigSchedule': {
-          setMaxDateTimeIfAddFutureCoinConfigSchedule(
-            max(dayjs(), dayjs(action.value.coinRulesAction.value.scheduleTime))
-          );
-          return;
+    if (!actionFromFormIsError(action)) {
+      if (action.tag === 'ARC_CoinRules') {
+        switch (action.value.coinRulesAction.tag) {
+          case 'CRARC_AddFutureCoinConfigSchedule': {
+            setMaxDateTimeIfAddFutureCoinConfigSchedule(
+              max(dayjs(), dayjs(action.value.coinRulesAction.value.newScheduleItem._1))
+            );
+            return;
+          }
+          case 'CRARC_UpdateFutureCoinConfigSchedule': {
+            setMaxDateTimeIfAddFutureCoinConfigSchedule(
+              max(dayjs(), dayjs(action.value.coinRulesAction.value.scheduleItem._1))
+            );
+            return;
+          }
+          case 'CRARC_RemoveFutureCoinConfigSchedule': {
+            setMaxDateTimeIfAddFutureCoinConfigSchedule(
+              max(dayjs(), dayjs(action.value.coinRulesAction.value.scheduleTime))
+            );
+            return;
+          }
         }
       }
     }
@@ -184,8 +193,13 @@ const VoteRequest: React.FC = () => {
         microseconds: BigInt(expiration!.diff(dayjs(), 'milliseconds') * 1000).toString(),
       };
 
-      if (actionNameOptions.map(e => e.value).includes(actionName) && validateAction(action!)) {
-        return await createVoteRequest(requester, action!, url, summary, duration)
+      if (
+        action &&
+        actionNameOptions.map(e => e.value).includes(actionName) &&
+        !actionFromFormIsError(action) &&
+        validateAction(action)
+      ) {
+        return await createVoteRequest(requester, action, url, summary, duration)
           .then(() => setUrl(''))
           .then(() => setSummary(''))
           .then(() => setActionName('SRARC_RemoveMember'))
@@ -295,7 +309,14 @@ const VoteRequest: React.FC = () => {
           <DisableConditionally
             conditions={[
               { disabled: createVoteRequestMutation.isLoading, reason: 'Loading...' },
-              { disabled: action === undefined, reason: 'No action' },
+              {
+                disabled: !action || actionFromFormIsError(action),
+                reason: !action
+                  ? 'No action'
+                  : `Action is not valid: ${
+                      actionFromFormIsError(action) && JSON.stringify(action.formError)
+                    }`,
+              },
               { disabled: summary === '', reason: 'No summary' },
             ]}
           >

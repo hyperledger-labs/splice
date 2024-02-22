@@ -22,7 +22,7 @@ const RemoveMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmatio
   }
 
   if (svcInfosQuery.isError) {
-    return <p>Not yet implemented.</p>;
+    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
   }
 
   var memberOptions: { key: string; value: string }[] = [];
