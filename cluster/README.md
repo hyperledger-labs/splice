@@ -81,6 +81,8 @@
   - [Backup and Recovery](#backup-and-recovery)
     - [Backup](#backup)
     - [Restore](#restore)
+  - [Chaos Mesh](#chaos-mesh)
+  - [Debugging problems with GKE](#debugging-problems-with-gke)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -1791,6 +1793,41 @@ This is currently disabled by default. To enable it, set
 ```
 export ENABLE_CHAOS_MESH=1
 ```
+
+## Debugging problems with GKE
+
+In order to facilitate debugging cluster deployment problems that point to issues with GKE, enabling additional logging is an option.
+These issues often manifest in Pulumi deployments as:
+
+```text
+client rate limiter Wait returned an error: context deadline exceeded
+```
+or
+```text
+the server is currently unable to handle the request
+```
+
+There are 2 [additional logging options](https://cloud.google.com/kubernetes-engine/docs/concepts/about-logs) available in GKE - control plane logs and audit logs.
+
+#### Kubernetes control plane logs
+
+These are logs for k8s control plane components eg. the Kubernetes API server, scheduler and controller manager and are configured on a per-cluster basis.
+To enable these, go to Kubernetes > Clusters, select your GKE project from the drop-down, click on the cluster name and scroll down to Features.
+Click on the Edit icon next to Logging and select the components for which to enable logs. It may take a while after you click "Save Changes" for your
+changes to be registered with GKE.
+
+#### Audit logs
+
+By default, our GKE clusters already have Admin Activity audit logging enabled. This includes logs that write metadata or configuration information eg.
+creating, modifying or deleting k8s resources (basically any GKE API method that starts with Create, Update, Set, or Delete). To also enable audit logging
+for read API requests (Get, Watch, List), you need to explicitly enable Data Access audit logs. To do so, go to IAM & Admin > Audit Logs, search for
+Kubernetes Engine API and add a tick mark against the log types you want to enable (Admin Read, Data Read and Data Write). For a description of what each log type
+represents, see [Enable Data Access audit logs](https://cloud.google.com/logging/docs/audit/configure-data-access)
+
+### Useful log filters
+
+- `resource.type="k8s_control_plane_component"` - provides all control plane logs
+- `protoPayload.authenticationInfo.principalEmail=~"circleci@.*"` - provides audit logs for the circleci service account
 
 ## Appendix: Kubernetes and Other Deployment Resources
 
