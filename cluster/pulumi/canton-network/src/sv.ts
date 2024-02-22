@@ -150,12 +150,15 @@ export async function installSvNode(
     await installAuth0UISecret(baseConfig.auth0Client, xns, 'sv', baseConfig.nodeName),
   ];
 
-  const periodicBackupConfig = baseConfig.periodicBackupConfig
+  const periodicBackupConfig: BackupConfig | undefined = baseConfig.periodicBackupConfig
     ? {
         ...baseConfig.periodicBackupConfig,
-        prefix:
-          baseConfig.periodicBackupConfig.location.prefix ||
-          `${CLUSTER_BASENAME}/${xns.logicalName}`,
+        location: {
+          ...baseConfig.periodicBackupConfig.location,
+          prefix:
+            baseConfig.periodicBackupConfig.location.prefix ||
+            `${CLUSTER_BASENAME}/${xns.logicalName}`,
+        },
       }
     : undefined;
 
