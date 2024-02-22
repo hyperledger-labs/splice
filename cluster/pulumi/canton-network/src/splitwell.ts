@@ -8,15 +8,13 @@ import {
   CLUSTER_BASENAME,
   ValidatorTopupConfig,
   ExactNamespace,
-  sanitizedForPostgres,
   DomainMigrationIndex,
 } from 'cn-pulumi-common';
 import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
-import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
 import { installParticipant } from './ledger';
-import { Postgres, installPostgresMetrics } from './postgres';
+import { installPostgresMetrics } from './postgres';
 import { installValidatorApp } from './validator';
 
 export async function installSplitwell(
@@ -37,8 +35,6 @@ export async function installSplitwell(
     splitPostgresInstances ? 'domain-pg' : 'postgres',
     splitPostgresInstances
   );
-
-  const domain = installDomain(xns, 'domain', domainPostgres);
 
   const loopback = installCNHelmChart(
     xns,
@@ -65,7 +61,7 @@ export async function installSplitwell(
     auth0UserNameEnvVarSource('validator'),
     // We disable auto-init if we have a dump to bootstrap from.
     !!participantBootstrapDump,
-    [domain, loopback]
+    [loopback]
   );
 
   const swPostgres = splitPostgresInstances
@@ -105,7 +101,6 @@ export async function installSplitwell(
       auth0UserNameEnvVar('splitwell'),
       { name: 'CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME', value: providerWalletUser },
     ],
-    extraDomains: [{ alias: 'splitwell', url: 'http://domain.splitwell:5008' }],
     additionalConfig: [
       'canton.validator-apps.validator_backend.app-instances.splitwell = {',
       '  service-user = ${?CN_APP_SPLITWELL_LEDGER_API_AUTH_USER_NAME}',
@@ -141,35 +136,6 @@ export async function installSplitwell(
   installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
 
   return validator;
-}
-
-function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): pulumi.Resource {
-  const sanitizedName = sanitizedForPostgres(name);
-  const mediatorDbName = `${sanitizedName}_mediator`;
-  const sequencerDbName = `${sanitizedName}_sequencer`;
-
-  const domain = installCNHelmChart(xns, name, 'cn-domain', {
-    mediator: {
-      persistence: {
-        databaseName: mediatorDbName,
-        host: postgres.address,
-        secretName: postgres.secretName,
-      },
-    },
-    sequencer: {
-      persistence: {
-        databaseName: sequencerDbName,
-        host: postgres.address,
-        secretName: postgres.secretName,
-      },
-    },
-    additionalJvmOptions: jmxOptions(),
-  });
-
-  installPostgresMetrics(postgres, mediatorDbName, [domain]);
-  installPostgresMetrics(postgres, sequencerDbName, [domain]);
-
-  return domain;
 }
 
 function installIngress(xns: ExactNamespace) {

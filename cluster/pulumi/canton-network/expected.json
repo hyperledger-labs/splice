@@ -1140,56 +1140,6 @@
     "custom": true,
     "id": "",
     "inputs": {
-      "chart": "/cluster/helm/cn-domain/",
-      "compat": "true",
-      "name": "domain",
-      "namespace": "splitwell",
-      "timeout": 480,
-      "values": {
-        "additionalJvmOptions": "-Dcom.sun.management.jmxremote=true -Dcom.sun.management.jmxremote.port=9010 -Dcom.sun.management.jmxremote.rmi.port=9010 -Dcom.sun.management.jmxremote.local.only=false -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false -Djava.rmi.server.hostname=127.0.0.1",
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "mediator": {
-          "persistence": {
-            "databaseName": "domain_mediator",
-            "host": "postgres.splitwell.svc.cluster.local",
-            "secretName": "postgres-secrets"
-          }
-        },
-        "resources": {
-          "limits": {
-            "memory": "8Gi"
-          },
-          "requests": {
-            "cpu": "1",
-            "memory": "4Gi"
-          }
-        },
-        "sequencer": {
-          "persistence": {
-            "databaseName": "domain_sequencer",
-            "host": "postgres.splitwell.svc.cluster.local",
-            "secretName": "postgres-secrets"
-          }
-        }
-      }
-    },
-    "name": "splitwell-domain",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
       "chart": "/cluster/helm/cn-cluster-loopback-gateway/",
       "compat": "true",
       "name": "loopback",
@@ -1274,68 +1224,6 @@
       }
     },
     "name": "splitwell-participant",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "postgres-domain-mediator-e",
-      "namespace": "splitwell",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "databaseName": "domain_mediator",
-          "host": "postgres.splitwell.svc.cluster.local",
-          "port": "5432",
-          "secretName": "postgres-secrets"
-        }
-      }
-    },
-    "name": "splitwell-postgres-domain-mediator-e",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres-metrics/",
-      "compat": "true",
-      "name": "postgres-domain-sequencer-e",
-      "namespace": "splitwell",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "databaseName": "domain_sequencer",
-          "host": "postgres.splitwell.svc.cluster.local",
-          "port": "5432",
-          "secretName": "postgres-secrets"
-        }
-      }
-    },
-    "name": "splitwell-postgres-domain-sequencer-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1545,12 +1433,6 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
-        "extraDomains": [
-          {
-            "alias": "splitwell",
-            "url": "http://domain.splitwell:5008"
-          }
-        ],
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
