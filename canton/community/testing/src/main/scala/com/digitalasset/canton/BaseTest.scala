@@ -10,8 +10,8 @@ import com.digitalasset.canton.concurrent.{DirectExecutionContext, FutureSupervi
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.logging.{NamedLogging, SuppressionRule, SuppressingLogger}
-import com.digitalasset.canton.protocol.{CatchUpConfig, StaticDomainParameters}
+import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger, SuppressionRule}
+import com.digitalasset.canton.protocol.{AcsCommitmentsCatchUpConfig, StaticDomainParameters}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.CheckedT
 import com.digitalasset.canton.util.FutureInstances.*
@@ -386,7 +386,7 @@ object BaseTest {
 
   def defaultStaticDomainParametersWith(
       protocolVersion: ProtocolVersion = testedProtocolVersion,
-      catchUpParameters: Option[CatchUpConfig] = None,
+      acsCommitmentsCatchUp: Option[AcsCommitmentsCatchUpConfig] = None,
   ): StaticDomainParameters = StaticDomainParameters.create(
     requiredSigningKeySchemes = SymbolicCryptoProvider.supportedSigningKeySchemes,
     requiredEncryptionKeySchemes = SymbolicCryptoProvider.supportedEncryptionKeySchemes,
@@ -394,7 +394,7 @@ object BaseTest {
     requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
     requiredCryptoKeyFormats = SymbolicCryptoProvider.supportedCryptoKeyFormats,
     protocolVersion = protocolVersion,
-    catchUpParameters = catchUpParameters,
+    acsCommitmentsCatchUp = acsCommitmentsCatchUp,
   )
 
   lazy val testedProtocolVersion: ProtocolVersion =
@@ -409,6 +409,7 @@ object BaseTest {
 
   lazy val CantonExamplesPath: String = getResourcePath("CantonExamples.dar")
   lazy val CantonTestsPath: String = getResourcePath("CantonTests.dar")
+  lazy val CantonTestsDevPath: String = getResourcePath("CantonTestsDev.dar")
   lazy val CantonLfDev: String = getResourcePath("CantonLfDev.dar")
   lazy val CantonLfV21: String = getResourcePath("CantonLfV21.dar")
   lazy val PerformanceTestPath: String = getResourcePath("PerformanceTest.dar")

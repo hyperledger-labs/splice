@@ -173,7 +173,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         }
 
         val partyAndParticipants =
-          env.participantsX.all.flatMap(_.parties.list().flatMap(partyIdToParticipant(_).toList))
+          env.participants.all.flatMap(_.parties.list().flatMap(partyIdToParticipant(_).toList))
         val allPartiesSingleParticipant =
           partyAndParticipants.groupBy { case (partyId, _) => partyId }.forall {
             case (_, participants) => participants.sizeCompare(1) <= 0
@@ -203,7 +203,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         def participantValue(p: ParticipantReference): String =
           if (useParticipantAlias) p.name else p.uid.toProtoPrimitive
 
-        val allParticipants = env.participantsX.all
+        val allParticipants = env.participants.all
         val participantsData =
           allParticipants.map(p => (participantValue(p), toLedgerApi(p.config))).toMap
         val uidToAlias = allParticipants.map(p => (p.id, p.name)).toMap
@@ -274,6 +274,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         env.runE(
           RepairService.ContractConverter.contractDataToInstance(
             contractData.templateId.toIdentifier,
+            contractData.packageName,
             contractData.createArguments,
             contractData.signatories,
             contractData.observers,
@@ -299,6 +300,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         RepairService.ContractConverter.contractInstanceToData(contract).map {
           case (
                 templateId,
+                packageName,
                 createArguments,
                 signatories,
                 observers,
@@ -308,6 +310,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
               ) =>
             ContractData(
               TemplateId.fromIdentifier(templateId),
+              packageName,
               createArguments,
               signatories,
               observers,
@@ -523,6 +526,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     ): Command =
       Command().withCreate(
         CreateCommand(
+          // TODO(#16362): Support encoding of the package-name
           templateId = Some(buildIdentifier(packageId, module, template)),
           createArguments = Some(buildArguments(arguments)),
         )
@@ -539,6 +543,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
     ): Command =
       Command().withExercise(
         ExerciseCommand(
+          // TODO(#16362): Support encoding of the package-name
           templateId = Some(buildIdentifier(packageId, module, template)),
           choice = choice,
           choiceArgument = Some(Value(Value.Sum.Record(buildArguments(arguments)))),

@@ -116,7 +116,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
       configs,
       Seq(),
       logSuffix,
-      allExtraEnv: _*
+      allExtraEnv*
     )(test)
   }
 }

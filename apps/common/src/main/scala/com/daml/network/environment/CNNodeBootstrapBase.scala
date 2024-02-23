@@ -159,7 +159,7 @@ abstract class CNNodeBootstrapBase[
         val stores = List()
         val instances =
           grpcAdminServers ++ getNode.toList ++ stores ++ List(clock)
-        Lifecycle.close(instances: _*)(logger)
+        Lifecycle.close(instances*)(logger)
         logger.debug(s"Successfully completed shutdown of $name")
       } else {
         logger.warn(

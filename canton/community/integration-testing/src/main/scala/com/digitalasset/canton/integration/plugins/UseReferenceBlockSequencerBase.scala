@@ -38,7 +38,7 @@ abstract class UseReferenceBlockSequencerBase[
   protected val dbNames: NonEmpty[List[String]] = NonEmpty(
     List,
     dbNameForGroup(0), // db 0 is the default one
-    (1 to sequencerGroups.numberOfDomains).map(i => dbNameForGroup(i)).toList *,
+    (1 to sequencerGroups.numberOfDomains).map(i => dbNameForGroup(i)).toList*
   )
 
   protected def driverConfigs(

@@ -12,7 +12,7 @@ import com.daml.network.environment.RetryFor
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.transaction.ParticipantPermissionX
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
 import scala.jdk.CollectionConverters.*
@@ -229,7 +229,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .mapping
           .participants
         svcHostingParticipants should have length 4
-        svcHostingParticipants.foreach(_.permission shouldBe ParticipantPermissionX.Submission)
+        svcHostingParticipants.foreach(_.permission shouldBe ParticipantPermission.Submission)
       }
     }
     clue("Each SV is submitting status reports") {

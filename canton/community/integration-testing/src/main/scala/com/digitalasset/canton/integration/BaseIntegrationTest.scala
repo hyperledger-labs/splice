@@ -80,7 +80,7 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
           assertion(entry)
           entry.commandFailureMessage
           succeed
-        }) *,
+        })*
     )
 
   /** Similar to [[com.digitalasset.canton.console.commands.ParticipantAdministration#ping]]

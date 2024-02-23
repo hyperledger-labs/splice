@@ -625,7 +625,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
     def allContractsMigrated(rows: (FilterableCompanion, PartyId)*) = {
       val companions = Table[JIdentifier, FilterableCompanion, PartyId](
         ("template", "companion", "querying party"),
-        rows.map { case (c, p) => (c.TEMPLATE_ID, c, p) }: _*
+        rows.map { case (c, p) => (c.TEMPLATE_ID, c, p) }*
       )
       eventually() {
         tForEvery(companions) { (_, companion, queryingParty) =>
@@ -637,7 +637,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
             sv1ValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
               .lookup_contract_domain(queryingParty, contractIds.toSet)
 
-          tForEvery(Table("contract ID", contractIds: _*)) { cid =>
+          tForEvery(Table("contract ID", contractIds*)) { cid =>
             domains.get(cid) shouldBe Some(globalUpgradeId)
           }
         }
@@ -656,7 +656,7 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
         c(so.SvOnboardingConfirmed.COMPANION),
       )
       // only have the sv party as a stakeholder
-      allContractsMigrated(templatesMovedBySvAutomation.map(c(_, sv1Party)): _*)
+      allContractsMigrated(templatesMovedBySvAutomation.map(c(_, sv1Party))*)
     }
 
     // wait a tick for next, as below wait for CoinRules to move

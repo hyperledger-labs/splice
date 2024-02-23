@@ -36,6 +36,8 @@ import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor.{
   CommitmentsPruningBound,
   RunningCommitments,
   commitmentsFromStkhdCmts,
+  computeCommitmentsPerParticipant,
+  emptyCommitment,
   initRunningCommitments,
 }
 import com.digitalasset.canton.participant.store.*
@@ -96,6 +98,12 @@ sealed trait AcsCommitmentProcessorBaseTest
     remoteId1 -> Set(bob),
     remoteId2 -> Set(carol, danna, ed),
   )
+
+  protected lazy val dummyCmt = {
+    val h = LtHash16()
+    h.add("123".getBytes())
+    h.getByteString()
+  }
 
   lazy val initialTransferCounter: TransferCounterO =
     Some(TransferCounter.Genesis)
@@ -226,7 +234,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       overrideDefaultSortedReconciliationIntervalsProvider: Option[
         SortedReconciliationIntervalsProvider
       ] = None,
-      catchUpModeEnabled: Boolean = false,
+      acsCommitmentsCatchUpModeEnabled: Boolean = false,
   )(implicit ec: ExecutionContext): (
       AcsCommitmentProcessor,
       AcsCommitmentStore,
@@ -250,9 +258,9 @@ sealed trait AcsCommitmentProcessorBaseTest
         constantSortedReconciliationIntervalsProvider(interval)
       }
 
-    val catchUpConfig =
-      if (catchUpModeEnabled)
-        Some(CatchUpConfig(PositiveInt.tryCreate(2), PositiveInt.tryCreate(1)))
+    val acsCommitmentsCatchUpConfig =
+      if (acsCommitmentsCatchUpModeEnabled)
+        Some(AcsCommitmentsCatchUpConfig(PositiveInt.tryCreate(2), PositiveInt.tryCreate(1)))
       else None
 
     val acsCommitmentProcessor = new AcsCommitmentProcessor(
@@ -265,7 +273,7 @@ sealed trait AcsCommitmentProcessorBaseTest
       _ => (),
       ParticipantTestMetrics.pruning,
       testedProtocolVersion,
-      catchUpConfig,
+      acsCommitmentsCatchUpConfig,
       DefaultProcessingTimeouts.testing
         .copy(storageMaxRetryInterval = NonNegativeDuration.tryFromDuration(1.millisecond)),
       futureSupervisor,
@@ -783,7 +791,7 @@ class AcsCommitmentProcessorTest
             logger.debug(
               s"adding to commitment for stakeholders $stkhs the parts cid and transfer counter in $m"
             )
-            SortedSet(stkhs.toList: _*) -> stakeholderCommitment(m.map {
+            SortedSet(stkhs.toList*) -> stakeholderCommitment(m.map {
               case (cid, (_, transferCounter)) => (cid, transferCounter)
             })
           }
@@ -1872,7 +1880,7 @@ class AcsCommitmentProcessorTest
     "use catch-up logic correctly:" must {
 
       def checkCatchUpModeCfgCorrect(processor: pruning.AcsCommitmentProcessor): Assertion = {
-        processor.catchUpConfig match {
+        processor.acsCommitmentsCatchUpConfig match {
           case Some(cfg) =>
             assert(cfg.nrIntervalsToTriggerCatchUp == PositiveInt.tryCreate(1))
             assert(cfg.catchUpIntervalSkip == PositiveInt.tryCreate(2))
@@ -1904,8 +1912,13 @@ class AcsCommitmentProcessorTest
           remoteId2 -> Set(carol),
         )
 
-        val (processor, store, _, changes) =
-          testSetupDontPublish(timeProofs, contractSetup, topology, catchUpModeEnabled = true)
+        val (processor, store, sequencerClient, changes) =
+          testSetupDontPublish(
+            timeProofs,
+            contractSetup,
+            topology,
+            acsCommitmentsCatchUpModeEnabled = true,
+          )
 
         checkCatchUpModeCfgCorrect(processor)
 
@@ -1986,8 +1999,13 @@ class AcsCommitmentProcessorTest
           remoteId2 -> Set(carol),
         )
 
-        val (processor, store, _, changes) =
-          testSetupDontPublish(timeProofs, contractSetup, topology, catchUpModeEnabled = true)
+        val (processor, store, sequencerClient, changes) =
+          testSetupDontPublish(
+            timeProofs,
+            contractSetup,
+            topology,
+            acsCommitmentsCatchUpModeEnabled = true,
+          )
 
         checkCatchUpModeCfgCorrect(processor)
 
@@ -2067,8 +2085,13 @@ class AcsCommitmentProcessorTest
           remoteId2 -> Set(carol),
         )
 
-        val (processor, store, _, changes) =
-          testSetupDontPublish(timeProofs, contractSetup, topology, catchUpModeEnabled = true)
+        val (processor, store, sequencerClient, changes) =
+          testSetupDontPublish(
+            timeProofs,
+            contractSetup,
+            topology,
+            acsCommitmentsCatchUpModeEnabled = true,
+          )
 
         checkCatchUpModeCfgCorrect(processor)
 
@@ -2174,8 +2197,13 @@ class AcsCommitmentProcessorTest
           remoteId2 -> Set(carol),
         )
 
-        val (processor, store, _, changes) =
-          testSetupDontPublish(timeProofs, contractSetup, topology, catchUpModeEnabled = true)
+        val (processor, store, sequencerClient, changes) =
+          testSetupDontPublish(
+            timeProofs,
+            contractSetup,
+            topology,
+            acsCommitmentsCatchUpModeEnabled = true,
+          )
 
         checkCatchUpModeCfgCorrect(processor)
 
@@ -2274,17 +2302,21 @@ class AcsCommitmentProcessorTest
           // init phase
           rc <- runningCommitments
           _ = rc.update(rt(2, 0), acsChanges(ts(2)))
-          normalCommitments2 <- AcsCommitmentProcessor.commitments(
+          byParticipant2 <- AcsCommitmentProcessor.stakeholderCommitmentsPerParticipant(
             localId,
             rc.snapshot().active,
             crypto,
             ts(2),
-            None,
             parallelism,
-            new CachedCommitments(),
           )
-
-          _ = cachedCommitments.setCachedCommitments(normalCommitments2, rc.snapshot().active)
+          normalCommitments2 = computeCommitmentsPerParticipant(byParticipant2, cachedCommitments)
+          _ = cachedCommitments.setCachedCommitments(
+            normalCommitments2,
+            rc.snapshot().active,
+            byParticipant2.map { case (pid, set) =>
+              (pid, set.map { case (stkhd, _cmt) => stkhd }.toSet)
+            },
+          )
 
           // update: at time 4, a contract of (alice, bob), and a contract of (alice, bob, charlie) gets archived
           // these are all the stakeholder groups participant "localId" has in common with participant "remoteId1"
@@ -2302,12 +2334,12 @@ class AcsCommitmentProcessorTest
 
           computeFromCachedRemoteId1 = cachedCommitments.computeCmtFromCached(
             remoteId1,
-            byParticipant(remoteId1),
+            byParticipant(remoteId1).toMap,
           )
 
           computeFromCachedRemoteId2 = cachedCommitments.computeCmtFromCached(
             remoteId2,
-            byParticipant(remoteId2),
+            byParticipant(remoteId2).toMap,
           )
         } yield {
           // because more than 1/2 of the stakeholder commitments for participant "remoteId1" change, we shouldn't
@@ -2402,17 +2434,21 @@ class AcsCommitmentProcessorTest
           // (alice, danna) with one contract, and (alice, ed) with one contract
           rc <- runningCommitments
           _ = rc.update(rt(2, 0), acsChanges(ts(2)))
-          normalCommitments2 <- AcsCommitmentProcessor.commitments(
+          byParticipant2 <- AcsCommitmentProcessor.stakeholderCommitmentsPerParticipant(
             remoteId2,
             rc.snapshot().active,
             crypto,
             ts(2),
-            None,
             parallelism,
-            new CachedCommitments(),
           )
-
-          _ = cachedCommitments.setCachedCommitments(normalCommitments2, rc.snapshot().active)
+          normalCommitments2 = computeCommitmentsPerParticipant(byParticipant2, cachedCommitments)
+          _ = cachedCommitments.setCachedCommitments(
+            normalCommitments2,
+            rc.snapshot().active,
+            byParticipant2.map { case (pid, set) =>
+              (pid, set.map { case (stkhd, _cmt) => stkhd }.toSet)
+            },
+          )
 
           byParticipant <- AcsCommitmentProcessor.stakeholderCommitmentsPerParticipant(
             remoteId2,
@@ -2423,15 +2459,10 @@ class AcsCommitmentProcessorTest
           )
 
           // simulate offboarding party ed from remoteId2 by replacing the commitment for (alice,ed) with an empty commitment
-          byParticipantWithOffboard = byParticipant.map { case (participant, stakeholdersCmts) =>
-            if (participant == localId)
-              (
-                localId,
-                stakeholdersCmts
-                  .filter(x => x._1 != SortedSet(alice, ed))
-                  .union(Set((SortedSet(alice, ed), AcsCommitmentProcessor.emptyCommitment))),
-              )
-            else (participant, stakeholdersCmts)
+          byParticipantWithOffboard = byParticipant.updatedWith(localId) {
+            case Some(stakeholdersCmts) =>
+              Some(stakeholdersCmts.updated(SortedSet(alice, ed), emptyCommitment))
+            case None => None
           }
 
           computeFromCachedLocalId1 = cachedCommitments.computeCmtFromCached(
@@ -2448,6 +2479,72 @@ class AcsCommitmentProcessorTest
           )
         } yield {
           assert(computeFromCachedLocalId1.contains(correctCmts))
+        }
+      }
+
+      "handles stakeholder group addition correctly" in {
+        val (_, acsChanges) = setupContractsAndAcsChanges2()
+        val crypto = cryptoSetup(remoteId2, topology)
+
+        val inMemoryCommitmentStore = new InMemoryAcsCommitmentStore(loggerFactory)
+        val runningCommitments = initRunningCommitments(inMemoryCommitmentStore)
+        val cachedCommitments = new CachedCommitments()
+
+        for {
+          // init phase
+          // participant "remoteId2" has one stakeholder group in common with "remote1": (alice, bob, charlie) with one contract
+          // participant "remoteId2" has three stakeholder group in common with "local": (alice, bob, charlie) with one contract,
+          // (alice, danna) with one contract, and (alice, ed) with one contract
+          rc <- runningCommitments
+          _ = rc.update(rt(2, 0), acsChanges(ts(2)))
+          byParticipant2 <- AcsCommitmentProcessor.stakeholderCommitmentsPerParticipant(
+            remoteId2,
+            rc.snapshot().active,
+            crypto,
+            ts(2),
+            parallelism,
+          )
+          normalCommitments2 = computeCommitmentsPerParticipant(byParticipant2, cachedCommitments)
+          _ = cachedCommitments.setCachedCommitments(
+            normalCommitments2,
+            rc.snapshot().active,
+            byParticipant2.map { case (pid, set) =>
+              (pid, set.map { case (stkhd, _cmt) => stkhd }.toSet)
+            },
+          )
+
+          byParticipant <- AcsCommitmentProcessor.stakeholderCommitmentsPerParticipant(
+            remoteId2,
+            rc.snapshot().active,
+            crypto,
+            ts(2),
+            parallelism,
+          )
+
+          // simulate onboarding party ed to remoteId1 by adding remoteId1 as a participant for group (alice, ed)
+          // the commitment for (alice,ed) existed previously, but was not used for remoteId1's commitment
+          // also simulate creating a new, previously inexisting stakeholder group (danna, ed) with commitment dummyCmt,
+          // which the commitment for remoteId1 needs to use now that ed is onboarded on remoteId1
+          newCmts = byParticipant(localId).filter(x => x._1 == SortedSet(alice, ed)) ++ Map(
+            SortedSet(danna, ed) -> dummyCmt
+          )
+          byParticipantWithOnboard = byParticipant.updatedWith(remoteId1) {
+            case Some(stakeholdersCmts) => Some(stakeholdersCmts ++ newCmts)
+            case None => Some(newCmts)
+          }
+
+          computeFromCachedRemoteId1 = cachedCommitments.computeCmtFromCached(
+            remoteId1,
+            byParticipantWithOnboard(remoteId1).toMap,
+          )
+
+          // the correct commitment for local should include the commitments for (alice, bob, charlie), (alice, ed)
+          // and (dana, ed)
+          correctCmts = commitmentsFromStkhdCmts(
+            byParticipantWithOnboard(remoteId1).values.toSeq
+          )
+        } yield {
+          assert(computeFromCachedRemoteId1.contains(correctCmts))
         }
       }
 

@@ -446,7 +446,7 @@ class GlobalDomainMigrationIntegrationTest
           },
           // reset to not crash other tests
           {
-            // pausing DomainUpgradeTrigger of all all old SV to avoid them from setting the maxRatePerParticipant back to zero.
+            // pausing DomainUpgradeTrigger of all all old SV to avoid them from setting the confirmationRequestsMaxRate back to zero.
             allNodes.foreach { node =>
               node.oldBackend.svcAutomation
                 .trigger[GlobalDomainMigrationTrigger]
@@ -454,11 +454,11 @@ class GlobalDomainMigrationIntegrationTest
                 .futureValue
             }
             clue(
-              s"reset maxRatePerParticipant to ${domainDynamicParams.maxRatePerParticipant} to not crash other tests"
+              s"reset confirmationRequestsMaxRate to ${domainDynamicParams.confirmationRequestsMaxRate} to not crash other tests"
             ) {
               changeDomainRatePerParticipant(
                 allNodes.map(_.oldBackend.appState.participantAdminConnection),
-                domainDynamicParams.maxRatePerParticipant,
+                domainDynamicParams.confirmationRequestsMaxRate,
               )
             }
             deleteDirectoryRecursively(migrationDumpDir.toFile)
@@ -537,7 +537,7 @@ class GlobalDomainMigrationIntegrationTest
                   .futureValue
                   .mapping
                   .parameters
-                  .maxRatePerParticipant should be > NonNegativeInt.zero
+                  .confirmationRequestsMaxRate should be > NonNegativeInt.zero
               }
             }
           }
@@ -560,7 +560,7 @@ class GlobalDomainMigrationIntegrationTest
                 .futureValue
                 .mapping
                 .parameters
-                .maxRatePerParticipant should be(NonNegativeInt.zero)
+                .confirmationRequestsMaxRate should be(NonNegativeInt.zero)
             }
           }
 
@@ -665,7 +665,7 @@ class GlobalDomainMigrationIntegrationTest
         node
           .ensureDomainParameters(
             globalDomainId,
-            _.tryUpdate(maxRatePerParticipant = rate),
+            _.tryUpdate(confirmationRequestsMaxRate = rate),
             signedBy = id.namespace.fingerprint,
           )
       }

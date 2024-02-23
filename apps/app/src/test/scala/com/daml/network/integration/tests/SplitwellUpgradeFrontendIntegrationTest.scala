@@ -264,7 +264,7 @@ class SplitwellUpgradeFrontendIntegrationTest
                   val balanceUpdates =
                     bobSplitwellClient.listBalanceUpdates(GroupKey(abGroupName, alice))
                   balanceUpdates should have size 3
-                  assertAllOn(splitwellUpgradeAlias)(balanceUpdates.map(_.contractId): _*)
+                  assertAllOn(splitwellUpgradeAlias)(balanceUpdates.map(_.contractId)*)
                 },
               )
             }

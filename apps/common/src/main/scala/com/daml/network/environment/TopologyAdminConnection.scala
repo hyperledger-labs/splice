@@ -608,7 +608,7 @@ abstract class TopologyAdminConnection(
         participants.map(
           HostingParticipant(
             _,
-            ParticipantPermissionX.Submission,
+            ParticipantPermission.Submission,
           )
         ),
         groupAddressing = false,
@@ -648,7 +648,7 @@ abstract class TopologyAdminConnection(
       // New participants are only given Observation rights. We explicitly promote them to Submission rights later.
       // See SvOnboardingPromoteToSubmitterTrigger.
       val newHostingParticipant =
-        HostingParticipant(newParticipant, ParticipantPermissionX.Observation)
+        HostingParticipant(newParticipant, ParticipantPermission.Observation)
       if (participants.map(_.participantId).contains(newHostingParticipant.participantId)) {
         participants
       } else {
@@ -746,7 +746,7 @@ abstract class TopologyAdminConnection(
     def promoteParticipantToSubmitter(
         participants: Seq[HostingParticipant]
     ): Seq[HostingParticipant] = {
-      val newValue = HostingParticipant(participantId, ParticipantPermissionX.Submission)
+      val newValue = HostingParticipant(participantId, ParticipantPermission.Submission)
       val oldIndex = participants.indexWhere(_.participantId == newValue.participantId)
       participants.updated(oldIndex, newValue)
     }
@@ -757,7 +757,7 @@ abstract class TopologyAdminConnection(
       EitherT(getPartyToParticipant(domainId, party).map(result => {
         Either.cond(
           result.mapping.participants
-            .contains(HostingParticipant(participantId, ParticipantPermissionX.Submission)),
+            .contains(HostingParticipant(participantId, ParticipantPermission.Submission)),
           result,
           result,
         )

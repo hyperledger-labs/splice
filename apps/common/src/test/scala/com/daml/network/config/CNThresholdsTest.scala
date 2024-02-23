@@ -3,7 +3,7 @@ package com.daml.network.config
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.ParticipantId
-import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermissionX}
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 import org.scalatest.wordspec.AnyWordSpecLike
 
 class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
@@ -68,7 +68,7 @@ class CNThresholdsTest extends AnyWordSpecLike with BaseTest {
     (1 to size).map(i =>
       HostingParticipant(
         ParticipantId.tryFromProtoPrimitive(s"PAR::participant$i::dummy"),
-        ParticipantPermissionX.Submission,
+        ParticipantPermission.Submission,
       )
     )
   }

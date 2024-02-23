@@ -69,7 +69,7 @@ final class GlobalDomainMigrationTrigger(
     domainParamsTopologyResult <- participantAdminConnection
       .ensureDomainParameters(
         globalDomainId,
-        _.tryUpdate(maxRatePerParticipant = NonNegativeInt.zero),
+        _.tryUpdate(confirmationRequestsMaxRate = NonNegativeInt.zero),
         signedBy = id.namespace.fingerprint,
       )
   } yield domainParamsTopologyResult

@@ -5,7 +5,7 @@ import com.daml.network.automation.*
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermissionX}
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
@@ -59,7 +59,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
         .map(_.flatMap(_.mapping.participants))
     } yield {
       val observingParticipantIds = svcHostingParticipants
-        .filter(_.permission == ParticipantPermissionX.Observation)
+        .filter(_.permission == ParticipantPermission.Observation)
         .map(_.participantId)
       val svcMemberParticipantIds = svcMemberParticipants.map(_.participantId)
       observingParticipantIds
@@ -101,7 +101,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
         .map(_.mapping.participants)
     } yield {
       svcHostingParticipants
-        .contains(HostingParticipant(task.participantId, ParticipantPermissionX.Submission))
+        .contains(HostingParticipant(task.participantId, ParticipantPermission.Submission))
     }
   }
 

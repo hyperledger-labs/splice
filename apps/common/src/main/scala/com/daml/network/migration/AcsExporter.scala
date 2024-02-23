@@ -46,7 +46,7 @@ class AcsExporter(
             filterParticipant = participantId.toProtoPrimitive,
           )
           .map(_.map(_.mapping.partyId))
-        acs <- safeExportAcsFromPausedDomain(domain, parties *).value
+        acs <- safeExportAcsFromPausedDomain(domain, parties*).value
       } yield acs
     }
   }
@@ -62,7 +62,7 @@ class AcsExporter(
         )
       domainParamsState = domainParamsStateTopology.mapping.parameters
       _ <- EitherT.cond[Future](
-        domainParamsState.maxRatePerParticipant == NonNegativeInt.zero,
+        domainParamsState.confirmationRequestsMaxRate == NonNegativeInt.zero,
         (),
         AcsExporter.DomainNotPaused,
       )
@@ -91,7 +91,7 @@ class AcsExporter(
   ) = {
     val domainParams = domainParamsTopology.mapping.parameters
     val duration = domainParams.mediatorReactionTimeout.duration
-      .plus(domainParams.participantResponseTimeout.duration)
+      .plus(domainParams.confirmationResponseTimeout.duration)
       .plus(5.seconds.toJava) // a small buffer to account for network latency
 
     val readyForDumpAfter = domainParamsTopology.base.validFrom.plus(duration)

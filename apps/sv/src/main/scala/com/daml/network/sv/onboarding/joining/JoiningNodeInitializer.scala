@@ -36,7 +36,7 @@ import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermissionX}
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -248,7 +248,7 @@ class JoiningNodeInitializer(
               )
               .asRuntimeException()
           case Some(HostingParticipant(_, permission)) =>
-            if (permission == ParticipantPermissionX.Submission)
+            if (permission == ParticipantPermission.Submission)
               svcPartyHosting
             else
               throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()

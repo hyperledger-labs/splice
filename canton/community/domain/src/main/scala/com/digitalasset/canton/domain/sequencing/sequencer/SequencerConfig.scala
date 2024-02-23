@@ -62,6 +62,9 @@ object CommunitySequencerConfig {
   ) extends CommunitySequencerConfig {
     override def supportsReplicas: Boolean = false
   }
+
+  def default: CommunitySequencerConfig = ???
+  // TODO(#10244): add back the above definition by adding the necessary sbt project definitions
 }
 
 /** Health check related sequencer config

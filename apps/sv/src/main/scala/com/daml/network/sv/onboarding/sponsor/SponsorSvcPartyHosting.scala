@@ -16,7 +16,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{
   HostingParticipant,
-  ParticipantPermissionX,
+  ParticipantPermission,
   PartyToParticipantX,
 }
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
@@ -100,7 +100,7 @@ class SponsorSvcPartyHosting(
                 val newHostingParticipants = previous.participants.appended(
                   HostingParticipant(
                     newParticipant,
-                    ParticipantPermissionX.Observation,
+                    ParticipantPermission.Observation,
                   )
                 )
                 Right(

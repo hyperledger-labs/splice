@@ -191,7 +191,9 @@ class DomainMigrationInitializer(
         .ensureDomainParameters(
           domainMigrationDump.nodeIdentities.domainId,
           // TODO(#8761) hard code for now
-          _.tryUpdate(maxRatePerParticipant = DynamicDomainParameters.defaultMaxRatePerParticipant),
+          _.tryUpdate(confirmationRequestsMaxRate =
+            DynamicDomainParameters.defaultConfirmationRequestsMaxRate
+          ),
           signedBy = domainMigrationDump.nodeIdentities.participant.id.uid.namespace.fingerprint,
         )
       _ = logger.info("resumed domain")

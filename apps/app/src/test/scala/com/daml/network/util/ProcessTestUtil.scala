@@ -40,7 +40,7 @@ trait ProcessTestUtil {
     // See https://github.com/scala/scala/blob/1efd473aae819c8ddd2dc0656a4259c89bf03312/src/library/scala/sys/process/BasicIO.scala#LL246C39-L246C52
     // for the code in the scala stdlib that does the copying.
     val builder = new ProcessBuilder(
-      args: _*
+      args*
     )
     extraEnv.foreach { case (k, v) =>
       builder.environment.put(k, v)
@@ -62,7 +62,7 @@ trait ProcessTestUtil {
       startCantonInternal(
         configs.flatMap(config => Seq("-c", config.toString)) ++ extraConfigs.flatMap(Seq("-C", _)),
         logSuffix,
-        extraEnv: _*
+        extraEnv*
       )
     )(_ => test)
   }
@@ -76,7 +76,7 @@ trait ProcessTestUtil {
     startCantonInternal(
       configs.flatMap(config => Seq("-c", config.toString)) ++ extraConfigs.flatMap(Seq("-C", _)),
       logSuffix,
-      extraEnv: _*
+      extraEnv*
     )
   }
 

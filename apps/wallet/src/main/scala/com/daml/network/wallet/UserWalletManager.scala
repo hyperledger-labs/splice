@@ -222,6 +222,6 @@ class UserWalletManager(
 
   override def close(): Unit = Lifecycle.close(
     // per-user retry providers should have been closed by the shutdown signal, so only closing the services here
-    endUserWalletsMap.values.map(_._2).toSeq *
+    endUserWalletsMap.values.map(_._2).toSeq*
   )(logger)
 }

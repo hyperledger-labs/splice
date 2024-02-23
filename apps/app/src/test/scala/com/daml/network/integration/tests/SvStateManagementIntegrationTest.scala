@@ -230,7 +230,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     actAndCheck(
       "restarting all SVs", {
         svs.foreach(_.stop())
-        startAllSync(svs: _*)
+        startAllSync(svs*)
       },
     )(
       "CoinPriceVote contracts didn't change",

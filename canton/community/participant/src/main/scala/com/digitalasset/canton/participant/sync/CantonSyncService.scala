@@ -437,6 +437,8 @@ class CantonSyncService(
           .foreach(_.removeJournalGarageCollectionLock())
       }
     },
+    connectedDomainsLookup,
+    participantId,
     loggerFactory,
   )
 
@@ -449,7 +451,7 @@ class CantonSyncService(
       span.setAttribute("submission_id", submissionId)
       pruneInternally(pruneUpToInclusive)
         .fold(
-          err => PruningResult.NotPruned(err.code.asGrpcStatus(err)),
+          err => PruningResult.NotPruned(ErrorCode.asGrpcStatus(err)),
           _ => PruningResult.ParticipantPruned,
         )
         .onShutdown(
@@ -1491,7 +1493,7 @@ class CantonSyncService(
       sequencerClientHealth,
     )
 
-    Lifecycle.close(instances: _*)(logger)
+    Lifecycle.close(instances*)(logger)
   }
 
   override def toString: String = s"CantonSyncService($participantId)"

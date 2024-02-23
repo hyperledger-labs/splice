@@ -97,7 +97,7 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
             .futureValue
             .mapping
             .parameters
-            .maxRatePerParticipant should be > NonNegativeInt.zero
+            .confirmationRequestsMaxRate should be > NonNegativeInt.zero
         )
       }
     }

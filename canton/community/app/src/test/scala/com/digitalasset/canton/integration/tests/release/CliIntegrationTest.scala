@@ -299,7 +299,7 @@ class CliXIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMix
             expectedErrorLines
               .map(expectedErrorLine =>
                 (logEntry: LogEntry) => logEntry.errorMessage should include(expectedErrorLine)
-              ) *,
+              )*
           )
 
           exitCode shouldBe expectedExitCode

@@ -323,7 +323,7 @@ object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
 
   def fromResources(paths: Seq[String], testName: String): CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition(
-      baseConfig = loadConfigFromResources(paths: _*),
+      baseConfig = loadConfigFromResources(paths*),
       context = testName,
     )
 

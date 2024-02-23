@@ -778,7 +778,7 @@ class ValidatorApp(
                           _ => provide(()),
                         ),
                       )
-                  }): _*
+                  })*
               )
             }
           }

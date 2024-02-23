@@ -16,8 +16,8 @@ import com.digitalasset.canton.data.*
 import com.digitalasset.canton.ledger.participant.state.v2.SubmitterInfo
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.participant.DefaultParticipantStateValues
-import com.digitalasset.canton.participant.protocol.submission.ConfirmationRequestFactory.*
 import com.digitalasset.canton.participant.protocol.submission.EncryptedViewMessageFactory.UnableToDetermineParticipant
+import com.digitalasset.canton.participant.protocol.submission.TransactionConfirmationRequestFactory.*
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.{
   ContractLookupError,
   SerializableContractOfId,
@@ -27,9 +27,10 @@ import com.digitalasset.canton.protocol.ExampleTransactionFactory.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.{WithSuffixes, WithoutSuffixes}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
-import com.digitalasset.canton.sequencing.protocol.{OpenEnvelope, Recipient}
+import com.digitalasset.canton.sequencing.protocol.{MediatorsOfDomain, OpenEnvelope, Recipient}
 import com.digitalasset.canton.store.SessionKeyStore.RecipientGroup
 import com.digitalasset.canton.store.SessionKeyStoreWithInMemoryCache
+import com.digitalasset.canton.topology.MediatorGroup.MediatorGroupIndex
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
@@ -44,7 +45,7 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-class ConfirmationRequestFactoryTest
+class TransactionConfirmationRequestFactoryTest
     extends AsyncWordSpec
     with ProtocolVersionChecksAsyncWordSpec
     with BaseTest
@@ -56,7 +57,7 @@ class ConfirmationRequestFactoryTest
 
   // General dummy parameters
   private val domain: DomainId = DefaultTestIdentities.domainId
-  private val mediator: MediatorRef = MediatorRef(DefaultTestIdentities.mediator)
+  private val mediator: MediatorsOfDomain = MediatorsOfDomain(MediatorGroupIndex.zero)
   private val ledgerTime: CantonTimestamp = CantonTimestamp.Epoch
   private val workflowId: Option[WorkflowId] = Some(
     WorkflowId.assertFromString("workflowIdConfirmationRequestFactoryTest")
@@ -114,7 +115,7 @@ class ConfirmationRequestFactoryTest
   // Device under test
   private def confirmationRequestFactory(
       transactionTreeFactoryResult: Either[TransactionTreeConversionError, GenTransactionTree]
-  ): ConfirmationRequestFactory = {
+  ): TransactionConfirmationRequestFactory = {
 
     val transactionTreeFactory: TransactionTreeFactory = new TransactionTreeFactory {
       override def createTransactionTree(
@@ -122,7 +123,7 @@ class ConfirmationRequestFactoryTest
           submitterInfo: SubmitterInfo,
           _confirmationPolicy: ConfirmationPolicy,
           _workflowId: Option[WorkflowId],
-          _mediator: MediatorRef,
+          _mediator: MediatorsOfDomain,
           transactionSeed: SaltSeed,
           transactionUuid: UUID,
           _topologySnapshot: TopologySnapshot,
@@ -138,12 +139,16 @@ class ConfirmationRequestFactoryTest
           fail(
             s"Wrong submitters ${actAs.mkString(", ")}. Expected ${ExampleTransactionFactory.submitter}"
           )
-        if (transaction.metadata.ledgerTime != ConfirmationRequestFactoryTest.this.ledgerTime)
-          fail(s"""Wrong ledger time ${transaction.metadata.ledgerTime}.
-                  | Expected ${ConfirmationRequestFactoryTest.this.ledgerTime}""".stripMargin)
-        if (transactionUuid != ConfirmationRequestFactoryTest.this.transactionUuid)
+        if (
+          transaction.metadata.ledgerTime != TransactionConfirmationRequestFactoryTest.this.ledgerTime
+        )
           fail(
-            s"Wrong transaction UUID $transactionUuid. Expected ${ConfirmationRequestFactoryTest.this.transactionUuid}"
+            s"""Wrong ledger time ${transaction.metadata.ledgerTime}.
+                  | Expected ${TransactionConfirmationRequestFactoryTest.this.ledgerTime}""".stripMargin
+          )
+        if (transactionUuid != TransactionConfirmationRequestFactoryTest.this.transactionUuid)
+          fail(
+            s"Wrong transaction UUID $transactionUuid. Expected ${TransactionConfirmationRequestFactoryTest.this.transactionUuid}"
           )
         transactionTreeFactoryResult.toEitherT
       }
@@ -152,7 +157,7 @@ class ConfirmationRequestFactoryTest
           subaction: WellFormedTransaction[WithoutSuffixes],
           rootPosition: ViewPosition,
           confirmationPolicy: ConfirmationPolicy,
-          mediator: MediatorRef,
+          mediator: MediatorsOfDomain,
           submittingParticipantO: Option[ParticipantId],
           salts: Iterable[Salt],
           transactionUuid: UUID,
@@ -171,7 +176,7 @@ class ConfirmationRequestFactoryTest
 
     // we force view requests to be handled sequentially, which makes results deterministic and easier to compare
     // in the end.
-    new ConfirmationRequestFactory(
+    new TransactionConfirmationRequestFactory(
       submittingParticipant,
       LoggingConfig(),
       loggerFactory,
@@ -199,7 +204,9 @@ class ConfirmationRequestFactoryTest
   // So we simply replace them with a fixed empty signature. When we are using
   // EncryptedViewMessage we order the sequence of randomness encryption on both the actual
   // and expected messages so that they match.
-  private def stripSignatureAndOrderMap(request: ConfirmationRequest): ConfirmationRequest = {
+  private def stripSignatureAndOrderMap(
+      request: TransactionConfirmationRequest
+  ): TransactionConfirmationRequest = {
     val requestNoSignature = request
       .focus(_.viewEnvelopes)
       .modify(
@@ -234,7 +241,7 @@ class ConfirmationRequestFactoryTest
   def expectedConfirmationRequest(
       example: ExampleTransaction,
       cryptoSnapshot: DomainSnapshotSyncCryptoApi,
-  )(implicit traceContext: TraceContext): ConfirmationRequest = {
+  )(implicit traceContext: TraceContext): TransactionConfirmationRequest = {
     val cryptoPureApi = cryptoSnapshot.pureCrypto
     val viewEncryptionScheme = cryptoPureApi.defaultSymmetricKeyScheme
 
@@ -341,7 +348,7 @@ class ConfirmationRequestFactoryTest
 
     val signature = cryptoSnapshot.sign(example.fullInformeeTree.transactionId.unwrap).futureValue
 
-    ConfirmationRequest(
+    TransactionConfirmationRequest(
       InformeeMessage(example.fullInformeeTree, signature)(testedProtocolVersion),
       expectedTransactionViewMessages,
       testedProtocolVersion,
@@ -377,7 +384,7 @@ class ConfirmationRequestFactoryTest
     "everything is ok" can {
 
       forEvery(transactionFactory.standardHappyCases) { example =>
-        s"create a confirmation request for: $example" in {
+        s"create a transaction confirmation request for: $example" in {
 
           val factory = confirmationRequestFactory(Right(example.transactionTree))
 

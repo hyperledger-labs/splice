@@ -14,7 +14,7 @@ import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardin
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.topology.transaction.ParticipantPermissionX
+import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
@@ -405,9 +405,9 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
       ) { case Seq(mapping) =>
         inside(mapping.item.participants) { case Seq(sv1Participant, sv2Participant) =>
           sv1Participant.participantId shouldBe sv1Backend.participantClientWithAdminToken.id
-          sv1Participant.permission shouldBe ParticipantPermissionX.Submission
+          sv1Participant.permission shouldBe ParticipantPermission.Submission
           sv2Participant.participantId shouldBe sv2Backend.participantClientWithAdminToken.id
-          sv2Participant.permission shouldBe ParticipantPermissionX.Submission
+          sv2Participant.permission shouldBe ParticipantPermission.Submission
         }
       }
       clue("create a coin again with actAs = SVC") {

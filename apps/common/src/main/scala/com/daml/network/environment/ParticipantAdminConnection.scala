@@ -168,7 +168,8 @@ class ParticipantAdminConnection(
     val observer = new GrpcByteChunksToByteArrayObserver[ExportAcsResponse](requestComplete)
     runCmd(
       ParticipantAdminCommands.ParticipantRepairManagement.ExportAcs(
-        parties,
+        parties = parties,
+        partiesOffboarding = false,
         filterDomainId,
         timestamp,
         observer,
@@ -184,8 +185,12 @@ class ParticipantAdminConnection(
   ): Future[Unit] = {
     runCmd(
       ParticipantAdminCommands.ParticipantRepairManagement
-        .ImportAcs(acsBytes, IMPORT_ACS_WORKFLOW_ID_PREFIX)
-    )
+        .ImportAcs(
+          acsBytes,
+          IMPORT_ACS_WORKFLOW_ID_PREFIX,
+          allowContractIdSuffixRecomputation = false,
+        )
+    ).map(_ => ())
   }
 
   def getParticipantId()(implicit traceContext: TraceContext): Future[ParticipantId] =

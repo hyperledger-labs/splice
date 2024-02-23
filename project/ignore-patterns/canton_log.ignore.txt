@@ -54,12 +54,14 @@ SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*
 SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*PAR::sv.*Participant::.*Continue processing
 LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients
 
-# TODO(#5706): investigate and remove once fixed
+# TODO(#5706): investigate and remove once fixed (note that the latter seems to be a rename of the former, see https://github.com/DACH-NY/canton/commit/d4ee0ccb187802e363d71f5c7379cbe5a4473903)
 MEDIATOR_INVALID_MESSAGE.*Received a mediator response.*with an unknown request id.*Discarding response
+MEDIATOR_INVALID_MESSAGE.*Received a confirmation response.*with an unknown request id.*Discarding response
 
-# TODO(#8596): These two might be expected and benign, but let's investigate to be sure
+# TODO(#8596): These two might be expected and benign, but let's investigate to be sure (note that the latter seems to be a rename of the former, see https://github.com/DACH-NY/canton/commit/d4ee0ccb187802e363d71f5c7379cbe5a4473903)
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message
-MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash.*
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an invalid root hash
 
 # TODO(#6106): Remove this when we can
 Failed to handle Mediator events

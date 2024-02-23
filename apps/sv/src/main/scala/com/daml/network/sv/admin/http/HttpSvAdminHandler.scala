@@ -784,7 +784,7 @@ class HttpSvAdminHandler(
     result <- participantAdminConnection
       .ensureDomainParameters(
         globalDomainId,
-        _.tryUpdate(maxRatePerParticipant = rate),
+        _.tryUpdate(confirmationRequestsMaxRate = rate),
         signedBy = id.namespace.fingerprint,
       )
   } yield result

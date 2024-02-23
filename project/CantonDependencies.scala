@@ -3,12 +3,12 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.0.0-snapshot.20240209.12740.0.v499cb7f6"
+  val version: String = "3.0.0-snapshot.20240220.12792.0.vfaead3be"
   val daml_language_versions = Seq("2.1", "2.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
   val daml_libraries_version = version
-  val daml_compiler_version = "3.0.0-snapshot.20240214.12763.0.v307b621e"
+  val daml_compiler_version = version
   val daml_java_codegen_version = version
   val use_custom_daml_version = false
 
@@ -85,8 +85,6 @@ object CantonDependencies {
   lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive-reader" % daml_libraries_version
   lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
-  lazy val daml_lf_value_java_proto =
-    "com.daml" % "daml-lf-value-java-proto" % daml_libraries_version
   lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
   lazy val daml_lf_transaction_test_lib =
     "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version

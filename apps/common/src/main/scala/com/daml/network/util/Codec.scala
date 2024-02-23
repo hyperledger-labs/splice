@@ -4,8 +4,8 @@
 package com.daml.network.util
 
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId as JavaContractId}
-import com.daml.lf.data.{Decimal, Numeric}
-import com.digitalasset.canton.{topology, LfTimestamp}
+import com.daml.lf.data.Numeric
+import com.digitalasset.canton.{LfTimestamp, topology}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{
   MediatorId,
@@ -16,6 +16,8 @@ import com.digitalasset.canton.topology.{
 }
 import io.grpc.Status
 import com.daml.network.codegen.java.cc.types.Round
+
+import scala.util.matching.Regex
 
 /** Trait for values used in our requests.
   * Dec is the Scala representation while Enc is the representation used in code generated for the serialization format, e.g., Codec[BigDecimal, String].
@@ -32,6 +34,23 @@ trait CodecCompanion[Dec] {
 }
 
 object Codec {
+
+  private[this] val decimalScale = Numeric.Scale.assertFromInt(10)
+  private[this] def encodeJavaBigDecimal(d: java.math.BigDecimal): String =
+    Numeric
+      .assertFromBigDecimal(decimalScale, d)
+      .toScaledString
+
+  // A variant of Numeric.fromString specialized to Decimal that allows numbers w/o a decimal point.
+  private[this] val decimalFormat = """-?\d{1,28}(\.\d{1,10})?"""
+  private[this] val decimalFormatPattern = new Regex(decimalFormat).pattern
+  private[this] def decodeJavaBigDecimal(s: String): Either[String, java.math.BigDecimal] = {
+    if (decimalFormatPattern.matcher(s).matches())
+      Numeric.fromBigDecimal(decimalScale, new java.math.BigDecimal(s))
+    else
+      Left(s"""Invalid Decimal string "$s, as it does not match "$decimalFormat""""")
+  }
+
   def encode[Dec, Enc](d: Dec)(implicit instance: Codec[Dec, Enc]): Enc =
     instance.encode(d)
   def decode[Dec](companion: CodecCompanion[Dec])(e: companion.Enc): Either[String, Dec] =
@@ -52,8 +71,8 @@ object Codec {
 
   implicit val bigDecimalValue: Codec[BigDecimal, String] =
     new Codec[BigDecimal, String] {
-      def encode(d: BigDecimal) = Numeric.assertFromBigDecimal(Decimal.scale, d).toScaledString
-      def decode(e: String) = Decimal.fromString(e).map(scala.BigDecimal(_))
+      def encode(d: BigDecimal) = encodeJavaBigDecimal(d.bigDecimal)
+      def decode(e: String) = decodeJavaBigDecimal(e).map(scala.BigDecimal(_))
     }
 
   object BigDecimal extends CodecCompanion[BigDecimal] {
@@ -63,9 +82,8 @@ object Codec {
 
   implicit val javaBigDecimalValue: Codec[java.math.BigDecimal, String] =
     new Codec[java.math.BigDecimal, String] {
-      def encode(d: java.math.BigDecimal) =
-        Numeric.assertFromBigDecimal(Decimal.scale, d).toScaledString
-      def decode(e: String) = Decimal.fromString(e)
+      def encode(d: java.math.BigDecimal) = encodeJavaBigDecimal(d)
+      def decode(e: String) = decodeJavaBigDecimal(e)
     }
 
   object JavaBigDecimal extends CodecCompanion[java.math.BigDecimal] {

@@ -498,7 +498,6 @@ object BuildCommon {
           pprint,
           scaffeine,
           daml_nonempty_cats,
-          daml_lf_value_java_proto % "protobuf", // needed for protobuf import
           daml_lf_transaction,
           CantonDependencies.grpc_services % "protobuf",
           scalapb_runtime_grpc,
@@ -625,7 +624,6 @@ object BuildCommon {
           pekko_slf4j, // not used at compile time, but required by com.digitalasset.canton.util.pekkoUtil.createActorSystem
           daml_lf_archive_reader,
           daml_lf_engine,
-          daml_lf_value_java_proto % "protobuf", // needed for protobuf import
           daml_lf_transaction, // needed for importing java classes
           daml_nonempty_cats,
           logback_classic,

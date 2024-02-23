@@ -752,7 +752,7 @@ private[store] object MultiDomainAcsStoreTest {
   import com.daml.lf.value.test.ValueGenerators.comparableCoidsGen
 
   private[this] val coidsGen = comparableCoidsGen match {
-    case a +: b +: cs => Gen.oneOf(a, b, cs: _*)
+    case a +: b +: cs => Gen.oneOf(a, b, cs*)
     case Seq(a) => a
     // should never be reached
     case _ => throw new IllegalStateException("no contract ID generator present")

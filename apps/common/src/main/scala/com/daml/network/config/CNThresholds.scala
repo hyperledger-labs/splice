@@ -3,7 +3,7 @@ package com.daml.network.config
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.util.Contract
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermissionX}
+import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 
 import scala.math.{ceil, floor}
 
@@ -28,7 +28,7 @@ object CNThresholds {
       hostingParticipants: Seq[HostingParticipant]
   ): PositiveInt = {
     governanceThreshold(
-      hostingParticipants.count(_.permission == ParticipantPermissionX.Submission)
+      hostingParticipants.count(_.permission == ParticipantPermission.Submission)
     )
   }
 

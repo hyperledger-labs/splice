@@ -380,7 +380,7 @@ class SplitwellUpgradeIntegrationTest
               _ =>
                 inside(bobSplitwellClient.listBalanceUpdates(abGroupKey)) {
                   case ups @ Seq(_, _, _) =>
-                    assertAllOn(splitwellUpgradeAlias)(ups.map(_.contractId) *)
+                    assertAllOn(splitwellUpgradeAlias)(ups.map(_.contractId)*)
                 },
             )
           }

@@ -152,7 +152,7 @@ private[onboarding] object SetupUtil {
                 domainId = None,
                 threshold = PositiveInt.one,
                 participants =
-                  Seq(HostingParticipant(participantId, ParticipantPermissionX.Submission)),
+                  Seq(HostingParticipant(participantId, ParticipantPermission.Submission)),
                 groupAddressing = false,
               )
             ),

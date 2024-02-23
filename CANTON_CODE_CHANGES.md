@@ -63,3 +63,4 @@ to know which and/or what changes we'll need to upstream before the switch.
 - Added (empty) `data-dependencies` to all daml.yaml files
 * Changed cache detection logic for `damlBuild` in SBT DamlPlugin to file-hash instead of the default modification time.
 * Changed `DbStorageSetup` to use `DbConfig with PostgresDbConfig` instead of `CommunityDbConfig.Postgres`.
+* Stubbed the `SequencerConfig` due to a missing project dependency in on `communite-reference-sequecer`

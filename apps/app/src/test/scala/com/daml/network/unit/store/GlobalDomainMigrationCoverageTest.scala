@@ -37,7 +37,7 @@ class GlobalDomainMigrationCoverageTest
         forEvery(
           Table(
             ("template", "reason"),
-            knownNotHandled.view.map { case (t, (r, _)) => t -> r }.toSeq: _*
+            knownNotHandled.view.map { case (t, (r, _)) => t -> r }.toSeq*
           )
         ) { (templateId, reason) =>
           handled shouldNot contain(templateId) withClue reason

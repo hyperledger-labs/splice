@@ -32,7 +32,7 @@ class DomainDataSnapshotGenerator(
       .exportAcsAtTimestamp(
         globalDomain,
         timestamp,
-        partyId.fold(Seq(svcStore.key.svcParty, svcStore.key.svParty))(Seq(_)): _*
+        partyId.fold(Seq(svcStore.key.svcParty, svcStore.key.svParty))(Seq(_))*
       )
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(

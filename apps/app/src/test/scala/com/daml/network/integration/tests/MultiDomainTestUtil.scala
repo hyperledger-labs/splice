@@ -20,7 +20,7 @@ trait MultiDomainTestUtil extends CNNodeTestCommon {
         splitwellBackend.getProviderPartyId(),
         cidStrings.toSet,
       )
-    tForEvery(Table("contractId", cidStrings: _*)) { cid =>
+    tForEvery(Table("contractId", cidStrings*)) { cid =>
       domains.get(cid) shouldBe Some(domainId)
     }
   }
