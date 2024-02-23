@@ -81,6 +81,7 @@ import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import java.nio.file.Paths
 import io.circe.syntax.*
+
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -453,6 +454,7 @@ class SvApp(
           new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
         ),
         clock,
+        retryProvider,
         loggerFactory,
       )
 
@@ -1046,6 +1048,70 @@ object SvApp {
 
   }
 
+  def createVoteRequest2(
+      requester: String,
+      action: Json,
+      reasonUrl: String,
+      reasonDescription: String,
+      expiration: Json,
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+      templateJsonDecoder: TemplateJsonDecoder,
+  ): Future[Either[String, Unit]] = {
+    val decodedExpiration = templateJsonDecoder.decodeValue(
+      RelTime.valueDecoder(),
+      RelTime._packageId,
+      "DA.Time.Types",
+      "RelTime",
+    )(expiration)
+    val decodedAction = templateJsonDecoder.decodeValue(
+      ActionRequiringConfirmation.valueDecoder(),
+      ActionRequiringConfirmation._packageId,
+      "CN.SvcRules",
+      "ActionRequiringConfirmation",
+    )(action)
+    svcStoreWithIngestion.store
+      .lookupVoteRequestByThisSvAndActionWithOffset2(decodedAction)
+      .flatMap {
+        case QueryResult(_, Some(vote)) =>
+          Future.successful(
+            Left(s"This vote request has already been created ${vote.contractId}.")
+          )
+        case QueryResult(offset, None) =>
+          for {
+            svcRules <- svcStoreWithIngestion.store.getSvcRules()
+            reason = new Reason(reasonUrl, reasonDescription)
+            request = new SvcRules_RequestVote2(
+              requester,
+              decodedAction,
+              reason,
+              java.util.Optional.of(decodedExpiration),
+            )
+            cmd = svcRules.exercise(_.exerciseSvcRules_RequestVote2(request))
+            _ <- svcStoreWithIngestion.connection
+              .submit(
+                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
+                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+                cmd,
+              )
+              .withDedup(
+                commandId = CNLedgerConnection.CommandId(
+                  "com.daml.network.sv.requestVote2",
+                  Seq(
+                    svcStoreWithIngestion.store.key.svcParty,
+                    svcStoreWithIngestion.store.key.svParty,
+                  ),
+                  action.toString,
+                ),
+                deduplicationOffset = offset,
+              )
+              .yieldUnit()
+          } yield Right(())
+      }
+  }
+
   def castVote(
       voteRequestCid: cn.svcrules.VoteRequest.ContractId,
       isAccepted: Boolean,
@@ -1094,6 +1160,60 @@ object SvApp {
               )
               .yieldResult()
           } yield Right(res.exerciseResult)
+      }
+  }
+
+  def castVote2(
+      trackingCid: cn.svcrules.VoteRequest2.ContractId,
+      isAccepted: Boolean,
+      reasonUrl: String,
+      reasonDescription: String,
+      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      retryProvider: RetryProvider,
+      logger: TracedLogger,
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[Either[String, cn.svcrules.VoteRequest2.ContractId]] = {
+    svcStoreWithIngestion.store
+      .lookupVoteByThisSvAndVoteRequestWithOffset2(trackingCid)
+      .flatMap { case QueryResult(_, _) =>
+        for {
+          svcRules <- svcStoreWithIngestion.store.getSvcRules()
+          res <- retryProvider.retryForClientCalls(
+            "castVote2",
+            for {
+              resolvedVoteRequest <- svcStoreWithIngestion.store.lookupVoteRequest2(trackingCid)
+              resolvedCid = resolvedVoteRequest
+                .getOrElse(
+                  throw new IllegalArgumentException(
+                    s"Vote request not found in the ledger for trackingCid $trackingCid"
+                  )
+                )
+                .contractId
+              reason = new Reason(reasonUrl, reasonDescription)
+              cmd = svcRules.exercise(
+                _.exerciseSvcRules_CastVote2(
+                  resolvedCid,
+                  new Vote2(
+                    svcStoreWithIngestion.store.key.svParty.toProtoPrimitive,
+                    isAccepted,
+                    reason,
+                  ),
+                )
+              )
+              res <- svcStoreWithIngestion.connection
+                .submit(
+                  actAs = Seq(svcStoreWithIngestion.store.key.svParty),
+                  readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+                  update = cmd,
+                )
+                .noDedup
+                .yieldResult()
+            } yield res,
+            logger,
+          )
+        } yield Right(res.exerciseResult)
       }
   }
 

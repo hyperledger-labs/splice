@@ -42,6 +42,8 @@ import com.daml.network.sv.store.{
   TxLogEntry,
   VoteRequestTxLogEntry,
 }
+
+import scala.jdk.CollectionConverters.*
 import com.daml.network.util.*
 import com.daml.network.util.Contract.Companion.Template
 import com.digitalasset.canton.data.CantonTimestamp
@@ -58,7 +60,6 @@ import slick.jdbc.canton.SQLActionBuilder
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
-import scala.jdk.CollectionConverters.*
 
 class DbSvSvcStore(
     override val key: SvStore.Key,

@@ -2,18 +2,22 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, TransferConfig, USD}
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
+  SRARC_AddMember,
   SRARC_RemoveMember,
   SRARC_SetConfig,
 }
+import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome2.{VRO_Expired, VRO_Rejected}
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRulesConfig,
+  SvcRules_AddMember,
   SvcRules_RemoveMember,
   SvcRules_SetConfig,
 }
@@ -26,6 +30,148 @@ import java.time.Instant
 import scala.jdk.OptionConverters.*
 
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
+
+  private def actionRequiring3VotesForEarlyClosing(member: String) = new ARC_SvcRules(
+    new SRARC_RemoveMember(
+      new SvcRules_RemoveMember(
+        member
+      )
+    )
+  )
+
+  private def actionRequiring4VotesForEarlyClosing(domainId: String) = new ARC_SvcRules(
+    new SRARC_AddMember(
+      new SvcRules_AddMember(
+        "alice:1234",
+        "Alice",
+        1234L,
+        "alice-participant-id",
+        new Round(42),
+        domainId,
+      )
+    )
+  )
+
+  "SVs can create a VoteRequest2, vote on it and list them." in { implicit env =>
+    initSvc()
+    val (_, voteRequest) = actAndCheck(
+      "sv1 creates a vote request",
+      sv1Backend.createVoteRequest2(
+        sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+        actionRequiring3VotesForEarlyClosing(sv4Backend.getSvcInfo().svParty.toProtoPrimitive),
+        "url",
+        "remove sv4",
+        sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+      ),
+    )(
+      "vote request has been created",
+      _ => {
+        val voteRequest = sv1Backend.listVoteRequests2().loneElement
+        sv1Backend.lookupVoteRequest2(voteRequest.contractId) shouldBe voteRequest
+        voteRequest
+      },
+    )
+    actAndCheck(
+      "sv1 updates his vote, sv2 and sv3 reject the vote request",
+      Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
+        sv.castVote2(
+          voteRequest.contractId,
+          false,
+          "url",
+          "description",
+        )
+      },
+    )(
+      "vote request has been rejected because the majority of the votes are negative",
+      _ => {
+        sv1Backend.listVoteRequests2() shouldBe empty
+        sv1Backend
+          .listVoteRequestResults2(None, Some(false), None, None, None, 1)
+          .loneElement
+          .outcome shouldBe a[VRO_Rejected]
+      },
+    )
+  }
+
+  "VoteRequest2 expires with no definitive outcome." in { implicit env =>
+    initSvc()
+    val (_, voteRequest) = actAndCheck(
+      "sv1 creates a vote request that expires directly",
+      sv1Backend.createVoteRequest2(
+        sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+        actionRequiring3VotesForEarlyClosing(sv4Backend.getSvcInfo().svParty.toProtoPrimitive),
+        "url",
+        "remove sv4",
+        new RelTime(10_000_000L),
+      ),
+    )(
+      "vote request has been created",
+      _ => {
+        sv1Backend.listVoteRequests2().loneElement
+      },
+    )
+    actAndCheck(
+      "A number of SVs less than the required number of voters cast a vote",
+      Seq(sv1Backend, sv2Backend).foreach { sv =>
+        sv.castVote2(
+          voteRequest.contractId,
+          true,
+          "url",
+          "description",
+        )
+      },
+    )(
+      "vote request has expired",
+      _ => {
+        sv1Backend.listVoteRequests2() shouldBe empty
+        sv1Backend
+          .listVoteRequestResults2(None, Some(false), None, None, None, 1)
+          .loneElement
+          .outcome shouldBe a[VRO_Expired]
+      },
+    )
+  }
+
+  "VoteRequest2 expires with a definitive outcome." in { implicit env =>
+    initSvc()
+    val (_, voteRequest) = actAndCheck(
+      "sv1 creates a vote request that expires directly",
+      sv1Backend.createVoteRequest2(
+        sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+        actionRequiring4VotesForEarlyClosing(
+          sv4Backend.config.domains.global.alias.toProtoPrimitive
+        ),
+        "url",
+        "add new member",
+        new RelTime(10_000_000L),
+      ),
+    )(
+      "vote request has been created",
+      _ => {
+        sv1Backend.listVoteRequests2().loneElement
+      },
+    )
+    actAndCheck(
+      "A number of SVs less than the required number of voters cast a vote",
+      Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
+        sv.castVote2(
+          voteRequest.contractId,
+          false,
+          "url",
+          "description",
+        )
+      },
+    )(
+      "vote request was rejected",
+      _ => {
+        sv1Backend.listVoteRequests2() shouldBe empty
+        sv1Backend
+          .listVoteRequestResults2(None, Some(false), None, None, None, 1)
+          .loneElement
+          .outcome shouldBe a[VRO_Rejected]
+      },
+    )
+  }
 
   "SVs can update their CoinPriceVote contracts" in { implicit env =>
     initSvc()

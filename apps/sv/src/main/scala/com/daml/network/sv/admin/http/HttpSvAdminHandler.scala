@@ -9,6 +9,7 @@ import com.daml.network.environment.{
   CNNodeStatus,
   MediatorAdminConnection,
   ParticipantAdminConnection,
+  RetryProvider,
   SequencerAdminConnection,
 }
 import com.daml.network.http.v0.{definitions, sv_admin as v0}
@@ -54,6 +55,7 @@ class HttpSvAdminHandler(
     participantAdminConnection: ParticipantAdminConnection,
     domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
     clock: Clock,
+    retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -280,6 +282,27 @@ class HttpSvAdminHandler(
     }
   }
 
+  def createVoteRequest2(respond: v0.SvAdminResource.CreateVoteRequest2Response.type)(
+      body: definitions.CreateVoteRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.CreateVoteRequest2Response] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.createVoteRequest2") { _ => _ =>
+      SvApp
+        .createVoteRequest2(
+          body.requester,
+          body.action,
+          body.url,
+          body.description,
+          body.expiration,
+          svcStoreWithIngestion,
+        )
+        .flatMap {
+          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
+          case Right(()) => Future.successful(v0.SvAdminResource.CreateVoteRequest2ResponseOK)
+        }
+    }
+  }
+
   def listSvcRulesVoteRequests(
       respond: v0.SvAdminResource.ListSvcRulesVoteRequestsResponse.type
   )()(tuser: TracedUser): Future[v0.SvAdminResource.ListSvcRulesVoteRequestsResponse] = {
@@ -287,6 +310,21 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.listSvcRulesVoteRequests") { _ => _ =>
       for {
         svcRulesVoteRequests <- svcStore.listVoteRequests()
+      } yield {
+        definitions.ListSvcRulesVoteRequestsResponse(
+          svcRulesVoteRequests.map(_.toHttp).toVector
+        )
+      }
+    }
+  }
+
+  def listSvcRulesVoteRequests2(
+      respond: v0.SvAdminResource.ListSvcRulesVoteRequests2Response.type
+  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListSvcRulesVoteRequests2Response] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.listSvcRulesVoteRequests2") { _ => _ =>
+      for {
+        svcRulesVoteRequests <- svcStore.listVoteRequests2()
       } yield {
         definitions.ListSvcRulesVoteRequestsResponse(
           svcRulesVoteRequests.map(_.toHttp).toVector
@@ -304,6 +342,32 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.listSvcRulesVoteResults") { _ => _ =>
       for {
         voteResults <- svcStore.listVoteResults(
+          body.actionName,
+          body.executed,
+          body.requester,
+          body.effectiveFrom,
+          body.effectiveTo,
+          PageLimit.tryCreate(body.limit.intValue),
+        )
+      } yield {
+        definitions.ListSvcRulesVoteResultsResponse(
+          voteResults
+            .map(payloadJsonFromDefinedDataType)
+            .toVector
+        )
+      }
+    }
+  }
+
+  def listVoteRequestResults2(
+      respond: v0.SvAdminResource.ListVoteRequestResults2Response.type
+  )(
+      body: definitions.ListVoteResultsRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequestResults2Response] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.listSvcRulesVoteResults2") { _ => _ =>
+      for {
+        voteResults <- svcStore.listVoteRequestResults2(
           body.actionName,
           body.executed,
           body.requester,
@@ -349,6 +413,36 @@ class HttpSvAdminHandler(
     }
   }
 
+  def lookupSvcRulesVoteRequest2(
+      respond: v0.SvAdminResource.LookupSvcRulesVoteRequest2Response.type
+  )(
+      voteRequestContractId: String
+  )(tuser: TracedUser): Future[v0.SvAdminResource.LookupSvcRulesVoteRequest2Response] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.lookupSvcRulesVoteRequest2") { _ => _ =>
+      svcStore
+        .lookupVoteRequest2(
+          new cn.svcrules.VoteRequest2.ContractId(voteRequestContractId)
+        )
+        .flatMap {
+          case Some(voteRequest) =>
+            Future.successful(
+              v0.SvAdminResource.LookupSvcRulesVoteRequest2Response.OK(
+                definitions.LookupSvcRulesVoteRequestResponse(
+                  voteRequest.toHttp
+                )
+              )
+            )
+          case None =>
+            Future.failed(
+              HttpErrorHandler.notFound(
+                s"No VoteRequest found contract: $voteRequestContractId"
+              )
+            )
+        }
+    }
+  }
+
   def castVote(respond: v0.SvAdminResource.CastVoteResponse.type)(
       body: definitions.CastVoteRequest
   )(tuser: TracedUser): Future[v0.SvAdminResource.CastVoteResponse] = {
@@ -365,6 +459,28 @@ class HttpSvAdminHandler(
         .flatMap {
           case Left(cause) => Future.failed(HttpErrorHandler.badRequest(cause))
           case Right(_) => Future.successful(v0.SvAdminResource.CastVoteResponseCreated)
+        }
+    }
+  }
+
+  override def castVote2(respond: SvAdminResource.CastVote2Response.type)(
+      body: definitions.CastVoteRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.CastVote2Response] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.castVote2") { _ => _ =>
+      SvApp
+        .castVote2(
+          new cn.svcrules.VoteRequest2.ContractId(body.voteRequestContractId),
+          body.isAccepted,
+          body.reasonUrl,
+          body.reasonDescription,
+          svcStoreWithIngestion,
+          retryProvider,
+          logger,
+        )
+        .flatMap {
+          case Left(cause) => Future.failed(HttpErrorHandler.badRequest(cause))
+          case Right(_) => Future.successful(v0.SvAdminResource.CastVote2ResponseCreated)
         }
     }
   }
@@ -393,7 +509,7 @@ class HttpSvAdminHandler(
     }
   }
 
-  def batchListVotesByVoteRequests(
+  override def batchListVotesByVoteRequests(
       respond: v0.SvAdminResource.BatchListVotesByVoteRequestsResponse.type
   )(
       body: definitions.BatchListVotesByVoteRequestsRequest
@@ -718,4 +834,5 @@ class HttpSvAdminHandler(
       }
     }(extracted.traceContext, tracer)
   }
+
 }

@@ -13,6 +13,8 @@ import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   Vote,
   VoteRequest,
+  VoteRequest2,
+  VoteRequestResult2,
   VoteResult,
 }
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
@@ -247,6 +249,49 @@ object HttpSvAdminAppClient {
     }
   }
 
+  case class CreateVoteRequest2(
+      requester: String,
+      action: ActionRequiringConfirmation,
+      reasonUrl: String,
+      reasonDescription: String,
+      expiration: RelTime,
+  )(implicit elc: ErrorLoggingContext)
+      extends BaseCommand[http.CreateVoteRequest2Response, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.CreateVoteRequest2Response] =
+      client.createVoteRequest2(
+        body = definitions.CreateVoteRequest(
+          requester,
+          io.circe.parser
+            .parse(
+              ApiCodecCompressed
+                .apiValueToJsValue(Contract.javaValueToLfValue(action.toValue))
+                .compactPrint
+            )
+            .valueOr(error => throw new IllegalArgumentException(error)),
+          reasonUrl,
+          reasonDescription,
+          io.circe.parser
+            .parse(
+              ApiCodecCompressed
+                .apiValueToJsValue(Contract.javaValueToLfValue(expiration.toValue))
+                .compactPrint
+            )
+            .valueOr(error => throw new IllegalArgumentException(error)),
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.CreateVoteRequest2Response.OK =>
+      Right(())
+    }
+  }
+
   case object ListVoteRequests
       extends BaseCommand[http.ListSvcRulesVoteRequestsResponse, Seq[
         Contract[VoteRequest.ContractId, VoteRequest]
@@ -265,6 +310,52 @@ object HttpSvAdminAppClient {
     ) = { case http.ListSvcRulesVoteRequestsResponse.OK(response) =>
       response.svcRulesVoteRequests
         .traverse(req => Contract.fromHttp(VoteRequest.COMPANION)(req))
+        .leftMap(_.toString)
+    }
+  }
+
+  case object ListVoteRequests2
+      extends BaseCommand[http.ListSvcRulesVoteRequests2Response, Seq[
+        Contract[VoteRequest2.ContractId, VoteRequest2]
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListSvcRulesVoteRequests2Response] =
+      client.listSvcRulesVoteRequests2(
+        headers = headers
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListSvcRulesVoteRequests2Response.OK(response) =>
+      response.svcRulesVoteRequests
+        .traverse(req => Contract.fromHttp(VoteRequest2.COMPANION)(req))
+        .leftMap(_.toString)
+    }
+  }
+
+  case class LookupVoteRequest2(trackingCid: VoteRequest2.ContractId)()
+      extends BaseCommand[
+        http.LookupSvcRulesVoteRequest2Response,
+        Contract[VoteRequest2.ContractId, VoteRequest2],
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.LookupSvcRulesVoteRequest2Response] =
+      client.lookupSvcRulesVoteRequest2(
+        trackingCid.contractId,
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.LookupSvcRulesVoteRequest2Response.OK(response) =>
+      Contract
+        .fromHttp(VoteRequest2.COMPANION)(response.svcRulesVoteRequest)
         .leftMap(_.toString)
     }
   }
@@ -314,6 +405,51 @@ object HttpSvAdminAppClient {
     }
   }
 
+  case class ListVoteRequestResults2(
+      actionName: Option[String],
+      executed: Option[Boolean],
+      requester: Option[String],
+      effectiveFrom: Option[String],
+      effectiveTo: Option[String],
+      limit: BigInt,
+  )() extends BaseCommand[http.ListVoteRequestResults2Response, Seq[
+        VoteRequestResult2
+      ]] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListVoteRequestResults2Response] =
+      client.listVoteRequestResults2(
+        body = definitions.ListVoteResultsRequest(
+          actionName,
+          executed,
+          requester,
+          effectiveFrom,
+          effectiveTo,
+          limit,
+        ),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListVoteRequestResults2Response.OK(response) =>
+      Right(
+        response.svcRulesVoteResults
+          .map(e =>
+            decoder.decodeValue(
+              VoteRequestResult2.valueDecoder(),
+              VoteRequestResult2._packageId,
+              "CN.SvcRules",
+              "VoteRequestResult2",
+            )(e)
+          )
+          .toSeq
+      )
+    }
+  }
+
   case class CastVote(
       voteRequestCid: VoteRequest.ContractId,
       isAccepted: Boolean,
@@ -334,6 +470,30 @@ object HttpSvAdminAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.CastVoteResponse.Created =>
+      Right(())
+    }
+  }
+
+  case class CastVote2(
+      trackingCid: VoteRequest2.ContractId,
+      isAccepted: Boolean,
+      reasonUrl: String,
+      reasonDescription: String,
+  ) extends BaseCommand[http.CastVote2Response, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.CastVote2Response] =
+      client.castVote2(
+        body = definitions
+          .CastVoteRequest(trackingCid.contractId, isAccepted, reasonUrl, reasonDescription),
+        headers = headers,
+      )
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.CastVote2Response.Created =>
       Right(())
     }
   }
