@@ -3,6 +3,3 @@
 
 Request failed for sequencer. Is the server running?
 SEQUENCER_SUBSCRIPTION_LOST
-
-# TODO(#10052) Remove this if we can import without connecting to the domain
-ACS_COMMITMENT_MISMATCH

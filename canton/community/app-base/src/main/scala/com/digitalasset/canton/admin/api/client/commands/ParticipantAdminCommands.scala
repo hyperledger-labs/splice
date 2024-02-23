@@ -740,11 +740,16 @@ object ParticipantAdminCommands {
       }
     }
 
-    final case class RegisterDomain(config: CDomainConnectionConfig)
+    final case class RegisterDomain(config: CDomainConnectionConfig, handshakeOnly: Boolean = false)
         extends Base[RegisterDomainRequest, RegisterDomainResponse, Unit] {
 
       override def createRequest(): Either[String, RegisterDomainRequest] =
-        Right(RegisterDomainRequest(add = Some(config.toProtoV30)))
+        Right(
+          RegisterDomainRequest(
+            add = Some(config.toProtoV30),
+            handshakeOnly = handshakeOnly,
+          )
+        )
 
       override def submitRequest(
           service: DomainConnectivityServiceStub,

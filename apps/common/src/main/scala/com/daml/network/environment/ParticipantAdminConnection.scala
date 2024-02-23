@@ -92,10 +92,10 @@ class ParticipantAdminConnection(
     )
   } yield ()
 
-  def registerDomain(config: DomainConnectionConfig)(implicit
+  def registerDomain(config: DomainConnectionConfig, handshakeOnly: Boolean)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
-    runCmd(ParticipantAdminCommands.DomainConnectivity.RegisterDomain(config))
+    runCmd(ParticipantAdminCommands.DomainConnectivity.RegisterDomain(config, handshakeOnly))
 
   def connectDomain(alias: DomainAlias)(implicit
       traceContext: TraceContext
@@ -113,6 +113,26 @@ class ParticipantAdminConnection(
   ): Future[Unit] =
     runCmd(ParticipantAdminCommands.DomainConnectivity.DisconnectDomain(alias))
 
+  def ensureDomainRegistered(
+      config: DomainConnectionConfig,
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    require(
+      !config.manualConnect,
+      "manualConnect must be false when trying to register only, otherwise it doesn't even handshake",
+    )
+    for {
+      _ <- retryProvider
+        .ensureThat(
+          retryFor,
+          s"participant registered ${config.domain}",
+          lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
+          (_: Unit) => registerDomain(config, handshakeOnly = true),
+          logger,
+        )
+    } yield ()
+  }
+
   def ensureDomainRegisteredAndConnected(
       config: DomainConnectionConfig,
       retryFor: RetryFor,
@@ -122,7 +142,7 @@ class ParticipantAdminConnection(
         retryFor,
         s"participant registered ${config.domain}",
         lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
-        (_: Unit) => registerDomain(config),
+        (_: Unit) => registerDomain(config, handshakeOnly = false),
         logger,
       )
     // Albeit Canton auto-connects on registering a domain that auto-connect fails if the domain is

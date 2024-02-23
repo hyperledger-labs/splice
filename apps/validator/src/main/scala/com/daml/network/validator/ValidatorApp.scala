@@ -175,6 +175,8 @@ class ValidatorApp(
                 domainConnector.getGlobalDomainSequencerConnections.flatMap {
                   sequencerConnections =>
                     globalDomainInitializer.connectDomainAndRestoreData(
+                      connection,
+                      config.ledgerApiUser,
                       config.domains.global.alias,
                       migrationDump.domainId,
                       sequencerConnections,

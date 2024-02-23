@@ -1,7 +1,7 @@
 # Extra patterns to ignore from the canton-standalone-disaster-recovery log file
 # See 'canton_log.ignore.txt' for details on how to write these.
 
-# TODO(#10052) Remove this if we can import without connecting to the domain
+# TODO(#10286) Remove this if we can import without connecting to the domain
 ACS_COMMITMENT_MISMATCH
 
 # We've seen this happen due to txs submitted during offboarding of SV4. It can likely happen to other participants than the

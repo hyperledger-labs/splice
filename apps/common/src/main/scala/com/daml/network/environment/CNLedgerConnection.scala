@@ -980,6 +980,8 @@ object BaseLedgerConnection {
 
   val SVC_PARTY_USER_METADATA_KEY: String = "sv.app.network.canton.global/svc_party"
 
+  val INITIAL_ACS_IMPORT_METADATA_KEY: String = "network.canton.global/initial_acs_import"
+
   val APP_MANAGER_IDENTITY_PROVIDER_ID: String = "app_manager"
 
   val APP_MANAGER_ISSUER: String = "app_manager"

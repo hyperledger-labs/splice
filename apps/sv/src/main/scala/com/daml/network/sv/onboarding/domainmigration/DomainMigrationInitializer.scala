@@ -161,6 +161,8 @@ class DomainMigrationInitializer(
         domainTopologyTransactions,
       )
       _ <- domainDataRestorer.connectDomainAndRestoreData(
+        readOnlyConnection,
+        config.ledgerApiUser,
         domainAlias,
         domainMigrationDump.nodeIdentities.domainId,
         SequencerConnections.single(localDomainNode.sequencerConnection),
