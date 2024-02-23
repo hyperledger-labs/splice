@@ -1348,6 +1348,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd: |
             make cluster/build
+          cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: Apply SV-runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
@@ -1411,6 +1412,7 @@ jobs:
           cluster: << parameters.cluster >>
           cmd: |
             make cluster/build
+          cmd_retry_count: 2
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
