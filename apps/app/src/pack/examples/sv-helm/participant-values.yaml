@@ -2,10 +2,6 @@ persistence:
   host: participant-pg
   secretName: participant-pg-secret
   schema: sv_participant
-globalDomain:
-  alias: global
-  # replace TARGET_CLUSTER with your actual target cluster
-  url: https://sequencer.sv-1.svc.TARGET_CLUSTER.network.canton.global
 auth:
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"

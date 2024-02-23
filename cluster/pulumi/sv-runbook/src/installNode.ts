@@ -170,7 +170,6 @@ async function installSvAndValidator(config: SvConfig) {
 
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
-      TARGET_CLUSTER: TARGET_CLUSTER,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
     }),
     disableAutoInit: !!participantBootstrapDumpSecret,

@@ -43,16 +43,6 @@ spec:
         - name: CANTON_PARTICIPANT_POSTGRES_DB
           value: {{ .Values.persistence.databaseName }}
         {{- end }}
-        {{- with .Values.globalDomain }}
-        {{- if .alias }}
-        - name: GLOBAL_DOMAIN_ALIAS
-          value: "{{ .alias }}"
-        {{- end }}
-        {{- if .url }}
-        - name: GLOBAL_DOMAIN_URL
-          value: "{{ .url }}"
-        {{- end }}
-        {{- end }}
         {{- if .Values.disableAutoInit }}
         - name: CANTON_PARTICIPANT_AUTO_INIT
           value: "false"

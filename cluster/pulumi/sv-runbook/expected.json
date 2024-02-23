@@ -438,10 +438,6 @@
         },
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "globalDomain": {
-          "alias": "global",
-          "url": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global"
-        },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "host": "participant-pg",

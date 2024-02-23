@@ -160,7 +160,6 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
 
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
-      TARGET_CLUSTER: TARGET_CLUSTER,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
     }),
     ...loadYamlFromFile(

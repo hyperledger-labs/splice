@@ -161,10 +161,6 @@
         },
         "disableAutoInit": false,
         "enableHealthProbes": true,
-        "globalDomain": {
-          "alias": "global",
-          "url": "https://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global"
-        },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {

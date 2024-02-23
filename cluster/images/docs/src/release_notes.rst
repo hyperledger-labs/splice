@@ -3,6 +3,12 @@
 Release Notes
 =============
 
+2024-03-04
+----------
+
+* Deployment
+  * It is no longer necessary to specify anything related to `globalDomain` in `participant-values.yaml`.
+
 2024-02-26
 ----------
 
