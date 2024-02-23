@@ -3339,8 +3339,7 @@ workflows:
 
   deploy_cimain:
     when:
-      # TODO(#10235) Reenable this
-      equal: [ true, false ]
+      equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
       - docker_images_push:
           <<: *notify-fail
