@@ -78,18 +78,18 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
         )
       )
     sv4Backend.stop()
-    sv1Backend.createVoteRequest(
+    sv1Backend.createVoteRequest2(
       sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
       action,
       "url",
       "description",
       sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
     )
+    val trackingCid = sv1Backend.getLatestVoteRequestTrackingCid()
     Seq(sv2Backend, sv3Backend).foreach { sv =>
       eventually() {
-        sv.listVoteRequests() should not be empty
-        val voteId = sv.listVoteRequests().head.contractId
-        sv.castVote(voteId, isAccepted = true, "url", "description")
+        sv.listVoteRequests2() should not be empty
+        sv.castVote2(trackingCid, isAccepted = true, "url", "description")
       }
     }
     eventually(timeUntilSuccess = 2.minute, maxPollInterval = 1.second) {

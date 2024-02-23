@@ -7,7 +7,6 @@ import com.daml.network.config.CNNodeConfigTransforms
 import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
@@ -34,9 +33,6 @@ class SvOffboardingIntegrationTest
   override lazy val resetDecentralizedNamespace = false
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
-  // TODO(#9014) make it work with persistend stores
-  registerPlugin(new UseInMemoryStores(loggerFactory))
-
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
@@ -94,7 +90,7 @@ class SvOffboardingIntegrationTest
                 new SvcRules_RemoveMember(sv4Backend.getSvcInfo().svParty.toProtoPrimitive)
               )
             )
-          sv1Backend.createVoteRequest(
+          sv1Backend.createVoteRequest2(
             sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
             action,
             "url",
@@ -105,9 +101,9 @@ class SvOffboardingIntegrationTest
       )(
         "The vote request has been created",
         _ => {
-          val voteRequestCid = sv1Backend.listVoteRequests().headOption.value.contractId
+          val voteRequestCid = sv1Backend.listVoteRequests2().headOption.value.contractId
           Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach { sv =>
-            sv.listVoteRequests().headOption.value.contractId shouldBe voteRequestCid
+            sv.listVoteRequests2().headOption.value.contractId shouldBe voteRequestCid
           }
           voteRequestCid
         },
@@ -115,7 +111,7 @@ class SvOffboardingIntegrationTest
 
       actAndCheck(
         "SV2 votes on removing sv4", {
-          sv2Backend.castVote(voteRequestCid4, true, "url", "description")
+          sv2Backend.castVote2(voteRequestCid4, true, "url", "description")
         },
       )(
         "The majority has voted but without an acceptance majority, the trigger should not remove sv4",
@@ -126,7 +122,7 @@ class SvOffboardingIntegrationTest
 
       actAndCheck(
         "SV3 votes on removing sv4", {
-          sv3Backend.castVote(voteRequestCid4, true, "url", "description")
+          sv3Backend.castVote2(voteRequestCid4, true, "url", "description")
         },
       )(
         "The majority voted yet, thus the trigger should remove the svc party hosting for sv4",

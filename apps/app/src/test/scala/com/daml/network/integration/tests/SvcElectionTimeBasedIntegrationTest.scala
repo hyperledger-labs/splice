@@ -11,7 +11,7 @@ import CNNodeTests.BracketSynchronous.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.{ElectionRequest, SvcRules_RemoveMember}
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
-import com.daml.network.sv.automation.leaderbased.ExecuteVoteRequestActionTrigger
+import com.daml.network.sv.automation.leaderbased.CloseVoteRequest2WithEarlyClosingTrigger
 
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
@@ -184,13 +184,13 @@ class SvcElectionTimeBasedIntegrationTest
         )
       )
       leaderBackend.leaderBasedAutomation
-        .trigger[ExecuteVoteRequestActionTrigger]
+        .trigger[CloseVoteRequest2WithEarlyClosingTrigger]
         .pause()
         .futureValue
       val (_, voteRequest) = actAndCheck(
         "Creating vote request",
         eventuallySucceeds() {
-          sv1Backend.createVoteRequest(
+          sv1Backend.createVoteRequest2(
             sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
             removeAction,
             "url",
@@ -198,7 +198,7 @@ class SvcElectionTimeBasedIntegrationTest
             sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
           )
         },
-      )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
+      )("vote request has been created", _ => sv1Backend.listVoteRequests2().loneElement)
       Seq(sv2Backend, sv3Backend, sv4Backend)
         .filter(
           // current leader not voting
@@ -206,13 +206,9 @@ class SvcElectionTimeBasedIntegrationTest
         )
         .foreach { sv =>
           clue(s"${sv.name} accepts vote") {
-            val svVoteRequest = eventually() {
-              sv.listVoteRequests().loneElement
-            }
-            svVoteRequest.contractId shouldBe voteRequest.contractId
             eventuallySucceeds() {
-              sv.castVote(
-                svVoteRequest.contractId,
+              sv.castVote2(
+                voteRequest.contractId,
                 true,
                 "url",
                 "description",
@@ -222,7 +218,9 @@ class SvcElectionTimeBasedIntegrationTest
         }
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-        leaderBackend.leaderBasedAutomation.trigger[ExecuteVoteRequestActionTrigger].resume(),
+        leaderBackend.leaderBasedAutomation
+          .trigger[CloseVoteRequest2WithEarlyClosingTrigger]
+          .resume(),
         entries => {
           forExactly(4, entries) { line =>
             line.message should include(

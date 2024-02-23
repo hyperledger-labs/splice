@@ -27,6 +27,7 @@ import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem
+import scala.jdk.OptionConverters.*
 
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
@@ -215,6 +216,17 @@ abstract class SvAppReference(
         HttpSvAdminAppClient.ListVoteRequests2
       )
     }
+  }
+
+  @Help.Summary("Get the latest vote request trackingCid")
+  def getLatestVoteRequestTrackingCid(): VoteRequest2.ContractId = {
+    val latestVoteRequest = this
+      .listVoteRequests2()
+      .headOption
+      .getOrElse(
+        throw new RuntimeException("No latest vote request found")
+      )
+    latestVoteRequest.payload.trackingCid.toScala.getOrElse(latestVoteRequest.contractId)
   }
 
   @Help.Summary("Lookup vote request")

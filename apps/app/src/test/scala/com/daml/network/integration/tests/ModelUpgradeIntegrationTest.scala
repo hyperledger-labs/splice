@@ -110,7 +110,7 @@ class ModelUpgradeIntegrationTest
           val (_, voteRequest) = actAndCheck(
             "Creating vote request",
             eventuallySucceeds() {
-              sv1Backend.createVoteRequest(
+              sv1Backend.createVoteRequest2(
                 sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
                 upgradeAction,
                 "url",
@@ -118,22 +118,19 @@ class ModelUpgradeIntegrationTest
                 sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
               )
             },
-          )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
-          clue("sv2 sees the vote request") {
-            val svVoteRequest = eventually() {
-              sv2Backend.listVoteRequests().loneElement
-            }
-            svVoteRequest.contractId shouldBe voteRequest.contractId
-          }
-          clue(s"sv2 accepts vote") {
-            eventuallySucceeds() {
-              sv2Backend.castVote(
-                voteRequest.contractId,
-                true,
-                "url",
-                "description",
-              )
-            }
+          )("vote request has been created", _ => sv1Backend.listVoteRequests2().loneElement)
+
+          clue(s"sv2, sv3, and sv4 accepts") {
+            Seq(sv2Backend, sv3Backend).map(sv =>
+              eventuallySucceeds() {
+                sv.castVote2(
+                  voteRequest.contractId,
+                  true,
+                  "url",
+                  "description",
+                )
+              }
+            )
           }
         },
       )(
@@ -175,7 +172,7 @@ class ModelUpgradeIntegrationTest
           val (_, voteRequest) = actAndCheck(
             "Creating vote request",
             eventuallySucceeds() {
-              sv1Backend.createVoteRequest(
+              sv1Backend.createVoteRequest2(
                 sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
                 dummyUpgradeAction,
                 "url",
@@ -183,20 +180,18 @@ class ModelUpgradeIntegrationTest
                 sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
               )
             },
-          )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
-          clue(s"sv2 accepts vote") {
-            val svVoteRequest = eventually() {
-              sv2Backend.listVoteRequests().loneElement
-            }
-            svVoteRequest.contractId shouldBe voteRequest.contractId
-            eventuallySucceeds() {
-              sv2Backend.castVote(
-                svVoteRequest.contractId,
-                true,
-                "url",
-                "description",
-              )
-            }
+          )("vote request has been created", _ => sv1Backend.listVoteRequests2().loneElement)
+          clue(s"sv2, sv3, and sv4 accepts") {
+            Seq(sv2Backend, sv3Backend).map(sv =>
+              eventuallySucceeds() {
+                sv.castVote2(
+                  voteRequest.contractId,
+                  true,
+                  "url",
+                  "description",
+                )
+              }
+            )
           }
         },
       )(

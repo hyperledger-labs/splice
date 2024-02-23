@@ -35,8 +35,8 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
     }
 
     val svToCreateVoteRequest = svsWithAuth.headOption.value
-    svsWithAuth.tail.size should be >= 2
-    val svsToVote = svsWithAuth.tail.take(2)
+    svsWithAuth.tail.size should be >= 3
+    val svsToVote = svsWithAuth.tail.take(3)
 
     clue(s"schedule domain migration") {
       val scheduledTime = Instant.now().plus(10, ChronoUnit.SECONDS)

@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
   DomainUpgradeSchedule,
   SvcRulesConfig,
   SvcRules_SetConfig,
-  VoteRequest,
+  VoteRequest2,
 }
 import com.daml.network.console.{
   CNParticipantClientReference,
@@ -63,6 +63,13 @@ trait SvTestUtil extends CNNodeTestCommon {
     }
   }
 
+  def getTrackingId(
+      voteRequest: Contract[VoteRequest2.ContractId, VoteRequest2]
+  ): VoteRequest2.ContractId = {
+    voteRequest.payload.trackingCid.toScala
+      .getOrElse(voteRequest.contractId)
+  }
+
   def getConfirmingSvs(svBackends: Seq[SvAppBackendReference]): Seq[ConfirmingSv] =
     svBackends.map(sv => ConfirmingSv(sv.participantClientWithAdminToken, sv.getSvcInfo().svParty))
 
@@ -85,7 +92,7 @@ trait SvTestUtil extends CNNodeTestCommon {
     actAndCheck(
       "Voting on an SvcRules config change for scheduled migration", {
         def onlySetConfigVoteRequests(
-            voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
+            voteRequests: Seq[Contract[VoteRequest2.ContractId, VoteRequest2]]
         ) =
           voteRequests.filter {
             _.payload.action match {
@@ -101,7 +108,7 @@ trait SvTestUtil extends CNNodeTestCommon {
         val (_, voteRequest) = actAndCheck(
           "Creating vote request",
           eventuallySucceeds() {
-            svToCreateVoteRequest.createVoteRequest(
+            svToCreateVoteRequest.createVoteRequest2(
               svToCreateVoteRequest.getSvcInfo().svParty.toProtoPrimitive,
               action,
               "url",
@@ -111,20 +118,20 @@ trait SvTestUtil extends CNNodeTestCommon {
           },
         )(
           "vote request has been created",
-          _ => onlySetConfigVoteRequests(svToCreateVoteRequest.listVoteRequests()).loneElement,
+          _ => onlySetConfigVoteRequests(svToCreateVoteRequest.listVoteRequests2()).loneElement,
         )
 
         svsToCastVotes.parTraverse { sv =>
           Future {
             clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
               val svVoteRequest = eventually() {
-                onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
+                onlySetConfigVoteRequests(sv.listVoteRequests2()).loneElement
               }
-              svVoteRequest.contractId shouldBe voteRequest.contractId
+              getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
             }
             clue(s"${sv.name} accepts vote") {
               eventuallySucceeds() {
-                sv.castVote(
+                sv.castVote2(
                   voteRequest.contractId,
                   true,
                   "url",
