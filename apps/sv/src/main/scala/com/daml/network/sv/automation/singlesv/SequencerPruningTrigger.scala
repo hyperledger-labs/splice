@@ -10,6 +10,7 @@ import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -36,6 +37,10 @@ class SequencerPruningTrigger(
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingTrigger {
+  val pruningMetrics = new SequencerPruningMetrics(
+    context.metricsFactory
+  )
+
   private val svParty = store.key.svParty
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
@@ -76,6 +81,7 @@ class SequencerPruningTrigger(
             logger.warn(
               show"disabling ${membersToDisable.size} member clients preventing pruning to $pruningTimestamp: $membersToDisable"
             )
+            pruningMetrics.disabledMembers.updateValue(membersToDisable.size)
             Future.traverse(membersToDisable)(m => sequencerAdminConnection.disableMember(m.member))
           } else {
             throw Status.INTERNAL
@@ -95,8 +101,11 @@ class SequencerPruningTrigger(
         )
         Future.failed(Status.INTERNAL.withDescription(message).asRuntimeException())
       } else
-        sequencerAdminConnection
-          .prune(pruningTimestamp)
+        pruningMetrics.latency
+          .timeFuture(
+            sequencerAdminConnection
+              .prune(pruningTimestamp)
+          )
           .transform(
             identity,
             err => {
@@ -131,6 +140,9 @@ class SequencerPruningTrigger(
       .toList
       .map(m => SequencerPruningTrigger.LaggingMember(m, memberToSafePruningTimestamp(m)))
   }
+
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] =
+    SyncCloseable("Pruning Metrics", pruningMetrics.close()) +: super.closeAsync()
 }
 
 private object SequencerPruningTrigger {
