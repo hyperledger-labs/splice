@@ -32,7 +32,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.migrationDumpDir
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
-import com.daml.network.sv.automation.singlesv.SvRewardTrigger
+import com.daml.network.sv.automation.singlesv.{SubmitSvStatusReportTrigger, SvRewardTrigger}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
@@ -267,6 +267,8 @@ class GlobalDomainMigrationIntegrationTest
         (_, conf) =>
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[SvRewardTrigger]
+              // TODO(#10297): re-enable once that trigger is compatible with soft domain-migrations
+              .withPausedTrigger[SubmitSvStatusReportTrigger]
           )(conf),
       )
       .addConfigTransforms(

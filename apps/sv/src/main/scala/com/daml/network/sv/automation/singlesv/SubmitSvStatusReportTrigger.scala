@@ -44,6 +44,7 @@ class SubmitSvStatusReportTrigger(
       statusReport <- store.getSvStatusReport(store.key.svParty)
       openMiningRounds <- store.getOpenMiningRoundTriple()
       cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
+      // TODO(#10297): make this code work properly with multiple mediators in the case of soft-domain migration
       mediatorDomainTime <- mediatorAdminConnection.traverse(
         // TODO(#10189): only request a time-proof more recent than the status report interval
         _.getDomainTime(svcRules.domain, timeouts.shutdownShort)
