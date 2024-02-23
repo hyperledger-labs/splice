@@ -48,6 +48,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         "alice-participant-id",
         new Round(42),
         domainId,
+        0L,
       )
     )
   )
