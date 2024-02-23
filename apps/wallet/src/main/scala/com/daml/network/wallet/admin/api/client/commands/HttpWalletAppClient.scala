@@ -830,6 +830,32 @@ object HttpWalletAppClient {
         .leftMap(_.toString)
     }
   }
+
+  case object ListSvRewardCoupons
+      extends InternalBaseCommand[
+        http.ListSvRewardCouponsResponse,
+        Seq[
+          Contract[
+            coinCodegen.SvRewardCoupon.ContractId,
+            coinCodegen.SvRewardCoupon,
+          ]
+        ],
+      ] {
+    def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListSvRewardCouponsResponse] =
+      client.listSvRewardCoupons(headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.ListSvRewardCouponsResponse.OK(response) =>
+      response.svRewardCoupons
+        .traverse(req => Contract.fromHttp(coinCodegen.SvRewardCoupon.COMPANION)(req))
+        .leftMap(_.toString)
+    }
+  }
+
   case object UserStatus extends InternalBaseCommand[http.UserStatusResponse, UserStatusData] {
     override def submitRequest(
         client: Client,

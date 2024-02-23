@@ -163,7 +163,8 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
       }
     }
 
-    val svcRulesCid = sv1Backend.getSvcInfo().svcRules.contractId
+    val svcRules = sv1Backend.getSvcInfo().svcRules
+    val svcRulesCid = svcRules.contractId
 
     def nonEmptyOnSv1[
         TCid <: ContractId[T],
@@ -483,6 +484,16 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           svcParty.toProtoPrimitive,
           validator.toProtoPrimitive,
           dummyRound,
+        )
+      )
+
+      createSampleAndEnsurePresence(cc.coin.SvRewardCoupon.COMPANION)(
+        new cc.coin.SvRewardCoupon(
+          svcParty.toProtoPrimitive,
+          sv1Party.toProtoPrimitive,
+          sv1Party.toProtoPrimitive,
+          dummyRound,
+          svcRules.payload.members.get(sv1Party.toProtoPrimitive).svRewardWeight,
         )
       )
 

@@ -507,6 +507,7 @@ object UserWalletStore {
       coinCodegen.LockedCoin.COMPANION,
       coinCodegen.ValidatorRewardCoupon.COMPANION,
       validatorCodegen.ValidatorFaucetCoupon.COMPANION,
+      coinCodegen.SvRewardCoupon.COMPANION,
       subsCodegen.Subscription.COMPANION,
       subsCodegen.SubscriptionRequest.COMPANION,
       subsCodegen.SubscriptionInitialPayment.COMPANION,
@@ -582,6 +583,12 @@ object UserWalletStore {
         mkFilter(validatorCodegen.ValidatorFaucetCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.validator == endUser
+        )(co =>
+          UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
+        ),
+        mkFilter(coinCodegen.SvRewardCoupon.COMPANION)(co =>
+          co.payload.svc == svc &&
+            co.payload.sv == endUser
         )(co =>
           UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
         ),

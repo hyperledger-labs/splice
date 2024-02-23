@@ -85,7 +85,7 @@ class SvSvcAutomationService(
   registerTrigger(new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, connection))
   if (config.automation.enableSvRewards) {
     if (config.automation.useNewSvRewardIssuance) {
-      // TODO (#9973): registerTrigger(new ReceiveSvRewardCouponTrigger(...))
+      registerTrigger(new ReceiveSvRewardCouponTrigger(triggerContext, svcStore, connection))
     } else {
       registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
     }
@@ -382,6 +382,7 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
       aTrigger[SummarizingMiningRoundTrigger],
       aTrigger[SvOnboardingRequestTrigger],
       aTrigger[SvRewardTrigger],
+      aTrigger[ReceiveSvRewardCouponTrigger],
       aTrigger[ArchiveClosedMiningRoundsTrigger],
       aTrigger[ElectionRequestTrigger],
       aTrigger[RestartLeaderBasedAutomationTrigger],

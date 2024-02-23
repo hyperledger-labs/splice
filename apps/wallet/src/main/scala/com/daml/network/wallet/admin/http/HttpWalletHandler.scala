@@ -227,6 +227,17 @@ class HttpWalletHandler(
     )
   }
 
+  override def listSvRewardCoupons(respond: v0.WalletResource.ListSvRewardCouponsResponse.type)()(
+      tUser: TracedUser
+  ): Future[v0.WalletResource.ListSvRewardCouponsResponse] = {
+    implicit val TracedUser(user, traceContext) = tUser
+    listContracts(
+      coinCodegen.SvRewardCoupon.COMPANION,
+      user,
+      d0.ListSvRewardCouponsResponse(_),
+    )
+  }
+
   override def listTransactions(
       respond: v0.WalletResource.ListTransactionsResponse.type
   )(

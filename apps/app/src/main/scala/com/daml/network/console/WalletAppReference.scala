@@ -396,6 +396,20 @@ abstract class WalletAppReference(
       httpCommand(HttpWalletAppClient.ListValidatorFaucetCoupons)
     }
 
+  @Help.Summary("List SV reward coupons")
+  @Help.Description(
+    "List all open SV Reward coupons issued the authenticated SV user"
+  )
+  def listSvRewardCoupons(): Seq[
+    Contract[
+      coinCodegen.SvRewardCoupon.ContractId,
+      coinCodegen.SvRewardCoupon,
+    ]
+  ] =
+    consoleEnvironment.run {
+      httpCommand(HttpWalletAppClient.ListSvRewardCoupons)
+    }
+
   @Help.Summary("User status")
   @Help.Description("Get the user status")
   def userStatus(): UserStatusData =

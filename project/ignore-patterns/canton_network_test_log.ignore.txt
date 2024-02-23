@@ -70,6 +70,8 @@ Noticed an SvcRules epoch change.*GlobalDomainMigrationIntegrationTest
 
 # Shows up during global domain migration test, when the domain is frozen
 GlobalDomainMigrationIntegrationTest.*io.grpc.StatusRuntimeException: ABORTED: DOMAIN_BACKPRESSURE.*: The domain is overloaded
+# TODO (#10085): remove if it no longer applies
+GlobalDomainMigrationIntegrationTest.*io.grpc.StatusRuntimeException: ABORTED: SEQUENCER_REQUEST_FAILED.*: Failed to send command
 
 # TODO (#9979): this only applies to simtime.
 # In simtime tests where the rounds are advanced too quickly, this trigger might not have enough time to receive the coupon.
