@@ -27,7 +27,7 @@
         "3.18.254.138/32"
       ],
       "Fiutur": ["52.3.116.188/32"],
-      "Nima-Capital": ["177.71.164.26/32"]	
+      "Orb-1-LP": ["177.71.164.26/32"]	
     },
     "validators": {
       "Canton-Foundation Test Validator": ["34.41.138.150/32"],
@@ -56,7 +56,10 @@
     },
     "svs": {
       "Canton-Foundation": ["35.184.224.113/32"],
-      "Liberty-City-Ventures": ["54.228.250.8/32"],
+      "Liberty-City-Ventures": [
+              "54.228.250.8/32",
+              "54.195.228.240/32"
+      ],
       "SBI-Holdings": ["3.114.35.109/32"],
       "Cumberland": [
         "3.132.125.148/32",
