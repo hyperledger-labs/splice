@@ -289,11 +289,18 @@ class ValidatorApp(
       case _ =>
         onboardingConfig match {
           case Some(oc) =>
+            logger.info(
+              "ValidatorLicense not found, onboarding is configured. Requesting onboarding with configured secret"
+            )
             for {
               _ <- requestOnboarding(oc.svClient.adminApi, validatorParty, oc.secret)
               _ <- waitForValidatorLicense(store)
             } yield ()
-          case None => sys.error("Not onboarded but no onboarding config found; exiting.")
+          case None =>
+            logger.info(
+              "ValidatorLicense not found, onboarding is not configured. Wait for the ValidatorLicense"
+            )
+            waitForValidatorLicense(store)
         }
     }
   }
