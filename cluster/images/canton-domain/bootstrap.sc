@@ -26,6 +26,7 @@ def main() {
           domainOwners = Seq(sequencer),
           sequencers = Seq(sequencer),
           mediators = Seq(mediator),
+          staticDomainParameters = staticParameters(sequencer),
         )
         logger.info("Domain initialized")
         true

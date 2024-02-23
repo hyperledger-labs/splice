@@ -91,9 +91,7 @@ object SequencedEvent
 
     for {
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
-      timestamp <- ProtoConverter
-        .required("SequencedEvent.timestamp", tsP)
-        .flatMap(CantonTimestamp.fromProtoPrimitive)
+      timestamp <- CantonTimestamp.fromProtoPrimitive(tsP)
       domainId <- DomainId.fromProtoPrimitive(domainIdP, "SequencedEvent.domainId")
       mbBatch <- mbBatchP.traverse(
         // TODO(i10428) Prevent zip bombing when decompressing the request
@@ -194,7 +192,7 @@ sealed abstract case class DeliverError private[sequencing] (
 
   def toProtoV30: v30.SequencedEvent = v30.SequencedEvent(
     counter = counter.toProtoPrimitive,
-    timestamp = Some(timestamp.toProtoPrimitive),
+    timestamp = timestamp.toProtoPrimitive,
     domainId = domainId.toProtoPrimitive,
     messageId = Some(messageId.toProtoPrimitive),
     batch = None,
@@ -297,7 +295,7 @@ case class Deliver[+Env <: Envelope[_]] private[sequencing] (
 
   protected[sequencing] def toProtoV30: v30.SequencedEvent = v30.SequencedEvent(
     counter = counter.toProtoPrimitive,
-    timestamp = Some(timestamp.toProtoPrimitive),
+    timestamp = timestamp.toProtoPrimitive,
     domainId = domainId.toProtoPrimitive,
     messageId = messageIdO.map(_.toProtoPrimitive),
     batch = Some(batch.toProtoV30),

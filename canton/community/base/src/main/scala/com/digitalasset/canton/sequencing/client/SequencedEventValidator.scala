@@ -685,7 +685,7 @@ class SequencedEventValidatorImpl(
                 _.traverse((_: Unit) => None)
               )
             else {
-              val previousEvent = rememberedAndCurrent.head1.unwrap.valueOr { previousErr =>
+              val previousEvent = rememberedAndCurrent.head1.value.valueOr { previousErr =>
                 implicit val traceContext: TraceContext = current.traceContext
                 ErrorUtil.invalidState(
                   s"Subscription for sequencer $sequencerId delivered an event at counter ${current.counter} after having previously signalled the error $previousErr"
@@ -715,7 +715,7 @@ class SequencedEventValidatorImpl(
           FutureUnlessShutdown.pure(failedPreviously -> event.last1.map(_ => None))
         else
           performValidation(event).map { validation =>
-            val failed = validation.unwrap.exists(_.isLeft)
+            val failed = validation.value.exists(_.isLeft)
             failed -> validation
           }
       }

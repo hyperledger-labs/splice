@@ -1,0 +1,28 @@
+diff a/canton/community/participant/src/main/scala/com/digitalasset/canton/participant/protocol/MessageDispatcher.scala b/canton/community/participant/src/main/scala/com/digitalasset/canton/participant/protocol/MessageDispatcher.scala	(rejected hunks)
+@@ -182,21 +178,18 @@ trait MessageDispatcher { this: NamedLogging =>
+     * </ul>
+     */
+   protected def processBatch(
+-      eventE: Either[
+-        EventWithErrors[Deliver[DefaultOpenEnvelope]],
+-        SignedContent[Deliver[DefaultOpenEnvelope]],
+-      ]
++      eventE: WithOpeningErrors[SignedContent[Deliver[DefaultOpenEnvelope]]]
+   )(implicit traceContext: TraceContext): FutureUnlessShutdown[ProcessingResult] = {
+-    val content = eventE.fold(_.content, _.content)
+-    val Deliver(sc, ts, _, _, batch) = content
++    val deliver = eventE.event.content
++    val Deliver(sc, ts, _, _, batch) = deliver
+ 
+     val envelopesWithCorrectDomainId = filterBatchForDomainId(batch, sc, ts)
+ 
+     // Sanity check the batch
+     // we can receive an empty batch if it was for a deliver we sent but were not a recipient
+     // or if the event validation has failed on the sequencer for another member's submission
+-    if (content.isReceipt) {
+-      logger.debug(show"Received the receipt for a previously sent batch:\n$content")
++    if (deliver.isReceipt) {
++      logger.debug(show"Received the receipt for a previously sent batch:\n$deliver")
+     } else if (batch.envelopes.isEmpty) {
+       logger.debug(show"Received an empty batch.")
+     }

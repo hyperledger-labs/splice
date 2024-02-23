@@ -33,8 +33,10 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.MalformedInputErrors.InvalidDomainId
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.UnknownInformees
-import com.digitalasset.canton.protocol.messages.LocalReject
-import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.InactiveContracts
+import com.digitalasset.canton.protocol.LocalRejectError.ConsistencyRejections.{
+  LockedContracts,
+  InactiveContracts,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.retry.RetryUtil.*
@@ -706,7 +708,7 @@ object HttpWalletHandler {
         TransientErrorKind
       case Failure(ex: io.grpc.StatusRuntimeException) if isLockedContract(ex) =>
         logger.info(
-          s"The operation $operationName failed with a ${LocalReject.ConsistencyRejections.LockedContracts.id} error $ex."
+          s"The operation $operationName failed with a ${LockedContracts.id} error $ex."
         )
         TransientErrorKind
       // TODO(#3933) This is temporarily added to retry on INVALID_ARGUMENT errors when submitting transactions during topology change.
@@ -744,7 +746,7 @@ object HttpWalletHandler {
   private def isLockedContract(ex: io.grpc.StatusRuntimeException): Boolean = {
     ex.getStatus.getCode == Status.Code.ABORTED &&
     ErrorDetails.from(StatusProto.fromThrowable(ex)).exists {
-      case ErrorInfoDetail(LocalReject.ConsistencyRejections.LockedContracts.id, _) => true
+      case ErrorInfoDetail(LockedContracts.id, _) => true
       case _ => false
     }
   }
