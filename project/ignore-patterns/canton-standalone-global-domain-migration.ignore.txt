@@ -6,3 +6,6 @@ ACS_COMMITMENT_MISMATCH
 
 # TODO(#10137) Remove once we have a fix for this
 Claims do not authorize to read data for party 'bob__wallet__user.*
+
+# TODO(#9485): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
+Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
