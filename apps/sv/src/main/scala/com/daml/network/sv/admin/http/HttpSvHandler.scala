@@ -8,7 +8,6 @@ import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.*
-import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -26,14 +25,15 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
-import com.digitalasset.canton.topology.transaction.SequencerDomainStateX
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.util.Base64
+import java.time.Instant
+import java.util.{Base64, UUID}
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -496,15 +496,15 @@ class HttpSvHandler(
   private def waitForNewSequencerObservedByExistingSequencer(
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[SequencerDomainStateX]] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     for {
       globalDomain <- svcStore.getSvcRules().map(_.domain)
-      result <- retryProvider.getValueWithRetries(
+      _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
         "New sequencer is observed in SequencerDomainState through existing sequencer",
         sequencerAdminConnection
           .getSequencerDomainState(globalDomain)
-          .map { result =>
+          .map(result =>
             if (!result.mapping.active.contains(sequencerId)) {
               throw Status.NOT_FOUND
                 .withDescription(
@@ -512,11 +512,45 @@ class HttpSvHandler(
                 )
                 .asRuntimeException()
             }
-            result
-          },
+          ),
         logger,
       )
-    } yield result
+    } yield ()
+  }
+
+  private def dummyTopologyTransaction(
+      globalDomainId: DomainId,
+      sequencerAdminConnection: SequencerAdminConnection,
+  )(implicit traceContext: TraceContext): Future[Instant] = {
+    val dummyHint = s"dummy-${UUID.randomUUID}"
+    for {
+      party <- svcStoreWithIngestion.connection.ensurePartyAllocated(
+        TopologyStoreId.DomainStore(globalDomainId),
+        dummyHint,
+        None,
+        participantAdminConnection,
+      )
+      msg = "Wait for sequencer to observe party allocation"
+      _ = logger.info(msg)
+      sequencedAt <- retryProvider.retryForClientCalls(
+        msg,
+        for {
+          state <- sequencerAdminConnection.listPartyToParticipant(filterParty = party.filterString)
+        } yield {
+          state.lastOption match {
+            case None =>
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Sequencer has not yet observed allocation of $party"
+                )
+                .asRuntimeException()
+            case Some(last) =>
+              last.base.sequenced
+          }
+        },
+        logger,
+      )
+    } yield sequencedAt
   }
 
   private def getSequencerOnboardingSnapshots(
@@ -525,19 +559,18 @@ class HttpSvHandler(
   )(implicit traceContext: TraceContext): Future[definitions.SequencerSnapshot] = {
     logger.info("Querying sequencer domain state")
     for {
-      topologyTx <- waitForNewSequencerObservedByExistingSequencer(
-        sequencerAdminConnection,
-        sequencerId,
-      )
+      _ <- waitForNewSequencerObservedByExistingSequencer(sequencerAdminConnection, sequencerId)
       // We need to generate a dummy transaction before generating the export
       // to make sure that the new sequencer gets a sequencer counter that is included in the snapshot.
       // Note that for now we do the dummy transaction here independent of whether the sequencer has already been onboarded
       // in the topology state or not. We could crash after the topology update but before this and there doesn't seem to be a good way
       // to test for this.
       globalDomain <- svcStore.getSvcRules().map(_.domain)
+      dummyTxSequencedAt <- dummyTopologyTransaction(globalDomain, sequencerAdminConnection)
       _ = logger.info(s"Downloading topology and sequencer snapshot")
+      // TODO(#5339) Check if we need to be careful at which offset we query our snapshot.
       sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(
-        CantonTimestamp.assertFromInstant(topologyTx.base.sequenced)
+        CantonTimestamp.tryFromInstant(dummyTxSequencedAt)
       )
       topologySnapshot <- sequencerAdminConnection
         .getTopologySnapshot(globalDomain, sequencerSnapshot.lastTs)
