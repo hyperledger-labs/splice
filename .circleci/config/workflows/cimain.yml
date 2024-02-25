@@ -36,7 +36,7 @@ workflow:
             - canton-network-vpn
             - slack-context
           cluster: "cimain"
-          wait_for_sv: true
+          wait_for_sv: false
           wait_for_non_sv_nodes: false
           # TODO(#10254) run splitwell tests once it's fixed
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
