@@ -11,7 +11,7 @@ import java.io.IOException
 import java.net.http.{HttpClient, HttpRequest, HttpResponse}
 import java.net.{HttpURLConnection, URI}
 
-trait PreflightIntegrationTestUtil {
+trait PreflightIntegrationTestUtil extends DomainMigrationIntegrationTestUtil {
 
   // We cache this because we only need it for one test case in each suite
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
@@ -70,6 +70,23 @@ trait PreflightIntegrationTestUtil {
       response.body
     else
       throw new IOException(response.body)
+  }
+
+}
+
+trait DomainMigrationIntegrationTestUtil {
+
+  protected val migrationId: Long = sys.env.getOrElse("CN_MIGRATION_DOMAIN_INDEX", "0").toLong
+
+  protected def domainMigrationCNNodeConfigTransforms(
+      config: CNNodeConfig
+  ): CNNodeConfig = {
+    CNNodeConfigTransforms.updateAllSvAppConfigs_(
+      _.copy(domainMigrationId = migrationId)
+    )(config)
+    CNNodeConfigTransforms.updateAllValidatorConfigs_(
+      _.copy(domainMigrationId = migrationId)
+    )(config)
   }
 
 }

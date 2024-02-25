@@ -235,7 +235,7 @@ class GlobalDomainMigrationIntegrationTest
           CNNodeConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
             if (name == "bobValidator")
               validatorConfig.copy(
-                domainMigrationPath =
+                domainMigrationDumpPath =
                   Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
               )
             else validatorConfig

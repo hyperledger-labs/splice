@@ -1426,17 +1426,21 @@ printTests := {
 
   def isCoreDeploymentPreflightIntegrationTest(name: String): Boolean = isPreflightIntegrationTest(
     name
-  ) && !isThirdPartyDeploymentPreflightIntegrationTest(
+  ) && !isSplitwellDeploymentPreflightIntegrationTest(
+    name
+  ) && !isValidator1DeploymentPreflightIntegrationTest(
     name
   ) && !isRunbookValidatorPreflightIntegrationTest(name) && !isRunbookSvPreflightIntegrationTest(
     name
   )
-  def isThirdPartyDeploymentPreflightIntegrationTest(name: String): Boolean =
+  def isValidator1DeploymentPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(
       name
-    ) && (name.contains("Validator1PreflightIntegrationTest") || name.contains(
-      "SelfHostedSplitwellPreflightIntegrationTest"
-    ))
+    ) && name.contains("Validator1PreflightIntegrationTest")
+  def isSplitwellDeploymentPreflightIntegrationTest(name: String): Boolean =
+    isPreflightIntegrationTest(
+      name
+    ) && name.contains("SelfHostedSplitwellPreflightIntegrationTest")
   def isRunbookSvPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("RunbookSv")
   def isRunbookValidatorPreflightIntegrationTest(name: String): Boolean =
@@ -1470,9 +1474,14 @@ printTests := {
       (t: String) => isCoreDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
     (
-      "Preflight tests against third party components",
-      "test-full-class-names-third-party-preflight.log",
-      (t: String) => isThirdPartyDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
+      "Preflight tests against splitwell",
+      "test-full-class-names-splitwell-preflight.log",
+      (t: String) => isSplitwellDeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
+    ),
+    (
+      "Preflight tests against validator1",
+      "test-full-class-names-validator1-preflight.log",
+      (t: String) => isValidator1DeploymentPreflightIntegrationTest(t) && !isNonDevNetTest(t),
     ),
     (
       "Non-DevNet Preflight tests against core nodes",

@@ -18,7 +18,8 @@ import scala.util.Using
   */
 class CometBftPreflightIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
-    with PreflightAuthUtil {
+    with PreflightAuthUtil
+    with DomainMigrationIntegrationTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -26,12 +27,10 @@ class CometBftPreflightIntegrationTest
       this.getClass.getSimpleName
     )
 
-  private val domainIndex = sys.env.getOrElse("CN_MIGRATION_DOMAIN_INDEX", "0")
-
   "p2p port for all CometBft nodes is accessible" in { env =>
     env.svs.remote.zipWithIndex.map { case (_, index) =>
       val cometBftP2pHost = sys.env("NETWORK_APPS_ADDRESS")
-      val port = s"26$domainIndex${index + 1}6".toInt
+      val port = s"26$migrationId${index + 1}6".toInt
       clue(s"Connection to $cometBftP2pHost with port $port") {
         // All we care about is the p2p port for CometBFT being accessible by other nodes
         // The socket connects in the constructor, therefore if no error is thrown during the initialization then a successful TCP connection is established

@@ -23,6 +23,7 @@ import {
   imagePullSecret,
   CnInput,
   installPostgresPasswordSecret,
+  GlobalDomainMigrationConfig,
 } from 'cn-pulumi-common';
 
 import {
@@ -47,6 +48,8 @@ const participantIdentitiesFile = process.env.PARTICIPANT_IDENTITIES_FILE;
 const VALIDATOR_WALLET_USER_ID =
   process.env.VALIDATOR_WALLET_USER_ID || 'auth0|6526fab5214c99a9a8e1e3cc'; // Default to admin@validator.com at the validator-test tenant by default
 const DEFAULT_AUDIENCE = 'https://canton.network.global';
+
+const activeMigrationId = GlobalDomainMigrationConfig.fromEnv().activeMigrationId.toString();
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
@@ -112,6 +115,11 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
         hostPrefix: '',
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
         svNamespace: RUNBOOK_NAMESPACE,
+      },
+      ingress: {
+        globalDomain: {
+          activeMigrationId: activeMigrationId,
+        },
       },
       withSvIngress: false,
     },
@@ -221,6 +229,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
         SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
       }
     ),
+    domainMigrationId: activeMigrationId,
     participantIdentitiesDumpPeriodicBackup: backupConfig,
   };
 

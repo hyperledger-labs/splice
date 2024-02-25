@@ -516,12 +516,15 @@ jobs:
       include_sv:
         type: boolean
         default: true
-      include_non_sv_nodes:
+      include_splitwell:
         type: boolean
         default: true
       parallelism:
         type: integer
         default: 3
+      migration_id:
+        type: integer
+        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -539,13 +542,13 @@ jobs:
             nodes=""
             if [[ << parameters.include_sv >> != false ]]; then
               if (env-bool IS_DEVNET); then
-                nodes="sv-1 sv-2 sv-3 sv-4"
+                nodes="sv-1 sv-2 sv-3 sv-4 validator1"
               else
-                nodes="sv-1"
+                nodes="sv-1 validator1"
               fi
             fi
-            if [[ << parameters.include_non_sv_nodes >> != false ]]; then
-              nodes="$nodes splitwell validator1"
+            if [[ << parameters.include_splitwell >> != false ]]; then
+              nodes="$nodes splitwell"
             fi
             echo $nodes > nodes.txt
       - setup_vpn
@@ -565,14 +568,7 @@ jobs:
             cncluster activate
             # We use readiness of validator-app as an approximation to the node's readiness
             for ns in $(cat tests-to-run.txt); do
-              case $ns in
-                "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                  cncluster wait $ns validator-app-0
-                  ;;
-                "validator1"|"splitwell"|"sv")
-                  cncluster wait $ns validator-app
-                  ;;
-              esac
+              cncluster wait $ns validator-app-<< parameters.migration_id >>
             done
             cncluster backup_nodes $(cat tests-to-run.txt)
       - notify-cluster-fail:
@@ -583,6 +579,9 @@ jobs:
       <<: *cluster-parameter
       namespace_name:
         type: string
+      migration_id:
+        type: integer
+        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -605,12 +604,12 @@ jobs:
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app-0
-                cncluster wait << parameters.namespace_name >> sv-app-0
-                cncluster wait << parameters.namespace_name >> validator-app-0
+                cncluster wait << parameters.namespace_name >> scan-app-<< parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> sv-app-<< parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app-<< parameters.migration_id >>
                 ;;
               "validator1")
-                cncluster wait << parameters.namespace_name >> validator-app
+                cncluster wait << parameters.namespace_name >> validator-app-<< parameters.migration_id >>
                 ;;
             esac
       - notify-cluster-fail:

@@ -87,6 +87,9 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
+      global_domain_migration_id:
+        type: integer
+        default: 0
     steps:
       - checkout_with_retry
       - when:
@@ -108,6 +111,7 @@ jobs:
           additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
+            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_migration_id >>
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -252,15 +256,15 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            export CN_NON_SV_NODES="true"
+            export CN_INSTALL_SPLITWELL="true"
             if [[ << parameters.prepare_global_domain_upgrade >> == true ]]; then
-              export CN_NON_SV_NODES="false"
+              export CN_INSTALL_SPLITWELL="false"
             export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
             fi
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
               export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
-              export CN_NON_SV_NODES="false"
+              export CN_INSTALL_SPLITWELL="false"
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
               if [[ << parameters.global_domain_legacy_migration_id >> -ne 0 ]]; then
                 export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>

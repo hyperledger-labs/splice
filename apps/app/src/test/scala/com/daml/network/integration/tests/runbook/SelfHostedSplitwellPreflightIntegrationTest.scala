@@ -65,6 +65,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
       // Replace the path to the splitwell dar file.
       .addConfigTransforms((_, conf) => replaceDarFilePath(conf))
+      .addConfigTransform((_, conf) => domainMigrationCNNodeConfigTransforms(conf))
       .withManualStart
 
   "run through runbook with self-hosted splitwell" in { implicit env =>

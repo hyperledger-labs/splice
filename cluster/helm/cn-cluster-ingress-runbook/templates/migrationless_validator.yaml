@@ -1,10 +1,10 @@
-{{/*Used by the sv runbook, which is not aware of multiple domains yet, and by validators which are not multi-domain aware*/}}
+{{/*Used by the validator runbook, which is not aware of multiple domains yet.*/}}
 {{- if and (empty ((.Values.ingress).globalDomain).activeMigrationId) (empty ((.Values.ingress).globalDomain).migrationId) }}
   {{- if .Values.ingress.wallet }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: wallet-runbook-{{ (.Values.cluster).svNamespace }}
+  name: wallet-{{ (.Values.cluster).svNamespace }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
@@ -34,7 +34,7 @@ spec:
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: cns-runbook-{{ (.Values.cluster).svNamespace }}
+  name: cns-{{ (.Values.cluster).svNamespace }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
@@ -58,38 +58,6 @@ spec:
             port:
               number: 80
             host: cns-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-  {{- end }}
-  {{ if .Values.ingress.splitwell }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: splitwell-runbook-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-    - "splitwell.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-    - cluster-ingress/cn-http-gateway
-  http:
-    - match:
-        - port: 443
-          uri:
-            prefix: "/api/json-api/"
-      route:
-        - destination:
-            port:
-              number: 7575
-            host: participant.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-      rewrite:
-        uri: "/"
-    - match:
-        - port: 443
-      route:
-        - destination:
-            port:
-              number: 80
-            host: splitwell-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
 {{- end }}

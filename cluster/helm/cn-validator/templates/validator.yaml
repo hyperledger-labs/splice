@@ -1,4 +1,6 @@
 {{- $validatorAppLabel := include "appLabel" (list .Values "validator-app") }}
+{{ $isActiveNode := ((.Values.globalDomainUpgrade).isActiveNode) }}
+{{ $isRestoringNode := and (.Values.globalDomainUpgrade) (not $isActiveNode) }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -167,6 +169,21 @@ spec:
               file = /participant-bootstrapping-dump/content
             }
         {{- end }}
+        {{- if .Values.domainMigrationId }}
+        - name: ADDITIONAL_CONFIG_DOMAIN_MIGRATION_ID
+          value: |
+            canton.validator-apps.validator_backend.domain-migration-id = {{ .Values.domainMigrationId }}
+        {{- end }}
+        {{- if $isRestoringNode }}
+        - name: ADDITIONAL_CONFIG_VALIDATOR_MIGRATION_RESTORE
+          value: |
+            canton.validator-apps.validator_backend.restore-from-migration-dump = "/domain-upgrade-dump/domain_migration_dump.json"
+        {{- end }}
+        {{- if $isActiveNode }}
+        - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
+          value: |
+            canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
+        {{- end }}
         ports:
         - containerPort: 5003
           name: val-http
@@ -187,11 +204,17 @@ spec:
           periodSeconds: 5
           failureThreshold: 5
           timeoutSeconds: 3
-        {{- with .Values.participantIdentitiesDumpImport }}
+        {{- if or .Values.participantIdentitiesDumpImport .Values.globalDomainUpgrade }}
         volumeMounts:
+        {{- with .Values.participantIdentitiesDumpImport }}
           - name: participant-bootstrapping-dump-volume
             mountPath: /participant-bootstrapping-dump
             readOnly: true
+        {{- end }}
+        {{- if .Values.globalDomainUpgrade }}
+          - name: domain-upgrade-dump-volume
+            mountPath: /domain-upgrade-dump
+        {{- end }}
         {{- end }}
         {{- with .Values.resources }}
         resources: {{- toYaml . | nindent 10 }}
@@ -218,11 +241,22 @@ spec:
                 echo "trying to create postgres database {{ .Values.persistence.databaseName }}, last error: $errmsg";
                 sleep 2;
               done
-      {{- with .Values.participantIdentitiesDumpImport }}
+      {{- if or .Values.participantIdentitiesDumpImport (or $isActiveNode $isRestoringNode) }}
       volumes:
+      {{- with .Values.participantIdentitiesDumpImport }}
         - name: participant-bootstrapping-dump-volume
           secret:
             secretName: {{ .secretName }}
+      {{- end }}
+      {{- if or $isActiveNode $isRestoringNode }}
+        - name: domain-upgrade-dump-volume
+          persistentVolumeClaim:
+            {{- if $isActiveNode }}
+            claimName: "global-domain-active-pvc"
+            {{- else }}
+            claimName: "global-domain-upgrade-pvc"
+            {{- end }}
+      {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -249,3 +283,37 @@ spec:
     protocol: TCP
   - name: metrics
     port: 10013
+{{- if $isActiveNode }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "global-domain-active-pvc"
+  namespace: {{ $.Release.Namespace }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10G
+  storageClassName: {{ .Values.globalDomainUpgrade.storageClassName }}
+{{- end }}
+{{- if $isRestoringNode }}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: "global-domain-upgrade-pvc"
+  namespace: {{ $.Release.Namespace }}
+spec:
+  # Create the PVC as a clone of the active PVC, that must already contain the migration dump
+  dataSource:
+    name: "global-domain-active-pvc"
+    kind: PersistentVolumeClaim
+  accessModes:
+    - ReadOnlyMany
+  resources:
+    requests:
+      storage: 20G
+  storageClassName: {{ .Values.globalDomainUpgrade.storageClassName }}
+{{- end }}

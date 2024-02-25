@@ -1,4 +1,4 @@
-{{- if ((.Values.ingress).globalDomain).activeMigrationId }}
+{{- if and .Values.withSvIngress ((.Values.ingress).globalDomain).activeMigrationId }}
   {{- if .Values.ingress.sequencer }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
@@ -80,64 +80,4 @@ spec:
             host: scan-web-ui-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
-  {{- if .Values.ingress.wallet }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: wallet-sv-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-    - "wallet.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-    - cluster-ingress/cn-http-gateway
-  http:
-    - match:
-        - port: 443
-          uri:
-            prefix: "/api/validator/"
-      route:
-        - destination:
-            port:
-              number: 5003
-            host: validator-app-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-    - match:
-        - port: 443
-      route:
-        - destination:
-            port:
-              number: 80
-            host: wallet-web-ui-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-  {{- end }}
-{{- if .Values.ingress.cns }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: cns-sv-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-    - "cns.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-    - cluster-ingress/cn-http-gateway
-  http:
-    - match:
-        - port: 443
-          uri:
-            prefix: "/api/validator/"
-      route:
-        - destination:
-            port:
-              number: 5003
-            host: validator-app-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
-    - match:
-        - port: 443
-      route:
-        - destination:
-            port:
-              number: 80
-            host: cns-web-ui-{{ .Values.ingress.globalDomain.activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-{{- end }}
 {{- end }}

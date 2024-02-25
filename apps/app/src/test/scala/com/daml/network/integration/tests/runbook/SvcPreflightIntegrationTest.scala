@@ -6,6 +6,8 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
+import scala.concurrent.duration.DurationInt
+
 /** Preflight test that makes sure that *our* SVs (1-4) have initialized fine.
   */
 class SvcPreflightIntegrationTest
@@ -21,7 +23,7 @@ class SvcPreflightIntegrationTest
   "SVs 1-4 are online and reachable via their public HTTP API" in { implicit env =>
     env.svs.remote.foreach(sv =>
       clue(s"Checking SV at ${sv.httpClientConfig.url}") {
-        eventuallySucceeds() {
+        eventuallySucceeds(timeUntilSuccess = 2.minutes) {
           sv.getSvcInfo()
         }
       }

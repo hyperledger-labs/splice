@@ -13,7 +13,7 @@ component_to_deployments["participant"]="participant"
 component_to_deployments["participant-0"]="participant-0"
 component_to_deployments["cometbft-0"]="global-domain-0-cometbft"
 component_to_deployments["cn-apps-0"]="validator-app-0 scan-app-0 sv-app-0"
-component_to_deployments["validator"]="validator-app"
+component_to_deployments["validator"]="validator-app-0"
 
 function create_pvc_from_snapshot() {
   local -r snapshot_name=$1

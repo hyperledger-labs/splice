@@ -29,6 +29,7 @@ import {
   imagePullSecret,
   CnInput,
   sequencerPruningConfig,
+  GlobalDomainMigrationConfig,
 } from 'cn-pulumi-common';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
@@ -264,6 +265,7 @@ async function installSvAndValidator(config: SvConfig) {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,
     },
+    domainMigrationId: GlobalDomainMigrationConfig.fromEnv().activeMigrationId.toString(),
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -338,6 +340,7 @@ async function installSvAndValidator(config: SvConfig) {
     }),
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
     participantIdentitiesDumpPeriodicBackup: backupConfig,
+    domainMigrationId: GlobalDomainMigrationConfig.fromEnv().activeMigrationId.toString(),
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

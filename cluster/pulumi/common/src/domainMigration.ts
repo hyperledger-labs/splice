@@ -1,4 +1,4 @@
-export class GlobalDomainUpgradeConfig {
+export class GlobalDomainMigrationConfig {
   prepareUpgrade: boolean;
   legacyMigrationId?: DomainMigrationIndex;
   activeMigrationId: DomainMigrationIndex;
@@ -16,8 +16,8 @@ export class GlobalDomainUpgradeConfig {
     this.upgradeMigrationId = upgradeMigrationId;
   }
 
-  static fromEnv(): GlobalDomainUpgradeConfig {
-    return new GlobalDomainUpgradeConfig(
+  static fromEnv(): GlobalDomainMigrationConfig {
+    return new GlobalDomainMigrationConfig(
       process.env.GLOBAL_DOMAIN_PREPARE_UPGRADE === 'true',
       processIndex(process.env.GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID) || DefaultMigrationId,
       processIndex(process.env.GLOBAL_DOMAIN_LEGACY_MIGRATION_ID),
@@ -49,7 +49,7 @@ function processIndex(maybeValue?: string) {
 export const DefaultMigrationId = 0;
 
 export function installMigrationIdSpecificComponent<T>(
-  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
+  globalDomainUpgradeConfig: GlobalDomainMigrationConfig,
   component: (migrationId: DomainMigrationIndex, isActive: boolean) => T
 ): T {
   if (globalDomainUpgradeConfig.upgradeMigrationId) {

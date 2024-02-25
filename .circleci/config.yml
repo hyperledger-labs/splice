@@ -1398,6 +1398,9 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
+      global_domain_migration_id:
+        type: integer
+        default: 0
     steps:
       - checkout_with_retry
       - when:
@@ -1419,6 +1422,7 @@ jobs:
           additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
+            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_migration_id >>
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -1563,15 +1567,15 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            export CN_NON_SV_NODES="true"
+            export CN_INSTALL_SPLITWELL="true"
             if [[ << parameters.prepare_global_domain_upgrade >> == true ]]; then
-              export CN_NON_SV_NODES="false"
+              export CN_INSTALL_SPLITWELL="false"
             export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
             fi
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
               export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
-              export CN_NON_SV_NODES="false"
+              export CN_INSTALL_SPLITWELL="false"
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
               if [[ << parameters.global_domain_legacy_migration_id >> -ne 0 ]]; then
                 export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
@@ -2158,12 +2162,15 @@ jobs:
       include_sv:
         type: boolean
         default: true
-      include_non_sv_nodes:
+      include_splitwell:
         type: boolean
         default: true
       parallelism:
         type: integer
         default: 3
+      migration_id:
+        type: integer
+        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2181,13 +2188,13 @@ jobs:
             nodes=""
             if [[ << parameters.include_sv >> != false ]]; then
               if (env-bool IS_DEVNET); then
-                nodes="sv-1 sv-2 sv-3 sv-4"
+                nodes="sv-1 sv-2 sv-3 sv-4 validator1"
               else
-                nodes="sv-1"
+                nodes="sv-1 validator1"
               fi
             fi
-            if [[ << parameters.include_non_sv_nodes >> != false ]]; then
-              nodes="$nodes splitwell validator1"
+            if [[ << parameters.include_splitwell >> != false ]]; then
+              nodes="$nodes splitwell"
             fi
             echo $nodes > nodes.txt
       - setup_vpn
@@ -2207,14 +2214,7 @@ jobs:
             cncluster activate
             # We use readiness of validator-app as an approximation to the node's readiness
             for ns in $(cat tests-to-run.txt); do
-              case $ns in
-                "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                  cncluster wait $ns validator-app-0
-                  ;;
-                "validator1"|"splitwell"|"sv")
-                  cncluster wait $ns validator-app
-                  ;;
-              esac
+              cncluster wait $ns validator-app-<< parameters.migration_id >>
             done
             cncluster backup_nodes $(cat tests-to-run.txt)
       - notify-cluster-fail:
@@ -2225,6 +2225,9 @@ jobs:
       <<: *cluster-parameter
       namespace_name:
         type: string
+      migration_id:
+        type: integer
+        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2247,12 +2250,12 @@ jobs:
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app-0
-                cncluster wait << parameters.namespace_name >> sv-app-0
-                cncluster wait << parameters.namespace_name >> validator-app-0
+                cncluster wait << parameters.namespace_name >> scan-app-<< parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> sv-app-<< parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app-<< parameters.migration_id >>
                 ;;
               "validator1")
-                cncluster wait << parameters.namespace_name >> validator-app
+                cncluster wait << parameters.namespace_name >> validator-app-<< parameters.migration_id >>
                 ;;
             esac
       - notify-cluster-fail:
@@ -2267,14 +2270,14 @@ jobs:
         default: C05DT77QF5M
       test_names_file:
         type: string
-        default: "test-full-class-names-core-preflight.log,test-full-class-names-third-party-preflight.log"
+        default: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log,test-full-class-names-validator1-preflight.log"
       parallelism:
         type: integer
         default: 3
       wait_for_sv:
         type: boolean
         default: true
-      wait_for_third_party:
+      wait_for_non_sv_nodes:
         type: boolean
         default: true
       cluster_version:
@@ -2331,20 +2334,20 @@ jobs:
           cmd: |
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
-            # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
-            if [[ << parameters.wait_for_third_party >> == true ]]; then
-              cncluster wait validator1 validator-app
-              cncluster wait splitwell validator-app
-            fi
             validator_app="validator-app-<< parameters.migration_id >>"
+            # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
+            if [[ << parameters.wait_for_non_sv_nodes >> == true ]]; then
+              cncluster wait splitwell $validator_app
+            fi
             cncluster wait sv-1 $validator_app
+            cncluster wait validator1 $validator_app
             if (env-bool IS_DEVNET); then
               cncluster wait sv-2 $validator_app
               cncluster wait sv-3 $validator_app
               cncluster wait sv-4 $validator_app
             fi
             if [[ << parameters.wait_for_sv >> == true ]] && ( env-bool APPROVE_SV_RUNBOOK || env-bool IS_DEVNET ); then
-              cncluster wait sv validator-app
+              cncluster wait sv $validator_app
             fi
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
@@ -2393,6 +2396,9 @@ jobs:
       cluster_version:
         type: string
         default: ""
+      migration_id:
+        type: integer
+        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2435,7 +2441,7 @@ jobs:
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
             # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
-            cncluster wait sv validator-app
+            cncluster wait sv validator-app-<< parameters.migration_id >>
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
@@ -2453,7 +2459,9 @@ jobs:
             --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
             --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cluster: << parameters.cluster >>
-          cmd: cncluster preflight_sv
+          cmd: |
+            export CN_MIGRATION_DOMAIN_INDEX=<< parameters.migration_id >>
+            cncluster preflight_sv
           cmd_retry_count: 3
           # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
           # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
@@ -2482,6 +2490,9 @@ jobs:
       cluster_version:
         type: string
         default: ""
+      migration_id:
+        type: integer
+        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2524,7 +2535,7 @@ jobs:
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
             # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
-            cncluster wait validator validator-app
+            cncluster wait validator validator-app-<< parameters.migration_id >>
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
@@ -2541,7 +2552,9 @@ jobs:
             --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET \
             --keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cluster: << parameters.cluster >>
-          cmd: cncluster preflight_validator
+          cmd: |
+            export CN_MIGRATION_DOMAIN_INDEX=<< parameters.migration_id >>
+            cncluster preflight_validator
           cmd_retry_count: 3
           # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
           # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
@@ -3374,9 +3387,10 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "cimain"
-          wait_for_sv: false
-          wait_for_third_party: false
-          test_names_file: "test-full-class-names-core-preflight.log"
+          wait_for_sv: true
+          wait_for_non_sv_nodes: false
+          # TODO(#10254) run splitwell tests once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - wait_for_previous_pipeline
@@ -3392,7 +3406,7 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_third_party: false
+          wait_for_non_sv_nodes: false
           requires:
             - preflight_check
             - backup_cluster
@@ -3411,7 +3425,7 @@ workflows:
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
-          include_non_sv_nodes: false
+          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -3445,6 +3459,7 @@ workflows:
           <<: *main-branch-only
           # backup splitwell and validator1
           name: "backup_after_global_domain_upgrade"
+          migration_id: 1
           cluster: "cimain"
           include_sv: false
           parallelism: 1
@@ -3463,6 +3478,8 @@ workflows:
             - slack-context
           cluster: "cimain"
           migration_id: 1
+          # TODO(#10246) run validator1 once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
@@ -3491,10 +3508,12 @@ workflows:
             - artifactory
             - slack-context
           cluster: "cimain"
+          global_domain_migration_id: 1
           requires:
             - switch_global_domain_upgrade
       - preflight_validator_check:
           <<: *main-branch-only
+          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -3796,8 +3815,9 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           wait_for_sv: false
-          wait_for_third_party: false
-          test_names_file: "test-full-class-names-core-preflight.log"
+          wait_for_non_sv_nodes: false
+          # TODO(#10254) run splitwell tests once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -3805,7 +3825,7 @@ workflows:
           name: "backup_before_migration"
           <<: *main-branch-never
           cluster: "scratchneta"
-          include_non_sv_nodes: false
+          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -3823,7 +3843,7 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_third_party: false
+          wait_for_non_sv_nodes: false
           requires:
             - preflight_check_core
             - backup_before_migration
@@ -3869,6 +3889,7 @@ workflows:
           <<: *main-branch-never
           # backup splitwell and validator1
           name: "backup_after_global_domain_upgrade"
+          migration_id: 1
           cluster: "scratchneta"
           include_sv: false
           parallelism: 1
@@ -3886,7 +3907,10 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchneta"
+          # TODO(#10246) run validator1 once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
+          parallelism: 1
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
@@ -3911,6 +3935,7 @@ workflows:
       #       - switch_global_domain_upgrade
       - deploy_validator_runbook:
           name: "deploy_migrated_validator_runbook"
+          global_domain_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -3920,6 +3945,7 @@ workflows:
             - switch_global_domain_upgrade
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
+          migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4098,8 +4124,9 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           wait_for_sv: false
-          wait_for_third_party: false
-          test_names_file: "test-full-class-names-core-preflight.log"
+          wait_for_non_sv_nodes: false
+          # TODO(#10254) run splitwell tests once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -4107,7 +4134,7 @@ workflows:
           name: "backup_before_migration"
           <<: *main-branch-never
           cluster: "scratchnetb"
-          include_non_sv_nodes: false
+          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -4125,7 +4152,7 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_third_party: false
+          wait_for_non_sv_nodes: false
           requires:
             - preflight_check_core
             - backup_before_migration
@@ -4171,6 +4198,7 @@ workflows:
           <<: *main-branch-never
           # backup splitwell and validator1
           name: "backup_after_global_domain_upgrade"
+          migration_id: 1
           cluster: "scratchnetb"
           include_sv: false
           parallelism: 1
@@ -4188,7 +4216,10 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchnetb"
+          # TODO(#10246) run validator1 once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
+          parallelism: 1
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
@@ -4213,6 +4244,7 @@ workflows:
       #       - switch_global_domain_upgrade
       - deploy_validator_runbook:
           name: "deploy_migrated_validator_runbook"
+          global_domain_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4222,6 +4254,7 @@ workflows:
             - switch_global_domain_upgrade
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
+          migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4400,8 +4433,9 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           wait_for_sv: false
-          wait_for_third_party: false
-          test_names_file: "test-full-class-names-core-preflight.log"
+          wait_for_non_sv_nodes: false
+          # TODO(#10254) run splitwell tests once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -4409,7 +4443,7 @@ workflows:
           name: "backup_before_migration"
           <<: *main-branch-never
           cluster: "scratchnetc"
-          include_non_sv_nodes: false
+          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -4427,7 +4461,7 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_third_party: false
+          wait_for_non_sv_nodes: false
           requires:
             - preflight_check_core
             - backup_before_migration
@@ -4473,6 +4507,7 @@ workflows:
           <<: *main-branch-never
           # backup splitwell and validator1
           name: "backup_after_global_domain_upgrade"
+          migration_id: 1
           cluster: "scratchnetc"
           include_sv: false
           parallelism: 1
@@ -4490,7 +4525,10 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchnetc"
+          # TODO(#10246) run validator1 once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
+          parallelism: 1
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
@@ -4515,6 +4553,7 @@ workflows:
       #       - switch_global_domain_upgrade
       - deploy_validator_runbook:
           name: "deploy_migrated_validator_runbook"
+          global_domain_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4524,6 +4563,7 @@ workflows:
             - switch_global_domain_upgrade
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
+          migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4702,8 +4742,9 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           wait_for_sv: false
-          wait_for_third_party: false
-          test_names_file: "test-full-class-names-core-preflight.log"
+          wait_for_non_sv_nodes: false
+          # TODO(#10254) run splitwell tests once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -4711,7 +4752,7 @@ workflows:
           name: "backup_before_migration"
           <<: *main-branch-never
           cluster: "scratchnetd"
-          include_non_sv_nodes: false
+          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -4729,7 +4770,7 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_third_party: false
+          wait_for_non_sv_nodes: false
           requires:
             - preflight_check_core
             - backup_before_migration
@@ -4775,6 +4816,7 @@ workflows:
           <<: *main-branch-never
           # backup splitwell and validator1
           name: "backup_after_global_domain_upgrade"
+          migration_id: 1
           cluster: "scratchnetd"
           include_sv: false
           parallelism: 1
@@ -4792,7 +4834,10 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchnetd"
+          # TODO(#10246) run validator1 once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
+          parallelism: 1
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
@@ -4817,6 +4862,7 @@ workflows:
       #       - switch_global_domain_upgrade
       - deploy_validator_runbook:
           name: "deploy_migrated_validator_runbook"
+          global_domain_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4826,6 +4872,7 @@ workflows:
             - switch_global_domain_upgrade
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
+          migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -5004,8 +5051,9 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           wait_for_sv: false
-          wait_for_third_party: false
-          test_names_file: "test-full-class-names-core-preflight.log"
+          wait_for_non_sv_nodes: false
+          # TODO(#10254) run splitwell tests once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -5013,7 +5061,7 @@ workflows:
           name: "backup_before_migration"
           <<: *main-branch-never
           cluster: "scratchnete"
-          include_non_sv_nodes: false
+          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -5031,7 +5079,7 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_third_party: false
+          wait_for_non_sv_nodes: false
           requires:
             - preflight_check_core
             - backup_before_migration
@@ -5077,6 +5125,7 @@ workflows:
           <<: *main-branch-never
           # backup splitwell and validator1
           name: "backup_after_global_domain_upgrade"
+          migration_id: 1
           cluster: "scratchnete"
           include_sv: false
           parallelism: 1
@@ -5094,7 +5143,10 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchnete"
+          # TODO(#10246) run validator1 once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
+          parallelism: 1
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
@@ -5119,6 +5171,7 @@ workflows:
       #       - switch_global_domain_upgrade
       - deploy_validator_runbook:
           name: "deploy_migrated_validator_runbook"
+          global_domain_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -5128,6 +5181,7 @@ workflows:
             - switch_global_domain_upgrade
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
+          migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory

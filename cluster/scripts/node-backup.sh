@@ -204,11 +204,17 @@ function main() {
 
   if [ "$1" == "validator" ]; then
     _info "Backing up validator $namespace"
-    backup_component "$namespace" "validator" "$requested_component"
-    wait_for_backup "$namespace" "validator" "$requested_component"
+    local validator="validator"
+    local participant="participant"
+    if [ "$namespace" == "validator1" ]; then
+      validator="validator-0"
+      participant="participant-0"
+    fi
+    backup_component "$namespace" $validator "$requested_component"
+    wait_for_backup "$namespace" $validator "$requested_component"
     # CN apps must be strictly before participant, so we sync on apps before starting the participant backup
-    backup_component "$namespace" "participant" "$requested_component"
-    wait_for_backup "$namespace" "participant" "$requested_component"
+    backup_component "$namespace" $participant "$requested_component"
+    wait_for_backup "$namespace" $participant "$requested_component"
   elif [ "$1" == "sv" ]; then
     _info "Backing up SV node $namespace"
 

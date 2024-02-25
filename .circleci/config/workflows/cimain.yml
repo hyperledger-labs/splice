@@ -36,9 +36,10 @@ workflow:
             - canton-network-vpn
             - slack-context
           cluster: "cimain"
-          wait_for_sv: false
-          wait_for_third_party: false
-          test_names_file: "test-full-class-names-core-preflight.log"
+          wait_for_sv: true
+          wait_for_non_sv_nodes: false
+          # TODO(#10254) run splitwell tests once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - wait_for_previous_pipeline
@@ -54,7 +55,7 @@ workflow:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_third_party: false
+          wait_for_non_sv_nodes: false
           requires:
             - preflight_check
             - backup_cluster
@@ -73,7 +74,7 @@ workflow:
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
-          include_non_sv_nodes: false
+          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -107,6 +108,7 @@ workflow:
           <<: *main-branch-only
           # backup splitwell and validator1
           name: "backup_after_global_domain_upgrade"
+          migration_id: 1
           cluster: "cimain"
           include_sv: false
           parallelism: 1
@@ -125,6 +127,8 @@ workflow:
             - slack-context
           cluster: "cimain"
           migration_id: 1
+          # TODO(#10246) run validator1 once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
@@ -153,10 +157,12 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cimain"
+          global_domain_migration_id: 1
           requires:
             - switch_global_domain_upgrade
       - preflight_validator_check:
           <<: *main-branch-only
+          migration_id: 1
           context:
             - artifactory
             - canton-network-vpn

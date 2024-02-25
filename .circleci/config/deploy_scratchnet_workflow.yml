@@ -45,8 +45,9 @@
             - slack-context
           cluster: "_CLUSTERNAME_"
           wait_for_sv: false
-          wait_for_third_party: false
-          test_names_file: "test-full-class-names-core-preflight.log"
+          wait_for_non_sv_nodes: false
+          # TODO(#10254) run splitwell tests once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -54,7 +55,7 @@
           name: "backup_before_migration"
           <<: *main-branch-never
           cluster: "_CLUSTERNAME_"
-          include_non_sv_nodes: false
+          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -72,7 +73,7 @@
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_third_party: false
+          wait_for_non_sv_nodes: false
           requires:
             - preflight_check_core
             - backup_before_migration
@@ -118,6 +119,7 @@
           <<: *main-branch-never
           # backup splitwell and validator1
           name: "backup_after_global_domain_upgrade"
+          migration_id: 1
           cluster: "_CLUSTERNAME_"
           include_sv: false
           parallelism: 1
@@ -135,7 +137,10 @@
             - canton-network-vpn
             - slack-context
           cluster: "_CLUSTERNAME_"
+          # TODO(#10246) run validator1 once it's fixed
+          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
+          parallelism: 1
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
@@ -160,6 +165,7 @@
       #       - switch_global_domain_upgrade
       - deploy_validator_runbook:
           name: "deploy_migrated_validator_runbook"
+          global_domain_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -169,6 +175,7 @@
             - switch_global_domain_upgrade
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
+          migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory

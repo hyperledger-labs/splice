@@ -84,6 +84,11 @@
           "svNamespace": "validator"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingress": {
+          "globalDomain": {
+            "activeMigrationId": "0"
+          }
+        },
         "withSvIngress": false
       }
     },
@@ -242,6 +247,7 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "validatorrun.network.com.network.canton.global",
+        "domainMigrationId": "0",
         "globalDomainUrl": "https://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "onboardingSecretFrom": {

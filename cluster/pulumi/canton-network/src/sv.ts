@@ -12,15 +12,18 @@ import {
   ChartValues,
   CLUSTER_BASENAME,
   CnInput,
+  DomainMigrationIndex,
   ExactNamespace,
   exactNamespace,
   ExpectedValidatorOnboarding,
   fetchAndInstallParticipantBootstrapDump,
   getLatestSvcAcsDumpFile,
+  GlobalDomainMigrationConfig,
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
   installCNHelmChart,
+  installMigrationIdSpecificComponent,
   installValidatorOnboardingSecret,
   participantBootstrapDumpSecretName,
   PersistenceConfig,
@@ -28,9 +31,6 @@ import {
   SvIdKey,
   validatorOnboardingSecretName,
   ValidatorTopupConfig,
-  DomainMigrationIndex,
-  GlobalDomainUpgradeConfig,
-  installMigrationIdSpecificComponent,
 } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
@@ -122,11 +122,12 @@ export type InstalledSv = {
   scan: Release;
   globalDomain: GlobalDomainNode;
   participant: Release;
+  ingress: Resource;
 };
 
 export async function installSvNode(
   baseConfig: SvConfig,
-  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
+  globalDomainUpgradeConfig: GlobalDomainMigrationConfig,
   cometBftSyncSource?: k8s.helm.v3.Release
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
@@ -235,7 +236,7 @@ export async function installSvNode(
     validatorSecrets
   );
 
-  installCNHelmChart(
+  const activeIngress = installCNHelmChart(
     xns,
     'ingress-sv',
     'cn-cluster-ingress-runbook',
@@ -254,7 +255,7 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
-  return migrationIdSpecificComponents;
+  return { ...migrationIdSpecificComponents, ingress: activeIngress };
 }
 
 function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {
@@ -273,6 +274,7 @@ async function installValidator(
   postgres: Postgres,
   xns: ExactNamespace,
   migrationId: DomainMigrationIndex,
+  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
   svConfig: SvConfig,
   participant: Release,
   backupConfigSecret: Resource | undefined,
@@ -286,6 +288,7 @@ async function installValidator(
   const validator = await installValidatorApp({
     xns,
     domainMigrationId: migrationId,
+    globalDomainMigrationConfig: globalDomainMigrationConfig,
     validatorWalletUser: svConfig.validatorWalletUser,
     participant: participant,
     disableAllocateLedgerApiUserParty: true,
@@ -311,7 +314,7 @@ async function installValidator(
 
 function installMigrationIdSpecificComponents(
   xns: ExactNamespace,
-  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig,
+  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
   defaultPostgres: Postgres | undefined,
   cometbft: {
     name: string;
@@ -329,7 +332,7 @@ function installMigrationIdSpecificComponents(
   validatorSecrets: ValidatorSecrets
 ) {
   return installMigrationIdSpecificComponent(
-    globalDomainUpgradeConfig,
+    globalDomainMigrationConfig,
     async (migrationId, isActive) => {
       const sequencerPostgres =
         defaultPostgres || postgres.installPostgres(xns, `sequencer-${migrationId}-pg`, true);
@@ -360,14 +363,14 @@ function installMigrationIdSpecificComponents(
         isActive
       );
       let svAppConfigOverrides = {};
-      if (migrationId === globalDomainUpgradeConfig.upgradeMigrationId) {
+      if (migrationId === globalDomainMigrationConfig.upgradeMigrationId) {
         svAppConfigOverrides = {
           onboarding: {
             type: 'domain-migration',
           },
         };
       }
-      installCNHelmChart(
+      const migrationIngress = installCNHelmChart(
         xns,
         'ingress-domain-' + migrationId,
         'cn-cluster-ingress-runbook',
@@ -398,8 +401,8 @@ function installMigrationIdSpecificComponents(
         dependsOn,
         participant,
         globalDomainNode,
-        globalDomainUpgradeConfig.prepareUpgrade ||
-          globalDomainUpgradeConfig.upgradeMigrationId != undefined,
+        globalDomainMigrationConfig.prepareUpgrade ||
+          globalDomainMigrationConfig.upgradeMigrationId != undefined,
         appsPostgres,
         svConfig.identitiesBackupLocation,
         svConfig.periodicBackupConfig
@@ -418,6 +421,7 @@ function installMigrationIdSpecificComponents(
         appsPostgres,
         xns,
         migrationId,
+        globalDomainMigrationConfig,
         svConfig,
         participant,
         backupConfigSecret,
@@ -432,6 +436,7 @@ function installMigrationIdSpecificComponents(
         svApp: svApp,
         scan: scan,
         validatorApp: validatorApp,
+        ingress: migrationIngress,
       };
     }
   );
@@ -536,12 +541,7 @@ function installScan(
 ) {
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}_${domainMigrationId}`;
   // const scanDb = scanAppPostgres.createDatabase(scanDbName);
-  let ingestFromParticipantBegin;
-  if (svConfigOnboardingType == 'found-collective') {
-    ingestFromParticipantBegin = true;
-  } else {
-    ingestFromParticipantBegin = false;
-  }
+  const ingestFromParticipantBegin = svConfigOnboardingType == 'found-collective';
   const scanValues = {
     clusterUrl,
     metrics: {

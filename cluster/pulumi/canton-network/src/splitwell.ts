@@ -1,22 +1,22 @@
 import * as pulumi from '@pulumi/pulumi';
+import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
 import {
   auth0UserNameEnvVar,
   auth0UserNameEnvVarSource,
-  installAuth0Secret,
-  exactNamespace,
-  installCNHelmChart,
   CLUSTER_BASENAME,
-  ValidatorTopupConfig,
+  exactNamespace,
   ExactNamespace,
+  GlobalDomainMigrationConfig,
+  installAuth0Secret,
+  installCNHelmChart,
   sanitizedForPostgres,
-  DomainMigrationIndex,
+  ValidatorTopupConfig,
 } from 'cn-pulumi-common';
-import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
 import { installParticipant } from './ledger';
-import { Postgres, installPostgresMetrics } from './postgres';
+import { installPostgresMetrics, Postgres } from './postgres';
 import { installValidatorApp } from './validator';
 
 export async function installSplitwell(
@@ -24,7 +24,7 @@ export async function installSplitwell(
   providerWalletUser: string,
   onboardingSecret: string,
   splitPostgresInstances: boolean,
-  svActiveMigrationId: DomainMigrationIndex,
+  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
   dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
@@ -73,7 +73,7 @@ export async function installSplitwell(
     : domainPostgres;
 
   const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
-  const scanAddress = `http://scan-app-${svActiveMigrationId}.sv-1:5012`;
+  const scanAddress = `http://scan-app-${globalDomainMigrationConfig.activeMigrationId}.sv-1:5012`;
   installCNHelmChart(
     xns,
     'splitwell-app',
@@ -101,6 +101,8 @@ export async function installSplitwell(
     xns,
     extraDependsOn,
     participant,
+    globalDomainMigrationConfig,
+    domainMigrationId: globalDomainMigrationConfig.activeMigrationId,
     additionalUsers: [
       auth0UserNameEnvVar('splitwell'),
       { name: 'CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME', value: providerWalletUser },
@@ -116,7 +118,7 @@ export async function installSplitwell(
     ].join('\n'),
     onboardingSecret,
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
-    svSponsorAddress: `http://sv-app-${svActiveMigrationId}.sv-1:5014`,
+    svSponsorAddress: `http://sv-app-${globalDomainMigrationConfig.activeMigrationId}.sv-1:5014`,
     participantBootstrapDump,
     participantAddress: 'participant',
     topupConfig: topupConfig,

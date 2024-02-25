@@ -5,11 +5,11 @@ import {
   BootstrappingDumpConfig,
   domainFeesConfig,
   envFlag,
+  GlobalDomainMigrationConfig,
   isDevNet,
   requireEnv,
   sequencerPruningConfig,
   ValidatorTopupConfig,
-  GlobalDomainUpgradeConfig,
 } from 'cn-pulumi-common';
 
 import { installChaosMesh } from './chaosMesh';
@@ -48,10 +48,11 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
   : undefined;
 
-const globalDomainUpgradeConfig: GlobalDomainUpgradeConfig = GlobalDomainUpgradeConfig.fromEnv();
+const globalDomainUpgradeConfig: GlobalDomainMigrationConfig =
+  GlobalDomainMigrationConfig.fromEnv();
 
-const installNonSvComponents = envFlag(
-  'CN_NON_SV_NODES',
+const mustInstallSplitwell = envFlag(
+  'CN_INSTALL_SPLITWELL',
   !globalDomainUpgradeConfig.containsUpgrade() && globalDomainUpgradeConfig.isDefaultActive()
 );
 
@@ -156,31 +157,33 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
 
   const allSvs = await svc.allSvs;
 
-  const svDependencies = allSvs.flatMap(sv => [sv.scan, sv.svApp, sv.validatorApp]);
+  const svDependencies = allSvs.flatMap(sv => [sv.scan, sv.svApp, sv.validatorApp, sv.ingress]);
 
   // TODO(#8761) install the non sv nodes once the upgrade supports it
-  const nonSvComponentsDependencies = allSvs.map(sv => sv.scan);
-  if (installNonSvComponents) {
-    await installValidator1(
-      auth0Client,
-      'validator1',
-      validator1Onboarding.secret,
-      'auth0|63e3d75ff4114d87a2c1e4f5',
-      splitPostgresInstances,
-      globalDomainUpgradeConfig.activeMigrationId,
-      nonSvComponentsDependencies,
-      periodicBackupConfig,
-      bootstrappingDumpConfig,
-      // x10 validator1's traffic targetThroughput for load tester -- see #9064
-      { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
-    );
+  const nonSvComponentsDependencies = allSvs.flatMap(sv => [sv.scan, sv.ingress]);
 
+  await installValidator1(
+    auth0Client,
+    'validator1',
+    validator1Onboarding.secret,
+    'auth0|63e3d75ff4114d87a2c1e4f5',
+    splitPostgresInstances,
+    globalDomainUpgradeConfig,
+    mustInstallSplitwell,
+    nonSvComponentsDependencies,
+    periodicBackupConfig,
+    bootstrappingDumpConfig,
+    // x10 validator1's traffic targetThroughput for load tester -- see #9064
+    { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
+  );
+
+  if (mustInstallSplitwell) {
     await installSplitwell(
       auth0Client,
       'auth0|63e12e0415ad881ffe914e61',
       splitwellOnboarding.secret,
       splitPostgresInstances,
-      globalDomainUpgradeConfig.activeMigrationId,
+      globalDomainUpgradeConfig,
       nonSvComponentsDependencies,
       periodicBackupConfig,
       bootstrappingDumpConfig,

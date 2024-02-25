@@ -12,7 +12,7 @@ import {
   ValidatorTopupConfig,
   loadYamlFromFile,
   svKeyFromSecret,
-  GlobalDomainUpgradeConfig,
+  GlobalDomainMigrationConfig,
 } from 'cn-pulumi-common';
 import _ from 'lodash';
 
@@ -38,8 +38,9 @@ interface SvcArgs {
   topupConfig?: ValidatorTopupConfig;
   splitPostgresInstances: boolean;
   sequencerPruningConfig: SequencerPruningConfig;
-  globalDomainUpgradeConfig: GlobalDomainUpgradeConfig;
+  globalDomainUpgradeConfig: GlobalDomainMigrationConfig;
 }
+
 export class Svc extends pulumi.ComponentResource {
   args: SvcArgs;
   founder: Promise<InstalledSv>;
