@@ -138,32 +138,6 @@ class HttpSvAdminHandler(
     }
   }
 
-  def approveSvIdentity(
-      respond: v0.SvAdminResource.ApproveSvIdentityResponse.type
-  )(
-      body: definitions.ApproveSvIdentityRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.ApproveSvIdentityResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.approveSvIdentity") { _ => _ =>
-      svcStore
-        .getSvcRules()
-        .flatMap { svcRules =>
-          SvApp
-            .approveSvIdentity(
-              body.candidateName,
-              body.candidateKey,
-              svStoreWithIngestion,
-              svcRules.domain,
-              logger,
-            )
-        }
-        .flatMap {
-          case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-          case Right(()) => Future.successful(v0.SvAdminResource.ApproveSvIdentityResponseOK)
-        }
-    }
-  }
-
   def listCoinPriceVotes(
       respond: v0.SvAdminResource.ListCoinPriceVotesResponse.type
   )()(tuser: TracedUser): Future[v0.SvAdminResource.ListCoinPriceVotesResponse] = {

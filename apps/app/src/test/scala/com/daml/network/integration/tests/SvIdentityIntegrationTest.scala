@@ -4,30 +4,6 @@ import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIde
 
 class SvIdentityIntegrationTest extends SvIntegrationTestBase {
 
-  "SV Identity can be approved at runtime" in { implicit env =>
-    initSvc()
-    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(ApprovedSvIdentity.COMPANION)(
-        sv1Backend.getSvcInfo().svParty
-      ) should have length 3
-    val svXName = "Canton-Foundation-X"
-    val svXKey =
-      "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEj6n2u5RWQdkq2cWvStGbIBe2JmoFs+vZGOVfd6oIm/FqfK2qV2fiHX9DieJ1c6BarDdsAD7IRnksD9BGisU3ZQ=="
-    sv1Backend.approveSvIdentity(svXName, svXKey)
-    inside(
-      sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-        .filterJava(ApprovedSvIdentity.COMPANION)(sv1Backend.getSvcInfo().svParty)
-    ) {
-      case approvedSvIds => {
-        approvedSvIds should have size 4
-        val maybeSvXApprovedSvId = approvedSvIds.find(_.data.candidateName == svXName)
-        inside(maybeSvXApprovedSvId) { case Some(svXApprovedSvId) =>
-          svXApprovedSvId.data.candidateKey shouldBe svXKey
-        }
-      }
-    }
-  }
-
   "SVs create approval contracts for configured approved SV identities" in { implicit env =>
     initSvc()
     clue("SV1 has created an ApprovedSvIdentity contract as it's configured to.") {

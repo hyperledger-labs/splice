@@ -45,11 +45,6 @@ abstract class SvAppReference(
       httpCommand(HttpSvAppClient.OnboardValidator(validator, secret))
     }
 
-  def approveSvIdentity(name: String, key: String): Unit =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.ApproveSvIdentity(name, key))
-    }
-
   def startSvOnboarding(token: String): Unit =
     consoleEnvironment.run {
       httpCommand(HttpSvAppClient.StartSvOnboarding(token))

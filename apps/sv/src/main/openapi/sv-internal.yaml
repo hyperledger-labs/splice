@@ -245,23 +245,6 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-
-  /v0/admin/sv/identity/approve:
-    post:
-      tags: [sv]
-      x-jvm-package: sv_admin
-      operationId: "approveSvIdentity"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/ApproveSvIdentityRequest"
-      responses:
-        "200":
-          description: ok
-        "400":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /v0/admin/sv/voterequests:
     get:
       tags: [sv]
@@ -870,17 +853,6 @@ components:
           $ref: "#/components/schemas/CometBftJsonRpcRequestId"
         result:
           type: object
-
-    ApproveSvIdentityRequest:
-      type: object
-      required:
-        - candidateName
-        - candidateKey
-      properties:
-        candidateName:
-          type: string
-        candidateKey:
-          type: string
 
     ListVoteResultsRequest:
       type: object

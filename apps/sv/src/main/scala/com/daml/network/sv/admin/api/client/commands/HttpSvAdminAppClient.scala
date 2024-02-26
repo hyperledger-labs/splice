@@ -100,25 +100,6 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class ApproveSvIdentity(candidateName: String, candidateKey: String)
-      extends BaseCommand[http.ApproveSvIdentityResponse, Unit] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ApproveSvIdentityResponse] =
-      client.approveSvIdentity(
-        body = definitions.ApproveSvIdentityRequest(candidateName, candidateKey),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.ApproveSvIdentityResponse.OK =>
-      Right(())
-    }
-  }
-
   case object ListCoinPriceVotes
       extends BaseCommand[http.ListCoinPriceVotesResponse, Seq[
         Contract[CoinPriceVote.ContractId, CoinPriceVote]

@@ -1380,37 +1380,24 @@ and a public key (base64 string; must match the public and private key that the 
 External partners need to tell us their name and public key before we can approve them.
 The SV runbook prompts them to do so.
 
-There are two ways of approving a new SV identity.
-It's recommended to complete *both* ways - approval via API for instant approval, and approval via config for persisting the approval across redeploys.
-
-#### Approving via SV API
-
-Approval via the API is instant but not persisted across cluster redeploys.
-Steps (from a cluster directory, e.g., `cluter/deployment/testnet`):
-
-1. Run
-
-```
-$REPO_ROOT/scripts/approve-sv.sh $SV_NAME $SV_PUBLIC_KEY
-```
-
-2. Repeat the steps for every other cluster you want to update. Usually you should update at least devnet and testnet.
-
 #### Approving via SV config
 
 Approval via the configs of our SV apps requires a restart of those SVs,
 but the approval is persisted across cluster redeploys.
-To approve a new SV identity on all SVs, it is sufficient to add the new identity to the relevant `..ApprovedSvIdentities` lists in `cluster/pulumi/canton-network/src/installCluster.ts`:
+To approve a new SV identity on all SVs, you can:
+
+1. add the new identity to the `approvedSvIdentities` list in `approved-sv-id-values-dev.yaml` or `approved-sv-id-values-test.yaml` (depending on the cluster you are working with),
+   and wait for the next cluster deployment to pick up the change:
 
 ```
-const devNetApprovedSvIdentities = [ // or other list
-  ...
-  { name = "SV name", public-key = "SV key" },
-  ...
-]
+approvedSvIdentities:
+  - name: DA-example
+    publicKey: LOPwEwYHKoZIzj0CAQYIasDAQcDQgAExZqACOeB0Es3PQp+BgBXioU67aO3XTxuM/tDaF05SPYL3252fseasdfadsfLuNEGqPp/E17DNiaGkLVLf+Q==
 ```
 
-It might be a good idea to deploy your changes to a scratchnet to ensure that you didn't break the config,
+2. if you cannot wait the next update then, checkout the deployment branch of the cluster you want to update. You can run `make cluster/helm/build` to rebuild the helm charts, and then `cncluster apply` to redeploy the SVs.
+
+As this process is quite subtle, ask in #team-canton-network-internal to pair with someone that has done this before. You can also deploy your changes to a scratchnet to ensure that you didn't break the config,
 which would prevent our SVs from initializing after the next redeploy.
 
 ## Interacting with Canton Network UIs
@@ -1491,7 +1478,7 @@ curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/svc | jq '.svc_rule
 ### App APIs with authentication
 
 We again use `curl`, but this time we also need an auth token from Auth0.
-See [`scripts/approve-sv.sh`](/scripts/approve-sv.sh) and the implementation of `cncluster participant_console` for ideas on how to obtain this programmatically.
+See the implementation of `cncluster participant_console` for ideas on how to obtain this programmatically.
 
 For obtaining a token manually, you can use the Auth0 dashboard.
 Here is one way:
