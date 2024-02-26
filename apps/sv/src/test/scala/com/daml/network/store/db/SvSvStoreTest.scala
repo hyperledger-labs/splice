@@ -1,6 +1,5 @@
 package com.daml.network.store.db
 
-import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.codegen.java.cn.validatoronboarding.UsedSecret
 import com.daml.network.environment.{DarResources, RetryProvider}
@@ -88,36 +87,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       }
 
     }
-
-    "lookupApprovedSvIdentityByNameWithOffset" should {
-
-      "find an ApprovedSvIdentity by name" in {
-        val wanted = approvedSvIdentity("good_name")
-        val unwanted = approvedSvIdentity("bad_name")
-        val firstOffset = "0101"
-        val secondOffset = "0202"
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.create(wanted, firstOffset, createdEventSignatories = Seq(storeSvParty))(
-            store.multiDomainAcsStore
-          )
-          _ <- dummyDomain.create(
-            unwanted,
-            secondOffset,
-            createdEventSignatories = Seq(storeSvParty),
-          )(store.multiDomainAcsStore)
-        } yield {
-          store.lookupApprovedSvIdentityByNameWithOffset("good_name").futureValue should be(
-            QueryResult(secondOffset, Some(wanted))
-          )
-          store.lookupApprovedSvIdentityByNameWithOffset("bad_name").futureValue should be(
-            QueryResult(secondOffset, Some(unwanted))
-          )
-        }
-      }
-
-    }
-
   }
 
   private def validatorOnboarding(secret: String) = {
@@ -145,16 +114,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
     contract(
       templateId,
       new UsedSecret.ContractId(nextCid()),
-      template,
-    )
-  }
-
-  private def approvedSvIdentity(name: String) = {
-    val template = new ApprovedSvIdentity(storeSvParty.toProtoPrimitive, name, "some key")
-
-    contract(
-      ApprovedSvIdentity.TEMPLATE_ID,
-      new ApprovedSvIdentity.ContractId(nextCid()),
       template,
     )
   }
@@ -200,8 +159,7 @@ class DbSvSvStoreTest
         DarResources.cantonCoin.all ++
           DarResources.validatorLifecycle.all ++
           DarResources.svcGovernance.all ++
-          DarResources.svcGovernance.all ++
-          DarResources.svLocal.all
+          DarResources.svcGovernance.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

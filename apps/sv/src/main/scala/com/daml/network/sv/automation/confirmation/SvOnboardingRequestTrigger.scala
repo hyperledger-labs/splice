@@ -17,6 +17,7 @@ import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
@@ -33,6 +34,7 @@ class SvOnboardingRequestTrigger(
     override protected val context: TriggerContext,
     svcStore: SvSvcStore,
     svStore: SvSvStore,
+    config: SvAppBackendConfig,
     connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
@@ -74,15 +76,16 @@ class SvOnboardingRequestTrigger(
         SvOnboardingRequest,
       ],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
+    val approval = SvApp
+      .isApprovedSvIdentity(
+        svOnboarding.payload.candidateName,
+        PartyId.tryFromProtoPrimitive(svOnboarding.payload.candidateParty),
+        svOnboarding.payload.token,
+        config,
+        svStore,
+        logger,
+      )
     for {
-      approval <- SvApp
-        .isApprovedSvIdentity(
-          svOnboarding.payload.candidateName,
-          PartyId.tryFromProtoPrimitive(svOnboarding.payload.candidateParty),
-          svOnboarding.payload.token,
-          svStore,
-          logger,
-        )
       (party, name) <- approval match {
         case Left(reason) => {
           // we fail so that the task is retried; it's possible that an approval happens eventually

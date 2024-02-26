@@ -6,12 +6,10 @@ import com.daml.network.automation.{
   AssignTrigger,
   CNNodeAppAutomationService,
 }
-import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.util.QualifiedName
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -39,7 +37,6 @@ class SvSvAutomationService(
           clock,
           svcStore,
           loggerFactory,
-          SvSvAutomationService.bootstrapPackageIdResolver,
         ),
       ledgerClient,
       retryProvider,
@@ -51,11 +48,5 @@ class SvSvAutomationService(
 }
 
 object SvSvAutomationService extends AutomationServiceCompanion {
-  private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
-    // For SV local state, we can just use whatever version we want.
-    Option.when(template == QualifiedName(ApprovedSvIdentity.TEMPLATE_ID))(
-      ApprovedSvIdentity.TEMPLATE_ID.getPackageId
-    )
-
   override protected[this] def expectedTriggerClasses = Seq.empty
 }

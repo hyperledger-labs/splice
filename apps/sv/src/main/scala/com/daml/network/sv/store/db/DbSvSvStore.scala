@@ -1,6 +1,5 @@
 package com.daml.network.sv.store.db
 
-import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -98,31 +97,6 @@ class DbSvSvStore(
         resultWithOffset.row.map(contractFromRow(UsedSecret.COMPANION)(_)),
       )).getOrRaise(offsetExpectedError())
     }
-
-  override def lookupApprovedSvIdentityByNameWithOffset(
-      name: String
-  )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[
-    Option[Contract[ApprovedSvIdentity.ContractId, ApprovedSvIdentity]]
-  ]] = waitUntilAcsIngested {
-    (for {
-      resultWithOffset <- storage
-        .querySingle(
-          selectFromAcsTableWithOffset(
-            DbSvSvStore.tableName,
-            storeId,
-            domainMigrationId,
-            sql"""
-              template_id_qualified_name = ${QualifiedName(ApprovedSvIdentity.TEMPLATE_ID)}
-                and sv_candidate_name = ${lengthLimited(name)}
-            """,
-          ).headOption,
-          "lookupApprovedSvIdentityByNameWithOffset",
-        )
-    } yield QueryResult(
-      resultWithOffset.offset,
-      resultWithOffset.row.map(contractFromRow(ApprovedSvIdentity.COMPANION)(_)),
-    )).getOrRaise(offsetExpectedError())
-  }
 }
 
 object DbSvSvStore {

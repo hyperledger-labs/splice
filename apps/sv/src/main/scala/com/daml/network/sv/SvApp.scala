@@ -41,7 +41,7 @@ import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.util.{
   BackupDump,
   Contract,
@@ -85,7 +85,6 @@ import io.circe.syntax.*
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import cats.syntax.foldable.*
 import cats.instances.future.*
 import com.daml.network.migration.AcsExporter
 import com.daml.network.sv.migration.{DomainDataSnapshotGenerator, DomainNodeIdentities}
@@ -119,7 +118,7 @@ class SvApp(
     .filter(_.enabled)
 
   override def packages: Seq[DarResource] =
-    super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.cantonNameService.all ++ DarResources.svLocal.all
+    super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.cantonNameService.all
 
   override def preInitializeBeforeLedgerConnection(): Future[Unit] = {
     val participantAdminConnection = new ParticipantAdminConnection(
@@ -363,12 +362,6 @@ class SvApp(
           clock,
         )
       }
-      _ <- appInitStep("Permanently archive offboarded SV identities") {
-        archiveRemovedSvIdentities(svAutomation, globalDomain)
-      }
-      _ <- appInitStep("Approve configured SV identities") {
-        approveConfiguredSvIdentities(svAutomation, globalDomain)
-      }
       isDevNet <- appInitStep("Get CoinRules to determine if we are in a DevNet") {
         retryProvider.getValueWithRetriesNoPretty(
           RetryFor.WaitingOnInitDependency,
@@ -424,6 +417,7 @@ class SvApp(
         svAutomation,
         svcAutomation,
         isDevNet,
+        config,
         clock,
         participantAdminConnection,
         localDomainNode,
@@ -544,7 +538,6 @@ class SvApp(
       SvApp.coinPackage,
       SvApp.svcGovernancePackage,
       SvApp.validatorLifecyclePackage,
-      SvApp.svLocal,
     )
 
   private def newTrafficBalanceService(participantAdminConnection: ParticipantAdminConnection) = {
@@ -612,7 +605,6 @@ class SvApp(
       RetryFor.WaitingOnInitDependency,
       "Onboarding contracts have been created", {
         val expectedValidatorOnboardingSecrets = config.expectedValidatorOnboardings.map(_.secret)
-        val approvedSvIdentities = config.approvedSvIdentities.map(_.name)
         for {
           createdValidatorOnboardingSecrets <- expectedValidatorOnboardingSecrets.traverse {
             secret =>
@@ -621,22 +613,17 @@ class SvApp(
                 .orElse(OptionT(store.lookupUsedSecret(secret)).map(_ => ()))
                 .value
           }
-          createdApprovedSvIdentities <- approvedSvIdentities.traverse(
-            store.lookupApprovedSvIdentityByName(_)
-          )
           missingOnboardingSecrets = createdValidatorOnboardingSecrets.zipWithIndex.filter(
             _._1.isEmpty
           )
-          missingApprovedIdentities = createdApprovedSvIdentities.zipWithIndex.filter(_._1.isEmpty)
           _ <-
-            if (missingOnboardingSecrets.isEmpty && missingApprovedIdentities.isEmpty) {
+            if (missingOnboardingSecrets.isEmpty) {
               Future.unit
             } else {
               Future.failed(
                 Status.NOT_FOUND
                   .withDescription(
-                    s"Missing ${missingOnboardingSecrets.size}/${expectedValidatorOnboardingSecrets.size} onboarding secrets" +
-                      s" and ${missingApprovedIdentities.size}/${approvedSvIdentities.size} approved identities."
+                    s"Missing ${missingOnboardingSecrets.size}/${expectedValidatorOnboardingSecrets.size} onboarding secrets"
                   )
                   .asRuntimeException()
               )
@@ -694,64 +681,6 @@ class SvApp(
           case Left(reason) => logger.info(s"Did not prepare validator onboarding: $reason")
           case Right(()) => ()
         },
-      logger,
-    )
-
-  private def archiveRemovedSvIdentities(
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      globalDomain: DomainId,
-  ) = {
-    val svStore = svStoreWithIngestion.store
-    for {
-      approvedSvIds <- svStore.listApprovedSvIdentities()
-      _ <- approvedSvIds
-        .filterNot(svId =>
-          config.approvedSvIdentities.map(_.name).contains(svId.payload.candidateName)
-        )
-        .traverse_(svId =>
-          svStoreWithIngestion.connection
-            .submit(
-              actAs = Seq(svStore.key.svParty),
-              readAs = Seq.empty,
-              update = svId.contractId.exerciseArchive(),
-            )
-            .noDedup
-            .withDomainId(globalDomain)
-            .yieldUnit()
-        )
-    } yield Right(())
-  }
-
-  private def approveConfiguredSvIdentities(
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      globalDomain: DomainId,
-  ): Future[List[Unit]] = {
-    if (
-      config.approvedSvIdentities.map(_.publicKey).toSet.size != config.approvedSvIdentities.size
-    ) {
-      sys.error("Approved SV keys must be unique! Check your SV app config.")
-    }
-    if (config.approvedSvIdentities.map(_.name).toSet.size != config.approvedSvIdentities.size) {
-      sys.error("Approved SV names must be unique! Check your SV app config.")
-    }
-    Future.traverse(config.approvedSvIdentities)(c =>
-      approveConfiguredSvIdentity(c.name, c.publicKey, svStoreWithIngestion, globalDomain)
-    )
-  }
-
-  private def approveConfiguredSvIdentity(
-      name: String,
-      key: String,
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      globalDomain: DomainId,
-  ): Future[Unit] =
-    retryProvider.retry(
-      RetryFor.WaitingOnInitDependency,
-      "Create ApprovedSvIdentity contract for preconfigured SV identity",
-      SvApp.approveSvIdentity(name, key, svStoreWithIngestion, globalDomain, logger).map {
-        case Left(reason) => logger.info(s"Failed to approve SV identity: $reason")
-        case Right(()) => ()
-      },
       logger,
     )
 
@@ -1261,67 +1190,16 @@ object SvApp {
       }
   }
 
-  private[sv] def approveSvIdentity(
-      name: String,
-      key: String,
-      svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      globalDomain: DomainId,
-      logger: TracedLogger,
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
-    val svParty = svStoreWithIngestion.store.key.svParty
-    val approvedSvIdentity = new cn.svlocal.approvedsvidentity.ApprovedSvIdentity(
-      svParty.toProtoPrimitive,
-      name,
-      key,
-    ).create()
-    SvUtil.parsePublicKey(key) match {
-      case Left(error) => Future.successful(Left(error))
-      case Right(_) =>
-        for {
-          res <- svStoreWithIngestion.store.lookupApprovedSvIdentityByNameWithOffset(name).flatMap {
-            case QueryResult(_, Some(id)) =>
-              Future.successful(
-                Left(if (id.payload.candidateKey == key) {
-                  s"The SV identitiy ($name:$key) is already approved."
-                } else {
-                  s"Tried to approve SV identity ($name:$key), but name $name " +
-                    s"is already approved with key ${id.payload.candidateKey}."
-                })
-              )
-            case QueryResult(offset, None) =>
-              for {
-                _ <- svStoreWithIngestion.connection
-                  .submit(actAs = Seq(svParty), readAs = Seq.empty, update = approvedSvIdentity)
-                  .withDedup(
-                    commandId = CNLedgerConnection
-                      .CommandId(
-                        "com.daml.network.sv.approveSvIdentity",
-                        Seq(svParty),
-                        s"$key",
-                      ),
-                    deduplicationOffset = offset,
-                  )
-                  .withDomainId(globalDomain)
-                  .yieldTransaction()
-              } yield {
-                logger.info("Created new ApprovedSvIdentity contract.")
-                Right(())
-              }
-          }
-        } yield res
-    }
-  }
-
   private[sv] def isApprovedSvIdentity(
       candidateName: String,
       candidateParty: PartyId,
       rawToken: String,
+      config: SvAppBackendConfig,
       svStore: SvSvStore,
       logger: TracedLogger,
   )(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[Either[String, (PartyId, String)]] = {
+      tc: TraceContext
+  ): Either[String, (PartyId, String)] = {
 
     // We want to make sure that:
     // 1. we log warnings whenever an auth check fails
@@ -1331,39 +1209,37 @@ object SvApp {
       Left(reason)
     }
 
-    svStore
-      .lookupApprovedSvIdentityByName(candidateName)
-      .map(approvedSvO =>
-        for {
-          approvedSv <- approvedSvO
-            .toRight(s"no matching approved SV identity found for $candidateName")
-          token <- SvOnboardingToken.verifyAndDecode(rawToken)
-          _ <-
-            if (candidateName == token.candidateName) Right(())
-            else
-              authFailure(
-                "provided candidate name doesn't match name in token",
-                s"$candidateName != ${token.candidateName}",
-              )
-          _ <-
-            if (token.candidateKey == approvedSv.payload.candidateKey) Right(())
-            else
-              authFailure(
-                "candidate key doesn't match approved key",
-                s"${token.candidateKey} != ${approvedSv.payload.candidateKey}",
-              )
-          _ <-
-            if (candidateParty == token.candidateParty) Right(())
-            else
-              authFailure(
-                "provided party doesn't match party in token",
-                s"$candidateParty != ${token.candidateParty}",
-              )
-          _ <-
-            if (token.svcParty == svStore.key.svcParty) Right(())
-            else authFailure("wrong SVC party", s"${token.svcParty} != ${svStore.key.svcParty}")
-        } yield (token.candidateParty, token.candidateName)
-      )
+    val approvedSvO = config.approvedSvIdentities.find(_.name == candidateName)
+
+    for {
+      approvedSv <- approvedSvO
+        .toRight(s"no matching approved SV identity found for $candidateName")
+      token <- SvOnboardingToken.verifyAndDecode(rawToken)
+      _ <-
+        if (candidateName == token.candidateName) Right(())
+        else
+          authFailure(
+            "provided candidate name doesn't match name in token",
+            s"$candidateName != ${token.candidateName}",
+          )
+      _ <-
+        if (token.candidateKey == approvedSv.publicKey) Right(())
+        else
+          authFailure(
+            "candidate key doesn't match approved key",
+            s"${token.candidateKey} != ${approvedSv.publicKey}",
+          )
+      _ <-
+        if (candidateParty == token.candidateParty) Right(())
+        else
+          authFailure(
+            "provided party doesn't match party in token",
+            s"$candidateParty != ${token.candidateParty}",
+          )
+      _ <-
+        if (token.svcParty == svStore.key.svcParty) Right(())
+        else authFailure("wrong SVC party", s"${token.svcParty} != ${svStore.key.svcParty}")
+    } yield (token.candidateParty, token.candidateName)
   }
 
   private[sv] def isSvcMember(
@@ -1553,6 +1429,4 @@ object SvApp {
     UploadablePackage.fromResource(DarResources.svcGovernance.bootstrap)
   val validatorLifecyclePackage: UploadablePackage =
     UploadablePackage.fromResource(DarResources.validatorLifecycle.bootstrap)
-  val svLocal: UploadablePackage =
-    UploadablePackage.fromResource(DarResources.svLocal.bootstrap)
 }

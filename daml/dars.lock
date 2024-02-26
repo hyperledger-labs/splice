@@ -12,7 +12,6 @@ daml/splitwell-test-upgrade/.daml/dist/splitwell-test-0.2.0.dar 20faa1d0fa964464
 daml/splitwell-test/.daml/dist/splitwell-test-0.1.0.dar fbba614c012f2e242ff3e0602c66dfbc18a771d441d547084c0c6c8c38f1a1df
 daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar 3b7e0eb2337953d287f20f2402cc7807e255c7e729c5449755cd39897897737c
 daml/splitwell/.daml/dist/splitwell-0.1.0.dar e5dd818bfd67b2c59494235f9d73928da66919da0171ba76405801440f646d71
-daml/sv-local/.daml/dist/sv-local-0.1.0.dar 0bc463ae5181f4c3338577df4d1f921e608fcc5795c5ebb3336a6f4b734e30b2
 daml/svc-governance-test-upgrade/.daml/dist/svc-governance-test-0.2.0.dar 036146046beb2faadeb2a8575dba9771838851b71d74bd0e2988c28cd5b3abf7
 daml/svc-governance-test/.daml/dist/svc-governance-test-0.1.0.dar 1cc46e8747ff3ed3159fdd89ccff88eaa789841929e02001e598685f3168c347
 daml/svc-governance-upgrade/.daml/dist/svc-governance-0.2.0.dar ebe674e7da0b4067c0b01d40350c7661e9cddfef7ab6ad811b57dda353190c22

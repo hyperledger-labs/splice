@@ -87,7 +87,6 @@ lazy val root = (project in file("."))
     `svc-governance-upgrade-daml`,
     `svc-governance-test-daml`,
     `svc-governance-test-upgrade-daml`,
-    `sv-local-daml`,
     `validator-lifecycle-daml`,
     `validator-lifecycle-test-daml`,
     `app-manager-daml`,
@@ -303,15 +302,6 @@ lazy val `svc-governance-test-upgrade-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `sv-local-daml` =
-  project
-    .in(file("daml/sv-local"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings
-    )
-    .dependsOn(`canton-bindings-java`)
-
 lazy val `validator-lifecycle-daml` =
   project
     .in(file("daml/validator-lifecycle"))
@@ -513,7 +503,6 @@ lazy val `apps-common` =
       `canton-name-service-upgrade-daml`,
       `splitwell-daml`,
       `splitwell-upgrade-daml`,
-      `sv-local-daml`,
       `svc-governance-daml`,
       `svc-governance-upgrade-daml`,
       `validator-lifecycle-daml`,
@@ -642,7 +631,6 @@ lazy val `apps-sv` =
       `apps-common-sv`,
       `validator-lifecycle-daml`,
       `svc-governance-daml`,
-      `sv-local-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(

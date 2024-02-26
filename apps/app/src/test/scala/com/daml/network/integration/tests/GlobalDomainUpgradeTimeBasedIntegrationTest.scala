@@ -11,7 +11,6 @@ import com.daml.network.automation.{AssignTrigger, TransferFollowTrigger}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{
   cns,
-  svlocal,
   svcrules as svcr,
   svonboarding as so,
   validatoronboarding as vo,
@@ -265,14 +264,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           )
         ),
       )("ensure SvOnboardingRequest is there", _ => nonEmptyOnSv1(so.SvOnboardingRequest.COMPANION))
-
-      createSampleAndEnsurePresence(svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION)(
-        new svlocal.approvedsvidentity.ApprovedSvIdentity(
-          sv1Party.toProtoPrimitive,
-          "irrelevant name",
-          "irrelevant key",
-        )
-      )
 
       createSampleAndEnsurePresence(vo.UsedSecret.COMPANION)(
         new vo.UsedSecret(

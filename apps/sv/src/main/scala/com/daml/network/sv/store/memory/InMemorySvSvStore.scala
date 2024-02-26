@@ -1,6 +1,5 @@
 package com.daml.network.sv.store.memory
 
-import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
@@ -41,17 +40,6 @@ class InMemorySvSvStore(
     multiDomainAcsStore
       .findContractWithOffset(vo.UsedSecret.COMPANION)(
         (_: Contract[?, vo.UsedSecret]).payload.secret == secret
-      )
-      .map(onlyContractResult)
-
-  override def lookupApprovedSvIdentityByNameWithOffset(
-      name: String
-  )(implicit tc: TraceContext): Future[MultiDomainAcsStore.QueryResult[Option[
-    Contract[ApprovedSvIdentity.ContractId, ApprovedSvIdentity]
-  ]]] =
-    multiDomainAcsStore
-      .findContractWithOffset(ApprovedSvIdentity.COMPANION)(
-        (_: Contract[?, ApprovedSvIdentity]).payload.candidateName == name
       )
       .map(onlyContractResult)
 }

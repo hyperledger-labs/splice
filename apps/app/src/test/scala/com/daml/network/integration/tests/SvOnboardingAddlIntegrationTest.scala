@@ -3,9 +3,9 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.svlocal.approvedsvidentity.ApprovedSvIdentity
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.sv.util.SvOnboardingToken
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
@@ -21,6 +21,20 @@ import scala.concurrent.duration.*
 
 class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletTestUtil {
 
+  override def environmentDefinition =
+    super.environmentDefinition
+      .addConfigTransform((_, config) =>
+        CNNodeConfigTransforms.updateAllSvAppConfigs { (name, config) =>
+          if (name == "sv3") {
+            config.copy(
+              approvedSvIdentities = config.approvedSvIdentities.filter(
+                _.name != "Canton-Foundation-4"
+              )
+            )
+          } else config
+        }(config)
+      )
+
   "SVs can onboard new SVs" in { implicit env =>
     clue("Initialize SVC with 3 SVs") {
       startAllSync(
@@ -34,27 +48,6 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
         sv3ValidatorBackend,
       )
       sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
-    }
-    clue("Simulate that sv3 hasn't approved sv4 by archiving the respective `ApprovedSvIdentity`") {
-      inside(
-        sv3Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(ApprovedSvIdentity.COMPANION)(
-            sv3Backend.getSvcInfo().svParty,
-            c => c.data.candidateName == "Canton-Foundation-4",
-          )
-      ) {
-        case Seq(approvedSvId) => {
-          sv3Backend.participantClientWithAdminToken.ledger_api_extensions.commands
-            .submitWithResult(
-              sv3Backend.config.ledgerApiUser,
-              actAs = Seq(sv3Backend.getSvcInfo().svParty),
-              readAs = Seq.empty,
-              update = approvedSvId.id.exerciseArchive(
-                new com.daml.network.codegen.java.da.internal.template.Archive()
-              ),
-            )
-        }
-      }
     }
     clue("Stop SV2 so that SV4 can't gather enough confirmations just yet") {
       sv2Backend.stop()

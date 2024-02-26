@@ -82,7 +82,9 @@ class SvSvcAutomationService(
   )
 
   registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, connection))
+  registerTrigger(
+    new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, config, connection)
+  )
   if (config.automation.enableSvRewards) {
     if (config.automation.useNewSvRewardIssuance) {
       registerTrigger(new ReceiveSvRewardCouponTrigger(triggerContext, svcStore, connection))

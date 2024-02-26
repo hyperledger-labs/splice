@@ -5,7 +5,6 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
-import com.daml.network.codegen.java.cn.svlocal
 import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
@@ -70,35 +69,6 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       : ListExpiredContracts[ValidatorOnboarding.ContractId, ValidatorOnboarding] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(ValidatorOnboarding.COMPANION)(_.expiresAt)
 
-  def lookupApprovedSvIdentityByNameWithOffset(
-      name: String
-  )(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[
-      svlocal.approvedsvidentity.ApprovedSvIdentity.ContractId,
-      svlocal.approvedsvidentity.ApprovedSvIdentity,
-    ]]]
-  ]
-
-  def lookupApprovedSvIdentityByName(
-      name: String
-  )(implicit
-      tc: TraceContext
-  ): Future[Option[Contract[
-    svlocal.approvedsvidentity.ApprovedSvIdentity.ContractId,
-    svlocal.approvedsvidentity.ApprovedSvIdentity,
-  ]]] =
-    lookupApprovedSvIdentityByNameWithOffset(name).map(_.value)
-
-  def listApprovedSvIdentities(limit: Limit = Limit.DefaultLimit)(implicit
-      tc: TraceContext
-  ): Future[Seq[Contract[
-    svlocal.approvedsvidentity.ApprovedSvIdentity.ContractId,
-    svlocal.approvedsvidentity.ApprovedSvIdentity,
-  ]]] =
-    multiDomainAcsStore
-      .listContracts(svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION, limit)
-      .map(_ map (_.contract))
-
   def lookupSvOnboardingConfirmed()(implicit tc: TraceContext): Future[
     Option[Contract[so.SvOnboardingConfirmed.ContractId, so.SvOnboardingConfirmed]]
   ] =
@@ -153,7 +123,6 @@ object SvSvStore {
     Seq[ConstrainedTemplate](
       vo.UsedSecret.COMPANION,
       vo.ValidatorOnboarding.COMPANION,
-      svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION,
     )
 
   /** Contract filter of an sv acs store for a specific acs party. */
@@ -175,14 +144,6 @@ object SvSvStore {
           SvAcsStoreRowData(
             contract,
             onboardingSecret = Some(contract.payload.secret),
-          )
-        },
-        mkFilter(svlocal.approvedsvidentity.ApprovedSvIdentity.COMPANION)(co =>
-          co.payload.approvingSv == sv
-        ) { contract =>
-          SvAcsStoreRowData(
-            contract,
-            svCandidateName = Some(contract.payload.candidateName),
           )
         },
         mkFilter(so.SvOnboardingConfirmed.COMPANION)(co => co.payload.svParty == sv) { contract =>

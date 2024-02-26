@@ -12,6 +12,7 @@ import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.cometbft.CometBftClient
+import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
@@ -42,6 +43,7 @@ class HttpSvHandler(
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
     isDevNet: Boolean,
+    config: SvAppBackendConfig,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
     localDomainNode: Option[LocalDomainNode],
@@ -142,40 +144,40 @@ class HttpSvHandler(
                     token.candidateName,
                     token.candidateParty,
                     body.token,
+                    config,
                     svStore,
                     logger,
-                  )
-                  .flatMap {
-                    case Left(reason) =>
-                      Future.failed(
-                        HttpErrorHandler.unauthorized(
-                          s"Could not approve SV Identity because of reason: $reason"
-                        )
+                  ) match {
+                  case Left(reason) =>
+                    Future.failed(
+                      HttpErrorHandler.unauthorized(
+                        s"Could not approve SV Identity because of reason: $reason"
                       )
-                    case Right(_) =>
-                      // We retry here because the SvcRules can change while attempting this.
-                      retryProvider
-                        .retryForClientCalls(
-                          s"start SV ${token.candidateName} onboarding via SvcRules",
-                          startSvOnboarding(
-                            token.candidateName,
-                            token.candidateParty,
-                            token.candidateParticipantId,
-                            body.token,
-                          ),
-                          logger,
-                        )
-                        .flatMap {
-                          case Left(reason) =>
-                            Future.failed(
-                              HttpErrorHandler.badRequest(
-                                s"Could not start onboarding request because of reason: : $reason"
-                              )
+                    )
+                  case Right(_) =>
+                    // We retry here because the SvcRules can change while attempting this.
+                    retryProvider
+                      .retryForClientCalls(
+                        s"start SV ${token.candidateName} onboarding via SvcRules",
+                        startSvOnboarding(
+                          token.candidateName,
+                          token.candidateParty,
+                          token.candidateParticipantId,
+                          body.token,
+                        ),
+                        logger,
+                      )
+                      .flatMap {
+                        case Left(reason) =>
+                          Future.failed(
+                            HttpErrorHandler.badRequest(
+                              s"Could not start onboarding request because of reason: : $reason"
                             )
-                          case Right(_) =>
-                            Future.successful(v0.SvResource.StartSvOnboardingResponseOK)
-                        }
-                  }
+                          )
+                        case Right(_) =>
+                          Future.successful(v0.SvResource.StartSvOnboardingResponseOK)
+                      }
+                }
           } yield res
       }
     }

@@ -62,12 +62,6 @@ object DarResources {
     Seq.empty,
   )
 
-  val svLocal_0_1_0 = DarResource("sv-local-0.1.0.dar")
-  val svLocal = PackageResource(
-    svLocal_0_1_0,
-    Seq.empty,
-  )
-
   private val packageResources: Seq[PackageResource] =
     Seq(
       DarResources.appManager,
@@ -75,7 +69,6 @@ object DarResources {
       DarResources.cantonNameService,
       DarResources.splitwell,
       DarResources.svcGovernance,
-      DarResources.svLocal,
       DarResources.validatorLifecycle,
       DarResources.wallet,
       DarResources.walletPayments,
