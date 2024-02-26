@@ -2114,7 +2114,7 @@ function subcmd_restore_node() {
             ;;
         validator1|splitwell)
             _info "Restoring validator node $node"
-            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" participant validator
+            "$REPO_ROOT"/cluster/scripts/node-restore.sh $force "$node" "$backup_run_id" participant validator-0
             ;;
         *)
             _error "Unknown node $node"
