@@ -7,6 +7,8 @@ approvedSvIdentities:
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESLPPYUXcHS7yOEmDHHA4+/UueQM9KU26GvMXqYVJh/okOWFzdiXWtSDZfL1dYUJ9q9KrkNztVlANExBTjY70Vw==
   - name: Cumberland-2
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9/PUF/FFmdhbJNtxt+fR67LEW9vM/NluHSKTecvaqx7EYymDRsJf0GShphXwJAgrFzEOQ0Vsmbu6dmO6N1x8/g==
+  - name: Orb-1-LP
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1LDIm4cEZ/fVP9Y3ReyP93osmeZ+9saRSHRDRb+gmLxtAEOL3GTYCRZClItc4gS8Y8FCNBBYkcSpfjvtBSTfGw==
   - name: Canton-Foundation-2
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==
   - name: Canton-Foundation-3
