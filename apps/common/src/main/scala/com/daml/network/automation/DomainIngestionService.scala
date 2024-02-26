@@ -1,6 +1,5 @@
 package com.daml.network.automation
 
-import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.DomainStore
 import com.digitalasset.canton.tracing.TraceContext
@@ -11,17 +10,19 @@ import scala.concurrent.{ExecutionContext, Future}
 class DomainIngestionService(
     sink: DomainStore.IngestionSink,
     connection: CNLedgerConnection,
-    override protected val context: TriggerContext,
-)(implicit val ec: ExecutionContext, val tracer: Tracer)
-    extends PollingTrigger {
+    context: TriggerContext,
+)(implicit ec: ExecutionContext, tracer: Tracer)
+    extends PeriodicTaskTrigger(context) {
 
-  def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
+  override def completeTask(
+      task: PeriodicTaskTrigger.Task
+  )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
-      domainResults <- context.retryProvider.retryForClientCalls(
-        "getConnectedDomains",
-        connection.getConnectedDomains(sink.ingestionFilter),
-        logger,
-      )
-      _ <- sink.ingestConnectedDomains(domainResults)
-    } yield false
+      domainResults <-
+        connection.getConnectedDomains(sink.ingestionFilter)
+      optChangeSummary <- sink.ingestConnectedDomains(domainResults)
+    } yield optChangeSummary match {
+      case Some(changeSummary) => TaskSuccess(s"Ingested domain store changes: $changeSummary")
+      case None => TaskSuccess("Domain store is up to date")
+    }
 }

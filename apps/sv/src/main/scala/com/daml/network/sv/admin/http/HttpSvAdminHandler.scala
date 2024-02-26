@@ -545,7 +545,7 @@ class HttpSvAdminHandler(
               acsDumpConfig.location,
               loggerFactory,
               svcStore,
-              clock,
+              clock.now,
             )
           } yield v0.SvAdminResource.TriggerAcsDumpResponseOK(
             definitions.TriggerAcsDumpResponse(

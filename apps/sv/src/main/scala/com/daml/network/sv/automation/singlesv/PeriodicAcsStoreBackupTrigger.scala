@@ -1,8 +1,7 @@
 package com.daml.network.sv.automation.singlesv
 
-import com.daml.network.automation.{PollingTrigger, TriggerContext}
+import com.daml.network.automation.{PeriodicTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.config.PeriodicBackupDumpConfig
-import com.daml.network.environment.RetryFor
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.tracing.TraceContext
@@ -14,33 +13,19 @@ class PeriodicAcsStoreBackupTrigger(
     config: PeriodicBackupDumpConfig,
     triggerContext: TriggerContext,
     svcStore: SvSvcStore,
-)(implicit
-    override val ec: ExecutionContext,
-    override val tracer: Tracer,
-) extends PollingTrigger {
+)(implicit ec: ExecutionContext, tracer: Tracer)
+    extends PeriodicTaskTrigger(config.backupInterval, triggerContext) {
 
-  override protected def context: TriggerContext = triggerContext.copy(
-    config = triggerContext.config.copy(
-      pollingInterval = config.backupInterval
-    )
-  )
-
-  override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
-    triggerContext.retryProvider
-      .retry(
-        RetryFor.Automation,
-        s"backup AcsStore dump to: ${config.location.locationDescription}",
-        SvUtil.writeAcsStoreDump(
-          config.location,
-          loggerFactory,
-          svcStore,
-          triggerContext.clock,
-        ),
-        logger,
+  override def completeTask(
+      task: PeriodicTaskTrigger.Task
+  )(implicit traceContext: TraceContext): Future[TaskOutcome] = {
+    SvUtil
+      .writeAcsStoreDump(
+        config.location,
+        loggerFactory,
+        svcStore,
+        task.now,
       )
-      .map(_ =>
-        // We signal that no more work is available to make the polling trigger wait for the backup interval
-        false
-      )
+      .map { case (path, dump @ _) => TaskSuccess(s"Wrote ACS store dump to $path") }
   }
 }

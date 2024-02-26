@@ -28,6 +28,7 @@ import com.daml.network.sv.config.SvScanConfig
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.BackupDump
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
@@ -268,14 +269,13 @@ object SvUtil {
       acsDumpConfig: BackupDumpConfig,
       loggerFactory: NamedLoggerFactory,
       svcStore: SvSvcStore,
-      clock: Clock,
+      now: CantonTimestamp,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[(Path, JsonAcsSnapshot)] = {
     val logger = loggerFactory.getTracedLogger(this.getClass)
     implicit val elc: ErrorLoggingContext =
       ErrorLoggingContext(logger, NamedLoggerFactory.root.properties, tc)
 
-    val now = clock.now.toInstant
-    val filename = acsStoreDumpFilename(now)
+    val filename = acsStoreDumpFilename(now.toInstant)
     logger.debug(
       s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription} at path: $filename"
     )

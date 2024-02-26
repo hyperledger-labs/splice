@@ -122,17 +122,15 @@ class InMemoryDomainStore(
 
     override def ingestConnectedDomains(
         domains: Map[DomainAlias, DomainId]
-    )(implicit traceContext: TraceContext): Future[Unit] =
+    )(implicit traceContext: TraceContext): Future[Option[Pretty[?]]] =
       updateState(
         _.setDomains(domains)
       ).map { case (summary, stateChanged, aliasSignals) =>
-        if (summary.nonEmpty) {
-          logger.debug(show"Ingested domain update $summary")
-        }
         stateChanged.success(())
         aliasSignals.foreach { case (domainId, promise) =>
           promise.success(domainId)
         }
+        Option.when(summary.nonEmpty)(summary.pretty)
       }
   }
 

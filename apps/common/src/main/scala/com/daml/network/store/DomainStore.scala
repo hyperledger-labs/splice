@@ -51,9 +51,11 @@ object DomainStore {
 
     /** Ingest the set of connected domains. This fully
       * replaces the previously ingested domains.
+      *
+      * @return a future that completes with a description of the changes done, if there were any
       */
     def ingestConnectedDomains(domains: Map[DomainAlias, DomainId])(implicit
         traceContext: TraceContext
-    ): Future[Unit]
+    ): Future[Option[Pretty[?]]]
   }
 }
