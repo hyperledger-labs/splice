@@ -626,6 +626,7 @@ commands:
               --keep GCP_DA_CN_CI_2_KEY \
               --keep GCP_DA_CN_SCRATCHNET_KEY \
               --keep GCP_DA_CN_SCRATCHNET2_KEY \
+              --keep CIRCLE_BRANCH \
               $ADDITIONAL_NIX_ARGS \
               --command bash \<<'EOF'
 

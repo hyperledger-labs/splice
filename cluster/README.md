@@ -1704,12 +1704,9 @@ When [deploying via CI](#manually-deploying-via-ci), you can use the `bootstrapp
 ### Patching healthchecks against a deployed cluster
 
 Our periodic healthchecks are triggered by CircleCI on `deployment/<cluster>` branches.
-In case you need to patch the tests without redeploying the cluster, you can cherry-pick the fix onto the corresponding deployment branch.
-
-After cherry-picking your fixes, set the environment variable `OVERRIDE_VERSION` in the `cluster/deployment/<cluster>/.envrc.vars` file
-for the corresponding cluster to `latest_snapshot_tag` to prevent version mismatch issues between the deployed version and the periodic preflights
-(or SV runbook deployments). While `latest_snapshot_tag` should be what you want in most cases, `OVERRIDE_VERSION` also takes an explicit version string.
-See [`get-snapshot-version`](https://github.com/DACH-NY/canton-network-node/blob/main/build-tools/get-snapshot-version) for usage and caveats.
+In case you need to patch the tests without redeploying the cluster, create a new branch based of
+the `deployment/<cluster>` branch you want to patch, cherry-pick your fixes onto it and open a PR
+against the deployment branch.
 
 ## Backup and Recovery
 

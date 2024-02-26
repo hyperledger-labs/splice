@@ -1,5 +1,5 @@
 
-  deploy_CLUSTERNAME_:
+  deploy__CLUSTERNAME_:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:

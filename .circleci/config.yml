@@ -755,6 +755,7 @@ commands:
               --keep GCP_DA_CN_CI_2_KEY \
               --keep GCP_DA_CN_SCRATCHNET_KEY \
               --keep GCP_DA_CN_SCRATCHNET2_KEY \
+              --keep CIRCLE_BRANCH \
               $ADDITIONAL_NIX_ARGS \
               --command bash \<<'EOF'
 
@@ -3769,7 +3770,7 @@ workflows:
             - slack-context
 
 
-  deployscratchneta:
+  deploy_scratchneta:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
@@ -4078,7 +4079,7 @@ workflows:
             - preflight_sv_check
             - restore_node
 
-  deployscratchnetb:
+  deploy_scratchnetb:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
@@ -4387,7 +4388,7 @@ workflows:
             - preflight_sv_check
             - restore_node
 
-  deployscratchnetc:
+  deploy_scratchnetc:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
@@ -4696,7 +4697,7 @@ workflows:
             - preflight_sv_check
             - restore_node
 
-  deployscratchnetd:
+  deploy_scratchnetd:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
@@ -5005,7 +5006,7 @@ workflows:
             - preflight_sv_check
             - restore_node
 
-  deployscratchnete:
+  deploy_scratchnete:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:

@@ -1,5 +1,11 @@
 #! /usr/bin/env bash
 
+# Default to OVERRIDE_VERSION=latest_snapshot_tag for deployment branches
+branch=${CIRCLE_BRANCH:-""}
+if [[ $branch == deployment/* && -z ${OVERRIDE_VERSION-} ]]; then
+    OVERRIDE_VERSION="latest_snapshot_tag"
+fi
+
 # Overriding the version is useful when patching a deployment branch for an already deployed cluster
 # (see https://github.com/DACH-NY/canton-network-node/blob/main/cluster/README.md#patching-healthchecks-against-a-deployed-cluster)
 # Valid values for OVERRIDE_VERSION are:-
