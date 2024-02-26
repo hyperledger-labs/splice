@@ -137,8 +137,6 @@
             - canton-network-vpn
             - slack-context
           cluster: "_CLUSTERNAME_"
-          # TODO(#10246) run validator1 once it's fixed
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
           parallelism: 1
           requires:

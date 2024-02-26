@@ -98,15 +98,6 @@ export async function installValidator1(
           'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.2.0.dar',
         ],
         validatorPartyHint: `${name}_validator_service_user`,
-        extraDomains:
-          isActive && installSplitwell
-            ? [
-                {
-                  alias: 'splitwell',
-                  url: 'http://domain.splitwell:5008',
-                },
-              ]
-            : [],
         svSponsorAddress: `http://sv-app-${migrationId}.sv-1:5014`,
         onboardingSecret,
         persistenceConfig: {

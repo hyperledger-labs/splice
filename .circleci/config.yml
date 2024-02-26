@@ -3479,8 +3479,6 @@ workflows:
             - slack-context
           cluster: "cimain"
           migration_id: 1
-          # TODO(#10246) run validator1 once it's fixed
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           requires:
             - switch_global_domain_upgrade
       - deploy_sv_runbook:
@@ -3908,8 +3906,6 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchneta"
-          # TODO(#10246) run validator1 once it's fixed
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
           parallelism: 1
           requires:
@@ -4217,8 +4213,6 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchnetb"
-          # TODO(#10246) run validator1 once it's fixed
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
           parallelism: 1
           requires:
@@ -4526,8 +4520,6 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchnetc"
-          # TODO(#10246) run validator1 once it's fixed
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
           parallelism: 1
           requires:
@@ -4835,8 +4827,6 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchnetd"
-          # TODO(#10246) run validator1 once it's fixed
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
           parallelism: 1
           requires:
@@ -5144,8 +5134,6 @@ workflows:
             - canton-network-vpn
             - slack-context
           cluster: "scratchnete"
-          # TODO(#10246) run validator1 once it's fixed
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-splitwell-preflight.log"
           migration_id: 1
           parallelism: 1
           requires:
