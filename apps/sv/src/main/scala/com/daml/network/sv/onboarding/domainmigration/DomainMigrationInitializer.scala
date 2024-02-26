@@ -16,12 +16,18 @@ import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationSer
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
-import com.daml.network.sv.onboarding.{NodeInitializerUtil, SetupUtil, SvcPartyHosting}
+import com.daml.network.sv.onboarding.{
+  DomainNodeReconciler,
+  NodeInitializerUtil,
+  SetupUtil,
+  SvcPartyHosting,
+}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
   loadDomainMigrationDump,
   DomainNodeInitializer,
   DomainTopologyTransactions,
 }
+import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.data.CantonTimestamp
@@ -134,9 +140,21 @@ class DomainMigrationInitializer(
           svcStore,
           Some(localDomainNode),
         )
-
+      domainNodeReconciler = new DomainNodeReconciler(
+        svcStore,
+        svcAutomation.connection,
+        config.scan,
+        clock,
+        retryProvider,
+        logger,
+      )
       globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
+      _ <- domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
+        Some(localDomainNode),
+        migrationDump.nodeIdentities.domainId,
+        DomainNodeState.Onboarded,
+      )
     } yield (
       globalDomain,
       svcPartyHosting,

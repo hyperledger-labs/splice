@@ -50,6 +50,8 @@ class DomainDataRestorer(
           )
           // We rely on the calls here being idempotent
           for {
+            // Disconnect
+            _ <- participantAdminConnection.disconnectFromAllDomains()
             _ <- importDars(dars)
             _ = logger.info("Imported all the dars.")
             _ <-
@@ -61,18 +63,18 @@ class DomainDataRestorer(
             _ = logger.info("Importing the ACS")
             _ <- importAcs(acsSnapshot)
             _ = logger.info("Imported the ACS")
-            _ <-
-              participantAdminConnection.connectDomain(domainAlias)
             _ <- ledgerConnection.ensureUserMetadataAnnotation(
               userId,
               BaseLedgerConnection.INITIAL_ACS_IMPORT_METADATA_KEY,
               "true",
               RetryFor.ClientCalls,
             )
+            _ <-
+              participantAdminConnection.connectDomain(domainAlias)
           } yield ()
         case Some(_) =>
           logger.info("Domain is already registered and ACS is imported")
-          Future.unit
+          participantAdminConnection.connectDomain(domainAlias)
       }
   }
 
