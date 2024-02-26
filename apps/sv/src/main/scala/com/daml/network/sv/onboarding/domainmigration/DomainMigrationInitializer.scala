@@ -262,7 +262,7 @@ class DomainMigrationInitializer(
         nodeIdentities.mediator,
       )
       _ <- retryProvider.waitUntil(
-        RetryFor.ClientCalls,
+        RetryFor.WaitingOnInitDependency,
         "mediator synced topology",
         for {
           sequencerTopology <- localDomainNode.sequencerAdminConnection.listAllTransactions(
