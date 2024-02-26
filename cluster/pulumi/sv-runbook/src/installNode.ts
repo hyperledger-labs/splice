@@ -61,6 +61,7 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   : undefined;
 
 const participantIdentitiesFile = process.env.PARTICIPANT_IDENTITIES_FILE;
+const globalDomainMigrationConfig = GlobalDomainMigrationConfig.fromEnv();
 
 const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
@@ -127,6 +128,12 @@ export async function installNode(
       cluster: {
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
         svNamespace: svNamespaceStr,
+      },
+      ingress: {
+        globalDomain: {
+          activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
+          migrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
+        },
       },
     },
     localCharts,
@@ -265,7 +272,7 @@ async function installSvAndValidator(config: SvConfig) {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,
     },
-    domainMigrationId: GlobalDomainMigrationConfig.fromEnv().activeMigrationId.toString(),
+    domainMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -314,6 +321,7 @@ async function installSvAndValidator(config: SvConfig) {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
     }),
+    ...{ domainMigrationId: globalDomainMigrationConfig.activeMigrationId.toString() },
   };
 
   const scanValuesWithFixedTokens = {
@@ -323,7 +331,7 @@ async function installSvAndValidator(config: SvConfig) {
 
   installCNRunbookHelmChart(
     xns,
-    'scan',
+    `scan-${globalDomainMigrationConfig.activeMigrationId}`,
     'cn-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
     localCharts,
@@ -336,11 +344,11 @@ async function installSvAndValidator(config: SvConfig) {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-      TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
+      TRUSTED_SCAN_URL: `http://scan-app-${globalDomainMigrationConfig.activeMigrationId}.${xns.logicalName}:5012`,
     }),
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
     participantIdentitiesDumpPeriodicBackup: backupConfig,
-    domainMigrationId: GlobalDomainMigrationConfig.fromEnv().activeMigrationId.toString(),
+    domainMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

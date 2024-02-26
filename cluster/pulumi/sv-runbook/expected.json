@@ -152,7 +152,13 @@
           "hostname": "svrun.network.canton.global",
           "svNamespace": "sv"
         },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingress": {
+          "globalDomain": {
+            "activeMigrationId": "0",
+            "migrationId": "0"
+          }
+        }
       }
     },
     "name": "cluster-ingress-sv",
@@ -456,11 +462,12 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan",
+      "name": "scan-0",
       "namespace": "sv",
       "timeout": 480,
       "values": {
         "clusterUrl": "svrun.network.com.network.canton.global",
+        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "host": "apps-pg",
@@ -468,7 +475,7 @@
         }
       }
     },
-    "name": "scan",
+    "name": "scan-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -683,7 +690,7 @@
           "host": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "scanAddress": "http://scan-app.sv:5012",
+        "scanAddress": "http://scan-app-0.sv:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,

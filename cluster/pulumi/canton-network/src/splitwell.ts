@@ -52,7 +52,7 @@ export async function installSplitwell(
     { dependsOn: [xns.ns] }
   );
 
-  installIngress(xns);
+  installIngress(xns, globalDomainMigrationConfig);
 
   const participantPostgres = splitPostgresInstances
     ? postgres.installPostgres(xns, 'participant-pg', true)
@@ -174,7 +174,10 @@ function installDomain(xns: ExactNamespace, name: string, postgres: Postgres): p
   return domain;
 }
 
-function installIngress(xns: ExactNamespace) {
+function installIngress(
+  xns: ExactNamespace,
+  globalDomainMigrationConfig: GlobalDomainMigrationConfig
+) {
   installCNHelmChart(
     xns,
     'cluster-ingress-splitwell-uis',
@@ -185,6 +188,13 @@ function installIngress(xns: ExactNamespace) {
         hostPrefix: '',
         svNamespace: xns.logicalName,
       },
+      ingress: {
+        globalDomain: {
+          migrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
+          activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
+        },
+      },
+
       withSvIngress: false,
     },
     {}
