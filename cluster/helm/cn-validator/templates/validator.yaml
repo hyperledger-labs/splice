@@ -169,10 +169,10 @@ spec:
               file = /participant-bootstrapping-dump/content
             }
         {{- end }}
-        {{- if .Values.domainMigrationId }}
-        - name: ADDITIONAL_CONFIG_DOMAIN_MIGRATION_ID
+        {{- with .Values.domainMigrationId }}
+        - name: ADDITIONAL_CONFIG_MIGRATION_ID
           value: |
-            canton.validator-apps.validator_backend.domain-migration-id = {{ .Values.domainMigrationId }}
+            canton.validator-apps.validator_backend.domain-migration-id = {{ . }}
         {{- end }}
         {{- if $isRestoringNode }}
         - name: ADDITIONAL_CONFIG_VALIDATOR_MIGRATION_RESTORE

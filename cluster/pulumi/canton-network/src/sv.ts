@@ -211,6 +211,8 @@ export async function installSvNode(
     ? undefined
     : postgres.installPostgres(xns, 'postgres', false);
 
+  const appsPostgres = defaultPostgres || postgres.installPostgres(xns, `cn-apps-pg`, true);
+
   const validatorSecrets = await installValidatorSecrets({
     xns,
     auth0Client: config.auth0Client,
@@ -221,6 +223,7 @@ export async function installSvNode(
     xns,
     globalDomainUpgradeConfig,
     defaultPostgres,
+    appsPostgres,
     {
       name: config.nodeName,
       onboardingName: config.onboardingName,
@@ -255,6 +258,16 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
+  // TODO(#10153): Remove this duplication again
+  const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
+  const scanDbName = `scan_${sanitizedForPostgres(config.nodeName)}`;
+  const validatorDbName = `validator_${sanitizedForPostgres(config.nodeName)}`;
+  installPostgresMetrics(appsPostgres, svDbName, [migrationIdSpecificComponents.svApp]);
+  installPostgresMetrics(appsPostgres, scanDbName, [migrationIdSpecificComponents.scan]);
+  installPostgresMetrics(appsPostgres, validatorDbName, [
+    migrationIdSpecificComponents.validatorApp,
+  ]);
+
   return { ...migrationIdSpecificComponents, ingress: activeIngress };
 }
 
@@ -282,7 +295,7 @@ async function installValidator(
   scan: Release,
   validatorSecrets: ValidatorSecrets
 ) {
-  const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}_${migrationId}`;
+  const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
   const globalDomainUrl = `https://sequencer-${migrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
 
   const validator = await installValidatorApp({
@@ -308,7 +321,6 @@ async function installValidator(
     scanAddress: pulumi.interpolate`http://scan-app-${migrationId}.${svConfig.nodeName}:5012`,
     secrets: validatorSecrets,
   });
-  installPostgresMetrics(postgres, validatorDbName, [validator]);
   return validator;
 }
 
@@ -316,6 +328,7 @@ function installMigrationIdSpecificComponents(
   xns: ExactNamespace,
   globalDomainMigrationConfig: GlobalDomainMigrationConfig,
   defaultPostgres: Postgres | undefined,
+  appsPostgres: Postgres,
   cometbft: {
     name: string;
     onboardingName: string;
@@ -392,8 +405,6 @@ function installMigrationIdSpecificComponents(
         },
         { dependsOn: [xns.ns] }
       );
-      const appsPostgres =
-        defaultPostgres || postgres.installPostgres(xns, `cn-apps-${migrationId}-pg`, true);
       const svApp = installSvApp(
         migrationId,
         { ...svConfig, ...svAppConfigOverrides },
@@ -454,7 +465,7 @@ function installSvApp(
   identitiesBackupLocation: BackupLocation,
   backupConfig?: BackupConfig
 ) {
-  const svAppName = sanitizedForPostgres(`${config.nodeName}-${domainMigrationId}`);
+  const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
 
   const svValues = {
     domainMigrationId: domainMigrationId.toString(),
@@ -491,7 +502,7 @@ function installSvApp(
     })),
     isDevNet: config.isDevNet,
     approvedSvIdentities: config.approvedSvIdentities,
-    persistence: persistenceConfig(postgres, svAppName),
+    persistence: persistenceConfig(postgres, svDbName),
     identitiesExport: identitiesBackupLocation,
     acsDumpPeriodicExport: backupConfig,
     acsDumpImport:
@@ -524,8 +535,6 @@ function installSvApp(
     dependsOn: dependsOn.concat([participant, postgres, globalDomain]),
   });
 
-  installPostgresMetrics(postgres, svAppName, [svApp]);
-
   return svApp;
 }
 
@@ -539,7 +548,7 @@ function installScan(
   participant: Release,
   postgres: Postgres
 ) {
-  const scanDbName = `scan_${sanitizedForPostgres(nodename)}_${domainMigrationId}`;
+  const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
   // const scanDb = scanAppPostgres.createDatabase(scanDbName);
   const ingestFromParticipantBegin = svConfigOnboardingType == 'found-collective';
   const scanValues = {
@@ -557,6 +566,5 @@ function installScan(
   const scanApp = installCNHelmChart(xns, `scan-${domainMigrationId}`, 'cn-scan', scanValues, {
     dependsOn: [svApp, globalDomainNode],
   });
-  installPostgresMetrics(postgres, scanDbName, [scanApp]);
   return scanApp;
 }

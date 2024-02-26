@@ -50,6 +50,9 @@ export async function installValidator1(
     ? postgres.installPostgres(xns, 'postgres', false)
     : undefined;
 
+  const validatorPostgres = defaultPostgres || postgres.installPostgres(xns, `validator-pg`, true);
+  const validatorDbName = `validator1`;
+
   const validatorSecrets = await installValidatorSecrets({
     xns,
     auth0Client,
@@ -72,12 +75,6 @@ export async function installValidator1(
         !!participantBootstrapDump || !isActive,
         [loopback]
       );
-
-      const validatorPostgres = splitPostgresInstances
-        ? postgres.installPostgres(xns, `validator-${migrationId}-pg`, true)
-        : participantPostgres;
-
-      const validatorDbName = `validator1_${migrationId}`;
 
       const extraDependsOn: pulumi.Resource[] = dependsOn.concat([
         participantPostgres,
@@ -118,7 +115,6 @@ export async function installValidator1(
         scanAddress,
         secrets: validatorSecrets,
       });
-      installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
       installIngress(xns, installSplitwell, {
         type: 'migration-specific',
         migrationId: migrationId.toString(),
@@ -126,6 +122,7 @@ export async function installValidator1(
       return validator;
     }
   );
+  installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
 
   installIngress(xns, installSplitwell, {
     type: 'active',

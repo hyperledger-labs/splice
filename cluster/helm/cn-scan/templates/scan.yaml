@@ -55,6 +55,11 @@ spec:
               ingest-from-participant-begin = {{ .Values.ingestFromParticipantBegin }}
             }
         {{- end }}
+        {{- with .Values.domainMigrationId }}
+        - name: ADDITIONAL_CONFIG_MIGRATION_ID
+          value: |
+            canton.scan-apps.scan-app.domain-migration-id = {{ . }}
+        {{- end }}
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: CN_APP_SCAN_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | default "participant" | quote }}
