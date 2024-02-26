@@ -1037,7 +1037,7 @@ subcommand_whitelist[eipaddr]='Display the cluster\s Egress IP address. (May not
 function subcmd_eipaddr() {
     _cluster_must_exist
 
-    kubectl exec -n docs "$(kubectl get pods -n docs -lapp=docs -o name)" -- \
+    kubectl exec -n cluster-ingress "$(kubectl get pods -n cluster-ingress -lapp=istio-ingress -o name)" -- \
             curl -sSLf http://checkip.amazonaws.com
 }
 
