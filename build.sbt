@@ -1449,6 +1449,8 @@ printTests := {
     isPreflightIntegrationTest(
       name
     ) && name.contains("GlobalDomainUpgradeCluster")
+  def isAuth0CredentialsPreflightIntegrationTest(name: String): Boolean =
+    isPreflightIntegrationTest(name) && name.contains("Auth0Credentials")
 
   def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
@@ -1467,6 +1469,11 @@ printTests := {
       "Global domain upgrade cluster preflight",
       "test-full-class-names-global-domain-upgrade-preflight.log",
       (t: String) => isGlobalDomainDeploymentPreflightIntegrationTest(t),
+    ),
+    (
+      "Fetch UI credentials from Auth0 and store them in a k8s secret",
+      "test-full-class-names-auth0-credentials-preflight.log",
+      (t: String) => isAuth0CredentialsPreflightIntegrationTest(t),
     ),
     (
       "Preflight tests against core nodes",

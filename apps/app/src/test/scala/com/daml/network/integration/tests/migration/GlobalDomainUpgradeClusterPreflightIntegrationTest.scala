@@ -7,7 +7,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.auth.PreflightAuthUtil
+import com.daml.network.integration.tests.auth.PreflightAuthUtil
 import com.daml.network.util.SvTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 

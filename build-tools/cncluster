@@ -1139,6 +1139,47 @@ function subcmd_preflight_global_domain_upgrade() {
 
 ###
 
+subcommand_whitelist[preflight_refresh_auth0_credentials]='Run the auth0 credentials preflight, updating the auth0 tokens saved in the cluster if necessary'
+
+function subcmd_preflight_refresh_auth0_credentials() {
+    _needs_auth0_management_api_creds
+
+    preflight_tests=$(_get_preflight_test_names "auth0-credentials")
+    _log "Starting auth0 tokens preflight tests: $preflight_tests"
+    cd "${REPO_ROOT}" && \
+            NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" \
+            sbt "apps-app/testOnly $preflight_tests"
+}
+
+###
+
+subcommand_whitelist[get_ui_credentials]='Get UI auth0 credentials for a given admin user'
+
+function subcmd_get_ui_credentials() {
+
+  if [ "$#" -ne 1 ]; then
+     _error "Usage: $0 <node>"
+  fi
+
+  node="$1"
+
+  client_ids=$(subcmd_pulumi infra stack output --json | grep -v "Running Pulumi Command")
+  client_id=$(echo "$client_ids" | jq -r '.auth0.cantonNetwork.appToClientId."'"$node"'"')
+  if [ -z "$client_id" ] || [ "$client_id" == "null" ]; then
+    known=$(echo "$client_ids" | jq -r '.auth0.cantonNetwork.appToClientId')
+    _error "No client ID found for node $node in infra stack. Known client IDs are: $known"
+  fi
+  secrets=$(kubectl get secret auth0-preflight-token-cache -o jsonpath="{.data}")
+  encoded=$(echo "$secrets" | jq -r --arg client_id "$client_id" '.[$client_id]')
+  if [ -z "$encoded" ] || [ "$encoded" == "null" ]; then
+    _error "no secret found for client ID $client_id. Did you run \"preflight_refresh_auth0_credentials\"? Are we fetching a secret for this client (hint: look at Auth0CredentialsPreflightIntegrationTest)?"
+  fi
+  token=$(echo "$encoded" | base64 --decode | jq -r .accessToken)
+  echo "$token"
+}
+
+###
+
 subcommand_whitelist[preflight_sv]='Run the SV runbook preflight tests against the cluster'
 
 function subcmd_preflight_sv() {

@@ -2,11 +2,11 @@ package com.daml.network.integration.tests.runbook
 
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.auth.PreflightAuthUtil
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.integration.tests.auth.PreflightAuthUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import io.circe.*
 import io.circe.parser.*

@@ -1,4 +1,4 @@
-package com.daml.network.integration.auth
+package com.daml.network.integration.tests.auth
 
 import com.daml.network.console.SvAppClientReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -18,14 +18,14 @@ trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
   private val sv2ClientId = "rv4bllgKWAiW9tBtdvURMdHW42MAXghz"
   private val sv3ClientId = "SeG68w0ubtLQ1dEMDOs4YKPRTyMMdDLk"
   private val sv4ClientId = "CqKgSbH54dqBT7V1JbnCxb6TfMN8I1cN"
-  private val clientIds = Map(
+  val clientIds = Map(
     "sv1" -> sv1ClientId,
     "sv2" -> sv2ClientId,
     "sv3" -> sv3ClientId,
     "sv4" -> sv4ClientId,
   )
 
-  private lazy val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com", "dev")
+  lazy val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com", "dev")
   protected def svclWithToken(
       name: String
   )(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference = {

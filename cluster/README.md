@@ -1287,36 +1287,13 @@ participantAdminUserNameFrom:
 By default, our apps are configured using client ids and secrets and
 use a client credentials flow to request tokens from Auth0 on
 startup. However, auth0 has limits on how many tokens can be requested
-per month. To work around this, we configure our staging cluster
-(which is redeployed most frequently) with a fixed static token which
-is refreshed daily.
+per month. To work around this, we configure our non-production clusters
+with fixed static tokens.
 
-The behavior can be switched by setting the following environment variable, e.g., to test this on scratchnet.
+The behavior can be switched by setting the following environment variable.
 
 ```
 export CNCLUSTER_FIXED_TOKENS=1
-```
-
-After setting that first refresh the secrets. This will not set client
-id and secret but instead query auth0 for an m2m token and set that:
-
-```
-cncluster update_secrets
-```
-
-After that, you can now apply the manifest (while still keeping the environment variable set).
-
-```
-cncluster apply
-```
-
-After you finished testing, make sure to reset scratchnet back to the
-default behavior by unsetting the environment variable and updating
-the secrets:
-
-```
-unset CNCLUSTER_FIXED_TOKENS
-cncluster update_secrets
 ```
 
 ## Testing the SV Helm Runbook
@@ -1502,6 +1479,13 @@ curl -sSL --fail-with-body "https://sv.sv-1.svc.dev.network.canton.global/api/sv
 For quickly obtaining a token for the SV API or the validator API on a (non-SV) validator,
 you can currently also use [`cncluster participant_console`](#canton-participant-apis),
 which prints a compatible token as part of its startup.
+
+For some UIs, we cache tokens in a secret in k8s, and have a utility `cncluster` command for easily retrieving them.
+At the moment, the four SVs sv-1 to sv-4 are supported. To fetch a token for one of them, run for example:
+```
+export TOKEN=$(cncluster get_ui_credentials sv-1)
+```
+If the token saved in the secret is expired, run `cncluster preflight_get_auth0_tokens` to update the secret with fresh tokens.
 
 ## Configuring a New GCP Project
 
