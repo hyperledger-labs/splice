@@ -7,7 +7,13 @@ Release Notes
 ----------
 
 * Deployment
+
   * It is no longer necessary to specify anything related to `globalDomain` in `participant-values.yaml`.
+
+* Documentation
+
+  * Added section on :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`.
+    This section only contains a high-level overview for now and will be expanded in the upcoming weeks.
 
 2024-02-26
 ----------
