@@ -120,7 +120,7 @@ class ModelUpgradeIntegrationTest
             },
           )("vote request has been created", _ => sv1Backend.listVoteRequests2().loneElement)
 
-          clue(s"sv2, sv3, and sv4 accepts") {
+          clue(s"sv2 and sv3 accept") {
             Seq(sv2Backend, sv3Backend).map(sv =>
               eventuallySucceeds() {
                 sv.castVote2(
@@ -181,7 +181,7 @@ class ModelUpgradeIntegrationTest
               )
             },
           )("vote request has been created", _ => sv1Backend.listVoteRequests2().loneElement)
-          clue(s"sv2, sv3, and sv4 accepts") {
+          clue(s"sv2 and sv3 accept") {
             Seq(sv2Backend, sv3Backend).map(sv =>
               eventuallySucceeds() {
                 sv.castVote2(

@@ -359,7 +359,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
       "The vote request has been created, SV1 accepts as he created it and all other SVs observe it",
       _ => {
         svs.foreach { sv => sv.listVoteRequests2() should not be empty }
-        val head = sv1Backend.listVoteRequests2().head.contractId
+        val head = sv1Backend.listVoteRequests2().headOption.value.contractId
         sv1Backend.lookupVoteRequest2(head).payload.votes should have size 1
         (head, sv1Backend.getSvcInfo().svcRules.payload.config.numUnclaimedRewardsThreshold)
       },
@@ -469,7 +469,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
       "The vote request has been created and SV1 accepts as he created it",
       _ => {
         svs.foreach { sv => sv.listVoteRequests2() should not be empty }
-        val head = sv1Backend.listVoteRequests2().head.contractId
+        val head = sv1Backend.listVoteRequests2().headOption.value.contractId
         sv1Backend.lookupVoteRequest2(head).payload.votes should have size 1
         (head, sv1Backend.getSvcInfo().coinRules.payload.configSchedule.futureValues.size())
       },
@@ -531,8 +531,8 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
         val voteResult =
           sv1Backend
             .listVoteRequestResults2(None, Some(false), None, None, None, 1)
-            .head
-
+            .headOption
+            .value
         voteResult.outcome shouldBe a[VRO_Accepted]
         voteResult.request.votes.asScala.values
           .filter(_.accept)
