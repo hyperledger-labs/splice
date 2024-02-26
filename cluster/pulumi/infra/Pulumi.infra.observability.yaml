@@ -1,0 +1,2 @@
+secretsprovider: gcpkms://projects/da-cn-ci/locations/us-central1/keyRings/pulumi/cryptoKeys/observability
+encryptedkey: CiQA7q5BTSvVGryIqmSfpm6qnYaNHQN7r0Fwx3HdJCVGOsx6CAsSSQDh3GCf34olpd6HqRg1qAg/pep2X6Z/ztySzRFo5MCAsrbtNeMKy8jhmcbIoJPLXfI8DY47KP0jq4JxSULXBYdSpwNvzjKnHqU=
