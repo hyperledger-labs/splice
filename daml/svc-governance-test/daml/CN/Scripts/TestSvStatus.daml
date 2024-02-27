@@ -32,7 +32,7 @@ testStatusReportSubmission = do
   let getStatusReport sv = do
         [report] <- queryFilter @SvStatusReport svc (\report -> report.sv == sv)
         pure report
-  let submitStatusReport sv dummyNr = do
+  let submitStatusReport sv svName dummyNr = do
         (previousReportCid, prevReport) <- getStatusReport sv
         submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_SubmitStatusReport with
           sv
@@ -42,9 +42,10 @@ testStatusReportSubmission = do
         let expectedNewReport = SvStatusReport with
               svc
               sv
+              svName
               number = prevReport.number + 1
               status = Some (dummyStatus dummyNr)
         expectedNewReport === actualNewReport
 
-  submitStatusReport sv1 10
-  submitStatusReport sv2 20
+  submitStatusReport sv1 "sv1" 10
+  submitStatusReport sv2 "sv2" 20

@@ -65,6 +65,7 @@ template SvcBootstrap with
         _ <- create SvStatusReport with
           svc
           sv = founderParty
+          svName = founderName
           number = 0
           status = None
         -- create the SVC rules with the founding member as the sole member

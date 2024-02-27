@@ -420,6 +420,7 @@ template SvcRules with
           void $ create SvStatusReport with
             svc
             sv = newMemberParty
+            svName = newMemberName
             number = 0
             status = None
         -- create traffic contracts for the initial traffic grant to the SV
@@ -477,13 +478,16 @@ template SvcRules with
         status : SvStatus
       controller sv
       do
-        require "SV is a collective member" (sv `Map.member` members)
-        previousReport <- fetchAndArchive (ForOwner with svc; owner = sv) previousReportCid
-        create SvStatusReport with
-          svc
-          sv
-          number = previousReport.number + 1
-          status = Some status
+        case Map.lookup sv members of
+          None -> fail "SV is not a collective member"
+          Some info -> do
+            previousReport <- fetchAndArchive (ForOwner with svc; owner = sv) previousReportCid
+            create SvStatusReport with
+              svc
+              sv
+              svName = info.name
+              number = previousReport.number + 1
+              status = Some status
 
     -- Called by SV candidates to add themselves to the SvcRules once they are confirmed and ready.
     -- We use the passed rounds for reliably determining the earliest open round, which will be

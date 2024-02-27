@@ -20,14 +20,16 @@ data SvStatus = SvStatus with
     -- ^ The maximum round number of the OpenMiningRound contracts at the time of submission
   deriving (Eq, Show)
 
--- | A singleton contract per SV that is used to regularly submit status reports.
+-- | A singleton contract per SV party that is used to regularly submit status reports.
 --
--- Individual status reports serve as a heartbeat for an SV; and to distribute
--- that SVs view on the network to all other SVC members.
+-- Individual status reports serve as a heartbeat for a specific SV party and its associoated SV node
+-- ; and to distribute that SVs view on the network to all other SVC members.
 template SvStatusReport with
     svc : Party
     sv : Party
     -- ^ The SV party that submitted this report.
+    svName : Text
+    -- ^ The name of the SV operator whose operator party was used to submit this report.
     number : Int
     -- ^ The number of this report, starting from 0.
     status : Optional SvStatus

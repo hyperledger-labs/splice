@@ -4,6 +4,7 @@ import com.daml.metrics.api.MetricHandle.Gauge
 import com.daml.metrics.api.{MetricName, MetricsContext}
 import com.daml.network.automation.{
   OnAssignedContractTrigger,
+  TaskNoop,
   TaskOutcome,
   TaskSuccess,
   TriggerContext,
@@ -19,6 +20,7 @@ import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
+import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future, blocking}
@@ -37,15 +39,16 @@ class SvStatusReportMetricsExportTrigger(
       SvStatusReport.COMPANION,
     ) {
 
-  private val perSvMetrics: TrieMap[String, SvStatusMetrics] = TrieMap.empty
+  private val perSvMetrics: TrieMap[SvStatusReportMetricsExportTrigger.SvId, SvStatusMetrics] =
+    TrieMap.empty
 
-  private def getSvMetrics(sv: String): SvStatusMetrics =
-    perSvMetrics.get(sv).getOrElse {
+  private def getSvMetrics(svId: SvStatusReportMetricsExportTrigger.SvId): SvStatusMetrics =
+    perSvMetrics.get(svId).getOrElse {
       // We must synchronize here to avoid allocating the metrics for the same sv multiple times, which would lead to
       // duplicate metric labels being reported by OpenTelemetry.
       blocking {
         synchronized {
-          perSvMetrics.getOrElseUpdate(sv, SvStatusMetrics(sv, context.metricsFactory))
+          perSvMetrics.getOrElseUpdate(svId, SvStatusMetrics(svId, context.metricsFactory))
         }
       }
     }
@@ -58,23 +61,27 @@ class SvStatusReportMetricsExportTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     Future {
       val report = task.payload
-      report.status.toScala.foreach(status => {
-        // We only update the metrics if the status is present to avoid the gauges starting at a non-sensical value.
-        val metrics = getSvMetrics(task.payload.sv)
-        metrics.reportNumber.updateValue(report.number)
-        metrics.creationTime.updateValue(
-          CantonTimestamp.assertFromInstant(report.status.get().createdAt).toMicros
-        )
-        metrics.mediatorDomainTime.updateValue(
-          CantonTimestamp.assertFromInstant(status.mediatorDomainTime).toMicros
-        )
-        metrics.participantDomainTime.updateValue(
-          CantonTimestamp.assertFromInstant(status.participantDomainTime).toMicros
-        )
-        metrics.cometBftHeight.updateValue(status.cometBftHeight)
-        metrics.latestOpenRound.updateValue(status.latestOpenRound.number)
-      })
-      TaskSuccess(s"Updated SvStatusReport metrics")
+      report.status.toScala match {
+        case None => TaskNoop
+        case Some(status) =>
+          val svId =
+            SvStatusReportMetricsExportTrigger.SvId(svParty = report.sv, svName = report.svName)
+          val metrics = getSvMetrics(svId)
+          metrics.reportNumber.updateValue(task.payload.number)
+          metrics.creationTime.updateValue(
+            CantonTimestamp.assertFromInstant(task.payload.status.get().createdAt).toMicros
+          )
+          metrics.mediatorDomainTime.updateValue(
+            CantonTimestamp.assertFromInstant(status.mediatorDomainTime).toMicros
+          )
+          metrics.participantDomainTime.updateValue(
+            CantonTimestamp.assertFromInstant(status.participantDomainTime).toMicros
+          )
+          metrics.cometBftHeight.updateValue(status.cometBftHeight)
+          metrics.latestOpenRound.updateValue(status.latestOpenRound.number)
+
+          TaskSuccess(show"Updated SvStatusReport metrics")
+      }
     }
   }
 
@@ -90,13 +97,17 @@ class SvStatusReportMetricsExportTrigger(
 }
 
 object SvStatusReportMetricsExportTrigger {
+
+  private case class SvId(svParty: String, svName: String)
   private case class SvStatusMetrics(
-      svPartyId: String,
+      svId: SvId,
       metricsFactory: CantonLabeledMetricsFactory,
   ) extends AutoCloseable {
-    private implicit val mc: MetricsContext = MetricsContext(
-      "report_publisher" -> svPartyId
-    )
+
+    private implicit val mc: MetricsContext =
+      MetricsContext(
+        Map("report_publisher" -> svId.svName, "report_publisher_party" -> svId.svParty)
+      )
     private val prefix: MetricName = CNMetrics.MetricsPrefix :+ "sv_status_report"
     private def gauge(name: String, initial: Long): Gauge[Long] =
       metricsFactory.gauge(prefix :+ name, initial = initial)
