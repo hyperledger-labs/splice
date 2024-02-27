@@ -1,9 +1,6 @@
 {
   "devnet": {
-    "Canton-Foundation Engineering Internal": {},
-    "Security Team": {
-      "imageScanner": ["35.212.9.127/32"]
-    }
+    "Canton-Foundation Engineering Internal": {}
   },
   "testnet": {}
 }
