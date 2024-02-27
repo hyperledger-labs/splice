@@ -1,6 +1,7 @@
 package com.daml.network.migration
 
 import cats.data.EitherT
+import cats.implicits.showInterpolator
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.migration.AcsExporter.AcsExportFailure
@@ -46,6 +47,7 @@ class AcsExporter(
             filterParticipant = participantId.toProtoPrimitive,
           )
           .map(_.map(_.mapping.partyId))
+        _ = logger.info(show"Exporting ACS from paused domain $domain for $parties")
         acs <- safeExportAcsFromPausedDomain(domain, parties*).value
       } yield acs
     }
@@ -69,11 +71,12 @@ class AcsExporter(
       _ <- EitherT.liftF[Future, AcsExportFailure, Unit](
         waitForMediatorAndParticipantResponseTime(domain, domainParamsStateTopology)
       )
+      acsSnapshotTimestamp = domainParamsStateTopology.base.validFrom
       snapshot <- EitherT.liftF[Future, AcsExportFailure, ByteString](
         participantAdminConnection.downloadAcsSnapshot(
           parties = parties.toSet,
           filterDomainId = Some(domain),
-          timestamp = Some(domainParamsStateTopology.base.validFrom),
+          timestamp = Some(acsSnapshotTimestamp),
           force = true,
         )
       )
@@ -102,15 +105,16 @@ class AcsExporter(
           "wait for mediator and participant response time after domain is paused",
           participantAdminConnection
             .getDomainTime(domainId, retryProvider.timeouts.default)
-            .map(domainTimeResponse =>
-              if (domainTimeResponse.timestamp.toInstant.isBefore(readyForDumpAfter)) {
+            .map(domainTimeResponse => {
+              val domainTime = domainTimeResponse.timestamp.toInstant
+              if (domainTime.isBefore(readyForDumpAfter)) {
                 throw Status.FAILED_PRECONDITION
                   .withDescription(
-                    s"we should wait until $readyForDumpAfter to let all participants catch up with the paused domain state"
+                    s"we should wait until $readyForDumpAfter to let all participants catch up with the paused domain state. Current domain time is $domainTime"
                   )
                   .asRuntimeException()
               }
-            ),
+            }),
           logger,
         )
     } yield ()

@@ -183,6 +183,9 @@ class ParticipantAdminConnection(
       timestamp: Option[Instant] = None,
       force: Boolean = false,
   )(implicit traceContext: TraceContext): Future[ByteString] = {
+    logger.debug(
+      show"Downloading ACS snapshot from domain $filterDomainId, for parties $parties at timestamp $timestamp"
+    )
     val requestComplete = Promise[ByteString]()
     // TODO(#3298) just concatenate the byteString here. Make it scale to 2M contracts.
     val observer = new GrpcByteChunksToByteArrayObserver[ExportAcsResponse](requestComplete)

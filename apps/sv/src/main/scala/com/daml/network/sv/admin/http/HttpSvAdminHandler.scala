@@ -662,7 +662,7 @@ class HttpSvAdminHandler(
       tuser: TracedUser
   ): Future[SvAdminResource.GetDomainDataSnapshotResponse] = {
     val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.getDomainNodeIdentitiesDump") { implicit tc => _ =>
+    withSpan(s"$workflowId.getDomainDataSnapshot") { implicit tc => _ =>
       domainDataSnapshotGenerator
         .getDomainDataSnapshot(
           Instant.parse(body.timestamp),
