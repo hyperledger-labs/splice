@@ -13,6 +13,14 @@ case class TaskSuccess(
     description: String
 ) extends TaskOutcome
 
+/** Use this to denote that the task processing did not result in any change, and thus was a no-op. */
+case object TaskNoop extends TaskOutcome with PrettyPrinting {
+  override def pretty: Pretty[this.type] = {
+    prettyOfString(_ => "skipped, as the task was a no-op")
+  }
+}
+
+/** The task is no longer current, and can thus be skipped. */
 case object TaskStale extends TaskOutcome with PrettyPrinting {
   override def pretty: Pretty[this.type] = {
     prettyOfString(_ => "skipped, as the task has become stale")

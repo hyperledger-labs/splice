@@ -14,8 +14,12 @@ import scala.util.{Failure, Success}
 /** An abstract interface for triggers that keep track of some list of tasks.
   *
   * Note that the vanilla [[Trigger]] and [[PollingTrigger]] are the only non-task based triggers.
+  *
+  * @param quiet true if only non-trivial outcomes should be logged
   */
-abstract class TaskbasedTrigger[T: Pretty]()(implicit
+abstract class TaskbasedTrigger[T: Pretty](
+    quiet: Boolean = false
+)(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends Trigger {
@@ -72,7 +76,8 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
               }
           }
 
-      logger.info(show"Processing\n$task")
+      if (!quiet)
+        logger.info(show"Processing\n$task")
       context.retryProvider
         .retry(
           RetryFor.Automation,
@@ -86,17 +91,23 @@ abstract class TaskbasedTrigger[T: Pretty]()(implicit
           case Success(taskOutcomeE) =>
             taskOutcomeE match {
               case TaskSuccess(description) =>
-                logger.info(
-                  show"Completed processing with outcome: ${description}"
-                )
+                if (quiet)
+                  logger.info(show"Completed processing $task with outcome: $description")
+                else
+                  logger.info(show"Completed processing with outcome: ${description}")
                 MetricsContext.withExtraMetricLabels(("stale", "false")) { m =>
                   metrics.completed.mark()(m)
                 }
                 Success(true)
+              case TaskNoop =>
+                if (!quiet) logger.info(show"${TaskNoop}")
+                MetricsContext.withExtraMetricLabels(("noop", "false")) { m =>
+                  metrics.completed.mark()(m)
+                }
+                // Signal to polling triggers that no work was done, and it's not worth retrying immediately.
+                Success(false)
               case TaskStale =>
-                logger.info(
-                  show"${TaskStale}"
-                )
+                if (!quiet) logger.info(show"${TaskStale}")
                 MetricsContext.withExtraMetricLabels(("stale", "true")) { m =>
                   metrics.completed.mark()(m)
                 }

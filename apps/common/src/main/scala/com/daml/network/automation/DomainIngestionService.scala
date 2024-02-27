@@ -4,6 +4,7 @@ import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.DomainStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
+import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -12,17 +13,17 @@ class DomainIngestionService(
     connection: CNLedgerConnection,
     context: TriggerContext,
 )(implicit ec: ExecutionContext, tracer: Tracer)
-    extends PeriodicTaskTrigger(context) {
+    extends PeriodicTaskTrigger(context, quiet = true) {
 
   override def completeTask(
-      task: PeriodicTaskTrigger.Task
+      task: PeriodicTaskTrigger.PeriodicTask
   )(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       domainResults <-
         connection.getConnectedDomains(sink.ingestionFilter)
       optChangeSummary <- sink.ingestConnectedDomains(domainResults)
     } yield optChangeSummary match {
-      case Some(changeSummary) => TaskSuccess(s"Ingested domain store changes: $changeSummary")
-      case None => TaskSuccess("Domain store is up to date")
+      case Some(changeSummary) => TaskSuccess(show"Ingested domain store changes $changeSummary")
+      case None => TaskNoop
     }
 }

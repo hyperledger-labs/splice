@@ -17,14 +17,15 @@ import scala.concurrent.{ExecutionContext, Future}
 abstract class PeriodicTaskTrigger(
     executionInterval: NonNegativeFiniteDuration,
     triggerContext: TriggerContext,
+    quiet: Boolean = false,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends TaskbasedTrigger[PeriodicTaskTrigger.Task]
+) extends TaskbasedTrigger[PeriodicTaskTrigger.PeriodicTask](quiet = quiet)
     with PollingTrigger {
 
-  def this(context: TriggerContext)(implicit ec: ExecutionContext, tracer: Tracer) =
-    this(context.config.pollingInterval, context)(ec, tracer)
+  def this(context: TriggerContext, quiet: Boolean)(implicit ec: ExecutionContext, tracer: Tracer) =
+    this(context.config.pollingInterval, context, quiet)(ec, tracer)
 
   override protected def context: TriggerContext = triggerContext.copy(
     config = triggerContext.config.copy(
@@ -33,12 +34,12 @@ abstract class PeriodicTaskTrigger(
   )
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
-    processTaskWithRetry(PeriodicTaskTrigger.Task(context.clock.now))
+    processTaskWithRetry(PeriodicTaskTrigger.PeriodicTask(context.clock.now))
       .map(_ => false)
   }
 
   override def isStaleTask(
-      task: PeriodicTaskTrigger.Task
+      task: PeriodicTaskTrigger.PeriodicTask
   )(implicit tc: TraceContext): Future[Boolean] = {
     // Periodic tasks are never stale, as they have no precondition for their execution.
     Future.successful(false)
@@ -47,7 +48,7 @@ abstract class PeriodicTaskTrigger(
 }
 
 object PeriodicTaskTrigger {
-  case class Task(
+  case class PeriodicTask(
       now: CantonTimestamp
   ) extends PrettyPrinting {
 

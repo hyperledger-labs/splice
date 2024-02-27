@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import cats.Show.Shown
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import com.daml.network.environment.RetryProvider
@@ -12,7 +13,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import monocle.macros.syntax.lens.*
 
-import scala.concurrent.{blocking, ExecutionContext, Future, Promise}
+import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
 
 class InMemoryDomainStore(
     party: PartyId,
@@ -122,7 +123,7 @@ class InMemoryDomainStore(
 
     override def ingestConnectedDomains(
         domains: Map[DomainAlias, DomainId]
-    )(implicit traceContext: TraceContext): Future[Option[Pretty[?]]] =
+    )(implicit traceContext: TraceContext): Future[Option[Shown]] =
       updateState(
         _.setDomains(domains)
       ).map { case (summary, stateChanged, aliasSignals) =>
@@ -130,7 +131,7 @@ class InMemoryDomainStore(
         aliasSignals.foreach { case (domainId, promise) =>
           promise.success(domainId)
         }
-        Option.when(summary.nonEmpty)(summary.pretty)
+        Option.when(summary.nonEmpty)(show"$summary")
       }
   }
 

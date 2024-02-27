@@ -17,7 +17,7 @@ class PeriodicAcsStoreBackupTrigger(
     extends PeriodicTaskTrigger(config.backupInterval, triggerContext) {
 
   override def completeTask(
-      task: PeriodicTaskTrigger.Task
+      task: PeriodicTaskTrigger.PeriodicTask
   )(implicit traceContext: TraceContext): Future[TaskOutcome] = {
     SvUtil
       .writeAcsStoreDump(

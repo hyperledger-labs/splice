@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import cats.Show.Shown
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import com.digitalasset.canton.DomainAlias
@@ -56,6 +57,6 @@ object DomainStore {
       */
     def ingestConnectedDomains(domains: Map[DomainAlias, DomainId])(implicit
         traceContext: TraceContext
-    ): Future[Option[Pretty[?]]]
+    ): Future[Option[Shown]]
   }
 }
