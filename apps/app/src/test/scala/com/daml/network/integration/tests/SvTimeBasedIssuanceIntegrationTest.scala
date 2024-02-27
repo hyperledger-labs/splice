@@ -26,7 +26,8 @@ class SvTimeBasedIssuanceIntegrationTest
     advanceRoundsByOneTick
     val config = defaultIssuanceCurve.initialValue
     val RoundsPerYear =
-      BigDecimal(365 * 24 * 60 * 60).bigDecimal.divide(BigDecimal(150.0).bigDecimal)
+      BigDecimal(365 * 24 * 60 * 60).bigDecimal
+        .divide(BigDecimal(defaultTickDuration.duration.toSeconds).bigDecimal)
     val coinsToIssueToSvc = config.coinToIssuePerYear
       .multiply(
         BigDecimal(1.0).bigDecimal

@@ -8,6 +8,7 @@ import com.daml.network.codegen.java.cc.coinrules.transferinput.{
   ExtTransferInput,
   InputAppRewardCoupon,
   InputCoin,
+  InputSvRewardCoupon,
   InputValidatorRewardCoupon,
 }
 import com.daml.network.codegen.java.cc.coinrules.{
@@ -504,13 +505,16 @@ class TreasuryService(
         maxNumInputs,
         issuingRoundsMap,
       )
+      (svRewardsTotalCoinQuantity, svRewardInputs) <- getSvRewardCouponsAndQuantity(
+        maxNumInputs,
+        issuingRoundsMap,
+      )
       validatorFeaturedAppRight <- walletManager.store.lookupValidatorFeaturedAppRight()
     } yield {
       val createFeeUsd = configUsd.createFee.fee
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
-          // TODO(#9173): also merge in reward coupons weights,
-          appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity + validatorFaucetsCoinQuantity,
+          appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity + validatorFaucetsCoinQuantity + svRewardsTotalCoinQuantity,
           coinInputsAndQuantity,
           createFeeUsd,
         )
@@ -523,12 +527,13 @@ class TreasuryService(
           validatorRewardInputs,
           appRewardInputs,
           validatorFaucetInputs,
+          svRewardInputs,
           numTapOperations,
         )
         val rewardInputRounds =
           appRewardInputs.map(_._1).toSet ++ validatorRewardInputs
             .map(_._1)
-            .toSet ++ validatorFaucetInputs.map(_._1).toSet
+            .toSet ++ validatorFaucetInputs.map(_._1).toSet ++ svRewardInputs.map(_._1).toSet
         val transferContext = new TransferContext(
           openRound.contractId,
           openIssuingRounds.view
@@ -583,14 +588,16 @@ class TreasuryService(
       validatorRewardInputs: Seq[(Round, BigDecimal, InputValidatorRewardCoupon)],
       appRewardInputs: Seq[(Round, BigDecimal, InputAppRewardCoupon)],
       validatorFaucetInputs: Seq[(Round, BigDecimal, ExtTransferInput)],
+      svRewardCouponInputs: Seq[(Round, BigDecimal, InputSvRewardCoupon)],
       numTapOperations: Int,
   ): Seq[TransferInput] = {
-    val sortedRewardInputs = (validatorRewardInputs ++ appRewardInputs ++ validatorFaucetInputs)
-      .sorted(
-        // prioritize the soonest-to-expire, most-valuable rewards.
-        Ordering[(Long, BigDecimal)].on((rw: (Round, BigDecimal, _)) => (rw._1.number, -rw._2))
-      )
-      .map(_._3)
+    val sortedRewardInputs =
+      (validatorRewardInputs ++ appRewardInputs ++ validatorFaucetInputs ++ svRewardCouponInputs)
+        .sorted(
+          // prioritize the soonest-to-expire, most-valuable rewards.
+          Ordering[(Long, BigDecimal)].on((rw: (Round, BigDecimal, _)) => (rw._1.number, -rw._2))
+        )
+        .map(_._3)
     // Since taps in the batch increase the number of transfer inputs, we need to subtract them from the maxNumInputs limit.
     // (We could theoretically check/adjust the ordering of the batch such that if a non-tap operation is
     // before a tap-operation, we don't need to adjust the maxNumInput limit since the inputs would be merged
@@ -675,6 +682,28 @@ class TreasuryService(
         )
       )
     } yield (validatorFaucetsCoinQuantity, validatorFaucetsInputs)
+  }
+
+  private def getSvRewardCouponsAndQuantity(
+      maxNumInputs: Int,
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+  )(implicit
+      tc: TraceContext
+  ): Future[(BigDecimal, Seq[(Round, BigDecimal, InputSvRewardCoupon)])] = {
+    for {
+      svRewardCouponsInputs <- userStore.listSortedSvRewardCoupons(
+        issuingRoundsMap,
+        PageLimit.tryCreate(maxNumInputs),
+      )
+      svRewardCouponsQuantity = svRewardCouponsInputs.map(_._2).sum
+      svRewardCouponInputs = svRewardCouponsInputs.map(rw =>
+        (
+          rw._1.payload.round,
+          rw._2,
+          new cc.coinrules.transferinput.InputSvRewardCoupon(rw._1.contractId),
+        )
+      )
+    } yield (svRewardCouponsQuantity, svRewardCouponInputs)
   }
 
   private def getAppRewardsAndQuantity(

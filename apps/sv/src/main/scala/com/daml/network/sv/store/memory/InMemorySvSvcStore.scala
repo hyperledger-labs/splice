@@ -255,6 +255,17 @@ class InMemorySvSvcStore(
     )
   }
 
+  override def listSvRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[SvRewardCoupon.ContractId, SvRewardCoupon]]] = {
+    multiDomainAcsStore.filterContractsOnDomain(
+      SvRewardCoupon.COMPANION,
+      domainId,
+      (co: Contract[SvRewardCoupon.ContractId, SvRewardCoupon]) => co.payload.round.number == round,
+      limit,
+    )
+  }
+
   override def listValidatorFaucetCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,
@@ -298,6 +309,13 @@ class InMemorySvSvcStore(
       tc: TraceContext
   ): Future[Long] =
     listValidatorFaucetCouponsOnDomain(round, domainId, Limit.DefaultLimit).map(_.size.toLong)
+
+  override def sumSvRewardCouponWeightsOnDomain(round: Long, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long] =
+    listSvRewardCouponsOnDomain(round, domainId, Limit.DefaultLimit).map(
+      _.map(_.payload.weight.longValue()).sum
+    )
 
   override protected def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext

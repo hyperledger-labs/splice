@@ -1,11 +1,12 @@
 package com.daml.network.wallet.store.db
 
+import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.environment.RetryProvider
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
@@ -25,6 +26,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import slick.jdbc.canton.SQLActionBuilder
 
 import scala.concurrent.*
 import scala.jdk.OptionConverters.*
@@ -149,12 +151,43 @@ class DbUserWalletStore(
         ],
         BigDecimal,
     )
-  ]] = {
+  ]] = listSortedRewardCoupons(
+    validatorCodegen.ValidatorFaucetCoupon.COMPANION,
+    issuingRoundsMap,
+    _.optIssuancePerValidatorFaucetCoupon.toScala.map(BigDecimal(_)),
+    limit,
+  )
+
+  override def listSortedSvRewardCoupons(
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[
+    Seq[(Contract[coinCodegen.SvRewardCoupon.ContractId, coinCodegen.SvRewardCoupon], BigDecimal)]
+  ] =
+    listSortedRewardCoupons(
+      coinCodegen.SvRewardCoupon.COMPANION,
+      issuingRoundsMap,
+      r => Some(BigDecimal(r.issuancePerSvRewardCoupon)),
+      limit,
+      ccValue = sql"rti.issuance * acs.reward_coupon_weight",
+    )
+
+  private def listSortedRewardCoupons[C, TCid <: ContractId[_], T](
+      companion: C,
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+      roundToIssuance: IssuingMiningRound => Option[BigDecimal],
+      limit: Limit,
+      ccValue: SQLActionBuilder = sql"rti.issuance",
+  )(implicit
+      companionClass: ContractCompanion[C, TCid, T],
+      traceContext: TraceContext,
+  ): Future[Seq[(Contract[TCid, T], BigDecimal)]] = {
+    val templateId = companionClass.typeId(companion)
     issuingRoundsMap
       .flatMap { case (round, contract) =>
-        contract.optIssuancePerValidatorFaucetCoupon
-          .map(round.number.longValue() -> BigDecimal(_))
-          .toScala
+        roundToIssuance(contract).map(round.number.longValue() -> _)
       }
       .map { case (round, issuance) =>
         sql"($round, $issuance)"
@@ -168,21 +201,20 @@ class DbUserWalletStore(
           result <- storage.query(
             (sql"""
                  with round_to_issuance(round, issuance) as (values """ ++ roundToIssuance ++ sql""")
-                 select #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()}, rti.issuance
+                 select
+                   #${SelectFromAcsTableResult.sqlColumnsCommaSeparated()},""" ++ ccValue ++ sql"""
                  from #${WalletTables.acsTableName} acs join round_to_issuance rti on acs.reward_coupon_round = rti.round
                  where acs.store_id = $storeId
                    and migration_id = $domainMigrationId
-                   and acs.template_id_qualified_name = ${QualifiedName(
-                validatorCodegen.ValidatorFaucetCoupon.TEMPLATE_ID
-              )}
-                 order by (acs.reward_coupon_round, -rti.issuance)
+                   and acs.template_id_qualified_name = ${QualifiedName(templateId)}
+                 order by (acs.reward_coupon_round, -""" ++ ccValue ++ sql""")
                  limit ${sqlLimit(limit)}""").toActionBuilder
               .as[(SelectFromAcsTableResult, BigDecimal)],
-            "listSortedValidatorFaucets",
+            s"listSorted${templateId.getEntityName}",
           )
-        } yield applyLimit("listSortedValidatorFaucets", limit, result).map {
+        } yield applyLimit(s"listSorted${templateId.getEntityName}", limit, result).map {
           case (row, issuance) =>
-            val contract = contractFromRow(validatorCodegen.ValidatorFaucetCoupon.COMPANION)(row)
+            val contract = contractFromRow(companion)(row)
             contract -> issuance
         }
     }

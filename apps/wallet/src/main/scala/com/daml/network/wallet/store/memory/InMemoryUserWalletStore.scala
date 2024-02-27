@@ -2,6 +2,7 @@ package com.daml.network.wallet.store.memory
 
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coin.SvRewardCoupon
 import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.RetryProvider
@@ -136,6 +137,44 @@ class InMemoryUserWalletStore(
                 Contract.Has[
                   validatorCodegen.ValidatorFaucetCoupon.ContractId,
                   validatorCodegen.ValidatorFaucetCoupon,
+                ],
+                BigDecimal,
+            )) => (x._1.payload.round.number, -x._2)
+          )
+        ),
+    )
+  }
+
+  override def listSortedSvRewardCoupons(
+      issuingRoundsMap: Map[Round, IssuingMiningRound],
+      limit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[(Contract[SvRewardCoupon.ContractId, SvRewardCoupon], BigDecimal)]] = {
+    // blatant copy-paste from above, this will be deleted anyway.
+    for {
+      rewards <- multiDomainAcsStore.listContracts(
+        SvRewardCoupon.COMPANION
+      )
+    } yield applyLimit(
+      "listSortedSvRewardCoupons",
+      limit,
+      rewards
+        .flatMap { rw =>
+          val issuingO = issuingRoundsMap.get(rw.payload.round)
+          issuingO
+            .map { round =>
+              rw.contract -> BigDecimal(round.issuancePerSvRewardCoupon) * BigDecimal(
+                rw.contract.payload.weight
+              )
+            }
+        }
+        .sorted(
+          Ordering[(Long, BigDecimal)].on(
+            (x: (
+                Contract.Has[
+                  SvRewardCoupon.ContractId,
+                  SvRewardCoupon,
                 ],
                 BigDecimal,
             )) => (x._1.payload.round.number, -x._2)

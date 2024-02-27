@@ -14,6 +14,7 @@ import com.daml.network.config.{
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.SvAppClientConfig
+import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
@@ -68,7 +69,8 @@ object SvBootstrapDumpConfig {
 object SvOnboardingConfig {
   case class FoundCollective(
       name: String,
-      founderSvRewardWeight: Long = 10,
+      // TODO (#10340): this should come from sv-approved-sv-id-values
+      founderSvRewardWeight: Long = SvUtil.dummySvRewardWeight,
       svcPartyHint: String = "SVC",
       initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.

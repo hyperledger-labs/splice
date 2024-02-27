@@ -120,13 +120,13 @@ class SummarizingMiningRoundTrigger(
       unfeaturedAppRewardCoupons: BigDecimal,
       validatorRewardCoupons: BigDecimal,
       validatorFaucetCoupons: Long,
+      svRewardCouponsWeightSum: Long,
   ) {
     lazy val summary: cc.issuance.OpenMiningRoundSummary = new cc.issuance.OpenMiningRoundSummary(
       validatorRewardCoupons.bigDecimal,
       featuredAppRewardCoupons.bigDecimal,
       unfeaturedAppRewardCoupons.bigDecimal,
-      // TODO(#9173): total up SV reward coupons weights,
-      0,
+      svRewardCouponsWeightSum,
       Optional.of(validatorFaucetCoupons),
     )
   }
@@ -151,6 +151,10 @@ class SummarizingMiningRoundTrigger(
         round,
         domain,
       )
+      svRewardCouponsWeightSum <- store.sumSvRewardCouponWeightsOnDomain(
+        round,
+        domain,
+      )
     } yield {
       RoundRewards(
         round = round,
@@ -158,6 +162,7 @@ class SummarizingMiningRoundTrigger(
         unfeaturedAppRewardCoupons = appRewardCoupons.unfeatured,
         validatorRewardCoupons = validatorRewardCoupons,
         validatorFaucetCoupons = validatorFaucetCoupons,
+        svRewardCouponsWeightSum = svRewardCouponsWeightSum,
       )
     }
   }

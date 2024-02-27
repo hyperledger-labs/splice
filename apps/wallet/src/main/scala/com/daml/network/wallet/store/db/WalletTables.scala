@@ -16,9 +16,11 @@ object WalletTables extends AcsTables {
       contract: Contract[?, ?],
       contractExpiresAt: Option[Timestamp] = None,
       rewardCouponRound: Option[Long] = None,
+      rewardCouponWeight: Option[Long] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
-      "reward_coupon_round" -> IndexColumnValue(rewardCouponRound)
+      "reward_coupon_round" -> IndexColumnValue(rewardCouponRound),
+      "reward_coupon_weight" -> IndexColumnValue(rewardCouponWeight),
     )
   }
 

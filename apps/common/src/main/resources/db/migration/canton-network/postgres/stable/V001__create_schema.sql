@@ -265,7 +265,10 @@ create table user_wallet_acs_store(
     -- index columns
     ----------------
     -- the round of a reward coupon contract
-    reward_coupon_round bigint
+    reward_coupon_round  bigint,
+
+    -- the weight in an SvRewardCoupon
+    reward_coupon_weight bigint
 );
 
 create index user_wallet_acs_store_sid_mid_tid_rcr
@@ -582,6 +585,9 @@ create table svc_acs_store
 
     -- the amount rewarded in an AppRewardCoupon/ValidatorRewardCoupon
     reward_amount                 numeric,
+
+    -- the weight in an SvRewardCoupon
+    reward_weight                 bigint,
 
     -- whether an AppRewardCoupon is featured
     app_reward_is_featured        boolean,

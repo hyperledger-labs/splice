@@ -263,7 +263,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
     (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
   ]]
 
-  /** Returns the app reward coupon sorted by their round in ascending order and their value in descending order.
+  /** Returns the validator faucet coupons sorted by their round in ascending order and their value in descending order.
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   def listSortedValidatorFaucets(
@@ -274,6 +274,22 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
         Contract[
           validatorCodegen.ValidatorFaucetCoupon.ContractId,
           validatorCodegen.ValidatorFaucetCoupon,
+        ],
+        BigDecimal,
+    )
+  ]]
+
+  /** Returns the SV reward coupons sorted by their round in ascending order and their value in descending order.
+    * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
+    */
+  def listSortedSvRewardCoupons(
+      issuingRoundsMap: Map[cc.types.Round, roundCodegen.IssuingMiningRound],
+      limit: Limit = Limit.DefaultLimit,
+  )(implicit tc: TraceContext): Future[Seq[
+    (
+        Contract[
+          coinCodegen.SvRewardCoupon.ContractId,
+          coinCodegen.SvRewardCoupon,
         ],
         BigDecimal,
     )
@@ -590,7 +606,12 @@ object UserWalletStore {
           co.payload.svc == svc &&
             co.payload.sv == endUser
         )(co =>
-          UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
+          UserWalletAcsStoreRowData(
+            co,
+            None,
+            rewardCouponRound = Some(co.payload.round.number),
+            rewardCouponWeight = Some(co.payload.weight),
+          )
         ),
         mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
           // All validator rights where the current user is the validator.

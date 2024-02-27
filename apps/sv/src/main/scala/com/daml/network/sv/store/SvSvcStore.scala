@@ -354,6 +354,22 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       tc: TraceContext
   ): Future[Seq[Seq[cc.validatorlicense.ValidatorFaucetCoupon.ContractId]]]
 
+  def listSvRewardCouponsOnDomain(
+      round: Long,
+      domainId: DomainId,
+      limit: Limit,
+  )(implicit tc: TraceContext): Future[
+    Seq[Contract[
+      cc.coin.SvRewardCoupon.ContractId,
+      cc.coin.SvRewardCoupon,
+    ]]
+  ]
+
+  def sumSvRewardCouponWeightsOnDomain(
+      round: Long,
+      domainId: DomainId,
+  )(implicit tc: TraceContext): Future[Long]
+
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
   ): Future[
@@ -466,6 +482,11 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
             domain,
             PageLimit.tryCreate(1),
           )
+          svRewardCoupons <- listSvRewardCouponsOnDomain(
+            round.payload.round.number,
+            domain,
+            PageLimit.tryCreate(1),
+          )
           action = new ARC_CoinRules(
             new CRARC_MiningRound_Archive(
               new CoinRules_MiningRound_Archive(
@@ -479,7 +500,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
             // archivable if ...
             if (
               // ... there are no unclaimed rewards left in this round
-              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty && validatorFaucetCoupons.isEmpty &&
+              appRewardCoupons.isEmpty && validatorRewardCoupons.isEmpty && validatorFaucetCoupons.isEmpty && svRewardCoupons.isEmpty &&
               // ... and a confirmation to archive is not already created by this SV
               confirmationQueryResult.value.isEmpty
             ) Some(QueryResult(confirmationQueryResult.offset, AssignedContract(round, domain)))
@@ -1013,6 +1034,7 @@ object SvSvcStore {
     QualifiedName(cc.coin.AppRewardCoupon.TEMPLATE_ID),
     QualifiedName(cc.coin.ValidatorRewardCoupon.TEMPLATE_ID),
     QualifiedName(cc.validatorlicense.ValidatorFaucetCoupon.TEMPLATE_ID),
+    QualifiedName(cc.coin.SvRewardCoupon.TEMPLATE_ID),
     QualifiedName(cc.round.ClosedMiningRound.TEMPLATE_ID),
   )
 
@@ -1225,6 +1247,14 @@ object SvSvcStore {
             rewardRound = Some(contract.payload.round.number),
             rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
           )
+      },
+      mkFilter(cc.coin.SvRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
+        SvcAcsStoreRowData(
+          contract,
+          rewardRound = Some(contract.payload.round.number),
+          rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
+          rewardWeight = Some(contract.payload.weight),
+        )
       },
       mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(

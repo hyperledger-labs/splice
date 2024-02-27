@@ -269,11 +269,25 @@ class DbSvSvcStore(
   ): Future[Seq[Contract[ValidatorFaucetCoupon.ContractId, ValidatorFaucetCoupon]]] =
     listRewardCouponsOnDomain(ValidatorFaucetCoupon.COMPANION, round, domainId, limit)
 
+  override def listSvRewardCouponsOnDomain(round: Long, domainId: DomainId, limit: Limit)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[SvRewardCoupon.ContractId, SvRewardCoupon]]] =
+    listRewardCouponsOnDomain(SvRewardCoupon.COMPANION, round, domainId, limit)
+
   override def countValidatorFaucetCouponsOnDomain(round: Long, domainId: DomainId)(implicit
       tc: TraceContext
   ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
     sql"select count(*)",
     ValidatorFaucetCoupon.COMPANION.TEMPLATE_ID,
+    round,
+    domainId,
+  ).map(_.headOption.flatten.getOrElse(0L))
+
+  override def sumSvRewardCouponWeightsOnDomain(round: Long, domainId: DomainId)(implicit
+      tc: TraceContext
+  ): Future[Long] = selectFromRewardCouponsOnDomain[Option[Long]](
+    sql"select sum(reward_weight)",
+    SvRewardCoupon.COMPANION.TEMPLATE_ID,
     round,
     domainId,
   ).map(_.headOption.flatten.getOrElse(0L))
