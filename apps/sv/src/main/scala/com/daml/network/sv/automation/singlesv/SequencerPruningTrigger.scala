@@ -78,7 +78,7 @@ class SequencerPruningTrigger(
       if (membersToDisable.nonEmpty) {
         filterToOurMembers(membersToDisable).flatMap { ourLaggingMembers =>
           if (ourLaggingMembers.isEmpty) {
-            logger.warn(
+            logger.info(
               show"disabling ${membersToDisable.size} member clients preventing pruning to $pruningTimestamp: $membersToDisable"
             )
             pruningMetrics.disabledMembers.updateValue(membersToDisable.size)
