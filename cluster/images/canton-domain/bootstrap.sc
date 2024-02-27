@@ -6,7 +6,7 @@ import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 
 def main() {
   val domainParametersConfig = DomainParametersConfig(
-    protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
+    protocolVersion = DomainProtocolVersion(ProtocolVersion.v30),
     devVersionSupport = true,
   )
   def staticParameters(sequencer: LocalInstanceReference) =

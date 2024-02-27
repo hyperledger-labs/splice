@@ -20,7 +20,7 @@ import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 println("Running canton bootstrap script...")
 
 val domainParametersConfig = DomainParametersConfig(
-  protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
+  protocolVersion = DomainProtocolVersion(ProtocolVersion.v30),
   devVersionSupport = true,
 )
 

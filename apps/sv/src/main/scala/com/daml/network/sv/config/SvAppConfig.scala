@@ -225,7 +225,6 @@ final case class SvDomainNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
     parameters: DomainParametersConfig = DomainParametersConfig(
-      protocolVersion = DomainProtocolVersion(ProtocolVersion.dev),
-      devVersionSupport = true,
+      protocolVersion = DomainProtocolVersion(ProtocolVersion.v30)
     ),
 )

@@ -249,7 +249,7 @@ class FoundingNodeInitializer(
           namespace,
         )
       )
-      val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.dev)
+      val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v30)
       val values = initialValues.copy(
         // TODO(#6055) Consider increasing topology change delay again
         topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
