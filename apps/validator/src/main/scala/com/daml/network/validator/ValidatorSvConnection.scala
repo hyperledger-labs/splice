@@ -43,6 +43,7 @@ object ValidatorSvConnection {
       config: NetworkAppClientConfig,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
+      retryConnectionOnInitialFailure: Boolean = true,
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -51,7 +52,8 @@ object ValidatorSvConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[ValidatorSvConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new ValidatorSvConnection(config, retryProvider, loggerFactory)
+      new ValidatorSvConnection(config, retryProvider, loggerFactory),
+      retryConnectionOnInitialFailure,
     )
 
   case class OnboardValidator(candidate: PartyId, secret: String)

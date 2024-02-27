@@ -224,6 +224,7 @@ object ScanConnection {
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
+      retryConnectionOnInitialFailure: Boolean = true,
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -232,7 +233,8 @@ object ScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new CachedScanConnection(coinLedgerClient, config, clock, retryProvider, loggerFactory)
+      new CachedScanConnection(coinLedgerClient, config, clock, retryProvider, loggerFactory),
+      retryConnectionOnInitialFailure,
     )
 
   def singleUncached(
@@ -240,6 +242,7 @@ object ScanConnection {
       clock: Clock,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
+      retryConnectionOnInitialFailure: Boolean,
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -248,7 +251,8 @@ object ScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[SingleScanConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new SingleScanConnection(config, clock, retryProvider, loggerFactory)
+      new SingleScanConnection(config, clock, retryProvider, loggerFactory),
+      retryConnectionOnInitialFailure,
     )
 
   private[client] case class CachedCoinRules(
@@ -342,6 +346,7 @@ object MinimalScanConnection {
       config: ScanAppClientConfig,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
+      retryConnectionOnInitialFailure: Boolean = true,
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -350,6 +355,7 @@ object MinimalScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[MinimalScanConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new MinimalScanConnection(config, retryProvider, loggerFactory)
+      new MinimalScanConnection(config, retryProvider, loggerFactory),
+      retryConnectionOnInitialFailure,
     )
 }

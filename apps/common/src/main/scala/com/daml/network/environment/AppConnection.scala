@@ -159,26 +159,29 @@ abstract class HttpAppConnection(
       }
     }
 
-  private def getHttpAppVersionInfo(url: Uri): Future[HttpAdminAppClient.VersionInfo] = {
-    retryProvider.getValueWithRetries(
-      RetryFor.WaitingOnInitDependency,
-      s"app version of $url",
-      runHttpCmd(
-        url,
-        HttpAdminAppClient.GetVersion(basePath),
-        List(),
-      ),
-      logger,
+  private def getHttpAppVersionInfo(): Future[HttpAdminAppClient.VersionInfo] = {
+    runHttpCmd(
+      config.url,
+      HttpAdminAppClient.GetVersion(basePath),
+      List(),
     )
   }
 
-  def checkVersionCompatibility(): Future[Unit] = {
+  def checkVersionCompatibility(retryConnectionOnInitialFailure: Boolean): Future[Unit] = {
     for {
-      versionInfo <- getHttpAppVersionInfo(
-        config.url
-      )
+      versionInfo <-
+        if (retryConnectionOnInitialFailure) {
+          retryProvider.getValueWithRetries(
+            RetryFor.WaitingOnInitDependency,
+            s"app version of ${config.url}",
+            getHttpAppVersionInfo(),
+            logger,
+          )
+        } else {
+          getHttpAppVersionInfo()
+        }
     } yield {
-      logger.debug(s"Found app version: ${versionInfo}")(TraceContext.empty)
+      logger.debug(s"Found app version: $versionInfo")(TraceContext.empty)
       val myVersion = BuildInfo.compiledVersion
       if (versionInfo.version != myVersion) {
         val errorMsg = s"Version mismatch detected, please download the latest bundle. " +
@@ -200,10 +203,11 @@ abstract class HttpAppConnection(
 
 object HttpAppConnection {
   private[network] def checkVersionOrClose(
-      conn: HttpAppConnection
+      conn: HttpAppConnection,
+      retryConnectionOnInitialFailure: Boolean,
   )(implicit ec: ExecutionContext): Future[conn.type] =
     conn
-      .checkVersionCompatibility()
+      .checkVersionCompatibility(retryConnectionOnInitialFailure)
       .transform {
         case Success(_) => Success(conn)
         case Failure(e) =>

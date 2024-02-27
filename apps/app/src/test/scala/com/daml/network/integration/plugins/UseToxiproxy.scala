@@ -104,13 +104,11 @@ case class UseToxiproxy(
                       ),
                     )
                   case BftScanClientConfig.Bft(seedUrls, _, coinRulesCacheTimeToLive) =>
-                    val newSeedUrls = seedUrls.zipWithIndex.map { case (seedUrl, ii) =>
-                      addScanAppHttpProxy(n.unwrap, seedUrl, basePortBump + ii)
-                    }
+                    val newUrl = addScanAppHttpProxy(n.unwrap, seedUrls.head, basePortBump)
                     (
                       n,
                       config.copy(scanClient =
-                        BftScanClientConfig.Bft(newSeedUrls, coinRulesCacheTimeToLive)
+                        BftScanClientConfig.TrustSingle(newUrl, coinRulesCacheTimeToLive)
                       ),
                     )
                 }

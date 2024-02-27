@@ -242,10 +242,9 @@ class BftScanConnection(
       call: SingleScanConnection => Future[T]
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
     val connections @ ScanConnections(open, _) = scanList.scanConnections
-    val totalNumber = connections.totalNumber
     val f = connections.f
-    val nTargetSuccess = f + 1
-    if (open.size < nTargetSuccess) {
+    if (!connections.enoughAvailableScans) {
+      val totalNumber = connections.totalNumber
       val msg =
         s"Only ${open.size} scan instances are reachable (out of $totalNumber configured ones), which are fewer than the necessary ${f + 1} to achieve BFT guarantees."
       val exception = HttpErrorWithHttpCode(
@@ -257,7 +256,7 @@ class BftScanConnection(
     } else {
       val nRequestsToDo = 2 * f + 1
       val requestFrom = Random.shuffle(open).take(nRequestsToDo)
-      executeCall(call, requestFrom, nTargetSuccess)
+      executeCall(call, requestFrom, nTargetSuccess = f + 1)
     }
   }
 
@@ -359,6 +358,7 @@ object BftScanConnection {
   case class ScanConnections(open: Seq[SingleScanConnection], failed: Int) {
     val totalNumber: Int = open.size + failed
     val f: Int = (totalNumber - 1) / 3
+    val enoughAvailableScans: Boolean = open.size > f
   }
 
   private[BftScanConnection] sealed trait ScanList
@@ -467,7 +467,7 @@ object BftScanConnection {
             logger.info(s"Updated scan list to $newState")
 
             val connections = newState.scanConnections
-            if (connections.failed > connections.f) {
+            if (!connections.enoughAvailableScans) {
               throw io.grpc.Status.FAILED_PRECONDITION
                 .withDescription(
                   s"There are not enough Scans to satisfy f=${connections.f}. Will be retried. State: $newState"
@@ -642,6 +642,9 @@ object BftScanConnection {
         clock,
         retryProvider,
         loggerFactory,
+        // We only need f+1 Scans to be available, so so as long as those are connected we don't need to slow init down.
+        // Furthermore, the refresh (either on init, or periodically) will retry anyway.
+        retryConnectionOnInitialFailure = false,
       )
     }
 

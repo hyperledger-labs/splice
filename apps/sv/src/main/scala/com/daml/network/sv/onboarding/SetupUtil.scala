@@ -202,6 +202,7 @@ private[onboarding] object SetupUtil {
           clock,
           retryProvider,
           loggerFactory,
+          retryConnectionOnInitialFailure = true,
         )
         r <- f(scanConnection).andThen { _ => scanConnection.close() }
       } yield r

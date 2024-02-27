@@ -103,6 +103,7 @@ object SvConnection {
       config: NetworkAppClientConfig,
       retryProvider: RetryProvider,
       loggerFactory: NamedLoggerFactory,
+      retryConnectionOnInitialFailure: Boolean = true,
   )(implicit
       ec: ExecutionContextExecutor,
       tc: TraceContext,
@@ -111,6 +112,7 @@ object SvConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[SvConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new SvConnection(config, retryProvider, loggerFactory)
+      new SvConnection(config, retryProvider, loggerFactory),
+      retryConnectionOnInitialFailure,
     )
 }
