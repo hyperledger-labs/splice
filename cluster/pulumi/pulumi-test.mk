@@ -9,7 +9,7 @@ $(dir)/test.json: $(dir $(dir)).build
 	if [ -n "$$CI" ]; then \
 		npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	else \
-		env -i PATH=$$PATH HOME=$$HOME IGNORE_PRIVATE_ENVRC=1 direnv exec . npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+		env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 direnv exec . npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	fi
 
 .PHONY: $(dir)/test
