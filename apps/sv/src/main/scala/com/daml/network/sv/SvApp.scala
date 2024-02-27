@@ -1112,14 +1112,8 @@ object SvApp {
           res <- retryProvider.retryForClientCalls(
             "castVote2",
             for {
-              resolvedVoteRequest <- svcStoreWithIngestion.store.lookupVoteRequest2(trackingCid)
-              resolvedCid = resolvedVoteRequest
-                .getOrElse(
-                  throw new IllegalArgumentException(
-                    s"Vote request not found in the ledger for trackingCid $trackingCid"
-                  )
-                )
-                .contractId
+              resolvedVoteRequest <- svcStoreWithIngestion.store.getVoteRequest2(trackingCid)
+              resolvedCid = resolvedVoteRequest.contractId
               reason = new Reason(reasonUrl, reasonDescription)
               cmd = svcRules.exercise(
                 _.exerciseSvcRules_CastVote2(

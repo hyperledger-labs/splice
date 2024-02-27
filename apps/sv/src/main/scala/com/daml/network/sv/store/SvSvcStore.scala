@@ -730,6 +730,17 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       tc: TraceContext
   ): Future[Option[Contract[cn.svcrules.VoteRequest2.ContractId, cn.svcrules.VoteRequest2]]]
 
+  def getVoteRequest2(contractId: cn.svcrules.VoteRequest2.ContractId)(implicit
+      tc: TraceContext
+  ): Future[Contract[cn.svcrules.VoteRequest2.ContractId, cn.svcrules.VoteRequest2]] =
+    lookupVoteRequest2(contractId).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(show"Vote request not found for tracking-id $contractId")
+          .asRuntimeException()
+      )
+    )
+
   def listVotesByVoteRequests(
       voteRequestCids: Seq[cn.svcrules.VoteRequest.ContractId],
       limit: Limit = Limit.DefaultLimit,
