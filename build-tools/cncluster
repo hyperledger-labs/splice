@@ -2182,6 +2182,7 @@ function subcmd_hard_domain_migration() {
   # switch to the new domain
   unset GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
+  export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=0
   _cluster_apply "$version"
   export CN_INSTALL_SPLITWELL="true"
   _cluster_apply "$version"

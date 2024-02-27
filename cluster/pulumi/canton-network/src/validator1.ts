@@ -121,7 +121,7 @@ export async function installValidator1(
       });
       return validator;
     }
-  );
+  ).activeComponent;
   installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
 
   installIngress(xns, installSplitwell, {

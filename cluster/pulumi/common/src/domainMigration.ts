@@ -51,18 +51,22 @@ export const DefaultMigrationId = 0;
 export function installMigrationIdSpecificComponent<T>(
   globalDomainUpgradeConfig: GlobalDomainMigrationConfig,
   component: (migrationId: DomainMigrationIndex, isActive: boolean) => T
-): T {
-  if (globalDomainUpgradeConfig.upgradeMigrationId) {
-    component(globalDomainUpgradeConfig.upgradeMigrationId, false);
-  }
-  if (globalDomainUpgradeConfig.legacyMigrationId) {
-    component(globalDomainUpgradeConfig.legacyMigrationId, false);
-  }
-  if (globalDomainUpgradeConfig.activeMigrationId == DefaultMigrationId) {
-    return component(DefaultMigrationId, true);
-  } else {
-    return component(globalDomainUpgradeConfig.activeMigrationId, true);
-  }
+): {
+  activeComponent: T;
+  legacyComponent?: T;
+  upgradeComponent?: T;
+} {
+  return {
+    activeComponent: component(globalDomainUpgradeConfig.activeMigrationId, true),
+    legacyComponent:
+      globalDomainUpgradeConfig.legacyMigrationId != undefined
+        ? component(globalDomainUpgradeConfig.legacyMigrationId, false)
+        : undefined,
+    upgradeComponent:
+      globalDomainUpgradeConfig.upgradeMigrationId != undefined
+        ? component(globalDomainUpgradeConfig.upgradeMigrationId, false)
+        : undefined,
+  };
 }
 
 export type DomainMigrationIndex = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;

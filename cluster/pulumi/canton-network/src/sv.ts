@@ -247,7 +247,7 @@ export async function installSvNode(
       withSvIngress: true,
       ingress: {
         globalDomain: {
-          activeMigrationId: migrationIdSpecificComponents.globalDomain.migrationId.toString(),
+          activeMigrationId: globalDomainUpgradeConfig.activeMigrationId.toString(),
         },
       },
       cluster: {
@@ -257,18 +257,17 @@ export async function installSvNode(
     },
     { dependsOn: [xns.ns] }
   );
+  const activeComponents = await migrationIdSpecificComponents.activeComponent;
 
   // TODO(#10153): Remove this duplication again
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
   const scanDbName = `scan_${sanitizedForPostgres(config.nodeName)}`;
   const validatorDbName = `validator_${sanitizedForPostgres(config.nodeName)}`;
-  installPostgresMetrics(appsPostgres, svDbName, [migrationIdSpecificComponents.svApp]);
-  installPostgresMetrics(appsPostgres, scanDbName, [migrationIdSpecificComponents.scan]);
-  installPostgresMetrics(appsPostgres, validatorDbName, [
-    migrationIdSpecificComponents.validatorApp,
-  ]);
+  installPostgresMetrics(appsPostgres, svDbName, [activeComponents.svApp]);
+  installPostgresMetrics(appsPostgres, scanDbName, [activeComponents.scan]);
+  installPostgresMetrics(appsPostgres, validatorDbName, [activeComponents.validatorApp]);
 
-  return { ...migrationIdSpecificComponents, ingress: activeIngress };
+  return { ...activeComponents, ingress: activeIngress };
 }
 
 function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {

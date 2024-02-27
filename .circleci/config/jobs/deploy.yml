@@ -167,7 +167,7 @@ jobs:
         default: 0
       global_domain_legacy_migration_id:
         type: integer
-        default: 0
+        default: -1
       cancel_workflow_on_failure:
         type: boolean
         default: false
@@ -262,13 +262,13 @@ jobs:
             export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
             fi
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
+            if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+            fi
             if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
               export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
               export CN_INSTALL_SPLITWELL="false"
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
-              if [[ << parameters.global_domain_legacy_migration_id >> -ne 0 ]]; then
-                export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
-              fi
             fi
             cncluster ci_apply
       - when:
