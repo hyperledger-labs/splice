@@ -112,6 +112,12 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
               Future.successful(Done)
 
             def loopWithDelay(newState: PollingTriggerState): Future[Done] = LoggerUtil.logOnThrow {
+              val config = context.config
+              val pollingIntervalNanos = config.pollingInterval.unwrap.toNanos
+              val jitterNanos: Long =
+                (pollingIntervalNanos * config.pollingJitter * (math.random() - 0.5)).toLong
+              val delayNanos =
+                (pollingIntervalNanos + jitterNanos).max(0L).min(2L * pollingIntervalNanos)
               val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
                 context.pollingClock
                   .scheduleAfter(
@@ -119,7 +125,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
                       // No work done here, as we are only interested in the scheduling notification
                       ()
                     },
-                    context.config.pollingInterval.asJava,
+                    java.time.Duration.ofNanos(delayNanos),
                   )
               )
               // Continue looping
@@ -242,6 +248,7 @@ object PollingTrigger {
     override def pretty: Pretty[this.type] = {
       prettyOfClass(
         param("pollingInterval", _.config.pollingInterval),
+        param("pollingJitter", _.config.pollingJitter.toString.unquoted),
         param("maxNumSilentPollingRetries", _.config.maxNumSilentPollingRetries),
       )
     }

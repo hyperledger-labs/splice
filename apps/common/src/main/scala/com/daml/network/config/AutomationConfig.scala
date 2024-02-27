@@ -15,6 +15,12 @@ case class AutomationConfig(
     /** Interval at which time-based automation triggers
       */
     pollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    /** Percentage of the polling interval to use for randomly distributing the actual polling duration.
+      *
+      * The duration used is sampled uniformly at random from
+      * `[pollingInterval * (1 - 0.5*pollingJitter), pollingInterval * (1 + 0.5 * pollingJitter)]`
+      */
+    pollingJitter: Double = 0.2,
     /** Maximal number of retries that the time-based triggers retry transient failures w/o raising a warning.
       */
     maxNumSilentPollingRetries: Int = 3,
