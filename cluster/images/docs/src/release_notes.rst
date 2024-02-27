@@ -14,6 +14,8 @@ Release Notes
 
   * Added section on :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`.
     This section only contains a high-level overview for now and will be expanded in the upcoming weeks.
+  * Preliminary documentation of :ref:`restoring from backups <sv_restore>`.
+    Note that for now, only the case of restoring a full SV node from a backup is fully covered.
 
 2024-02-26
 ----------
