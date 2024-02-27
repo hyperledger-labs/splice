@@ -357,12 +357,17 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
         s"$name retry provider",
         retryProvider.close(),
       ),
-      // By shutting down this before the app state, any in-flight gRPC connections will be cancelled.
+      // By shutting down gRPC (ledger) and HTTP connections before the app state, any in-flight connections will be cancelled.
       // This prevents requests that take longer than the shutdown wait from blocking the shutdown process.
-      // See #9851.
+      // See #9851 and #10167.
       AsyncCloseable(
         s"$name Ledger API connection",
         ledgerClientF.map(_.close()),
+        nonNegativeDuration,
+      ),
+      AsyncCloseable(
+        "http pool",
+        httpExt.shutdownAllConnectionPools(),
         nonNegativeDuration,
       ),
       AsyncCloseable(
@@ -372,11 +377,6 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
           case Failure(e) => Failure(e)
           case Success(node) => Success(node.close())
         },
-        nonNegativeDuration,
-      ),
-      AsyncCloseable(
-        "http pool",
-        httpExt.shutdownAllConnectionPools(),
         nonNegativeDuration,
       ),
     )
