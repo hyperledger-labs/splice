@@ -150,8 +150,12 @@ template AppRewardCoupon
     amount : Decimal
     round : Round
   where
-    signatory svc, provider
+    signatory svc
     ensure amount > 0.0
+
+    -- The provider is no signatory so their node's unavailability does not hold up the rewards issuance process.
+    -- They can rely on the SVC to only withdraw the coupon once it expired.
+    observer provider
 
     choice AppRewardCoupon_SvcExpire : (Bool, Decimal)
       with
@@ -172,8 +176,12 @@ template ValidatorRewardCoupon
     amount : Decimal
     round : Round
   where
-    signatory svc, user
+    signatory svc
     ensure amount > 0.0
+
+    -- The user is no signatory so their node's unavailability does not hold up the rewards issuance process.
+    -- They can rely on the SVC to only withdraw the coupon once it expired.
+    observer user
 
     choice ValidatorRewardCoupon_SvcExpire : Decimal
       with
@@ -237,8 +245,6 @@ template SvRewardCoupon with
     choice SvRewardCoupon_ArchiveAsBeneficiary : ()
       controller beneficiary
       do pure ()
-
-
 
 
 -- | Rewards that have not been claimed and are thus at the disposal of the foundation.
