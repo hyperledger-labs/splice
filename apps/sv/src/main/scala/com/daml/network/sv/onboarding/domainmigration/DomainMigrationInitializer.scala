@@ -154,6 +154,7 @@ class DomainMigrationInitializer(
         Some(localDomainNode),
         migrationDump.nodeIdentities.domainId,
         DomainNodeState.Onboarded,
+        config.domainMigrationId,
       )
     } yield (
       globalDomain,

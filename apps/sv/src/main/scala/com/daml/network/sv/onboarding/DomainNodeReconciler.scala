@@ -39,6 +39,7 @@ class DomainNodeReconciler(
       localDomainNode: Option[LocalDomainNode],
       domainId: DomainId,
       state: DomainNodeState,
+      migrationId: Long,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -47,7 +48,7 @@ class DomainNodeReconciler(
     val svcParty = svcStore.key.svcParty
 
     def setConfigIfRequired() = for {
-      localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode)
+      localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode, migrationId)
       localMediatorConfig <- SvUtil.getMediatorConfig(localDomainNode)
       svcRules <- svcStore.getSvcRules()
       // TODO(#4901): do not use default, but reconcile all configured domains
@@ -58,7 +59,9 @@ class DomainNodeReconciler(
       sequencerConfig = domainNodeConfig.flatMap(_.sequencer.toScala)
       mediatorConfig = domainNodeConfig.flatMap(_.mediator.toScala)
       existingScanConfig = domainNodeConfig.flatMap(_.scan.toScala)
-      existingSequencerConfig = sequencerConfig.map(c => LocalSequencerConfig(c.sequencerId, c.url))
+      existingSequencerConfig = sequencerConfig.map(c =>
+        LocalSequencerConfig(c.sequencerId, c.url, c.migrationId)
+      )
       existingMediatorConfig = mediatorConfig.map(c => LocalMediatorConfig(c.mediatorId))
       shouldMarkSequencerAsOnboarded = state match {
         case DomainNodeState.Onboarded => sequencerConfig.exists(_.availableAfter.isEmpty)
@@ -87,6 +90,7 @@ class DomainNodeReconciler(
                     )
                   )
               new SequencerConfig(
+                c.migrationId,
                 c.sequencerId,
                 c.url,
                 (state match {

@@ -854,8 +854,11 @@ components:
             $ref: "#/components/schemas/SvcSequencer"
     SvcSequencer:
       type: object
-      required: ["id", "url", "svName", availableAfter]
+      required: ["migrationId", "id", "url", "svName", "availableAfter"]
       properties:
+        migrationId:
+          type: integer
+          format: int64
         id:
           type: string
         url:

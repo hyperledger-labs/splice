@@ -540,6 +540,7 @@ class HttpScanHandler(
             sequencer <- domainConfig.sequencer.toScala
             availableAfter <- sequencer.availableAfter.toScala
           } yield domainId -> definitions.SvcSequencer(
+            sequencer.migrationId,
             sequencer.sequencerId,
             sequencer.url,
             memberInfo.name,

@@ -338,6 +338,7 @@ export const svcInfo: GetSvcInfoResponse = {
                     sequencingKeys: [],
                   },
                   sequencer: {
+                    migrationId: '0',
                     sequencerId:
                       'SEQ::sequencer::12209f0d96157ae83871bd347d2fe22fe0b982dfbfe50016f7cf6dcfdfcd4eb8e132',
                     url: 'https://sequencer-0.sv-1.svc.cimain.network.canton.global',
@@ -388,6 +389,7 @@ export const svcInfo: GetSvcInfoResponse = {
                     sequencingKeys: [],
                   },
                   sequencer: {
+                    migrationId: '0',
                     sequencerId:
                       'SEQ::sequencer::12207eec8b03a668493a6068a755e2eb32084d9b588717049690cdbecb6558fd325c',
                     url: 'https://sequencer-0.sv-2.svc.cimain.network.canton.global',
@@ -438,6 +440,7 @@ export const svcInfo: GetSvcInfoResponse = {
                     sequencingKeys: [],
                   },
                   sequencer: {
+                    migrationId: '0',
                     sequencerId:
                       'SEQ::sequencer::12207a75f3778b60414df3bb876e4a7c84976f35640b4daf30894189bc73e5c7fe38',
                     url: 'https://sequencer-0.sv-3.svc.cimain.network.canton.global',
@@ -488,6 +491,7 @@ export const svcInfo: GetSvcInfoResponse = {
                     sequencingKeys: [],
                   },
                   sequencer: {
+                    migrationId: '0',
                     sequencerId:
                       'SEQ::sequencer::12208d47d9361a0e84ee10648c611fc2436885ab5193aa67fa5d9eefc7929f732e96',
                     url: 'https://sequencer-0.sv-4.svc.cimain.network.canton.global',

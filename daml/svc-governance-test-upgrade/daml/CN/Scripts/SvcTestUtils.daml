@@ -93,6 +93,7 @@ initCollective initialRoundNumber isDevNet = do
                   sequencingKeys = map SequencingKeyConfig ["initial-sequencer-key"]
                   governanceKeys = map GovernanceKeyConfig ["initial-governance-key"]
                 sequencer = Some SequencerConfig with
+                  migrationId = 0
                   sequencerId = "sequencer-id"
                   url = "sequencer.address:1234"
                   availableAfter = Some now

@@ -32,6 +32,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.migrationDumpDir
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import com.daml.network.sv.automation.singlesv.{SubmitSvStatusReportTrigger, SvRewardTrigger}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
@@ -317,6 +318,17 @@ class GlobalDomainMigrationIntegrationTest
       },
     )
 
+    eventually() {
+      inside(sv1ScanBackend.listSvcSequencers()) {
+        case Seq(DomainSequencers(domainId, sequencers)) =>
+          domainId shouldBe globalDomainId
+          sequencers should have size 4
+          sequencers.foreach { sequencer =>
+            sequencer.migrationId shouldBe 0
+          }
+      }
+    }
+
     def startValidatorAndTapCoin(
         validatorBackend: ValidatorAppBackendReference,
         walletClient: WalletAppClientReference,
@@ -578,6 +590,17 @@ class GlobalDomainMigrationIntegrationTest
               uwc("bobWalletLocal"),
               expectedCoins = 99 to 100,
             )
+          }
+
+          eventually() {
+            inside(sv1ScanLocalBackend.listSvcSequencers()) {
+              case Seq(DomainSequencers(domainId, sequencers)) =>
+                domainId shouldBe globalDomainId
+                sequencers should have size 4
+                sequencers.foreach { sequencer =>
+                  sequencer.migrationId shouldBe 1
+                }
+            }
           }
 
           sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4

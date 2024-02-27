@@ -30,6 +30,7 @@ testDomainMigration = do
           sequencingKeys = []
           governanceKeys = []
         sequencer = Some SequencerConfig with
+          migrationId = 0
           sequencerId = "sequencer-id-" <> partyToText sv
           url = "sequencer-" <> partyToText sv <> ".address:1234"
           availableAfter = Some now
@@ -44,6 +45,7 @@ testDomainMigration = do
     let Some(memberInfo) = Map.lookup sv svcRules.members
         Some(domainConfig) = Map.lookup domainId memberInfo.domainNodes
     domainConfig.sequencer === Some SequencerConfig with
+      migrationId = 0
       sequencerId = "sequencer-id-" <> partyToText sv
       url = "sequencer-" <> partyToText sv <> ".address:1234"
       availableAfter = Some now

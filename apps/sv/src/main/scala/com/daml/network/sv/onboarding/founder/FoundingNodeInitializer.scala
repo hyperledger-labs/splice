@@ -191,7 +191,10 @@ class FoundingNodeInitializer(
       // This is for the case that SvcRules is already bootstrapped but setting the domain node config is required,
       // for example if the founding SV node restarted after bootstrapping the SvcRules.
       // We only set the domain sequencer config if the existing one is different here.
-      _ <- withSvcStore.reconcileSequencerConfigIfRequired(Some(localDomainNode))
+      _ <- withSvcStore.reconcileSequencerConfigIfRequired(
+        Some(localDomainNode),
+        config.domainMigrationId,
+      )
     } yield (
       globalDomain,
       svcPartyHosting,
@@ -378,12 +381,14 @@ class FoundingNodeInitializer(
     )
 
     def reconcileSequencerConfigIfRequired(
-        localDomainNode: Option[LocalDomainNode]
+        localDomainNode: Option[LocalDomainNode],
+        migrationId: Long,
     ): Future[Unit] = {
       domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
         localDomainNode,
         domainId,
         DomainNodeState.Onboarded,
+        migrationId,
       )
     }
 
@@ -514,6 +519,7 @@ class FoundingNodeInitializer(
                     config.scan,
                     domainId,
                     clock,
+                    config.domainMigrationId,
                   )
                   _ = logger
                     .info(

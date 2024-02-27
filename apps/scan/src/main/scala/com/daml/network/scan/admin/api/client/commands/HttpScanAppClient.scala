@@ -658,7 +658,13 @@ object HttpScanAppClient {
             domain.sequencers
               .traverse { s =>
                 Codec.decode(Codec.Sequencer)(s.id).map { sequencerId =>
-                  SvcSequencer(sequencerId, s.url, s.svName, s.availableAfter.toInstant)
+                  SvcSequencer(
+                    s.migrationId,
+                    sequencerId,
+                    s.url,
+                    s.svName,
+                    s.availableAfter.toInstant,
+                  )
                 }
               }
               .map { sequencers =>
@@ -672,6 +678,7 @@ object HttpScanAppClient {
   final case class DomainSequencers(domainId: DomainId, sequencers: Seq[SvcSequencer])
 
   final case class SvcSequencer(
+      migrationId: Long,
       id: SequencerId,
       url: String,
       svName: String,

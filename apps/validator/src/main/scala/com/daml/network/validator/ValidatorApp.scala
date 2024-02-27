@@ -884,7 +884,7 @@ object ValidatorApp {
     // sequencer connections will be ignore if they are with a invalid Alias, empty url or not yet available (`before availableAfter`)
     val validConnections = sequencers
       .collect {
-        case SvcSequencer(_, url, svName, availableAfter)
+        case SvcSequencer(_, _, url, svName, availableAfter)
             if url.nonEmpty && !domainTime.toInstant.isBefore(availableAfter) =>
           for {
             sequencerAlias <- SequencerAlias.create(svName)

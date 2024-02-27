@@ -336,7 +336,11 @@ class JoiningNodeInitializer(
         domainNodeState: DomainNodeState,
     ): Future[Unit] = {
       new WithSvcStore(svcStoreWithIngestion)
-        .reconcileDomainNodeConfigIfRequired(localDomainNode, domainNodeState)
+        .reconcileDomainNodeConfigIfRequired(
+          localDomainNode,
+          domainNodeState,
+          config.domainMigrationId,
+        )
     }
 
     /** A private class to share the svcStoreWithIngestion across utility methods. */
@@ -453,11 +457,13 @@ class JoiningNodeInitializer(
       def reconcileDomainNodeConfigIfRequired(
           localDomainNode: Option[LocalDomainNode],
           domainNodeState: DomainNodeState,
+          migrationId: Long,
       ): Future[Unit] = {
         domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
           localDomainNode,
           domainId,
           domainNodeState,
+          migrationId,
         )
       }
     }

@@ -59,6 +59,8 @@ data DomainState
 
 -- | Config for a sequencer.
 data SequencerConfig = SequencerConfig with
+    migrationId : Int
+    -- ^ The domain migration id corresponding to this sequencer.
     sequencerId : Text
     -- ^ The id of the sequencer.
     url : Text

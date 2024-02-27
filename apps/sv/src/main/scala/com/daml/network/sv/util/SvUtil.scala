@@ -85,9 +85,9 @@ object SvUtil {
 
   )
 
-  case class LocalSequencerConfig(sequencerId: String, url: String)
+  case class LocalSequencerConfig(sequencerId: String, url: String, migrationId: Long)
 
-  def getSequencerConfig(localDomainNode: Option[LocalDomainNode])(implicit
+  def getSequencerConfig(localDomainNode: Option[LocalDomainNode], migrationId: Long)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Option[LocalSequencerConfig]] = localDomainNode.map { node =>
@@ -95,6 +95,7 @@ object SvUtil {
       LocalSequencerConfig(
         sequencerId.toProtoPrimitive,
         node.sequencerExternalPublicUrl,
+        migrationId,
       )
     }
   }.sequence
@@ -118,6 +119,7 @@ object SvUtil {
       scanConfig: Option[SvScanConfig],
       domainId: DomainId,
       clock: Clock,
+      migrationId: Long,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -147,9 +149,10 @@ object SvUtil {
           )
         }
         .getOrElse(SvUtil.emptyCometBftConfig)
-      localSequencerConfig <- getSequencerConfig(Some(localDomainNode))
+      localSequencerConfig <- getSequencerConfig(Some(localDomainNode), migrationId)
       sequencerConfig = localSequencerConfig.map(c =>
         new SequencerConfig(
+          migrationId,
           c.sequencerId,
           c.url,
           Some(clock.now.toInstant).toJava,

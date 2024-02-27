@@ -182,6 +182,7 @@ testSvOnboarding = do
         sequencingKeys = []
 
   let sequencerConfig = Some SequencerConfig with
+        migrationId = 0
         sequencerId = "sequencer-id"
         url = "sequencer.address:1234"
         availableAfter = Some now
