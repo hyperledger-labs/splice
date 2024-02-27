@@ -191,6 +191,13 @@ class JoiningNodeInitializer(
           withSvStore
             .startOnboardingWithSvcPartyMigration(initConnection, svcStore)
         }
+      // Register triggers once the SvcRules are visible and have been ingested
+      _ <- retryProvider.waitUntil(
+        RetryFor.WaitingOnInitDependency,
+        show"the SvcRules and CoinRules are visible",
+        svcStore.getSvcRules().map(_ => ()),
+        logger,
+      )
       _ = svcAutomation.registerPostOnboardingTriggers()
       // It is important to wait only here since at this point we may have been added
       // to the decentralized namespace so we depend on our own automation promoting us to

@@ -175,7 +175,6 @@ class FoundingNodeInitializer(
         svcStore,
         Some(localDomainNode),
       )
-      _ = svcAutomation.registerPostOnboardingTriggers()
       _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
       withSvcStore = new WithSvcStore(svcAutomation, globalDomain)
       _ <- retryProvider.ensureThatB(
@@ -186,6 +185,8 @@ class FoundingNodeInitializer(
         },
         logger,
       )
+      // Only start the triggers once SvcRules and CoinRules have been bootstrapped
+      _ = svcAutomation.registerPostOnboardingTriggers()
       // The previous foundCollective step will set the domain node config if SvcRules is not yet bootstrapped.
       // This is for the case that SvcRules is already bootstrapped but setting the domain node config is required,
       // for example if the founding SV node restarted after bootstrapping the SvcRules.

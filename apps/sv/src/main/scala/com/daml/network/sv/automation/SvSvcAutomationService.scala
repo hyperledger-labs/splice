@@ -71,34 +71,6 @@ class SvSvcAutomationService(
 
   override def companion = SvSvcAutomationService
 
-  config.acsStoreDump.foreach(backupConfig =>
-    registerTrigger(
-      new PeriodicAcsStoreBackupTrigger(
-        backupConfig,
-        triggerContext,
-        svcStore,
-      )
-    )
-  )
-
-  registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
-  registerTrigger(
-    new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, config, connection)
-  )
-  if (config.automation.enableSvRewards) {
-    if (config.automation.useNewSvRewardIssuance) {
-      registerTrigger(new ReceiveSvRewardCouponTrigger(triggerContext, svcStore, connection))
-    } else {
-      registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
-    }
-  }
-  if (config.automation.enableClosedRoundArchival)
-    registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))
-
-  if (config.automation.enableLeaderReplacementTrigger) {
-    registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
-  }
-
   private[network] val restartLeaderBasedAutomationTrigger =
     new RestartLeaderBasedAutomationTrigger(
       triggerContext,
@@ -109,76 +81,104 @@ class SvSvcAutomationService(
       retryProvider,
     )
 
-  registerTrigger(restartLeaderBasedAutomationTrigger)
-
-  registerTrigger(new SvcRulesTransferTrigger(triggerContext, svcStore, connection))
-  registerTrigger(new AssignTrigger(triggerContext, svcStore, connection, store.key.svcParty))
-
-  registerTrigger(
-    new TransferFollowTrigger(
-      triggerContext,
-      svcStore,
-      connection,
-      store.key.svcParty,
-      implicit tc =>
-        svcStore.listSvcRulesTransferFollowers(participantAdminConnection).flatMap {
-          svcRulesFollowers =>
-            // don't try to schedule CoinRules' followers if CoinRules might move
-            // (i.e. be one of svcRulesFollowers)
-            if (svcRulesFollowers.nonEmpty) Future successful svcRulesFollowers
-            else svcStore.listCoinRulesTransferFollowers(participantAdminConnection)
-        },
-    )
-  )
-
-  registerTrigger(
-    new TransferFollowTrigger(
-      triggerContext,
-      svStore,
-      connection,
-      store.key.svParty,
-      implicit tc =>
-        svcStore
-          .lookupSvcRules()
-          .flatMap(
-            _.map(svStore.listSvcRulesTransferFollowers(_, participantAdminConnection))
-              .getOrElse(Future successful Seq.empty)
-          ),
-    )
-  )
-  registerTrigger(
-    new CnsSubscriptionInitialPaymentTrigger(triggerContext, svcStore, connection)
-  )
-  registerTrigger(
-    new SvPackageVettingTrigger(
-      participantAdminConnection,
-      svcStore,
-      config.prevetDuration,
-      triggerContext,
-    )
-  )
-
-  // SV status report triggers
-  registerTrigger(
-    new SubmitSvStatusReportTrigger(
-      config,
-      triggerContext,
-      svcStore,
-      connection,
-      cometBft,
-      localDomainNode.map(_.mediatorAdminConnection),
-      participantAdminConnection,
-    )
-  )
-  registerTrigger(
-    new SvStatusReportMetricsExportTrigger(
-      triggerContext,
-      svcStore,
-    )
-  )
-
-  // requires namespace permissions to run these triggers, can only be run after onboarding
+  // Triggers that require namespace permissions and the existence of the SvcRules and CoinRules contracts
   def registerPostOnboardingTriggers(): Unit = {
+    config.acsStoreDump.foreach(backupConfig =>
+      registerTrigger(
+        new PeriodicAcsStoreBackupTrigger(
+          backupConfig,
+          triggerContext,
+          svcStore,
+        )
+      )
+    )
+
+    registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
+    registerTrigger(
+      new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, config, connection)
+    )
+    if (config.automation.enableSvRewards) {
+      if (config.automation.useNewSvRewardIssuance) {
+        registerTrigger(new ReceiveSvRewardCouponTrigger(triggerContext, svcStore, connection))
+      } else {
+        registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
+      }
+    }
+    if (config.automation.enableClosedRoundArchival)
+      registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))
+
+    if (config.automation.enableLeaderReplacementTrigger) {
+      registerTrigger(new ElectionRequestTrigger(triggerContext, svcStore, connection))
+    }
+
+    registerTrigger(restartLeaderBasedAutomationTrigger)
+
+    registerTrigger(new SvcRulesTransferTrigger(triggerContext, svcStore, connection))
+    registerTrigger(new AssignTrigger(triggerContext, svcStore, connection, store.key.svcParty))
+
+    registerTrigger(
+      new TransferFollowTrigger(
+        triggerContext,
+        svcStore,
+        connection,
+        store.key.svcParty,
+        implicit tc =>
+          svcStore.listSvcRulesTransferFollowers(participantAdminConnection).flatMap {
+            svcRulesFollowers =>
+              // don't try to schedule CoinRules' followers if CoinRules might move
+              // (i.e. be one of svcRulesFollowers)
+              if (svcRulesFollowers.nonEmpty) Future successful svcRulesFollowers
+              else svcStore.listCoinRulesTransferFollowers(participantAdminConnection)
+          },
+      )
+    )
+
+    registerTrigger(
+      new TransferFollowTrigger(
+        triggerContext,
+        svStore,
+        connection,
+        store.key.svParty,
+        implicit tc =>
+          svcStore
+            .lookupSvcRules()
+            .flatMap(
+              _.map(svStore.listSvcRulesTransferFollowers(_, participantAdminConnection))
+                .getOrElse(Future successful Seq.empty)
+            ),
+      )
+    )
+    registerTrigger(
+      new CnsSubscriptionInitialPaymentTrigger(triggerContext, svcStore, connection)
+    )
+    registerTrigger(
+      new SvPackageVettingTrigger(
+        participantAdminConnection,
+        svcStore,
+        config.prevetDuration,
+        triggerContext,
+      )
+    )
+
+    // SV status report triggers
+    registerTrigger(
+      new SubmitSvStatusReportTrigger(
+        config,
+        triggerContext,
+        svcStore,
+        connection,
+        cometBft,
+        localDomainNode.map(_.mediatorAdminConnection),
+        participantAdminConnection,
+      )
+    )
+    registerTrigger(
+      new SvStatusReportMetricsExportTrigger(
+        triggerContext,
+        svcStore,
+      )
+    )
+
     // required for triggers that must run in sim time as well
     val wallClockTriggerContext = triggerContext
       .focus(_.clock)

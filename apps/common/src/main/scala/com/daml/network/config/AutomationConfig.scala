@@ -15,6 +15,9 @@ case class AutomationConfig(
     /** Interval at which time-based automation triggers
       */
     pollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
+    /** Maximal number of retries that the time-based triggers retry transient failures w/o raising a warning.
+      */
+    maxNumSilentPollingRetries: Int = 3,
     /** Only intended for testing. Disables the polling trigger that periodically collects rewards
       * and merges coins.
       */

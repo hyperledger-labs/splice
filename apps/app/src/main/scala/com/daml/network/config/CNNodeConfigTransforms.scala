@@ -122,7 +122,12 @@ object CNNodeConfigTransforms {
     transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
-  def reducePollingInterval = setPollingInterval(NonNegativeFiniteDuration.ofSeconds(1))
+  def reducePollingInterval: CNNodeConfigTransform = { config =>
+    def setPollingIntervalInternal(config: AutomationConfig): AutomationConfig =
+      config.focus(_.pollingInterval).replace(NonNegativeFiniteDuration.ofSeconds(1))
+
+    updateAllAutomationConfigs(setPollingIntervalInternal)(config)
+  }
 
   def updateAutomationConfig(
       app: ConfigurableApp
@@ -145,15 +150,6 @@ object CNNodeConfigTransforms {
         updateAllSplitwellAppConfigs_(c => c.focus(_.automation).modify(transform)),
       )
       transforms.foldLeft(config)((c, tf) => tf(c))
-  }
-
-  def setPollingInterval(newInterval: NonNegativeFiniteDuration): CNNodeConfigTransform = {
-    config =>
-      def setPollingIntervalInternal(config: AutomationConfig): AutomationConfig = {
-        config.focus(_.pollingInterval).replace(newInterval)
-      }
-
-      updateAllAutomationConfigs(setPollingIntervalInternal)(config)
   }
 
   /** Ensure that the set of Daml user names used in a given instance of a configuration

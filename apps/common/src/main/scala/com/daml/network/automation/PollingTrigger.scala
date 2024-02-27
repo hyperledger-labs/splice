@@ -3,13 +3,16 @@ package com.daml.network.automation
 import org.apache.pekko.Done
 import com.daml.network.environment.RetryProvider
 import com.daml.metrics.api.MetricsContext
+import com.daml.network.automation.PollingTrigger.PollingTriggerState
+import com.daml.network.config.AutomationConfig
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.util.retry.RetryUtil.ErrorKind
+import com.digitalasset.canton.util.retry.RetryUtil
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise, blocking}
@@ -102,61 +105,81 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
       {
 
         // Construct a future that loops until the Trigger is closing.
-        def pollingLoop(previousResult: Future[Boolean]): Future[Done] = LoggerUtil.logOnThrow {
+        def pollingLoop(state: PollingTriggerState, previousResult: Future[Boolean]): Future[Done] =
+          LoggerUtil.logOnThrow {
 
-          def exitPollingLoop(): Future[Done] =
-            Future.successful(Done)
+            def exitPollingLoop(): Future[Done] =
+              Future.successful(Done)
 
-          def loopWithDelay(): Future[Done] = LoggerUtil.logOnThrow {
-            val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
-              context.pollingClock
-                .scheduleAfter(
-                  _ => {
-                    // No work done here, as we are only interested in the scheduling notification
-                    ()
-                  },
-                  context.config.pollingInterval.asJava,
-                )
-            )
-            // Continue looping
-            continueOrShutdownSignal.unwrap.flatMap {
-              case UnlessShutdown.AbortedDueToShutdown =>
-                exitPollingLoop()
-              case UnlessShutdown.Outcome(()) =>
-                pollingLoop(Future.successful(true))
-            }
-          }
-
-          // Here we tie the knot and ensure that once the previous iteration completes, we kick off another iteration.
-          previousResult.transformWith {
-            case Failure(ex) =>
-              // We only call this to get logging
-              retryable.retryOK(Failure(ex), logger, None).discard[ErrorKind]
-              loopWithDelay()
-
-            case Success(workDone) =>
-              if (context.retryProvider.isClosing) {
-                exitPollingLoop()
-              } else if (workDone) {
-                // If productive work was done in the previous iteration, then we loop without a delay.
-                pollingLoop(performWorkIfNotPaused())
-              } else {
-                logger.trace(
-                  show"No work performed. Sleeping for ${context.config.pollingInterval}"
-                )
-                loopWithDelay()
+            def loopWithDelay(newState: PollingTriggerState): Future[Done] = LoggerUtil.logOnThrow {
+              val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
+                context.pollingClock
+                  .scheduleAfter(
+                    _ => {
+                      // No work done here, as we are only interested in the scheduling notification
+                      ()
+                    },
+                    context.config.pollingInterval.asJava,
+                  )
+              )
+              // Continue looping
+              continueOrShutdownSignal.unwrap.flatMap {
+                case UnlessShutdown.AbortedDueToShutdown =>
+                  exitPollingLoop()
+                case UnlessShutdown.Outcome(()) =>
+                  pollingLoop(newState, Future.successful(true))
               }
-          }
-        }(loggingContext)
+            }
 
+            // Here we tie the knot and ensure that once the previous iteration completes, we kick off another iteration.
+            previousResult.transformWith {
+              case Failure(ex) =>
+                // Call this to get the default logging
+                val errorKind = retryable.retryOK(Failure(ex), logger, None)
+                // Determine if we need to log a warning due to repeated transient errors
+                val isTransientFailure = errorKind match {
+                  case RetryUtil.NoErrorKind => false
+                  case RetryUtil.TransientErrorKind => true
+                  case RetryUtil.FatalErrorKind => false
+                  case RetryUtil.SpuriousTransientErrorKind => true
+                }
+                val numConsecutiveTransientFailures =
+                  if (isTransientFailure) state.numConsecutiveTransientFailures + 1 else 0
+                val newState =
+                  if (numConsecutiveTransientFailures > context.config.maxNumSilentPollingRetries) {
+                    logger.warn(
+                      s"Encountered $numConsecutiveTransientFailures consecutive transient failures (polling interval ${context.config.pollingInterval}).\nThe last one was:",
+                      ex,
+                    )
+                    PollingTrigger.initialPollingTriggerState
+                  } else {
+                    PollingTriggerState(numConsecutiveTransientFailures)
+                  }
+                loopWithDelay(newState)
+
+              case Success(workDone) =>
+                if (context.retryProvider.isClosing) {
+                  exitPollingLoop()
+                } else if (workDone) {
+                  // If productive work was done in the previous iteration, then we loop without a delay.
+                  pollingLoop(PollingTrigger.initialPollingTriggerState, performWorkIfNotPaused())
+                } else {
+                  logger.trace(
+                    show"No work performed. Sleeping for ${context.config.pollingInterval}"
+                  )
+                  loopWithDelay(PollingTrigger.initialPollingTriggerState)
+                }
+            }
+          }(loggingContext)
         logger.debug(
-          show"Starting trigger polling loop (polling interval: ${context.config.pollingInterval})"
+          show"Starting trigger polling loop, ${PollingTrigger.ConfigSummary(context.config)}"
         )
 
         // kick-off the first iteration, and store the handle to its final outcome
-        val loopF = pollingLoop(Future.successful(true)).transform(
-          context.retryProvider.logTerminationAndRecoverOnShutdown("trigger polling loop", logger)
-        )
+        val loopF =
+          pollingLoop(PollingTrigger.initialPollingTriggerState, Future.successful(true)).transform(
+            context.retryProvider.logTerminationAndRecoverOnShutdown("trigger polling loop", logger)
+          )
         pollingLoopRef.set(Some(loopF))
       }
     }
@@ -206,5 +229,21 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
       }
     }
     performWorkIfAvailable()
+
+  }
+}
+
+object PollingTrigger {
+
+  private val initialPollingTriggerState = PollingTriggerState(0)
+  private case class PollingTriggerState(numConsecutiveTransientFailures: Int)
+
+  private case class ConfigSummary(config: AutomationConfig) extends PrettyPrinting {
+    override def pretty: Pretty[this.type] = {
+      prettyOfClass(
+        param("pollingInterval", _.config.pollingInterval),
+        param("maxNumSilentPollingRetries", _.config.maxNumSilentPollingRetries),
+      )
+    }
   }
 }
