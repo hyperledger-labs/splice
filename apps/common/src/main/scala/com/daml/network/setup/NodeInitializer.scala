@@ -1,6 +1,6 @@
 package com.daml.network.setup
 
-import cats.implicits.toFoldableOps
+import cats.implicits.{showInterpolator, toFoldableOps}
 import com.daml.network.environment.{RetryFor, RetryProvider, TopologyAdminConnection}
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.nonempty.NonEmpty
@@ -22,12 +22,12 @@ class NodeInitializer(
       targetId: Option[NodeIdentity] = None,
       domainId: Option[DomainId] = None,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
-    logger.info(s"Initializing node from dump: $dump")
+    logger.info(show"Initializing node from dump: $dump")
     val expectedId = targetId.getOrElse(dump.id)
     for {
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
-        s"node is initialized with id ${expectedId}",
+        s"node is initialized with id $expectedId",
         connection.isNodeInitialized(),
         initializeFromDump(dump, Some(expectedId), domainId),
         logger,
@@ -39,7 +39,7 @@ class NodeInitializer(
         } else {
           Future.failed(
             Status.INTERNAL
-              .withDescription(s"Node has ID $id instead of expected ID ${expectedId}.")
+              .withDescription(s"Node has ID $id instead of expected ID $expectedId.")
               .asRuntimeException()
           )
         }
@@ -96,7 +96,7 @@ class NodeInitializer(
       dump: NodeIdentitiesDump,
       expectedId: NodeIdentity,
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Unit] = {
-    logger.info(s"Uploading node keys from dump for id ${dump.id}, new node id: ${expectedId}")
+    logger.info(s"Uploading node keys from dump for id ${dump.id}, new node id: $expectedId")
     // this is idempotent
     dump.keys.traverse_(key => connection.importKeyPair(key.keyPair.toArray, key.name))
   }

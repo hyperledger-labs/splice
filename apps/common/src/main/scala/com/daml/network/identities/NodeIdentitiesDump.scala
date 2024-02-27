@@ -1,14 +1,15 @@
 package com.daml.network.identities
 
 import better.files.File
+import cats.syntax.either.*
 import com.daml.network.http.v0.definitions as http
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.NodeIdentity
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.google.protobuf.ByteString
 import io.circe.Json
 import io.circe.syntax.*
-import cats.syntax.either.*
 
 import java.nio.file.Path
 import java.util.Base64
@@ -19,7 +20,7 @@ final case class NodeIdentitiesDump(
     keys: Seq[NodeIdentitiesDump.NodeKey],
     bootstrapTxs: Seq[GenericSignedTopologyTransactionX],
     version: Option[String],
-) {
+) extends PrettyPrinting {
   def toHttp: http.NodeIdentitiesDump = {
     http.NodeIdentitiesDump(
       id.toProtoPrimitive,
@@ -33,6 +34,17 @@ final case class NodeIdentitiesDump(
   def toJson: Json = {
     toHttp.asJson
   }
+
+  import Pretty.*
+
+  override def pretty: Pretty[NodeIdentitiesDump.this.type] =
+    prettyNode(
+      "NodeIdentitiesDump",
+      param("id", _.id),
+      param("numberOfKeys", _.keys.size),
+      param("bootstrapTxs", _.bootstrapTxs),
+      param("version", _.version.map(_.singleQuoted)),
+    )
 }
 object NodeIdentitiesDump {
   def fromHttp(
