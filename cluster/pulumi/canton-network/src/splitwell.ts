@@ -20,6 +20,7 @@ import { installValidatorApp } from './validator';
 export async function installSplitwell(
   auth0Client: Auth0Client,
   providerWalletUser: string,
+  validatorWalletUser: string,
   onboardingSecret: string,
   splitPostgresInstances: boolean,
   globalDomainMigrationConfig: GlobalDomainMigrationConfig,
@@ -133,6 +134,7 @@ export async function installSplitwell(
       auth0Client: auth0Client,
       auth0AppName: 'splitwell_validator',
     },
+    validatorWalletUser,
   });
 
   installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);

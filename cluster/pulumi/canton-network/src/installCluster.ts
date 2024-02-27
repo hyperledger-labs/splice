@@ -181,6 +181,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     await installSplitwell(
       auth0Client,
       'auth0|63e12e0415ad881ffe914e61',
+      'auth0|65de04b385816c4a38cc044f',
       splitwellOnboarding.secret,
       splitPostgresInstances,
       globalDomainUpgradeConfig,

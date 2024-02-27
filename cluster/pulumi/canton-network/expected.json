@@ -1475,7 +1475,8 @@
           "minTopupInterval": "1m",
           "targetThroughput": 33330
         },
-        "useSequencerConnectionsFromScan": true
+        "useSequencerConnectionsFromScan": true,
+        "validatorWalletUser": "auth0|65de04b385816c4a38cc044f"
       }
     },
     "name": "splitwell-validator-splitwell",
