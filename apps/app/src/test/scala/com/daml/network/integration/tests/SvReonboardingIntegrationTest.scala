@@ -273,7 +273,7 @@ class SvReonboardingIntegrationTest
       )(
         "SV4_PARTICIPANT_AUTO_INIT" -> "false"
       ) {
-        eventually() {
+        eventuallySucceeds() {
           sv4ReonboardBackend.participantClientWithAdminToken.health.status shouldBe NodeStatus
             .NotInitialized(
               true
