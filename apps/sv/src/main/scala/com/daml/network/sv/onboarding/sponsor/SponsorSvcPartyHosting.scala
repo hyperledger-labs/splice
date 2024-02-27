@@ -1,27 +1,20 @@
 package com.daml.network.sv.onboarding.sponsor
 
 import cats.data.{EitherT, OptionT}
-import cats.syntax.either.*
-import com.daml.network.config.CNThresholds
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
 import com.daml.network.environment.TopologyAdminConnection.{AuthorizedStateChanged, TopologyResult}
-import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, TopologyAdminConnection}
+import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.SvcPartyHosting.{
   RequiredProposalNotFound,
   SvcPartyMigrationFailure,
 }
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.transaction.{
-  HostingParticipant,
-  ParticipantPermission,
-  PartyToParticipantX,
-}
+import com.digitalasset.canton.topology.transaction.PartyToParticipantX
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -69,52 +62,17 @@ class SponsorSvcPartyHosting(
       traceContext: TraceContext
   ): EitherT[Future, SvcPartyMigrationFailure, TopologyResult[PartyToParticipantX]] = {
     validateProposalForNewMember(domainId, newParticipant).flatMap {
-      validProposalOrValidAuthorizedState =>
+      case SponsorSvcPartyHosting.ValidAcceptedState(accepted) =>
+        EitherT.right(Future.successful(accepted))
+      case SponsorSvcPartyHosting.ValidProposal(proposal) =>
         EitherT(
           participantAdminConnection
-            .ensureTopologyMapping[PartyToParticipantX](
-              TopologyStoreId.DomainStore(domainId),
-              show"Party $party is authorized on $newParticipant",
-              EitherT(
-                participantAdminConnection
-                  .getPartyToParticipant(domainId, party)
-                  .map(result =>
-                    Either
-                      .cond(
-                        result.mapping.participants
-                          .exists(hosting => hosting.participantId == newParticipant),
-                        result,
-                        result,
-                      )
-                      // ensure that the state hasn't changed compared to the accepted state
-                      .leftMap { latestAcceptedState =>
-                        if (
-                          latestAcceptedState.base.serial >= validProposalOrValidAuthorizedState.base.serial
-                        )
-                          throw AuthorizedStateChanged(latestAcceptedState.base.serial)
-                        latestAcceptedState
-                      }
-                  )
-              ),
-              previous => {
-                val newHostingParticipants = previous.participants.appended(
-                  HostingParticipant(
-                    newParticipant,
-                    ParticipantPermission.Observation,
-                  )
-                )
-                Right(
-                  previous.copy(
-                    participants = newHostingParticipants,
-                    threshold = CNThresholds
-                      .partyToParticipantThreshold(newHostingParticipants),
-                  )
-                )
-              },
-              RetryFor.ClientCalls,
+            .ensurePartyToParticipantAdditionProposalWithSerial(
+              domainId,
+              party,
+              newParticipant,
+              PositiveInt.tryCreate(proposal.base.serial.value - 1),
               signedBy,
-              isProposal = true,
-              recreateOnAuthorizedStateChange = false,
             )
             .map(Right(_))
             .recover { case AuthorizedStateChanged(serial) =>
@@ -133,7 +91,7 @@ class SponsorSvcPartyHosting(
   )(implicit tc: TraceContext): EitherT[
     Future,
     SvcPartyMigrationFailure,
-    TopologyAdminConnection.TopologyResult[PartyToParticipantX],
+    SponsorSvcPartyHosting.ValidProposalOrAcceptedState,
   ] = {
     val partyToParticipantAcceptedState =
       participantAdminConnection.getPartyToParticipant(domainId, svcParty)
@@ -147,18 +105,27 @@ class SponsorSvcPartyHosting(
         .flatMap { proposals =>
           partyToParticipantAcceptedState
             .map { _ =>
-              proposals.find(proposal =>
-                proposal.mapping.participantIds
-                  .contains(participantId)
-              )
+              proposals
+                .find(proposal =>
+                  proposal.mapping.participantIds
+                    .contains(participantId)
+                )
+                .map[SponsorSvcPartyHosting.ValidProposalOrAcceptedState](
+                  SponsorSvcPartyHosting.ValidProposal(_)
+                )
             }
         }
     )
-      .orElse(OptionT.liftF(partyToParticipantAcceptedState).filter { partyToParticipant =>
-        partyToParticipant.mapping.participantIds.contains(
-          participantId
-        )
-      })
+      .orElse(
+        OptionT
+          .liftF(partyToParticipantAcceptedState)
+          .filter { partyToParticipant =>
+            partyToParticipant.mapping.participantIds.contains(
+              participantId
+            )
+          }
+          .map(SponsorSvcPartyHosting.ValidAcceptedState(_))
+      )
       .toRightF {
         partyToParticipantAcceptedState.map { partyToParticipant =>
           logger.debug(s"Required proposal not found, found accepted state: $partyToParticipant")
@@ -169,4 +136,12 @@ class SponsorSvcPartyHosting(
       }
   }
 
+}
+
+object SponsorSvcPartyHosting {
+  sealed abstract class ValidProposalOrAcceptedState extends Product with Serializable
+  final case class ValidProposal(proposal: TopologyResult[PartyToParticipantX])
+      extends ValidProposalOrAcceptedState
+  final case class ValidAcceptedState(accepted: TopologyResult[PartyToParticipantX])
+      extends ValidProposalOrAcceptedState
 }

@@ -77,6 +77,7 @@ abstract class TopologyAdminConnection(
     )
     with RetryProvider.Has {
   import TopologyAdminConnection.TopologyResult
+  import TopologyAdminConnection.RecreateOnAuthorizedStateChange
 
   override val serviceName = "Canton Participant Admin API"
 
@@ -528,21 +529,30 @@ abstract class TopologyAdminConnection(
       retryFor: RetryFor,
       signedBy: Fingerprint,
       isProposal: Boolean = false,
-      recreateOnAuthorizedStateChange: Boolean = true,
+      recreateOnAuthorizedStateChange: RecreateOnAuthorizedStateChange =
+        RecreateOnAuthorizedStateChange.Recreate,
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] =
     retryProvider.retry(
       retryFor,
       description,
       check.foldF(
         { case TopologyResult(beforeEstablishedBaseResult, mapping) =>
-          val updatedMapping = update(mapping)
-          proposeMapping(
-            store,
-            updatedMapping,
-            signedBy,
-            serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
-            isProposal = isProposal,
-          )
+          (recreateOnAuthorizedStateChange match {
+            case RecreateOnAuthorizedStateChange.Abort(expectedSerial)
+                if expectedSerial != beforeEstablishedBaseResult.serial =>
+              Future.failed(AuthorizedStateChanged(beforeEstablishedBaseResult.serial))
+            case _ => Future.unit
+          })
+            .flatMap { _ =>
+              val updatedMapping = update(mapping)
+              proposeMapping(
+                store,
+                updatedMapping,
+                signedBy,
+                serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
+                isProposal = isProposal,
+              )
+            }
             .flatMap { _ =>
               retryProvider.retry(
                 retryFor,
@@ -569,7 +579,7 @@ abstract class TopologyAdminConnection(
               )
             }
             .recover {
-              case ex: AuthorizedStateChanged if recreateOnAuthorizedStateChange =>
+              case ex: AuthorizedStateChanged if recreateOnAuthorizedStateChange.shouldRecreate =>
                 logger.info(
                   s"check $description failed and the base state has changed, re-establishing condition"
                 )
@@ -661,6 +671,50 @@ abstract class TopologyAdminConnection(
       party,
       addParticipant,
       signedBy,
+    )
+  }
+
+  def ensurePartyToParticipantAdditionProposalWithSerial(
+      domainId: DomainId,
+      party: PartyId,
+      newParticipant: ParticipantId,
+      expectedSerial: PositiveInt,
+      signedBy: Fingerprint,
+  )(implicit traceContext: TraceContext): Future[TopologyResult[PartyToParticipantX]] = {
+    ensureTopologyMapping[PartyToParticipantX](
+      TopologyStoreId.DomainStore(domainId),
+      show"Party $party is authorized on $newParticipant",
+      EitherT(
+        getPartyToParticipant(domainId, party)
+          .map(result =>
+            Either
+              .cond(
+                result.mapping.participants
+                  .exists(hosting => hosting.participantId == newParticipant),
+                result,
+                result,
+              )
+          )
+      ),
+      previous => {
+        val newHostingParticipants = previous.participants.appended(
+          HostingParticipant(
+            newParticipant,
+            ParticipantPermission.Observation,
+          )
+        )
+        Right(
+          previous.copy(
+            participants = newHostingParticipants,
+            threshold = CNThresholds
+              .partyToParticipantThreshold(newHostingParticipants),
+          )
+        )
+      },
+      RetryFor.ClientCalls,
+      signedBy,
+      isProposal = true,
+      recreateOnAuthorizedStateChange = RecreateOnAuthorizedStateChange.Abort(expectedSerial),
     )
   }
 
@@ -1363,6 +1417,19 @@ object TopologyAdminConnection {
       override def signingKey: Option[String] = None
     }
 
+  }
+
+  sealed abstract class RecreateOnAuthorizedStateChange {
+    def shouldRecreate: Boolean
+  }
+
+  object RecreateOnAuthorizedStateChange {
+    final case object Recreate extends RecreateOnAuthorizedStateChange {
+      override def shouldRecreate = true
+    }
+    final case class Abort(expectedSerial: PositiveInt) extends RecreateOnAuthorizedStateChange {
+      override def shouldRecreate = false
+    }
   }
 
   final case class AuthorizedStateChanged(baseSerial: PositiveInt)
