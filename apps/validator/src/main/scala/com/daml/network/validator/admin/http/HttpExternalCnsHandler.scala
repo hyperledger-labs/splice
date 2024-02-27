@@ -79,7 +79,7 @@ class HttpExternalCnsHandler(
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.listCnsEntries") { implicit traceContext => _ =>
       for {
-        entriesWithPayData <- getUserStore(user).flatMap(_.listCnsEntries())
+        entriesWithPayData <- getUserStore(user).flatMap(_.listCnsEntries(walletManager.clock.now))
         res <- Future.successful {
           r0.ListCnsEntriesResponse.OK(
             d0.ListCnsEntriesResponse(entries =

@@ -40,7 +40,8 @@ object HardLimit {
 }
 
 /** Limit for when the result can be arbitrarily large (up to Limit.MaxPageSize).
-  * To be used with pagination.
+  * To be used with pagination.  A limit of ''n'' implies that if there are
+  * ''k > n'' result elements, ''z'' elements where ''0≤z≤n'' may be returned.
   */
 case class PageLimit private (limit: Int) extends Limit
 object PageLimit {

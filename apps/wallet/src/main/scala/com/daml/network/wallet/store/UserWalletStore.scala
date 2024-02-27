@@ -155,7 +155,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
         .take(limit.limit)
     }
 
-  final def listSubscriptions(limit: Limit = Limit.DefaultLimit)(implicit
+  final def listSubscriptions(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Seq[Subscription]] = {
@@ -166,10 +166,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
         subsCodegen.Subscription.COMPANION,
         limit,
       )
-      subscriptionIdleStates <- multiDomainAcsStore.listContracts(
-        subsCodegen.SubscriptionIdleState.COMPANION,
-        limit,
-      )
+      subscriptionIdleStates <- listSubscriptionIdleStates(now, limit)
       subscriptionPayments <- multiDomainAcsStore.listContracts(
         subsCodegen.SubscriptionPayment.COMPANION,
         limit,
@@ -192,6 +189,20 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       } yield Subscription(main.contract, state)
     }
   }
+
+  /** Exclude any idle states that expired strictly before `unlessExpiredAsOf`.
+    * This is '''not the same''' as a historical query, as it may also exclude
+    * states that expired ''after'' that value.  The intent is to match the
+    * expiry behavior of `SvSvcStore#listExpiredCnsSubscriptions`, not to
+    * provide a grace period for subscription payments.
+    */
+  protected[this] def listSubscriptionIdleStates(
+      unlessExpiredAsOf: CantonTimestamp,
+      limit: Limit,
+  )(implicit tc: TraceContext): Future[Seq[ContractWithState[
+    subsCodegen.SubscriptionIdleState.ContractId,
+    subsCodegen.SubscriptionIdleState,
+  ]]]
 
   final def getSubscriptionRequest(
       cid: subsCodegen.SubscriptionRequest.ContractId
@@ -316,7 +327,9 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       limit: PageLimit,
   )(implicit lc: TraceContext): Future[Seq[TxLogEntry.TransactionHistoryTxLogEntry]]
 
-  def listCnsEntries(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
+  def listCnsEntries(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
+      tc: TraceContext
+  ): Future[
     Seq[UserWalletStore.CnsEntryWithPayData]
   ] = {
     import UserWalletStore.{
@@ -336,7 +349,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
         cnsCodegen.CnsEntryContext.COMPANION,
         limit,
       )
-      subscriptions <- listSubscriptions(limit)
+      subscriptions <- listSubscriptions(now, limit)
     } yield {
       val entriesWithSubs = entries.foldLeft(Seq.empty[EntryWithSubscriptionContext]) {
         (acc, entry) =>
@@ -667,7 +680,12 @@ object UserWalletStore {
         mkFilter(subsCodegen.SubscriptionIdleState.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
-        )(UserWalletAcsStoreRowData(_)),
+        )(contract =>
+          UserWalletAcsStoreRowData(
+            contract,
+            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.nextPaymentDueAt)),
+          )
+        ),
         mkFilter(subsCodegen.SubscriptionInitialPayment.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser

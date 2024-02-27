@@ -543,7 +543,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     "listSubscriptions" should {
 
       def resultCids(store: UserWalletStore) = store
-        .listSubscriptions()
+        .listSubscriptions(time(0))
         .futureValue
         .map(r =>
           r.subscription.contractId.contractId -> (r.state match {
@@ -868,7 +868,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store1.multiDomainAcsStore
           )
         } yield {
-          val actual = store1.listCnsEntries().futureValue
+          val actual = store1.listCnsEntries(time(0)).futureValue
           val expected = Seq(
             UserWalletStore.CnsEntryWithPayData(
               contractId = cnsEntry1.contractId,

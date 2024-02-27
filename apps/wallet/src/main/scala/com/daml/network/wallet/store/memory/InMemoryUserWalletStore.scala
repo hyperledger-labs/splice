@@ -1,25 +1,27 @@
 package com.daml.network.wallet.store.memory
 
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.coin.SvRewardCoupon
-import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, validatorlicense as validatorCodegen}
+import coinCodegen.SvRewardCoupon
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.{InMemoryCNNodeAppStore, Limit, LimitHelpers, PageLimit}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ContractWithState}
 import com.daml.network.wallet.store.{
   BuyTrafficRequestTxLogEntry,
   TransferOfferTxLogEntry,
   TxLogEntry,
   UserWalletStore,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.*
+import scala.Ordering.Implicits.*
 import scala.jdk.OptionConverters.*
 
 class InMemoryUserWalletStore(
@@ -229,12 +231,21 @@ class InMemoryUserWalletStore(
       (offset, entryOpt) <- multiDomainAcsStore.collectLatestTxLogEntryWithOffset {
         case btr: BuyTrafficRequestTxLogEntry if btr.trackingId == trackingId => btr
       }
-    } yield entryOpt match {
-      case Some(request: BuyTrafficRequestTxLogEntry) =>
-        QueryResult(offset, Some(request))
-      case None =>
-        QueryResult(offset, None)
-      case _ => throw txLogIsOfWrongType()
-    }
+    } yield QueryResult(offset, entryOpt)
+  }
+
+  protected[this] override def listSubscriptionIdleStates(
+      unlessExpiredAsOf: CantonTimestamp,
+      limit: Limit,
+  )(implicit tc: TraceContext): Future[Seq[ContractWithState[
+    subsCodegen.SubscriptionIdleState.ContractId,
+    subsCodegen.SubscriptionIdleState,
+  ]]] = {
+    val expiry = unlessExpiredAsOf.toInstant
+    multiDomainAcsStore.filterContracts(
+      subsCodegen.SubscriptionIdleState.COMPANION,
+      (_: Contract[?, subsCodegen.SubscriptionIdleState]).payload.nextPaymentDueAt >= expiry,
+      limit,
+    )
   }
 }

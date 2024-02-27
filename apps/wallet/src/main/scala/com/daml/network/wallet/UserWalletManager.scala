@@ -30,7 +30,7 @@ class UserWalletManager(
     val store: WalletStore,
     val validatorUser: String,
     automationConfig: AutomationConfig,
-    clock: Clock,
+    private[network] val clock: Clock,
     treasuryConfig: TreasuryConfig,
     storage: Storage,
     retryProvider: RetryProvider,

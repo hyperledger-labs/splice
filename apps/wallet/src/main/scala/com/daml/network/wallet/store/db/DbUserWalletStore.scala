@@ -5,12 +5,13 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
-import com.daml.network.util.{Contract, QualifiedName, TemplateJsonDecoder}
+import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
 import com.daml.network.wallet.store
 import com.daml.network.wallet.store.{
   BuyTrafficRequestTxLogEntry,
@@ -18,6 +19,7 @@ import com.daml.network.wallet.store.{
   TxLogEntry,
   UserWalletStore,
 }
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
@@ -313,4 +315,33 @@ class DbUserWalletStore(
         entry,
       )
     }
+
+  protected[this] override def listSubscriptionIdleStates(
+      unlessExpiredAsOf: CantonTimestamp,
+      limit: Limit,
+  )(implicit tc: TraceContext): Future[Seq[ContractWithState[
+    subsCodegen.SubscriptionIdleState.ContractId,
+    subsCodegen.SubscriptionIdleState,
+  ]]] = {
+    val opName = "listSubscriptionIdleStates"
+    for {
+      _ <- waitUntilAcsIngested()
+      idleStates <- storage.query(
+        selectFromAcsTableWithState(
+          WalletTables.acsTableName,
+          storeId,
+          domainMigrationId,
+          where = sql"""template_id_qualified_name = ${QualifiedName(
+              subsCodegen.SubscriptionIdleState.TEMPLATE_ID
+            )}
+              and contract_expires_at >= $unlessExpiredAsOf""",
+          orderLimit = sql"""order by event_number
+                             limit ${sqlLimit(limit)}""",
+        ),
+        opName,
+      )
+    } yield applyLimit(opName, limit, idleStates).map(
+      contractWithStateFromRow(subsCodegen.SubscriptionIdleState.COMPANION)(_)
+    )
+  }
 }

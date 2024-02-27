@@ -179,7 +179,7 @@ class HttpWalletHandler(
     withSpan(s"$workflowId.listSubscriptions") { implicit traceContext => _ =>
       for {
         userStore <- getUserStore(user)
-        subscriptions <- userStore.listSubscriptions()
+        subscriptions <- userStore.listSubscriptions(walletManager.clock.now)
       } yield {
         v0.WalletResource.ListSubscriptionsResponseOK(
           d0.ListSubscriptionsResponse(
