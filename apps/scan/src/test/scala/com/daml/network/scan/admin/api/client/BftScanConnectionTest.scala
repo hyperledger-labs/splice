@@ -206,14 +206,16 @@ class BftScanConnectionTest
       }
     }
 
-    "fail if some Scans failed to connect" in {
-      // f = (2ok + 2bad - 1) / 3 = 1
-      val connections = getMockedConnections(n = 2)
+    "fail if too many Scans failed to connect" in {
+      // f = (1ok + 3bad - 1) / 3 = 1
+      // 1 Scan is not enough for f+1=2
+      val connections = getMockedConnections(n = 1)
       val bft = getBft(
         connections,
         initialFailedConnections = Map(
           Uri("https://failure1.example.com") -> new RuntimeException("Failed"),
           Uri("https://failure2.example.com") -> new RuntimeException("Failed"),
+          Uri("https://failure3.example.com") -> new RuntimeException("Failed"),
         ),
       )
 
@@ -223,23 +225,25 @@ class BftScanConnectionTest
         } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
           code should be(StatusCodes.BadGateway)
           message should include(
-            s"Could not connect to 2/4 Scans, which is above the threshold f=1."
+            s"Only 1 scan instances are reachable (out of 4 configured ones), which are fewer than the necessary 2 to achieve BFT guarantees."
           )
         },
         _.warningMessage should include(
-          s"Could not connect to 2/4 Scans, which is above the threshold f=1."
+          s"Only 1 scan instances are reachable (out of 4 configured ones), which are fewer than the necessary 2 to achieve BFT guarantees."
         ),
       )
     }
 
     "work with partial failures" in {
-      // f = (3ok + 1bad - 1) / 3 = 1
+      // f = (2ok + 2bad - 1) / 3 = 1
+      // 2 Scans is JUST enough for f+1=2
       val connections = getMockedConnections(n = 3)
       connections.foreach(makeMockReturn(_, partyIdA))
       val bft = getBft(
         connections,
         initialFailedConnections = Map(
-          Uri("https://failure1.example.com") -> new RuntimeException("Failed")
+          Uri("https://failure1.example.com") -> new RuntimeException("Failed"),
+          Uri("https://failure2.example.com") -> new RuntimeException("Failed"),
         ),
       )
 

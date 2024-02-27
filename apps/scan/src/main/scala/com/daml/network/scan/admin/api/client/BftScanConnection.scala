@@ -241,12 +241,13 @@ class BftScanConnection(
   private def bftCall[T](
       call: SingleScanConnection => Future[T]
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
-    val connections @ ScanConnections(open, failed) = scanList.scanConnections
+    val connections @ ScanConnections(open, _) = scanList.scanConnections
     val totalNumber = connections.totalNumber
     val f = connections.f
-    if (failed > f) {
+    val nTargetSuccess = f + 1
+    if (open.size < nTargetSuccess) {
       val msg =
-        s"Could not connect to $failed/$totalNumber Scans, which is above the threshold f=$f."
+        s"Only ${open.size} scan instances are reachable (out of $totalNumber configured ones), which are fewer than the necessary ${f + 1} to achieve BFT guarantees."
       val exception = HttpErrorWithHttpCode(
         StatusCodes.BadGateway,
         msg,
@@ -254,7 +255,6 @@ class BftScanConnection(
       logger.warn(msg, exception)
       Future.failed(exception)
     } else {
-      val nTargetSuccess = f + 1
       val nRequestsToDo = 2 * f + 1
       val requestFrom = Random.shuffle(open).take(nRequestsToDo)
       executeCall(call, requestFrom, nTargetSuccess)
