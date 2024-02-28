@@ -41,8 +41,8 @@ class LocalRunbookIntegrationTest
   System.setProperty("GLOBAL_DOMAIN_URL", "http://localhost:5108")
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
-    ("ParticipantLedgerApi", 7101),
-    ("ParticipantAdminApi", 7102),
+    ("ParticipantLedgerApi", 7001),
+    ("ParticipantAdminApi", 7002),
   )
 
   var cantonProcess: Option[Process] = None
@@ -63,8 +63,8 @@ class LocalRunbookIntegrationTest
         svDomainPath / "canton.conf",
       ),
       Seq(
-        "canton.participants.validatorParticipant.ledger-api.port=7101",
-        "canton.participants.validatorParticipant.admin-api.port=7102",
+        "canton.participants.validatorParticipant.ledger-api.port=7001",
+        "canton.participants.validatorParticipant.admin-api.port=7002",
       ),
       "local-runbook",
     )

@@ -29,8 +29,8 @@ class SelfHostedSplitwellPreflightIntegrationTest
 
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
     // Validator participant
-    ("ParticipantLedgerApi", 7101),
-    ("ParticipantAdminApi", 7102),
+    ("ParticipantLedgerApi", 7001),
+    ("ParticipantAdminApi", 7002),
     // Splitwell validator participant
     ("ParticipantLedgerApi", 7701),
     ("ParticipantAdminApi", 7702),
@@ -77,8 +77,8 @@ class SelfHostedSplitwellPreflightIntegrationTest
         splitwellPath / "splitwell-participant.conf",
       ),
       Seq(
-        "canton.participants.validatorParticipant.ledger-api.port=7101",
-        "canton.participants.validatorParticipant.admin-api.port=7102",
+        "canton.participants.validatorParticipant.ledger-api.port=7001",
+        "canton.participants.validatorParticipant.admin-api.port=7002",
         "canton.participants.splitwellParticipant.ledger-api.port=7701",
         "canton.participants.splitwellParticipant.admin-api.port=7702",
       ),
