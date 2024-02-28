@@ -26,6 +26,7 @@ import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
+import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
@@ -273,7 +274,8 @@ class SvReonboardingIntegrationTest
       )(
         "SV4_PARTICIPANT_AUTO_INIT" -> "false"
       ) {
-        eventuallySucceeds() {
+        // Canton is slooooooooooooooooooooooooooow
+        eventuallySucceeds(timeUntilSuccess = 60.seconds) {
           sv4ReonboardBackend.participantClientWithAdminToken.health.status shouldBe NodeStatus
             .NotInitialized(
               true
