@@ -12,7 +12,12 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.PackageIdResolver.HasCoinRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
 import com.daml.network.http.v0.definitions.MigrationSchedule
-import com.daml.network.scan.admin.api.client.BftScanConnection.{ScanConnections, ScanList}
+import com.daml.network.scan.admin.api.client.BftScanConnection.{
+  ConsensusNotReached,
+  ConsensusNotReachedRetryable,
+  ScanConnections,
+  ScanList,
+}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcScan
 import com.daml.network.scan.config.ScanAppClientConfig
@@ -20,10 +25,12 @@ import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.time.{Clock, PeriodicAction}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.retry.RetryUtil
+import com.digitalasset.canton.util.retry.RetryUtil.ExceptionRetryable
 import io.circe.Json
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.*
@@ -256,7 +263,21 @@ class BftScanConnection(
     } else {
       val nRequestsToDo = 2 * f + 1
       val requestFrom = Random.shuffle(open).take(nRequestsToDo)
-      executeCall(call, requestFrom, nTargetSuccess = f + 1)
+      retryProvider
+        .retryForClientCalls(
+          "bft_call",
+          executeCall(call, requestFrom, nTargetSuccess = f + 1),
+          logger,
+          (_: String) => ConsensusNotReachedRetryable,
+        )
+        .recoverWith { case c: ConsensusNotReached =>
+          val httpError = HttpErrorWithHttpCode(
+            StatusCodes.BadGateway,
+            s"Failed to reach consensus from ${requestFrom.size} Scan nodes.",
+          )
+          logger.warn(s"Consensus not reached.", c)
+          Future.failed(httpError)
+        }
     }
   }
 
@@ -287,11 +308,7 @@ class BftScanConnection(
           if (nResponsesDone.incrementAndGet() == requestFrom.size) { // all Scans are done
             finalResponse.future.value match {
               case None =>
-                val exception = HttpErrorWithHttpCode(
-                  StatusCodes.BadGateway,
-                  s"Failed to reach consensus from ${requestFrom.size} Scan nodes.",
-                )
-                logger.warn(s"Consensus not reached. Responses: $responses", exception)
+                val exception = new ConsensusNotReached(requestFrom.size, responses)
                 finalResponse.tryFailure(exception): Unit
               case Some(consensusResponse) =>
                 logDisagreements(consensusResponse, responses)
@@ -668,4 +685,27 @@ object BftScanConnection {
   private case class SuccessfulResponse[T](response: T) extends ScanResponse
   private case class HttpFailureResponse(status: StatusCode, body: Json) extends ScanResponse
   private case class ExceptionFailureResponse(error: Throwable) extends ScanResponse
+
+  class ConsensusNotReached(
+      numRequests: Int,
+      responses: ConcurrentHashMap[BftScanConnection.ScanResponse, List[Uri]],
+  ) extends RuntimeException(
+        s"Failed to reach consensus from $numRequests Scan nodes. Responses: $responses"
+      )
+
+  object ConsensusNotReachedRetryable extends ExceptionRetryable {
+    override def retryOK(
+        outcome: Try[_],
+        logger: TracedLogger,
+        lastErrorKind: Option[RetryUtil.ErrorKind],
+    )(implicit tc: TraceContext): RetryUtil.ErrorKind = {
+      outcome match {
+        case Success(_) => RetryUtil.NoErrorKind
+        case Failure(c: ConsensusNotReached) =>
+          logger.info("Consensus not reached. Will be retried.", c)
+          RetryUtil.SpuriousTransientErrorKind
+        case Failure(_) => RetryUtil.FatalErrorKind
+      }
+    }
+  }
 }

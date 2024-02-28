@@ -28,7 +28,9 @@ import java.time.{Duration, Instant}
 import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cc.coinrules as coinrulesCodegen
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.tracing.TraceContext
+import org.slf4j.event.Level
 
 // mock verification triggers this
 @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
@@ -250,6 +252,30 @@ class BftScanConnectionTest
       for {
         svcPartyId <- bft.getSvcPartyId()
       } yield svcPartyId should be(partyIdA)
+    }
+
+    "retry on failure" in {
+      val connections = getMockedConnections(n = 4)
+      val bft = getBft(connections)
+
+      connections.zipWithIndex.foreach { case (mock, n) =>
+        val failure = new RuntimeException(s"Mock #$n Failed. Hopefully only once.")
+        // fail once, then succeed
+        when(mock.getSvcPartyId()).thenReturn(Future.failed(failure), Future.successful(partyIdA))
+      }
+
+      loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
+        for {
+          result <- bft.getSvcPartyId()
+        } yield result should be(partyIdA),
+        logs => {
+          logs.exists(log =>
+            log.level == Level.INFO && log.message.contains(
+              "Consensus not reached. Will be retried."
+            )
+          ) should be(true)
+        },
+      )
     }
   }
 
