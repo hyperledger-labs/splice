@@ -332,19 +332,15 @@ object CNNodeConfigTransforms {
     bumpSvAppCantonDomainPortsBy(bump) compose bumpValidatorAppCantonDomainPortsBy(bump)
 
   def bumpSvAppCantonDomainPortsBy(bump: Int): CNNodeConfigTransform = {
-    def bumpUrl(s: String): String = {
-      val uri = Uri(s)
-      uri.withPort(uri.effectivePort + bump).toString
-    }
     updateAllSvAppConfigs_(
       _.focus(_.domains.global.url)
-        .modify(bumpUrl(_))
+        .modify(bumpUrl(bump, _))
         .focus(_.localDomainNode)
         .modify(
           _.map(d =>
             d.copy(
-              sequencer =
-                d.sequencer.copy(externalPublicApiUrl = bumpUrl(d.sequencer.externalPublicApiUrl))
+              sequencer = d.sequencer
+                .copy(externalPublicApiUrl = bumpUrl(bump, d.sequencer.externalPublicApiUrl))
             )
           )
         )
@@ -404,6 +400,30 @@ object CNNodeConfigTransforms {
         config
       }
     })
+  }
+
+  def bumpSomeSvAppCantonDomainPortsBy(bump: Int, svApps: Seq[String]): CNNodeConfigTransform = {
+    updateAllSvAppConfigs((name, config) => {
+      if (svApps.contains(name)) {
+        config
+          .focus(_.domains.global.url)
+          .modify(bumpUrl(bump, _))
+          .focus(_.localDomainNode)
+          .modify(
+            _.map(d =>
+              d.copy(
+                sequencer = d.sequencer
+                  .copy(externalPublicApiUrl = bumpUrl(bump, d.sequencer.externalPublicApiUrl))
+              )
+            )
+          )
+      } else config
+    })
+  }
+
+  private def bumpUrl(bump: Int, s: String): String = {
+    val uri = Uri(s)
+    uri.withPort(uri.effectivePort + bump).toString
   }
 
   private def setPortPrefix(range: Int): Port => Port = { port =>

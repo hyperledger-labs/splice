@@ -325,6 +325,7 @@ class SvSvcAutomationService(
         internalClientConfig.globalDomainAlias,
         svcStore,
         internalClientConfig.sequencerInternalConfig,
+        config.domainMigrationId,
       )
     )
   }
@@ -345,6 +346,7 @@ class SvSvcAutomationService(
           clock,
           pruningConfig.retentionPeriod,
           participantAdminConnection,
+          config.domainMigrationId,
         )
       )
     }

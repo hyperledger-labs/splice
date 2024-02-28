@@ -13,6 +13,7 @@ import com.daml.network.config.{
 }
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.{
+  CNParticipantClientReference,
   ScanAppBackendReference,
   ValidatorAppBackendReference,
   WalletAppClientReference,
@@ -34,7 +35,6 @@ import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.m
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import com.daml.network.sv.automation.singlesv.{SubmitSvStatusReportTrigger, SvRewardTrigger}
-import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
@@ -56,6 +56,7 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
@@ -102,13 +103,6 @@ class GlobalDomainMigrationIntegrationTest
                         dumpFilePath = Path.of(""),
                       )
                     ),
-                    domains = SvDomainConfig(global =
-                      SvGlobalDomainConfig(
-                        alias = DomainAlias.tryCreate("global"),
-                        // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
-                        url = s"http://localhost:27${sv}08",
-                      )
-                    ),
                     domainMigrationId = 1L,
                   )
             ) + (
@@ -118,12 +112,6 @@ class GlobalDomainMigrationIntegrationTest
                   .copy(
                     onboarding = None,
                     domainMigrationId = 1L,
-                    domains = SvDomainConfig(global =
-                      SvGlobalDomainConfig(
-                        alias = DomainAlias.tryCreate("global"),
-                        url = s"http://localhost:27108",
-                      )
-                    ),
                   )
             ),
           scanApps = config.scanApps + (
@@ -175,7 +163,7 @@ class GlobalDomainMigrationIntegrationTest
                   domains = ValidatorDomainConfig(global =
                     ValidatorGlobalDomainConfig(
                       alias = DomainAlias.tryCreate("global"),
-                      url = Some("http://localhost:27108"),
+                      url = None,
                     )
                   ),
                   participantClient = CNParticipantClientConfig(
@@ -225,6 +213,11 @@ class GlobalDomainMigrationIntegrationTest
             22_000,
             Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
           ) compose
+          CNNodeConfigTransforms.bumpSomeSvAppCantonDomainPortsBy(
+            22_000,
+            Seq("sv1Local", "sv1LocalOnboarded", "sv2Local", "sv3Local", "sv4Local"),
+          )
+          compose
           CNNodeConfigTransforms
             .bumpSomeScanAppPortsBy(22_000, Seq("sv1ScanLocal")) compose
           CNNodeConfigTransforms
@@ -391,6 +384,19 @@ class GlobalDomainMigrationIntegrationTest
       extraParticipantUser = bobValidatorBackend.config.ledgerApiUser.some,
     )() {
       startValidatorAndTapCoin(bobValidatorBackend, bobWalletClient)
+
+      val sequencerUrlSetBeforeUpgrade = clue("validator should connect to all sequencer urls") {
+        eventually() {
+          val urlSet =
+            getSequencerUrlSet(
+              bobValidatorBackend.participantClientWithAdminToken,
+              globalDomainAlias,
+            )
+          urlSet should have size 4
+          urlSet
+        }
+      }
+
       Using.resources(
         createUpgradeNode(
           1,
@@ -583,8 +589,9 @@ class GlobalDomainMigrationIntegrationTest
             sv1ValidatorLocalBackend,
           )
 
+          val bobValidatorLocal = v("bobValidatorLocal")
           withClueAndLog("validator can migrate to the new domain") {
-            val validatorThatMigrates = v("bobValidatorLocal")
+            val validatorThatMigrates = bobValidatorLocal
             startValidatorAndTapCoin(
               validatorThatMigrates,
               uwc("bobWalletLocal"),
@@ -592,14 +599,25 @@ class GlobalDomainMigrationIntegrationTest
             )
           }
 
-          eventually() {
-            inside(sv1ScanLocalBackend.listSvcSequencers()) {
-              case Seq(DomainSequencers(domainId, sequencers)) =>
-                domainId shouldBe globalDomainId
-                sequencers should have size 4
-                sequencers.foreach { sequencer =>
-                  sequencer.migrationId shouldBe 1
-                }
+          clue("validator should connect to sequencers in upgraded domain") {
+            eventually() {
+              inside(sv1ScanLocalBackend.listSvcSequencers()) {
+                case Seq(DomainSequencers(domainId, sequencers)) =>
+                  domainId shouldBe globalDomainId
+                  sequencers.foreach { sequencer =>
+                    if (sequencer.migrationId != 1)
+                      throw new RuntimeException(
+                        s"Expected sequencer migrationId to be 1, but got ${sequencer.migrationId}"
+                      )
+                    sequencers should have size 4
+                  }
+              }
+              val sequencerUrlSet = getSequencerUrlSet(
+                bobValidatorLocal.participantClientWithAdminToken,
+                globalDomainAlias,
+              )
+              sequencerUrlSet should have size 4
+              sequencerUrlSet.intersect(sequencerUrlSetBeforeUpgrade) shouldBe Set.empty
             }
           }
 
@@ -730,6 +748,22 @@ class GlobalDomainMigrationIntegrationTest
     // listFiles return null if directoryToBeDeleted is not a directory
     allContents.foreach(_.foreach(deleteDirectoryRecursively))
     directoryToBeDeleted.delete
+  }
+
+  private def getSequencerUrlSet(
+      participantConnection: CNParticipantClientReference,
+      domainAlias: DomainAlias,
+  ): Set[String] = {
+    val sequencerConnections = participantConnection.domains
+      .config(domainAlias)
+      .value
+      .sequencerConnections
+    (for {
+      conn <- sequencerConnections.aliasToConnection.values
+      endpoint <- conn match {
+        case GrpcSequencerConnection(endpoints, _, _, _) => endpoints
+      }
+    } yield endpoint.toString).toSet
   }
 }
 

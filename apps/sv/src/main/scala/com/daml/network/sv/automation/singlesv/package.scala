@@ -16,12 +16,12 @@ package object singlesv {
       svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
       time: Instant,
       globalDomainId: DomainId,
+      migrationId: Long,
   ): Option[SequencerConfig] = for {
     memberInfo <- svcRules.payload.members.asScala.get(svParty.toProtoPrimitive)
     domainNodeConfig <- memberInfo.domainNodes.asScala.get(globalDomainId.toProtoPrimitive)
     sequencerConfig <- domainNodeConfig.sequencer.toScala
-    if sequencerConfig.url.nonEmpty && sequencerConfig.availableAfter.toScala.exists(
-      availableAfter => time.isAfter(availableAfter)
-    )
+    if sequencerConfig.migrationId == migrationId && sequencerConfig.url.nonEmpty && sequencerConfig.availableAfter.toScala
+      .exists(availableAfter => time.isAfter(availableAfter))
   } yield sequencerConfig
 }

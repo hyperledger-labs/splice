@@ -25,7 +25,6 @@ import com.daml.network.migration.DomainDataRestorer
 import com.daml.network.scan.admin.api.client
 import com.daml.network.scan.admin.api.client.{BftScanConnection, MinimalScanConnection}
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
@@ -56,17 +55,14 @@ import com.daml.network.validator.util.{OAuth2Manager, ValidatorUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.admin.http.{HttpExternalWalletHandler, HttpWalletHandler}
 import com.daml.network.wallet.automation.UserWalletAutomationService
-import com.digitalasset.canton.SequencerAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -80,7 +76,7 @@ import org.apache.pekko.http.scaladsl.model.HttpMethods
 import org.apache.pekko.http.scaladsl.server.Directives.*
 import org.apache.pekko.http.scaladsl.server.directives.BasicDirectives
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 /** Class representing a Validator app instance. */
@@ -163,6 +159,7 @@ class ValidatorApp(
               participantAdminConnection,
               scanConnection,
               clock,
+              config.domainMigrationId,
               retryProvider,
               loggerFactory,
             )
@@ -522,6 +519,15 @@ class ValidatorApp(
         ledgerClient,
         participantAdminConnection,
         participantIdentitiesStore,
+        new DomainConnector(
+          config,
+          participantAdminConnection,
+          scanConnection,
+          clock,
+          config.domainMigrationId,
+          retryProvider,
+          loggerFactory,
+        ),
         config.domainMigrationDumpPath,
         config.domainMigrationId,
         retryProvider,
@@ -857,49 +863,5 @@ object ValidatorApp {
         scanConnection,
         participantAdminConnection,
       )(logger)
-  }
-
-  def getSequencerConnectionsFromScan(
-      scanConnection: BftScanConnection,
-      logger: TracedLogger,
-      domainTime: CantonTimestamp,
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[Seq[GrpcSequencerConnection]] = {
-    for {
-      globalDomainId <- scanConnection.getCoinRulesDomain()(traceContext)
-      domainSequencers <- scanConnection.listSvcSequencers()
-      maybeSequencers = domainSequencers.find(_.domainId == globalDomainId)
-    } yield maybeSequencers.fold {
-      logger.warn("global domain sequencer list not found.")
-      Seq.empty[GrpcSequencerConnection]
-    } { domainSequencer =>
-      extractValidConnections(domainSequencer.sequencers, domainTime)
-    }
-  }
-
-  private def extractValidConnections(
-      sequencers: Seq[SvcSequencer],
-      domainTime: CantonTimestamp,
-  ): Seq[GrpcSequencerConnection] = {
-    // sequencer connections will be ignore if they are with a invalid Alias, empty url or not yet available (`before availableAfter`)
-    val validConnections = sequencers
-      .collect {
-        case SvcSequencer(_, _, url, svName, availableAfter)
-            if url.nonEmpty && !domainTime.toInstant.isBefore(availableAfter) =>
-          for {
-            sequencerAlias <- SequencerAlias.create(svName)
-            grpcSequencerConnection <- GrpcSequencerConnection.create(
-              url,
-              None,
-              sequencerAlias,
-            )
-          } yield grpcSequencerConnection
-      }
-      .collect { case Right(conn) =>
-        conn
-      }
-    validConnections
   }
 }

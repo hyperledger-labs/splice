@@ -4,7 +4,7 @@ import com.daml.network.automation.{PollingTrigger, TriggerContext}
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.validator.ValidatorApp
+import com.daml.network.validator.domain.DomainConnector
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -27,6 +27,7 @@ class ReconcileSequencerConnectionsTrigger(
     scanConnection: BftScanConnection,
     globalDomainAlias: DomainAlias,
     submissionRequestAmplification: PositiveInt,
+    domainConnector: DomainConnector,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -47,11 +48,7 @@ class ReconcileSequencerConnectionsTrigger(
       _ <- maybeDomainTime match {
         case Some(domainTime) =>
           for {
-            sequencerConnections <- ValidatorApp.getSequencerConnectionsFromScan(
-              scanConnection,
-              logger,
-              domainTime,
-            )
+            sequencerConnections <- domainConnector.getSequencerConnectionsFromScan(domainTime)
             _ <- participantAdminConnection.modifyDomainConnectionConfigAndReconnect(
               globalDomainAlias, // TODO (#8450) how?
               modifySequencerConnections(sequencerConnections),

@@ -25,6 +25,7 @@ class LocalSequencerConnectionsTrigger(
     globalDomainAlias: DomainAlias,
     store: SvSvcStore,
     sequencerInternalConfig: ClientConfig,
+    migrationId: Long,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -40,6 +41,7 @@ class LocalSequencerConnectionsTrigger(
         svcRules,
         domainTime.timestamp.toInstant,
         globalDomainId,
+        migrationId,
       )
       _ <- svcRulesActiveSequencerConfig.fold {
         logger.debug(

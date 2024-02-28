@@ -13,6 +13,7 @@ import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.QualifiedName
 import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
+import com.daml.network.validator.domain.DomainConnector
 import com.daml.network.validator.migration.GlobalDomainMigrationTrigger
 import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
 import com.daml.network.wallet.UserWalletManager
@@ -47,6 +48,7 @@ class ValidatorAutomationService(
     ledgerClient: CNLedgerClient,
     participantAdminConnection: ParticipantAdminConnection,
     participantIdentitiesStore: NodeIdentitiesStore,
+    domainConnector: DomainConnector,
     domainMigrationDumpPath: Option[Path],
     domainMigrationId: Long,
     retryProvider: RetryProvider,
@@ -166,6 +168,7 @@ class ValidatorAutomationService(
         scanConnection,
         globalDomainAlias,
         submissionRequestAmplification,
+        domainConnector,
       )
     )
 

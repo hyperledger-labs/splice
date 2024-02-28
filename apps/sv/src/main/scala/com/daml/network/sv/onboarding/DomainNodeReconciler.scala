@@ -68,6 +68,10 @@ class DomainNodeReconciler(
         case DomainNodeState.Onboarding =>
           false
       }
+      _ = ensureSequencerUrlIsDifferentWhenDomainUpgraded(
+        existingSequencerConfig,
+        localSequencerConfig,
+      )
       _ <-
         if (
           existingSequencerConfig != localSequencerConfig ||
@@ -137,6 +141,21 @@ class DomainNodeReconciler(
       )
   }
 
+  private def ensureSequencerUrlIsDifferentWhenDomainUpgraded(
+      existingSequencerConfigOpt: Option[LocalSequencerConfig],
+      sequencerConfigOpt: Option[LocalSequencerConfig],
+  ): Unit = {
+    if (
+      existingSequencerConfigOpt.exists { existingSequencerConfig =>
+        sequencerConfigOpt.exists(sequencerConfig =>
+          existingSequencerConfig.migrationId != sequencerConfig.migrationId
+            &&
+            existingSequencerConfig.url == sequencerConfig.url
+        )
+      }
+    )
+      sys.error("Sequencer URL must be different when domain is upgraded.")
+  }
 }
 
 object DomainNodeReconciler {

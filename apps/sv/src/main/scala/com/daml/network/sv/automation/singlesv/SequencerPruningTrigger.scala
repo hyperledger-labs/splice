@@ -33,6 +33,7 @@ class SequencerPruningTrigger(
     clock: Clock,
     retentionPeriod: NonNegativeFiniteDuration,
     participantAdminConnection: ParticipantAdminConnection,
+    migrationId: Long,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -51,6 +52,7 @@ class SequencerPruningTrigger(
         svcRules,
         clock.now.toInstant,
         globalDomainId,
+        migrationId,
       )
       _ <- svcRulesActiveSequencerConfig.fold {
         logger.debug(
