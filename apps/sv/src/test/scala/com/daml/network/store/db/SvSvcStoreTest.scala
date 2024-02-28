@@ -32,7 +32,7 @@ import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfir
 import com.daml.network.codegen.java.cn.svcrules.electionrequestreason.ERR_OtherReason
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
   SRARC_AddMember,
-  SRARC_RemoveMember,
+  SRARC_OffboardMember,
 }
 import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome2.VRO_Accepted
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
@@ -1248,7 +1248,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
   )
 
   lazy val removeUserAction = new ARC_SvcRules(
-    new SRARC_RemoveMember(new SvcRules_RemoveMember(userParty(666).toProtoPrimitive))
+    new SRARC_OffboardMember(new SvcRules_OffboardMember(userParty(666).toProtoPrimitive))
   )
 
   private def mkExecuteDefiniteVote(

@@ -11,7 +11,7 @@ function createRow(key: string, value: string, isParty: boolean = false) {
   return { key, value, isParty };
 }
 
-const RemoveMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmation) => void }> = ({
+const OffboardMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmation) => void }> = ({
   chooseAction,
 }) => {
   const svcInfosQuery = useSvcInfos();
@@ -35,7 +35,7 @@ const RemoveMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmatio
       tag: 'ARC_SvcRules',
       value: {
         svcAction: {
-          tag: 'SRARC_RemoveMember',
+          tag: 'SRARC_OffboardMember',
           value: { member: member },
         },
       },
@@ -64,4 +64,4 @@ const RemoveMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmatio
   );
 };
 
-export default RemoveMember;
+export default OffboardMember;

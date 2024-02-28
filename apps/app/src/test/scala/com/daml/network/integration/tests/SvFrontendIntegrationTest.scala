@@ -337,7 +337,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "can create a valid SRARC_RemoveMember vote request and cast vote on it" in { implicit env =>
+    "can create a valid SRARC_OffboardMember vote request and cast vote on it" in { implicit env =>
       val requestReasonUrl = "This is a request reason url."
       val requestReasonBody = "This is a request reason."
       val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
@@ -358,7 +358,7 @@ class SvFrontendIntegrationTest
           val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
             "sv1 operator can create a new vote request", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-              dropDownAction.selectByValue("SRARC_RemoveMember")
+              dropDownAction.selectByValue("SRARC_OffboardMember")
 
               val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
               dropDownMember.selectByIndex(3)
@@ -439,7 +439,7 @@ class SvFrontendIntegrationTest
               element.text should matchText("ARC_SvcRules")
             }
             inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
-              element.text should matchText("SRARC_RemoveMember")
+              element.text should matchText("SRARC_OffboardMember")
             }
             inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
               seleniumText(element) should matchText(

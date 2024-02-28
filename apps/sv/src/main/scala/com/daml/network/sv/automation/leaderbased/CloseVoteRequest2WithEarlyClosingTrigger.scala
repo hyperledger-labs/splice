@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
 import com.daml.network.codegen.java.cn.svcrules.VoteRequest2
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
@@ -58,8 +58,10 @@ class CloseVoteRequest2WithEarlyClosingTrigger(
             requiredNumVotesForEarlyClosing = voteRequestContract.payload.action match {
               case arcSvcRules: ARC_SvcRules =>
                 arcSvcRules.svcAction match {
-                  case action: SRARC_RemoveMember =>
-                    if (votes.map(_.sv).toSeq.contains(action.svcRules_RemoveMemberValue.member)) {
+                  case action: SRARC_OffboardMember =>
+                    if (
+                      votes.map(_.sv).toSeq.contains(action.svcRules_OffboardMemberValue.member)
+                    ) {
                       defaultRequiredNumVotesForEarlyClosing
                     } else {
                       defaultRequiredNumVotesForEarlyClosing - 1

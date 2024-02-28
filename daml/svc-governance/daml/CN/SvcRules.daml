@@ -90,7 +90,7 @@ data CoinRules_ActionRequiringConfirmation
 data SvcRules_ActionRequiringConfirmation
   = SRARC_AddMember SvcRules_AddMember
     -- ^ Voted action to directly add a member to the SVC.
-  | SRARC_RemoveMember SvcRules_RemoveMember
+  | SRARC_OffboardMember SvcRules_OffboardMember
     -- ^ Voted action to remove a member from the SVC.
   | SRARC_ConfirmSvOnboarding SvcRules_ConfirmSvOnboarding
     -- ^ Automated action to confirm that a party can become an SV member.
@@ -433,7 +433,7 @@ template SvcRules with
           initialTrafficState
           isDevNet
 
-    choice SvcRules_RemoveMember : ContractId SvcRules
+    choice SvcRules_OffboardMember : ContractId SvcRules
       with
         member : Party
       controller svc
@@ -731,7 +731,7 @@ template SvcRules with
         -- check if the request is ready to be closed
         when (now < request.voteBefore) $ do
           let memberBeingOffboarded = case request.action of
-                ARC_SvcRules (SRARC_RemoveMember (SvcRules_RemoveMember with member)) ->
+                ARC_SvcRules (SRARC_OffboardMember (SvcRules_OffboardMember with member)) ->
                   fmap (.name) (Map.lookup member members)
                 _ -> None
           require "All members (except one being offboarded) must have voted to allow early closing" $
@@ -1363,7 +1363,7 @@ executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
   ARC_SvcRules with .. ->
     case svcAction of
       SRARC_AddMember choiceArg -> void $ exercise svcRulesCid choiceArg
-      SRARC_RemoveMember choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARC_OffboardMember choiceArg -> void $ exercise svcRulesCid choiceArg
       SRARC_ConfirmSvOnboarding choiceArg -> void $ exercise svcRulesCid choiceArg
       SRARC_GrantFeaturedAppRight choiceArg -> void $ exercise svcRulesCid choiceArg
       SRARC_RevokeFeaturedAppRight choiceArg -> void $ exercise svcRulesCid choiceArg

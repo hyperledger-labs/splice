@@ -135,8 +135,8 @@ testSvcRulesConfigChange = do
 
 
 -- | Test membership removal and GC of CoinPriceVotes
-testRemoveMember : Script ()
-testRemoveMember = do
+testOffboardMember : Script ()
+testOffboardMember = do
   (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
 
   -- check that the leader is currently sv1
@@ -146,7 +146,7 @@ testRemoveMember = do
   -- run the voting process to change the config and remove the current leader 'sv1'
   initateAndAcceptVote app [sv2, sv3, sv4] $
     ARC_SvcRules with
-      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+      svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
         member = sv1
 
   -- check that the member was removed and the leader changed to sv2

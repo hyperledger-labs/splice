@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
 import com.daml.network.config.CNNodeConfigTransforms
 import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -86,8 +86,8 @@ class SvOffboardingIntegrationTest
         "SV1 create a vote request to remove sv4", {
           val action: ActionRequiringConfirmation =
             new ARC_SvcRules(
-              new SRARC_RemoveMember(
-                new SvcRules_RemoveMember(sv4Backend.getSvcInfo().svParty.toProtoPrimitive)
+              new SRARC_OffboardMember(
+                new SvcRules_OffboardMember(sv4Backend.getSvcInfo().svParty.toProtoPrimitive)
               )
             )
           sv1Backend.createVoteRequest2(

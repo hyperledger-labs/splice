@@ -170,7 +170,7 @@ const ListVoteRequests: React.FC = () => {
     if (action.tag === 'ARC_SvcRules') {
       const svcRulesAction = action.value.svcAction;
       switch (svcRulesAction.tag) {
-        case 'SRARC_RemoveMember': {
+        case 'SRARC_OffboardMember': {
           return `${svcRulesAction.tag}`;
         }
         case 'SRARC_GrantFeaturedAppRight': {

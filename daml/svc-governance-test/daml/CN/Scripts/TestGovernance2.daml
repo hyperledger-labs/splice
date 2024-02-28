@@ -168,7 +168,7 @@ testRacingMembershipRemoval = do
   req1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
     requester = sv1
     action = ARC_SvcRules with
-      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+      svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
         member = sv2
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
@@ -176,7 +176,7 @@ testRacingMembershipRemoval = do
   req2 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
     requester = sv1
     action = ARC_SvcRules with
-      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+      svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
         member = sv2
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
@@ -185,7 +185,7 @@ testRacingMembershipRemoval = do
   req3 <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
     requester = sv2
     action = ARC_SvcRules with
-      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+      svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
         member = sv1
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
@@ -249,7 +249,7 @@ testRacingMembershipRemoval = do
   req4 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
     requester = sv3
     action = ARC_SvcRules with
-      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+      svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
         member = sv4
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (seconds 1) -- attempt to not give sv4 enough time to vote
@@ -273,7 +273,7 @@ testRacingMembershipRemoval = do
   req5 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
     requester = sv3
     action = ARC_SvcRules with
-      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+      svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
         member = sv4
     reason = Reason with url = ""; body = "they want to leave!"
     voteRequestTimeout = Some (days 1)
@@ -320,8 +320,8 @@ testSvcRulesConfigChange = do
 
 
 -- | Test membership removal and GC of CoinPriceVotes
-testRemoveMemberAndCoinPriceVotes : Script ()
-testRemoveMemberAndCoinPriceVotes = do
+testOffboardMemberAndCoinPriceVotes : Script ()
+testOffboardMemberAndCoinPriceVotes = do
   (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
 
   -- check that the leader is currently sv1
@@ -331,7 +331,7 @@ testRemoveMemberAndCoinPriceVotes = do
   -- run the voting process to change the config and remove the current leader 'sv1'
   initateAndAcceptVote2 app [sv2, sv3, sv4] $
     ARC_SvcRules with
-      svcAction = SRARC_RemoveMember SvcRules_RemoveMember with
+      svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
         member = sv1
 
   -- the voting process is only definitive after the timeout, so right now sv1 is still present

@@ -1,10 +1,10 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
-  SvcRules_RemoveMember,
+  SvcRules_OffboardMember,
 }
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.SvAppBackendReference
@@ -73,8 +73,8 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
     }
     val action: ActionRequiringConfirmation =
       new ARC_SvcRules(
-        new SRARC_RemoveMember(
-          new SvcRules_RemoveMember(sv4Backend.getSvcInfo().svParty.toProtoPrimitive)
+        new SRARC_OffboardMember(
+          new SvcRules_OffboardMember(sv4Backend.getSvcInfo().svParty.toProtoPrimitive)
         )
       )
     sv4Backend.stop()

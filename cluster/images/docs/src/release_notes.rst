@@ -20,6 +20,8 @@ Release Notes
 * SVs do not pay domain fees anymore for their nodes. Therefore, traffic top-ups do not need to be configured for SV validators.
   In keeping with this, `topup.enabled` in `sv-validator-values.yaml` is set to `false`.
 
+* The `RemoveMember` action has been renamed to `OffboardMember` in the SV UI and SvcRules Daml model, including `SRARC_OffboardMember` and `SvcRules_OffboardMember`.
+
 2024-02-26
 ----------
 

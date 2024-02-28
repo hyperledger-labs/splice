@@ -36,8 +36,8 @@ import {
 import ListVoteRequests from './ListVoteRequests';
 import AddFutureCoinConfigSchedule from './actions/AddFutureCoinConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
+import OffboardMember from './actions/OffboardMember';
 import RemoveFutureCoinConfigSchedule from './actions/RemoveFutureCoinConfigSchedule';
-import RemoveMember from './actions/RemoveMember';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
 import UpdateFutureCoinConfigSchedule from './actions/UpdateFutureCoinConfigSchedule';
@@ -52,7 +52,7 @@ function actionFromFormIsError(action: ActionFromForm): action is { formError: D
 
 const VoteRequest: React.FC = () => {
   // States related to vote requests
-  const [actionName, setActionName] = useState('SRARC_RemoveMember');
+  const [actionName, setActionName] = useState('SRARC_OffboardMember');
   const [summary, setSummary] = useState<string>('');
   const [url, setUrl] = useState<string>('');
   const [expiration, setExpiration] = useState<Dayjs | null>(null);
@@ -95,7 +95,7 @@ const VoteRequest: React.FC = () => {
   }, [actionName, setActionName]); // same than above
 
   const actionNameOptions = [
-    { name: 'Remove Member', value: 'SRARC_RemoveMember' },
+    { name: 'Offboard Member', value: 'SRARC_OffboardMember' },
     { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
     { name: 'Set SvcRules Configuration', value: 'SRARC_SetConfig' },
@@ -202,7 +202,7 @@ const VoteRequest: React.FC = () => {
         return await createVoteRequest(requester, action, url, summary, duration)
           .then(() => setUrl(''))
           .then(() => setSummary(''))
-          .then(() => setActionName('SRARC_RemoveMember'))
+          .then(() => setActionName('SRARC_OffboardMember'))
           .then(() => setAction(undefined))
           .then(() => setExpiration(getDefaultExpiration))
           .then(() => setMaxDateTimeIfAddFutureCoinConfigSchedule(undefined))
@@ -240,7 +240,7 @@ const VoteRequest: React.FC = () => {
               </NativeSelect>
             </FormControl>
           </Stack>
-          {actionName === 'SRARC_RemoveMember' && <RemoveMember chooseAction={chooseAction} />}
+          {actionName === 'SRARC_OffboardMember' && <OffboardMember chooseAction={chooseAction} />}
           {actionName === 'SRARC_GrantFeaturedAppRight' && (
             <GrantFeaturedAppRight chooseAction={chooseAction} />
           )}

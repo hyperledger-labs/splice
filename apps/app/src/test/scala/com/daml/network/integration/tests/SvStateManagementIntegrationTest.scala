@@ -8,13 +8,13 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
 }
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
-  SRARC_RemoveMember,
+  SRARC_OffboardMember,
   SRARC_SetConfig,
 }
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRulesConfig,
-  SvcRules_RemoveMember,
+  SvcRules_OffboardMember,
   SvcRules_SetConfig,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -116,8 +116,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     actAndCheck(
       "remove sv3 on svcRules contract to trigger `GarbageCollectCoinPriceVotesTrigger` to non member votes", {
         val removeAction = new ARC_SvcRules(
-          new SRARC_RemoveMember(
-            new SvcRules_RemoveMember(
+          new SRARC_OffboardMember(
+            new SvcRules_OffboardMember(
               svParties("sv3").toProtoPrimitive
             )
           )
@@ -409,7 +409,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         val sv1Party = sv1Backend.getSvcInfo().svParty
         val sv2Party = sv2Backend.getSvcInfo().svParty
         val action: ActionRequiringConfirmation = new ARC_SvcRules(
-          new SRARC_RemoveMember(new SvcRules_RemoveMember(sv1Party.toProtoPrimitive))
+          new SRARC_OffboardMember(new SvcRules_OffboardMember(sv1Party.toProtoPrimitive))
         )
 
         sv2Backend.createVoteRequest(

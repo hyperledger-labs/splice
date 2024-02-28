@@ -243,8 +243,8 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
           svcRulesCid.exerciseSvcRules_ConfirmAction(
             sv1Party.toProtoPrimitive,
             new svcr.actionrequiringconfirmation.ARC_SvcRules(
-              new svcr.svcrules_actionrequiringconfirmation.SRARC_RemoveMember(
-                new svcr.SvcRules_RemoveMember("nonsense")
+              new svcr.svcrules_actionrequiringconfirmation.SRARC_OffboardMember(
+                new svcr.SvcRules_OffboardMember("nonsense")
               )
             ),
           )

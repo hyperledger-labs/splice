@@ -9,8 +9,8 @@ import com.digitalasset.canton.topology.{DomainId, PartyId}
 import org.slf4j.event.Level
 import CNNodeTests.BracketSynchronous.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.{ElectionRequest, SvcRules_RemoveMember}
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_RemoveMember
+import com.daml.network.codegen.java.cn.svcrules.{ElectionRequest, SvcRules_OffboardMember}
+import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequest2WithEarlyClosingTrigger
 
 import java.time.Duration as JavaDuration
@@ -177,8 +177,8 @@ class SvcElectionTimeBasedIntegrationTest
         )
         .value
       val removeAction = new ARC_SvcRules(
-        new SRARC_RemoveMember(
-          new SvcRules_RemoveMember(
+        new SRARC_OffboardMember(
+          new SvcRules_OffboardMember(
             currentLeader
           )
         )

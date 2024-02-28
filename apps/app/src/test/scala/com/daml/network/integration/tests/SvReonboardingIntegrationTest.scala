@@ -191,7 +191,7 @@ class SvReonboardingIntegrationTest
             "SV1 create a vote request to remove sv4", {
               val action: ActionRequiringConfirmation =
                 new ARC_SvcRules(
-                  new SRARC_RemoveMember(new SvcRules_RemoveMember(sv4Party.toProtoPrimitive))
+                  new SRARC_OffboardMember(new SvcRules_OffboardMember(sv4Party.toProtoPrimitive))
                 )
               sv1Backend.createVoteRequest(
                 sv1Backend.getSvcInfo().svParty.toProtoPrimitive,

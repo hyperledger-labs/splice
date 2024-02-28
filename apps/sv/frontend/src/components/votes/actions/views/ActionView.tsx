@@ -39,7 +39,7 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
   if (action.tag === 'ARC_SvcRules') {
     const svcAction = action.value.svcAction;
     switch (svcAction.tag) {
-      case 'SRARC_RemoveMember': {
+      case 'SRARC_OffboardMember': {
         return (
           <ActionValueTable
             actionType={actionType}
