@@ -20,7 +20,7 @@ testBoundedSet = script do
       round0 = Round 0
       round1 = Round 1
   -- overflow when applying div
-  amountExpiresAt (expiringAmount rate maxDecimal round0) === AfterMaxBound
+  amountExpiresAt (expiringAmount rate maxDecimalDiv10 round0) === AfterMaxBound
   amountExpiresAt (expiringAmount rate 49999999999999999999999.9999999999 round0) === AfterMaxBound
 
   -- overflow when applying ceiling
@@ -100,7 +100,7 @@ testAmountExpiresAt = do
   amountExpiresAt largeAmountCreatedAt0ThatOverflow === AfterMaxBound
 
   let amountWithLargestAmountAndLeastHoldingFee = ExpiringAmount with
-        initialAmount = maxDecimal
+        initialAmount = maxDecimalDiv10
         createdAt = Round 0
         ratePerRound = RatePerRound(0.0000000001)
   amountExpiresAt amountWithLargestAmountAndLeastHoldingFee === AfterMaxBound

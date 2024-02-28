@@ -11,7 +11,7 @@ data-dependencies:
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches
-  - --target=2.dev # TODO(#10057) Switch back to LF 2.1
+  - --target=2.1
 codegen:
   java:
     package-prefix: com.daml.network.codegen.java

@@ -8,7 +8,7 @@ module CC.Expiry
   , amountExpiresAt
   , estimateOpenRoundCreatedAt
   , maxInt
-  , maxDecimal
+  , maxDecimalDiv10
   , minTime
   , maxTime
   )
@@ -20,7 +20,6 @@ import CC.Types
 import CC.Round
 import CC.RelRound
 
-import DA.BigNumeric
 import DA.Date
 import DA.Time
 
@@ -71,19 +70,22 @@ boundedTimes x y
 -- BoundedSet Decimal
 ---------------------
 
-maxDecimal : Decimal
-maxDecimal = 9999999999999999999999999999.9999999999
+
+maxDecimalDiv10 : Decimal
+maxDecimalDiv10 = 999999999999999999999999999.9999999999
 
 -- | Divide two positive decimal numbers such that a division by a number between 0.0 and 1.0 does
 -- not result in an overflow, but is instead captured as a bounded set.
--- Rounding mode RoundingCeiling is used for the division.
-boundedDivCeilingDecimal : Decimal -> Decimal -> BoundedSet Decimal
-boundedDivCeilingDecimal x y
-  | x <= 0.0 = error $ "boundedDivCeilingDecimal: negative first operand " <> show x
-  | y <= 0.0 = error $ "boundedDivCeilingDecimal: negative second operand " <> show y
-  | y < 1.0 && x > maxDecimal * y = AfterMaxBound
-  | otherwise = let d = div 10 RoundingCeiling (fromNumeric x) (fromNumeric y)
-                in Singleton (fromBigNumeric d)
+--
+-- We use `maxDecimalDiv10` as the upper bound to be on the safe side rounding shenanigans.
+-- This is OK, as being overly conservative with returning `AfterMaxBound` is fine for the uses
+-- of this function that we have.
+boundedDivDecimal : Decimal -> Decimal -> BoundedSet Decimal
+boundedDivDecimal x y
+  | x <= 0.0 = error $ "boundedDivDecimal: negative first operand " <> show x
+  | y <= 0.0 = error $ "boundedDivDecimal: negative second operand " <> show y
+  | y < 1.0 && x > maxDecimalDiv10 * y = AfterMaxBound
+  | otherwise = Singleton (x / y)
 
 maxIntAsDecimal : Decimal
 maxIntAsDecimal = intToDecimal maxBound
@@ -141,7 +143,7 @@ spentWithRatePerRound : RatePerRound -> Decimal -> BoundedSet RelRound
 spentWithRatePerRound rate amount =
     RelRound <$> boundedCeiling roundsUntilExpired
   where
-    roundsUntilExpired = amount `boundedDivCeilingDecimal` rate.rate
+    roundsUntilExpired = amount `boundedDivDecimal` rate.rate
 
 -- | Compute the round where the coin expires. i.e. the coin is fully expired.
 amountExpiresAt : ExpiringAmount -> BoundedSet Round
