@@ -31,6 +31,8 @@
         - [Pod error states](#pod-error-states)
         - [Check for Cluster Updates](#check-for-cluster-updates)
         - [Check for Autoscaler Activity](#check-for-autoscaler-activity)
+      - [Debugging problems with GKE](#debugging-problems-with-gke)
+      - [GCE Log-based Metrics](#gce-log-based-metrics)
       - [Prometheus Metrics and Grafana Dashboards](#prometheus-metrics-and-grafana-dashboards)
         - [Prometheus Metrics](#prometheus-metrics)
         - [Grafana Dashboards](#grafana-dashboards)
@@ -83,7 +85,6 @@
     - [Restore](#restore)
   - [Security](#security)
   - [Chaos Mesh](#chaos-mesh)
-  - [Debugging problems with GKE](#debugging-problems-with-gke)
   - [Appendix: Kubernetes and Other Deployment Resources](#appendix-kubernetes-and-other-deployment-resources)
 
 Note that operations in this directory require authentication to use
@@ -772,12 +773,67 @@ and down. A scale up is not disruptive to cluster operation, but a
 scale down often results in Pod downtime as a node is drained of
 running pods to be relocated elsewhere.
 
-
 ```
 resource.type="k8s_cluster" AND
 log_id("events") AND
 (jsonPayload.source.component="cluster-autoscaler" OR jsonPayload.source.component="default-scheduler")
 ```
+
+#### Debugging problems with GKE
+
+In order to facilitate debugging cluster deployment problems that point to issues with GKE, enabling additional logging is an option.
+These issues often manifest in Pulumi deployments as:
+
+```text
+client rate limiter Wait returned an error: context deadline exceeded
+```
+or
+```text
+the server is currently unable to handle the request
+```
+
+There are 2 [additional logging options](https://cloud.google.com/kubernetes-engine/docs/concepts/about-logs) available in GKE - control plane logs and audit logs.
+
+###### Kubernetes control plane logs
+
+These are logs for k8s control plane components eg. the Kubernetes API server, scheduler and controller manager and are configured on a per-cluster basis.
+To enable these, go to Kubernetes > Clusters, select your GKE project from the drop-down, click on the cluster name and scroll down to Features.
+Click on the Edit icon next to Logging and select the components for which to enable logs. It may take a while after you click "Save Changes" for your
+changes to be registered with GKE.
+
+###### Audit logs
+
+By default, our GKE clusters already have Admin Activity audit logging enabled. This includes logs that write metadata or configuration information eg.
+creating, modifying or deleting k8s resources (basically any GKE API method that starts with Create, Update, Set, or Delete). To also enable audit logging
+for read API requests (Get, Watch, List), you need to explicitly enable Data Access audit logs. To do so, go to IAM & Admin > Audit Logs, search for
+Kubernetes Engine API and add a tick mark against the log types you want to enable (Admin Read, Data Read and Data Write). For a description of what each log type
+represents, see [Enable Data Access audit logs](https://cloud.google.com/logging/docs/audit/configure-data-access)
+
+##### Useful log filters
+
+- `resource.type="k8s_control_plane_component"` - provides all control plane logs
+- `protoPayload.authenticationInfo.principalEmail=~"circleci@.*"` - provides audit logs for the circleci service account
+
+#### GCE Log-based Metrics
+
+Google Cloud has a feature to create [log-based metrics](https://cloud.google.com/logging/docs/logs-based-metrics) from the logs it aggregates.
+We currently have such a metric configured for the number of unexpected warnings and errors we see in our GKE clusters for the `da-cn-ci2` project
+[here](https://console.cloud.google.com/logs/metrics?project=da-cn-ci-2). GCE also allows configuring alerts based on these metrics by setting up
+alerting policies in the [Google Alerting dashboard](https://console.cloud.google.com/monitoring/alerting/policies?project=da-cn-ci-2).
+
+At the time of writing, we have such an alert policy configured for our `cilr` cluster that sends notifications to the `#temp-canton-network-internal-log-alerts` Slack channel.
+When investigating an incident that caused this alert to fire, you might want to see the offending logs. Clicking on the incident link
+contained within the alert will take you to the incident details page in the Google Cloud console where you should find a "View Logs" button.
+See [0.n9uo152f10jk](https://console.cloud.google.com/monitoring/alerting/incidents/0.n9uo152f10jk?channelType=slack&amp;project=da-cn-ci-2&project=da-cn-ci-2&pageState=(%22interval%22:(%22d%22:%22P1D%22,%22i%22:(%22s%22:%222024-02-28T06:09:40.000Z%22,%22e%22:%222024-02-28T07:09:44.000Z%22))
+for an example incident details page. Since we filter for the cluster and namespace in the alerting policy and not the log filter directly, you will want to add the following log filter
+to what you get from "View Logs" to identify the exact set of logs that caused the alert to fire:
+
+```
+resource.labels.cluster_name="cn-cilrnet"
+-resource.labels.namespace_name="sv-4"
+```
+
+Note that at present we filter out the `sv-4` namespace to reduce noise because our crash fault tolerance tests constantly take down containers in this namespace.
 
 #### Prometheus Metrics and Grafana Dashboards
 
@@ -1772,41 +1828,6 @@ This is currently disabled by default. To enable it, set
 ```
 export ENABLE_CHAOS_MESH=1
 ```
-
-## Debugging problems with GKE
-
-In order to facilitate debugging cluster deployment problems that point to issues with GKE, enabling additional logging is an option.
-These issues often manifest in Pulumi deployments as:
-
-```text
-client rate limiter Wait returned an error: context deadline exceeded
-```
-or
-```text
-the server is currently unable to handle the request
-```
-
-There are 2 [additional logging options](https://cloud.google.com/kubernetes-engine/docs/concepts/about-logs) available in GKE - control plane logs and audit logs.
-
-#### Kubernetes control plane logs
-
-These are logs for k8s control plane components eg. the Kubernetes API server, scheduler and controller manager and are configured on a per-cluster basis.
-To enable these, go to Kubernetes > Clusters, select your GKE project from the drop-down, click on the cluster name and scroll down to Features.
-Click on the Edit icon next to Logging and select the components for which to enable logs. It may take a while after you click "Save Changes" for your
-changes to be registered with GKE.
-
-#### Audit logs
-
-By default, our GKE clusters already have Admin Activity audit logging enabled. This includes logs that write metadata or configuration information eg.
-creating, modifying or deleting k8s resources (basically any GKE API method that starts with Create, Update, Set, or Delete). To also enable audit logging
-for read API requests (Get, Watch, List), you need to explicitly enable Data Access audit logs. To do so, go to IAM & Admin > Audit Logs, search for
-Kubernetes Engine API and add a tick mark against the log types you want to enable (Admin Read, Data Read and Data Write). For a description of what each log type
-represents, see [Enable Data Access audit logs](https://cloud.google.com/logging/docs/audit/configure-data-access)
-
-### Useful log filters
-
-- `resource.type="k8s_control_plane_component"` - provides all control plane logs
-- `protoPayload.authenticationInfo.principalEmail=~"circleci@.*"` - provides audit logs for the circleci service account
 
 ## Appendix: Kubernetes and Other Deployment Resources
 
