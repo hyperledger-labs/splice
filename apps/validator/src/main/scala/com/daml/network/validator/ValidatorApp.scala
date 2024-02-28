@@ -526,6 +526,7 @@ class ValidatorApp(
         config.domainMigrationId,
         retryProvider,
         config.ingestFromParticipantBegin,
+        config.svValidator,
         loggerFactory,
       )
       domainId <- appInitStep(s"Wait for domain connection on ${config.domains.global.alias}") {

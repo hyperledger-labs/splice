@@ -51,6 +51,7 @@ class ValidatorAutomationService(
     domainMigrationId: Long,
     retryProvider: RetryProvider,
     ingestFromParticipantBegin: Boolean,
+    svValidator: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -177,20 +178,22 @@ class ValidatorAutomationService(
     )
   )
 
-  domainMigrationDumpPath.fold(
-    logger.info(
-      "Not starting DomainUpgradeTrigger, as no domain migration dump path is configured."
-    )(TraceContext.empty)
-  ) { path =>
-    registerTrigger(
-      new GlobalDomainMigrationTrigger(
-        domainMigrationId,
-        triggerContext,
-        participantAdminConnection,
-        path,
-        scanConnection,
+  if (!svValidator) {
+    domainMigrationDumpPath.fold(
+      logger.info(
+        "Not starting DomainUpgradeTrigger, as no domain migration dump path is configured."
+      )(TraceContext.empty)
+    ) { path =>
+      registerTrigger(
+        new GlobalDomainMigrationTrigger(
+          domainMigrationId,
+          triggerContext,
+          participantAdminConnection,
+          path,
+          scanConnection,
+        )
       )
-    )
+    }
   }
 }
 

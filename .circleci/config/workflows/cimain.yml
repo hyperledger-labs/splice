@@ -101,6 +101,7 @@ workflow:
           send_deployment_notification: false
           update_deployment_branch: false
           global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
           requires:
             - deploy_global_domain_upgrade
@@ -109,7 +110,6 @@ workflow:
           <<: *main-branch-only
           # backup splitwell and validator1
           name: "backup_after_global_domain_upgrade"
-          migration_id: 1
           cluster: "cimain"
           include_sv: false
           parallelism: 1

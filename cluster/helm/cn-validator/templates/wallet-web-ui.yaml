@@ -1,9 +1,10 @@
-{{- $walletWebUiLabel := include "appLabel" (list .Values "wallet-web-ui") }}
+{{- $walletWebUiLabel :=  "wallet-web-ui" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
     app: {{ $walletWebUiLabel }}
+    migration: {{ .Values.migration.id | quote }}
   name: {{ $walletWebUiLabel }}
   namespace: {{ .Release.Namespace }}
 spec:
@@ -61,6 +62,8 @@ kind: Service
 metadata:
   name: {{ $walletWebUiLabel }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    migration: {{ .Values.migration.id | quote }}
 spec:
   selector:
     app: {{ $walletWebUiLabel }}

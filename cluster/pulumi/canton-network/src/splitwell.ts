@@ -49,7 +49,7 @@ export async function installSplitwell(
     { dependsOn: [xns.ns] }
   );
 
-  installIngress(xns, globalDomainMigrationConfig);
+  installIngress(xns);
 
   const participantPostgres = splitPostgresInstances
     ? postgres.installPostgres(xns, 'participant-pg', true)
@@ -94,12 +94,13 @@ export async function installSplitwell(
     await installAuth0Secret(auth0Client, xns, 'splitwell', 'splitwell'),
   ]);
 
-  const validator = installValidatorApp({
+  const validator = await installValidatorApp({
     xns,
     extraDependsOn,
     participant,
-    globalDomainMigrationConfig,
-    domainMigrationId: globalDomainMigrationConfig.activeMigrationId,
+    migration: {
+      id: globalDomainMigrationConfig.activeMigrationId,
+    },
     additionalUsers: [
       auth0UserNameEnvVar('splitwell'),
       { name: 'CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME', value: providerWalletUser },
@@ -142,10 +143,7 @@ export async function installSplitwell(
   return validator;
 }
 
-function installIngress(
-  xns: ExactNamespace,
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig
-) {
+function installIngress(xns: ExactNamespace) {
   installCNHelmChart(
     xns,
     'cluster-ingress-splitwell-uis',
@@ -156,13 +154,6 @@ function installIngress(
         hostPrefix: '',
         svNamespace: xns.logicalName,
       },
-      ingress: {
-        globalDomain: {
-          migrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
-          activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
-        },
-      },
-
       withSvIngress: false,
     },
     {}

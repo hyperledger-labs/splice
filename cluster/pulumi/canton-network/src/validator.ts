@@ -11,7 +11,6 @@ import {
   DomainMigrationIndex,
   ExactNamespace,
   fetchAndInstallParticipantBootstrapDump,
-  GlobalDomainMigrationConfig,
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
@@ -62,8 +61,10 @@ export type ValidatorConfig = {
   participantAddress: Output<string> | string;
   globalDomainUrl: string;
   scanAddress: Output<string> | string;
-  domainMigrationId?: DomainMigrationIndex;
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig;
+  migration: {
+    id: DomainMigrationIndex;
+    migrating?: boolean;
+  };
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
 };
 
@@ -85,14 +86,6 @@ export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<
 
   const config = { ...baseConfig, backupConfig };
 
-  function migrationSuffixed(value: string) {
-    if (config.domainMigrationId) {
-      return `${value}-${config.domainMigrationId}`;
-    } else {
-      return value;
-    }
-  }
-
   const validatorSecrets =
     'validatorSecret' in config.secrets
       ? config.secrets
@@ -110,13 +103,7 @@ export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<
     : undefined;
 
   const validatorOnboardingSecret = config.onboardingSecret
-    ? [
-        installValidatorOnboardingSecret(
-          config.xns,
-          migrationSuffixed('validator'),
-          config.onboardingSecret
-        ),
-      ]
+    ? [installValidatorOnboardingSecret(config.xns, 'validator', config.onboardingSecret)]
     : [];
   const dependsOn: CnInput<pulumi.Resource>[] = [config.xns.ns, config.participant]
     .concat(validatorOnboardingSecret)
@@ -125,18 +112,12 @@ export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<
     .concat([validatorSecrets.validatorSecret, validatorSecrets.wallet, validatorSecrets.cns])
     .concat(config.extraDependsOn || []);
 
-  const mustIncludeUpgradeConfiguration =
-    !config.svValidator &&
-    config.domainMigrationId != undefined &&
-    (config.globalDomainMigrationConfig.upgradeMigrationId != undefined ||
-      config.globalDomainMigrationConfig.prepareUpgrade);
   return installCNHelmChart(
     config.xns,
-    migrationSuffixed('validator-' + config.xns.logicalName),
+    `validator-${config.xns.logicalName}`,
     'cn-validator',
     {
-      // required for top-ups
-      domainMigrationId: config.domainMigrationId?.toString(),
+      migration: config.migration,
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
@@ -148,7 +129,7 @@ export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<
       onboardingSecretFrom: config.onboardingSecret
         ? {
             secretKeyRef: {
-              name: validatorOnboardingSecretName(migrationSuffixed('validator')),
+              name: validatorOnboardingSecretName('validator'),
               key: 'secret',
               optional: false,
             },
@@ -169,13 +150,6 @@ export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<
       },
       participantAddress: config.participantAddress,
       additionalJvmOptions: jmxOptions(),
-      globalDomainUpgrade: mustIncludeUpgradeConfiguration
-        ? {
-            isActiveNode:
-              config.domainMigrationId == config.globalDomainMigrationConfig.activeMigrationId,
-            storageClassName: 'standard-rwo',
-          }
-        : undefined,
     },
     { dependsOn }
   );

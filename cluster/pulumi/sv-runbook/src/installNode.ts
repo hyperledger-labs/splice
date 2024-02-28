@@ -343,7 +343,7 @@ async function installSvAndValidator(config: SvConfig) {
     }),
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
     participantIdentitiesDumpPeriodicBackup: backupConfig,
-    domainMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
+    migration: { id: globalDomainMigrationConfig.activeMigrationId },
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

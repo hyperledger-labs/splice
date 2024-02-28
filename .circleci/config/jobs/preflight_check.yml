@@ -72,7 +72,7 @@ jobs:
           cmd: |
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
-            validator_app="validator-app-<< parameters.migration_id >>"
+            validator_app="validator-app"
             # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
             if [[ << parameters.wait_for_non_sv_nodes >> == true ]]; then
               cncluster wait splitwell $validator_app
@@ -179,7 +179,7 @@ jobs:
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
             # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
-            cncluster wait sv validator-app-<< parameters.migration_id >>
+            cncluster wait sv validator-app
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
@@ -273,7 +273,7 @@ jobs:
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
             # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
-            cncluster wait validator validator-app-<< parameters.migration_id >>
+            cncluster wait validator validator-app
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)

@@ -5,32 +5,32 @@ import {
   Auth0Client,
   BackupConfig,
   ChartValues,
+  CnInput,
+  cnsUiSecret,
   exactNamespace,
   ExactNamespace,
-  REPO_ROOT,
-  cnsUiSecret,
   fixedTokens,
-  setupBootstrapping,
+  GlobalDomainMigrationConfig,
+  imagePullSecret,
   imagePullSecretByNamespaceName,
   installCNRunbookHelmChart,
   installCNRunbookHelmChartByNamespaceName,
-  loadYamlFromFile,
-  validatorSecrets,
-  installValidatorOnboardingSecret,
   installLoopback,
-  imagePullSecret,
-  CnInput,
   installPostgresPasswordSecret,
-  GlobalDomainMigrationConfig,
+  installValidatorOnboardingSecret,
+  loadYamlFromFile,
+  REPO_ROOT,
+  setupBootstrapping,
+  validatorSecrets,
   ValidatorTopupConfig,
   nonSvValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
 import {
   CLUSTER_BASENAME,
-  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
-  TARGET_CLUSTER,
   localCharts,
+  TARGET_CLUSTER,
+  VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
   version,
 } from './utils';
 
@@ -49,7 +49,7 @@ const VALIDATOR_WALLET_USER_ID =
   process.env.VALIDATOR_WALLET_USER_ID || 'auth0|6526fab5214c99a9a8e1e3cc'; // Default to admin@validator.com at the validator-test tenant by default
 const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
-const activeMigrationId = GlobalDomainMigrationConfig.fromEnv().activeMigrationId.toString();
+const globalDomainMigrationConfig = GlobalDomainMigrationConfig.fromEnv();
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
@@ -110,11 +110,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
         hostPrefix: '',
         hostname: `${CLUSTER_BASENAME}.network.canton.global`,
         svNamespace: RUNBOOK_NAMESPACE,
-      },
-      ingress: {
-        globalDomain: {
-          activeMigrationId: activeMigrationId,
-        },
       },
       withSvIngress: false,
     },
@@ -224,7 +219,9 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
         SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
       }
     ),
-    domainMigrationId: activeMigrationId,
+    migration: {
+      id: globalDomainMigrationConfig.activeMigrationId,
+    },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
   };
 
@@ -261,7 +258,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     )
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : []);
 
-  const validator = installCNRunbookHelmChart(
+  return installCNRunbookHelmChart(
     xns,
     'validator',
     'cn-validator',
@@ -270,6 +267,4 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     version,
     dependsOn
   );
-
-  return validator;
 }

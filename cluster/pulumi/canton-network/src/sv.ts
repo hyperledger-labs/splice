@@ -39,7 +39,7 @@ import { GlobalDomainNode } from './globalDomainNode';
 import { installParticipant } from './ledger';
 import { installPostgresMetrics, Postgres } from './postgres';
 import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svconfs';
-import { installValidatorApp, installValidatorSecrets, ValidatorSecrets } from './validator';
+import { installValidatorApp, installValidatorSecrets } from './validator';
 
 export function installSvKeySecret(
   xns: ExactNamespace,
@@ -105,6 +105,14 @@ export interface SvConfig extends StaticSvConfig {
   sequencerPruningConfig: SequencerPruningConfig;
   splitPostgresInstances: boolean;
 }
+
+type InstalledMigrationSpecificSv = {
+  ingress: Release;
+  svApp: Release;
+  scan: Release;
+  globalDomain: GlobalDomainNode;
+  participant: Release;
+};
 
 async function getAcsBootstrappingDump(xns: ExactNamespace, config: BootstrappingDumpConfig) {
   const file = await getLatestSvcAcsDumpFile(xns, config);
@@ -212,14 +220,7 @@ export async function installSvNode(
     : postgres.installPostgres(xns, 'postgres', false);
 
   const appsPostgres = defaultPostgres || postgres.installPostgres(xns, `cn-apps-pg`, true);
-
-  const validatorSecrets = await installValidatorSecrets({
-    xns,
-    auth0Client: config.auth0Client,
-    auth0AppName: config.auth0ValidatorAppName,
-  });
-
-  const migrationIdSpecificComponents = await installMigrationIdSpecificComponents(
+  const activeMigrationComponents = installMigrationIdSpecificComponents(
     xns,
     globalDomainUpgradeConfig,
     defaultPostgres,
@@ -234,9 +235,16 @@ export async function installSvNode(
       syncSource: cometBftSyncSource,
     },
     config,
-    dependsOn,
+    dependsOn
+  ).activeComponent;
+
+  const validatorApp = await installValidator(
+    appsPostgres,
+    xns,
+    globalDomainUpgradeConfig,
+    baseConfig,
     backupConfigSecret,
-    validatorSecrets
+    activeMigrationComponents
   );
 
   const activeIngress = installCNHelmChart(
@@ -257,17 +265,16 @@ export async function installSvNode(
     },
     { dependsOn: [xns.ns] }
   );
-  const activeComponents = await migrationIdSpecificComponents.activeComponent;
 
   // TODO(#10153): Remove this duplication again
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
   const scanDbName = `scan_${sanitizedForPostgres(config.nodeName)}`;
   const validatorDbName = `validator_${sanitizedForPostgres(config.nodeName)}`;
-  installPostgresMetrics(appsPostgres, svDbName, [activeComponents.svApp]);
-  installPostgresMetrics(appsPostgres, scanDbName, [activeComponents.scan]);
-  installPostgresMetrics(appsPostgres, validatorDbName, [activeComponents.validatorApp]);
+  installPostgresMetrics(appsPostgres, svDbName, [activeMigrationComponents.svApp]);
+  installPostgresMetrics(appsPostgres, scanDbName, [activeMigrationComponents.scan]);
+  installPostgresMetrics(appsPostgres, validatorDbName, [validatorApp]);
 
-  return { ...activeComponents, ingress: activeIngress };
+  return { ...activeMigrationComponents, validatorApp, ingress: activeIngress };
 }
 
 function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {
@@ -285,24 +292,27 @@ function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): Persi
 async function installValidator(
   postgres: Postgres,
   xns: ExactNamespace,
-  migrationId: DomainMigrationIndex,
   globalDomainMigrationConfig: GlobalDomainMigrationConfig,
   svConfig: SvConfig,
-  participant: Release,
   backupConfigSecret: Resource | undefined,
-  svApp: Release,
-  scan: Release,
-  validatorSecrets: ValidatorSecrets
+  sv: InstalledMigrationSpecificSv
 ) {
-  const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
-  const globalDomainUrl = `https://sequencer-${migrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
-
-  const validator = await installValidatorApp({
+  const validatorSecrets = await installValidatorSecrets({
     xns,
-    domainMigrationId: migrationId,
-    globalDomainMigrationConfig: globalDomainMigrationConfig,
+    auth0Client: svConfig.auth0Client,
+    auth0AppName: svConfig.auth0ValidatorAppName,
+  });
+
+  const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
+  const globalDomainUrl = `https://sequencer-${globalDomainMigrationConfig.activeMigrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
+
+  return await installValidatorApp({
+    xns,
+    migration: {
+      id: globalDomainMigrationConfig.activeMigrationId,
+    },
     validatorWalletUser: svConfig.validatorWalletUser,
-    participant: participant,
+    participant: sv.participant,
     disableAllocateLedgerApiUserParty: true,
     topupConfig: svConfig.topupConfig,
     backupConfig:
@@ -313,14 +323,13 @@ async function installValidator(
           }
         : undefined,
     persistenceConfig: persistenceConfig(postgres, validatorDbName),
-    extraDependsOn: [svApp, postgres, scan],
+    extraDependsOn: [sv.svApp, postgres, sv.scan],
     svValidator: true,
-    participantAddress: participant.name,
+    participantAddress: sv.participant.name,
     globalDomainUrl: globalDomainUrl,
-    scanAddress: pulumi.interpolate`http://scan-app-${migrationId}.${svConfig.nodeName}:5012`,
+    scanAddress: pulumi.interpolate`http://scan-app-${globalDomainMigrationConfig.activeMigrationId}.${svConfig.nodeName}:5012`,
     secrets: validatorSecrets,
   });
-  return validator;
 }
 
 function installMigrationIdSpecificComponents(
@@ -339,13 +348,11 @@ function installMigrationIdSpecificComponents(
     syncSource?: Release;
   },
   svConfig: SvConfig,
-  dependsOn: CnInput<pulumi.Resource>[],
-  backupConfigSecret: pulumi.Resource | undefined,
-  validatorSecrets: ValidatorSecrets
+  dependsOn: CnInput<pulumi.Resource>[]
 ) {
   return installMigrationIdSpecificComponent(
     globalDomainMigrationConfig,
-    async (migrationId, isActive) => {
+    (migrationId, isActive) => {
       const sequencerPostgres =
         defaultPostgres || postgres.installPostgres(xns, `sequencer-${migrationId}-pg`, true);
       const mediatorPostgres =
@@ -427,25 +434,11 @@ function installMigrationIdSpecificComponents(
         participant,
         appsPostgres
       );
-      const validatorApp = await installValidator(
-        appsPostgres,
-        xns,
-        migrationId,
-        globalDomainMigrationConfig,
-        svConfig,
-        participant,
-        backupConfigSecret,
-        svApp,
-        scan,
-        validatorSecrets
-      );
-
       return {
         globalDomain: globalDomainNode,
         participant: participant,
         svApp: svApp,
         scan: scan,
-        validatorApp: validatorApp,
         ingress: migrationIngress,
       };
     }
@@ -530,11 +523,9 @@ function installSvApp(
     };
   }
 
-  const svApp = installCNHelmChart(xns, `sv-app-${domainMigrationId}`, 'cn-sv-node', svValues, {
+  return installCNHelmChart(xns, `sv-app-${domainMigrationId}`, 'cn-sv-node', svValues, {
     dependsOn: dependsOn.concat([participant, postgres, globalDomain]),
   });
-
-  return svApp;
 }
 
 function installScan(
@@ -562,8 +553,7 @@ function installScan(
     participantAddress: participant.name,
     domainMigrationId: domainMigrationId.toString(),
   };
-  const scanApp = installCNHelmChart(xns, `scan-${domainMigrationId}`, 'cn-scan', scanValues, {
+  return installCNHelmChart(xns, `scan-${domainMigrationId}`, 'cn-scan', scanValues, {
     dependsOn: [svApp, globalDomainNode],
   });
-  return scanApp;
 }

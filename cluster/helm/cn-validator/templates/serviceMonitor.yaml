@@ -1,11 +1,12 @@
-{{- $validatorAppLabel := include "appLabel" (list .Values "validator-app") }}
+{{- $validatorAppLabel := "validator-app" }}
 {{- if .Values.metrics.enable }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
     release: {{ .Values.metrics.release }}
-  name: {{ include "appLabel" (list .Values "validator") }}
+    migration: {{ .Values.migration.id | quote }}
+  name: {{ "validator" }}
   namespace: {{ .Release.Namespace }}
 spec:
   endpoints:

@@ -175,7 +175,7 @@ export const installChaosMesh = ({ dependsOn }: ChaosMeshArguments): k8s.helm.v3
     'participant-0',
     'scan-app-0',
     'sv-app-0',
-    'validator-app-0',
+    'validator-app',
   ].forEach(name => podKillSchedule(ns, name, 'sv-4', [roleBinding, ...dependsOn]));
   return chaosMesh;
 };

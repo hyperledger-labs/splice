@@ -686,9 +686,11 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
-        "domainMigrationId": "0",
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "migration": {
+          "id": 0
+        },
         "participantAddress": "participant",
         "persistence": {
           "host": "apps-pg",

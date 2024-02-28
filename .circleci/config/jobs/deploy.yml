@@ -168,6 +168,9 @@ jobs:
       global_domain_legacy_migration_id:
         type: integer
         default: -1
+      global_domain_migrate_from_id:
+        type: integer
+        default: -1
       cancel_workflow_on_failure:
         type: boolean
         default: false
@@ -269,6 +272,9 @@ jobs:
               export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
               export CN_INSTALL_SPLITWELL="false"
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
+            fi
+            if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
             fi
             cncluster ci_apply
       - when:

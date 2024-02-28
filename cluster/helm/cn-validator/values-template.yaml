@@ -25,6 +25,14 @@ persistence:
   user: cnadmin
   secretName: "postgres-secrets"
 
+migration:
+  id: 0
+  migrating: false
+  attachPvc: true
+# pvc used for migrations
+pvc:
+  volumeStorageClass: standard-rwo
+
 # k8s affinity for all deployed pods (optional)
 # affinity:
 
