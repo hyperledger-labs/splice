@@ -70,13 +70,13 @@ template MemberTraffic with
       && migrationId >= 0
 
 
-initialMemberTraffic : Party -> Text -> Text -> Int -> Int -> MemberTraffic
-initialMemberTraffic svc memberId domainId migrationId amount = MemberTraffic with
+initialMemberTraffic : Party -> Text -> Text -> Int -> MemberTraffic
+initialMemberTraffic svc memberId domainId migrationId = MemberTraffic with
     svc
     memberId
     migrationId
     domainId
-    totalPurchased = amount
+    totalPurchased = 0
     numPurchases = 0
     ccSpent = 0.0
     usdSpent = 0.0

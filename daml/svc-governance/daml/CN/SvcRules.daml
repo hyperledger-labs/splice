@@ -18,7 +18,7 @@ import CC.Round
 import CC.Types
 import CC.ValidatorLicense
 import CN.Wallet.Subscriptions
-import CC.GlobalDomain (initialMemberTraffic, MemberTraffic)
+import CC.GlobalDomain (MemberTraffic)
 
 import qualified CN.CometBft as CometBft
 import CN.Cns
@@ -329,7 +329,6 @@ data SvcRulesConfig = SvcRulesConfig with
     leaderInactiveTimeout: RelTime -- ^ The amount of time given to the leader to complete an action it should take care of
     domainNodeConfigLimits : DomainNodeConfigLimits  -- ^ Limits to enforce on the members' `DomainNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
-    initialTrafficGrant: Int -- ^ Extra traffic granted to SVs at the time of joining
     globalDomain : SvcGlobalDomainConfig
     nextScheduledDomainUpgrade: Optional DomainUpgradeSchedule
   deriving (Eq, Show)
@@ -378,7 +377,6 @@ template SvcRules with
         newMemberParticipantId : Text
         joinedAsOfRound : Round
         domainId : Text
-        migrationId : Int
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
@@ -423,8 +421,6 @@ template SvcRules with
             svName = newMemberName
             number = 0
             status = None
-        -- create traffic contracts for the initial traffic grant to the SV
-        create (initialMemberTraffic svc newMemberParticipantId domainId migrationId config.initialTrafficGrant)
         create SvcRules with
           svc
           epoch
@@ -501,7 +497,6 @@ template SvcRules with
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
         coinRulesCid: ContractId CoinRules
-        migrationId : Int
       controller sv
       do
 
@@ -524,7 +519,6 @@ template SvcRules with
           newMemberParticipantId = svOnboardingConfirmed.svParticipantId
           joinedAsOfRound = earliestRound.round
           domainId = coinConfig.globalDomain.activeDomain
-          migrationId
 
 
     -- Global domain config management

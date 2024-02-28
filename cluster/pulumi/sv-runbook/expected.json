@@ -699,7 +699,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 33330
+          "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64b16b9ff7a0dfd00ea3704e"

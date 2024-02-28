@@ -3,13 +3,13 @@ import {
   BackupConfig,
   bootstrapDataBucketSpec,
   BootstrappingDumpConfig,
-  domainFeesConfig,
   envFlag,
   GlobalDomainMigrationConfig,
   isDevNet,
   requireEnv,
   sequencerPruningConfig,
-  ValidatorTopupConfig,
+  svValidatorTopupConfig,
+  nonSvValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
 import { installChaosMesh } from './chaosMesh';
@@ -116,11 +116,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   }
   const identitiesBackupLocation = { bucket: bootstrapBucketSpec };
 
-  const topupConfig: ValidatorTopupConfig = {
-    targetThroughput: domainFeesConfig.targetThroughput,
-    minTopupInterval: domainFeesConfig.minTopupInterval,
-  };
-
   if (bootstrappingConfig) {
     const end = new Date(Date.parse(bootstrappingConfig.date));
     // We search within an interval of 24 hours. Given that we usually backups every 10min, this gives us
@@ -149,7 +144,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     periodicBackupConfig,
     identitiesBackupLocation,
     bootstrappingDumpConfig,
-    topupConfig,
+    topupConfig: svValidatorTopupConfig,
     splitPostgresInstances,
     sequencerPruningConfig,
     globalDomainUpgradeConfig,
@@ -174,7 +169,10 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     periodicBackupConfig,
     bootstrappingDumpConfig,
     // x10 validator1's traffic targetThroughput for load tester -- see #9064
-    { ...topupConfig, targetThroughput: topupConfig.targetThroughput * 10 }
+    {
+      ...nonSvValidatorTopupConfig,
+      targetThroughput: nonSvValidatorTopupConfig.targetThroughput * 10,
+    }
   );
 
   if (mustInstallSplitwell) {
@@ -188,7 +186,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
       nonSvComponentsDependencies,
       periodicBackupConfig,
       bootstrappingDumpConfig,
-      topupConfig
+      nonSvValidatorTopupConfig
     );
   }
 

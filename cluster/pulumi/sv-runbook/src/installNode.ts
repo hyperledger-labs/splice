@@ -16,8 +16,6 @@ import {
   isDevNet,
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
-  domainFeesConfig,
-  ValidatorTopupConfig,
   REPO_ROOT,
   svAppSecrets,
   svKeySecret,
@@ -30,6 +28,8 @@ import {
   CnInput,
   sequencerPruningConfig,
   GlobalDomainMigrationConfig,
+  ValidatorTopupConfig,
+  svValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
@@ -99,11 +99,6 @@ export async function installNode(
 
   const svKey = svKeyFromSecret('sv');
 
-  const topupConfig: ValidatorTopupConfig = {
-    targetThroughput: domainFeesConfig.targetThroughput,
-    minTopupInterval: domainFeesConfig.minTopupInterval,
-  };
-
   const { sv, validator } = await installSvAndValidator({
     xns,
     participantBootstrapDumpSecret,
@@ -112,7 +107,7 @@ export async function installNode(
     loopback,
     backupConfigSecret,
     backupConfig,
-    topupConfig,
+    topupConfig: svValidatorTopupConfig,
     svKey,
     onboardingName: svAppConfig.onboardingName,
     cometBftConnectionUri: svAppConfig.cometBftConnectionUri,

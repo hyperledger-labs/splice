@@ -67,12 +67,10 @@ initCollective initialRoundNumber isDevNet = do
         leaderInactiveTimeout = seconds 70
         domainNodeConfigLimits = defaultDomainNodeConfigLimits
         maxTextLength = 1024
-        initialTrafficGrant = 1_000_000
         globalDomain = initialSvcGlobalDomainConfig
         nextScheduledDomainUpgrade = None
   let coinConfig = defaultCoinConfig
   let cnsRulesConfig = defaultCnsRulesConfig
-  let migrationId = 0
 
   now <- getTime
   -- have sv1 bootstrap the collective
@@ -109,7 +107,6 @@ initCollective initialRoundNumber isDevNet = do
         if initialRoundNumber == 0 then hours 24 else defaultCoinConfig.tickDuration
       cnsRulesConfig
       config
-      migrationId
       initialTrafficState = Map.empty
       isDevNet
     SvcBootstrap_Bootstrap
@@ -135,7 +132,6 @@ initCollective initialRoundNumber isDevNet = do
       newMemberParticipantId = svName <> "-participant-id"
       joinedAsOfRound = earliestOpenRound.round
       domainId = coinConfig.globalDomain.activeDomain
-      migrationId
 
   -- check that the SvStatusReports are present
   checkSvStatusReports app

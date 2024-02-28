@@ -201,7 +201,7 @@ class SvSvcAutomationService(
       )
     )
     registerTrigger(
-      new SvOnboardingMediatorUnlimitedTrafficTrigger(
+      new SvOnboardingUnlimitedTrafficTrigger(
         wallClockTriggerContext,
         svcStore,
         participantAdminConnection,
@@ -395,7 +395,7 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
       aTrigger[SvPackageVettingTrigger],
       aTrigger[SvOffboardingPartyToParticipantProposalTrigger],
       aTrigger[SvOffboardingMediatorTrigger],
-      aTrigger[SvOnboardingMediatorUnlimitedTrafficTrigger],
+      aTrigger[SvOnboardingUnlimitedTrafficTrigger],
       aTrigger[SvOffboardingSequencerTrigger],
       aTrigger[ReconcileSequencerLimitWithMemberTrafficTrigger],
       aTrigger[SvNamespaceMembershipTrigger],

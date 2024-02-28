@@ -96,7 +96,7 @@ class SvReonboardingIntegrationTest
       .withManualStart
 
   "restore SV from namespace only" in { implicit env =>
-    // Mediators/sequencers that have been offboarderded stay in a broken state which is fine in prod
+    // Mediators/sequencers that have been offboarded stay in a broken state which is fine in prod
     // (you can onboard a fresh mediator/sequencer)
     // but annoying in tests so we use a dedicated Canton instance for this test.
     withCantonSvNodes(

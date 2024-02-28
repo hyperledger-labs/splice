@@ -2376,7 +2376,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 33330
+          "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc0956a97fe9577249d7"
@@ -3247,7 +3247,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 33330
+          "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc353bbc7ca776e27bf4"
@@ -4118,7 +4118,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 33330
+          "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc4431b562edb8995da6"
@@ -4989,7 +4989,7 @@
         "topup": {
           "enabled": true,
           "minTopupInterval": "1m",
-          "targetThroughput": 33330
+          "targetThroughput": 0
         },
         "useSequencerConnectionsFromScan": false,
         "validatorWalletUser": "auth0|64afbc720e20777e46fff490"

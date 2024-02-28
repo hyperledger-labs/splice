@@ -10,6 +10,7 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
@@ -48,50 +49,70 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
           Future.successful(TaskSuccess(s"Skipping MemberTraffic with invalid memberId: ${err}"))
         },
         memberId => {
-          val domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
-          for {
-            // Compute new extra traffic limit
-            svcRules <- store.getSvcRules()
-            trafficLimitOffset = svcRules.payload.initialTrafficState.asScala
-              .get(memberId.toProtoPrimitive)
-              .fold(0L)(_.consumedTraffic)
-            totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, domainId)
-            newExtraTrafficLimit = trafficLimitOffset + totalPurchasedTraffic
-
-            // Fetch current extra traffic limit
-            currentExtraTrafficLimit <- participantAdminConnection
-              .lookupTrafficControlState(domainId, memberId)
-              .map(_.fold(0L)(_.mapping.totalExtraTrafficLimit.value))
-
-            // Compare and reconcile old and new limits
-            taskOutcome <-
-              if (currentExtraTrafficLimit < newExtraTrafficLimit) {
-                participantAdminConnection
-                  .getParticipantId()
-                  .flatMap(svParticipantId =>
-                    participantAdminConnection
-                      .ensureTrafficControlState(
-                        domainId,
-                        memberId,
-                        newExtraTrafficLimit,
-                        svParticipantId.uid.namespace.fingerprint,
-                      )
-                      .map(_ =>
-                        TaskSuccess(
-                          s"Updated extra traffic limit for member ${memberId} from ${currentExtraTrafficLimit} to ${newExtraTrafficLimit}"
-                        )
-                      )
-                  )
+          store
+            .getSvcRules()
+            .flatMap(svcRules => {
+              if (SvUtil.listActiveSvParticipantsAndMediators(svcRules).contains(memberId)) {
+                // SVs are granted unlimited traffic and do not need to purchase it via MemberTraffic contracts.
+                // While the top-up trigger for SV validators is disabled by default, we also explicitly ignore
+                // SV related MemberTraffic contracts here as a safeguard for the case of 3rd party top-ups
+                // of SV nodes or an SV validator misconfiguration that changes the defaults.
+                Future
+                  .successful(TaskSuccess(s"Skipping MemberTraffic contract for SV node $memberId"))
               } else {
-                Future(
-                  TaskSuccess(
-                    s"Skipping since traffic limit is already up to date (previous limit = ${currentExtraTrafficLimit}, new limit = ${newExtraTrafficLimit})."
-                  )
-                )
+                val domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
+                val trafficLimitOffset = svcRules.payload.initialTrafficState.asScala
+                  .get(memberId.toProtoPrimitive)
+                  .fold(0L)(_.consumedTraffic)
+                reconcileExtraTrafficLimitForMember(memberId, domainId, trafficLimitOffset)
               }
-          } yield taskOutcome
+            })
         },
       )
+  }
+
+  private def reconcileExtraTrafficLimitForMember(
+      memberId: Member,
+      domainId: DomainId,
+      trafficLimitOffset: Long,
+  )(implicit tc: TraceContext): Future[TaskSuccess] = {
+    for {
+      // Compute new extra traffic limit
+      totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, domainId)
+      newExtraTrafficLimit = trafficLimitOffset + totalPurchasedTraffic
+
+      // Fetch current extra traffic limit
+      currentExtraTrafficLimit <- participantAdminConnection
+        .lookupTrafficControlState(domainId, memberId)
+        .map(_.fold(0L)(_.mapping.totalExtraTrafficLimit.value))
+
+      // Compare and reconcile old and new limits
+      taskOutcome <-
+        if (currentExtraTrafficLimit < newExtraTrafficLimit) {
+          participantAdminConnection
+            .getParticipantId()
+            .flatMap(svParticipantId =>
+              participantAdminConnection
+                .ensureTrafficControlState(
+                  domainId,
+                  memberId,
+                  newExtraTrafficLimit,
+                  svParticipantId.uid.namespace.fingerprint,
+                )
+                .map(_ =>
+                  TaskSuccess(
+                    s"Updated extra traffic limit for member ${memberId} from ${currentExtraTrafficLimit} to ${newExtraTrafficLimit}"
+                  )
+                )
+            )
+        } else {
+          Future(
+            TaskSuccess(
+              s"Skipping since traffic limit is already up to date (previous limit = ${currentExtraTrafficLimit}, new limit = ${newExtraTrafficLimit})."
+            )
+          )
+        }
+    } yield taskOutcome
   }
 
 }

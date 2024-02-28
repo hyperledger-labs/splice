@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
   SequencerConfig,
   SvcGlobalDomainConfig,
 }
-import com.daml.network.codegen.java.cn.svcrules.SvcRulesConfig
+import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
 import com.daml.network.codegen.java.cn.{cometbft, svc}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.BackupDumpConfig
@@ -26,13 +26,13 @@ import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvScanConfig
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.BackupDump
+import com.daml.network.util.{AssignedContract, BackupDump}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
@@ -68,8 +68,6 @@ object SvUtil {
     List.empty.asJava,
     List.empty.asJava,
   )
-
-  private val defaultInitialTrafficGrant = 1000_000L
 
   private def defaultSvcGlobalDomainConfig(domainId: DomainId) = new SvcGlobalDomainConfig(
     // domains
@@ -186,7 +184,6 @@ object SvUtil {
     new RelTime(TimeUnit.SECONDS.toMicros(70)), // leaderInactiveTimeout
     defaultDomainNodeConfigLimits,
     1024, // maxTextLength
-    defaultInitialTrafficGrant,
     defaultSvcGlobalDomainConfig(domainId), // globalDomainConfig
     Optional.empty(), // nextScheduledHardDomainMigration
   )
@@ -308,4 +305,34 @@ object SvUtil {
       }
     } yield response
   }
+
+  def listActiveSvParticipantsAndMediators(
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules]
+  ): Seq[Member] = {
+    val svParticipants = svcRules.contract.payload.members
+      .values()
+      .asScala
+      .map(_.participantId)
+      .toSeq
+      .map(ParticipantId.tryFromProtoPrimitive)
+    val offboardedSvParticipants = svcRules.contract.payload.offboardedMembers
+      .values()
+      .asScala
+      .map(_.participantId)
+      .toSeq
+      .map(ParticipantId.tryFromProtoPrimitive)
+    val svMediators = svcRules.contract.payload.members
+      .values()
+      .asScala
+      .toSeq
+      .flatMap(_.domainNodes.values().asScala)
+      .flatMap(_.mediator.toScala)
+      .map(m =>
+        MediatorId
+          .fromProtoPrimitive(m.mediatorId, "mediator")
+          .fold(err => throw new IllegalArgumentException(err.message), identity)
+      )
+    svParticipants.filterNot(offboardedSvParticipants.contains) ++ svMediators
+  }
+
 }

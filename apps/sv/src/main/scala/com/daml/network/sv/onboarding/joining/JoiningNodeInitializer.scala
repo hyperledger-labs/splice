@@ -430,7 +430,6 @@ class JoiningNodeInitializer(
                         openMiningRounds.middle.contractId,
                         openMiningRounds.newest.contractId,
                         coinRules.contractId,
-                        config.domainMigrationId,
                       )
                     )
                     svcStoreWithIngestion.connection

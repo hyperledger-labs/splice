@@ -4,3 +4,6 @@ useSequencerConnectionsFromScan: false
 persistence:
   host: apps-pg
   secretName: apps-pg-secret
+
+topup:
+  enabled: false

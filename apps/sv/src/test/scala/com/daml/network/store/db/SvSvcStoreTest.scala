@@ -1230,7 +1230,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         "user666ParticipantId",
         new Round(1L),
         dummyDomain.toProtoPrimitive,
-        domainMigrationId,
       )
     )
   )
@@ -1244,7 +1243,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         "user667ParticipantId",
         new Round(1L),
         dummyDomain.toProtoPrimitive,
-        domainMigrationId,
       )
     )
   )
@@ -1399,7 +1397,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         new RelTime(1),
         new RelTime(1),
         new DomainNodeConfigLimits(new CometBftConfigLimits(1, 1, 1, 1, 1)),
-        1,
         1,
         new SvcGlobalDomainConfig(Collections.emptyMap(), newDomainId, newDomainId),
         Optional.empty(),

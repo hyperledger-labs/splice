@@ -167,7 +167,7 @@ case class CNNodeEnvironmentDefinition(
         if (name.startsWith("sv"))
           domainFeesEnabledConfig
             .focus(_.domains.global.buyExtraTraffic.targetThroughput)
-            .replace(NonNegativeNumeric.tryCreate(BigDecimal(80000)))
+            .replace(NonNegativeNumeric.tryCreate(BigDecimal(0)))
         else if (name.contains("bob"))
           domainFeesEnabledConfig
             .focus(_.domains.global.buyExtraTraffic.targetThroughput)

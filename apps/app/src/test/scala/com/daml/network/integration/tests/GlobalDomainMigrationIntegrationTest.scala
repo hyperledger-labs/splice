@@ -643,7 +643,6 @@ class GlobalDomainMigrationIntegrationTest
                     "alice-participant-id",
                     new Round(42),
                     globalDomainId.toProtoPrimitive,
-                    sv1LocalBackend.config.domainMigrationId,
                   )
                 )
               ),

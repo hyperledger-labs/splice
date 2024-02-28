@@ -56,7 +56,6 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
         "alice-participant-id",
         new Round(42),
         domainId,
-        0L,
       )
     )
   )
@@ -339,7 +338,6 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
           sv1Backend.getSvcInfo().svcRules.payload.config.leaderInactiveTimeout,
           sv1Backend.getSvcInfo().svcRules.payload.config.domainNodeConfigLimits,
           sv1Backend.getSvcInfo().svcRules.payload.config.maxTextLength,
-          sv1Backend.getSvcInfo().svcRules.payload.config.initialTrafficGrant,
           sv1Backend.getSvcInfo().svcRules.payload.config.globalDomain,
           sv1Backend.getSvcInfo().svcRules.payload.config.nextScheduledDomainUpgrade,
         )

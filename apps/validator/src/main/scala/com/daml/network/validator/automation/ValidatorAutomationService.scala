@@ -39,6 +39,7 @@ class ValidatorAutomationService(
     submissionRequestAmplification: PositiveInt,
     prevetDuration: NonNegativeFiniteDuration,
     globalDomainAlias: DomainAlias,
+    isSvValidator: Boolean,
     clock: Clock,
     walletManager: UserWalletManager,
     store: ValidatorStore,
@@ -83,7 +84,15 @@ class ValidatorAutomationService(
   registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
   registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
 
-  if (buyExtraTrafficConfig.targetThroughput.value > 0L)
+  if (isSvValidator)
+    logger.info(
+      s"Not starting TopupMemberTrafficTrigger, as this is an SV validator."
+    )(TraceContext.empty)
+  else if (buyExtraTrafficConfig.targetThroughput.value <= 0L)
+    logger.info(
+      s"Not starting TopupMemberTrafficTrigger, as the validator is not configured to buy extra traffic."
+    )(TraceContext.empty)
+  else
     registerTrigger(
       new TopupMemberTrafficTrigger(
         triggerContext,
@@ -97,10 +106,6 @@ class ValidatorAutomationService(
         domainMigrationId,
       )
     )
-  else
-    logger.info(
-      s"Not starting TopupMemberTrafficTrigger, as the validator is not configured to buy extra traffic."
-    )(TraceContext.empty)
 
   backupDumpConfig.foreach(config =>
     registerTrigger(

@@ -1375,7 +1375,6 @@ trait CoinTransferUtil { self: StoreTest =>
           new cometbftCodegen.CometBftConfigLimits(1, 1, 1, 1, 1)
         ),
         1,
-        1,
         new globaldomainCodegen.SvcGlobalDomainConfig(
           Collections.emptyMap(),
           newDomainId,

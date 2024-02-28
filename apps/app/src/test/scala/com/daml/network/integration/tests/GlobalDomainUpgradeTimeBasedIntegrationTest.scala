@@ -211,7 +211,6 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
                 "alice-participant-id",
                 dummyRound,
                 previousGlobalId.toProtoPrimitive,
-                sv1Backend.config.domainMigrationId,
               )
             )
           ),

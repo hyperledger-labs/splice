@@ -15,8 +15,6 @@ import {
   installCNRunbookHelmChart,
   installCNRunbookHelmChartByNamespaceName,
   loadYamlFromFile,
-  domainFeesConfig,
-  ValidatorTopupConfig,
   validatorSecrets,
   installValidatorOnboardingSecret,
   installLoopback,
@@ -24,6 +22,8 @@ import {
   CnInput,
   installPostgresPasswordSecret,
   GlobalDomainMigrationConfig,
+  ValidatorTopupConfig,
+  nonSvValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
 import {
@@ -87,11 +87,6 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   }).result;
   const passwordSecret = installPostgresPasswordSecret(xns, password, 'postgres-secrets');
 
-  const topupConfig: ValidatorTopupConfig = {
-    targetThroughput: domainFeesConfig.targetThroughput,
-    minTopupInterval: domainFeesConfig.minTopupInterval,
-  };
-
   const validator = await installValidator({
     xns,
     onboardingSecret,
@@ -101,7 +96,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     loopback,
     backupConfigSecret,
     backupConfig,
-    topupConfig,
+    topupConfig: nonSvValidatorTopupConfig,
     otherDeps: [passwordSecret],
   });
 

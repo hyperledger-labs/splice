@@ -9,78 +9,87 @@ import com.daml.network.automation.{
 }
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.topology.{DomainId, MediatorId}
+import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class SvOnboardingMediatorUnlimitedTrafficTrigger(
+class SvOnboardingUnlimitedTrafficTrigger(
     override protected val context: TriggerContext,
     svcStore: SvSvcStore,
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[SvOnboardingMediatorUnlimitedTrafficTrigger.Task] {
+) extends PollingParallelTaskExecutionTrigger[SvOnboardingUnlimitedTrafficTrigger.Task] {
 
-  import SvOnboardingMediatorUnlimitedTrafficTrigger.Task
+  import SvOnboardingUnlimitedTrafficTrigger.Task
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[Task]] = {
     for {
       svcRules <- svcStore.getSvcRules()
-      mediatorState <- participantAdminConnection.getMediatorDomainState(
-        svcRules.domain
-      )
-      mediatorsWithTrafficState <- mediatorState.mapping.active.forgetNE.traverse { mediatorId =>
-        for {
-          state <- participantAdminConnection.lookupTrafficControlState(svcRules.domain, mediatorId)
-        } yield mediatorId -> state
+      svMembersWithTrafficState <- SvUtil.listActiveSvParticipantsAndMediators(svcRules).traverse {
+        memberId =>
+          for {
+            state <- participantAdminConnection.lookupTrafficControlState(svcRules.domain, memberId)
+          } yield memberId -> state
       }
-
     } yield {
-      mediatorsWithTrafficState.collect {
-        case (mediator, None) => Task(mediator, svcRules.domain)
-        case (mediator, Some(result))
+      svMembersWithTrafficState.collect {
+        case (memberId, None) => Task(memberId, svcRules.domain)
+        case (memberId, Some(result))
             if result.mapping.totalExtraTrafficLimit != PositiveLong.MaxValue =>
-          Task(mediator, svcRules.domain)
+          Task(memberId, svcRules.domain)
       }
     }
   }
 
-  override protected def completeTask(task: SvOnboardingMediatorUnlimitedTrafficTrigger.Task)(
-      implicit tc: TraceContext
+  override protected def completeTask(task: SvOnboardingUnlimitedTrafficTrigger.Task)(implicit
+      tc: TraceContext
   ): Future[TaskOutcome] =
     for {
       participantId <- participantAdminConnection.getParticipantId()
       _ <- participantAdminConnection.ensureTrafficControlState(
         task.domainId,
-        task.mediatorId,
-        Long.MaxValue,
+        task.memberId,
+        PositiveLong.MaxValue.value,
         participantId.uid.namespace.fingerprint,
       )
-    } yield TaskSuccess("")
+    } yield TaskSuccess(
+      s"Updated traffic limit for ${task.memberId} on ${task.domainId} to PositiveLong.MaxValue"
+    )
 
   override protected def isStaleTask(task: Task)(implicit
       tc: TraceContext
   ): Future[Boolean] = for {
-    mediatorState <- participantAdminConnection.getMediatorDomainState(task.domainId)
-  } yield !mediatorState.mapping.active.contains(task.mediatorId)
+    svcRules <- svcStore.getSvcRules()
+    trafficState <- participantAdminConnection.lookupTrafficControlState(
+      task.domainId,
+      task.memberId,
+    )
+  } yield {
+    !SvUtil.listActiveSvParticipantsAndMediators(svcRules).contains(task.memberId)
+    || trafficState.fold(PositiveLong.one)(
+      _.mapping.totalExtraTrafficLimit
+    ) == PositiveLong.MaxValue
+  }
 
 }
 
-object SvOnboardingMediatorUnlimitedTrafficTrigger {
+object SvOnboardingUnlimitedTrafficTrigger {
   final case class Task(
-      mediatorId: MediatorId,
+      memberId: Member,
       domainId: DomainId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
       prettyOfClass(
-        param("mediatorId", _.mediatorId),
+        param("memberId", _.memberId),
         param("domainId", _.domainId),
       )
   }

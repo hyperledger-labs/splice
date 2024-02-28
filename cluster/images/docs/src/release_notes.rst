@@ -17,6 +17,9 @@ Release Notes
   * Preliminary documentation of :ref:`restoring from backups <sv_restore>`.
     Note that for now, only the case of restoring a full SV node from a backup is fully covered.
 
+* SVs do not pay domain fees anymore for their nodes. Therefore, traffic top-ups do not need to be configured for SV validators.
+  In keeping with this, `topup.enabled` in `sv-validator-values.yaml` is set to `false`.
+
 2024-02-26
 ----------
 

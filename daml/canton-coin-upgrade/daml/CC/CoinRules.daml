@@ -153,7 +153,7 @@ template CoinRules
                 numPurchases = acc.numPurchases + traffic.numPurchases
                 usdSpent = acc.usdSpent + traffic.usdSpent
                 ccSpent = acc.ccSpent + traffic.ccSpent
-              ) (initialMemberTraffic svc first.memberId first.domainId first.migrationId 0) traffics
+              ) (initialMemberTraffic svc first.memberId first.domainId first.migrationId) traffics
         create mergedTraffic
 
     -- Coin usage

@@ -514,6 +514,7 @@ class ValidatorApp(
         config.domains.global.submissionRequestAmplification,
         config.prevetDuration,
         config.domains.global.alias,
+        config.svValidator,
         clock,
         walletManager,
         store,

@@ -481,19 +481,13 @@ class FoundingNodeInitializer(
           svcStore.lookupCoinRules(),
           svcStore.lookupSvcRulesWithOffset(),
         ).tupled
-        participantTrafficState = trafficStateForAllMembers
-          .find(_.member == participantId)
-          .map(_.trafficState)
         _ <- (
           participantAdminConnection.ensureTrafficControlState(
             domainId,
             participantId,
-            participantTrafficState.fold(0L)(
-              _.extraTrafficConsumed.value
-            ) + svcRulesConfig.initialTrafficGrant,
+            Long.MaxValue,
             participantId.uid.namespace.fingerprint,
           ),
-          // TODO(#6256): Remove this and make SvApp pay for mediator traffic as well
           participantAdminConnection.ensureTrafficControlState(
             domainId,
             mediatorId,
@@ -560,7 +554,6 @@ class FoundingNodeInitializer(
                           foundingConfig.initialCnsConfig.entryFee,
                         ),
                         svcRulesConfig,
-                        config.domainMigrationId,
                         trafficStateForAllMembers
                           .map(m =>
                             m.member.toProtoPrimitive -> new cn.svcrules.TrafficState(
