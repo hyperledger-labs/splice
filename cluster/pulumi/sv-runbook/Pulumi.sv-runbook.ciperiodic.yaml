@@ -1,0 +1,2 @@
+secretsprovider: gcpkms://projects/da-cn-shared/locations/us-central1/keyRings/pulumi/cryptoKeys/shared
+encryptedkey: CiQAras7ydJp9tCLyrnYwwGij8vmShrUzmMAmxJRa5roo4jkfJMSSQCKstUGBLKUD7hQir2lpieTHum+RMAFmG+oCD/uyjwH3X90olxJcWBaGQUdGEg+/amwKu+0B6dxsx77sFjMRJ7wpv+fnSyVADg=

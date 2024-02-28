@@ -835,9 +835,11 @@ function subcmd_create() {
       fi
     fi
 
-    _log "Cluster at IP ${IPADDR} ready"
+    for stack in infra canton-network sv-runbook validator-runbook; do
+	_uses_pulumi_stack $stack
+    done
 
-    _warning "Please note that Auth0 applications are not automatically updated at the moment. Make sure to add URLs for your new cluster as allowed callback URLs, allowed logout URLs, etc. in the relevant Auth0 UI applications."
+    _log "Cluster at IP ${IPADDR} ready"
 }
 
 ###
