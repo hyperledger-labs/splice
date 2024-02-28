@@ -224,7 +224,7 @@ object AuthServiceJWTCodec {
   // ------------------------------------------------------------------------------------------------------------------
   // Decoding
   // ------------------------------------------------------------------------------------------------------------------
-  def readAudienceBasedToken(value: JsValue): AuthServiceJWTPayload = value match {
+  def readAudienceBasedToken(value: JsValue): StandardJWTPayload = value match {
     case JsObject(fields) =>
       StandardJWTPayload(
         issuer = readOptionalString(propIss, fields),
@@ -241,7 +241,7 @@ object AuthServiceJWTCodec {
       )
   }
 
-  def readScopeBasedToken(value: JsValue): AuthServiceJWTPayload = value match {
+  def readScopeBasedToken(value: JsValue): StandardJWTPayload = value match {
     case JsObject(fields) =>
       StandardJWTPayload(
         issuer = readOptionalString(propIss, fields),

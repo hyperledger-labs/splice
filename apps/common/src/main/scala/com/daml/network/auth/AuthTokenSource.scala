@@ -3,26 +3,53 @@
 
 package com.daml.network.auth
 
+import com.daml.jwt.JwtDecoder
+import com.daml.jwt.domain.Jwt
 import org.apache.pekko.actor.ActorSystem
 import com.daml.network.auth.OAuthApi.TokenResponse
 import com.daml.network.config.AuthTokenSourceConfig
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.ledger.api.auth.AuthServiceJWTCodec
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 object AuthToken {
   /* Creates a token that never expires */
   def apply(accessToken: String): AuthToken =
-    AuthToken(accessToken, CantonTimestamp.MaxValue)
+    AuthToken(accessToken, CantonTimestamp.MaxValue, user = guessLedgerApiUser(accessToken))
   def apply(tokenResponse: TokenResponse): AuthToken =
     AuthToken(
-      tokenResponse.access_token,
-      CantonTimestamp.now().plusMillis(tokenResponse.expiresIn.toMillis),
+      accessToken = tokenResponse.access_token,
+      expiresAt = CantonTimestamp.now().plusMillis(tokenResponse.expiresIn.toMillis),
+      user = guessLedgerApiUser(tokenResponse.access_token),
     )
+
+  /** Attempts to interpret the token the same way the participant server would,
+    *  and returns the user the token is associated with, if the token is associated with exactly one user.
+    */
+  def guessLedgerApiUser(accessToken: String): Option[String] = {
+    import spray.json.*
+    for {
+      decoded <- JwtDecoder.decode(Jwt(accessToken)).toOption
+      json <- Try(decoded.payload.parseJson).toOption
+      // Note: CN only uses audience-based tokens (i.e., the standard JWT format).
+      // AuthServiceJWTCodec.readPayload() guesses the token format, but only works if audience-based tokens
+      // use the default ledger API audience prefix.
+      payload <- Try(AuthServiceJWTCodec.readAudienceBasedToken(json)).toOption
+    } yield payload.userId
+  }
 }
-final case class AuthToken(accessToken: String, expiresAt: CantonTimestamp)
+
+/** @param accessToken The access token
+  * @param expiresAt The time at which the token expires
+  * @param user The user the token is associated with, if known.
+  *             `None` means the token is either not associated with a user (e.g., canton admin tokens),
+  *             or it is not known if the token is associated with a user (e.g., the token uses an unknown format).
+  */
+final case class AuthToken(accessToken: String, expiresAt: CantonTimestamp, user: Option[String])
 
 sealed trait AuthTokenSource {
   def getToken(implicit tc: TraceContext): Future[Option[AuthToken]]
@@ -46,7 +73,9 @@ case class AuthTokenSourceSelfSigned(
     secret: String,
 ) extends AuthTokenSource {
   override def getToken(implicit tc: TraceContext): Future[Option[AuthToken]] =
-    Future.successful(Some(AuthToken(AuthUtil.testTokenSecret(audience, user, secret))))
+    Future.successful(
+      Some(AuthToken(AuthUtil.testTokenSecret(audience, user, secret)))
+    )
 }
 
 case class AuthTokenSourceOAuthClientCredentials(
