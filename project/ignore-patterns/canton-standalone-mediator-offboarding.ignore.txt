@@ -1,0 +1,3 @@
+# globalMediatorSv4 is offboarded at this time
+LOCAL_VERDICT_TIMEOUT.* Rejected transaction due to a participant determined timeout.*c.d.c.p.p.TransactionProcessingSteps:participant=sv
+RequestRefused\(SenderUnknown\(The following senders in the aggregation rule are unknown: .*MED::sv4StandaloneMediator

@@ -89,13 +89,6 @@ Sender .* of send request .* is not registered so cannot send or receive events\
 # This is happenening during party migration and is expected. We can remove this in the future if/when canton detects and handles this warning
 .*Received a commitment where we have no shared contract.*ACS_MISMATCH_NO_SHARED_CONTRACTS.*
 
-# globalMediatorSv4 is offboarded at this time
-c.d.c.t.TimeProofRequestSubmitterImpl:mediatorx=globalMediatorSv4Offboarding
-RequestRefused\(SenderUnknown\(.*globalMediatorSv4Offboarding
-RequestRefused\(SenderUnknown\(.*globalReonboardMediator_4
-LOCAL_VERDICT_TIMEOUT.* Rejected transaction due to a participant determined timeout.*c.d.c.p.p.TransactionProcessingSteps:participant=sv
-Response message for request.*timed out at.*c.d.c.p.p.TransactionProcessor:participant=.*ParticipantReonboard
-
 # TODO(#9485) Figure out if those timeouts are really ok and not a bug in Canton
 Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=.*ParticipantReonboard
 
@@ -118,9 +111,6 @@ Unable to get topology snapshot to check whether informees are hosted on the dom
 
 # Shows up during the test case in SvOnboardingAddlIntegrationTest when submitting command with actAs = SVC and there are more than 1 SV onboarded
 Received a request with id RequestId\(.*\) with a view that is not correctly authorized.*is not authorized to submit on behalf of the submitting parties SVC-.*
-
-# TODO(#10196) Remove this ignore once fixed.
-RequestRefused\(SenderUnknown
 
 # TODO(#10160) Remove this ignore once Canton fixes this.
 SEQUENCER_MAX_SEQUENCING_TIME_TOO_FAR
