@@ -36,6 +36,7 @@ class ScanAutomationService(
   override def companion = ScanAutomationService
 
   registerTrigger(new ScanAggregationTrigger(store, triggerContext))
+  registerTrigger(new ScanBackfillAggregatesTrigger(store, triggerContext))
 }
 
 object ScanAutomationService extends AutomationServiceCompanion {

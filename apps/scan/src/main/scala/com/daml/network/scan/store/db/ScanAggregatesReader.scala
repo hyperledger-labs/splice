@@ -23,8 +23,7 @@ import scala.util.Success
 import scala.util.Failure
 import ScanAggregator.*
 
-// TODO(#9842) Add a trigger that backfills aggregates from svc (add methods to ScanAggregatesReader to support this)
-trait ScanAggregatesReader {
+trait ScanAggregatesReader extends AutoCloseable {
   def readRoundAggregateFromSvc(round: Long)(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,

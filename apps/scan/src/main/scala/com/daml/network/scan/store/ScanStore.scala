@@ -47,6 +47,10 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ScanAggregator.RoundTotals]]
 
+  def backFillAggregates()(implicit
+      tc: TraceContext
+  ): Future[Boolean]
+
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
 

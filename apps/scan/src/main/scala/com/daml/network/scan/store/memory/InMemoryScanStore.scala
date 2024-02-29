@@ -59,6 +59,10 @@ class InMemoryScanStore(
       tc: TraceContext
   ) = Future.successful(None)
 
+  def backFillAggregates()(implicit
+      tc: TraceContext
+  ): Future[Boolean] = Future.successful(false)
+
   override def lookupCoinRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[CoinRules.ContractId, CoinRules]]] =

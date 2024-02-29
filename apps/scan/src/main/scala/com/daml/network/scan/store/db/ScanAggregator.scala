@@ -13,6 +13,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
+
 import slick.jdbc.PostgresProfile
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
@@ -20,6 +21,10 @@ import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import ScanAggregator.*
 import com.daml.network.scan.store.TxLogEntry.EntryType
 import slick.dbio.{DBIO, DBIOAction, NoStream, Effect}
+import com.digitalasset.canton.lifecycle.FlagCloseableAsync
+import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
+import com.digitalasset.canton.lifecycle.SyncCloseable
+import com.digitalasset.canton.config.ProcessingTimeout
 
 final class ScanAggregator(
     storage: DbStorage,
@@ -28,12 +33,19 @@ final class ScanAggregator(
     reader: ScanAggregatesReader,
     val loggerFactory: NamedLoggerFactory,
     domainMigrationId: Long,
+    val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext,
     closeContext: CloseContext,
 ) extends NamedLogging
-    with AcsJdbcTypes {
+    with AcsJdbcTypes
+    with FlagCloseableAsync {
   val profile: slick.jdbc.JdbcProfile = PostgresProfile
+  import profile.api.jdbcActionExtensionMethods
+
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    Seq(SyncCloseable("scan_aggregates_reader", reader.close()))
+  }
 
   /** Aggregates RoundTotals and RoundPartyTotals in batches and reports the most recently aggregated RoundTotals. */
   def aggregate()(implicit traceContext: TraceContext): Future[Option[RoundTotals]] = {
@@ -58,6 +70,54 @@ final class ScanAggregator(
         logger.debug(msg)
         None
     }
+  }
+
+  def backFillAggregates()(implicit
+      tc: TraceContext
+  ): Future[Boolean] = {
+    for {
+      earliestClosedRound <- getEarliestAggregatedRound()
+      res <-
+        earliestClosedRound match {
+          case None =>
+            logger.debug("No closed round found in round_totals, not backfilling aggregates.")
+            Future.successful(false)
+          case Some(0L) =>
+            logger.debug(
+              s"Round zero exists. No need to backfill aggregates."
+            )
+            Future.successful(false)
+          case Some(closedRound) =>
+            val backFillRound = closedRound - 1L
+            logger.debug(
+              s"Backfilling round $backFillRound."
+            )
+            backFill(backFillRound).map(_ => true)
+        }
+    } yield res
+  }
+
+  def backFill(round: Long)(implicit
+      tc: TraceContext
+  ): Future[Unit] = {
+    for {
+      aggregatedRound <- reader.readRoundAggregateFromSvc(round)
+      res <- aggregatedRound match {
+        case Some(RoundAggregate(rt, rpt)) =>
+          storage
+            .update_(
+              insertRoundTotals(rt).andThen(insertRoundPartyTotals(rpt)).transactionally,
+              "backfill insert round aggregates from svc",
+            )
+            .map(_ => ())
+        case None =>
+          Future.failed(
+            CannotAdvance(
+              s"Could not read aggregates for round $round from svc while backfilling aggregates."
+            )
+          )
+      }
+    } yield res
   }
 
   private def skipAggregation(
@@ -141,7 +201,7 @@ final class ScanAggregator(
         case Some(RoundAggregate(rt, rpt)) =>
           for {
             _ <- storage.update_(
-              insertRoundTotals(rt).andThen(insertRoundPartyTotals(rpt)),
+              insertRoundTotals(rt).andThen(insertRoundPartyTotals(rpt)).transactionally,
               "insert round aggregates from svc",
             )
             lastRoundTotals <- getLastAggregatedRoundTotals()
@@ -194,7 +254,7 @@ final class ScanAggregator(
 
   def insertRoundPartyTotals(
       roundPartyTotals: Vector[RoundPartyTotals]
-  ): DBIOAction[Unit, NoStream, Effect.Write] = {
+  ): DBIOAction[Unit, NoStream, Effect.Write & Effect.Transactional] = {
     def insert(rpt: RoundPartyTotals) = {
       sql"""
       insert into round_party_totals (
@@ -234,7 +294,11 @@ final class ScanAggregator(
       on conflict do nothing
     """.asUpdate
     }
-    DBIOAction.sequence(roundPartyTotals.map(insert)).map(_ => ()).andThen(DBIO.successful(()))
+    DBIOAction
+      .sequence(roundPartyTotals.map(insert))
+      .map(_ => ())
+      .andThen(DBIO.successful(()))
+      .transactionally
   }
 
   def getLastAggregatedRoundTotals()(implicit
@@ -252,6 +316,24 @@ final class ScanAggregator(
         "getLastAggregatedRoundTotals",
       )
       .value
+  }
+
+  def getEarliestAggregatedRound()(implicit
+      traceContext: TraceContext
+  ): Future[Option[Long]] = {
+    val q = sql"""
+      select closed_round
+      from   round_totals
+      where  store_id = $storeId
+      and    closed_round = (select coalesce(min(closed_round), 0) from round_totals where store_id = $storeId)
+    """
+    storage
+      .querySingle(
+        q.as[Option[Long]].headOption,
+        "getLastAggregatedRoundTotals",
+      )
+      .value
+      .map(_.flatten)
   }
 
   def getRoundTotals(round: Long)(implicit

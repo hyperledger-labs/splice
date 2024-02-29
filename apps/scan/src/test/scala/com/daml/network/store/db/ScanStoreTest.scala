@@ -1489,6 +1489,7 @@ class DbScanStoreTest
               ec: ExecutionContext,
               traceContext: TraceContext,
           ): Future[Option[ScanAggregator.RoundAggregate]] = Future.successful(None)
+          def close(): Unit = ()
         },
       domainMigrationId,
     )(parallelExecutionContext, implicitly, implicitly)

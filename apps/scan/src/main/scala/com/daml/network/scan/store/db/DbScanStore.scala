@@ -29,6 +29,10 @@ import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInt
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.FlagCloseableAsync
+import com.digitalasset.canton.lifecycle.AsyncCloseable
+import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
+import com.digitalasset.canton.config.NonNegativeDuration
 
 class DbScanStore(
     override val serviceUserPrimaryParty: PartyId,
@@ -61,9 +65,22 @@ class DbScanStore(
     with AcsQueries
     with TxLogQueries[TxLogEntry]
     with NamedLogging
-    with LimitHelpers {
+    with LimitHelpers
+    with FlagCloseableAsync
+    with RetryProvider.Has {
 
   import multiDomainAcsStore.waitUntilAcsIngested
+
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    implicit def traceContext: TraceContext = TraceContext.empty
+    Seq(
+      AsyncCloseable(
+        "db_scan_store",
+        aggregator.map(_.close()),
+        NonNegativeDuration.tryFromDuration(timeouts.shutdownNetwork.duration),
+      )
+    )
+  }
 
   val aggregator: Future[ScanAggregator] =
     waitUntilAcsIngested().map(_ =>
@@ -74,6 +91,7 @@ class DbScanStore(
         createScanAggregatesReader(this),
         loggerFactory,
         domainMigrationId,
+        timeouts,
       )
     )
 
@@ -83,6 +101,15 @@ class DbScanStore(
     for {
       a <- aggregator
       r <- a.aggregate()
+    } yield r
+  }
+
+  def backFillAggregates()(implicit
+      tc: TraceContext
+  ): Future[Boolean] = {
+    for {
+      a <- aggregator
+      r <- a.backFillAggregates()
     } yield r
   }
 

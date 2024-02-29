@@ -36,6 +36,7 @@ class ScanAggregatorTest
     with CoinTransferUtil {
 
   val coinPrice = 1.0
+
   def createReader(store: DbScanStore) = new ScanAggregatesReader() {
     def readRoundAggregateFromSvc(
         round: Long
@@ -45,6 +46,7 @@ class ScanAggregatorTest
       val _ = round
       Future.successful(None)
     }
+    def close = ()
   }
 
   "ScanAggregator" should {
@@ -101,6 +103,7 @@ class ScanAggregatorTest
               )
             )
           }
+          def close = ()
         }
       }
       for {
@@ -461,7 +464,123 @@ class ScanAggregatorTest
         )
       }
     }
+
+    "Fail to backfill aggregates if it cannot read aggregates before round" in {
+      val (aggr, store) = mkAggregator(user1, svcParty).futureValue
+      val now = CantonTimestamp.now()
+      val lastRound = 10L
+      (for {
+        _ <- storage
+          .update_(aggr.insertRoundTotals(RoundTotals(lastRound, now)), "insert round total")
+        res <- store.backFillAggregates()
+      } yield {
+        res
+      }).failed.futureValue shouldBe an[CannotAdvance]
+    }
+
+    "backfill aggregates before existing rounds total, up to round zero" in {
+      val lastRound = 10L
+      val now = CantonTimestamp.now()
+
+      val previousRoundAggregates = mkRoundAggregates(0, lastRound - 1)
+
+      def createSvcReader(store: DbScanStore) = {
+        val _ = store
+        new TestScanAggregatesReader(previousRoundAggregates)
+      }
+
+      val (aggr, store) =
+        mkAggregator(
+          user1,
+          svcParty,
+          ingestFromParticipantBegin = false,
+          createSvcReader,
+        ).futureValue
+
+      val prevRoundTotals = RoundTotals(lastRound, now)
+      for {
+        _ <- storage
+          .update_(aggr.insertRoundTotals(prevRoundTotals), "insert round total")
+        res <- MonadUtil
+          .sequentialTraverse(0 to lastRound.toInt - 1) { _ =>
+            store.backFillAggregates()
+          }
+          .map(_.forall(identity))
+        backFilledRoundTotals <- store.getRoundTotals(0L, lastRound - 1)
+        backFilledRoundPartyTotals <- store.getRoundPartyTotals(0L, lastRound - 1)
+      } yield {
+        res shouldBe true
+        backFilledRoundTotals should not be empty
+        backFilledRoundPartyTotals should not be empty
+        backFilledRoundTotals shouldBe previousRoundAggregates
+          .map(
+            _.roundTotals
+          )
+        backFilledRoundPartyTotals shouldBe previousRoundAggregates
+          .flatMap(
+            _.roundPartyTotals
+          )
+      }
+    }
+
+    "not backfill if no closed rounds can be found in round totals" in {
+      val (_, store) =
+        mkAggregator(
+          user1,
+          svcParty,
+          ingestFromParticipantBegin = false,
+          createReader,
+        ).futureValue
+
+      for {
+        res <- store.backFillAggregates()
+      } yield {
+        res shouldBe false
+      }
+    }
   }
+
+  private def mkRoundAggregates(firstRound: Long, lastRound: Long) = {
+    val now = CantonTimestamp.now()
+
+    (firstRound to lastRound).map { i =>
+      val round = i.toLong
+      RoundAggregate(
+        RoundTotals(
+          closedRound = round,
+          closedRoundEffectiveAt = now,
+          appRewards = BigDecimal(i + 1),
+          validatorRewards = BigDecimal(i + 2),
+          changeToInitialAmountAsOfRoundZero = BigDecimal(i + 3),
+          changeToHoldingFeesRate = BigDecimal(i + 4),
+          cumulativeAppRewards = BigDecimal(i + 5),
+          cumulativeValidatorRewards = BigDecimal(i + 6),
+          cumulativeChangeToInitialAmountAsOfRoundZero = BigDecimal(i + 7),
+          cumulativeChangeToHoldingFeesRate = BigDecimal(i + 8),
+          totalCoinBalance = BigDecimal(i + 9),
+        ),
+        Vector(
+          RoundPartyTotals(
+            closedRound = round,
+            party = s"party$round",
+            appRewards = BigDecimal(i + 1),
+            validatorRewards = BigDecimal(i + 2),
+            trafficPurchased = round + 1,
+            trafficPurchasedCcSpent = BigDecimal(i + 3),
+            trafficNumPurchases = round + 2,
+            cumulativeAppRewards = BigDecimal(i + 4),
+            cumulativeValidatorRewards = BigDecimal(i + 5),
+            cumulativeChangeToInitialAmountAsOfRoundZero = BigDecimal(i + 6),
+            cumulativeChangeToHoldingFeesRate = BigDecimal(i + 7),
+            cumulativeTrafficPurchased = round + 3,
+            cumulativeTrafficPurchasedCcSpent = BigDecimal(i + 8),
+            cumulativeTrafficNumPurchases = round + 4,
+          )
+        ),
+      )
+    }
+  }
+
   private def sumRoundPartyTotalsPerRound(
       rpts: Seq[RoundPartyTotals]
   ): Map[Long, List[RoundPartyTotals]] = {
@@ -737,4 +856,22 @@ class ScanAggregatorTest
       "getTopValidatorsByPurchasedTrafficFromTxLog",
     )
   } yield rows.map((HttpScanAppClient.ValidatorPurchasedTraffic.apply _).tupled)
+}
+
+class TestScanAggregatesReader(aggregates: Iterable[RoundAggregate]) extends ScanAggregatesReader {
+  val roundAggregates = aggregates.map { a =>
+    a.roundTotals.closedRound -> a
+  }.toMap
+
+  def readRoundAggregateFromSvc(
+      round: Long
+  )(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): Future[Option[RoundAggregate]] = {
+    val _ = traceContext
+    val _ = round
+    Future.successful(roundAggregates.get(round))
+  }
+  def close = ()
 }
