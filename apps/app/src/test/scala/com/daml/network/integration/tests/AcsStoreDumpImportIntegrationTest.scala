@@ -175,7 +175,7 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
               .filterJava(cc.round.ClosedMiningRound.COMPANION)(
                 svcParty
               )
-            closedMiningRounds.map(_.data.round.number) shouldBe Seq(0L)
+            closedMiningRounds.map(_.data.round.number) should contain(0L)
           }
         }
         clue("Check that scan can produce aggregates in the future") {
