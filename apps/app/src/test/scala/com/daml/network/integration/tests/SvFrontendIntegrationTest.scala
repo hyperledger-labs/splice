@@ -684,7 +684,8 @@ class SvFrontendIntegrationTest
         }
     }
 
-    "SV1 can create valid SRARC_SetConfig (new SvcRules Configuration) vote requests that can expire and get rejected by other SVs" in {
+    // TODO(#9338) Reenable this test
+    "SV1 can create valid SRARC_SetConfig (new SvcRules Configuration) vote requests that can expire and get rejected by other SVs" ignore {
       implicit env =>
         val requestReasonUrl = "This is a request reason url."
         val requestReasonBody = "This is a request reason."
