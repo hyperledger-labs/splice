@@ -182,11 +182,14 @@ class CometBftNodeConfig {
     }, {});
   }
 
-  private p2pExternalAddress(nodeIndex: DomainMigrationIndex): string {
+  private p2pExternalAddress(nodeIndex: number): string {
     return `${CLUSTER_DNS_NAME}:${this.istioExternalPort(nodeIndex)}`;
   }
 
-  private istioExternalPort(nodeIndex: DomainMigrationIndex) {
-    return Number(`26${this._domainMigrationId}${nodeIndex}6`);
+  private istioExternalPort(nodeIndex: number) {
+    // TODO(#10482) Revisit port scheme
+    return nodeIndex >= 10
+      ? Number(`26${this._domainMigrationId}${nodeIndex}`)
+      : Number(`26${this._domainMigrationId}${nodeIndex}6`);
   }
 }

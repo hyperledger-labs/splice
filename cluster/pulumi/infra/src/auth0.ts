@@ -71,7 +71,7 @@ function cnAuth0(clusterBasename: string) {
     clusterBasename,
     provider
   );
-  const svUiApps = [...Array(9).keys()].map(i => {
+  const svUiApps = [...Array(16).keys()].map(i => {
     const sv = i + 1;
     const uiApp = newUiApp(
       `sv${sv}UiApp`,
@@ -99,6 +99,13 @@ function cnAuth0(clusterBasename: string) {
       'sv-7': '4imYa3E6Q5JPdLjZxHatRDtV1Wurq7pK',
       'sv-8': 'lQogWncLX7AIc2laUj8VVW6zwNJ169vR',
       'sv-9': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
+      'sv-10': 'GReLRFp7OQVDHmAhIyWlcnS7ZdWLdqhd',
+      'sv-11': 'ndIxuns8kZoObE7qN6M3IbtKSZ7RRO9B',
+      'sv-12': 'qnYhBjBJ5LQu0pM5M6V8e3erQsadfew1',
+      'sv-13': 'IA7BOrFhKvQ5AP9g8DxSTmO6pVT0oed3',
+      'sv-14': 'cY4I4HCHgDj2mkxSSEwguFQGRFEjhnTq',
+      'sv-15': 'hwKLKN5TWpaPjzuY52ubNVIRF8Onnzgk',
+      'sv-16': '9pvoTvQIt2l1rzlNnaEZVsnNDFTOvt7W',
       sv1_validator: '7YEiu1ty0N6uWAjL8tCAWTNi7phr7tov',
       sv2_validator: '5N2kwYLOqrHtnnikBqw8A7foa01kui7h',
       sv3_validator: 'V0RjcwPCsIXqYTslkF5mjcJn70AiD0dh',
@@ -108,6 +115,13 @@ function cnAuth0(clusterBasename: string) {
       sv7_validator: '2cfFl6z5huY4rVYvxOEja8MvDdplYCDW',
       sv8_validator: 'JYvSRekV1E5EUZ2sJ494YyHXbxR3OHIR',
       sv9_validator: 'BABNqQ3m5ROTGJTlTHVlIckS3cwJ0M0w',
+      sv10_validator: 'EKBJkDcOHosrnhLALfrQYG6Uc4Csqwbe',
+      sv11_validator: '8jpCSqSkLxdY8zdmJwm0XXRfxFnPNAhG',
+      sv12_validator: 'PEMwunsstamR1c5k3LdjVInTKlVTkeb6',
+      sv13_validator: 'eqssDmClrmtQFTgJ7XIP7RDdhcD6iGfx',
+      sv14_validator: 'luGkjf4AvM5PYhmi3X5rFmKLzxHTBlgz',
+      sv15_validator: 'gL9Iv3iUiPTtDvyEZ9b4wCcTvz3G6qys',
+      sv16_validator: '6ANtCorumVE8Ur7n1gJ8Gfvgv5pa96mZ',
     },
 
     appToApiAudience: {},

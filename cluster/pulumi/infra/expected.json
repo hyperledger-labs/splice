@@ -1446,6 +1446,307 @@
     "id": "",
     "inputs": {
       "authenticationMethod": "none",
+      "clientId": "SV10 UI (Pulumi managed, test-stack)_id"
+    },
+    "name": "sv10UiAppCredentials",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientCredentials:ClientCredentials"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allowedLogoutUrls": [
+        "https://wallet.sv-10.svc.test-stack.network.canton.global",
+        "https://cns.sv-10.svc.test-stack.network.canton.global",
+        "https://sv.sv-10.svc.test-stack.network.canton.global"
+      ],
+      "allowedOrigins": [
+        "https://wallet.sv-10.svc.test-stack.network.canton.global",
+        "https://cns.sv-10.svc.test-stack.network.canton.global",
+        "https://sv.sv-10.svc.test-stack.network.canton.global"
+      ],
+      "appType": "spa",
+      "callbacks": [
+        "https://wallet.sv-10.svc.test-stack.network.canton.global",
+        "https://cns.sv-10.svc.test-stack.network.canton.global",
+        "https://sv.sv-10.svc.test-stack.network.canton.global"
+      ],
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, CNS and SV UIs for SV10",
+      "name": "SV10 UI (Pulumi managed, test-stack)",
+      "webOrigins": [
+        "https://wallet.sv-10.svc.test-stack.network.canton.global",
+        "https://cns.sv-10.svc.test-stack.network.canton.global",
+        "https://sv.sv-10.svc.test-stack.network.canton.global"
+      ]
+    },
+    "name": "sv10UiApp",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/client:Client"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "authenticationMethod": "none",
+      "clientId": "SV11 UI (Pulumi managed, test-stack)_id"
+    },
+    "name": "sv11UiAppCredentials",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientCredentials:ClientCredentials"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allowedLogoutUrls": [
+        "https://wallet.sv-11.svc.test-stack.network.canton.global",
+        "https://cns.sv-11.svc.test-stack.network.canton.global",
+        "https://sv.sv-11.svc.test-stack.network.canton.global"
+      ],
+      "allowedOrigins": [
+        "https://wallet.sv-11.svc.test-stack.network.canton.global",
+        "https://cns.sv-11.svc.test-stack.network.canton.global",
+        "https://sv.sv-11.svc.test-stack.network.canton.global"
+      ],
+      "appType": "spa",
+      "callbacks": [
+        "https://wallet.sv-11.svc.test-stack.network.canton.global",
+        "https://cns.sv-11.svc.test-stack.network.canton.global",
+        "https://sv.sv-11.svc.test-stack.network.canton.global"
+      ],
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, CNS and SV UIs for SV11",
+      "name": "SV11 UI (Pulumi managed, test-stack)",
+      "webOrigins": [
+        "https://wallet.sv-11.svc.test-stack.network.canton.global",
+        "https://cns.sv-11.svc.test-stack.network.canton.global",
+        "https://sv.sv-11.svc.test-stack.network.canton.global"
+      ]
+    },
+    "name": "sv11UiApp",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/client:Client"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "authenticationMethod": "none",
+      "clientId": "SV12 UI (Pulumi managed, test-stack)_id"
+    },
+    "name": "sv12UiAppCredentials",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientCredentials:ClientCredentials"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allowedLogoutUrls": [
+        "https://wallet.sv-12.svc.test-stack.network.canton.global",
+        "https://cns.sv-12.svc.test-stack.network.canton.global",
+        "https://sv.sv-12.svc.test-stack.network.canton.global"
+      ],
+      "allowedOrigins": [
+        "https://wallet.sv-12.svc.test-stack.network.canton.global",
+        "https://cns.sv-12.svc.test-stack.network.canton.global",
+        "https://sv.sv-12.svc.test-stack.network.canton.global"
+      ],
+      "appType": "spa",
+      "callbacks": [
+        "https://wallet.sv-12.svc.test-stack.network.canton.global",
+        "https://cns.sv-12.svc.test-stack.network.canton.global",
+        "https://sv.sv-12.svc.test-stack.network.canton.global"
+      ],
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, CNS and SV UIs for SV12",
+      "name": "SV12 UI (Pulumi managed, test-stack)",
+      "webOrigins": [
+        "https://wallet.sv-12.svc.test-stack.network.canton.global",
+        "https://cns.sv-12.svc.test-stack.network.canton.global",
+        "https://sv.sv-12.svc.test-stack.network.canton.global"
+      ]
+    },
+    "name": "sv12UiApp",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/client:Client"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "authenticationMethod": "none",
+      "clientId": "SV13 UI (Pulumi managed, test-stack)_id"
+    },
+    "name": "sv13UiAppCredentials",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientCredentials:ClientCredentials"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allowedLogoutUrls": [
+        "https://wallet.sv-13.svc.test-stack.network.canton.global",
+        "https://cns.sv-13.svc.test-stack.network.canton.global",
+        "https://sv.sv-13.svc.test-stack.network.canton.global"
+      ],
+      "allowedOrigins": [
+        "https://wallet.sv-13.svc.test-stack.network.canton.global",
+        "https://cns.sv-13.svc.test-stack.network.canton.global",
+        "https://sv.sv-13.svc.test-stack.network.canton.global"
+      ],
+      "appType": "spa",
+      "callbacks": [
+        "https://wallet.sv-13.svc.test-stack.network.canton.global",
+        "https://cns.sv-13.svc.test-stack.network.canton.global",
+        "https://sv.sv-13.svc.test-stack.network.canton.global"
+      ],
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, CNS and SV UIs for SV13",
+      "name": "SV13 UI (Pulumi managed, test-stack)",
+      "webOrigins": [
+        "https://wallet.sv-13.svc.test-stack.network.canton.global",
+        "https://cns.sv-13.svc.test-stack.network.canton.global",
+        "https://sv.sv-13.svc.test-stack.network.canton.global"
+      ]
+    },
+    "name": "sv13UiApp",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/client:Client"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "authenticationMethod": "none",
+      "clientId": "SV14 UI (Pulumi managed, test-stack)_id"
+    },
+    "name": "sv14UiAppCredentials",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientCredentials:ClientCredentials"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allowedLogoutUrls": [
+        "https://wallet.sv-14.svc.test-stack.network.canton.global",
+        "https://cns.sv-14.svc.test-stack.network.canton.global",
+        "https://sv.sv-14.svc.test-stack.network.canton.global"
+      ],
+      "allowedOrigins": [
+        "https://wallet.sv-14.svc.test-stack.network.canton.global",
+        "https://cns.sv-14.svc.test-stack.network.canton.global",
+        "https://sv.sv-14.svc.test-stack.network.canton.global"
+      ],
+      "appType": "spa",
+      "callbacks": [
+        "https://wallet.sv-14.svc.test-stack.network.canton.global",
+        "https://cns.sv-14.svc.test-stack.network.canton.global",
+        "https://sv.sv-14.svc.test-stack.network.canton.global"
+      ],
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, CNS and SV UIs for SV14",
+      "name": "SV14 UI (Pulumi managed, test-stack)",
+      "webOrigins": [
+        "https://wallet.sv-14.svc.test-stack.network.canton.global",
+        "https://cns.sv-14.svc.test-stack.network.canton.global",
+        "https://sv.sv-14.svc.test-stack.network.canton.global"
+      ]
+    },
+    "name": "sv14UiApp",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/client:Client"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "authenticationMethod": "none",
+      "clientId": "SV15 UI (Pulumi managed, test-stack)_id"
+    },
+    "name": "sv15UiAppCredentials",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientCredentials:ClientCredentials"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allowedLogoutUrls": [
+        "https://wallet.sv-15.svc.test-stack.network.canton.global",
+        "https://cns.sv-15.svc.test-stack.network.canton.global",
+        "https://sv.sv-15.svc.test-stack.network.canton.global"
+      ],
+      "allowedOrigins": [
+        "https://wallet.sv-15.svc.test-stack.network.canton.global",
+        "https://cns.sv-15.svc.test-stack.network.canton.global",
+        "https://sv.sv-15.svc.test-stack.network.canton.global"
+      ],
+      "appType": "spa",
+      "callbacks": [
+        "https://wallet.sv-15.svc.test-stack.network.canton.global",
+        "https://cns.sv-15.svc.test-stack.network.canton.global",
+        "https://sv.sv-15.svc.test-stack.network.canton.global"
+      ],
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, CNS and SV UIs for SV15",
+      "name": "SV15 UI (Pulumi managed, test-stack)",
+      "webOrigins": [
+        "https://wallet.sv-15.svc.test-stack.network.canton.global",
+        "https://cns.sv-15.svc.test-stack.network.canton.global",
+        "https://sv.sv-15.svc.test-stack.network.canton.global"
+      ]
+    },
+    "name": "sv15UiApp",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/client:Client"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "authenticationMethod": "none",
+      "clientId": "SV16 UI (Pulumi managed, test-stack)_id"
+    },
+    "name": "sv16UiAppCredentials",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/clientCredentials:ClientCredentials"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "allowedLogoutUrls": [
+        "https://wallet.sv-16.svc.test-stack.network.canton.global",
+        "https://cns.sv-16.svc.test-stack.network.canton.global",
+        "https://sv.sv-16.svc.test-stack.network.canton.global"
+      ],
+      "allowedOrigins": [
+        "https://wallet.sv-16.svc.test-stack.network.canton.global",
+        "https://cns.sv-16.svc.test-stack.network.canton.global",
+        "https://sv.sv-16.svc.test-stack.network.canton.global"
+      ],
+      "appType": "spa",
+      "callbacks": [
+        "https://wallet.sv-16.svc.test-stack.network.canton.global",
+        "https://cns.sv-16.svc.test-stack.network.canton.global",
+        "https://sv.sv-16.svc.test-stack.network.canton.global"
+      ],
+      "description": " ** Managed by Pulumi, do not edit manually **\nUsed for the Wallet, CNS and SV UIs for SV16",
+      "name": "SV16 UI (Pulumi managed, test-stack)",
+      "webOrigins": [
+        "https://wallet.sv-16.svc.test-stack.network.canton.global",
+        "https://cns.sv-16.svc.test-stack.network.canton.global",
+        "https://sv.sv-16.svc.test-stack.network.canton.global"
+      ]
+    },
+    "name": "sv16UiApp",
+    "provider": "urn:pulumi:test-stack::test-project::pulumi:providers:auth0::dev::undefined_id",
+    "type": "auth0:index/client:Client"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "authenticationMethod": "none",
       "clientId": "SV1 UI (Pulumi managed, test-stack)_id"
     },
     "name": "sv1UiAppCredentials",

@@ -1,5 +1,5 @@
 import { Output } from '@pulumi/pulumi';
-import { DomainMigrationIndex, cometbftRetainBlocks, isDevNet } from 'cn-pulumi-common';
+import { cometbftRetainBlocks, isDevNet } from 'cn-pulumi-common';
 
 export interface StaticSvConfig {
   nodeName: string;
@@ -16,7 +16,7 @@ export type StaticCometBftConfig = {
     privateKey: Output<string> | string;
     publicKey: Output<string> | string;
   };
-  nodeIndex: DomainMigrationIndex;
+  nodeIndex: number;
   retainBlocks: number;
   id: Output<string> | string;
 };
@@ -196,6 +196,139 @@ const svconfs: StaticSvConfig[] = [
         privateKey:
           'yDch3FNnIHFJPGlUpOYecAtxlwAi3QBi7dELVC/ON3muR3ekkf6TCsO32Lxvcj1zVGrOeewV7k+54TeAHmdmDw==',
         publicKey: 'rkd3pJH+kwrDt9i8b3I9c1RqznnsFe5PueE3gB5nZg8=',
+      },
+    },
+  },
+  {
+    nodeName: 'sv-10',
+    onboardingName: 'Canton-Foundation-10',
+    auth0ValidatorAppName: 'sv10_validator',
+    validatorWalletUser: 'auth0|65e0a7854c76b74b28b8477f',
+    cometBft: {
+      nodeIndex: 10,
+      id: 'cc8e74ca2c3c66820266dc6cca759f5368dd9924',
+      privateKey:
+        'rrf2SKLa1gU3xGvoueeYmc6B8EESs7tyVljWb2vflDP1om8gCSYpaIobMtjfnh8DedY8vrZfZh7lvnZuYYS0wg==',
+      retainBlocks: cometbftRetainBlocks,
+      validator: {
+        keyAddress: 'E71220096CC607150D56914B9175A5D4B70B00E6',
+        privateKey:
+          'SwqjEqjukgRqu6DxaQQKJHxiEyU7t/zitQvzRW4ZTUQOSCp7gCwDGK7BwJNoz1Bo3vvcCmWkzvEDtLpS35q2rg==',
+        publicKey: '9aJvIAkmKWiKGzLY354fA3nWPL62X2Ye5b52bmGEtMI=',
+      },
+    },
+  },
+  {
+    nodeName: 'sv-11',
+    onboardingName: 'Canton-Foundation-11',
+    auth0ValidatorAppName: 'sv11_validator',
+    validatorWalletUser: 'auth0|65e0a78976d9757e3f14846b',
+    cometBft: {
+      nodeIndex: 11,
+      id: '21f60b2667972ff943fbd46ea9ca82ddf0905948',
+      privateKey:
+        'vLbQjq8pJ288nOxle6fq52UXZYuGNLX1nC0Q3FxQP1xewjkKy8l+Qcg9bOumTix7gFRRZw2WbFxs1sjtCKSocw==',
+      retainBlocks: cometbftRetainBlocks,
+      validator: {
+        keyAddress: '14474E591E9C75E5FCA4520B36CD4963E2FBAA2C',
+        privateKey:
+          'rBmpzn2EwWPH/Zc+jakmQODl94RoLcI6fbNVeeUTifJxI0im8qlRV2ekOHubTOFldGFfgxNGVl5gOfCXjuYusw==',
+        publicKey: 'cSNIpvKpUVdnpDh7m0zhZXRhX4MTRlZeYDnwl47mLrM=',
+      },
+    },
+  },
+  {
+    nodeName: 'sv-12',
+    onboardingName: 'Canton-Foundation-12',
+    auth0ValidatorAppName: 'sv12_validator',
+    validatorWalletUser: 'auth0|65e0a78d68c39e5cc0351ed2',
+    cometBft: {
+      nodeIndex: 12,
+      id: '817bb28c471d7a8631e701c914fc7e9a65e74be2',
+      privateKey:
+        '9IBlZ1pjb+sfHEJY9uH/o00/54exhZ9XFl3iXTFdldSlhmmjUf0pR3YIL6hkjN2X7RI0TVBlVotP22H9YhIGhw==',
+      retainBlocks: cometbftRetainBlocks,
+      validator: {
+        keyAddress: '1E5F191A4E2C4DD5026A3B26F1F66A809D5D4E8C',
+        privateKey:
+          '+zX5POXRv4X63O3t2n/T/7dQlhc+vtXzQPcIc29ukn8XRy5oislTg19Oa2mpU/rLqhF4mHZZK4H1hYMq1JHbBQ==',
+        publicKey: 'F0cuaIrJU4NfTmtpqVP6y6oReJh2WSuB9YWDKtSR2wU=',
+      },
+    },
+  },
+  {
+    nodeName: 'sv-13',
+    onboardingName: 'Canton-Foundation-13',
+    auth0ValidatorAppName: 'sv13_validator',
+    validatorWalletUser: 'auth0|65e0a7914c76b74b28b84793',
+    cometBft: {
+      nodeIndex: 13,
+      id: '254dd73eb4cee23d439c2f2e706ccdbeac52f06c',
+      privateKey:
+        'fNyXPdBLI7skpoyhS57REEqt0FyQTZP8JRJnmtVUV9I4URL3gRORNcAn71kznx53UAsLtpRFLdSij2FvA/WwsA==',
+      retainBlocks: cometbftRetainBlocks,
+      validator: {
+        keyAddress: 'CFF50F6EFD5DFDD8DAD7A468D5FB5DA2D43CF281',
+        privateKey:
+          'BhcNZ9TNV4EbKw+GxN2oKMJzN2CswkXc5n2ozect+MTqW1Y3EdGvA+P2o9gHcdBYviGl4VMKMdJbab7usJhYDA==',
+        publicKey: '6ltWNxHRrwPj9qPYB3HQWL4hpeFTCjHSW2m+7rCYWAw=',
+      },
+    },
+  },
+  {
+    nodeName: 'sv-14',
+    onboardingName: 'Canton-Foundation-14',
+    auth0ValidatorAppName: 'sv14_validator',
+    validatorWalletUser: 'auth0|65e0a795aa7a40df0cc65ace',
+    cometBft: {
+      nodeIndex: 14,
+      id: '9de44f8ddac42901c094371e867bb0db60ab03b8',
+      privateKey:
+        'MRXAxpwuEH63FfwPSiC17OM73owF5XZ7dmGFLeENcFKxuZHblOOAkhMy8S93KpZRKDd+HRzXsfkbyhyr7DrWdg==',
+      retainBlocks: cometbftRetainBlocks,
+      validator: {
+        keyAddress: 'F691F4CA91B972A6B291C09BADA9970AAAC86C84',
+        privateKey:
+          '/8MSzUv70iyE5M7g6B1CN4swFNwxOQGjveEgAKcJMX6s/h5Y7hZly1StATlkMUeRfEJZ9lrq1zwHyouavNXuAQ==',
+        publicKey: 'rP4eWO4WZctUrQE5ZDFHkXxCWfZa6tc8B8qLmrzV7gE=',
+      },
+    },
+  },
+  {
+    nodeName: 'sv-15',
+    onboardingName: 'Canton-Foundation-15',
+    auth0ValidatorAppName: 'sv15_validator',
+    validatorWalletUser: 'auth0|65e0a7994c76b74b28b8479c',
+    cometBft: {
+      nodeIndex: 15,
+      id: '7a5f4f9ee97ec24bb4a1a6ed22ec3676805fa494',
+      privateKey:
+        'sRaCaZcBcHtzLtX5rAtd0MNvVLBjY2K1yBck1QFm3oZ+d9IlKS+FAxgMWzQTaUNwTVhaIm39vDdx+E6K1w/0yQ==',
+      retainBlocks: cometbftRetainBlocks,
+      validator: {
+        keyAddress: 'AAE830BF1289910D20E646D9B69561D9E0F965EA',
+        privateKey:
+          'VYGQIwjykHZoW/Twa45aYBZu53ubMUmVxn94hlmCp42IDExO8It79g7hw/35GhxPHDv6USwbGyKI9zaEyrqguw==',
+        publicKey: 'iAxMTvCLe/YO4cP9+RocTxw7+lEsGxsiiPc2hMq6oLs=',
+      },
+    },
+  },
+  {
+    nodeName: 'sv-16',
+    onboardingName: 'Canton-Foundation-16',
+    auth0ValidatorAppName: 'sv16_validator',
+    validatorWalletUser: 'auth0|65e0a79de124e5c43dcb6a19',
+    cometBft: {
+      nodeIndex: 16,
+      id: '9831eeb365f221034e70f27c5073ee0857bdc945',
+      privateKey:
+        'WsUfOOFAmym9HVI5qvYH98HAyHW4Eu/L88ri5ms5JPvDbo22puGKBAGye1GVEUQaDKYNRVLOEGDlO/jNZBGz6g==',
+      retainBlocks: cometbftRetainBlocks,
+      validator: {
+        keyAddress: '0C77119A80F4B4305729D49EC76FC7D4C0576229',
+        privateKey:
+          'A3kveZBU2CspwiATgCe+aRc7oG7TxaRsX0Sre7nDyM75w2mUVEubuAFL+EiwmtZVwO18agJDZhvgcLO8Gph1nQ==',
+        publicKey: '+cNplFRLm7gBS/hIsJrWVcDtfGoCQ2Yb4HCzvBqYdZ0=',
       },
     },
   },
