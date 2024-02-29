@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import better.files.File
 import better.files.File.apply
 import com.daml.network.config.{CNDbConfig, CNNodeConfigTransforms, NetworkAppClientConfig}
-import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
 import com.daml.network.environment.{CNNodeEnvironmentImpl, RetryProvider}
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
@@ -27,6 +27,7 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{NonNegativeDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import io.circe.syntax.EncoderOps
@@ -36,7 +37,7 @@ import org.slf4j.event.Level
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.duration.*
-import scala.util.Using
+import scala.util.{Failure, Success, Try, Using}
 
 class DisasterRecoveryIntegrationTest
     extends CNNodeIntegrationTest
@@ -224,11 +225,10 @@ class DisasterRecoveryIntegrationTest
           },
         )
 
-        // In a real disaster, we would take the minimum of getDomainTime on a majority of SVs,
-        // but for this test we are guaranteed here only that sv1 is caught up on the tap that
-        // we're testing with, so instead, we take the domain time from SV1, and wait for all
-        // to catch up before killing the domain.
-        val timestampBeforeDisaster = sv1Backend.getDomainTime()
+        // In a real disaster, we would find the available ACS timestamp from each SV, and take the
+        // minimum on a majority of SVs, but here we want to make sure all SVs have the tap in their
+        // ACS, so we wait until they all have "now" available.
+        val timestampBeforeDisaster = Instant.now()
         waitForSvParticipantsToCatchup(timestampBeforeDisaster)
 
         // Tap some more coin and wait for SVs to see it (even though we're going to recover to a point before it)
@@ -332,17 +332,25 @@ class DisasterRecoveryIntegrationTest
     }
   }
 
+  private def getAvailableACSTimestamp(svBackend: SvAppBackendReference, time: Instant): Instant = {
+    Try(svBackend.getDomainDataSnapshot(time)) match {
+      case Success(_) => time
+      case Failure(_: CommandFailure) =>
+        getAvailableACSTimestamp(svBackend, time.minusSeconds(5))
+      case Failure(ex) =>
+        throw ex
+    }
+  }
+
   private def waitForSvParticipantsToCatchup(timestamp: Instant)(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
-    withClue("Waiting for SV participants to catchup") {
-      eventually() {
-        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(backend => {
-          backend
-            .getDomainTime()
-            .isAfter(timestamp) shouldBe true withClue s"${backend.name} should be caught up"
-        })
-      }
+    eventually() {
+      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(svBackend =>
+        getAvailableACSTimestamp(svBackend, Instant.now()).isAfter(timestamp) should be(
+          true
+        ) withClue "SV participant should be caught up"
+      )
     }
   }
 

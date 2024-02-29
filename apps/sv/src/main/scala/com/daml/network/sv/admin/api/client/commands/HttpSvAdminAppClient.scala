@@ -717,27 +717,6 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class GetDomainTime()
-      extends BaseCommand[
-        http.GetDomainTimeResponse,
-        Instant,
-      ] {
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[
-      Throwable,
-      HttpResponse,
-    ], http.GetDomainTimeResponse] =
-      client.getDomainTime(headers = headers)
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.GetDomainTimeResponse.OK(response) =>
-      Either.right(response.domainTime.toInstant)
-    }
-  }
-
   case class TriggerAcsDump()
       extends BaseCommand[
         http.TriggerAcsDumpResponse,
