@@ -77,3 +77,6 @@ GlobalDomainMigrationIntegrationTest.*io.grpc.StatusRuntimeException: ABORTED: S
 # In simtime tests where the rounds are advanced too quickly, this trigger might not have enough time to receive the coupon.
 # Nevertheless, it is still useful to have the warning in production environments, where this should never happen.
 Skipped.*faucet coupons from last claimed round.*to current round
+
+# Sometimes the CircleCI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
+DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
