@@ -392,7 +392,9 @@ class FoundingNodeInitializer(
       )
     }
 
-    private def importAcsSnapshot(): Future[Option[cc.types.Round]] =
+    private def importAcsSnapshot(
+        coinConfig: cc.coinconfig.CoinConfig[cc.coinconfig.USD]
+    ): Future[Option[cc.types.Round]] =
       foundingConfig.bootstrappingDump match {
         case None =>
           logger.debug("Skipping importing an ACS snapshot, as none was configured.")
@@ -432,7 +434,9 @@ class FoundingNodeInitializer(
                   )
               }
             }
-            cmds = AcsStoreDump.extractImportCommands(svcParty)(jsonDump.contracts.toSeq)
+            cmds = AcsStoreDump.extractImportCommands(svcParty, coinConfig)(
+              jsonDump.contracts.toSeq
+            )
             _ <-
               if (cmds.isEmpty) {
                 logger.debug(
@@ -457,9 +461,7 @@ class FoundingNodeInitializer(
               )
               None
             } else {
-
-              val initialOpenMiningRound =
-                AcsStoreDump.extractEarliestOpenMiningRound(jsonDump.contracts)
+              val initialOpenMiningRound = Some(new cc.types.Round(0L))
               logger.info(
                 s"Completed importing ACS store dump by submitting ${cmds.size} commands in one transaction."
               )
@@ -504,8 +506,16 @@ class FoundingNodeInitializer(
                     show"This should never happen.\nCoinRules: $coinRules"
                 )
               case None =>
+                val coinConfig = defaultCoinConfig(
+                  foundingConfig.initialTickDuration,
+                  foundingConfig.initialMaxNumInputs,
+                  domainId,
+                  foundingConfig.initialTrafficControlConfig.baseRateBurstAmount.value,
+                  foundingConfig.initialTrafficControlConfig.baseRateBurstWindow,
+                  foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor.value,
+                )
                 for {
-                  optInitialOpenMiningRound <- importAcsSnapshot()
+                  optInitialOpenMiningRound <- importAcsSnapshot(coinConfig)
                   initialRoundNumber = optInitialOpenMiningRound.fold(0L)(_.number)
                   founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(
                     cometBftNode,
@@ -539,14 +549,7 @@ class FoundingNodeInitializer(
                               .toNanos
                           )
                         ),
-                        defaultCoinConfig(
-                          foundingConfig.initialTickDuration,
-                          foundingConfig.initialMaxNumInputs,
-                          domainId,
-                          foundingConfig.initialTrafficControlConfig.baseRateBurstAmount.value,
-                          foundingConfig.initialTrafficControlConfig.baseRateBurstWindow,
-                          foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor.value,
-                        ),
+                        coinConfig,
                         foundingConfig.initialCoinPrice.bigDecimal,
                         defaultCnsConfig(
                           foundingConfig.initialCnsConfig.renewalDuration,

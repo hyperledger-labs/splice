@@ -11,6 +11,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import java.time.{Duration, Instant}
 import com.daml.network.util.FrontendLoginUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import scala.util.Try
 
 abstract class SvNonDevNetPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
@@ -150,5 +151,20 @@ final class Sv1NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightInt
 
   "Check that there is a recent ACS snapshot on GCP" in { _ =>
     testRecentAcsDump("sv-1")
+  }
+  "Check that sv-1 responds with a recent aggregated round" in { implicit env =>
+    val latestOpenMiningRound =
+      Try(
+        svScanClient
+          .getLatestOpenMiningRound(env.environment.clock.now)
+          .contract
+          .payload
+          .round
+          .number
+      ).getOrElse(fail("Could not get latest open mining round from sv-1"))
+    val latestAggregatedRound = Try(svScanClient.getRoundOfLatestData()._1)
+      .getOrElse(fail("Could not get round of latest data from sv-1"))
+
+    latestOpenMiningRound - latestAggregatedRound should be <= 7L
   }
 }

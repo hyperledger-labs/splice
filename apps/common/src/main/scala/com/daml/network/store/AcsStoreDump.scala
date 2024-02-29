@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord}
 import com.daml.lf.data.Ref
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_ValidatorLicense
+import com.daml.network.codegen.java.cc.coinimport.importpayload.{IP_ValidatorLicense, IP_Coin}
 import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryFor, RetryProvider}
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.util.Contract.Companion
@@ -75,7 +75,10 @@ object AcsStoreDump {
     candidates.minOption.map(new cc.types.Round(_))
   }
 
-  def extractImportCommands(svcParty: PartyId)(
+  def extractImportCommands(
+      svcParty: PartyId,
+      coinConfig: cc.coinconfig.CoinConfig[cc.coinconfig.USD],
+  )(
       contracts: Seq[http.Contract]
   )(implicit
       templateDecoder: TemplateJsonDecoder
@@ -89,9 +92,31 @@ object AcsStoreDump {
         .orElse(fromJsonIgnoringPackageId(cc.coin.LockedCoin.COMPANION)(co).map(_.payload.coin))
         .toSeq
 
+    val roundZero = new cc.types.Round(0L)
+
+    // We explicitly accept that this messes up the amount a bit due to holding fees
+    def zeroRoundCoin(c: cc.coin.Coin) = new cc.coin.Coin(
+      c.svc,
+      c.owner,
+      new cc.fees.ExpiringAmount(
+        c.amount.initialAmount,
+        roundZero,
+        coinConfig.transferConfig.holdingFee,
+      ),
+      c.upgrade,
+    )
+    def zeroRoundLicense(license: cc.validatorlicense.ValidatorLicense) =
+      new cc.validatorlicense.ValidatorLicense(
+        license.validator,
+        license.sponsor,
+        license.svc,
+        // setting numCouponsMissed to 0
+        license.faucetState.map(_ => new cc.validatorlicense.FaucetState(roundZero, roundZero, 0L)),
+      )
+
     val coinCommands = for {
       httpCo <- contracts
-      coin <- extractCoin(httpCo)
+      coin <- extractCoin(httpCo).map(zeroRoundCoin)
     } yield new cc.coinimport.ImportCrate(
       svcParty.toProtoPrimitive,
       coin.owner,
@@ -105,20 +130,33 @@ object AcsStoreDump {
       license <- fromJsonIgnoringPackageId(cc.validatorlicense.ValidatorLicense.COMPANION)(
         httpCo
       ).toSeq
-    } yield new cc.coinimport.ImportCrate(
-      svcParty.toProtoPrimitive,
-      license.payload.validator,
-      new IP_ValidatorLicense(license.payload),
-    )
+    } yield {
+      val zeroedPayload = zeroRoundLicense(license.payload)
+      new cc.coinimport.ImportCrate(
+        svcParty.toProtoPrimitive,
+        zeroedPayload.validator,
+        new IP_ValidatorLicense(zeroedPayload),
+      )
+    }
 
     val importCrateCommands = for {
       httpCo <- contracts
       crate <- fromJsonIgnoringPackageId(cc.coinimport.ImportCrate.COMPANION)(httpCo).toSeq
-    } yield new cc.coinimport.ImportCrate(
-      svcParty.toProtoPrimitive, // override the svc party to the current one
-      crate.payload.receiver, // keep as-is
-      crate.payload.payload, // keep as-is
-    )
+    } yield {
+      val originalPayload = crate.payload.payload
+      val payload: cc.coinimport.ImportPayload = crate.payload.payload match {
+        case ip: IP_Coin =>
+          new IP_Coin(zeroRoundCoin(ip.coinValue))
+        case ip: IP_ValidatorLicense =>
+          new IP_ValidatorLicense(zeroRoundLicense(ip.validatorLicenseValue))
+        case _ => originalPayload
+      }
+      new cc.coinimport.ImportCrate(
+        svcParty.toProtoPrimitive, // override the svc party to the current one
+        crate.payload.receiver, // keep as-is
+        payload, // keep as-is, rounds zeroed
+      )
+    }
 
     (coinCommands ++ validatorLicenseCommands ++ importCrateCommands)
       .map(_.create())

@@ -3,18 +3,25 @@ package com.daml.network.integration.tests
 import better.files.File
 import com.daml.network.codegen.java.cc
 import com.daml.network.config.CNNodeConfigTransforms.{
+  ConfigurableApp,
   updateAllAutomationConfigs,
   updateAllSvAppFoundCollectiveConfigs_,
+  updateAutomationConfig,
 }
 import com.daml.network.config.GcpBucketConfig
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
+import com.daml.network.scan.automation.ScanAggregationTrigger
 import com.daml.network.sv.config.SvBootstrapDumpConfig
 import com.daml.network.util.{GcpBucket, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import org.slf4j.event.Level
 
 import java.nio.file.{Files, Paths}
+import scala.jdk.OptionConverters.*
+import scala.util.Try
+import scala.concurrent.duration.DurationInt
 
 // Separate from the export as we need a different config for SV1
 abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
@@ -61,8 +68,18 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
           )(config),
         (_, config) =>
           updateAllSvAppFoundCollectiveConfigs_ { c =>
-            c.copy(bootstrappingDump = Some(bootstrapDumpConfig(config.name.value)))
+            c.copy(
+              bootstrappingDump = Some(bootstrapDumpConfig(config.name.value)),
+              // very quick rounds for aggregation trigger testing
+              initialTickDuration = NonNegativeFiniteDuration.ofSeconds(10),
+              roundZeroDuration = Some(NonNegativeFiniteDuration.ofSeconds(10)),
+            )
           }(config),
+        (_, config) =>
+          updateAutomationConfig(ConfigurableApp.Scan)(c =>
+            // pausing scan aggregation trigger so we can run it manually
+            c.withPausedTrigger[ScanAggregationTrigger]
+          )(config),
       )
 
   // Runs against a temporary Canton instance.
@@ -101,6 +118,24 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
             .collect { case (validator, ls) if ls.length > 1 => validator }
             .toSeq
           duplicates shouldBe empty
+          // All licenses should refer to round zero
+          val faucetStateRounds = licenses
+            .flatMap(
+              _.data.faucetState
+                .map(fs => (fs.firstReceivedFor.number, fs.lastReceivedFor.number))
+                .toScala
+                .toList
+            )
+            .toSet
+          if (faucetStateRounds.nonEmpty) faucetStateRounds shouldBe Set((0L, 0L))
+        }
+
+        clue("Check that coins all refer to round zero") {
+          val coins = sv1LocalBackend.participantClient.ledger_api_extensions.acs
+            .filterJava(cc.coin.Coin.COMPANION)(
+              svcParty
+            )
+          coins.map(_.data.amount.createdAt.number).toSet shouldBe Set(0L)
         }
 
         clue("Check that the open-mining rounds advanced by one tick have been restored") {
@@ -111,8 +146,8 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
               .filterJava(cc.round.OpenMiningRound.COMPANION)(
                 svcParty
               )
-            // we expect to have bootstrapped from round 1
-            openMiningRounds.map(_.data.round.number).sorted shouldBe Seq(1L, 2L, 3L)
+            // we expect to have bootstrapped from round 0 (mining rounds are not restored from the dump)
+            openMiningRounds.map(_.data.round.number).sorted shouldBe Seq(0L, 1L, 2L)
           }
         }
         val alice = onboardWalletUser(aliceWalletClient, aliceValidatorLocalBackend)
@@ -133,6 +168,25 @@ abstract class AcsStoreDumpImportIntegrationTest[T <: SvBootstrapDumpConfig]
         checkWallet(charlie, charlieWalletClient, Seq((30.0, 30.0), (30.0, 30.0)))
         // SV1 got some rewards that were exported
         checkWallet(sv1LocalBackend.getSvcInfo().svParty, sv1WalletClient, Seq((66590.0, 66591.0)))
+
+        clue("Wait for closed round zero to exist") {
+          eventually(100.seconds, 1 second) {
+            val closedMiningRounds = sv1LocalBackend.participantClient.ledger_api_extensions.acs
+              .filterJava(cc.round.ClosedMiningRound.COMPANION)(
+                svcParty
+              )
+            closedMiningRounds.map(_.data.round.number) shouldBe Seq(0L)
+          }
+        }
+        clue("Check that scan can produce aggregates in the future") {
+          sv1ScanLocalBackend.automation
+            .trigger[ScanAggregationTrigger]
+            .runOnce()
+            .futureValue
+          val latestAggregatedRound = Try(sv1ScanLocalBackend.getRoundOfLatestData()._1)
+            .getOrElse(fail("Could not get round of latest data from sv-1"))
+          latestAggregatedRound should be >= 0L
+        }
       }
     }
   }
