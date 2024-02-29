@@ -24,7 +24,6 @@ workflow:
           cluster: "cimain"
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for cimain
-          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - wait_for_previous_pipeline
@@ -37,13 +36,23 @@ workflow:
             - slack-context
           cluster: "cimain"
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           # TODO(#10254) run splitwell tests once it's fixed
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - wait_for_previous_pipeline
             - docker_images_push
+      - backup_cluster:
+          <<: *main-branch-only
+          cluster: "cimain"
+          include_splitwell: false
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-only
@@ -55,44 +64,12 @@ workflow:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           requires:
             - preflight_check
             - backup_cluster
       - deploy_cluster:
-          name: "deploy_global_domain_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cimain"
-          send_deployment_notification: false
-          update_deployment_branch: false
-          global_domain_upgrade_migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - backup_cluster:
-          <<: *main-branch-only
-          cluster: "cimain"
-          include_splitwell: false
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-      - restore_node:
-          <<: *main-branch-only
-          cluster: "cimain"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
-      - deploy_cluster:
-          name: "switch_global_domain_upgrade"
+          name: "migrate_cluster"
           <<: *main-branch-only
           context:
             - artifactory
@@ -104,23 +81,9 @@ workflow:
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
           requires:
-            - deploy_global_domain_upgrade
-            - restore_node
-      - backup_cluster:
-          <<: *main-branch-only
-          # backup splitwell and validator1
-          name: "backup_after_global_domain_upgrade"
-          cluster: "cimain"
-          include_sv: false
-          parallelism: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - preflight_check:
-          name: "preflight_check_global_domain_upgrade"
+          name: "preflight_check_migrated"
           <<: *main-branch-only
           context:
             - artifactory
@@ -129,7 +92,7 @@ workflow:
           cluster: "cimain"
           migration_id: 1
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - deploy_sv_runbook:
           <<: *main-branch-only
           context:
@@ -138,18 +101,17 @@ workflow:
           cluster: "cimain"
           send_deployment_notification: false
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
           global_domain_migration_id: 1
-      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-      # - preflight_sv_check:
-      #     <<: *main-branch-only
-      #     context:
-      #       - artifactory
-      #       - canton-network-vpn
-      #       - slack-context
-      #     cluster: "cimain"
-      #     requires:
-      #       - switch_global_domain_upgrade
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - trigger_global_domain_migration
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -158,7 +120,7 @@ workflow:
           cluster: "cimain"
           global_domain_migration_id: 1
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
       - preflight_validator_check:
           <<: *main-branch-only
           migration_id: 1
@@ -168,4 +130,16 @@ workflow:
             - slack-context
           cluster: "cimain"
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
+      - restore_node:
+          <<: *main-branch-only
+          cluster: "cimain"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check
+            - preflight_validator_check
+            - preflight_check_migrated

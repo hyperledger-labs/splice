@@ -267,7 +267,7 @@ async function installSvAndValidator(config: SvConfig) {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,
     },
-    domainMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
+    migration: { id: globalDomainMigrationConfig.activeMigrationId },
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -316,7 +316,7 @@ async function installSvAndValidator(config: SvConfig) {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
     }),
-    ...{ domainMigrationId: globalDomainMigrationConfig.activeMigrationId.toString() },
+    migration: { id: globalDomainMigrationConfig.activeMigrationId },
   };
 
   const scanValuesWithFixedTokens = {
@@ -326,7 +326,7 @@ async function installSvAndValidator(config: SvConfig) {
 
   installCNRunbookHelmChart(
     xns,
-    `scan-${globalDomainMigrationConfig.activeMigrationId}`,
+    `scan`,
     'cn-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
     localCharts,
@@ -339,7 +339,7 @@ async function installSvAndValidator(config: SvConfig) {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OPERATOR_WALLET_USER_ID: validatorWalletUserName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-      TRUSTED_SCAN_URL: `http://scan-app-${globalDomainMigrationConfig.activeMigrationId}.${xns.logicalName}:5012`,
+      TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
     }),
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
     participantIdentitiesDumpPeriodicBackup: backupConfig,

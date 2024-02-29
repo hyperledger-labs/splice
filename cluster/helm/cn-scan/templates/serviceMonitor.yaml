@@ -1,11 +1,12 @@
-{{- $scanAppLabel := include "appLabel" (list .Values "scan-app") }}
+{{- $scanAppLabel := "scan-app" }}
 {{- if .Values.metrics.enable }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
     release: {{ .Values.metrics.release }}
-  name: {{ include "appLabel" (list .Values "scan-sm") }}
+    migration: {{ .Values.migration.id | quote }}
+  name: "scan-sm"
   namespace: {{ .Release.Namespace }}
 spec:
   endpoints:

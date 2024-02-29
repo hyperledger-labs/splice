@@ -26,10 +26,13 @@ persistence:
   user: cnadmin
   secretName: "postgres-secrets"
 
-#Domain upgrade specific values
-#globalDomainUpgrade:
-#  isActiveNode: true # specifies that this node is current active node, the one that manages the PV
-#  storageClassName: standard
+migration:
+  id: 0
+  migrating: false
+  attachPvc: true
+# pvc used for migrations
+pvc:
+  volumeStorageClass: standard-rwo
 
 # k8s affinity for all deployed pods (optional)
 # affinity:

@@ -462,20 +462,22 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan-0",
+      "name": "scan",
       "namespace": "sv",
       "timeout": 480,
       "values": {
         "clusterUrl": "svrun.network.com.network.canton.global",
-        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "migration": {
+          "id": 0
+        },
         "persistence": {
           "host": "apps-pg",
           "secretName": "apps-pg-secret"
         }
       }
     },
-    "name": "scan-0",
+    "name": "scan",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -597,11 +599,13 @@
           },
           "sequencerPublicUrl": "https://sequencer.sv.svc.svrun.network.canton.global"
         },
-        "domainMigrationId": "0",
         "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
+        },
+        "migration": {
+          "id": 0
         },
         "onboardingName": "DA-Helm-Test-Node",
         "persistence": {
@@ -696,7 +700,7 @@
           "host": "apps-pg",
           "secretName": "apps-pg-secret"
         },
-        "scanAddress": "http://scan-app-0.sv:5012",
+        "scanAddress": "http://scan-app.sv:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,

@@ -155,10 +155,6 @@ jobs:
       send_deployment_notification:
         type: boolean
         default: true
-      prepare_global_domain_upgrade:
-        type: boolean
-        default: false
-        description: "If true, it will set the env GLOBAL_DOMAIN_PREPARE_UPGRADE to true, and the deployment will attach the required PVC for the global domain migration dump to the sv app"
       global_domain_active_migration_id:
         type: integer
         default: 0
@@ -196,7 +192,6 @@ jobs:
           condition:
             and:
               - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
-              - equal: [ 0, <<parameters.global_domain_upgrade_migration_id>> ]
               - equal: [ 0, <<parameters.global_domain_active_migration_id>> ]
           steps:
             - run_bash_command_in_nix:
@@ -260,16 +255,11 @@ jobs:
               VERSION=$(get-snapshot-version)
             fi
             export CN_INSTALL_SPLITWELL="true"
-            if [[ << parameters.prepare_global_domain_upgrade >> == true ]]; then
-              export CN_INSTALL_SPLITWELL="false"
-            export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
-            fi
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
             fi
             if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
-              export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
               export CN_INSTALL_SPLITWELL="false"
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi

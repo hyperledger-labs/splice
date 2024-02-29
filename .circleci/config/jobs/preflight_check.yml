@@ -15,7 +15,7 @@ jobs:
       wait_for_sv:
         type: boolean
         default: true
-      wait_for_non_sv_nodes:
+      wait_for_splitwell:
         type: boolean
         default: true
       cluster_version:
@@ -74,7 +74,7 @@ jobs:
             cncluster wait_version $VERSION
             validator_app="validator-app"
             # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
-            if [[ << parameters.wait_for_non_sv_nodes >> == true ]]; then
+            if [[ << parameters.wait_for_splitwell >> == true ]]; then
               cncluster wait splitwell $validator_app
             fi
             cncluster wait sv-1 $validator_app

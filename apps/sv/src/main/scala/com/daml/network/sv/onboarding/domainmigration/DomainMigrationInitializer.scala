@@ -16,18 +16,13 @@ import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationSer
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
-import com.daml.network.sv.onboarding.{
-  DomainNodeReconciler,
-  NodeInitializerUtil,
-  SetupUtil,
-  SvcPartyHosting,
-}
+import com.daml.network.sv.onboarding.{NodeInitializerUtil, SetupUtil, SvcPartyHosting}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
   loadDomainMigrationDump,
   DomainNodeInitializer,
   DomainTopologyTransactions,
 }
-import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
+import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.data.CantonTimestamp
@@ -49,7 +44,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.io.FileNotFoundException
@@ -68,9 +62,9 @@ class DomainMigrationInitializer(
     override protected val storage: Storage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
+    joiningNodeInitializer: JoiningNodeInitializer,
 )(implicit
     ec: ExecutionContextExecutor,
-    httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,
@@ -108,14 +102,18 @@ class DomainMigrationInitializer(
       SvStore.Key(migrationDump.nodeIdentities.svPartyId, migrationDump.nodeIdentities.svcPartyId)
     val svcPartyHosting = newSvcPartyHosting(storeKey)
     for {
-      _ <- migrateToNewDomainNode(migrationDump, svcPartyHosting)
-      _ <- SetupUtil.setupSvParty(
-        readOnlyConnection,
-        config,
-        participantAdminConnection,
-        clock,
-        retryProvider,
-        loggerFactory,
+      _ <- migrateToNewDomainNode(migrationDump)
+      globalDomainId = migrationDump.nodeIdentities.domainId
+      _ <- svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
+        globalDomainId,
+        ParticipantId(migrationDump.nodeIdentities.participant.id.uid),
+      )
+      _ = logger.info(
+        s"SVC party hosting is replicated on the new global domain"
+      )
+      _ <- readOnlyConnection.ensureUserHasPrimaryParty(
+        config.ledgerApiUser,
+        storeKey.svParty,
       )
       svStore = newSvStore(storeKey, config.domainMigrationId)
       svcStore = newSvcStore(svStore.key, config.domainMigrationId)
@@ -124,51 +122,31 @@ class DomainMigrationInitializer(
         svcStore,
         ledgerClient,
       )
-      _ <- SetupUtil.grantSvUserRightReadAsSvc(
-        svAutomation.connection,
-        config.ledgerApiUser,
-        svStore.key.svcParty,
-      )
-      _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(
-        svAutomation.connection,
-        config,
-        migrationDump.nodeIdentities.svcPartyId,
-      )
-      svcAutomation =
-        newSvSvcAutomationService(
-          svStore,
-          svcStore,
-          Some(localDomainNode),
+      _ <- SetupUtil
+        .grantSvUserRightReadAsSvc(
+          svAutomation.connection,
+          config.ledgerApiUser,
+          svStore.key.svcParty,
         )
-      domainNodeReconciler = new DomainNodeReconciler(
-        svcStore,
-        svcAutomation.connection,
-        config.scan,
-        clock,
-        retryProvider,
-        logger,
-      )
-      globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
-      _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
-      _ <- domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
-        Some(localDomainNode),
-        migrationDump.nodeIdentities.domainId,
-        DomainNodeState.Onboarded,
-        config.domainMigrationId,
+      svcAutomationService =
+        newSvSvcAutomationService(svStore, svcStore, Some(localDomainNode))
+      _ <- joiningNodeInitializer.onboard(
+        globalDomainId,
+        svcAutomationService,
+        svAutomation,
       )
     } yield (
-      globalDomain,
+      globalDomainId,
       svcPartyHosting,
       svStore,
       svAutomation,
       svcStore,
-      svcAutomation,
+      svcAutomationService,
     )
   }
 
   private def migrateToNewDomainNode(
-      domainMigrationDump: DomainMigrationDump,
-      svcPartyHosting: SvcPartyHosting,
+      domainMigrationDump: DomainMigrationDump
   ): Future[Unit] = {
     val domainTopologyTransactions = DomainTopologyTransactions(
       domainMigrationDump.domainDataSnapshot.topologySnapshot.result
@@ -218,14 +196,6 @@ class DomainMigrationInitializer(
           signedBy = domainMigrationDump.nodeIdentities.participant.id.uid.namespace.fingerprint,
         )
       _ = logger.info("resumed domain")
-      _ <- svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
-        domainMigrationDump.nodeIdentities.domainId,
-        ParticipantId(domainMigrationDump.nodeIdentities.participant.id.uid),
-      )
-      _ = logger.info(
-        s"SVC party hosting is replicated on the new global domain"
-      )
-
     } yield {}
   }
 

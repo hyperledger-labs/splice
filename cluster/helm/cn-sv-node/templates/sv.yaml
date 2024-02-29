@@ -1,7 +1,5 @@
 ---
-{{- $appIdentifier := include "domainMigrationIdOrDefaultValue" (list .Values "sv-app") }}
-{{ $isActiveNode := ((.Values.globalDomainUpgrade).isActiveNode) }}
-{{ $isRestoringNode := and (.Values.globalDomainUpgrade) (not $isActiveNode) }}
+{{- $appIdentifier :=  "sv-app" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -9,6 +7,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ $appIdentifier }}
+    migration: {{ .Values.migration.id | quote }}
 spec:
   replicas: 1
   selector:
@@ -30,10 +29,20 @@ spec:
               value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
             {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "sv" "keyName" "sv" "fixedTokens" .Values.cluster.fixedTokens) | indent 12}}
             {{- include "cn-util-lib.auth0-user-env-var" (dict "appName" "validator" "keyName" "validator") | indent 12}}
-            {{- if eq .Values.onboardingType "found-collective" }}
+            - name: CN_APP_SV_PARTICIPANT_ADDRESS
+              value: {{ .Values.participantAddress | default "participant" | quote }}
+            {{- if .Values.migration.migrating }}
+            - name: ADDITIONAL_CONFIG_SV_ONBOARDING
+              value: |
+                _onboarding {
+                  type = "domain-migration"
+                  dump-file-path = "/domain-upgrade-dump/domain_migration_dump.json"
+                }
+            {{- else }}
+              {{- if eq .Values.onboardingType "found-collective" }}
             - name: CN_APP_SV_IS_DEV_NET
               value: {{ .Values.isDevNet | quote }}
-            {{- with .Values.acsDumpImport }}
+                {{- with .Values.acsDumpImport }}
             - name: ADDITIONAL_CONFIG_ACS_DUMP_IMPORT
               value: |
                 canton.sv-apps.sv.onboarding.bootstrapping-dump {
@@ -53,13 +62,12 @@ spec:
                 secretKeyRef:
                   key: "json-credentials"
                   name: {{ .bucket.secretName }}
-            {{- end }}
-            {{- end }}
-            - name: CN_APP_SV_PARTICIPANT_ADDRESS
-              value: {{ .Values.participantAddress | default "participant" | quote }}
-            {{- if .Values.onboardingType }}
+                {{- end }}
+              {{- end }}
+              {{ if .Values.onboardingType }}
             - name: CN_APP_SV_ONBOARDING_TYPE
               value: {{ .Values.onboardingType }}
+              {{- end }}
             {{- end }}
             {{- if .Values.onboardingName }}
             - name: CN_APP_SV_ONBOARDING_NAME
@@ -116,23 +124,15 @@ spec:
                   name: "cn-app-sv-key"
                   optional: false
             {{- end }}
-            {{- with .Values.domainMigrationId }}
             - name: ADDITIONAL_CONFIG_MIGRATION_ID
               value: |
-                canton.sv-apps.sv.domain-migration-id = {{ . }}
-            {{- end }}
-            {{- if $isRestoringNode }}
-            - name: ADDITIONAL_CONFIG_SV_ONBOARDING
-              value: |
-                _onboarding {
-                  dump-file-path = "/domain-upgrade-dump/domain_migration_dump.json"
+                canton.sv-apps.sv {
+                  domain-migration-id = {{ .Values.migration.id }}
+                  ingest-from-participant-begin = true
                 }
-            {{- end }}
-            {{- if $isActiveNode }}
             - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
               value: |
                 canton.sv-apps.sv.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
-            {{- end }}
             {{- with .Values.domain }}
             - name: ADDITIONAL_CONFIG_SV_DOMAIN
               value: |
@@ -272,7 +272,7 @@ spec:
               mountPath: /participant-bootstrapping-dump
               readOnly: true
           {{- end }}
-          {{- if .Values.globalDomainUpgrade }}
+          {{- if .Values.migration.attachPvc }}
           volumeMounts:
             - name: domain-upgrade-dump-volume
               mountPath: /domain-upgrade-dump
@@ -308,14 +308,10 @@ spec:
           secret:
             secretName: {{ .secretName }}
       {{- end }}
-      {{- if or $isActiveNode $isRestoringNode }}
+      {{- if .Values.migration.attachPvc }}
         - name: domain-upgrade-dump-volume
           persistentVolumeClaim:
-            {{- if $isActiveNode }}
-            claimName: "global-domain-active-pvc"
-            {{- else }}
-            claimName: "global-domain-upgrade-pvc"
-            {{- end }}
+            claimName: "sv-app-global-domain-migration-pvc"
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
@@ -343,37 +339,18 @@ spec:
     - name: metrics
       port: 10013
       protocol: TCP
-{{- if $isActiveNode }}
+{{- if .Values.migration.attachPvc }}
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: "global-domain-active-pvc"
+  name: "sv-app-global-domain-migration-pvc"
   namespace: {{ $.Release.Namespace }}
 spec:
   accessModes:
     - ReadWriteOnce
   resources:
     requests:
-      storage: 10G
-  storageClassName: {{ .Values.globalDomainUpgrade.storageClassName }}
-{{- end }}
-{{- if $isRestoringNode }}
----
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: "global-domain-upgrade-pvc"
-  namespace: {{ $.Release.Namespace }}
-spec:
-  # Create the PVC as a clone of the active PVC, that must already contain the migration dump
-  dataSource:
-    name: "global-domain-active-pvc"
-    kind: PersistentVolumeClaim
-  accessModes:
-    - ReadOnlyMany
-  resources:
-    requests:
       storage: 20G
-  storageClassName: {{ .Values.globalDomainUpgrade.storageClassName }}
+  storageClassName: {{ .Values.pvc.volumeStorageClass }}
 {{- end }}

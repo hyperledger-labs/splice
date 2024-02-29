@@ -1,26 +1,5 @@
 {{/*Used by the sv runbook, which is not aware of multiple domains yet.*/}}
-{{- if and .Values.withSvIngress (and (empty ((.Values.ingress).globalDomain).activeMigrationId) (empty ((.Values.ingress).globalDomain).migrationId)) }}
-  {{- if .Values.ingress.sequencer }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: sequencer-sv-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-    - "sequencer.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-    - cluster-ingress/cn-http-gateway
-  http:
-    - match:
-        - port: 443
-      route:
-        - destination:
-            port:
-              number: 5008
-            host: global-domain-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-  {{- end }}
+{{- if .Values.withSvIngress }}
   {{- if .Values.ingress.sv }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService

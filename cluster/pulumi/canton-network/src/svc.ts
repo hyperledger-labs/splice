@@ -49,7 +49,7 @@ export class Svc extends pulumi.ComponentResource {
   private joinViaSv1(sv1: pulumi.Resource, keys: CnInput<SvIdKey>): SvOnboarding {
     return {
       type: 'join-with-key',
-      sponsorApiUrl: `http://sv-app-${this.args.globalDomainUpgradeConfig.activeMigrationId}.sv-1:5014`,
+      sponsorApiUrl: `http://sv-app.sv-1:5014`,
       sponsorRelease: sv1,
       keys,
     };
@@ -131,9 +131,10 @@ export class Svc extends pulumi.ComponentResource {
       nodeName: conf.nodeName,
     }));
 
+    const runningMigration = this.args.globalDomainUpgradeConfig.isRunningMigration();
     const founder = await this.installSvNode(
       founderConf,
-      { type: 'found-collective' },
+      runningMigration ? { type: 'domain-migration' } : { type: 'found-collective' },
       {
         founder: founderCometBftConf,
         peers: peerCometBftConfs,
@@ -144,7 +145,9 @@ export class Svc extends pulumi.ComponentResource {
 
     const restSvs = await Promise.all(
       restSvConfs.map(conf => {
-        const onboarding = this.joinViaSv1(founder.svApp, keys[conf.onboardingName]);
+        const onboarding: SvOnboarding = runningMigration
+          ? { type: 'domain-migration' }
+          : this.joinViaSv1(founder.svApp, keys[conf.onboardingName]);
         const cometBft = {
           founder: founderCometBftConf,
           peers: peerCometBftConfs.filter(c => c.id !== conf.cometBft.id), // remove self from peer list

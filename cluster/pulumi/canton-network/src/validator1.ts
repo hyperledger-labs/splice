@@ -80,20 +80,20 @@ export async function installValidator1(
 
   const extraDependsOn: pulumi.Resource[] = dependsOn.concat([participant, validatorPostgres]);
   const globalDomainUrl = `https://sequencer-${globalDomainMigrationConfig.activeMigrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
-  const scanAddress = `http://scan-app-${globalDomainMigrationConfig.activeMigrationId}.sv-1:5012`;
+  const scanAddress = `http://scan-app.sv-1:5012`;
 
   const validator = await installValidatorApp({
     validatorWalletUser,
     xns,
     participant,
-    ...globalDomainMigrationConfig.validatorMigrationConfig(),
+    ...globalDomainMigrationConfig.migratingNodeConfig(),
     // We vet both versions to easily test upgrades.
     appDars: [
       'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar',
       'cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.2.0.dar',
     ],
     validatorPartyHint: `${name}_validator_service_user`,
-    svSponsorAddress: `http://sv-app-${globalDomainMigrationConfig.activeMigrationId}.sv-1:5014`,
+    svSponsorAddress: `http://sv-app.sv-1:5014`,
     onboardingSecret,
     persistenceConfig: {
       host: validatorPostgres.address,

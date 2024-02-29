@@ -511,13 +511,13 @@ class GlobalDomainMigrationIntegrationTest
 
           checkMigrateDomainOnNodes(majorityUpgradeNodes)
 
-          withClueAndLog("decentralized namespace can be modified on the new domain") {
-            majorityUpgradeNodes
-              .parTraverse { upgradeNode =>
+          val namespaceChangeResult =
+            withClueAndLog("decentralized namespace can be modified on the new domain") {
+              majorityUpgradeNodes.parTraverse { upgradeNode =>
                 val connection = upgradeNode.newParticipantConnection
                 for {
                   id <- connection.getId()
-                  _ <- connection
+                  result <- connection
                     .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
                       "keep just sv1",
                       globalDomainId,
@@ -526,25 +526,25 @@ class GlobalDomainMigrationIntegrationTest
                       id.namespace.fingerprint,
                       RetryFor.WaitingOnInitDependency,
                     )
-                } yield {}
-              }
-              .futureValue
-              .discard
-          }
+                } yield result
+              }.futureValue
+            }
 
           withClueAndLog("migrate the late joining node") {
             // sv1 is the founder so specifically join it later to validate our replay
             sv1LocalBackend.startSync()
 
-            eventuallySucceeds() {
+            val changeSerial = namespaceChangeResult.map(_.base.serial).max
+            // reconciliation loops will restore the removed namespaces once the sv1 starts
+            eventuallySucceeds(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
               upgradeDomainNode1.newParticipantConnection
                 .getDecentralizedNamespaceDefinition(
                   globalDomainId,
                   svcPartyDecentralizedNamespace,
                 )
                 .futureValue
-                .mapping
-                .owners shouldBe Set(sv1Party.uid.namespace)
+                .base
+                .serial should be >= changeSerial
             }
             withClueAndLog("domain is unpaused on the new node") {
               eventuallySucceeds() {

@@ -70,7 +70,7 @@ export async function installSplitwell(
     : domainPostgres;
 
   const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
-  const scanAddress = `http://scan-app-${globalDomainMigrationConfig.activeMigrationId}.sv-1:5012`;
+  const scanAddress = `http://scan-app.sv-1:5012`;
   installCNHelmChart(
     xns,
     'splitwell-app',
@@ -115,7 +115,7 @@ export async function installSplitwell(
     ].join('\n'),
     onboardingSecret,
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
-    svSponsorAddress: `http://sv-app-${globalDomainMigrationConfig.activeMigrationId}.sv-1:5014`,
+    svSponsorAddress: `http://sv-app.sv-1:5014`,
     participantBootstrapDump,
     participantAddress: 'participant',
     topupConfig: topupConfig,

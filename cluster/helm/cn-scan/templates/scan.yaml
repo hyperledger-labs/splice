@@ -1,5 +1,5 @@
-{{- $scanAppLabel := include "appLabel" (list .Values "scan-app") }}
-{{- $scanWebUiAppLabel := include "appLabel" (list .Values "scan-web-ui") }}
+{{- $scanAppLabel :=  "scan-app" }}
+{{- $scanWebUiAppLabel := "scan-web-ui" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -7,6 +7,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ $scanAppLabel }}
+    migration: {{ .Values.migration.id | quote }}
 spec:
   replicas: 1
   selector:
@@ -55,11 +56,9 @@ spec:
               ingest-from-participant-begin = {{ .Values.ingestFromParticipantBegin }}
             }
         {{- end }}
-        {{- with .Values.domainMigrationId }}
         - name: ADDITIONAL_CONFIG_MIGRATION_ID
           value: |
-            canton.scan-apps.scan-app.domain-migration-id = {{ . }}
-        {{- end }}
+            canton.scan-apps.scan-app.domain-migration-id = {{ .Values.migration.id }}
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "scan" "keyName" "sv" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         - name: CN_APP_SCAN_PARTICIPANT_ADDRESS
           value: {{ .Values.participantAddress | default "participant" | quote }}
@@ -127,6 +126,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ $scanAppLabel }}
+    migration: {{ .Values.migration.id | quote }}
 spec:
   selector:
     app: {{ $scanAppLabel }}
@@ -145,6 +145,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ $scanWebUiAppLabel }}
+    migration: {{ .Values.migration.id | quote }}
 spec:
   replicas: 1
   selector:
@@ -188,6 +189,8 @@ kind: Service
 metadata:
   name: {{ $scanWebUiAppLabel }}
   namespace: {{ .Release.Namespace }}
+  labels:
+    migration: {{ .Values.migration.id | quote }}
 spec:
   selector:
     app: {{ $scanWebUiAppLabel }}

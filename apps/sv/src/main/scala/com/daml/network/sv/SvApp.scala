@@ -2,6 +2,7 @@ package com.daml.network.sv
 
 import cats.data.OptionT
 import cats.implicits.catsSyntaxTuple2Semigroupal
+import cats.instances.future.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -18,6 +19,7 @@ import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.sv_admin.SvAdminResource
+import com.daml.network.migration.AcsExporter
 import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -36,11 +38,12 @@ import com.daml.network.sv.cometbft.{
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.metrics.SvAppMetrics
+import com.daml.network.sv.migration.{DomainDataSnapshotGenerator, DomainNodeIdentities}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.util.{
   BackupDump,
@@ -71,6 +74,7 @@ import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.circe.Json
+import io.circe.syntax.*
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
@@ -81,14 +85,9 @@ import org.apache.pekko.http.scaladsl.model.{HttpMethods, HttpRequest, HttpRespo
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import java.nio.file.Paths
-import io.circe.syntax.*
-
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
-import cats.instances.future.*
-import com.daml.network.migration.AcsExporter
-import com.daml.network.sv.migration.{DomainDataSnapshotGenerator, DomainNodeIdentities}
 
 class SvApp(
     override val name: InstanceName,
@@ -225,6 +224,11 @@ class SvApp(
       ledgerClient: CNLedgerClient,
       localDomainNode: Option[LocalDomainNode],
   ): Future[SvApp.State] = {
+    val cometBftClient = newCometBftClient
+    val cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
+      new CometBftNode(client, config, loggerFactory)
+    )
+
     for {
       // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
       // reconnect all domains at the beginning of SV initialization just in case.
@@ -244,14 +248,23 @@ class SvApp(
           logger,
         )
       }
-      cometBftClient = newCometBftClient
-      cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-        new CometBftNode(client, config, loggerFactory)
-      )
-
+      newJoiningNodeInitializer = (joiningConfig: Option[SvOnboardingConfig.JoinWithKey]) =>
+        new JoiningNodeInitializer(
+          localDomainNode,
+          joiningConfig,
+          participantId,
+          darFilesToUploadDuringInit,
+          config,
+          cometBftNode,
+          ledgerClient,
+          participantAdminConnection,
+          clock,
+          storage,
+          loggerFactory,
+          retryProvider,
+        )
       // Ensure SVC party, SvcRules, CoinRules, Mediator, and Sequencer nodes are setup
       // -------------------------------------------------------------------------------
-
       case (
         globalDomain,
         svcPartyHosting,
@@ -288,25 +301,13 @@ class SvApp(
           }
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           appInitStep("JoiningNodeInitializer joining collective with key") {
-            val initializer = new JoiningNodeInitializer(
-              localDomainNode,
-              Some(joiningConfig),
-              participantId,
-              darFilesToUploadDuringInit,
-              config,
-              cometBftNode,
-              ledgerClient,
-              participantAdminConnection,
-              clock,
-              storage,
-              loggerFactory,
-              retryProvider,
-            )
+            val initializer = newJoiningNodeInitializer(Some(joiningConfig))
             initializer.joinCollectiveAndOnboardNodes()
           }
         case Some(domainMigrationConfig: SvOnboardingConfig.DomainMigration) =>
           appInitStep("DomainMigrationInitializer initializing node from dump") {
-            val initializer = new DomainMigrationInitializer(
+            val joiningNodeInitializer = newJoiningNodeInitializer(None)
+            new DomainMigrationInitializer(
               localDomainNode.getOrElse(
                 sys.error("It must always specify a domain config for Domain Migration")
               ),
@@ -319,25 +320,12 @@ class SvApp(
               storage,
               loggerFactory,
               retryProvider,
-            )
-            initializer.migrateDomain()
+              joiningNodeInitializer,
+            ).migrateDomain()
           }
         case None =>
           appInitStep("JoiningNodeInitializer joining collective") {
-            val initializer = new JoiningNodeInitializer(
-              localDomainNode,
-              None,
-              participantId,
-              darFilesToUploadDuringInit,
-              config,
-              cometBftNode,
-              ledgerClient,
-              participantAdminConnection,
-              clock,
-              storage,
-              loggerFactory,
-              retryProvider,
-            )
+            val initializer = newJoiningNodeInitializer(None)
             initializer.joinCollectiveAndOnboardNodes()
           }
       }

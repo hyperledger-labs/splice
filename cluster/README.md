@@ -1789,7 +1789,7 @@ command) can be used for recovery using the `node-restore.sh` command.
 
 To do that, run: `node-restore.sh <node> <run_id> <component...>`, where `component` can be one
 or more out of {validator, participant} for a validator and one or more out of
-{validator, scan, sv-app-0, participant-0, mediator, sequencer, cometbft-0} for an SV.
+{validator, scan, sv-app, participant-0, mediator, sequencer, cometbft-0} for an SV.
 
 Most components can, in general, be restored independently of others.
 

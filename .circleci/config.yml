@@ -1467,10 +1467,6 @@ jobs:
       send_deployment_notification:
         type: boolean
         default: true
-      prepare_global_domain_upgrade:
-        type: boolean
-        default: false
-        description: "If true, it will set the env GLOBAL_DOMAIN_PREPARE_UPGRADE to true, and the deployment will attach the required PVC for the global domain migration dump to the sv app"
       global_domain_active_migration_id:
         type: integer
         default: 0
@@ -1508,7 +1504,6 @@ jobs:
           condition:
             and:
               - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
-              - equal: [ 0, <<parameters.global_domain_upgrade_migration_id>> ]
               - equal: [ 0, <<parameters.global_domain_active_migration_id>> ]
           steps:
             - run_bash_command_in_nix:
@@ -1572,16 +1567,11 @@ jobs:
               VERSION=$(get-snapshot-version)
             fi
             export CN_INSTALL_SPLITWELL="true"
-            if [[ << parameters.prepare_global_domain_upgrade >> == true ]]; then
-              export CN_INSTALL_SPLITWELL="false"
-            export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
-            fi
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
             fi
             if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
-              export GLOBAL_DOMAIN_PREPARE_UPGRADE="true"
               export CN_INSTALL_SPLITWELL="false"
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi
@@ -2229,9 +2219,6 @@ jobs:
       <<: *cluster-parameter
       namespace_name:
         type: string
-      migration_id:
-        type: integer
-        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2254,8 +2241,8 @@ jobs:
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app-<< parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> sv-app-<< parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> scan-app
+                cncluster wait << parameters.namespace_name >> sv-app
                 cncluster wait << parameters.namespace_name >> validator-app
                 ;;
               "validator1")
@@ -2281,7 +2268,7 @@ jobs:
       wait_for_sv:
         type: boolean
         default: true
-      wait_for_non_sv_nodes:
+      wait_for_splitwell:
         type: boolean
         default: true
       cluster_version:
@@ -2340,7 +2327,7 @@ jobs:
             cncluster wait_version $VERSION
             validator_app="validator-app"
             # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
-            if [[ << parameters.wait_for_non_sv_nodes >> == true ]]; then
+            if [[ << parameters.wait_for_splitwell >> == true ]]; then
               cncluster wait splitwell $validator_app
             fi
             cncluster wait sv-1 $validator_app
@@ -3378,7 +3365,6 @@ workflows:
           cluster: "cimain"
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for cimain
-          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - wait_for_previous_pipeline
@@ -3391,13 +3377,23 @@ workflows:
             - slack-context
           cluster: "cimain"
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           # TODO(#10254) run splitwell tests once it's fixed
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - wait_for_previous_pipeline
             - docker_images_push
+      - backup_cluster:
+          <<: *main-branch-only
+          cluster: "cimain"
+          include_splitwell: false
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-only
@@ -3409,44 +3405,12 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           requires:
             - preflight_check
             - backup_cluster
       - deploy_cluster:
-          name: "deploy_global_domain_upgrade"
-          <<: *main-branch-only
-          context:
-            - artifactory
-            - slack-context
-          cluster: "cimain"
-          send_deployment_notification: false
-          update_deployment_branch: false
-          global_domain_upgrade_migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - backup_cluster:
-          <<: *main-branch-only
-          cluster: "cimain"
-          include_splitwell: false
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-      - restore_node:
-          <<: *main-branch-only
-          cluster: "cimain"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
-      - deploy_cluster:
-          name: "switch_global_domain_upgrade"
+          name: "migrate_cluster"
           <<: *main-branch-only
           context:
             - artifactory
@@ -3458,23 +3422,9 @@ workflows:
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
           requires:
-            - deploy_global_domain_upgrade
-            - restore_node
-      - backup_cluster:
-          <<: *main-branch-only
-          # backup splitwell and validator1
-          name: "backup_after_global_domain_upgrade"
-          cluster: "cimain"
-          include_sv: false
-          parallelism: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - preflight_check:
-          name: "preflight_check_global_domain_upgrade"
+          name: "preflight_check_migrated"
           <<: *main-branch-only
           context:
             - artifactory
@@ -3483,7 +3433,7 @@ workflows:
           cluster: "cimain"
           migration_id: 1
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - deploy_sv_runbook:
           <<: *main-branch-only
           context:
@@ -3492,18 +3442,17 @@ workflows:
           cluster: "cimain"
           send_deployment_notification: false
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
           global_domain_migration_id: 1
-      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-      # - preflight_sv_check:
-      #     <<: *main-branch-only
-      #     context:
-      #       - artifactory
-      #       - canton-network-vpn
-      #       - slack-context
-      #     cluster: "cimain"
-      #     requires:
-      #       - switch_global_domain_upgrade
+      - preflight_sv_check:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - trigger_global_domain_migration
       - deploy_validator_runbook:
           <<: *main-branch-only
           context:
@@ -3512,7 +3461,7 @@ workflows:
           cluster: "cimain"
           global_domain_migration_id: 1
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
       - preflight_validator_check:
           <<: *main-branch-only
           migration_id: 1
@@ -3522,7 +3471,19 @@ workflows:
             - slack-context
           cluster: "cimain"
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
+      - restore_node:
+          <<: *main-branch-only
+          cluster: "cimain"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check
+            - preflight_validator_check
+            - preflight_check_migrated
 
 
   auth0_user_cleanup:
@@ -3803,7 +3764,6 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -3817,14 +3777,14 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           # TODO(#10254) run splitwell tests once it's fixed
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
       - backup_cluster:
-          name: "backup_before_migration"
+          name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchneta"
           include_splitwell: false
@@ -3845,36 +3805,12 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           requires:
             - preflight_check_core
-            - backup_before_migration
+            - backup_cluster_before_migration
       - deploy_cluster:
-          name: "deploy_global_domain_upgrade"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
-          update_deployment_branch: false
-          global_domain_upgrade_migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration_created"
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
-      - deploy_cluster:
-          name: "switch_global_domain_upgrade"
+          name: "migrate_cluster"
           <<: *main-branch-never
           context:
             - artifactory
@@ -3887,23 +3823,9 @@ workflows:
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
           requires:
-            - deploy_global_domain_upgrade
-            - restore_node_after_migration_created
-      - backup_cluster:
-          <<: *main-branch-never
-          # backup splitwell and validator1
-          name: "backup_after_global_domain_upgrade"
-          cluster: "scratchneta"
-          include_sv: false
-          parallelism: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - preflight_check:
-          name: "preflight_check_global_domain_upgrade"
+          name: "preflight_check_migrated"
           <<: *main-branch-never
           context:
             - artifactory
@@ -3913,29 +3835,29 @@ workflows:
           migration_id: 1
           parallelism: 1
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_migrated_sv_runbook"
+          name: "deploy_sv_runbook_migrated"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "scratchneta"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
           global_domain_migration_id: 1
-      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-      # - preflight_sv_check:
-      #     <<: *main-branch-never
-      #     context:
-      #       - artifactory
-      #       - canton-network-vpn
-      #       - slack-context
-      #     cluster: "scratchneta"
-      #     requires:
-      #       - switch_global_domain_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - trigger_global_domain_migration
       - deploy_validator_runbook:
-          name: "deploy_migrated_validator_runbook"
+          name: "deploy_validator_runbook_migrated"
           global_domain_migration_id: 1
           <<: *main-branch-never
           context:
@@ -3943,7 +3865,7 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           migration_id: 1
@@ -3954,18 +3876,30 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
+      - restore_node:
+          name: "restore_node_after_migration"
+          <<: *main-branch-never
+          cluster: "scratchneta"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchneta"
           context:
             - canton-network-vpn
           requires:
-            - backup_after_global_domain_upgrade
-            # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-            # - preflight_sv_check
+            - restore_node_after_migration
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
-            - preflight_check_global_domain_upgrade
+            - preflight_check_migrated
       # Simple deployment with no migration
       - hold:
           name: "hold_basic"
@@ -4111,7 +4045,6 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -4125,14 +4058,14 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           # TODO(#10254) run splitwell tests once it's fixed
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
       - backup_cluster:
-          name: "backup_before_migration"
+          name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchnetb"
           include_splitwell: false
@@ -4153,36 +4086,12 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           requires:
             - preflight_check_core
-            - backup_before_migration
+            - backup_cluster_before_migration
       - deploy_cluster:
-          name: "deploy_global_domain_upgrade"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
-          update_deployment_branch: false
-          global_domain_upgrade_migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration_created"
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
-      - deploy_cluster:
-          name: "switch_global_domain_upgrade"
+          name: "migrate_cluster"
           <<: *main-branch-never
           context:
             - artifactory
@@ -4195,23 +4104,9 @@ workflows:
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
           requires:
-            - deploy_global_domain_upgrade
-            - restore_node_after_migration_created
-      - backup_cluster:
-          <<: *main-branch-never
-          # backup splitwell and validator1
-          name: "backup_after_global_domain_upgrade"
-          cluster: "scratchnetb"
-          include_sv: false
-          parallelism: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - preflight_check:
-          name: "preflight_check_global_domain_upgrade"
+          name: "preflight_check_migrated"
           <<: *main-branch-never
           context:
             - artifactory
@@ -4221,29 +4116,29 @@ workflows:
           migration_id: 1
           parallelism: 1
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_migrated_sv_runbook"
+          name: "deploy_sv_runbook_migrated"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "scratchnetb"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
           global_domain_migration_id: 1
-      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-      # - preflight_sv_check:
-      #     <<: *main-branch-never
-      #     context:
-      #       - artifactory
-      #       - canton-network-vpn
-      #       - slack-context
-      #     cluster: "scratchnetb"
-      #     requires:
-      #       - switch_global_domain_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - trigger_global_domain_migration
       - deploy_validator_runbook:
-          name: "deploy_migrated_validator_runbook"
+          name: "deploy_validator_runbook_migrated"
           global_domain_migration_id: 1
           <<: *main-branch-never
           context:
@@ -4251,7 +4146,7 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           migration_id: 1
@@ -4262,18 +4157,30 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
+      - restore_node:
+          name: "restore_node_after_migration"
+          <<: *main-branch-never
+          cluster: "scratchnetb"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetb"
           context:
             - canton-network-vpn
           requires:
-            - backup_after_global_domain_upgrade
-            # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-            # - preflight_sv_check
+            - restore_node_after_migration
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
-            - preflight_check_global_domain_upgrade
+            - preflight_check_migrated
       # Simple deployment with no migration
       - hold:
           name: "hold_basic"
@@ -4419,7 +4326,6 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -4433,14 +4339,14 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           # TODO(#10254) run splitwell tests once it's fixed
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
       - backup_cluster:
-          name: "backup_before_migration"
+          name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchnetc"
           include_splitwell: false
@@ -4461,36 +4367,12 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           requires:
             - preflight_check_core
-            - backup_before_migration
+            - backup_cluster_before_migration
       - deploy_cluster:
-          name: "deploy_global_domain_upgrade"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
-          update_deployment_branch: false
-          global_domain_upgrade_migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration_created"
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
-      - deploy_cluster:
-          name: "switch_global_domain_upgrade"
+          name: "migrate_cluster"
           <<: *main-branch-never
           context:
             - artifactory
@@ -4503,23 +4385,9 @@ workflows:
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
           requires:
-            - deploy_global_domain_upgrade
-            - restore_node_after_migration_created
-      - backup_cluster:
-          <<: *main-branch-never
-          # backup splitwell and validator1
-          name: "backup_after_global_domain_upgrade"
-          cluster: "scratchnetc"
-          include_sv: false
-          parallelism: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - preflight_check:
-          name: "preflight_check_global_domain_upgrade"
+          name: "preflight_check_migrated"
           <<: *main-branch-never
           context:
             - artifactory
@@ -4529,29 +4397,29 @@ workflows:
           migration_id: 1
           parallelism: 1
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_migrated_sv_runbook"
+          name: "deploy_sv_runbook_migrated"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "scratchnetc"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
           global_domain_migration_id: 1
-      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-      # - preflight_sv_check:
-      #     <<: *main-branch-never
-      #     context:
-      #       - artifactory
-      #       - canton-network-vpn
-      #       - slack-context
-      #     cluster: "scratchnetc"
-      #     requires:
-      #       - switch_global_domain_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - trigger_global_domain_migration
       - deploy_validator_runbook:
-          name: "deploy_migrated_validator_runbook"
+          name: "deploy_validator_runbook_migrated"
           global_domain_migration_id: 1
           <<: *main-branch-never
           context:
@@ -4559,7 +4427,7 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           migration_id: 1
@@ -4570,18 +4438,30 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
+      - restore_node:
+          name: "restore_node_after_migration"
+          <<: *main-branch-never
+          cluster: "scratchnetc"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetc"
           context:
             - canton-network-vpn
           requires:
-            - backup_after_global_domain_upgrade
-            # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-            # - preflight_sv_check
+            - restore_node_after_migration
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
-            - preflight_check_global_domain_upgrade
+            - preflight_check_migrated
       # Simple deployment with no migration
       - hold:
           name: "hold_basic"
@@ -4727,7 +4607,6 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -4741,14 +4620,14 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           # TODO(#10254) run splitwell tests once it's fixed
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
       - backup_cluster:
-          name: "backup_before_migration"
+          name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchnetd"
           include_splitwell: false
@@ -4769,36 +4648,12 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           requires:
             - preflight_check_core
-            - backup_before_migration
+            - backup_cluster_before_migration
       - deploy_cluster:
-          name: "deploy_global_domain_upgrade"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
-          update_deployment_branch: false
-          global_domain_upgrade_migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration_created"
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
-      - deploy_cluster:
-          name: "switch_global_domain_upgrade"
+          name: "migrate_cluster"
           <<: *main-branch-never
           context:
             - artifactory
@@ -4811,23 +4666,9 @@ workflows:
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
           requires:
-            - deploy_global_domain_upgrade
-            - restore_node_after_migration_created
-      - backup_cluster:
-          <<: *main-branch-never
-          # backup splitwell and validator1
-          name: "backup_after_global_domain_upgrade"
-          cluster: "scratchnetd"
-          include_sv: false
-          parallelism: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - preflight_check:
-          name: "preflight_check_global_domain_upgrade"
+          name: "preflight_check_migrated"
           <<: *main-branch-never
           context:
             - artifactory
@@ -4837,29 +4678,29 @@ workflows:
           migration_id: 1
           parallelism: 1
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_migrated_sv_runbook"
+          name: "deploy_sv_runbook_migrated"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "scratchnetd"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
           global_domain_migration_id: 1
-      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-      # - preflight_sv_check:
-      #     <<: *main-branch-never
-      #     context:
-      #       - artifactory
-      #       - canton-network-vpn
-      #       - slack-context
-      #     cluster: "scratchnetd"
-      #     requires:
-      #       - switch_global_domain_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - trigger_global_domain_migration
       - deploy_validator_runbook:
-          name: "deploy_migrated_validator_runbook"
+          name: "deploy_validator_runbook_migrated"
           global_domain_migration_id: 1
           <<: *main-branch-never
           context:
@@ -4867,7 +4708,7 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           migration_id: 1
@@ -4878,18 +4719,30 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
+      - restore_node:
+          name: "restore_node_after_migration"
+          <<: *main-branch-never
+          cluster: "scratchnetd"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnetd"
           context:
             - canton-network-vpn
           requires:
-            - backup_after_global_domain_upgrade
-            # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-            # - preflight_sv_check
+            - restore_node_after_migration
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
-            - preflight_check_global_domain_upgrade
+            - preflight_check_migrated
       # Simple deployment with no migration
       - hold:
           name: "hold_basic"
@@ -5035,7 +4888,6 @@ workflows:
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -5049,14 +4901,14 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           # TODO(#10254) run splitwell tests once it's fixed
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
       - backup_cluster:
-          name: "backup_before_migration"
+          name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchnete"
           include_splitwell: false
@@ -5077,36 +4929,12 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           requires:
             - preflight_check_core
-            - backup_before_migration
+            - backup_cluster_before_migration
       - deploy_cluster:
-          name: "deploy_global_domain_upgrade"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
-          update_deployment_branch: false
-          global_domain_upgrade_migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration_created"
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
-      - deploy_cluster:
-          name: "switch_global_domain_upgrade"
+          name: "migrate_cluster"
           <<: *main-branch-never
           context:
             - artifactory
@@ -5119,23 +4947,9 @@ workflows:
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
           requires:
-            - deploy_global_domain_upgrade
-            - restore_node_after_migration_created
-      - backup_cluster:
-          <<: *main-branch-never
-          # backup splitwell and validator1
-          name: "backup_after_global_domain_upgrade"
-          cluster: "scratchnete"
-          include_sv: false
-          parallelism: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - preflight_check:
-          name: "preflight_check_global_domain_upgrade"
+          name: "preflight_check_migrated"
           <<: *main-branch-never
           context:
             - artifactory
@@ -5145,29 +4959,29 @@ workflows:
           migration_id: 1
           parallelism: 1
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_migrated_sv_runbook"
+          name: "deploy_sv_runbook_migrated"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "scratchnete"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
           global_domain_migration_id: 1
-      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-      # - preflight_sv_check:
-      #     <<: *main-branch-never
-      #     context:
-      #       - artifactory
-      #       - canton-network-vpn
-      #       - slack-context
-      #     cluster: "scratchnete"
-      #     requires:
-      #       - switch_global_domain_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - trigger_global_domain_migration
       - deploy_validator_runbook:
-          name: "deploy_migrated_validator_runbook"
+          name: "deploy_validator_runbook_migrated"
           global_domain_migration_id: 1
           <<: *main-branch-never
           context:
@@ -5175,7 +4989,7 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           migration_id: 1
@@ -5186,18 +5000,30 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
+      - restore_node:
+          name: "restore_node_after_migration"
+          <<: *main-branch-never
+          cluster: "scratchnete"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
       - reset_cluster:
           <<: *main-branch-never
           cluster: "scratchnete"
           context:
             - canton-network-vpn
           requires:
-            - backup_after_global_domain_upgrade
-            # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-            # - preflight_sv_check
+            - restore_node_after_migration
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
-            - preflight_check_global_domain_upgrade
+            - preflight_check_migrated
       # Simple deployment with no migration
       - hold:
           name: "hold_basic"

@@ -41,9 +41,7 @@ export function installCometBftNode(
   const nodeConfig = configs.nodeConfigs[nodename];
   let stateSyncConfig;
   if (syncSource) {
-    const rpcServer = syncSource.status.namespace.apply(namespace =>
-      rpcServiceAddress(namespace, migrationId)
-    );
+    const rpcServer = syncSource.status.namespace.apply(namespace => rpcServiceAddress(namespace));
     stateSyncConfig = {
       enable: true,
       rpcServers: pulumi.interpolate`${rpcServer},${rpcServer}`,
@@ -113,8 +111,8 @@ interface NodeConfig extends Omit<StaticCometBftConfig, 'nodeIndex'> {
   identifier: string;
 }
 
-function rpcServiceAddress(namespace: string, migrationId: DomainMigrationIndex): string {
-  return `http://sv-app-${migrationId}.${namespace}.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc`;
+function rpcServiceAddress(namespace: string): string {
+  return `http://sv-app.${namespace}.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc`;
 }
 
 class CometBftNodeConfig {

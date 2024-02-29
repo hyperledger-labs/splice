@@ -1,10 +1,11 @@
-{{- $appIdentifier := include "domainMigrationIdOrDefaultValue" (list .Values "sv-app") }}
+{{- $appIdentifier :=  "sv-app" }}
 {{- if .Values.metrics.enable }}
 apiVersion: monitoring.coreos.com/v1
 kind: ServiceMonitor
 metadata:
   labels:
     release: {{ .Values.metrics.release }}
+    migration: {{ .Values.migration.id | quote }}
   name: {{ $appIdentifier }}
   namespace: {{ .Release.Namespace }}
 spec:

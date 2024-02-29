@@ -576,9 +576,6 @@ jobs:
       <<: *cluster-parameter
       namespace_name:
         type: string
-      migration_id:
-        type: integer
-        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -601,8 +598,8 @@ jobs:
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app-<< parameters.migration_id >>
-                cncluster wait << parameters.namespace_name >> sv-app-<< parameters.migration_id >>
+                cncluster wait << parameters.namespace_name >> scan-app
+                cncluster wait << parameters.namespace_name >> sv-app
                 cncluster wait << parameters.namespace_name >> validator-app
                 ;;
               "validator1")

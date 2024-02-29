@@ -31,7 +31,6 @@
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
-          prepare_global_domain_upgrade: true
           cancel_workflow_on_failure: true
           requires:
             - deployment_test
@@ -45,14 +44,14 @@
             - slack-context
           cluster: "_CLUSTERNAME_"
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           # TODO(#10254) run splitwell tests once it's fixed
           test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
       - backup_cluster:
-          name: "backup_before_migration"
+          name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "_CLUSTERNAME_"
           include_splitwell: false
@@ -73,36 +72,12 @@
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_non_sv_nodes: false
+          wait_for_splitwell: false
           requires:
             - preflight_check_core
-            - backup_before_migration
+            - backup_cluster_before_migration
       - deploy_cluster:
-          name: "deploy_global_domain_upgrade"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "_CLUSTERNAME_"
-          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
-          # So we want to avoid creating them.
-          update_deployment_branch: false
-          global_domain_upgrade_migration_id: 1
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration_created"
-          <<: *main-branch-never
-          cluster: "_CLUSTERNAME_"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - trigger_global_domain_migration
-      - deploy_cluster:
-          name: "switch_global_domain_upgrade"
+          name: "migrate_cluster"
           <<: *main-branch-never
           context:
             - artifactory
@@ -115,23 +90,9 @@
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
           requires:
-            - deploy_global_domain_upgrade
-            - restore_node_after_migration_created
-      - backup_cluster:
-          <<: *main-branch-never
-          # backup splitwell and validator1
-          name: "backup_after_global_domain_upgrade"
-          cluster: "_CLUSTERNAME_"
-          include_sv: false
-          parallelism: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - preflight_check:
-          name: "preflight_check_global_domain_upgrade"
+          name: "preflight_check_migrated"
           <<: *main-branch-never
           context:
             - artifactory
@@ -141,29 +102,29 @@
           migration_id: 1
           parallelism: 1
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_migrated_sv_runbook"
+          name: "deploy_sv_runbook_migrated"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "_CLUSTERNAME_"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
           global_domain_migration_id: 1
-      # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-      # - preflight_sv_check:
-      #     <<: *main-branch-never
-      #     context:
-      #       - artifactory
-      #       - canton-network-vpn
-      #       - slack-context
-      #     cluster: "_CLUSTERNAME_"
-      #     requires:
-      #       - switch_global_domain_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - trigger_global_domain_migration
       - deploy_validator_runbook:
-          name: "deploy_migrated_validator_runbook"
+          name: "deploy_validator_runbook_migrated"
           global_domain_migration_id: 1
           <<: *main-branch-never
           context:
@@ -171,7 +132,7 @@
             - slack-context
           cluster: "_CLUSTERNAME_"
           requires:
-            - switch_global_domain_upgrade
+            - migrate_cluster
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           migration_id: 1
@@ -182,18 +143,30 @@
             - slack-context
           cluster: "_CLUSTERNAME_"
           requires:
-            - switch_global_domain_upgrade
+            - trigger_global_domain_migration
+      - restore_node:
+          name: "restore_node_after_migration"
+          <<: *main-branch-never
+          cluster: "_CLUSTERNAME_"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
       - reset_cluster:
           <<: *main-branch-never
           cluster: "_CLUSTERNAME_"
           context:
             - canton-network-vpn
           requires:
-            - backup_after_global_domain_upgrade
-            # TODO(#10038) Reenable this once TxLogs work across domain migrations.
-            # - preflight_sv_check
+            - restore_node_after_migration
+            - preflight_sv_check_migrated
             - preflight_validator_check_migrated
-            - preflight_check_global_domain_upgrade
+            - preflight_check_migrated
       # Simple deployment with no migration
       - hold:
           name: "hold_basic"

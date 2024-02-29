@@ -23,6 +23,9 @@ persistence:
   user: cnadmin
   secretName: "postgres-secrets"
 
+migration:
+  id: 0
+
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

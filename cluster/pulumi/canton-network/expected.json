@@ -1388,7 +1388,7 @@
             "memory": "1536Mi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-1:5012"
+        "scanAddress": "http://scan-app.sv-1:5012"
       }
     },
     "name": "splitwell-splitwell-app",
@@ -1474,8 +1474,8 @@
             "memory": "4Gi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-1:5012",
-        "svSponsorAddress": "http://sv-app-0.sv-1:5014",
+        "scanAddress": "http://scan-app.sv-1:5012",
+        "svSponsorAddress": "http://sv-app.sv-1:5014",
         "svValidator": false,
         "topup": {
           "enabled": true,
@@ -1710,10 +1710,10 @@
             "activeMigrationId": "",
             "migrationId": "0"
           },
-          "scan": true,
+          "scan": false,
           "sequencer": true,
           "splitwell": false,
-          "sv": true,
+          "sv": false,
           "wallet": false
         },
         "withSvIngress": true
@@ -2111,7 +2111,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan-0",
+      "name": "scan",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2125,13 +2125,15 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": true,
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "migration": {
+          "id": 0
         },
         "participantAddress": "participant-0",
         "persistence": {
@@ -2154,7 +2156,7 @@
         "sequencerAddress": "global-domain-0-sequencer"
       }
     },
-    "name": "sv-1-scan-0",
+    "name": "sv-1-scan",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2164,7 +2166,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
-      "name": "sv-app-0",
+      "name": "sv-app",
       "namespace": "sv-1",
       "timeout": 480,
       "values": {
@@ -2248,7 +2250,6 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global"
         },
-        "domainMigrationId": "0",
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",
@@ -2299,6 +2300,11 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "migration": {
+          "attachPvc": true,
+          "id": 0,
+          "migrating": false
+        },
         "onboardingName": "Canton-Foundation-1",
         "onboardingType": "found-collective",
         "participantAddress": "participant-0",
@@ -2310,6 +2316,9 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
+        "pvc": {
+          "volumeStorageClass": "standard-rwo"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -2320,11 +2329,11 @@
           }
         },
         "scan": {
-          "publicUrl": "https://scan-0.sv-1.svc.mock.network.canton.global"
+          "publicUrl": "https://scan.sv-1.svc.mock.network.canton.global"
         }
       }
     },
-    "name": "sv-1-sv-app-0",
+    "name": "sv-1-sv-app",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -2385,7 +2394,7 @@
             "memory": "4Gi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-1:5012",
+        "scanAddress": "http://scan-app.sv-1:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -2508,7 +2517,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
+          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -2616,10 +2625,10 @@
             "activeMigrationId": "",
             "migrationId": "0"
           },
-          "scan": true,
+          "scan": false,
           "sequencer": true,
           "splitwell": false,
-          "sv": true,
+          "sv": false,
           "wallet": false
         },
         "withSvIngress": true
@@ -3017,7 +3026,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan-0",
+      "name": "scan",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -3031,13 +3040,15 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "migration": {
+          "id": 0
         },
         "participantAddress": "participant-0",
         "persistence": {
@@ -3060,7 +3071,7 @@
         "sequencerAddress": "global-domain-0-sequencer"
       }
     },
-    "name": "sv-2-scan-0",
+    "name": "sv-2-scan",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3070,7 +3081,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
-      "name": "sv-app-0",
+      "name": "sv-app",
       "namespace": "sv-2",
       "timeout": 480,
       "values": {
@@ -3154,7 +3165,6 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-2.svc.mock.network.canton.global"
         },
-        "domainMigrationId": "0",
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -3170,12 +3180,17 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app-0.sv-1:5014"
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "migration": {
+          "attachPvc": true,
+          "id": 0,
+          "migrating": false
         },
         "onboardingName": "Canton-Foundation-2",
         "onboardingType": "join-with-key",
@@ -3188,6 +3203,9 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
+        "pvc": {
+          "volumeStorageClass": "standard-rwo"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -3198,11 +3216,11 @@
           }
         },
         "scan": {
-          "publicUrl": "https://scan-0.sv-2.svc.mock.network.canton.global"
+          "publicUrl": "https://scan.sv-2.svc.mock.network.canton.global"
         }
       }
     },
-    "name": "sv-2-sv-app-0",
+    "name": "sv-2-sv-app",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3263,7 +3281,7 @@
             "memory": "4Gi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-2:5012",
+        "scanAddress": "http://scan-app.sv-2:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -3386,7 +3404,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
+          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -3494,10 +3512,10 @@
             "activeMigrationId": "",
             "migrationId": "0"
           },
-          "scan": true,
+          "scan": false,
           "sequencer": true,
           "splitwell": false,
-          "sv": true,
+          "sv": false,
           "wallet": false
         },
         "withSvIngress": true
@@ -3895,7 +3913,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan-0",
+      "name": "scan",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -3909,13 +3927,15 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "migration": {
+          "id": 0
         },
         "participantAddress": "participant-0",
         "persistence": {
@@ -3938,7 +3958,7 @@
         "sequencerAddress": "global-domain-0-sequencer"
       }
     },
-    "name": "sv-3-scan-0",
+    "name": "sv-3-scan",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -3948,7 +3968,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
-      "name": "sv-app-0",
+      "name": "sv-app",
       "namespace": "sv-3",
       "timeout": 480,
       "values": {
@@ -4032,7 +4052,6 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-3.svc.mock.network.canton.global"
         },
-        "domainMigrationId": "0",
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -4048,12 +4067,17 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app-0.sv-1:5014"
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "migration": {
+          "attachPvc": true,
+          "id": 0,
+          "migrating": false
         },
         "onboardingName": "Canton-Foundation-3",
         "onboardingType": "join-with-key",
@@ -4066,6 +4090,9 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
+        "pvc": {
+          "volumeStorageClass": "standard-rwo"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -4076,11 +4103,11 @@
           }
         },
         "scan": {
-          "publicUrl": "https://scan-0.sv-3.svc.mock.network.canton.global"
+          "publicUrl": "https://scan.sv-3.svc.mock.network.canton.global"
         }
       }
     },
-    "name": "sv-3-sv-app-0",
+    "name": "sv-3-sv-app",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4141,7 +4168,7 @@
             "memory": "4Gi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-3:5012",
+        "scanAddress": "http://scan-app.sv-3:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -4264,7 +4291,7 @@
         },
         "stateSync": {
           "enable": true,
-          "rpcServers": "http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app-0.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
+          "rpcServers": "http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc,http://sv-app.undefined.svc.cluster.local:5014/api/sv/v0/admin/domain/cometbft/json-rpc",
           "trustPeriod": "168h0m0s"
         }
       }
@@ -4372,10 +4399,10 @@
             "activeMigrationId": "",
             "migrationId": "0"
           },
-          "scan": true,
+          "scan": false,
           "sequencer": true,
           "splitwell": false,
-          "sv": true,
+          "sv": false,
           "wallet": false
         },
         "withSvIngress": true
@@ -4773,7 +4800,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-scan/",
       "compat": "true",
-      "name": "scan-0",
+      "name": "scan",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -4787,13 +4814,15 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "domainMigrationId": "0",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "migration": {
+          "id": 0
         },
         "participantAddress": "participant-0",
         "persistence": {
@@ -4816,7 +4845,7 @@
         "sequencerAddress": "global-domain-0-sequencer"
       }
     },
-    "name": "sv-4-scan-0",
+    "name": "sv-4-scan",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -4826,7 +4855,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-sv-node/",
       "compat": "true",
-      "name": "sv-app-0",
+      "name": "sv-app",
       "namespace": "sv-4",
       "timeout": 480,
       "values": {
@@ -4910,7 +4939,6 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-4.svc.mock.network.canton.global"
         },
-        "domainMigrationId": "0",
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -4926,12 +4954,17 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "isDevNet": true,
         "joinWithKeyOnboarding": {
-          "sponsorApiUrl": "http://sv-app-0.sv-1:5014"
+          "sponsorApiUrl": "http://sv-app.sv-1:5014"
         },
         "metrics": {
           "enable": true,
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
+        },
+        "migration": {
+          "attachPvc": true,
+          "id": 0,
+          "migrating": false
         },
         "onboardingName": "Canton-Foundation-4",
         "onboardingType": "join-with-key",
@@ -4944,6 +4977,9 @@
           "secretName": "postgres-secrets",
           "user": "cnadmin"
         },
+        "pvc": {
+          "volumeStorageClass": "standard-rwo"
+        },
         "resources": {
           "limits": {
             "memory": "4096Mi"
@@ -4954,11 +4990,11 @@
           }
         },
         "scan": {
-          "publicUrl": "https://scan-0.sv-4.svc.mock.network.canton.global"
+          "publicUrl": "https://scan.sv-4.svc.mock.network.canton.global"
         }
       }
     },
-    "name": "sv-4-sv-app-0",
+    "name": "sv-4-sv-app",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -5019,7 +5055,7 @@
             "memory": "4Gi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-4:5012",
+        "scanAddress": "http://scan-app.sv-4:5012",
         "svValidator": true,
         "topup": {
           "enabled": true,
@@ -5415,8 +5451,8 @@
             "memory": "4Gi"
           }
         },
-        "scanAddress": "http://scan-app-0.sv-1:5012",
-        "svSponsorAddress": "http://sv-app-0.sv-1:5014",
+        "scanAddress": "http://scan-app.sv-1:5012",
+        "svSponsorAddress": "http://sv-app.sv-1:5014",
         "svValidator": false,
         "topup": {
           "enabled": true,

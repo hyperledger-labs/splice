@@ -290,7 +290,6 @@ metadata:
   namespace: {{ $.Release.Namespace }}
   labels:
     app: {{ $validatorAppLabel }}
-    migration: {{ .Values.migration.id | quote }}
 spec:
   accessModes:
     - ReadWriteOnce
