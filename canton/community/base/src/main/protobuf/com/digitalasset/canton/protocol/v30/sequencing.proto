@@ -121,6 +121,7 @@ message SequencedEvent {
   google.protobuf.StringValue message_id = 4; // Optional: Present for DeliverError, present for the sender of a Deliver.
   CompressedBatch batch = 5; // Optional: Present for Deliver, absent for DeliverError
   google.rpc.Status deliver_error_reason = 6; // Optional: Present for DeliverError, absent for other events
+  google.protobuf.Int64Value topology_timestamp = 7; // Optional: Present for Deliver events when it is different from timestamp, absent for other events
 }
 
 // Messages used for synchronization between sequencer nodes

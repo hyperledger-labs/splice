@@ -705,6 +705,8 @@ object CantonConfig {
       deriveEnumerationReader[SymmetricKeyScheme]
     lazy implicit val cryptoHashAlgorithmReader: ConfigReader[HashAlgorithm] =
       deriveEnumerationReader[HashAlgorithm]
+    lazy implicit val cryptoPbkdfSchemeReader: ConfigReader[PbkdfScheme] =
+      deriveEnumerationReader[PbkdfScheme]
     lazy implicit val cryptoKeyFormatReader: ConfigReader[CryptoKeyFormat] =
       deriveEnumerationReader[CryptoKeyFormat]
     implicit def cryptoSchemeConfig[S: ConfigReader: Order]: ConfigReader[CryptoSchemeConfig[S]] =
@@ -1053,7 +1055,8 @@ object CantonConfig {
       deriveWriter[TlsClientConfig]
     lazy implicit val initBaseIdentityConfigWriter: ConfigWriter[InitConfigBase.Identity] =
       deriveWriter[InitConfigBase.Identity]
-    lazy implicit val initConfigWriter: ConfigWriter[InitConfig] = deriveWriter[InitConfig]
+    lazy implicit val initConfigWriter: ConfigWriter[InitConfig] =
+      InitConfigBase.writerForSubtype(deriveWriter[InitConfig])
     lazy implicit val httpHealthServerConfigWriter: ConfigWriter[HttpHealthServerConfig] =
       deriveWriter[HttpHealthServerConfig]
     lazy implicit val grpcHealthServerConfigWriter: ConfigWriter[GrpcHealthServerConfig] =
@@ -1070,7 +1073,7 @@ object CantonConfig {
     lazy implicit val nodeNameWriter: ConfigWriter[NodeIdentifierConfig] =
       deriveWriter[NodeIdentifierConfig]
     lazy implicit val participantInitConfigWriter: ConfigWriter[ParticipantInitConfig] =
-      deriveWriter[ParticipantInitConfig]
+      InitConfigBase.writerForSubtype(deriveWriter[ParticipantInitConfig])
     lazy implicit val communityCryptoProviderWriter: ConfigWriter[CommunityCryptoProvider] =
       deriveEnumerationWriter[CommunityCryptoProvider]
     lazy implicit val cryptoSigningKeySchemeWriter: ConfigWriter[SigningKeyScheme] =
@@ -1081,6 +1084,8 @@ object CantonConfig {
       deriveEnumerationWriter[SymmetricKeyScheme]
     lazy implicit val cryptoHashAlgorithmWriter: ConfigWriter[HashAlgorithm] =
       deriveEnumerationWriter[HashAlgorithm]
+    lazy implicit val cryptoPbkdfSchemeWriter: ConfigWriter[PbkdfScheme] =
+      deriveEnumerationWriter[PbkdfScheme]
     lazy implicit val cryptoKeyFormatWriter: ConfigWriter[CryptoKeyFormat] =
       deriveEnumerationWriter[CryptoKeyFormat]
     implicit def cryptoSchemeConfigWriter[S: ConfigWriter]: ConfigWriter[CryptoSchemeConfig[S]] =
@@ -1215,7 +1220,7 @@ object CantonConfig {
         : ConfigWriter[SequencerWriterConfig.LowLatency] =
       deriveWriter[SequencerWriterConfig.LowLatency]
     lazy implicit val sequencerNodeInitXConfigWriter: ConfigWriter[SequencerNodeInitXConfig] =
-      deriveWriter[SequencerNodeInitXConfig]
+      InitConfigBase.writerForSubtype(deriveWriter[SequencerNodeInitXConfig])
 
     implicit def communitySequencerConfigWriter[C]: ConfigWriter[CommunitySequencerConfig] = {
       case dbSequencerConfig: CommunitySequencerConfig.Database =>

@@ -59,6 +59,7 @@ class GrpcSequencerSubscriptionTest extends AnyWordSpec with BaseTest with HasEx
                 counter = 0L,
                 messageId = None,
                 deliverErrorReason = None,
+                topologyTimestamp = None,
               )
               .toByteString
           ),

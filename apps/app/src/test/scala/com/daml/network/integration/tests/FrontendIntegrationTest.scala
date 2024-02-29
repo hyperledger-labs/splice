@@ -365,23 +365,25 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   override def eventually[T](
       timeUntilSuccess: FiniteDuration = 20.seconds,
       maxPollInterval: FiniteDuration = 100.millis,
-  )(testCode: => T): T = super.eventually(timeUntilSuccess, maxPollInterval) {
-    try {
-      testCode
-    } catch {
-      // Some of WebDriverException subclasses represent non-retryable errors, we rely on the timeout
-      // to avoid blocking indefinitely.
-      // Of particular interest is StaleElementReferenceException, which usually happens when the test
-      // is interacting with the web page while the web page is being redrawn. Often these redraws
-      // can be optimized away in React, so we record them here.
-      case e: WebDriverException =>
-        logger.debug(
-          s"Retrying ${e.getClass.getSimpleName}\n${e.getStackTrace.map("  at " + _.toString).mkString("\n")}"
-        )(TraceContext.empty)
-        fail(e)
-    }
+      retryOnTestFailuresOnly: Boolean = true,
+  )(testCode: => T): T =
+    super.eventually(timeUntilSuccess, maxPollInterval, retryOnTestFailuresOnly) {
+      try {
+        testCode
+      } catch {
+        // Some of WebDriverException subclasses represent non-retryable errors, we rely on the timeout
+        // to avoid blocking indefinitely.
+        // Of particular interest is StaleElementReferenceException, which usually happens when the test
+        // is interacting with the web page while the web page is being redrawn. Often these redraws
+        // can be optimized away in React, so we record them here.
+        case e: WebDriverException =>
+          logger.debug(
+            s"Retrying ${e.getClass.getSimpleName}\n${e.getStackTrace.map("  at " + _.toString).mkString("\n")}"
+          )(TraceContext.empty)
+          fail(e)
+      }
 
-  }
+    }
 
   protected def waitForQuery(query: Query, timeUntilSuccess: Option[FiniteDuration] = None)(implicit
       webDriver: WebDriver

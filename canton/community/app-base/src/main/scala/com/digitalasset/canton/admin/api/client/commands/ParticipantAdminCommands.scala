@@ -740,7 +740,7 @@ object ParticipantAdminCommands {
       }
     }
 
-    final case class RegisterDomain(config: CDomainConnectionConfig, handshakeOnly: Boolean = false)
+    final case class RegisterDomain(config: CDomainConnectionConfig, handshakeOnly: Boolean)
         extends Base[RegisterDomainRequest, RegisterDomainResponse, Unit] {
 
       override def createRequest(): Either[String, RegisterDomainRequest] =

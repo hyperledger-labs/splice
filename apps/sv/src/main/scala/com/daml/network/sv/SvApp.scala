@@ -52,6 +52,7 @@ import com.daml.network.util.{
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{
   CommunityCryptoConfig,
+  CommunityCryptoProvider,
   NonNegativeFiniteDuration,
   ProcessingTimeout,
 }
@@ -191,7 +192,9 @@ class SvApp(
             clock,
           ),
           config.parameters
-            .toStaticDomainParameters(CommunityCryptoConfig())
+            .toStaticDomainParameters(
+              CommunityCryptoConfig(provider = CommunityCryptoProvider.Tink)
+            )
             .valueOr(err =>
               throw new IllegalArgumentException(s"Invalid domain parameters config: $err")
             ),
