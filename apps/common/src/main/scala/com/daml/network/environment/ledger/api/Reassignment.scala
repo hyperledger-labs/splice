@@ -1,13 +1,13 @@
 package com.daml.network.environment.ledger.api
 
-import com.daml.ledger.javaapi.data.LedgerOffset
+import com.daml.ledger.javaapi.data.ParticipantOffset
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
 import com.daml.ledger.api.v2.reassignment as multidomain
 
 final case class Reassignment[+E](
     updateId: String,
-    offset: LedgerOffset.Absolute,
+    offset: ParticipantOffset.Absolute,
     event: E & ReassignmentEvent,
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
@@ -20,7 +20,7 @@ final case class Reassignment[+E](
 
 object Reassignment {
   private[api] def fromProto(proto: multidomain.Reassignment): Reassignment[ReassignmentEvent] = {
-    val offset = new LedgerOffset.Absolute(proto.offset)
+    val offset = new ParticipantOffset.Absolute(proto.offset)
     val event = proto.event match {
       case multidomain.Reassignment.Event.UnassignedEvent(out) =>
         ReassignmentEvent.Unassign.fromProto(out)

@@ -330,7 +330,7 @@ object JsonProtocol extends JsonProtocolLow {
         // the proper contract type ID right doesn't matter
         TemplateIdRequiredPkgFormat[domain.ContractTypeId],
       )
-    jsonFormat7(domain.ActiveContract.apply[ContractTypeId.Resolved, JsValue])
+    jsonFormat6(domain.ActiveContract.apply[ContractTypeId.Resolved, JsValue])
   }
 
   implicit val ArchivedContractFormat: RootJsonFormat[domain.ArchivedContract] =
@@ -518,7 +518,7 @@ object JsonProtocol extends JsonProtocolLow {
     jsonFormat3(domain.ExerciseResponse[JsValue])
 
   implicit val CreateCommandResponseFormat: RootJsonFormat[domain.CreateCommandResponse[JsValue]] =
-    jsonFormat8(domain.CreateCommandResponse[JsValue])
+    jsonFormat7(domain.CreateCommandResponse[JsValue])
 
   implicit val StatusCodeFormat: RootJsonFormat[StatusCode] =
     new RootJsonFormat[StatusCode] {

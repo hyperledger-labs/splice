@@ -90,7 +90,6 @@ class CommandService(
         contract.payload,
         contract.signatories,
         contract.observers,
-        contract.agreementText,
         domain.CompletionOffset(response.completionOffset),
       )
       et.run

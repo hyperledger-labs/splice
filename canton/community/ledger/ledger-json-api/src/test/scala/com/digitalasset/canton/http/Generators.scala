@@ -90,7 +90,6 @@ object Generators {
       argument <- Gen.identifier.map(JsString(_))
       signatories <- Gen.listOf(partyGen)
       observers <- Gen.listOf(partyGen)
-      agreementText <- Gen.identifier
     } yield domain.ActiveContract[ContractTypeId.Resolved, JsValue](
       contractId = contractId,
       templateId = templateId,
@@ -98,7 +97,6 @@ object Generators {
       payload = argument,
       signatories = signatories,
       observers = observers,
-      agreementText = agreementText,
     )
 
   def archivedContractGen: Gen[domain.ArchivedContract] =

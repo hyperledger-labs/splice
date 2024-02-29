@@ -371,7 +371,6 @@ package domain {
       payload: LfV,
       signatories: Seq[Party],
       observers: Seq[Party],
-      agreementText: String,
       completionOffset: CompletionOffset,
   )
 

@@ -11,10 +11,6 @@ object Dependencies {
 
   lazy val scalatestScalacheck = CD.scalatestScalacheck
 
-  // Note that this can be out of sync if the Canton binary we use
-  // is on a newer version.
-  lazy val ledgerApiVersion = CD.version
-
   // Picked up automatically by the scalapb compiler. Contains common dependencies such as protocol buffers like google/protobuf/timestamp.proto
   lazy val scalapb_runtime =
     "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"

@@ -161,14 +161,14 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
     param("templateId", _.getTemplateId),
   )
 
-  implicit def prettyJavaLedgerOffset: Pretty[javaapi.data.LedgerOffset] = {
-    case _: javaapi.data.LedgerOffset.LedgerBegin =>
-      Tree.Literal("LedgerOffsetBegin")
-    case _: javaapi.data.LedgerOffset.LedgerEnd =>
-      Tree.Literal("LedgerOffsetEnd")
-    case absolute: javaapi.data.LedgerOffset.Absolute =>
-      prettyNode[javaapi.data.LedgerOffset.Absolute](
-        "LedgerOffsetAbsolute",
+  implicit def prettyJavaParticipantOffset: Pretty[javaapi.data.ParticipantOffset] = {
+    case _: javaapi.data.ParticipantOffset.ParticipantBegin =>
+      Tree.Literal("ParticipantOffsetBegin")
+    case _: javaapi.data.ParticipantOffset.ParticipantEnd =>
+      Tree.Literal("ParticipantOffsetEnd")
+    case absolute: javaapi.data.ParticipantOffset.Absolute =>
+      prettyNode[javaapi.data.ParticipantOffset.Absolute](
+        "ParticipantOffsetAbsolute",
         param("offset", _.getOffset.unquoted),
       ).treeOf(absolute)
     case offset => sys.error(s"Invalid java offset: $offset")

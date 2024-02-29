@@ -7,7 +7,6 @@ import com.google.protobuf.ByteString
 import cats.implicits.toBifunctorOps
 import cats.syntax.option.*
 import cats.syntax.traverse.*
-import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.admin.api.client.commands.ParticipantAdminCommands.Pruning.{
@@ -54,7 +53,6 @@ import com.digitalasset.canton.participant.admin.grpc.TransferSearchResult
 import com.digitalasset.canton.participant.admin.inspection.SyncStateInspection
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.participant.sync.TimestampedEvent
-import com.digitalasset.canton.platform.apiserver.services.ApiConversions
 import com.digitalasset.canton.protocol.messages.{
   AcsCommitment,
   CommitmentPeriod,
@@ -539,7 +537,7 @@ class ParticipantPruningAdministrationGroup(
       |performs additional safety checks returning a ``NOT_FOUND`` error if ``pruneUpTo`` is higher than the
       |offset returned by ``find_safe_offset`` on any domain with events preceding the pruning offset."""
   )
-  def prune(pruneUpTo: LedgerOffset): Unit =
+  def prune(pruneUpTo: ParticipantOffset): Unit =
     consoleEnvironment.run(
       ledgerApiCommand(LedgerApiCommands.ParticipantPruningService.Prune(pruneUpTo))
     )
@@ -557,10 +555,9 @@ class ParticipantPruningAdministrationGroup(
         .run(
           adminCommand(
             ParticipantAdminCommands.Pruning
-              .GetSafePruningOffsetCommand(beforeOrAt, ApiConversions.toV1(ledgerEnd))
+              .GetSafePruningOffsetCommand(beforeOrAt, ledgerEnd)
           )
         )
-        .map(ledgerOffset => ApiConversions.toV2(ledgerOffset))
     }
   }
 
@@ -579,7 +576,7 @@ class ParticipantPruningAdministrationGroup(
       |offset returned by ``find_safe_offset`` on any domain with events preceding the pruning offset."""
   )
   // Consider adding an "Enterprise" annotation if we end up having more enterprise-only commands than this lone enterprise command.
-  def prune_internally(pruneUpTo: LedgerOffset): Unit =
+  def prune_internally(pruneUpTo: ParticipantOffset): Unit =
     check(FeatureFlag.Preview) {
       consoleEnvironment.run(
         adminCommand(ParticipantAdminCommands.Pruning.PruneInternallyCommand(pruneUpTo))
@@ -635,7 +632,7 @@ class ParticipantPruningAdministrationGroup(
       |the event. Returns ``None`` if no such offset exists.
     """
   )
-  def get_offset_by_time(upToInclusive: Instant): Option[LedgerOffset] =
+  def get_offset_by_time(upToInclusive: Instant): Option[ParticipantOffset] =
     consoleEnvironment.run(
       adminCommand(
         ParticipantAdminCommands.Inspection.LookupOffsetByTime(
@@ -644,7 +641,7 @@ class ParticipantPruningAdministrationGroup(
       )
     ) match {
       case "" => None
-      case offset => Some(LedgerOffset(LedgerOffset.Value.Absolute(offset)))
+      case offset => Some(ParticipantOffset(ParticipantOffset.Value.Absolute(offset)))
     }
 
   @Help.Summary("Identify the participant ledger offset to prune up to.", FeatureFlag.Preview)
@@ -654,12 +651,12 @@ class ParticipantPruningAdministrationGroup(
       |returns the offset of the first transaction (if the ledger is non-empty).
     """
   )
-  def locate_offset(n: Long): LedgerOffset =
+  def locate_offset(n: Long): ParticipantOffset =
     check(FeatureFlag.Preview) {
       val rawOffset = consoleEnvironment.run(
         adminCommand(ParticipantAdminCommands.Inspection.LookupOffsetByIndex(n))
       )
-      LedgerOffset(LedgerOffset.Value.Absolute(rawOffset))
+      ParticipantOffset(ParticipantOffset.Value.Absolute(rawOffset))
     }
 
 }

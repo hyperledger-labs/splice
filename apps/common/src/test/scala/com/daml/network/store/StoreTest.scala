@@ -6,7 +6,7 @@ import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   ExercisedEvent,
   Identifier,
-  LedgerOffset,
+  ParticipantOffset,
   TransactionTree,
   TreeEvent,
   Unit as damlUnit,
@@ -845,7 +845,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def mkReassignment[T <: ReassignmentEvent](offset: String, event: T): Reassignment[T] =
     Reassignment(
       updateId = "",
-      offset = new LedgerOffset.Absolute(offset),
+      offset = new ParticipantOffset.Absolute(offset),
       event = event,
     )
 
