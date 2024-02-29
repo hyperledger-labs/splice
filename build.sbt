@@ -1440,7 +1440,8 @@ printTests := {
   def isAuth0CredentialsPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("Auth0Credentials")
 
-  def isGlobalUpgradeTest(name: String): Boolean = name contains "GlobalDomainUpgrade"
+  def isGlobalSoftMigrationTest(name: String): Boolean =
+    name contains "GlobalDomainSoftDomainMigration"
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
   def isDisasterRecoveryTest(name: String): Boolean = name contains "DisasterRecovery"
 
@@ -1504,9 +1505,9 @@ printTests := {
       (t: String) => isRunbookValidatorPreflightIntegrationTest(t) && isNonDevNetTest(t),
     ),
     (
-      "global domain upgrade test",
-      "test-full-class-names-global-upgrade-sim-time.log",
-      (t: String) => isTimeBasedTest(t) && isGlobalUpgradeTest(t),
+      "global domain soft migration test",
+      "test-full-class-names-global-soft-migration-sim-time.log",
+      (t: String) => isTimeBasedTest(t) && isGlobalSoftMigrationTest(t),
     ),
     (
       "disaster recovery tests",

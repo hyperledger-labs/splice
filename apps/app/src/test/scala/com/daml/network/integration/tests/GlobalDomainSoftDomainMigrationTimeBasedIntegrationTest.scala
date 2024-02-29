@@ -25,7 +25,10 @@ import com.daml.network.config.CNNodeConfigTransforms.{
   updateAllValidatorConfigs,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
-import com.daml.network.sv.automation.singlesv.SvcRulesTransferTrigger
+import com.daml.network.sv.automation.singlesv.{
+  SubmitSvStatusReportTrigger,
+  SvcRulesTransferTrigger,
+}
 import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.{
   AssignedContract,
@@ -45,7 +48,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 /** You must `start-canton` with `-g` to run this test locally. */
-class GlobalDomainUpgradeTimeBasedIntegrationTest
+class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     with ConfigScheduleUtil {
 
@@ -64,6 +67,8 @@ class GlobalDomainUpgradeTimeBasedIntegrationTest
             _.withResumedTrigger[AssignTrigger]
               .withResumedTrigger[SvcRulesTransferTrigger]
               .withResumedTrigger[TransferFollowTrigger]
+              // TODO(#10297): re-enable once that trigger is compatible with soft domain-migrations
+              .withPausedTrigger[SubmitSvStatusReportTrigger]
           ))(config),
         (_, config) =>
           updateAllValidatorConfigs { case (name, c) =>
