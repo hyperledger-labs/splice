@@ -25,6 +25,7 @@ import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.lifecycle.SyncCloseable
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.lifecycle.UnlessShutdown
+import com.digitalasset.canton.util.ShowUtil.*
 
 class RestartLeaderBasedAutomationTrigger(
     override protected val context: TriggerContext,
@@ -83,6 +84,7 @@ class RestartLeaderBasedAutomationTrigger(
 
       synchronized {
         val currentEpoch = svcRules.payload.epoch
+        val currentLeader = PartyId.tryFromProtoPrimitive(svcRules.payload.leader)
         val lastKnownEpoch = epochStateVar.map(_.epoch)
 
         epochStateVar match {
@@ -91,9 +93,8 @@ class RestartLeaderBasedAutomationTrigger(
             restartAutomation(currentEpoch, svcRules)
           case Some(state) =>
             if (state.epoch != currentEpoch) {
-              logger.warn(
-                s"Noticed an SvcRules epoch change (from ${state.epoch} to $currentEpoch)."
-                  + " This typically means that the leader was replaced."
+              logger.info(
+                show"Noticed an SvcRules epoch change (from ${state.epoch} with leader ${state.leader} to $currentEpoch with leader ${currentLeader})."
               )
               logger.debug(
                 s"Restarting automation, as the epoch changed from ${state.epoch} to $currentEpoch"
@@ -149,6 +150,7 @@ class RestartLeaderBasedAutomationTrigger(
        epochStateVar = Some(
          EpochState(
            epoch,
+           PartyId.tryFromProtoPrimitive(svcRules.payload.leader),
            leaderBasedAutomation,
            retryProvider,
          )
@@ -179,6 +181,7 @@ class RestartLeaderBasedAutomationTrigger(
 
 case class EpochState(
     val epoch: Long,
+    val leader: PartyId,
     val leaderBasedAutomation: LeaderBasedAutomationService,
     val retryProvider: RetryProvider,
 ) {}

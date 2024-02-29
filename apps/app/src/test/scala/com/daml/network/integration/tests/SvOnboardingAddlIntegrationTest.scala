@@ -317,7 +317,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
         sv1Backend.getSvcInfo().svcRules.payload.epoch shouldBe 0
       }
 
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
         actAndCheck(
           "sv3 creates a new election request for epoch 1", {
             val sv3 = sv3Backend.getSvcInfo().svParty.toProtoPrimitive

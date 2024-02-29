@@ -78,7 +78,7 @@ class SvcElectionTimeBasedIntegrationTest
     bracket(
       sv1Backend.stop(),
       // when starting up, eventually SV1 will find out it was replaced as leader
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
         sv1Backend.startSync(),
         entries => {
           forExactly(1, entries) { line =>
@@ -119,7 +119,7 @@ class SvcElectionTimeBasedIntegrationTest
 
         val bufferDuration = JavaDuration.ofSeconds(5)
 
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
           advanceTime(effectiveTimeout.plus(bufferDuration)),
           entries => {
             forExactly(3, entries) { line =>
@@ -217,7 +217,7 @@ class SvcElectionTimeBasedIntegrationTest
           }
         }
 
-      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+      loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
         leaderBackend.leaderBasedAutomation
           .trigger[CloseVoteRequest2WithEarlyClosingTrigger]
           .resume(),

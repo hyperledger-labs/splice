@@ -84,7 +84,7 @@ class SvFrontendTimeBasedIntegrationTest
           .plus(automationConfig.pollingInterval.asJava)
           .plus(JavaDuration.ofSeconds(5))
         sv1Backend.stop()
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
           {
             advanceTime(tickDurationWithBuffer)
             advanceTime(effectiveTimeoutPlusBuffer)

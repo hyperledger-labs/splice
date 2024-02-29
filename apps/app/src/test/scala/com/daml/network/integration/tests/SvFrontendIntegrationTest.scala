@@ -1332,7 +1332,7 @@ class SvFrontendIntegrationTest
         sv2Backend.createElectionRequest(sv2Backend.getSvcInfo().svParty.toProtoPrimitive, members)
         sv3Backend.createElectionRequest(sv3Backend.getSvcInfo().svParty.toProtoPrimitive, members)
 
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
           actAndCheck(
             "sv1 operator makes his own ranking for his leader preference", {
               click on "submit-ranking-leader-election"
