@@ -1715,8 +1715,16 @@ To bootstrap a fresh cluster from an ACS and participant identities data dump,
 set ``process.env.BOOTSTRAPPING_CONFIG`` to a JSON object specifying the cluster and the date the backup is from.
 
 ```
-export BOOTSTRAPPING_CONFIG='{"cluster": "test-preview", "date": "2023-07-05T12:00:00.000Z"}'
+export BOOTSTRAPPING_CONFIG='{"cluster": "cidaily-testnet", "date": "2023-07-05T12:00:00.000Z"}'
 ```
+
+Note that unless you are restoring from a dump you produced yourself (e.g. on a scratchnet), you also want to set:
+
+```
+export IS_DEVNET=false
+```
+
+as the exports are currently only generated on clusters with testnet configuration.
 
 The most recent backup before the specified date will be used to bootstrap from.
 We only search for backups within an interval of 24 hours though,
