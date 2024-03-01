@@ -3130,6 +3130,7 @@ workflows:
           send_deployment_notification: false
           update_deployment_branch: false  # No need to create a deployment branch for cimain
           cancel_workflow_on_failure: true
+          global_domain_upgrade_migration_id: 1
           requires:
             - wait_for_previous_pipeline
             - docker_images_push
@@ -3523,6 +3524,7 @@ workflows:
           cluster: "scratchneta"
           update_deployment_branch: false
           cancel_workflow_on_failure: true
+          global_domain_upgrade_migration_id: 1
           requires:
             - deployment_test
             - docker_images_push
@@ -3887,6 +3889,7 @@ workflows:
           cluster: "scratchnetb"
           update_deployment_branch: false
           cancel_workflow_on_failure: true
+          global_domain_upgrade_migration_id: 1
           requires:
             - deployment_test
             - docker_images_push
@@ -4251,6 +4254,7 @@ workflows:
           cluster: "scratchnetc"
           update_deployment_branch: false
           cancel_workflow_on_failure: true
+          global_domain_upgrade_migration_id: 1
           requires:
             - deployment_test
             - docker_images_push
@@ -4615,6 +4619,7 @@ workflows:
           cluster: "scratchnetd"
           update_deployment_branch: false
           cancel_workflow_on_failure: true
+          global_domain_upgrade_migration_id: 1
           requires:
             - deployment_test
             - docker_images_push
@@ -4979,6 +4984,7 @@ workflows:
           cluster: "scratchnete"
           update_deployment_branch: false
           cancel_workflow_on_failure: true
+          global_domain_upgrade_migration_id: 1
           requires:
             - deployment_test
             - docker_images_push
