@@ -33,6 +33,8 @@ migration:
 pvc:
   volumeStorageClass: standard-rwo
 
+useSequencerConnectionsFromScan: true
+
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

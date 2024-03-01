@@ -2,7 +2,8 @@ joinWithKeyOnboarding:
   sponsorApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global"
 # Replace YOUR_SV_NAME with the name you provided for your SV identity
 onboardingName: YOUR_SV_NAME
-globalDomainUrl: "https://sequencer.sv-1.svc.TARGET_CLUSTER.network.canton.global"
+# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+globalDomainUrl: "https://sequencer-MIGRATION_ID.sv-1.svc.TARGET_CLUSTER.network.canton.global"
 auth:
   # The default value of audience is ``https://canton.network.global``.
   # If you want to configure a custom audience for SV app backend, uncomment this line and replace OIDC_AUTHORITY_SV_AUDIENCE with the audience of your choice.
@@ -19,10 +20,20 @@ cometBFT:
 #  secretName: participant-identities-dump
 # PARTICIPANT_BOOTSTRAP_END
 
+# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+migration:
+  id: "MIGRATION_ID"
+
+# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+participantAddress: "participant-MIGRATION_ID"
+
 # Please make the ``global-domain-sequencer`` service accessible for other validators to subscribe to, and set the URL below to your sequencer service.
 # Make sure your cluster's ingress is correctly configured for the sequencer service and can be accessed through the provided URL.
+# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
 domain:
-  sequencerPublicUrl: "https://sequencer.sv.svc.YOUR_HOSTNAME"
+  sequencerAddress: "global-domain-MIGRATION_ID-sequencer"
+  mediatorAddress: "global-domain-MIGRATION_ID-mediator"
+  sequencerPublicUrl: "https://sequencer-MIGRATION_ID.sv.svc.YOUR_HOSTNAME"
   sequencerAvailabilityDelay: "60 seconds"
   sequencerPruningConfig:
     enabled: false

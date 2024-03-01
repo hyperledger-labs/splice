@@ -170,6 +170,7 @@
           }
         },
         "persistence": {
+          "databaseName": "participant",
           "host": "postgres",
           "schema": "participant",
           "secretName": "postgres-secrets"
@@ -242,7 +243,6 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "validatorrun.network.com.network.canton.global",
-        "globalDomainUrl": "https://sequencer.sv-1.svc.validatorrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "migration": {
           "id": 0

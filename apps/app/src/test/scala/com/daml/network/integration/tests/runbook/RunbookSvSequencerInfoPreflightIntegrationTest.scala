@@ -29,6 +29,7 @@ class RunbookSvSequencerInfoPreflightIntegrationTest
     val memberInfo = svcRules.payload.members.asScala.get(svcInfo.svParty.toProtoPrimitive).value
     val domainConfig = memberInfo.domainNodes.asScala.values.headOption.value
     val sequencer = domainConfig.sequencer.toScala.value
-    sequencer.url shouldBe s"https://sequencer.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+    val migrationId = sequencer.migrationId.toInt
+    sequencer.url shouldBe s"https://sequencer-${migrationId}.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
   }
 }

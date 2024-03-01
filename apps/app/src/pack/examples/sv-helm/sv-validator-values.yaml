@@ -1,5 +1,14 @@
+# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+migration:
+  id: "MIGRATION_ID"
+
+# replace MIGRATION_ID with the current migration ID of the global synchronizer
+participantAddress: "participant-MIGRATION_ID"
+
 svValidator: true
 useSequencerConnectionsFromScan: false
+# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+globalDomainUrl: "https://sequencer-MIGRATION_ID.sv-1.svc.TARGET_CLUSTER.network.canton.global"
 
 persistence:
   host: apps-pg

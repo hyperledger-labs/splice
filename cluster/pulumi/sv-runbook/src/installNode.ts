@@ -28,6 +28,7 @@ import {
   CnInput,
   sequencerPruningConfig,
   GlobalDomainMigrationConfig,
+  DomainMigrationIndex,
   ValidatorTopupConfig,
   svValidatorTopupConfig,
 } from 'cn-pulumi-common';
@@ -81,6 +82,9 @@ export async function installNode(
 
   const xns = exactNamespace(svNamespaceStr, true);
 
+  const migrationId = globalDomainMigrationConfig.activeMigrationId;
+  console.error(`Using migration ID: ${migrationId}`);
+
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
       xns,
@@ -101,6 +105,7 @@ export async function installNode(
 
   const { sv, validator } = await installSvAndValidator({
     xns,
+    migrationId,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,
@@ -140,6 +145,7 @@ export async function installNode(
 type SvConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
+  migrationId: DomainMigrationIndex;
   onboarding?: ExpectedValidatorOnboarding;
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
@@ -156,6 +162,7 @@ type SvConfig = {
 async function installSvAndValidator(config: SvConfig) {
   const {
     xns,
+    migrationId,
     participantBootstrapDumpSecret,
     topupConfig,
     auth0Client,
@@ -169,10 +176,11 @@ async function installSvAndValidator(config: SvConfig) {
     validatorWalletUserName,
   } = config;
 
-  const globalDomain = installGlobalDomainNode(xns, onboardingName, imagePullDeps);
+  const globalDomain = installGlobalDomainNode(xns, onboardingName, migrationId, imagePullDeps);
 
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
+      MIGRATION_ID: migrationId.toString(),
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
     }),
     disableAutoInit: !!participantBootstrapDumpSecret,
@@ -204,11 +212,16 @@ async function installSvAndValidator(config: SvConfig) {
   const participantPgValues = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-participant.yaml`
   );
-  const participantPg = installPostgres(xns, 'participant-pg', participantPgValues);
+  const participantPg = installPostgres(
+    xns,
+    `participant-${migrationId}-pg`,
+    'participant-pg-secret',
+    participantPgValues
+  );
 
   const participant = installCNRunbookHelmChart(
     xns,
-    'participant',
+    `participant-${migrationId}`,
     'cn-participant',
     participantValuesWithSpecifiedAud,
     localCharts,
@@ -221,7 +234,7 @@ async function installSvAndValidator(config: SvConfig) {
   const appsPgValues = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-apps.yaml`
   );
-  const appsPg = installPostgres(xns, 'apps-pg', appsPgValues);
+  const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', appsPgValues);
 
   const sv234NameSet = new Set<string>([
     'Canton-Foundation-2',
@@ -250,6 +263,7 @@ async function installSvAndValidator(config: SvConfig) {
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
+      MIGRATION_ID: migrationId.toString(),
     }
   );
 
@@ -267,7 +281,6 @@ async function installSvAndValidator(config: SvConfig) {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,
     },
-    migration: { id: globalDomainMigrationConfig.activeMigrationId },
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -315,8 +328,8 @@ async function installSvAndValidator(config: SvConfig) {
   const scanValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
+      MIGRATION_ID: migrationId.toString(),
     }),
-    migration: { id: globalDomainMigrationConfig.activeMigrationId },
   };
 
   const scanValuesWithFixedTokens = {
@@ -341,9 +354,14 @@ async function installSvAndValidator(config: SvConfig) {
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       TRUSTED_SCAN_URL: `http://scan-app.${xns.logicalName}:5012`,
     }),
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`),
+    ...loadYamlFromFile(
+      `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
+      {
+        TARGET_CLUSTER: TARGET_CLUSTER,
+        MIGRATION_ID: migrationId.toString(),
+      }
+    ),
     participantIdentitiesDumpPeriodicBackup: backupConfig,
-    migration: { id: globalDomainMigrationConfig.activeMigrationId },
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

@@ -35,9 +35,17 @@ Requirements
 
 5) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
-.. parsed-literal::
+.. code-block:: bash
 
   tar xzvf |version|\_cn-node-0.1.0-SNAPSHOT.tar.gz
+
+6) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <sv-upgrades>`.
+   If it has, please record the current migration ID of the synchronizer.
+   The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
+
+.. code-block:: bash
+
+   export MIGRATION_ID=0
 
 .. _sv-identity:
 
@@ -370,7 +378,7 @@ To generate the node config you must have access to the CometBft docker image pr
 
 Use the following shell commands to generate the proper keys:
 
-.. parsed-literal::
+.. code-block:: bash
 
   # Create a folder to store the config
   mkdir cometbft
@@ -473,11 +481,13 @@ If you wish to run the Postgres instances as pods in your cluster, you can use t
 
 .. code-block:: bash
 
-    helm install sequencer-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-sequencer.yaml --wait
-    helm install mediator-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-mediator.yaml --wait
-    helm install participant-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-participant.yaml --wait
+    helm install sequencer-${MIGRATION_ID}-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-sequencer.yaml --wait
+    helm install mediator-${MIGRATION_ID}-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-mediator.yaml --wait
+    helm install participant-${MIGRATION_ID}-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-participant.yaml --wait
     helm install apps-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-apps.yaml --wait
 
+Note that we use the migration ID when naming postgres releases used by the SV node's Canton components.
+This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
 
 Cloud-Hosted Postgres
 +++++++++++++++++++++
@@ -485,12 +495,14 @@ Cloud-Hosted Postgres
 If you wish to use cloud-hosted Postgres instances, please configure and initialize each of them as follows:
 
 - Use Postgres version 14
-- Create a database called ``cantonnet``
+- Create a database called ``cantonnet`` (this is a dummy database that will not be filled with actual data; additional databases will be created as part of deployment and initialization)
 - Create a user called ``cnadmin`` with the password as configured in the kubernetes secrets above
 
 Note that the default Helm values files used below assume that the Postgres instances are deployed using the Helm charts above,
-thus are accessible at hostname sequencer-pg, mediator-pg, etc. If you are using cloud-hosted Postgres instances,
+thus are accessible at hostname sequencer-0-pg, mediator-0-pg, etc. If you are using cloud-hosted Postgres instances,
 please override the hostnames under `persistence.host` with the IP addresses of the Postgres instances.
+To avoid conflicts across migration IDs,
+you will also need to ensure that `persistence.databaseName` and `persistence.schema` are unique per component (participant, sequencer, mediator) and migration ID.
 
 .. _helm-sv-install:
 
@@ -526,24 +538,35 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-
 
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` as follows:
 
+- Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - If you want to configure the audience for the participant, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.targetAudience` entry with audience for the ledger API. e.g. ``https://ledger_api.example.com``.
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 
+Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` as follows:
+
+- Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 An SV node includes a validator app so you also need to configure
 that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
-- Replace ``scanAddress`` with the URL of the Scan you host. If you are using the ingress configuration of this runbook, you can use ``"http://scan-app.sv:5012"``.
+- Replace ``TRUSTED_SCAN_URL`` with the URL of the Scan you host. If you are using the ingress configuration of this runbook, you can use ``"http://scan-app.sv:5012"``.
 - If you want to configure the audience for the Validator app backend API, replace ``OIDC_AUTHORITY_VALIDATOR_AUDIENCE`` in the `auth.audience` entry with audience for the Validator app backend API. e.g. ``https://validator.example.com/api``.
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
+
+Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml`` as follows:
+
+- Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 The private and public key for your SV are defined in a K8s secret.
 If you haven't done so yet, please first follow the instructions in
@@ -562,6 +585,7 @@ identity.
 For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 - If you want to configure the audience for the SV app backend API, replace ``OIDC_AUTHORITY_SV_AUDIENCE`` in the `auth.audience` entry with audience for the SV app backend API. e.g. ``https://sv.example.com/api``.
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
@@ -612,13 +636,15 @@ Installing the Helm Charts
 With these files in place, you can execute the following helm commands
 in sequence. It's generally a good idea to wait until each deployment
 reaches a stable state prior to moving on to the next step.
+Note that we use the migration ID when naming Canton components.
+This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
 
 .. code-block:: bash
 
     helm repo update
     helm install cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml --wait
-    helm install global-domain canton-network-helm/cn-global-domain -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml --wait
-    helm install participant canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
+    helm install global-domain-${MIGRATION_ID} canton-network-helm/cn-global-domain -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml --wait
+    helm install participant-${MIGRATION_ID} canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
     helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml -f ${SV-IDENTITIES-FILE} --wait
     helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml --wait
     helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml --wait
@@ -670,7 +696,7 @@ Each SV member is required to configure their cluster ingress to allow traffic f
   Please note that cometBFT traffic is purely TCP. TLS is not supported so SNI host routing for these traffic is not possible.
 * ``https://cns.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``cns-web-ui`` in the ``sv`` namespace.
 * ``https://cns.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
-* ``https://sequencer.sv.svc.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-sequencer`` in the ``sv`` namespace.
+* ``https://sequencer-<MIGRATION_ID>.sv.svc.<YOUR_HOSTNAME>`` should be routed to port 5008 of service ``global-domain-<MIGRATION_ID>-sequencer`` in the ``sv`` namespace.
 
 Internet ingress configuration is often specific to the network configuration and scenario of the
 cluster being configured. To illustrate the basic requirements of an SV node ingress, we have
@@ -685,8 +711,8 @@ To check whether the sequencer is accessible, we can use the command below with 
 
     grpcurl <sequencer host>:<sequencer port> grpc.health.v1.Health/Check
 
-If you are using the ingress configuration of this runbook, the ``<sequencer host>:<sequencer port>`` should be ``sequencer.sv.svc.YOUR_HOSTNAME:443``
-Please replace ``YOUR_HOSTNAME`` with your host name.
+If you are using the ingress configuration of this runbook, the ``<sequencer host>:<sequencer port>`` should be ``sequencer-MIGRATION_ID.sv.svc.YOUR_HOSTNAME:443``
+Please replace ``YOUR_HOSTNAME`` with your host name and ``MIGRATION_ID`` with the migration ID of the synchronizer that the sequencer is part of.
 
 If you see the response below, it means the sequencer is up and accessible through the URL.
 
@@ -802,7 +828,7 @@ This list is useful for an SV that wishes to limit egress to only allow the mini
 Destination            Url                                                                                              Protocol  Source pod
 ---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
 Sponsor SV             sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                           HTTPS     sv-app
-Sponsor SV Sequencer   sequencer.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                    HTTPS     participant
+Sponsor SV Sequencer   sequencer-<MIGRATION_ID>.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                     HTTPS     participant
 Sponsor SV Scan        scan.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                         HTTPS     validator-app
 CometBft P2P           CometBft p2p IPs and ports 26016, 26026, 26036, 26046, 26096                                     TCP       cometbft
 CometBft JSON RPC      sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc  HTTPS     cometbft

@@ -12,6 +12,7 @@ import { localCharts, version } from './utils';
 export function installPostgres(
   xns: ExactNamespace,
   name: string,
+  secretName: string,
   values: ChartValues
 ): k8s.helm.v3.Release {
   const password = new random.RandomPassword(`${xns.logicalName}-${name}-passwd`, {
@@ -19,7 +20,6 @@ export function installPostgres(
     overrideSpecial: '_%@',
     special: true,
   }).result;
-  const secretName = `${name}-secret`;
   const passwordSecret = installPostgresPasswordSecret(xns, password, secretName);
 
   return installCNRunbookHelmChart(xns, name, 'cn-postgres', values, localCharts, version, [

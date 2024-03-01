@@ -7,6 +7,7 @@ import {
   REPO_ROOT,
   installCNRunbookHelmChart,
   loadYamlFromFile,
+  DomainMigrationIndex,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
@@ -16,6 +17,7 @@ import { localCharts, version } from './utils';
 export function installGlobalDomainNode(
   svNamespace: ExactNamespace,
   svName: string,
+  migrationId: DomainMigrationIndex,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
   const cometbft = installCometBftNode(svNamespace, svName, dependencies);
@@ -23,21 +25,33 @@ export function installGlobalDomainNode(
   const sequencerPgValues = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-sequencer.yaml`
   );
-  const sequencerPg = installPostgres(svNamespace, 'sequencer-pg', sequencerPgValues);
+  const sequencerPg = installPostgres(
+    svNamespace,
+    `sequencer-${migrationId}-pg`,
+    'sequencer-pg-secret',
+    sequencerPgValues
+  );
   const mediatorPgValues = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-mediator.yaml`
   );
-  const mediatorPg = installPostgres(svNamespace, 'mediator-pg', mediatorPgValues);
+  const mediatorPg = installPostgres(
+    svNamespace,
+    `mediator-${migrationId}-pg`,
+    'mediator-pg-secret',
+    mediatorPgValues
+  );
 
   const globalDomainValues: ChartValues = {
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
-      {}
+      {
+        MIGRATION_ID: migrationId.toString(),
+      }
     ),
   };
   return installCNRunbookHelmChart(
     svNamespace,
-    'global-domain',
+    `global-domain-${migrationId}`,
     'cn-global-domain',
     globalDomainValues,
     localCharts,

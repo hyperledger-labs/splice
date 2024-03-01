@@ -1,7 +1,9 @@
 persistence:
-  host: participant-pg
+  # replace MIGRATION_ID with the current migration ID of the global synchronizer
+  host: participant-MIGRATION_ID-pg
   secretName: participant-pg-secret
-  schema: sv_participant
+  schema: participant_MIGRATION_ID
+  databaseName: participant_MIGRATION_ID
 auth:
   # replace OIDC_AUTHORITY_URL with your provider's OIDC URL
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"

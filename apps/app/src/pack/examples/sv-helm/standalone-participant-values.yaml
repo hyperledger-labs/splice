@@ -8,3 +8,4 @@ persistence:
   secretName: postgres-secrets
   host: postgres
   schema: participant
+  databaseName: participant

@@ -27,40 +27,36 @@ database instance must be taken at a time strictly earlier than that of the part
 Assuming such a consistent set of backups is available, the following steps can be taken
 to restore the node:
 
-Scale down all components in the SV node to 0 replicas:
+Scale down all components in the SV node to 0 replicas
+(replace ``-0`` with the correct migration ID in case a :ref:`migration <sv-upgrades>` has already been performed):
 
 .. code-block:: bash
 
     kubectl scale deployment --replicas=0 -n sv \
       cometbft \
-      lobal-domain-mediator \
-      global-domain-sequencer \
-      participant \
+      global-domain-0-mediator \
+      global-domain-0-sequencer \
+      participant-0 \
       scan-app \
       sv-app \
       validator-app
 
-.. TODO(#9818)
-  Update deployment names with migration ID suffixes once they're in the runbook.
-
 Restore the storage and DBs of all components from the backups. The exact process for this
 depends on the storage and DBs used by the components, and is not documented here.
 
-Once all storage has been restored, scale up all components in the SV node back to 1 replica:
+Once all storage has been restored, scale up all components in the SV node back to 1 replica
+(replace ``-0`` with the correct migration ID in case a :ref:`migration <sv-upgrades>` has already been performed):
 
 .. code-block:: bash
 
     kubectl scale deployment --replicas=1 -n sv \
       cometbft \
-      lobal-domain-mediator \
-      global-domain-sequencer \
-      participant \
+      global-domain-0-mediator \
+      global-domain-0-sequencer \
+      participant-0 \
       scan-app \
       sv-app \
       validator-app
-
-.. TODO(#9818)
-  Update deployment names with migration ID suffixes once they're in the runbook.
 
 Once all components are healthy again, they should start catching up their state from peer
 SVs, and eventually become functional again.

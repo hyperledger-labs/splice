@@ -1,3 +1,5 @@
+participantAddress: "participant"
+
 # URL of sponsoring SV for onboarding your validator, e.g. sv.sv-1.svc.dev.canton.network.global
 svSponsorAddress: SPONSOR_SV_URL
 onboardingSecretFrom:

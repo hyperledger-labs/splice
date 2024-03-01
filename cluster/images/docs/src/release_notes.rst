@@ -3,6 +3,15 @@
 Release Notes
 =============
 
+2024-03-11
+----------
+
+* Deployment
+
+  * Multiple changes to the way SV nodes are deployed, to prepare for supporting :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`.
+    Please revisit the section on :ref:`Helm-based SV deployment <sv-helm>`,
+    paying attention to the new ``MIGRATION_ID`` variable (should be set to ``0`` until further notice).
+
 2024-03-04
 ----------
 

@@ -344,14 +344,16 @@
     "inputs": {
       "chart": "/cluster/helm/cn-global-domain/",
       "compat": "true",
-      "name": "global-domain",
+      "name": "global-domain-0",
       "namespace": "sv",
       "timeout": 480,
       "values": {
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "mediator": {
           "persistence": {
-            "host": "mediator-pg",
+            "databaseName": "mediator_0",
+            "host": "mediator-0-pg",
+            "schema": "mediator_0",
             "secretName": "mediator-pg-secret"
           }
         },
@@ -362,13 +364,15 @@
             "type": "cometbft"
           },
           "persistence": {
-            "host": "sequencer-pg",
+            "databaseName": "sequencer_0",
+            "host": "sequencer-0-pg",
+            "schema": "sequencer_0",
             "secretName": "sequencer-pg-secret"
           }
         }
       }
     },
-    "name": "global-domain",
+    "name": "global-domain-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -378,7 +382,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres/",
       "compat": "true",
-      "name": "mediator-pg",
+      "name": "mediator-0-pg",
       "namespace": "sv",
       "timeout": 480,
       "values": {
@@ -391,7 +395,7 @@
         }
       }
     },
-    "name": "mediator-pg",
+    "name": "mediator-0-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -411,7 +415,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres/",
       "compat": "true",
-      "name": "participant-pg",
+      "name": "participant-0-pg",
       "namespace": "sv",
       "timeout": 480,
       "values": {
@@ -424,7 +428,7 @@
         }
       }
     },
-    "name": "participant-pg",
+    "name": "participant-0-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -434,7 +438,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
-      "name": "participant",
+      "name": "participant-0",
       "namespace": "sv",
       "timeout": 480,
       "values": {
@@ -446,13 +450,14 @@
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "host": "participant-pg",
-          "schema": "sv_participant",
+          "databaseName": "participant_0",
+          "host": "participant-0-pg",
+          "schema": "participant_0",
           "secretName": "participant-pg-secret"
         }
       }
     },
-    "name": "participant",
+    "name": "participant-0",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -469,12 +474,14 @@
         "clusterUrl": "svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "migration": {
-          "id": 0
+          "id": "0"
         },
+        "participantAddress": "participant-0",
         "persistence": {
           "host": "apps-pg",
           "secretName": "apps-pg-secret"
-        }
+        },
+        "sequencerAddress": "global-domain-0-sequencer"
       }
     },
     "name": "scan",
@@ -487,7 +494,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres/",
       "compat": "true",
-      "name": "sequencer-pg",
+      "name": "sequencer-0-pg",
       "namespace": "sv",
       "timeout": 480,
       "values": {
@@ -500,7 +507,7 @@
         }
       }
     },
-    "name": "sequencer-pg",
+    "name": "sequencer-0-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -593,21 +600,24 @@
           "enabled": true
         },
         "domain": {
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
           "sequencerAvailabilityDelay": "60 seconds",
           "sequencerPruningConfig": {
             "enabled": false
           },
-          "sequencerPublicUrl": "https://sequencer.sv.svc.svrun.network.canton.global"
+          "sequencerPublicUrl": "https://sequencer-0.sv.svc.svrun.network.canton.global"
         },
-        "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
+        "globalDomainUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
         },
         "migration": {
-          "id": 0
+          "id": "0"
         },
         "onboardingName": "DA-Helm-Test-Node",
+        "participantAddress": "participant-0",
         "persistence": {
           "host": "apps-pg",
           "secretName": "apps-pg-secret"
@@ -629,7 +639,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-pg-passwd",
+    "name": "sv-mediator-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -641,7 +651,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-pg-passwd",
+    "name": "sv-participant-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -653,7 +663,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-pg-passwd",
+    "name": "sv-sequencer-0-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -690,12 +700,12 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
-        "globalDomainUrl": "https://sequencer.sv-1.svc.svrun.network.com.network.canton.global",
+        "globalDomainUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "migration": {
-          "id": 0
+          "id": "0"
         },
-        "participantAddress": "participant",
+        "participantAddress": "participant-0",
         "persistence": {
           "host": "apps-pg",
           "secretName": "apps-pg-secret"
