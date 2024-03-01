@@ -58,6 +58,7 @@ import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.{Duration, Instant}
+import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.reflect.ClassTag
 
@@ -81,10 +82,24 @@ abstract class TopologyAdminConnection(
 
   override val serviceName = "Canton Participant Admin API"
 
+  private val memberIdO: AtomicReference[Option[UniqueIdentifier]] = new AtomicReference(None)
+
   def getId(
-  )(implicit traceContext: TraceContext): Future[UniqueIdentifier] = runCmd(
-    TopologyAdminCommandsX.Init.GetId()
-  )
+  )(implicit traceContext: TraceContext): Future[UniqueIdentifier] =
+    // We don't lock around this, worst case we make concurrent requests
+    // that both update memberIdO which is fine as the request is idempotent.
+    memberIdO.get() match {
+      case Some(memberId) => Future.successful(memberId)
+      case None =>
+        for {
+          memberId <- runCmd(
+            TopologyAdminCommandsX.Init.GetId()
+          )
+        } yield {
+          memberIdO.set(Some(memberId))
+          memberId
+        }
+    }
 
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean]
 
