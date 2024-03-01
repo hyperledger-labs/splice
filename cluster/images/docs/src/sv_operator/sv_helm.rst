@@ -502,7 +502,7 @@ Note that the default Helm values files used below assume that the Postgres inst
 thus are accessible at hostname sequencer-0-pg, mediator-0-pg, etc. If you are using cloud-hosted Postgres instances,
 please override the hostnames under `persistence.host` with the IP addresses of the Postgres instances.
 To avoid conflicts across migration IDs,
-you will also need to ensure that `persistence.databaseName` and `persistence.schema` are unique per component (participant, sequencer, mediator) and migration ID.
+you will also need to ensure that `persistence.databaseName` is unique per component (participant, sequencer, mediator) and migration ID.
 
 .. _helm-sv-install:
 
@@ -529,6 +529,7 @@ An SV node includes a CometBft node so you also need to configure
 that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
+- Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster. Note that ``MIGRATION_ID`` is also used within port numbers in URLs here!
 - Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity (this must be an exact match of the string for your SV to be approved to onboard)
 - Replace ``YOUR_COMETBFT_NODE_ID`` with the id obtained when generating the config for the CometBft node
 - Replace ``YOUR_HOSTNAME`` with the hostname that will be used for the ingress
@@ -642,7 +643,7 @@ This is to support operating multiple instances of these components side by side
 .. code-block:: bash
 
     helm repo update
-    helm install cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml --wait
+    helm install global-domain-${MIGRATION_ID}-cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml --wait
     helm install global-domain-${MIGRATION_ID} canton-network-helm/cn-global-domain -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml --wait
     helm install participant-${MIGRATION_ID} canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
     helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml -f ${SV-IDENTITIES-FILE} --wait
@@ -656,18 +657,22 @@ namespace. A typical query might look as follows:
 .. code-block:: bash
 
     $ kubectl get pods -n sv
-    NAMESPACE         NAME                                                       READY   STATUS    RESTARTS      AGE
-    sv                scan-app-5658d74b58-xvlmz                                  1/1     Running   0             14m
-    sv                scan-web-ui-7db66d9f9d-kl9kw                               1/1     Running   0             14m
-    sv                sv-app-7658c9fdd4-58xm6                                    1/1     Running   0             91m
-    sv                sv-web-ui-84b6d7994c-w67rp                                 1/1     Running   0             91m
-    sv                validator-app-b7fd68479-w4992                              1/1     Running   0             43m
-    sv                wallet-web-ui-54c9ddbb8-nvkmp                              1/1     Running   0             43m
-    sv                participant-6fdff7fc4-vzg8c                                3/3     Running   1 (72m ago)   72m
-    sv                postgres-0                                                 1/1     Running   0             120m
-    sv                cometbft-6fdff7fc4-vzg8c                                   1/1     Running   0             120m
-    sv                global-domain-mediator-c57c9b55f                           1/1     Running   0             120m
-    sv                global-domain-sequencer-c57c9b55f                          1/1     Running   0             120m
+    NAME                                         READY   STATUS    RESTARTS      AGE
+    apps-pg-0                                    2/2     Running   0             14m
+    cns-web-ui-5cf76bfc98-bh6tw                  2/2     Running   0             10m
+    global-domain-0-cometbft-c584c9468-9r2v5     2/2     Running   2 (14m ago)   14m
+    global-domain-0-mediator-7bfb5f6b6d-ts5zp    2/2     Running   0             13m
+    global-domain-0-sequencer-6c85d98bb6-887c7   2/2     Running   0             13m
+    mediator-0-pg-0                              2/2     Running   0             14m
+    participant-0-57579c64ff-wmzk5               2/2     Running   0             14m
+    participant-0-pg-0                           2/2     Running   0             14m
+    scan-app-b8456cc64-stjm2                     2/2     Running   0             10m
+    scan-web-ui-7c6b5b59dc-fjxjg                 2/2     Running   0             10m
+    sequencer-0-pg-0                             2/2     Running   0             14m
+    sv-app-7f4b6f468c-sj7ch                      2/2     Running   0             13m
+    sv-web-ui-67bfbdfc77-wwvp9                   2/2     Running   0             13m
+    validator-app-667445fdfc-rcztx               2/2     Running   0             10m
+    wallet-web-ui-648f86f9f9-lffz5               2/2     Running   0             10m
 
 
 Note also that ``Pod`` restarts may happen during bringup,
@@ -692,7 +697,7 @@ Each SV member is required to configure their cluster ingress to allow traffic f
 * ``https://sv.sv.svc.<YOUR_HOSTNAME>/api/sv`` should be routed to ``/api/sv`` at port 5014 of service ``sv-app`` in the ``sv`` namespace.
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``scan-web-ui`` in the ``sv`` namespace.
 * ``https://scan.sv.svc.<YOUR_HOSTNAME>/api/scan`` should be routed to ``/api/scan`` at port 5012 in service ``scan-app`` in the ``sv`` namespace.
-* ``cometbft.sv.svc.<YOUR_HOSTNAME>:26656`` should be routed to port 26656 of service ``cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
+* ``global-domain-<MIGRATION_ID>-cometbft.sv.svc.<YOUR_HOSTNAME>:26<MIGRATION_ID>56`` should be routed to port 26656 of service ``global-domain-<MIGRATION_ID>-cometbft-cometbft-p2p`` in the ``sv`` namespace using the TCP protocol.
   Please note that cometBFT traffic is purely TCP. TLS is not supported so SNI host routing for these traffic is not possible.
 * ``https://cns.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``cns-web-ui`` in the ``sv`` namespace.
 * ``https://cns.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
@@ -823,15 +828,16 @@ Configuring the Cluster Egress
 
 Here is a list of destinations of all outbound traffic from the Super Validator node.
 This list is useful for an SV that wishes to limit egress to only allow the minimum necessary outbound traffic.
+``M`` will be used a shorthand for ``MIGRATION_ID``.
 
 ====================== ================================================================================================ ========= ==============
 Destination            Url                                                                                              Protocol  Source pod
 ---------------------- ------------------------------------------------------------------------------------------------ --------- --------------
 Sponsor SV             sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                           HTTPS     sv-app
-Sponsor SV Sequencer   sequencer-<MIGRATION_ID>.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                     HTTPS     participant
+Sponsor SV Sequencer   sequencer-<M>.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                HTTPS     participant-<M>
 Sponsor SV Scan        scan.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443                                         HTTPS     validator-app
-CometBft P2P           CometBft p2p IPs and ports 26016, 26026, 26036, 26046, 26096                                     TCP       cometbft
-CometBft JSON RPC      sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc  HTTPS     cometbft
+CometBft P2P           CometBft p2p IPs and ports 26<M>16, 26<M>26, 26<M>36, 26<M>46, 26<M>56                           TCP       global-domain-<M>-cometbft
+CometBft JSON RPC      sv.sv-1.svc.<TARGET_CLUSTER>.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc  HTTPS     global-domain-<M>-cometbft
 ====================== ================================================================================================ ========= ==============
 
 At present, we designate the founding SV as the sponsor SV. However, in the long term, any onboarded SV can function as a sponsor SV.

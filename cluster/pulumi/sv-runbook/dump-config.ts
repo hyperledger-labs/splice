@@ -52,7 +52,6 @@ async function main() {
   };
   const svAppConfig = {
     onboardingName: utils.SV_NAME,
-    cometBftConnectionUri: 'http://cometbft-cometbft-rpc:26657',
   };
   const validatorAppConfig = {
     walletUserName: utils.validatorWalletUserName,

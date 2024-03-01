@@ -58,6 +58,7 @@ node:
 istioVirtualService:
   enabled: false
   gateway: ""
+  # Port must match `externalAddress` port.
   port: 26656
 
 genesis:

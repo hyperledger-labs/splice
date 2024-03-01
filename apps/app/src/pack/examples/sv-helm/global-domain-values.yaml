@@ -3,16 +3,14 @@ sequencer:
     # replace MIGRATION_ID with the current migration ID of the global synchronizer
     host: sequencer-MIGRATION_ID-pg
     secretName: sequencer-pg-secret
-    schema: sequencer_MIGRATION_ID
     databaseName: sequencer_MIGRATION_ID
   driver:
     type: "cometbft"
-    host: "cometbft-cometbft-rpc"
+    host: "global-domain-MIGRATION_ID-cometbft-cometbft-rpc"
     port: 26657
 mediator:
   persistence:
     # replace MIGRATION_ID with the current migration ID of the global synchronizer
     host: mediator-MIGRATION_ID-pg
     secretName: mediator-pg-secret
-    schema: mediator_MIGRATION_ID
     databaseName: mediator_MIGRATION_ID

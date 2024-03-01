@@ -9,7 +9,6 @@ async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
 
   const svAppConfig = {
     onboardingName: SV_NAME,
-    cometBftConnectionUri: 'http://cometbft-cometbft-rpc:26657',
   };
   const validatorAppConfig = {
     walletUserName: validatorWalletUserName,

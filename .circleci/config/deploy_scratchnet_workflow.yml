@@ -115,6 +115,7 @@
           global_domain_migration_id: 1
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
+          migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory

@@ -104,6 +104,8 @@ workflow:
             - migrate_cluster
           global_domain_migration_id: 1
       - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          migration_id: 1
           <<: *main-branch-only
           context:
             - artifactory
@@ -123,6 +125,7 @@ workflow:
             - migrate_cluster
       - preflight_validator_check:
           <<: *main-branch-only
+          name: "preflight_validator_check_migrated"
           migration_id: 1
           context:
             - artifactory
@@ -140,6 +143,6 @@ workflow:
             - canton-network-vpn
             - slack-context
           requires:
-            - preflight_sv_check
-            - preflight_validator_check
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
             - preflight_check_migrated

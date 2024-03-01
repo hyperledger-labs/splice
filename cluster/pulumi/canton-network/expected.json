@@ -1544,7 +1544,7 @@
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "mock"
+          "chainId": "mock-0"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2463,7 +2463,7 @@
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "mock"
+          "chainId": "mock-0"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3350,7 +3350,7 @@
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "mock"
+          "chainId": "mock-0"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -4237,7 +4237,7 @@
           "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
         },
         "genesis": {
-          "chainId": "mock"
+          "chainId": "mock-0"
         },
         "imageName": "cometbft",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",

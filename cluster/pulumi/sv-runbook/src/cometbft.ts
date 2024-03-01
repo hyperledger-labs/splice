@@ -10,6 +10,7 @@ import {
   loadYamlFromFile,
   REPO_ROOT,
   CnInput,
+  DomainMigrationIndex,
 } from 'cn-pulumi-common';
 
 import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
@@ -23,17 +24,17 @@ const privValidatorKeyContent = fs.readFileSync(
   'utf-8'
 );
 
-const domainActiveMigrationId = process.env.GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID || '0';
-
 export function installCometBftNode(
   xns: ExactNamespace,
   svName: string,
+  migrationId: DomainMigrationIndex,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
   const cometBftValues = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
     {
       TARGET_CLUSTER: TARGET_CLUSTER,
+      MIGRATION_ID: migrationId.toString(),
       YOUR_SV_NAME: svName,
       YOUR_COMETBFT_NODE_ID: '9116f5faed79dcf98fa79a2a40865ad9b493f463',
       YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
@@ -55,43 +56,29 @@ export function installCometBftNode(
     },
     { dependsOn: dependencies.concat([xns.ns]) }
   );
-  const includeMigrationIdInChainId = domainActiveMigrationId !== '0';
   return installCNRunbookHelmChart(
     xns,
-    'cometbft',
+    `global-domain-${migrationId}-cometbft`,
     'cn-cometbft',
     _.mergeWith(cometBftValues, {
       node: {
-        externalAddress: `cometbft.svc.${CLUSTER_BASENAME}.network.canton.global:26096`,
         retainBlocks: cometbftRetainBlocks,
       },
       istioVirtualService: {
         enabled: true,
         gateway: 'cluster-ingress/cn-apps-gateway',
-        port: 26096,
-      },
-      stateSync: {
-        rpcServers: rpcServiceAddress('sv-1') + ',' + rpcServiceAddress('sv-1'),
+        port: `26${migrationId}56`,
       },
       genesis: {
         // for TestNet-like deployments on scratchnet, set the chainId to 'test'
         chainId:
           `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
             ? 'test'
-            : `${CLUSTER_BASENAME}` +
-              (includeMigrationIdInChainId ? `-${domainActiveMigrationId}` : ''),
-      },
-      founder: {
-        externalAddress: `${CLUSTER_BASENAME}.network.canton.global:26${domainActiveMigrationId}16`,
+            : cometBftValues.genesis.chainId,
       },
     }),
     localCharts,
     version,
     dependencies
   );
-}
-
-function rpcServiceAddress(namespace: string): string {
-  // Note that the port number is significant in the rpcServer address used for state sync
-  return `https://sv.${namespace}.svc.${CLUSTER_BASENAME}.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc`;
 }

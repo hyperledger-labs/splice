@@ -9,7 +9,6 @@ import {
   ExactNamespace,
   installCNHelmChart,
   isDevNet,
-  DefaultMigrationId,
   DomainMigrationIndex,
 } from 'cn-pulumi-common';
 
@@ -49,8 +48,6 @@ export function installCometBftNode(
   } else {
     stateSyncConfig = { enable: false };
   }
-  // for backwards compatibility, we keep the old chainId for the default global domain
-  const includeMigrationIdInChainId = migrationId !== DefaultMigrationId;
   const cometbftRelease = installCNHelmChart(
     xns,
     `cometbft-global-domain-${migrationId}`,
@@ -85,7 +82,7 @@ export function installCometBftNode(
         chainId:
           `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
             ? 'test'
-            : `${CLUSTER_BASENAME}` + (includeMigrationIdInChainId ? `-${migrationId}` : ''),
+            : `${CLUSTER_BASENAME}-${migrationId}`,
       },
       metrics: {
         enable: true,

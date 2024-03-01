@@ -14,7 +14,9 @@ import scala.util.Using
 
 /** Preflight test that makes sure that the cometBFT node of the node deployed through sv-runbook has initialized fine.
   */
-class RunbookSvCometBftPreflightIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment {
+class RunbookSvCometBftPreflightIntegrationTest
+    extends CNNodeIntegrationTestWithSharedEnvironment
+    with DomainMigrationIntegrationTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -24,7 +26,7 @@ class RunbookSvCometBftPreflightIntegrationTest extends CNNodeIntegrationTestWit
 
   "p2p port for the CometBft node is accessible" in { _ =>
     val cometBftP2pHost = sys.env("NETWORK_APPS_ADDRESS")
-    val cometBftPort = 26096
+    val cometBftPort = 26056 + migrationId.toInt * 100
     // All we care about is the p2p port for CometBFT being accessible by other nodes
     // The socket connects in the constructor, therefore if no error is thrown during the initialization then a successful TCP connection is established
     withClue(s"Testing p2p port at $cometBftP2pHost:$cometBftPort") {

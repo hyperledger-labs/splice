@@ -6,6 +6,10 @@
 {{ $_ := required ".Values.imageRepo is required." .Values.imageRepo }}
 {{ $_ := required ".Values.scanAddress is required." .Values.scanAddress }}
 
+{{- if .Values.svValidator }}
+{{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}
+{{- end }}
+
 {{- if (.Values.topup).enabled }}
 {{ $_ := required ".Values.topup.targetThroughput is required when topup is enabled." .Values.topup.targetThroughput }}
 {{ $_ := required ".Values.topup.minTopupInterval is required when topup is enabled." .Values.topup.minTopupInterval }}

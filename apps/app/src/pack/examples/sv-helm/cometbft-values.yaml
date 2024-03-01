@@ -1,16 +1,20 @@
 nodeName: "YOUR_SV_NAME"
 
 founder:
-  externalAddress: TARGET_CLUSTER.network.canton.global:26016
+  # Replace MIGRATION_ID (part of port number!) with the current migration ID of the global synchronizer.
+  externalAddress: TARGET_CLUSTER.network.canton.global:26MIGRATION_ID16
 
 node:
   id: YOUR_COMETBFT_NODE_ID
-  identifier: "cometbft"
-  externalAddress: "cometbft.sv.svc.YOUR_HOSTNAME:26656"
+  # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+  identifier: "global-domain-MIGRATION_ID-cometbft"
+  # Replace both instances of MIGRATION_ID (also part of port number!) with the current migration ID of the global synchronizer.
+  externalAddress: "global-domain-MIGRATION_ID-cometbft.sv.svc.YOUR_HOSTNAME:26MIGRATION_ID56"
   keysSecret: "cometbft-keys"
 
 genesis:
-  chainId: "TARGET_CLUSTER"
+  # Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+  chainId: "TARGET_CLUSTER-MIGRATION_ID"
 
 stateSync:
   # Uncomment the line below to disable state sync

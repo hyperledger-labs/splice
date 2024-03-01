@@ -115,7 +115,6 @@ export async function installNode(
     topupConfig: svValidatorTopupConfig,
     svKey,
     onboardingName: svAppConfig.onboardingName,
-    cometBftConnectionUri: svAppConfig.cometBftConnectionUri,
     validatorWalletUserName: validatorAppConfig.walletUserName,
   });
 
@@ -155,7 +154,6 @@ type SvConfig = {
   backupConfigSecret?: pulumi.Resource;
   svKey: CnInput<SvIdKey>;
   onboardingName: string;
-  cometBftConnectionUri: string;
   validatorWalletUserName: string;
 };
 
@@ -172,7 +170,6 @@ async function installSvAndValidator(config: SvConfig) {
     backupConfig,
     svKey,
     onboardingName,
-    cometBftConnectionUri,
     validatorWalletUserName,
   } = config;
 
@@ -273,10 +270,6 @@ async function installSvAndValidator(config: SvConfig) {
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,
     approvedSvIdentities,
-    cometBFT: {
-      enabled: true,
-      connectionUri: cometBftConnectionUri,
-    },
     domain: {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,

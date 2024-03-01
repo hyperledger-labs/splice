@@ -14,7 +14,8 @@ import scala.jdk.OptionConverters.*
 /** Preflight test that makes sure that the sequencer url is published to svcRules
   */
 class RunbookSvSequencerInfoPreflightIntegrationTest
-    extends CNNodeIntegrationTestWithSharedEnvironment {
+    extends CNNodeIntegrationTestWithSharedEnvironment
+    with DomainMigrationIntegrationTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -29,7 +30,7 @@ class RunbookSvSequencerInfoPreflightIntegrationTest
     val memberInfo = svcRules.payload.members.asScala.get(svcInfo.svParty.toProtoPrimitive).value
     val domainConfig = memberInfo.domainNodes.asScala.values.headOption.value
     val sequencer = domainConfig.sequencer.toScala.value
-    val migrationId = sequencer.migrationId.toInt
+    sequencer.migrationId shouldBe migrationId
     sequencer.url shouldBe s"https://sequencer-${migrationId}.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
   }
 }

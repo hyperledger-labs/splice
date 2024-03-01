@@ -12,7 +12,7 @@ auth:
   jwksUrl: "https://OIDC_AUTHORITY_URL/.well-known/jwks.json"
 cometBFT:
   enabled: true
-  connectionUri: "http://cometbft-cometbft-rpc:26657"
+  connectionUri: "http://global-domain-MIGRATION_ID-cometbft-cometbft-rpc:26657"
 # PARTICIPANT_BOOTSTRAP_START
 # Uncomment the two lines below if you are bootstrapping from an existing participant
 # identities dump.

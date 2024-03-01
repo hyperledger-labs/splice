@@ -305,36 +305,36 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cometbft/",
       "compat": "true",
-      "name": "cometbft",
+      "name": "global-domain-0-cometbft",
       "namespace": "sv",
       "timeout": 480,
       "values": {
         "founder": {
-          "externalAddress": "svrun.network.canton.global:26016"
+          "externalAddress": "svrun.network.com.network.canton.global:26016"
         },
         "genesis": {
-          "chainId": "svrun"
+          "chainId": "svrun.network.com-0"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "istioVirtualService": {
           "enabled": true,
           "gateway": "cluster-ingress/cn-apps-gateway",
-          "port": 26096
+          "port": "26056"
         },
         "node": {
-          "externalAddress": "cometbft.svc.svrun.network.canton.global:26096",
+          "externalAddress": "global-domain-0-cometbft.sv.svc.svrun.network.canton.global:26056",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
-          "identifier": "cometbft",
+          "identifier": "global-domain-0-cometbft",
           "keysSecret": "cometbft-keys",
           "retainBlocks": 10000
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {
-          "rpcServers": "https://sv.sv-1.svc.svrun.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.svc.svrun.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+          "rpcServers": "https://sv.sv-1.svc.svrun.network.com.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.svc.svrun.network.com.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         }
       }
     },
-    "name": "cometbft",
+    "name": "global-domain-0-cometbft",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -353,20 +353,18 @@
           "persistence": {
             "databaseName": "mediator_0",
             "host": "mediator-0-pg",
-            "schema": "mediator_0",
             "secretName": "mediator-pg-secret"
           }
         },
         "sequencer": {
           "driver": {
-            "host": "cometbft-cometbft-rpc",
+            "host": "global-domain-0-cometbft-cometbft-rpc",
             "port": 26657,
             "type": "cometbft"
           },
           "persistence": {
             "databaseName": "sequencer_0",
             "host": "sequencer-0-pg",
-            "schema": "sequencer_0",
             "secretName": "sequencer-pg-secret"
           }
         }
@@ -452,7 +450,7 @@
         "persistence": {
           "databaseName": "participant_0",
           "host": "participant-0-pg",
-          "schema": "participant_0",
+          "schema": "participant",
           "secretName": "participant-pg-secret"
         }
       }
@@ -596,7 +594,7 @@
           "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
         },
         "cometBFT": {
-          "connectionUri": "http://cometbft-cometbft-rpc:26657",
+          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
         "domain": {
