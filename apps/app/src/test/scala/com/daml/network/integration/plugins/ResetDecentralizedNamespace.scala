@@ -1,16 +1,15 @@
 package com.daml.network.integration.plugins
 
-import com.daml.error.utils.ErrorDetails
 import com.daml.network.config.CNNodeConfig
 import com.daml.network.console.CNParticipantClientReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests
 import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleMacros
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.topology.transaction.DecentralizedNamespaceDefinitionX
-import com.digitalasset.canton.topology.TopologyManagerError.SerialMismatch
 import io.grpc
 import io.grpc.StatusRuntimeException
 
@@ -21,6 +20,8 @@ import io.grpc.StatusRuntimeException
 class ResetDecentralizedNamespace
     extends EnvironmentSetupPlugin[CNNodeEnvironmentImpl, CNNodeTests.CNNodeTestConsoleEnvironment]
     with BaseTest {
+
+  private val MAX_RETRIES = 15
 
   override def beforeEnvironmentDestroyed(
       config: CNNodeConfig,
@@ -49,7 +50,13 @@ class ResetDecentralizedNamespace
           )
         val store = connectedDomain.domainId.filterString
 
-        def resetDecentralizedNamespace(): Unit = {
+        def resetDecentralizedNamespace(retries: Int): Unit = {
+          if (retries > MAX_RETRIES) {
+            logger.error(
+              s"Exceeded max retries for resetting decentralized namespace $MAX_RETRIES, giving up"
+            )
+            sys.exit(1)
+          }
           sv1.participantClientWithAdminToken.topology.decentralized_namespaces
             .list(
               store,
@@ -132,25 +139,25 @@ class ResetDecentralizedNamespace
 
                   }(env)
                 } catch {
-                  case s: StatusRuntimeException if ErrorDetails.matches(s, SerialMismatch) =>
+                  case _: CommandFailure =>
                     logger.info(
-                      "Restarting decentralized namespace reset as base serial has changed"
+                      "Restarting decentralized namespace as command failed likely because base serial has changed"
                     )
-                    resetDecentralizedNamespace()
+                    resetDecentralizedNamespace(retries + 1)
                   case s: StatusRuntimeException
                       if s.getStatus.getCode == grpc.Status.Code.INVALID_ARGUMENT =>
                     logger.info(
                       "Restarting decentralized namespace reset as base serial has changed"
                     )
-                    resetDecentralizedNamespace()
-                  case e: IllegalStateException =>
+                    resetDecentralizedNamespace(retries + 1)
+                  case e: Throwable =>
                     logger.error("Failed to reset decentralized namespace", e)
                     sys.exit(1)
                 }
               }
             }
         }
-        resetDecentralizedNamespace()
+        resetDecentralizedNamespace(0)
         logger.info("Decentralized namespace has been reset")
     }
   }
