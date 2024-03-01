@@ -685,8 +685,7 @@ class SvFrontendIntegrationTest
         }
     }
 
-    // TODO(#9338) Reenable this test
-    "SV1 can create valid SRARC_SetConfig (new SvcRules Configuration) vote requests that can expire and get rejected by other SVs" ignore {
+    "SV1 can create valid SRARC_SetConfig (new SvcRules Configuration) vote requests that can expire and get rejected by other SVs" in {
       implicit env =>
         val requestReasonUrl = "This is a request reason url."
         val requestReasonBody = "This is a request reason."
@@ -1535,6 +1534,10 @@ class SvFrontendIntegrationTest
         dateTimePicker.clear()
         dateTimePicker.click()
         // Typing in the "filler" characters can mess up the input badly
+        // Note: this breaks on Feb 29th because the date library validates that the day
+        // of the month is valid for the year you enter and because the year is entered
+        // one digit at a time that fails and it resets it to Feb 28th. Luckily,
+        // this does not happen very often …
         dateTimePicker.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
         eventually()(
           dateTimePicker.getAttribute("value") shouldBe dateTime
