@@ -88,7 +88,7 @@ class SequencerPruningTrigger(
           } else {
             throw Status.INTERNAL
               .withDescription(
-                show"Failed to prune sequencer to $pruningTimestamp because our own participant or mediator have not acknowledged that timestamp: ${ourLaggingMembers}"
+                show"Failed to prune sequencer to $pruningTimestamp because our own nodes have not acknowledged that timestamp: ${ourLaggingMembers}"
               )
               .asRuntimeException()
           }
@@ -126,8 +126,9 @@ class SequencerPruningTrigger(
   )(implicit traceContext: TraceContext): Future[Seq[SequencerPruningTrigger.LaggingMember]] = for {
     participantId <- participantAdminConnection.getParticipantId()
     mediatorId <- mediatorAdminConnection.getMediatorId
+    sequencerId <- sequencerAdminConnection.getSequencerId
   } yield laggingMembers.filter(m =>
-    Seq[Member](participantId.member, mediatorId.member).contains(m.member)
+    Seq[Member](participantId.member, mediatorId.member, sequencerId.member).contains(m.member)
   )
 
   private def clientsPreventingPruning(
