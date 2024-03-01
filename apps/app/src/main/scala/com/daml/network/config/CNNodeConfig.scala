@@ -60,6 +60,7 @@ import com.digitalasset.canton.domain.sequencing.config.{
   CommunitySequencerNodeXConfig,
   RemoteSequencerConfig,
 }
+import com.digitalasset.canton.topology.PartyId
 
 case class CNNodeConfig(
     override val name: Option[String] = None,
@@ -458,6 +459,10 @@ object CNNodeConfig {
       deriveReader[PeriodicBackupDumpConfig]
     implicit val migrateSvPartyConfigReader: ConfigReader[MigrateSvPartyConfig] =
       deriveReader[MigrateSvPartyConfig]
+    implicit val extraBeneficiariesConfigReader: ConfigReader[Map[PartyId, BigDecimal]] =
+      implicitly[ConfigReader[Map[String, BigDecimal]]].map(_.map { case (k, v) =>
+        PartyId.tryFromProtoPrimitive(k) -> v
+      })
     implicit val svConfigReader: ConfigReader[SvAppBackendConfig] =
       deriveReader[SvAppBackendConfig].emap { conf =>
         // We support joining nodes without sequencers/mediators but
@@ -703,6 +708,10 @@ object CNNodeConfig {
       deriveWriter[PeriodicBackupDumpConfig]
     implicit val migrateSvPartyConfigWriter: ConfigWriter[MigrateSvPartyConfig] =
       deriveWriter[MigrateSvPartyConfig]
+    implicit val extraBeneficiariesConfigWriter: ConfigWriter[Map[PartyId, BigDecimal]] =
+      implicitly[ConfigWriter[Map[String, BigDecimal]]].contramap(_.map { case (k, v) =>
+        k.toProtoPrimitive -> v
+      })
     implicit val svConfigWriter: ConfigWriter[SvAppBackendConfig] =
       deriveWriter[SvAppBackendConfig]
 

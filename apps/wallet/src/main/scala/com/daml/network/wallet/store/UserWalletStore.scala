@@ -617,7 +617,7 @@ object UserWalletStore {
         ),
         mkFilter(coinCodegen.SvRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
-            co.payload.sv == endUser
+            co.payload.beneficiary == endUser
         )(co =>
           UserWalletAcsStoreRowData(
             co,

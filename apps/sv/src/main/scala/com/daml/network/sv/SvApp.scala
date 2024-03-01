@@ -127,6 +127,13 @@ class SvApp(
       clock,
     )
     (for {
+      _ <- appInitStep("ensure beneficiary weights are <= 100.0") {
+        if (config.extraBeneficiaries.values.sum > BigDecimal(100)) {
+          sys.error(
+            s"Beneficiaries' weight percentage sum exceeds 100. Beneficiaries: ${config.extraBeneficiaries}"
+          )
+        } else Future.unit
+      }
       _ <-
         appInitStep("Ensure participant is initialized with expected id") {
           config.onboarding match {
@@ -985,7 +992,7 @@ object SvApp {
       logger: TracedLogger,
   )(implicit
       tc: TraceContext
-  ): Either[String, (PartyId, String)] = {
+  ): Either[String, (PartyId, String, Long)] = {
 
     // We want to make sure that:
     // 1. we log warnings whenever an auth check fails
@@ -1025,7 +1032,7 @@ object SvApp {
       _ <-
         if (token.svcParty == svStore.key.svcParty) Right(())
         else authFailure("wrong SVC party", s"${token.svcParty} != ${svStore.key.svcParty}")
-    } yield (token.candidateParty, token.candidateName)
+    } yield (token.candidateParty, token.candidateName, approvedSv.rewardWeightBps)
   }
 
   private[sv] def isSvcMember(

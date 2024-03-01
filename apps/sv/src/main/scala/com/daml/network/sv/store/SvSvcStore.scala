@@ -43,7 +43,6 @@ import com.daml.network.sv.store.SvSvcStore.{ignoredContractsForAcsDump, noActiv
 import com.daml.network.sv.store.db.{DbSvSvcStore, SvcTables}
 import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
-import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.*
 import com.digitalasset.canton.data.CantonTimestamp
@@ -595,6 +594,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
 
   def listSvOnboardingConfirmations(
       svOnboarding: Contract[so.SvOnboardingRequest.ContractId, so.SvOnboardingRequest],
+      weight: Long,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
@@ -605,8 +605,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
           svOnboarding.payload.candidateParty,
           svOnboarding.payload.candidateName,
           svOnboarding.payload.candidateParticipantId,
-          // TODO(#9173): include SV reward weights in the onboarding configs
-          dummySvRewardWeight,
+          weight,
           svOnboarding.payload.token,
         )
       )

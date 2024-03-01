@@ -681,8 +681,20 @@ class HttpSvHandler(
       svOnboardingRequest: Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest],
       svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
   )(implicit tc: TraceContext) = {
+    val candidateName = svOnboardingRequest.payload.candidateName
+    val weight = config
+      .rewardWeightBpsOf(candidateName)
+      .getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(
+            s"Candidate $candidateName not found in approved SV identities."
+          )
+          .asRuntimeException()
+      )
     for {
-      confirmations <- OptionT.liftF(svcStore.listSvOnboardingConfirmations(svOnboardingRequest))
+      confirmations <- OptionT.liftF(
+        svcStore.listSvOnboardingConfirmations(svOnboardingRequest, weight)
+      )
       confirmedBy = confirmations
         .map(c =>
           svcRules.payload.members.asScala.get(c.payload.confirmer) match {
@@ -693,7 +705,7 @@ class HttpSvHandler(
         .toVector
     } yield definitions.SvOnboardingStateRequested(
       state = "requested",
-      name = svOnboardingRequest.payload.candidateName,
+      name = candidateName,
       contractId = Codec.encodeContractId(svOnboardingRequest.contractId),
       confirmedBy = confirmedBy,
       requiredNumConfirmations = CNThresholds.requiredNumVotes(svcRules),

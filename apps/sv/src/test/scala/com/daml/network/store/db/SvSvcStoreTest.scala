@@ -55,7 +55,7 @@ import com.daml.network.sv.history.SvcRulesCloseVoteRequest2
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
-import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   AssignedContract,
   Contract,
@@ -1034,7 +1034,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new SvcRules_AddMember(
         userParty(666).toProtoPrimitive,
         "user666",
-        dummySvRewardWeight,
+        SvUtil.DefaultFoundingNodeWeight,
         "user666ParticipantId",
         new Round(1L),
         dummyDomain.toProtoPrimitive,
@@ -1047,7 +1047,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new SvcRules_AddMember(
         userParty(667).toProtoPrimitive,
         "user667",
-        dummySvRewardWeight,
+        SvUtil.DefaultFoundingNodeWeight,
         "user667ParticipantId",
         new Round(1L),
         dummyDomain.toProtoPrimitive,
@@ -1301,7 +1301,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       candidate.toProtoPrimitive,
       name,
       participantId,
-      dummySvRewardWeight,
+      SvUtil.DefaultFoundingNodeWeight,
       "reason",
       svcParty.toProtoPrimitive,
       expiry,

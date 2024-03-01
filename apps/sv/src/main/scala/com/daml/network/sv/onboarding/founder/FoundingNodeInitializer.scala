@@ -541,7 +541,7 @@ class FoundingNodeInitializer(
                         svcParty.toProtoPrimitive,
                         svParty.toProtoPrimitive,
                         foundingConfig.name,
-                        foundingConfig.founderSvRewardWeight,
+                        foundingConfig.founderSvRewardWeightBps,
                         participantId.toProtoPrimitive,
                         founderDomainNodes,
                         initialRoundNumber,

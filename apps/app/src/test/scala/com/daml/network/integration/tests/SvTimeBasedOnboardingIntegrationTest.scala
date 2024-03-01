@@ -17,7 +17,7 @@ import com.daml.network.sv.automation.confirmation.SvOnboardingRequestTrigger
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cn.svcrules
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
-import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.TriggerTestUtil
 
 import java.time.Duration as JavaDuration
@@ -91,7 +91,7 @@ class SvTimeBasedOnboardingIntegrationTest
                     svYParty.toProtoPrimitive,
                     "new random party",
                     "PAR::sv::1220f3e2",
-                    dummySvRewardWeight,
+                    SvUtil.DefaultFoundingNodeWeight,
                     "create new `SvOnboardingConfirmed` contract",
                   )
                 )

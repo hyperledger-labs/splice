@@ -20,6 +20,7 @@ if tmux has-session -t $tmux_session 2>/dev/null; then
 fi
 
 rm -f canton.tokens canton-simtime.tokens
+rm -f canton.participants canton-simtime.participants
 
 echo "Stopping cometbft"
 ./scripts/cometbft.sh stop

@@ -71,7 +71,7 @@ export function installSvKeySecret(
 
 export type SvOnboarding =
   | { type: 'domain-migration' }
-  | { type: 'found-collective' }
+  | { type: 'found-collective'; foundingSvRewardWeightBps: number }
   | {
       type: 'join-with-key';
       keys: CnInput<SvIdKey>;
@@ -79,7 +79,11 @@ export type SvOnboarding =
       sponsorApiUrl: string;
     };
 
-export type ApprovedSvIdentity = { name: string; publicKey: string | pulumi.Output<string> };
+export type ApprovedSvIdentity = {
+  name: string;
+  publicKey: string | pulumi.Output<string>;
+  rewardWeightBps: number;
+};
 
 export type SequencerPruningConfig = {
   enabled: boolean;
@@ -446,6 +450,10 @@ function installSvApp(
     ...globalDomainMigrationConfig.migratingNodeConfig(),
     onboardingType: config.onboarding.type,
     onboardingName: config.onboardingName,
+    onboardingFoundingSvRewardWeightBps:
+      config.onboarding.type == 'found-collective'
+        ? config.onboarding.foundingSvRewardWeightBps
+        : undefined,
     cometBFT: {
       enabled: true,
       connectionUri: pulumi.interpolate`http://${globalDomain.cometbftRpcService.metadata.name}:26657`,

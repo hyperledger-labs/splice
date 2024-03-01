@@ -15,6 +15,7 @@ import {
 import { installChaosMesh } from './chaosMesh';
 import { installDocs } from './docs';
 import { installSplitwell } from './splitwell';
+import { ApprovedSvIdentity } from './sv';
 import { Svc } from './svc';
 import svconfs from './svconfs';
 import { installValidator1 } from './validator1';
@@ -55,11 +56,12 @@ const mustInstallValidator1 = envFlag('CN_INSTALL_VALIDATOR1', true);
 
 const mustInstallSplitwell = envFlag('CN_INSTALL_SPLITWELL', true);
 
-const svRunbookApprovedSvIdentities = [
+const svRunbookApprovedSvIdentities: ApprovedSvIdentity[] = [
   {
     name: 'DA-Helm-Test-Node',
     publicKey:
       'MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==',
+    rewardWeightBps: 10000,
   },
 ];
 

@@ -184,11 +184,11 @@ if [ $globalUpgradeDomain -eq 1 ] && [ $wallclocktime -eq 0 ]; then
 fi
 
 tmux_cmd_canton() {
-  windowName="$1" tokensFile="$2" baseConfig="$3" confOverrides="$4" logFile="$5"
+  windowName="$1" tokensFile="$2" participantsFile="$3" baseConfig="$4" confOverrides="$5" logFile="$6"
   tmux_cmd "$windowName" \
     "EXTRA_CLASSPATH=$COMETBFT_DRIVER/driver.jar \
      COMETBFT_DOCKER_IP=${COMETBFT_DOCKER_IP-} \
-     CANTON_TOKEN_FILENAME=$tokensFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
+     CANTON_TOKEN_FILENAME=$tokensFile CANTON_PARTICIPANTS_FILENAME=$participantsFile JAVA_TOOL_OPTIONS=\"$JAVA_TOOL_OPTIONS\" $CANTON \
       -c $baseConfig $confOverrides \
       --log-level-canton=DEBUG \
       --log-encoder json \
@@ -197,13 +197,13 @@ tmux_cmd_canton() {
 }
 
 if [ $wallclocktime -eq 1 ]; then
-  tmux_cmd_canton canton canton.tokens \
+  tmux_cmd_canton canton canton.tokens canton.participants \
     ./apps/app/src/test/resources/simple-topology-canton.conf \
     "$config_overrides" log/canton.clog
 fi
 
 if [ $simtime -eq 1 ]; then
-  tmux_cmd_canton canton-simtime canton-simtime.tokens \
+  tmux_cmd_canton canton-simtime canton-simtime.tokens canton-simtime.participants \
      ./apps/app/src/test/resources/simple-topology-canton-simtime.conf \
      "$config_overrides_simtime" log/canton-simtime.clog
 fi

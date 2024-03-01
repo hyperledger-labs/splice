@@ -700,29 +700,40 @@ object CNNodeConfigTransforms {
     * so we export them to a file in our canton bootstrap script (see `bootstrap-canton.sc`).
     */
   private def readTokenDataFile(clockConfig: ClockConfig): Map[Int, String] = {
-    val tokens: mutable.Map[Int, String] = mutable.Map.empty
-
-    val tokenDataSource = clockConfig match {
-      case ClockConfig.RemoteClock(_) => Source.fromFile("canton-simtime.tokens")
-      case ClockConfig.WallClock(_) => Source.fromFile("canton.tokens")
-      case ClockConfig.SimClock =>
-        sys.error(
-          "Unexpected clock mode: use remote-clock for simulated time and wall-clock for normal execution"
-        )
-    }
-    for (line <- tokenDataSource.getLines()) {
-      val parts = line.split(" ")
-      if (parts.length == 2)
-        tokens.put(parts(0).toInt, parts(1))
-    }
-    tokenDataSource.close
-
-    tokens.toMap
+    readDataFile("tokens", clockConfig).map { case (k, v) => k.toInt -> v }
   }
 
   private def getAdminToken(clockConfig: ClockConfig, ledgerApi: ClientConfig): Option[String] = {
     val port = ledgerApi.port.unwrap
     readTokenDataFile(clockConfig).get(port)
+  }
+
+  def getParticipantIds(clockConfig: ClockConfig): Map[String, String] = {
+    readDataFile("participants", clockConfig)
+  }
+
+  private def readDataFile(fileExtension: String, clockConfig: ClockConfig): Map[String, String] = {
+    val rows: mutable.Map[String, String] = mutable.Map.empty
+
+    val tokenDataSource = clockConfig match {
+      case ClockConfig.RemoteClock(_) => Source.fromFile(s"canton-simtime.$fileExtension")
+      case ClockConfig.WallClock(_) => Source.fromFile(s"canton.$fileExtension")
+      case ClockConfig.SimClock =>
+        sys.error(
+          "Unexpected clock mode: use remote-clock for simulated time and wall-clock for normal execution"
+        )
+    }
+    try {
+      for (line <- tokenDataSource.getLines()) {
+        val parts = line.split(" ")
+        if (parts.length == 2)
+          rows.put(parts(0), parts(1))
+      }
+    } finally {
+      tokenDataSource.close
+    }
+
+    rows.toMap
   }
 
 }

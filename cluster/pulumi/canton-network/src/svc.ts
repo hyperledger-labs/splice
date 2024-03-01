@@ -13,6 +13,7 @@ import {
   loadYamlFromFile,
   svKeyFromSecret,
   GlobalDomainMigrationConfig,
+  isDevNet,
 } from 'cn-pulumi-common';
 import _ from 'lodash';
 
@@ -120,10 +121,13 @@ export class Svc extends pulumi.ComponentResource {
       };
     }, {});
 
-    const additionalSvIdentities = Object.entries(keys).map(([onboardingName, keys]) => ({
-      name: onboardingName,
-      publicKey: keys.publicKey,
-    }));
+    const additionalSvIdentities: ApprovedSvIdentity[] = Object.entries(keys).map(
+      ([onboardingName, keys]) => ({
+        name: onboardingName,
+        publicKey: keys.publicKey,
+        rewardWeightBps: 10000, // if already defined in approved-sv-id-values-$CLUSTER.yaml, this will be ignored.
+      })
+    );
 
     const founderCometBftConf = { ...founderConf.cometBft, nodeName: founderConf.nodeName };
     const peerCometBftConfs = restSvConfs.map(conf => ({
@@ -131,10 +135,17 @@ export class Svc extends pulumi.ComponentResource {
       nodeName: conf.nodeName,
     }));
 
+    // TODO (#10463): revisit whether this makes sense
+    // devnet: sv1 has weight 7, sv2-4 have weight 1 in approved-sv-id-values-dev.yaml
+    // testnet: the other half is in approved-sv-id-values-test.yaml
+    const foundingSvRewardWeightBps = isDevNet ? 70_000 : 140_000;
+
     const runningMigration = this.args.globalDomainUpgradeConfig.isRunningMigration();
     const founder = await this.installSvNode(
       founderConf,
-      runningMigration ? { type: 'domain-migration' } : { type: 'found-collective' },
+      runningMigration
+        ? { type: 'domain-migration' }
+        : { type: 'found-collective', foundingSvRewardWeightBps },
       {
         founder: founderCometBftConf,
         peers: peerCometBftConfs,

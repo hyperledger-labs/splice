@@ -51,6 +51,7 @@ Seq(
 // These user allocations are only there
 // for local testing. Our tests allocate their own users.
 println(s"Allocating users for local testing...")
+val participants = ListBuffer[(String, String)]()
 Seq(
   (sv1Participant, "sv1"),
   (sv2Participant, "sv2"),
@@ -67,7 +68,15 @@ Seq(
     readAs = Set.empty,
     participantAdmin = true,
   )
+  participants.append(user -> participant.id.uid.toProtoPrimitive)
 }
+println(s"Writing down participant ids...")
+val participantIdsContent =
+  participants.map(x => s"${x._1} ${x._2}").mkString(System.lineSeparator())
+Files.write(
+  Paths.get(System.getenv("CANTON_PARTICIPANTS_FILENAME")),
+  participantIdsContent.getBytes(StandardCharsets.UTF_8),
+)
 
 // Inserting extra commands here (do not edit this line)
 

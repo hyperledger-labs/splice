@@ -99,7 +99,14 @@ class SvSvcAutomationService(
     )
     if (config.automation.enableSvRewards) {
       if (config.automation.useNewSvRewardIssuance) {
-        registerTrigger(new ReceiveSvRewardCouponTrigger(triggerContext, svcStore, connection))
+        registerTrigger(
+          new ReceiveSvRewardCouponTrigger(
+            triggerContext,
+            svcStore,
+            connection,
+            config.extraBeneficiaries,
+          )
+        )
       } else {
         registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
       }

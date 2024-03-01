@@ -29,10 +29,10 @@ import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.{AssignedContract, BackupDump}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
-import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId}
+import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.nio.file.{Path, Paths}
@@ -48,8 +48,32 @@ import scala.jdk.OptionConverters.*
 
 object SvUtil {
 
-  // TODO(#9173): include SV reward weights in the onboarding configs and double-check all usages of this dummy weight wrt how they need changing
-  val dummySvRewardWeight: Long = 12345L
+  // Assumption: the founder node is run by the foundation
+  val DefaultFoundingNodeWeight: Long = 10_000L
+
+  def weightDistributionForSv(
+      memberSvRewardWeightBps: Long,
+      extraBeneficiaries: Map[PartyId, BigDecimal],
+      svParty: PartyId,
+  )(implicit logger: TracedLogger, tc: TraceContext): Map[PartyId, Long] = {
+    val beneficiariesToWeight = extraBeneficiaries.map { case (partyId, weightPct) =>
+      partyId -> (weightPct.setScale(2, BigDecimal.RoundingMode.DOWN) / BigDecimal(100.0) *
+        BigDecimal(memberSvRewardWeightBps)).toLong
+    }
+    val totalExtraBeneficiariesWeight = beneficiariesToWeight.values.sum
+    val svBeneficiaryWeight = memberSvRewardWeightBps - totalExtraBeneficiariesWeight
+    if (svBeneficiaryWeight < 0) {
+      logger.error(
+        s"Total weight of extra beneficiaries exceeds the member's svRewardWeightBps: $memberSvRewardWeightBps. " +
+          s"Amount will be attributed solely to the SV."
+      )
+      Map(svParty -> memberSvRewardWeightBps)
+    } else {
+      beneficiariesToWeight ++ Option(svBeneficiaryWeight)
+        .filter(_ > 0)
+        .map(weight => (svParty, weight))
+    }
+  }
 
   private def defaultCometBftNetworkLimits: CometBftConfigLimits = new CometBftConfigLimits(
     2, // maxNumCometBftNodes

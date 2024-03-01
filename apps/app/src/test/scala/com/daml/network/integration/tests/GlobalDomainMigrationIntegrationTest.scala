@@ -37,7 +37,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainS
 import com.daml.network.sv.automation.singlesv.SvRewardTrigger
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
-import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   DomainMigrationUtil,
   ProcessTestUtil,
@@ -655,7 +655,7 @@ class GlobalDomainMigrationIntegrationTest
                   new SvcRules_AddMember(
                     "alice",
                     "Alice",
-                    dummySvRewardWeight,
+                    SvUtil.DefaultFoundingNodeWeight,
                     "alice-participant-id",
                     new Round(42),
                     globalDomainId.toProtoPrimitive,

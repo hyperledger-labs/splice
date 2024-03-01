@@ -20,7 +20,6 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.SvApp
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -54,20 +53,22 @@ class SvOnboardingRequestTrigger(
   private def svcRulesConfirmSvOnboardingAction(
       candidateParty: PartyId,
       candidateName: String,
+      weightBps: Long,
       candidateParticipantId: String,
       reason: String,
-  ): ActionRequiringConfirmation = new ARC_SvcRules(
-    new SRARC_ConfirmSvOnboarding(
-      // TODO(#9173): include SV reward weights in the onboarding configs
-      new SvcRules_ConfirmSvOnboarding(
-        candidateParty.toProtoPrimitive,
-        candidateName,
-        candidateParticipantId,
-        dummySvRewardWeight,
-        reason,
+  ): ActionRequiringConfirmation = {
+    new ARC_SvcRules(
+      new SRARC_ConfirmSvOnboarding(
+        new SvcRules_ConfirmSvOnboarding(
+          candidateParty.toProtoPrimitive,
+          candidateName,
+          candidateParticipantId,
+          weightBps,
+          reason,
+        )
       )
     )
-  )
+  }
 
   private def attemptConfirmation(
       svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
@@ -86,7 +87,7 @@ class SvOnboardingRequestTrigger(
         logger,
       )
     for {
-      (party, name) <- approval match {
+      (party, name, weightBps) <- approval match {
         case Left(reason) => {
           // we fail so that the task is retried; it's possible that an approval happens eventually
           // TODO(#4073) Add a warning log
@@ -96,7 +97,7 @@ class SvOnboardingRequestTrigger(
               .asRuntimeException()
           )
         }
-        case Right((party, name)) => Future.successful((party, name))
+        case Right((party, name, weightBps)) => Future.successful((party, name, weightBps))
       }
       outcome <-
         if (SvApp.isSvcMember(name, party, svcRules)) {
@@ -117,6 +118,7 @@ class SvOnboardingRequestTrigger(
               confirm(
                 party,
                 name,
+                weightBps,
                 svOnboarding.payload.candidateParticipantId,
                 svOnboarding.payload.token,
                 svcRules,
@@ -162,11 +164,12 @@ class SvOnboardingRequestTrigger(
   private def confirm(
       party: PartyId,
       name: String,
+      weightBps: Long,
       participantId: String,
       reason: String,
       svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val action = svcRulesConfirmSvOnboardingAction(party, name, participantId, reason)
+    val action = svcRulesConfirmSvOnboardingAction(party, name, weightBps, participantId, reason)
     for {
       queryResult <- svcStore.lookupConfirmationByActionWithOffset(svParty, action)
       cmd = svcRules.exercise(

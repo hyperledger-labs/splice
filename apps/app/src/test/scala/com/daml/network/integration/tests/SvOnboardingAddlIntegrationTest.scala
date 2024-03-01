@@ -6,12 +6,11 @@ import com.daml.network.codegen.java.cn.svcrules.SvcRules_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.sv.util.SvOnboardingToken
+import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 import scala.jdk.OptionConverters.*
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
-import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
@@ -255,7 +254,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
                   sv2Party.toProtoPrimitive,
                   "Canton-Foundation-2",
                   "PAR::sv2::1220f3e2",
-                  dummySvRewardWeight,
+                  SvUtil.DefaultFoundingNodeWeight,
                   "no reason",
                 )
               )

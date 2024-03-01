@@ -12,8 +12,10 @@ import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.store.SvSvcStore.OpenMiningRoundContract
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -25,6 +27,7 @@ class ReceiveSvRewardCouponTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     cnLedgerConnection: CNLedgerConnection,
+    extraBeneficiaries: Map[PartyId, BigDecimal],
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -84,6 +87,8 @@ class ReceiveSvRewardCouponTrigger(
               s"This is expected in case of SV inactivity."
           )
     }
+    val weightDistribution =
+      SvUtil.weightDistributionForSv(member.svRewardWeight, extraBeneficiaries, svParty)(logger, tc)
     cnLedgerConnection
       .submit(
         actAs = Seq(svParty),
@@ -93,12 +98,15 @@ class ReceiveSvRewardCouponTrigger(
             _.exerciseSvcRules_ReceiveSvRewardCoupon(
               svParty.toProtoPrimitive,
               unclaimedRound.contractId,
-              List( // TODO (#10245): add other beneficiaries
-                new Tuple2[String, java.lang.Long](
-                  svParty.toProtoPrimitive,
-                  member.svRewardWeight,
-                )
-              ).asJava,
+              weightDistribution
+                .map { case (party, weight) =>
+                  new Tuple2[String, java.lang.Long](
+                    party.toProtoPrimitive,
+                    weight,
+                  )
+                }
+                .toList
+                .asJava,
             )
           ),
       )

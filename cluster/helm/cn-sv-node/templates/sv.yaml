@@ -74,6 +74,10 @@ spec:
             - name: CN_APP_SV_ONBOARDING_NAME
               value: {{ .Values.onboardingName }}
             {{- end }}
+            {{- if .Values.onboardingFoundingSvRewardWeightBps }}
+            - name: CN_APP_SV_FOUNDER_REWARD_WEIGHT
+              value: {{ .Values.onboardingFoundingSvRewardWeightBps | quote }}
+            {{- end }}
             {{ if ((.Values.auth).audience) }}
             - name: CN_APP_SV_AUTH_AUDIENCE
               value: {{ .Values.auth.audience | quote }}
@@ -189,6 +193,7 @@ spec:
                 canton.sv-apps.sv.approved-sv-identities.{{ $ii }} = {
                   name = {{ $sv.name | quote }}
                   public-key = {{ $sv.publicKey | quote }}
+                  reward-weight-bps = {{ $sv.rewardWeightBps | quote }}
                 }
             {{- end }}
             {{- with .Values.acsDumpPeriodicExport }}

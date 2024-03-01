@@ -20,16 +20,16 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms.{
   ConfigurableApp,
-  updateAutomationConfig,
   updateAllAutomationConfigs,
   updateAllValidatorConfigs,
+  updateAutomationConfig,
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.sv.automation.singlesv.{
   SubmitSvStatusReportTrigger,
   SvcRulesTransferTrigger,
 }
-import com.daml.network.sv.util.SvUtil.dummySvRewardWeight
+import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   AssignedContract,
   CoinConfigSchedule,
@@ -212,7 +212,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
               new svcr.SvcRules_AddMember(
                 "alice",
                 "Alice",
-                dummySvRewardWeight,
+                SvUtil.DefaultFoundingNodeWeight,
                 "alice-participant-id",
                 dummyRound,
                 previousGlobalId.toProtoPrimitive,
@@ -291,7 +291,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           sv1Party.toProtoPrimitive,
           "irrelevant name",
           "PAR::sv::1220f3e2",
-          dummySvRewardWeight,
+          SvUtil.DefaultFoundingNodeWeight,
           "observing domain migration",
           svcParty.toProtoPrimitive,
           mostDistantPossibleExpiry,

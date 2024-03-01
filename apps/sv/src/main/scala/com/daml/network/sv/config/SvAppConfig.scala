@@ -14,7 +14,6 @@ import com.daml.network.config.{
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.SvAppClientConfig
-import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
@@ -23,6 +22,7 @@ import com.digitalasset.canton.config.RequireTypes.{
   PositiveNumeric,
 }
 import com.digitalasset.canton.domain.config.DomainParametersConfig
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.version.{DomainProtocolVersion, ProtocolVersion}
 import org.apache.pekko.http.scaladsl.model.Uri
 
@@ -44,6 +44,7 @@ object ExpectedValidatorOnboardingConfig {
 case class ApprovedSvIdentityConfig(
     name: String,
     publicKey: String,
+    rewardWeightBps: Long,
 )
 
 sealed trait SvOnboardingConfig {
@@ -69,8 +70,7 @@ object SvBootstrapDumpConfig {
 object SvOnboardingConfig {
   case class FoundCollective(
       name: String,
-      // TODO (#10340): this should come from sv-approved-sv-id-values
-      founderSvRewardWeight: Long = SvUtil.dummySvRewardWeight,
+      founderSvRewardWeightBps: Long,
       svcPartyHint: String = "SVC",
       initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
@@ -186,10 +186,23 @@ case class SvAppBackendConfig(
       NonNegativeFiniteDuration.ofMinutes(1),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
     ingestFromParticipantBegin: Boolean = false,
+    extraBeneficiaries: Map[PartyId, BigDecimal] = Map.empty,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
+
+  def rewardWeightBpsOf(name: String): Option[Long] = approvedSvIdentities
+    .collectFirst { case ApprovedSvIdentityConfig(`name`, _, weightBps) =>
+      weightBps
+    }
+    .orElse {
+      onboarding match {
+        case Some(founder: SvOnboardingConfig.FoundCollective) if founder.name == name =>
+          Some(founder.founderSvRewardWeightBps)
+        case _ => None
+      }
+    }
 }
 
 case class CometBftConfig(
