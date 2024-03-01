@@ -1,5 +1,4 @@
-{{- if and (empty ((.Values.ingress).globalDomain).activeMigrationId) (empty ((.Values.ingress).globalDomain).migrationId) }}
-  {{ if .Values.ingress.splitwell }}
+{{ if .Values.ingress.splitwell }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
@@ -19,7 +18,7 @@ spec:
         - destination:
             port:
               number: 7575
-            host: participant.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: participant-{{ ((.Values.ingress).globalDomain).activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
       rewrite:
         uri: "/"
     - match:
@@ -30,5 +29,4 @@ spec:
               number: 80
             host: splitwell-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
-  {{- end }}
 {{- end }}

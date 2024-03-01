@@ -1381,13 +1381,11 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            export CN_INSTALL_SPLITWELL="true"
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
             fi
             if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
-              export CN_INSTALL_SPLITWELL="false"
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
@@ -3142,8 +3140,6 @@ workflows:
             - slack-context
           cluster: "cimain"
           wait_for_sv: false
-          wait_for_splitwell: false
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - wait_for_previous_pipeline
@@ -3151,7 +3147,6 @@ workflows:
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
-          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -3169,7 +3164,6 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_splitwell: false
           requires:
             - preflight_check
             - backup_cluster
@@ -3537,8 +3531,6 @@ workflows:
             - slack-context
           cluster: "scratchneta"
           wait_for_sv: false
-          wait_for_splitwell: false
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -3546,7 +3538,6 @@ workflows:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchneta"
-          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -3564,7 +3555,6 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_splitwell: false
           requires:
             - preflight_check_core
             - backup_cluster_before_migration
@@ -3902,8 +3892,6 @@ workflows:
             - slack-context
           cluster: "scratchnetb"
           wait_for_sv: false
-          wait_for_splitwell: false
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -3911,7 +3899,6 @@ workflows:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchnetb"
-          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -3929,7 +3916,6 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_splitwell: false
           requires:
             - preflight_check_core
             - backup_cluster_before_migration
@@ -4267,8 +4253,6 @@ workflows:
             - slack-context
           cluster: "scratchnetc"
           wait_for_sv: false
-          wait_for_splitwell: false
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -4276,7 +4260,6 @@ workflows:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchnetc"
-          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -4294,7 +4277,6 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_splitwell: false
           requires:
             - preflight_check_core
             - backup_cluster_before_migration
@@ -4632,8 +4614,6 @@ workflows:
             - slack-context
           cluster: "scratchnetd"
           wait_for_sv: false
-          wait_for_splitwell: false
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -4641,7 +4621,6 @@ workflows:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchnetd"
-          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -4659,7 +4638,6 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_splitwell: false
           requires:
             - preflight_check_core
             - backup_cluster_before_migration
@@ -4997,8 +4975,6 @@ workflows:
             - slack-context
           cluster: "scratchnete"
           wait_for_sv: false
-          wait_for_splitwell: false
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -5006,7 +4982,6 @@ workflows:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "scratchnete"
-          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -5024,7 +4999,6 @@ workflows:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_splitwell: false
           requires:
             - preflight_check_core
             - backup_cluster_before_migration

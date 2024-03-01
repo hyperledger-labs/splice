@@ -1173,7 +1173,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-participant/",
       "compat": "true",
-      "name": "participant",
+      "name": "participant-0",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1207,8 +1207,8 @@
           }
         },
         "persistence": {
-          "databaseName": "participant",
-          "host": "postgres.splitwell.svc.cluster.local",
+          "databaseName": "participant_0",
+          "host": "splitwell-pg.splitwell.svc.cluster.local",
           "schema": "participant",
           "secretName": "postgres-secrets"
         },
@@ -1223,7 +1223,54 @@
         }
       }
     },
-    "name": "splitwell-participant",
+    "name": "splitwell-participant-0",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-splitwell-app/",
+      "compat": "true",
+      "name": "splitwell-app",
+      "namespace": "splitwell",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "basename": "mock",
+          "dnsName": "mock.network.canton.global",
+          "fixedTokens": false,
+          "imageTag": "0.0.1-deadbeef",
+          "name": "cn-mocknet"
+        },
+        "clusterUrl": "mock.network.canton.global",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "fixedTokens": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "metrics": {
+          "enable": true,
+          "interval": "30s",
+          "release": "prometheus-grafana-monitoring"
+        },
+        "migration": {
+          "id": 0
+        },
+        "participantHost": "participant-0",
+        "postgres": "splitwell-pg.splitwell.svc.cluster.local",
+        "resources": {
+          "limits": {
+            "memory": "1536Mi"
+          },
+          "requests": {
+            "cpu": "1",
+            "memory": "1536Mi"
+          }
+        },
+        "scanAddress": "http://scan-app.sv-1:5012"
+      }
+    },
+    "name": "splitwell-splitwell-app",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1233,7 +1280,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-participant-e",
+      "name": "splitwell-pg-participant-0-e",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1247,14 +1294,14 @@
         "clusterUrl": "mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
-          "databaseName": "participant",
-          "host": "postgres.splitwell.svc.cluster.local",
+          "databaseName": "participant_0",
+          "host": "splitwell-pg.splitwell.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "splitwell-postgres-participant-e",
+    "name": "splitwell-splitwell-pg-participant-0-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1266,7 +1313,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "splitwell-postgres-passwd",
+    "name": "splitwell-splitwell-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -1276,7 +1323,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres-metrics/",
       "compat": "true",
-      "name": "postgres-val-splitwell-e",
+      "name": "splitwell-pg-val-splitwell-e",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1291,13 +1338,13 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "val_splitwell",
-          "host": "postgres.splitwell.svc.cluster.local",
+          "host": "splitwell-pg.splitwell.svc.cluster.local",
           "port": "5432",
           "secretName": "postgres-secrets"
         }
       }
     },
-    "name": "splitwell-postgres-val-splitwell-e",
+    "name": "splitwell-splitwell-pg-val-splitwell-e",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1305,7 +1352,7 @@
     "custom": false,
     "id": "",
     "inputs": {},
-    "name": "splitwell-postgres",
+    "name": "splitwell-splitwell-pg",
     "provider": "",
     "type": "canton:network:postgres"
   },
@@ -1315,7 +1362,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres/",
       "compat": "true",
-      "name": "postgres",
+      "name": "splitwell-pg",
       "namespace": "splitwell",
       "timeout": 480,
       "values": {
@@ -1348,50 +1395,7 @@
         }
       }
     },
-    "name": "splitwell-postgres",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-splitwell-app/",
-      "compat": "true",
-      "name": "splitwell-app",
-      "namespace": "splitwell",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
-        "fixedTokens": false,
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "metrics": {
-          "enable": true,
-          "interval": "30s",
-          "release": "prometheus-grafana-monitoring"
-        },
-        "postgres": "postgres.splitwell.svc.cluster.local",
-        "resources": {
-          "limits": {
-            "memory": "1536Mi"
-          },
-          "requests": {
-            "cpu": "1",
-            "memory": "1536Mi"
-          }
-        },
-        "scanAddress": "http://scan-app.sv-1:5012"
-      }
-    },
-    "name": "splitwell-splitwell-app",
+    "name": "splitwell-splitwell-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -1434,7 +1438,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "https://sequencer.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
@@ -1453,10 +1456,10 @@
             "optional": false
           }
         },
-        "participantAddress": "participant",
+        "participantAddress": "participant-0",
         "persistence": {
           "databaseName": "val_splitwell",
-          "host": "postgres.splitwell.svc.cluster.local",
+          "host": "splitwell-pg.splitwell.svc.cluster.local",
           "port": 5432,
           "schema": "val_splitwell",
           "secretName": "postgres-secrets",
@@ -1838,7 +1841,7 @@
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres.sv-1.svc.cluster.local",
-          "schema": "participant_0",
+          "schema": "participant",
           "secretName": "postgres-secrets"
         },
         "resources": {
@@ -2753,7 +2756,7 @@
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres.sv-2.svc.cluster.local",
-          "schema": "participant_0",
+          "schema": "participant",
           "secretName": "postgres-secrets"
         },
         "resources": {
@@ -3640,7 +3643,7 @@
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres.sv-3.svc.cluster.local",
-          "schema": "participant_0",
+          "schema": "participant",
           "secretName": "postgres-secrets"
         },
         "resources": {
@@ -4527,7 +4530,7 @@
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres.sv-4.svc.cluster.local",
-          "schema": "participant_0",
+          "schema": "participant",
           "secretName": "postgres-secrets"
         },
         "resources": {
@@ -5121,7 +5124,7 @@
         "ingress": {
           "cns": true,
           "globalDomain": {
-            "activeMigrationId": "",
+            "activeMigrationId": "0",
             "migrationId": ""
           },
           "scan": true,
@@ -5210,7 +5213,7 @@
         "persistence": {
           "databaseName": "participant_0",
           "host": "postgres.validator1.svc.cluster.local",
-          "schema": "participant_0",
+          "schema": "participant",
           "secretName": "postgres-secrets"
         },
         "resources": {
@@ -5411,7 +5414,6 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
         "fixedTokens": false,
-        "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,

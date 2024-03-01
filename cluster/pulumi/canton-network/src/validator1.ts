@@ -1,7 +1,6 @@
 import * as pulumi from '@pulumi/pulumi';
 import {
   Auth0Client,
-  auth0UserNameEnvVarSource,
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_BASENAME,
@@ -10,12 +9,11 @@ import {
   GlobalDomainMigrationConfig,
   installAuth0UISecret,
   installCNHelmChart,
-  installMigrationIdSpecificComponent,
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { installParticipant } from './ledger';
+import { installMigrationSpecificValidatorParticipant } from './participant';
 import { installPostgresMetrics } from './postgres';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 
@@ -59,27 +57,15 @@ export async function installValidator1(
     auth0AppName: 'validator1',
   });
 
-  const participant = installMigrationIdSpecificComponent(
+  const participant = installMigrationSpecificValidatorParticipant(
     globalDomainMigrationConfig,
-    (migrationId, isActive) => {
-      const participantPostgres = splitPostgresInstances
-        ? postgres.installPostgres(xns, `participant-${migrationId}-pg`, true)
-        : (defaultPostgres as postgres.Postgres);
-
-      return installParticipant(
-        xns,
-        `participant-${migrationId}`,
-        participantPostgres,
-        auth0UserNameEnvVarSource('validator'),
-        // We disable auto-init if we have a dump to bootstrap from.
-        !!participantBootstrapDump || !isActive || globalDomainMigrationConfig.isRunningMigration(),
-        [loopback]
-      );
-    }
-  ).activeComponent;
+    xns,
+    defaultPostgres,
+    participantBootstrapDump,
+    [loopback]
+  );
 
   const extraDependsOn: pulumi.Resource[] = dependsOn.concat([participant, validatorPostgres]);
-  const globalDomainUrl = `https://sequencer-${globalDomainMigrationConfig.activeMigrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
   const scanAddress = `http://scan-app.sv-1:5012`;
 
   const validator = await installValidatorApp({
@@ -109,13 +95,12 @@ export async function installValidator1(
     participantAddress: participant.name,
     topupConfig,
     svValidator: false,
-    globalDomainUrl,
     scanAddress,
     secrets: validatorSecrets,
   });
 
   installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
-  installIngress(xns, installSplitwell);
+  installIngress(xns, installSplitwell, globalDomainMigrationConfig);
 
   if (installSplitwell) {
     installCNHelmChart(
@@ -132,7 +117,11 @@ export async function installValidator1(
   return validator;
 }
 
-function installIngress(xns: ExactNamespace, spliwell: boolean) {
+function installIngress(
+  xns: ExactNamespace,
+  spliwell: boolean,
+  globalDomainMigrationConfig: GlobalDomainMigrationConfig
+) {
   installCNHelmChart(
     xns,
     `cluster-ingress-${xns.logicalName}`,
@@ -146,6 +135,9 @@ function installIngress(xns: ExactNamespace, spliwell: boolean) {
       withSvIngress: false,
       ingress: {
         splitwell: spliwell,
+        globalDomain: {
+          activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
+        },
       },
     },
     {}

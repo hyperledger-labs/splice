@@ -1,8 +1,9 @@
 import * as pulumi from '@pulumi/pulumi';
-import type { Auth0Client, BackupConfig, BootstrappingDumpConfig } from 'cn-pulumi-common';
 import {
+  Auth0Client,
   auth0UserNameEnvVar,
-  auth0UserNameEnvVarSource,
+  BackupConfig,
+  BootstrappingDumpConfig,
   CLUSTER_BASENAME,
   exactNamespace,
   ExactNamespace,
@@ -13,7 +14,7 @@ import {
 } from 'cn-pulumi-common';
 
 import * as postgres from './postgres';
-import { installParticipant } from './ledger';
+import { installMigrationSpecificValidatorParticipant } from './participant';
 import { installPostgresMetrics } from './postgres';
 import { installValidatorApp } from './validator';
 
@@ -31,11 +32,9 @@ export async function installSplitwell(
 ): Promise<pulumi.Resource> {
   const xns = exactNamespace('splitwell', true);
 
-  const domainPostgres = postgres.installPostgres(
-    xns,
-    splitPostgresInstances ? 'domain-pg' : 'postgres',
-    splitPostgresInstances
-  );
+  const sharedPostgres = splitPostgresInstances
+    ? undefined
+    : postgres.installPostgres(xns, 'splitwell-pg', splitPostgresInstances);
 
   const loopback = installCNHelmChart(
     xns,
@@ -51,25 +50,16 @@ export async function installSplitwell(
 
   installIngress(xns);
 
-  const participantPostgres = splitPostgresInstances
-    ? postgres.installPostgres(xns, 'participant-pg', true)
-    : domainPostgres;
-
-  const participant = installParticipant(
+  const participant = installMigrationSpecificValidatorParticipant(
+    globalDomainMigrationConfig,
     xns,
-    'participant',
-    participantPostgres,
-    auth0UserNameEnvVarSource('validator'),
-    // We disable auto-init if we have a dump to bootstrap from.
-    !!participantBootstrapDump,
+    sharedPostgres,
+    participantBootstrapDump,
     [loopback]
   );
 
-  const swPostgres = splitPostgresInstances
-    ? postgres.installPostgres(xns, 'sw-pg', true)
-    : domainPostgres;
+  const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', true);
 
-  const globalDomainUrl = `https://sequencer.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
   const scanAddress = `http://scan-app.sv-1:5012`;
   installCNHelmChart(
     xns,
@@ -80,14 +70,16 @@ export async function installSplitwell(
       metrics: {
         enable: true,
       },
+      migration: {
+        id: globalDomainMigrationConfig.activeMigrationId,
+      },
       scanAddress: scanAddress,
+      participantHost: participant.name,
     },
     { dependsOn: dependsOn.concat([participant]) }
   );
 
-  const validatorPostgres = splitPostgresInstances
-    ? postgres.installPostgres(xns, 'validator-pg', true)
-    : domainPostgres;
+  const validatorPostgres = sharedPostgres || postgres.installPostgres(xns, 'validator-pg', true);
   const validatorDbName = 'val_splitwell';
 
   const extraDependsOn = dependsOn.concat([
@@ -98,9 +90,7 @@ export async function installSplitwell(
     xns,
     extraDependsOn,
     participant,
-    migration: {
-      id: globalDomainMigrationConfig.activeMigrationId,
-    },
+    ...globalDomainMigrationConfig.migratingNodeConfig(),
     additionalUsers: [
       auth0UserNameEnvVar('splitwell'),
       { name: 'CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME', value: providerWalletUser },
@@ -117,7 +107,7 @@ export async function installSplitwell(
     backupConfig: backupConfig ? { config: backupConfig } : undefined,
     svSponsorAddress: `http://sv-app.sv-1:5014`,
     participantBootstrapDump,
-    participantAddress: 'participant',
+    participantAddress: participant.name,
     topupConfig: topupConfig,
     svValidator: false,
     persistenceConfig: {
@@ -129,7 +119,6 @@ export async function installSplitwell(
       port: pulumi.Output.create(5432),
     },
     scanAddress: scanAddress,
-    globalDomainUrl: globalDomainUrl,
     secrets: {
       xns: xns,
       auth0Client: auth0Client,

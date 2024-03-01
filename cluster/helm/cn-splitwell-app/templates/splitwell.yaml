@@ -26,6 +26,10 @@ spec:
           value: {{ .Values.defaultJvmOptions }} {{ .Values.additionalJvmOptions }}
         - name: CN_APP_SPLITWELL_SCAN_URL
           value: {{ .Values.scanAddress }}
+        - name: CN_APP_SPLITWELL_MIGRATION_ID
+          value: {{ .Values.migration.id | quote }}
+        - name: CN_APP_SPLITWELL_PARTICIPANT_HOST
+          value: {{ .Values.participantHost }}
         {{- include "cn-util-lib.auth0-env-vars" (dict "appName" "splitwell" "keyName" "splitwell" "fixedTokens" (.Values.cluster).fixedTokens) | indent 8}}
         ports:
         - containerPort: 5213

@@ -2,3 +2,7 @@
 
 {{ $_ := required ".Values.cluster.hostname is required." (.Values.cluster).hostname }}
 {{ $_ := required ".Values.cluster.svNamespace is required." (.Values.cluster).svNamespace }}
+#  if ingress.splitwell is set to true then require the active migration id
+{{- if .Values.ingress.splitwell }}
+{{ $_ := required ".Values.ingress.globalDomain.activeMigrationId is required." ((.Values.ingress).globalDomain).activeMigrationId }}
+{{- end }}

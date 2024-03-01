@@ -53,10 +53,7 @@ const globalDomainUpgradeConfig: GlobalDomainMigrationConfig =
 
 const mustInstallValidator1 = envFlag('CN_INSTALL_VALIDATOR1', true);
 
-const mustInstallSplitwell = envFlag(
-  'CN_INSTALL_SPLITWELL',
-  !globalDomainUpgradeConfig.containsUpgrade() && globalDomainUpgradeConfig.isDefaultActive()
-);
+const mustInstallSplitwell = envFlag('CN_INSTALL_SPLITWELL', true);
 
 const svRunbookApprovedSvIdentities = [
   {

@@ -254,13 +254,11 @@ jobs:
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
-            export CN_INSTALL_SPLITWELL="true"
             export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
             if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
             fi
             if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
-              export CN_INSTALL_SPLITWELL="false"
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then

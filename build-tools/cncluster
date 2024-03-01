@@ -483,7 +483,7 @@ function subcmd_logs() {
 
 
 function k8s_labels_for_app() {
-    local non_domain_specific_namespaces=("sv" "validator" "splitwell")
+    local non_domain_specific_namespaces=("sv" "validator")
     local global_domain_specific_apps=("global-domain-cometbft" "global-domain-sequencer" "global-domain-mediator")
     local domain_specific_apps=("participant")
 
@@ -2175,7 +2175,6 @@ function subcmd_hard_domain_migration() {
   local version=""
   version=$(get-snapshot-version)
   # deploy original domain and prepare upgrade
-  export CN_INSTALL_SPLITWELL="false"
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
   _cluster_apply "$version"
   # trigger upgrade
@@ -2185,7 +2184,6 @@ function subcmd_hard_domain_migration() {
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=0
   export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=0
-  export CN_INSTALL_SPLITWELL="true"
   _cluster_apply "$version"
 }
 

@@ -37,9 +37,6 @@ workflow:
             - slack-context
           cluster: "cimain"
           wait_for_sv: false
-          wait_for_splitwell: false
-          # TODO(#10254) run splitwell tests once it's fixed
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - wait_for_previous_pipeline
@@ -47,7 +44,6 @@ workflow:
       - backup_cluster:
           <<: *main-branch-only
           cluster: "cimain"
-          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -65,7 +61,6 @@ workflow:
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_splitwell: false
           requires:
             - preflight_check
             - backup_cluster

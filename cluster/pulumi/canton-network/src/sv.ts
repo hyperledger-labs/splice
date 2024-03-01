@@ -35,7 +35,7 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 
 import * as postgres from './postgres';
 import { GlobalDomainNode } from './globalDomainNode';
-import { installParticipant } from './ledger';
+import { installParticipant } from './participant';
 import { installPostgresMetrics, Postgres } from './postgres';
 import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svconfs';
 import { installValidatorApp, installValidatorSecrets } from './validator';

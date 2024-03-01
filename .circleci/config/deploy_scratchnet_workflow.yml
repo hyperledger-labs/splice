@@ -45,9 +45,6 @@
             - slack-context
           cluster: "_CLUSTERNAME_"
           wait_for_sv: false
-          wait_for_splitwell: false
-          # TODO(#10254) run splitwell tests once it's fixed
-          test_names_file: "test-full-class-names-core-preflight.log,test-full-class-names-validator1-preflight.log"
           parallelism: 1
           requires:
             - docker_images_push
@@ -55,7 +52,6 @@
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
           cluster: "_CLUSTERNAME_"
-          include_splitwell: false
           context:
             - artifactory
             - canton-network-vpn
@@ -73,7 +69,6 @@
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
-          wait_for_splitwell: false
           requires:
             - preflight_check_core
             - backup_cluster_before_migration

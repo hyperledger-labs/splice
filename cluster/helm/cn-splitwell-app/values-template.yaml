@@ -15,6 +15,11 @@ metrics:
   release: prometheus-grafana-monitoring
   interval: 30s
 
+migration:
+  id: 0
+
+participantHost: "participant"
+
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

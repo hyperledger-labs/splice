@@ -40,35 +40,48 @@ export type ValidatorSecrets = {
   wallet: Secret;
   cns: Secret;
 };
-export type ValidatorConfig = {
+
+type BasicValidatorConfig = {
   xns: ExactNamespace;
-  onboardingSecret?: string;
   topupConfig?: ValidatorTopupConfig;
   validatorWalletUser?: string;
   disableAllocateLedgerApiUserParty?: boolean;
   participant: pulumi.Resource;
-  persistenceConfig: PersistenceConfig;
   backupConfig?: ValidatorBackupConfig;
   extraDependsOn?: pulumi.Resource[];
+  scanAddress: Output<string> | string;
+  persistenceConfig: PersistenceConfig;
   appDars?: string[];
   validatorPartyHint?: string;
   extraDomains?: ExtraDomain[];
-  svSponsorAddress?: string;
   additionalConfig?: string;
   additionalUsers?: k8s.types.input.core.v1.EnvVar[];
-  participantBootstrapDump?: BootstrappingDumpConfig;
-  svValidator?: boolean;
   participantAddress: Output<string> | string;
-  globalDomainUrl: string;
-  scanAddress: Output<string> | string;
-  migration: {
-    id: DomainMigrationIndex;
-    migrating?: boolean;
-  };
   secrets: ValidatorSecrets | ValidatorSecretsConfig;
 };
 
-export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<pulumi.Resource> {
+export type ValidatorConfig = BasicValidatorConfig & {
+  svValidator: false;
+  onboardingSecret: string;
+  svSponsorAddress?: string;
+  participantBootstrapDump?: BootstrappingDumpConfig;
+  migration: {
+    id: DomainMigrationIndex;
+    migrating: boolean;
+  };
+};
+
+type SvValidatorConfig = BasicValidatorConfig & {
+  svValidator: true;
+  globalDomainUrl: string;
+  migration: {
+    id: DomainMigrationIndex;
+  };
+};
+
+export async function installValidatorApp(
+  baseConfig: ValidatorConfig | SvValidatorConfig
+): Promise<pulumi.Resource> {
   const backupConfig = baseConfig.backupConfig
     ? {
         ...baseConfig.backupConfig,
@@ -92,7 +105,7 @@ export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<
       : await installValidatorSecrets(config.secrets);
 
   const participantBootstrapDumpSecret: pulumi.Resource | undefined =
-    config.participantBootstrapDump
+    !config.svValidator && config.participantBootstrapDump
       ? await fetchAndInstallParticipantBootstrapDump(config.xns, config.participantBootstrapDump)
       : undefined;
 
@@ -102,9 +115,10 @@ export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<
       : installBootstrapDataBucketSecret(config.xns, config.backupConfig.config.location.bucket)
     : undefined;
 
-  const validatorOnboardingSecret = config.onboardingSecret
-    ? [installValidatorOnboardingSecret(config.xns, 'validator', config.onboardingSecret)]
-    : [];
+  const validatorOnboardingSecret =
+    !config.svValidator && config.onboardingSecret
+      ? [installValidatorOnboardingSecret(config.xns, 'validator', config.onboardingSecret)]
+      : [];
   const dependsOn: CnInput<pulumi.Resource>[] = [config.xns.ns, config.participant]
     .concat(validatorOnboardingSecret)
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
@@ -121,28 +135,30 @@ export async function installValidatorApp(baseConfig: ValidatorConfig): Promise<
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
-      globalDomainUrl: config.globalDomainUrl,
+      globalDomainUrl: config.svValidator ? config.globalDomainUrl : undefined,
       scanAddress: config.scanAddress,
       extraDomains: config.extraDomains,
       validatorWalletUser: config.validatorWalletUser,
-      svSponsorAddress: config.svSponsorAddress,
-      onboardingSecretFrom: config.onboardingSecret
-        ? {
-            secretKeyRef: {
-              name: validatorOnboardingSecretName('validator'),
-              key: 'secret',
-              optional: false,
-            },
-          }
-        : undefined,
+      svSponsorAddress: !config.svValidator ? config.svSponsorAddress : undefined,
+      onboardingSecretFrom:
+        !config.svValidator && config.onboardingSecret
+          ? {
+              secretKeyRef: {
+                name: validatorOnboardingSecretName('validator'),
+                key: 'secret',
+                optional: false,
+              },
+            }
+          : undefined,
       topup: config.topupConfig ? { enabled: true, ...config.topupConfig } : { enabled: false },
       persistence: config.persistenceConfig,
       disableAllocateLedgerApiUserParty: config.disableAllocateLedgerApiUserParty,
       participantIdentitiesDumpPeriodicBackup: config.backupConfig?.config,
       additionalConfig: config.additionalConfig,
-      participantIdentitiesDumpImport: config.participantBootstrapDump
-        ? { secretName: participantBootstrapDumpSecretName }
-        : undefined,
+      participantIdentitiesDumpImport:
+        !config.svValidator && config.participantBootstrapDump
+          ? { secretName: participantBootstrapDumpSecretName }
+          : undefined,
       svValidator: config.svValidator,
       useSequencerConnectionsFromScan: !config.svValidator,
       metrics: {
