@@ -70,7 +70,7 @@ export class LedgerApiClient {
       )}, payload=${JSON.stringify(payload)}`
     );
     const meta: CommandMeta = {
-      workflowId: domainId ? `domain-id:${domainId}` : undefined,
+      domainId,
     };
     const response = await this.ledger
       .create(template, payload, meta)
@@ -110,7 +110,7 @@ export class LedgerApiClient {
       }, contractId=${contractId}.`
     );
     const meta: CommandMeta = {
-      workflowId: domainId ? `domain-id:${domainId}` : undefined,
+      domainId,
       disclosedContracts,
     };
     const result = await this.ledger
