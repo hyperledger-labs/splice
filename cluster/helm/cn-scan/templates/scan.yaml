@@ -19,6 +19,7 @@ spec:
     metadata:
       labels:
         app: {{ $scanAppLabel }}
+        migration: {{ .Values.migration.id | quote }}
     spec:
       containers:
       - name: scan-app
@@ -157,6 +158,7 @@ spec:
     metadata:
       labels:
         app: {{ $scanWebUiAppLabel }}
+        migration: {{ .Values.migration.id | quote }}
     spec:
       containers:
       - env:

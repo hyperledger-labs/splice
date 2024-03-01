@@ -18,6 +18,7 @@ spec:
     metadata:
       labels:
         app: {{ $cnsWebUiLabel }}
+        migration: {{ .Values.migration.id | quote }}
     spec:
       containers:
       - name: cns-web-ui

@@ -1287,6 +1287,7 @@ function subcmd_wait() {
 
     namespace="${1-}"
     app="${2-}"
+    migration_id=${3:-0}
 
     if [ -z "$namespace" ]; then
         _log "Waiting for all pods to become ready"
@@ -1298,7 +1299,7 @@ function subcmd_wait() {
             _retry_until_success "kubectl wait --for=condition=Ready --all pod --timeout=1s --namespace $namespace"
         else
             _log "Namespace $namespace ready, waiting for $app"
-            _retry_until_value "kubectl get pods --selector=app=$app -n $namespace -o name" "pod for app $app" ^"pod" 1
+            _retry_until_value "kubectl get pods --selector=app=$app,migration=$migration_id -n $namespace -o name" "pod for app $app" ^"pod" 1
             pod=$ret
             _log "Pod $pod found, waiting for ready state"
             _retry_until_success "kubectl wait --for=condition=Ready --timeout=1s --namespace $namespace $pod"

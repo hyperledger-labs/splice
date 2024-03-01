@@ -19,6 +19,7 @@ spec:
     metadata:
       labels:
         app: {{ $appIdentifier }}
+        migration: {{ .Values.migration.id | quote }}
     spec:
       containers:
         - name: sv-app
@@ -330,6 +331,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: {{ $appIdentifier }}
+    migration: {{ .Values.migration.id | quote }}
 spec:
   selector:
     app: {{ $appIdentifier }}

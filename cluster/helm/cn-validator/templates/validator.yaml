@@ -19,6 +19,7 @@ spec:
     metadata:
       labels:
         app: {{ $validatorAppLabel }}
+        migration: {{ .Values.migration.id | quote }}
     spec:
       containers:
       - name: validator-app
