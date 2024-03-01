@@ -20,4 +20,7 @@ failed connection pool health check
 # See https://app.circleci.com/pipelines/github/DACH-NY/canton-network-node/137888/workflows/a856128a-eb86-4a44-ab2e-d2e377fc118c/jobs/664082
 Delaying setup of new sequencer subscription failed
 
+# TODO(#10510) Remove this once Canton fixes their shutdown issues
+Received block of height.*while the last processed block only had height.*. Expected to receive one block higher only.
+
 # Make sure to have a trailing newline
