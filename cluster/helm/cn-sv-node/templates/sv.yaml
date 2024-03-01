@@ -266,19 +266,20 @@ spec:
             periodSeconds: 5
             failureThreshold: 5
             timeoutSeconds: 10
-          {{- with .Values.participantIdentitiesDumpImport }}
+          {{- if or .Values.participantIdentitiesDumpImport .Values.migration.attachPvc }}
           volumeMounts:
+          {{- with .Values.participantIdentitiesDumpImport }}
             - name: participant-bootstrapping-dump-volume
               mountPath: /participant-bootstrapping-dump
               readOnly: true
           {{- end }}
           {{- if .Values.migration.attachPvc }}
-          volumeMounts:
             - name: domain-upgrade-dump-volume
               mountPath: /domain-upgrade-dump
           {{- end }}
           {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
           {{- end }}
       initContainers:
         - name: {{ .Release.Name }}-init
