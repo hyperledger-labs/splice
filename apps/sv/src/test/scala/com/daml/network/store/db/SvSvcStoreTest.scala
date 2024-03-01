@@ -1797,9 +1797,10 @@ class DbSvSvcStoreTest
         _ <- MonadUtil.sequentialTraverse(goodVoteRequests ++ badVoteRequests)(
           dummyDomain.create(_)(store.multiDomainAcsStore)
         )
-        result <- store.listVotesByVoteRequests2(goodVoteRequests.map(_.contractId))
+        result <- store.listVoteRequests2ByTrackingCid(goodVoteRequests.map(_.contractId))
+        votes = result.flatMap(_.payload.votes.values().asScala)
       } yield {
-        result should contain theSameElementsAs (goodVotes.flatten)
+        votes should contain theSameElementsAs (goodVotes.flatten)
       }
     }
   }

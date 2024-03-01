@@ -771,13 +771,13 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
     Seq[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]
   ]
 
-  def listVotesByVoteRequests2(
+  def listVoteRequests2ByTrackingCid(
       voteRequestCids: Seq[cn.svcrules.VoteRequest2.ContractId],
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[cn.svcrules.Vote2]
+    Seq[Contract[VoteRequest2.ContractId, VoteRequest2]]
   ]
 
   def lookupVoteByThisSvAndVoteRequestWithOffset(

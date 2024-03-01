@@ -21,7 +21,7 @@ import {
   TextField,
 } from '@mui/material';
 
-import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { VoteRequest2 } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId } from '@daml/types';
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
@@ -30,7 +30,7 @@ import { config } from '../../utils';
 
 interface VoteFormProps {
   vote?: SvVote;
-  voteRequestCid: ContractId<VoteRequest>;
+  voteRequestCid: ContractId<VoteRequest2>;
 }
 
 const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
@@ -38,13 +38,11 @@ const VoteForm: React.FC<VoteFormProps> = ({ vote, voteRequestCid }) => {
   const [voteEditing, setVoteEditing] = useState<'accept' | 'reject' | undefined>(undefined);
   const [reasonUrl, setReasonUrl] = useState<string>('');
   const [reasonBody, setReasonBody] = useState<string>('');
-  const { castVote, updateVote } = useSvAdminClient();
+  const { castVote2 } = useSvAdminClient();
 
   const castOrUpdateVoteMutation = useMutation({
     mutationFn: () => {
-      return vote
-        ? updateVote(vote.contractId, voteEditing === 'accept', reasonUrl, reasonBody)
-        : castVote(voteRequestCid, voteEditing === 'accept', reasonUrl, reasonBody);
+      return castVote2(voteRequestCid, voteEditing === 'accept', reasonUrl, reasonBody);
     },
     onSettled: async () => {
       setIsEditing(false);

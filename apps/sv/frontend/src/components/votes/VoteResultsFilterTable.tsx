@@ -15,18 +15,23 @@ import {
   GridRowParams,
 } from '@mui/x-data-grid';
 
+import * as damlTypes from '@daml/types';
 import {
   ActionRequiringConfirmation,
-  VoteResult,
+  Vote2,
+  VoteRequestResult2,
 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
-import { useListSvcRulesVoteResults } from '../../hooks/useListVoteRequests';
+import { useListVoteRequestResult2 } from '../../hooks/useListVoteRequests';
 
 dayjs.extend(utc);
+
+export type VoteRequestResultTableType = 'Executed' | 'Planned' | 'Rejected';
 
 interface ListVoteResultsTableProps {
   getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
   tableBodyId: string;
+  tableType: VoteRequestResultTableType;
   openModalWithVoteResult: (action: ActionRequiringConfirmation) => void;
   executed: boolean;
   effectiveFrom?: string;
@@ -34,7 +39,7 @@ interface ListVoteResultsTableProps {
   validityColumnName?: string;
 }
 
-type VoteResultRow = {
+type VoteRequestResult2Row = {
   id: number;
   actionName: string;
   requester: string;
@@ -42,7 +47,6 @@ type VoteResultRow = {
   votedAt: Date;
   idx: number;
   action: ActionRequiringConfirmation;
-  executed: boolean;
   expired: boolean;
   voteStatus: string[][];
 };
@@ -60,6 +64,7 @@ const QUERY_LIMIT = 50;
 export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   getAction,
   tableBodyId,
+  tableType,
   openModalWithVoteResult,
   executed,
   effectiveFrom,
@@ -71,12 +76,15 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
     effectiveTo: effectiveTo,
     effectiveFrom: effectiveFrom,
   });
-  const voteResultsQuery = useListSvcRulesVoteResults(queryOptions, QUERY_LIMIT);
+  const voteResultsQuery = useListVoteRequestResult2(queryOptions, QUERY_LIMIT);
 
-  const [rows, setRows] = useState<VoteResultRow[]>([]);
+  const [rows, setRows] = useState<VoteRequestResult2Row[]>([]);
 
   useEffect(() => {
-    const rows: VoteResultRow[] = getVoteResultRows(voteResultsQuery.data);
+    const rows: VoteRequestResult2Row[] = getVoteRequestResult2RowsByCategory(
+      voteResultsQuery.data,
+      tableType
+    );
     setRows(rows);
     setQueryOptions({
       executed: executed,
@@ -189,19 +197,53 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
     },
   ];
 
-  function getVoteResultRows(voteResults: VoteResult[] | undefined) {
-    return voteResults
-      ? voteResults.map((result, index) => ({
+  function getVoteStatus(votes: damlTypes.Map<string, Vote2>) {
+    const allVotes: Vote2[] = votes.entriesArray().map(v => v[1]);
+    const rejectedBy: string[] = allVotes.filter(v => !v.accept).map(sv => sv.sv);
+    const acceptedBy: string[] = allVotes.filter(v => v.accept).map(sv => sv.sv);
+    return [rejectedBy, acceptedBy];
+  }
+
+  function getVoteRequestResult2RowsByCategory(
+    voteResults: VoteRequestResult2[] | undefined,
+    tableType: VoteRequestResultTableType
+  ): VoteRequestResult2Row[] {
+    const now = dayjs();
+    const parsedVoteResults = voteResults
+      ? voteResults.filter((result, _) => {
+          if (
+            result.outcome.tag === 'VRO_Accepted' &&
+            dayjs(result.outcome.value.effectiveAt).isBefore(now) &&
+            tableType === 'Executed'
+          ) {
+            return true;
+          } else if (
+            result.outcome.tag === 'VRO_Accepted' &&
+            dayjs(result.outcome.value.effectiveAt).isAfter(now) &&
+            tableType === 'Planned'
+          ) {
+            return true;
+          } else if (
+            ['VRO_Rejected', 'VRO_Expired'].includes(result.outcome.tag) &&
+            tableType === 'Rejected'
+          ) {
+            return true;
+          } else {
+            return false;
+          }
+        })
+      : [];
+    return parsedVoteResults
+      ? parsedVoteResults.map((result, index) => ({
           id: index,
-          actionName: getAction(result.action, false),
-          requester: result.requester,
-          expiresAt: new Date(result.effectiveAt),
-          votedAt: new Date(result.votedAt),
+          actionName: getAction(result.request.action, false),
+          requester: result.request.requester,
+          expiresAt: new Date(result.request.voteBefore),
+          votedAt: new Date(result.completedAt),
           idx: index,
-          action: result.action,
-          executed: result.executed,
-          expired: result.expired,
-          voteStatus: [result.rejectedBy, result.acceptedBy],
+          action: result.request.action,
+          expired: result.outcome.tag === 'VRO_Expired',
+          voteStatus: getVoteStatus(result.request.votes),
         }))
       : [];
   }

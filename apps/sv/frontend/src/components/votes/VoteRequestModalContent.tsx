@@ -22,7 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { VoteRequest2 } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId, Party } from '@daml/types';
 
 import { useSvcInfos } from '../../contexts/SvContext';
@@ -34,15 +34,13 @@ import VoteForm from './VoteForm';
 import ActionView from './actions/views/ActionView';
 
 interface VoteRequestModalProps {
-  voteRequestContractId?: ContractId<VoteRequest>;
+  voteRequestContractId?: ContractId<VoteRequest2>;
   handleClose: () => void;
-  staled: boolean;
 }
 
 const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
   voteRequestContractId,
   handleClose,
-  staled,
 }) => {
   const voteRequestQuery = useVoteRequest(voteRequestContractId);
 
@@ -164,7 +162,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
                     <Typography variant="h6">Expires At</Typography>
                   </TableCell>
                   <TableCell>
-                    <DateDisplay datetime={voteRequestQuery.data.payload.expiresAt} />
+                    <DateDisplay datetime={voteRequestQuery.data.payload.voteBefore} />
                   </TableCell>
                 </TableRow>
                 <TableRow>
@@ -187,14 +185,8 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
           </TableContainer>
         </Stack>
         <Stack>
-          {voteRequestContractId && !staled && (
+          {voteRequestContractId && (
             <VoteForm vote={curSvVote} voteRequestCid={voteRequestContractId} />
-          )}
-          {staled && (
-            <Stack>
-              <Typography variant="h5">Status</Typography>
-              <p>Rejected due to a time conflict with another schedule.</p>
-            </Stack>
           )}
         </Stack>
         <Stack direction="column" mb={4} spacing={1}>
@@ -267,14 +259,14 @@ const VoteRows: React.FC<{
         </TableCell>
       )}
     </TableRow>
-    {votes.map(vote => {
+    {votes.map((vote: SvVote) => {
       return (
         <VoteRow
           key={vote.voter}
           sv={vote.voter}
           svName={getMemberName(vote.voter)}
-          reasonBody={vote.reason.body}
-          reasonUrl={vote.reason.url}
+          reasonBody={vote.reason?.body || ''}
+          reasonUrl={vote.reason?.body || ''}
         />
       );
     })}

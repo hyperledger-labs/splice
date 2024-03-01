@@ -16,7 +16,6 @@ import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
-import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -38,7 +37,6 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.circe.syntax.EncoderOps
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
-import slick.jdbc.PostgresProfile
 
 import java.nio.file.Path
 import java.time.Instant
@@ -63,10 +61,7 @@ class HttpSvAdminHandler(
     templateJsonDecoder: TemplateJsonDecoder,
 ) extends v0.SvAdminHandler[TracedUser]
     with Spanning
-    with NamedLogging
-    with AcsJdbcTypes {
-
-  val profile: slick.jdbc.JdbcProfile = PostgresProfile
+    with NamedLogging {
 
   implicit private val loggingContext: ErrorLoggingContext =
     ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
@@ -326,7 +321,12 @@ class HttpSvAdminHandler(
       } yield {
         definitions.ListSvcRulesVoteResultsResponse(
           voteResults
-            .map(payloadJsonFromDefinedDataType)
+            .map(_.toJson)
+            .map(json =>
+              io.circe.parser
+                .parse(json)
+                .getOrElse(throw new IllegalStateException(s"Failed to parse $json"))
+            )
             .toVector
         )
       }
@@ -352,7 +352,12 @@ class HttpSvAdminHandler(
       } yield {
         definitions.ListSvcRulesVoteResultsResponse(
           voteResults
-            .map(payloadJsonFromDefinedDataType)
+            .map(_.toJson)
+            .map(json =>
+              io.circe.parser
+                .parse(json)
+                .getOrElse(throw new IllegalStateException(s"Failed to parse $json"))
+            )
             .toVector
         )
       }
@@ -496,6 +501,25 @@ class HttpSvAdminHandler(
         )
       } yield {
         definitions.ListVotesResponse(
+          svcRulesVotes.map(_.toHttp).toVector
+        )
+      }
+    }
+  }
+
+  override def listVoteRequests2ByTrackingCid(
+      respond: v0.SvAdminResource.ListVoteRequests2ByTrackingCidResponse.type
+  )(
+      body: definitions.BatchListVotesByVoteRequestsRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequests2ByTrackingCidResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.listVoteRequests2ByTrackingCid") { _ => _ =>
+      for {
+        svcRulesVotes <- svcStore.listVoteRequests2ByTrackingCid(
+          body.voteRequestContractIds.map(new cn.svcrules.VoteRequest2.ContractId(_))
+        )
+      } yield {
+        definitions.ListVoteRequest2ByTrackingCidResponse(
           svcRulesVotes.map(_.toHttp).toVector
         )
       }

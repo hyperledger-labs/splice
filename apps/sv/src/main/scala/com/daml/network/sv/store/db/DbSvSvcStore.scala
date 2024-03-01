@@ -865,13 +865,13 @@ class DbSvSvcStore(
     } yield result.map(contractFromRow(VoteRequest2.COMPANION)(_))
   }
 
-  override def listVotesByVoteRequests2(
-      voteRequestCids: Seq[VoteRequest2.ContractId],
+  override def listVoteRequests2ByTrackingCid(
+      trackingCids: Seq[VoteRequest2.ContractId],
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Vote2]] = waitUntilAcsIngested {
-    val voteRequestCidsSql = inClause(voteRequestCids)
+  ): Future[Seq[Contract[VoteRequest2.ContractId, VoteRequest2]]] = waitUntilAcsIngested {
+    val voteRequestTrackingCidsSql = inClause(trackingCids)
     for {
       result <- storage
         .query(
@@ -880,14 +880,14 @@ class DbSvSvcStore(
             storeId,
             domainMigrationId,
             where = (sql""" template_id_qualified_name = ${QualifiedName(VoteRequest2.TEMPLATE_ID)}
-                          and contract_id in """ ++ voteRequestCidsSql).toActionBuilder,
+                          and vote_request_tracking_cid in """ ++ voteRequestTrackingCidsSql).toActionBuilder,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
-          "listVotesByVoteRequests",
+          "listVoteRequests2ByTrackingCid",
         )
-      records = applyLimit("listVotesByVoteRequests", limit, result)
+      records = applyLimit("listVoteRequests2ByTrackingCid", limit, result)
     } yield records
-      .flatMap(contractFromRow(VoteRequest2.COMPANION)(_).payload.votes.values().asScala)
+      .map(contractFromRow(VoteRequest2.COMPANION)(_))
   }
 
   override def lookupVoteByThisSvAndVoteRequestWithOffset(voteRequestCid: VoteRequest.ContractId)(

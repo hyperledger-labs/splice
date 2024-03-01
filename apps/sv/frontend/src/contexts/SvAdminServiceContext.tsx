@@ -4,7 +4,6 @@ import { useUserState } from 'common-frontend';
 import { BaseApiMiddleware, OpenAPILoggingMiddleware } from 'common-frontend-utils';
 import React, { useContext, useMemo } from 'react';
 import {
-  BatchListVotesByVoteRequestsRequest,
   CastVoteRequest,
   createConfiguration,
   CreateElectionRequest,
@@ -16,8 +15,8 @@ import {
   ListSvcRulesVoteRequestsResponse,
   ListSvcRulesVoteResultsResponse,
   ListValidatorLicensesResponse,
+  ListVoteRequest2ByTrackingCidResponse,
   ListVoteResultsRequest,
-  ListVotesResponse,
   LookupSvcRulesVoteRequestResponse,
   Middleware,
   PrepareValidatorOnboardingRequest,
@@ -26,7 +25,6 @@ import {
   ResponseContext,
   ServerConfiguration,
   UpdateCoinPriceVoteRequest,
-  UpdateVoteRequest,
 } from 'sv-openapi';
 
 import { RelTime } from '@daml.js/b47113ba94c31372c553e3869fffed9a45ef1c0f5ac1be3287857cd9450c0bae/lib/DA/Time/Types';
@@ -42,15 +40,15 @@ export interface SvAdminClient {
   isAuthorized: () => Promise<void>;
   getElectionRequest: () => Promise<GetElectionRequestResponse>;
   createElectionRequest: (requester: string, ranking: string[]) => Promise<void>;
-  createVoteRequest: (
+  createVoteRequest2: (
     requester: string,
     action: ActionRequiringConfirmation,
     url: string,
     description: string,
     expiration: RelTime
   ) => Promise<void>;
-  listSvcRulesVoteRequests: () => Promise<ListSvcRulesVoteRequestsResponse>;
-  listSvcRulesVoteResults: (
+  listSvcRulesVoteRequests2: () => Promise<ListSvcRulesVoteRequestsResponse>;
+  listVoteRequestResults2: (
     limit: number,
     actionName?: string,
     requester?: string,
@@ -58,22 +56,18 @@ export interface SvAdminClient {
     effectiveTo?: string,
     executed?: boolean
   ) => Promise<ListSvcRulesVoteResultsResponse>;
-  lookupSvcRulesVoteRequest: (
+  lookupSvcRulesVoteRequest2: (
     voteRequestContractId: string
   ) => Promise<LookupSvcRulesVoteRequestResponse>;
-  castVote: (
+  listVoteRequests2ByTrackingCid: (
+    voteRequestContractIds: string[]
+  ) => Promise<ListVoteRequest2ByTrackingCidResponse>;
+  castVote2: (
     voteRequestContractId: string,
     isAccepted: boolean,
     reasonUrl: string,
     reasonDescription: string
   ) => Promise<void>;
-  updateVote: (
-    voteContractId: string,
-    isAccepted: boolean,
-    reasonUrl: string,
-    reasonDescription: string
-  ) => Promise<void>;
-  listVotesByVoteRequests: (voteRequestContractIds: string[]) => Promise<ListVotesResponse>;
   prepareValidatorOnboarding: (expiresIn: number) => Promise<PrepareValidatorOnboardingResponse>;
   listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
   listValidatorLicenses: () => Promise<ListValidatorLicensesResponse>;
@@ -116,7 +110,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         };
         return await svAdminClient.createElectionRequest(request);
       },
-      createVoteRequest: async (
+      createVoteRequest2: async (
         requester,
         action: ActionRequiringConfirmation,
         url,
@@ -130,12 +124,12 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
           description,
           expiration: RelTime.encode(expiration),
         };
-        return await svAdminClient.createVoteRequest(request);
+        return await svAdminClient.createVoteRequest2(request);
       },
-      listSvcRulesVoteRequests: async (): Promise<ListSvcRulesVoteRequestsResponse> => {
-        return await svAdminClient.listSvcRulesVoteRequests();
+      listSvcRulesVoteRequests2: async (): Promise<ListSvcRulesVoteRequestsResponse> => {
+        return await svAdminClient.listSvcRulesVoteRequests2();
       },
-      listSvcRulesVoteResults: async (
+      listVoteRequestResults2: async (
         limit: number,
         actionName?: string,
         requester?: string,
@@ -151,14 +145,22 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
           effectiveTo: effectiveTo,
           limit: limit,
         };
-        return await svAdminClient.listSvcRulesVoteResults(request);
+        return await svAdminClient.listVoteRequestResults2(request);
       },
-      lookupSvcRulesVoteRequest: async (
+      lookupSvcRulesVoteRequest2: async (
         voteRequestContractId: string
       ): Promise<LookupSvcRulesVoteRequestResponse> => {
-        return await svAdminClient.lookupSvcRulesVoteRequest(voteRequestContractId);
+        return await svAdminClient.lookupSvcRulesVoteRequest2(voteRequestContractId);
       },
-      castVote: async (
+      listVoteRequests2ByTrackingCid: async (
+        voteRequestContractIds: string[]
+      ): Promise<ListVoteRequest2ByTrackingCidResponse> => {
+        const request = {
+          vote_request_contract_ids: voteRequestContractIds,
+        };
+        return await svAdminClient.listVoteRequests2ByTrackingCid(request);
+      },
+      castVote2: async (
         vote_request_contract_id,
         is_accepted,
         reason_url,
@@ -170,29 +172,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
           reason_url,
           reason_description,
         };
-        return await svAdminClient.castVote(request);
-      },
-      updateVote: async (
-        vote_contract_id,
-        is_accepted,
-        reason_url,
-        reason_description
-      ): Promise<void> => {
-        const request: UpdateVoteRequest = {
-          vote_contract_id,
-          is_accepted,
-          reason_url,
-          reason_description,
-        };
-        return await svAdminClient.updateVote(request);
-      },
-      listVotesByVoteRequests: async (
-        vote_request_contract_ids: string[]
-      ): Promise<ListVotesResponse> => {
-        const request: BatchListVotesByVoteRequestsRequest = {
-          vote_request_contract_ids,
-        };
-        return await svAdminClient.batchListVotesByVoteRequests(request);
+        return await svAdminClient.castVote2(request);
       },
       prepareValidatorOnboarding: async (
         expires_in: number

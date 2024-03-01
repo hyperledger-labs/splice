@@ -770,19 +770,14 @@ create table svc_txlog_store
     -- index columns
     ----------------
 
-    -- actionName is an index of DefiniteVoteIndexRecord
     action_name                                              text,
 
-    -- executed is an index of DefiniteVoteIndexRecord
     executed                                                 boolean,
 
-    -- requester is an index of DefiniteVoteIndexRecord
-    requester                                                text,
+    requester_name                                           text,
 
-    -- effective_at is an index of DefiniteVoteIndexRecord
     effective_at                                             text,
 
-    -- voted_at is an index of DefiniteVoteIndexRecord
     voted_at                                                 text
 );
 

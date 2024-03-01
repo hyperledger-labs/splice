@@ -103,7 +103,7 @@ object SvcTables extends AcsTables with NamedLogging {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "action_name" -> actionName.map(lengthLimited),
       "executed" -> executed,
-      "requester" -> requester.map(lengthLimited),
+      "requester_name" -> requester.map(lengthLimited),
       "effective_at" -> effectiveAt.map(lengthLimited),
       "voted_at" -> votedAt.map(lengthLimited),
     )

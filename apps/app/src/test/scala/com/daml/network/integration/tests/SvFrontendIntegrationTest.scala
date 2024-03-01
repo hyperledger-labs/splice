@@ -19,6 +19,7 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.cc.coinconfig.CoinConfig
+import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome2.VRO_AcceptedButActionFailed
 import com.daml.network.codegen.java.cn.wallet.payment.Currency
 
 import java.util.Optional
@@ -443,7 +444,7 @@ class SvFrontendIntegrationTest
             }
             inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
               seleniumText(element) should matchText(
-                sv1Backend.getSvcInfo().svParty.toProtoPrimitive
+                "Canton-Foundation-1"
               )
             }
             inside(find(id("vote-request-modal-reason-body"))) { case Some(element) =>
@@ -1040,6 +1041,7 @@ class SvFrontendIntegrationTest
           )
 
           vote(sv3Backend, requestIdAdd, true, "3", true)
+          vote(sv4Backend, requestIdAdd, true, "4", true)
 
           clue("the vote request is marked as planned") {
             eventually() {
@@ -1181,6 +1183,7 @@ class SvFrontendIntegrationTest
           )
 
           vote(sv3Backend, requestIdUpdate, true, "3", true)
+          vote(sv4Backend, requestIdUpdate, true, "4", true)
 
           eventually() {
             click on "tab-panel-in-progress"
@@ -1242,7 +1245,8 @@ class SvFrontendIntegrationTest
             },
           )
 
-          vote(sv3Backend, requestIdRemove, true, "2", true)
+          vote(sv3Backend, requestIdRemove, true, "2", false)
+          vote(sv4Backend, requestIdRemove, true, "3", true)
 
           actAndCheck(
             "sv1 operator fails create a request to remove a coin config scheduled at the same time", {
@@ -1302,7 +1306,7 @@ class SvFrontendIntegrationTest
               click on "save-vote-button"
             },
           )(
-            "sv2's modal closes as the threshold of 3 was reached",
+            "sv2's modal closes as all SVs voted before the expiration date",
             _ => {
               find(id("accept-vote-button")) shouldBe empty
             },
@@ -1358,7 +1362,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "if two AddFutureCoinConfigSchedule actions scheduled at the same time are created concurrently, then one is marked as staled" in {
+    "if two AddFutureCoinConfigSchedule actions scheduled at the same time are created concurrently, then only one succeeds" in {
       implicit env =>
         val requestReasonUrl = "This is a request reason url."
         val requestReasonBody = "This is a request reason."
@@ -1457,6 +1461,7 @@ class SvFrontendIntegrationTest
           )
           vote(sv2Backend, requestIdAdd1, true, "2", true)
           vote(sv3Backend, requestIdAdd1, true, "3", true)
+          vote(sv4Backend, requestIdAdd1, true, "4", true)
         }
 
         withFrontEnd("sv2") { implicit webDriver =>
@@ -1488,16 +1493,21 @@ class SvFrontendIntegrationTest
           )
           vote(sv1Backend, requestIdAdd2, true, "2", true)
           vote(sv3Backend, requestIdAdd2, true, "3", true)
+          vote(sv4Backend, requestIdAdd2, true, "4", true)
 
-          clue("Of of the two request is marked as rejected/staled") {
+          clue("The last action was accepted but failed") {
             eventually() {
-              click on "tab-panel-aborted"
-
-              val tbody = find(id("sv-voting-staled-table-body"))
-              inside(tbody) { case Some(tb) =>
-                val rows = tb.findAllChildElements(className("vote-row-action")).toSeq
-                rows should have size 1
-              }
+              sv1Backend
+                .listVoteRequestResults2(
+                  None,
+                  Some(false),
+                  Some("Canton-Foundation-2"),
+                  None,
+                  None,
+                  1,
+                )
+                .loneElement
+                .outcome shouldBe a[VRO_AcceptedButActionFailed]
             }
           }
         }

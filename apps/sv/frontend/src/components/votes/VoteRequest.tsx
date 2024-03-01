@@ -184,7 +184,7 @@ const VoteRequest: React.FC = () => {
     return scheduleValidity.isValid && dateValidity.isValid;
   }
 
-  const { createVoteRequest } = useSvAdminClient();
+  const { createVoteRequest2 } = useSvAdminClient();
   const createVoteRequestMutation = useMutation({
     mutationFn: async () => {
       const requester = svcInfosQuery.data?.svPartyId!;
@@ -199,7 +199,7 @@ const VoteRequest: React.FC = () => {
         !actionFromFormIsError(action) &&
         validateAction(action)
       ) {
-        return await createVoteRequest(requester, action, url, summary, duration)
+        return await createVoteRequest2(requester, action, url, summary, duration)
           .then(() => setUrl(''))
           .then(() => setSummary(''))
           .then(() => setActionName('SRARC_OffboardMember'))

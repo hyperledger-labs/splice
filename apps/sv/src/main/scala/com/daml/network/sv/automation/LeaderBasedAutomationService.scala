@@ -37,7 +37,6 @@ class LeaderBasedAutomationService(
       registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
       registerTrigger(new ExecuteVoteRequestActionTrigger(triggerContext, svTaskContext))
       registerTrigger(new CloseVoteRequest2WithEarlyClosingTrigger(triggerContext, svTaskContext))
-
     }
     registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
 

@@ -1,4 +1,4 @@
-import { Vote, VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { VoteRequest2 } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId, Numeric, Optional, Party } from '@daml/types';
 
 export interface CoinPriceVote {
@@ -13,8 +13,7 @@ export interface Reason {
 }
 
 export interface SvVote {
-  contractId: ContractId<Vote>;
-  requestCid: ContractId<VoteRequest>;
+  requestCid: ContractId<VoteRequest2>;
   voter: Party;
   accept: boolean;
   reason: Reason;

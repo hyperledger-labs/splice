@@ -1,38 +1,45 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { Vote, VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import * as damlTypes from '@daml/types';
+import { Vote2, VoteRequest2 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 import { ContractId } from '@daml/types';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 // TODO(#7675) - do we need this model?
 import { SvVote } from '../models/models';
 
-export const useListVotes = (contractIds: ContractId<VoteRequest>[]): UseQueryResult<SvVote[]> => {
-  const { listVotesByVoteRequests } = useSvAdminClient();
+function getVoteStatus(votes: damlTypes.Map<string, Vote2>): Vote2[] {
+  const allVotes: Vote2[] = [];
+  votes.forEach((v, _) => allVotes.push(v));
+  return allVotes;
+}
+
+export const useListVotes = (contractIds: ContractId<VoteRequest2>[]): UseQueryResult<SvVote[]> => {
+  const { listVoteRequests2ByTrackingCid } = useSvAdminClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
-    queryKey: ['listVotesByVoteRequests', contractIds],
+    queryKey: ['listVoteRequests2ByTrackingCid', contractIds],
     queryFn: async () => {
       if (contractIds.length === 0) {
         return [];
       }
-      const { svc_rules_votes } = await listVotesByVoteRequests(contractIds);
-      return svc_rules_votes
-        .map(vote => Contract.decodeOpenAPI(vote, Vote))
-        .map(vote => {
+      const { vote_requests } = await listVoteRequests2ByTrackingCid(contractIds);
+      const requests = vote_requests.map(v => Contract.decodeOpenAPI(v, VoteRequest2));
+      return requests.flatMap(vr =>
+        getVoteStatus(vr.payload.votes).map(vote => {
           return {
-            contractId: vote.contractId,
-            requestCid: vote.payload.requestCid,
-            voter: vote.payload.voter,
-            accept: vote.payload.accept,
+            requestCid: vr.payload.trackingCid ? vr.payload.trackingCid : vr.contractId,
+            voter: vote.sv,
+            accept: vote.accept,
             reason: {
-              url: vote.payload.reason.url,
-              body: vote.payload.reason.body,
+              url: vote.reason.url,
+              body: vote.reason.body,
             },
-            expiresAt: new Date(vote.payload.expiresAt),
+            expiresAt: new Date(vr.payload.voteBefore),
           };
-        });
+        })
+      );
     },
   });
 };

@@ -490,10 +490,10 @@ class InMemorySvSvcStore(
       .map(_ map (_.contract))
   }
 
-  override def listVotesByVoteRequests2(
+  override def listVoteRequests2ByTrackingCid(
       voteRequestCids: Seq[VoteRequest2.ContractId],
       limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[Vote2]] = {
+  )(implicit tc: TraceContext): Future[Seq[Contract[VoteRequest2.ContractId, VoteRequest2]]] = {
     throw new NotImplementedError("Not gonna bother.")
   }
 

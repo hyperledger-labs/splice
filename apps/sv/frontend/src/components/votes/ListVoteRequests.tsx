@@ -18,8 +18,7 @@ import {
 } from '@mui/material';
 import Container from '@mui/material/Container';
 
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules';
-import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { ActionRequiringConfirmation, VoteRequest2 } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId } from '@daml/types';
 
 import { useSvcInfos } from '../../contexts/SvContext';
@@ -80,25 +79,20 @@ const ListVoteRequests: React.FC = () => {
   const listVoteRequestsQuery = useListSvcRulesVoteRequests();
 
   const voteRequestIds = listVoteRequestsQuery.data
-    ? listVoteRequestsQuery.data.map(v => v.contractId)
+    ? listVoteRequestsQuery.data.map(v => v.payload.trackingCid || v.contractId)
     : [];
   const votesQuery = useListVotes(voteRequestIds);
   const svcInfosQuery = useSvcInfos();
 
   const [voteRequestContractId, setVoteRequestContractId] = useState<
-    ContractId<VoteRequest> | undefined
+    ContractId<VoteRequest2> | undefined
   >(undefined);
   const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
   const [isVoteRequestModalOpen, setVoteRequestModalOpen] = useState<boolean>(false);
   const [isVoteResultModalOpen, setVoteResultModalOpen] = useState<boolean>(false);
-  const [staledVoteRequestModal, setStaledVoteRequestModal] = useState<boolean>(false);
 
-  const openModalWithVoteRequest = (
-    voteRequestContractId: ContractId<VoteRequest>,
-    staled: boolean
-  ) => {
+  const openModalWithVoteRequest = (voteRequestContractId: ContractId<VoteRequest2>) => {
     setVoteRequestContractId(voteRequestContractId);
-    setStaledVoteRequestModal(staled);
     setVoteRequestModalOpen(true);
   };
 
@@ -113,28 +107,12 @@ const ListVoteRequests: React.FC = () => {
   };
 
   const svPartyId = svcInfosQuery.data?.svPartyId;
-  const votingThreshold = svcInfosQuery.data?.votingThreshold;
 
   const alreadyVotedRequestIds = useMemo(() => {
     return svPartyId && votesQuery.data
       ? new Set(votesQuery.data.filter(v => v.voter === svPartyId).map(v => v.requestCid))
       : new Set();
   }, [votesQuery.data, svPartyId]);
-
-  const staledVotedRequestsIds = useMemo(() => {
-    if (!votesQuery.data || !votingThreshold) {
-      return [];
-    }
-    const groupedVotes = votesQuery.data.reduce((dic: { [key: string]: number }, vote) => {
-      if (vote.accept) {
-        dic[vote.requestCid] = (dic[vote.requestCid] || 0) + 1;
-      }
-      return dic;
-    }, {});
-    return Object.entries(groupedVotes)
-      .filter(([, totalVotes]) => totalVotes >= votingThreshold)
-      .map(([Cid, _]) => Cid);
-  }, [votesQuery.data, votingThreshold]);
 
   if (listVoteRequestsQuery.isLoading || svcInfosQuery.isLoading || votesQuery.isLoading) {
     return <Loading />;
@@ -157,13 +135,10 @@ const ListVoteRequests: React.FC = () => {
   });
 
   const voteRequestsNotVoted = voteRequests.filter(
-    v => !alreadyVotedRequestIds.has(v.contractId) && !staledVotedRequestsIds.includes(v.contractId)
+    v => !alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId)
   );
-  const voteRequestsVoted = voteRequests.filter(
-    v => alreadyVotedRequestIds.has(v.contractId) && !staledVotedRequestsIds.includes(v.contractId)
-  );
-  const voteRequestsStaled = voteRequests.filter(v =>
-    staledVotedRequestsIds.includes(v.contractId)
+  const voteRequestsVoted = voteRequests.filter(v =>
+    alreadyVotedRequestIds.has(v.payload.trackingCid || v.contractId)
   );
 
   function getAction(action: ActionRequiringConfirmation) {
@@ -210,38 +185,32 @@ const ListVoteRequests: React.FC = () => {
           <Tab label="Planned" {...tabProps('planned')} id={'tab-panel-planned'} />
           <Tab label="Executed" {...tabProps('executed')} id={'tab-panel-executed'} />
           <Tab label="Rejected" {...tabProps('rejected')} id={'tab-panel-rejected'} />
-          {voteRequestsStaled.length > 0 && (
-            <Tab label="Aborted" {...tabProps('aborted')} id={'tab-panel-aborted'} />
-          )}
         </Tabs>
       </Box>
       <TabPanel value={value} index={0}>
         <ListVoteRequestsFilterTable
           voteRequests={voteRequestsNotVoted}
           getAction={getAction}
-          svcRules={svcInfosQuery.data!.svcRules}
           openModalWithVoteRequest={openModalWithVoteRequest}
           tableBodyId={'sv-voting-action-needed-table-body'}
-          staled={false}
         />
       </TabPanel>
       <TabPanel value={value} index={1}>
         <ListVoteRequestsFilterTable
           voteRequests={voteRequestsVoted}
           getAction={getAction}
-          svcRules={svcInfosQuery.data!.svcRules}
           openModalWithVoteRequest={openModalWithVoteRequest}
           tableBodyId={'sv-voting-in-progress-table-body'}
-          staled={false}
         />
       </TabPanel>
       <TabPanel value={value} index={2}>
         <VoteResultsFilterTable
           getAction={getAction}
           tableBodyId={'sv-vote-results-planned-table-body'}
+          tableType={'Planned'}
           openModalWithVoteResult={openModalWithVoteResult}
           validityColumnName={'Effective At'}
-          executed
+          executed={false}
           effectiveFrom={now}
         />
       </TabPanel>
@@ -249,34 +218,21 @@ const ListVoteRequests: React.FC = () => {
         <VoteResultsFilterTable
           getAction={getAction}
           tableBodyId={'sv-vote-results-executed-table-body'}
+          tableType={'Executed'}
           openModalWithVoteResult={openModalWithVoteResult}
           executed
-          effectiveTo={now}
         />
       </TabPanel>
       <TabPanel value={value} index={4}>
         <VoteResultsFilterTable
           getAction={getAction}
           tableBodyId={'sv-vote-results-rejected-table-body'}
+          tableType={'Rejected'}
           openModalWithVoteResult={openModalWithVoteResult}
           validityColumnName={'Not Executed At'}
           executed={false}
         />
       </TabPanel>
-      {voteRequestsStaled.length > 0 && (
-        <Stack>
-          <TabPanel value={value} index={5}>
-            <ListVoteRequestsFilterTable
-              voteRequests={voteRequestsStaled}
-              getAction={getAction}
-              svcRules={svcInfosQuery.data!.svcRules}
-              openModalWithVoteRequest={openModalWithVoteRequest}
-              tableBodyId={'sv-voting-staled-table-body'}
-              staled
-            />
-          </TabPanel>
-        </Stack>
-      )}
       <Modal
         open={isVoteRequestModalOpen}
         onClose={handleClose}
@@ -298,7 +254,6 @@ const ListVoteRequests: React.FC = () => {
                 <VoteRequestModalContent
                   voteRequestContractId={voteRequestContractId}
                   handleClose={handleClose}
-                  staled={staledVoteRequestModal}
                 />
               </Card>
             </Container>

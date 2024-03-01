@@ -7,30 +7,22 @@ import { DataGrid, GridEventListener, GridRenderCellParams, GridRowParams } from
 
 import {
   ActionRequiringConfirmation,
-  SvcRules,
-  VoteRequest,
+  VoteRequest2,
 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 import { ContractId } from '@daml/types';
 
 interface ListVoteRequestsTableProps {
-  voteRequests: Contract<VoteRequest>[];
-  getAction: (action: ActionRequiringConfirmation, staled: boolean) => string;
-  svcRules: Contract<SvcRules>;
-  openModalWithVoteRequest: (
-    voteRequestContractId: ContractId<VoteRequest>,
-    staled: boolean
-  ) => void;
+  voteRequests: Contract<VoteRequest2>[];
+  getAction: (action: ActionRequiringConfirmation) => string;
+  openModalWithVoteRequest: (voteRequestContractId: ContractId<VoteRequest2>) => void;
   tableBodyId: string;
-  staled: boolean;
 }
 
 export const ListVoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> = ({
   voteRequests,
   getAction,
-  svcRules,
   openModalWithVoteRequest,
   tableBodyId,
-  staled,
 }) => {
   const columns = [
     {
@@ -49,8 +41,8 @@ export const ListVoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> =
       },
     },
     {
-      field: 'contractId',
-      headerName: 'Contract Id',
+      field: 'trackingCid',
+      headerName: 'Tracking Id',
       width: 250,
       renderCell: (params: GridRenderCellParams) => {
         return <CopyableTypography text={params.value} maxWidth={'150px'} />;
@@ -92,18 +84,17 @@ export const ListVoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> =
 
   const rows = voteRequests.map((request, index) => ({
     id: index,
-    contractId: request.contractId,
-    action: getAction(request.payload.action, staled),
-    requester: svcRules.payload.members.get(request.payload.requester)?.name!,
-    expiresAt: new Date(request.payload.expiresAt),
+    trackingCid: request.payload.trackingCid || request.contractId,
+    action: getAction(request.payload.action),
+    requester: request.payload.requester,
+    expiresAt: new Date(request.payload.voteBefore),
     createdAt: request.createdAt,
     voteStatus: request.contractId,
     idx: index,
-    staled: staled,
   }));
 
   const handleRowClick: GridEventListener<'rowClick'> = (params: GridRowParams) => {
-    openModalWithVoteRequest(params.row.contractId, staled);
+    openModalWithVoteRequest(params.row.trackingCid);
   };
 
   return (

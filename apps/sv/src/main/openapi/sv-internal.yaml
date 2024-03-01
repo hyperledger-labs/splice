@@ -440,6 +440,24 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListVotesResponse"
+  /v0/admin/sv/voterequest2:
+    post:
+      tags: [ sv ]
+      x-jvm-package: sv_admin
+      operationId: "listVoteRequests2ByTrackingCid"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/BatchListVotesByVoteRequestsRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListVoteRequest2ByTrackingCidResponse"
   /v0/admin/sv/voterequest/create:
     post:
       tags: [sv]
@@ -456,7 +474,7 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /v0/admin/sv/voterequest2:
+  /v0/admin/sv/voterequest2/create:
     post:
       tags: [ sv ]
       x-jvm-package: sv_admin
@@ -897,6 +915,16 @@ components:
         - svc_rules_votes
       properties:
         svc_rules_votes:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+
+    ListVoteRequest2ByTrackingCidResponse:
+      type: object
+      required:
+        - vote_requests
+      properties:
+        vote_requests:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"

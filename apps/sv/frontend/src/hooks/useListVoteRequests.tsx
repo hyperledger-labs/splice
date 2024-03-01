@@ -1,11 +1,12 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { VoteRequest, VoteResult } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { VoteRequest2, VoteRequestResult2 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { List } from '@daml/types';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 
-export type ListSvcRulesVoteResultsParams = {
+export type ListVoteRequestResult2Params = {
   actionName?: string;
   executed?: boolean;
   requester?: string;
@@ -13,27 +14,28 @@ export type ListSvcRulesVoteResultsParams = {
   effectiveTo?: string;
 };
 
-export const useListSvcRulesVoteRequests = (): UseQueryResult<Contract<VoteRequest>[]> => {
-  const { listSvcRulesVoteRequests } = useSvAdminClient();
+export const useListSvcRulesVoteRequests = (): UseQueryResult<Contract<VoteRequest2>[]> => {
+  const { listSvcRulesVoteRequests2 } = useSvAdminClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
-    queryKey: ['listSvcRulesVoteRequests'],
+    queryKey: ['listSvcRulesVoteRequests2'],
     queryFn: async () => {
-      const { svc_rules_vote_requests } = await listSvcRulesVoteRequests();
-      return svc_rules_vote_requests.map(c => Contract.decodeOpenAPI(c, VoteRequest));
+      const { svc_rules_vote_requests } = await listSvcRulesVoteRequests2();
+      return svc_rules_vote_requests.map(c => Contract.decodeOpenAPI(c, VoteRequest2));
     },
   });
 };
 
-export const useListSvcRulesVoteResults = (
-  query: ListSvcRulesVoteResultsParams,
+export const useListVoteRequestResult2 = (
+  query: ListVoteRequestResult2Params,
   limit: number = 10
-): UseQueryResult<VoteResult[]> => {
-  const { listSvcRulesVoteResults } = useSvAdminClient();
+): UseQueryResult<VoteRequestResult2[]> => {
+  const { listVoteRequestResults2 } = useSvAdminClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
     queryKey: [
-      'listSvcRulesVoteResults',
+      'listVoteRequestResults2',
+      VoteRequestResult2,
       limit,
       query.actionName,
       query.executed,
@@ -43,7 +45,7 @@ export const useListSvcRulesVoteResults = (
     ],
     keepPreviousData: true,
     queryFn: async () => {
-      const { svc_rules_vote_results } = await listSvcRulesVoteResults(
+      const { svc_rules_vote_results } = await listVoteRequestResults2(
         limit,
         query.actionName,
         query.requester,
@@ -51,7 +53,7 @@ export const useListSvcRulesVoteResults = (
         query.effectiveTo,
         query.executed
       );
-      return svc_rules_vote_results;
+      return List(VoteRequestResult2).decoder.runWithException(svc_rules_vote_results);
     },
   });
 };
