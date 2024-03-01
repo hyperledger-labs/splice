@@ -2,7 +2,7 @@ package com.daml.network.sv.onboarding.joining
 
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
-import cats.implicits.{catsSyntaxTuple3Semigroupal, catsSyntaxTuple4Semigroupal}
+import cats.implicits.{catsSyntaxTuple3Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.NetworkAppClientConfig
@@ -25,7 +25,7 @@ import com.daml.network.sv.onboarding.{
   SetupUtil,
   SvcPartyHosting,
 }
-import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, PackageVetting, TemplateJsonDecoder, UploadablePackage}
@@ -94,15 +94,17 @@ class JoiningNodeInitializer(
       ),
     )
     for {
-      (svcPartyId, _, svParty) <- (
+      (svcPartyId, sponsorSvConnectionAndConfig, svParty) <- (
         getSvcPartyId(initConnection),
         // TODO(#5803) Consider removing this once Canton stops falling apart.
         // Wait for the sponsoring SV which also ensures the domain is initialized.
-        joiningConfig.traverse_ { conf =>
-          retryProvider.waitUntil(
+        joiningConfig.traverse { conf =>
+          retryProvider.getValueWithRetriesNoPretty(
             RetryFor.WaitingOnInitDependency,
             "Sponsoring SV is active",
-            withSvConnection(conf.svClient.adminApi)(_.checkActive()),
+            withSvConnection(conf.svClient.adminApi)(connection =>
+              connection.checkActive().map(_ => conf -> connection)
+            ),
             logger,
           )
         },
@@ -176,8 +178,15 @@ class JoiningNodeInitializer(
               RetryFor.WaitingOnInitDependency,
               show"the SvcRules list the SV party ${svcStore.key.svParty} as a member",
               isOnboarded(svcStore), {
+                val (joiningConfig, svConnection) = sponsorSvConnectionAndConfig.getOrElse(
+                  sys.error(
+                    "An onboarding config is required."
+                  )
+                )
                 withSvStore.startOnboardingWithSvcPartyHosted(
-                  svcAutomation
+                  svcAutomation,
+                  svConnection,
+                  joiningConfig,
                 )
               },
               logger,
@@ -188,8 +197,18 @@ class JoiningNodeInitializer(
             "The SVC party is not authorized to our participant. " +
               "Starting onboarding with SVC party migration."
           )
+          val (joiningConfig, svConnection) = sponsorSvConnectionAndConfig.getOrElse(
+            sys.error(
+              "An onboarding config is required."
+            )
+          )
           withSvStore
-            .startOnboardingWithSvcPartyMigration(initConnection, svcStore)
+            .startOnboardingWithSvcPartyMigration(
+              initConnection,
+              svcStore,
+              svConnection,
+              joiningConfig,
+            )
         }
       _ <- onboard(globalDomain, svcAutomation, svAutomation)
     } yield {
@@ -362,9 +381,12 @@ class JoiningNodeInitializer(
     private val svcParty = svStore.key.svcParty
 
     def startOnboardingWithSvcPartyHosted(
-        svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore]
+        svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+        svConnection: SvConnection,
+        joiningConfig: SvOnboardingConfig.JoinWithKey,
     ): Future[Unit] = {
-      new WithSvcStore(svcStoreWithIngestion).startOnboardingWithSvcPartyHosted()
+      new WithSvcStore(svcStoreWithIngestion)
+        .startOnboardingWithSvcPartyHosted(svConnection, joiningConfig)
     }
 
     /** A private class to share the svcStoreWithIngestion across utility methods. */
@@ -373,16 +395,16 @@ class JoiningNodeInitializer(
     ) {
       private val svcStore: SvSvcStore = svcStoreWithIngestion.store
 
-      def startOnboardingWithSvcPartyHosted(): Future[Unit] = {
-        val SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =
-          joiningConfig.getOrElse(
-            sys.error("An onboarding config is required to start onboarding; exiting.")
-          )
+      def startOnboardingWithSvcPartyHosted(
+          svConnection: SvConnection,
+          joiningConfig: SvOnboardingConfig.JoinWithKey,
+      ): Future[Unit] = {
+        val SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKey) = joiningConfig
         SvUtil.keyPairMatches(publicKey, privateKey) match {
           case Right(privateKey_) =>
             for {
               _ <- requestOnboarding(
-                svClient.adminApi,
+                svConnection,
                 name,
                 participantId,
                 publicKey,
@@ -474,16 +496,16 @@ class JoiningNodeInitializer(
     def startOnboardingWithSvcPartyMigration(
         initConnection: BaseLedgerConnection,
         svcStore: SvSvcStore,
+        svConnection: SvConnection,
+        joiningConfig: SvOnboardingConfig.JoinWithKey,
     ): Future[SvSvcAutomationService] = {
-      joiningConfig.getOrElse(
-        sys.error("An onboarding config is required to start onboarding; exiting.")
-      ) match {
-        case SvOnboardingConfig.JoinWithKey(name, svClient, publicKey, privateKey) =>
+      joiningConfig match {
+        case SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKey) =>
           SvUtil.keyPairMatches(publicKey, privateKey) match {
             case Right(privateKey_) =>
               for {
                 _ <- requestOnboarding(
-                  svClient.adminApi,
+                  svConnection,
                   name,
                   participantId,
                   publicKey,
@@ -538,13 +560,13 @@ class JoiningNodeInitializer(
       )
     }
 
-    private def vetThroughSponsor(sponsorConfig: NetworkAppClientConfig): Future[Unit] = {
+    private def vetThroughSponsor(svConnection: SvConnection): Future[Unit] = {
       logger.info("Vetting packages based on state from sponsor")
       for {
         // This is not a BFT read: That's acceptable because
         // we will only vet packages that have been statically compiled into the app.
         // At most, we can be tricked into vetting a package a bit too early.
-        svcInfo <- withSvConnection(sponsorConfig)(_.getSvcInfo())
+        svcInfo <- svConnection.getSvcInfo()
         coinRules = svcInfo.coinRules
         vetting = new PackageVetting(
           SvPackageVettingTrigger.packages,
@@ -559,7 +581,7 @@ class JoiningNodeInitializer(
     }
 
     private def requestOnboarding(
-        sponsorConfig: NetworkAppClientConfig,
+        svConnection: SvConnection,
         name: String,
         participantId: ParticipantId,
         publicKey: String,
@@ -575,12 +597,12 @@ class JoiningNodeInitializer(
           // we will just crash and retry so it doesn't seem worth the complexity
           // to wrap everything in a giant retry.
           for {
-            _ <- vetThroughSponsor(sponsorConfig)
-            _ = logger.info(s"Requesting to be onboarded via SV at: ${sponsorConfig.url}")
+            _ <- vetThroughSponsor(svConnection)
+            _ = logger.info(s"Requesting to be onboarded via the sponsor SV")
             _ <- retryProvider.retry(
               RetryFor.WaitingOnInitDependency,
               "request onboarding",
-              withSvConnection(sponsorConfig)(_.startSvOnboarding(token)),
+              svConnection.startSvOnboarding(token),
               logger,
             )
           } yield ()

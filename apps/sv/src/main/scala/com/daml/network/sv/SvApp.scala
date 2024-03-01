@@ -13,7 +13,7 @@ import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAV
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.config.{NetworkAppClientConfig, SharedCNNodeAppParameters}
+import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
@@ -23,7 +23,6 @@ import com.daml.network.migration.AcsExporter
 import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.automation.{
   LeaderBasedAutomationService,
@@ -73,7 +72,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import com.digitalasset.canton.DiscardOps
 import io.circe.Json
 import io.circe.syntax.*
 import io.grpc.Status
@@ -131,30 +129,11 @@ class SvApp(
     )
     (for {
       _ <-
-        appInitStep("Ensure participant initialized with expected id") {
+        appInitStep("Ensure participant is initialized with expected id") {
           config.onboarding match {
-            case Some(SvOnboardingConfig.JoinWithKey(_, svClient, _, _)) =>
-              (
-                // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
-                appInitStep("ensure version match") {
-                  retryProvider.waitUntil(
-                    RetryFor.WaitingOnInitDependency,
-                    "version checked via sponsor SV",
-                    // we checkVersionCompatibility on every CN app connection
-                    withSvConnection(svClient.adminApi)(_.checkActive()),
-                    logger,
-                  )
-                },
-                ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
-                  participantAdminConnection,
-                  config.participantBootstrappingDump,
-                  loggerFactory,
-                  retryProvider,
-                ),
-              ).tupled.map(_.discard)
             case Some(SvOnboardingConfig.DomainMigration(_, dumpFilePath)) =>
               logger.info(
-                "We're restoring from a migration dump, ensuring participant is initialized and skipping version checks"
+                "We're restoring from a migration dump, ensuring participant is initialized"
               )
               val participantInitializer = new NodeInitializer(
                 participantAdminConnection,
@@ -168,15 +147,13 @@ class SvApp(
                   .participant
               )
 
-            case _ => {
-              logger.info("Skipping version check")
+            case _ =>
               ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
                 participantAdminConnection,
                 config.participantBootstrappingDump,
                 loggerFactory,
                 retryProvider,
               )
-            }
           }
         }
     } yield ()).andThen { case _ => participantAdminConnection.close() }
@@ -573,13 +550,6 @@ class SvApp(
         )
       )
   }
-
-  private def withSvConnection[T](
-      svConfig: NetworkAppClientConfig
-  )(f: SvConnection => Future[T]): Future[T] =
-    SvConnection(svConfig, retryProvider, loggerFactory).flatMap(con =>
-      f(con).andThen(_ => con.close())
-    )
 
   private def waitUntilConfiguredOnboardingContractsHaveBeenCreated(
       store: SvSvStore
