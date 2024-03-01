@@ -57,7 +57,7 @@ workflow:
           test_names_file: "test-full-class-names.log"
           start_canton_options: "-w -f -m"
           resource_class: "xlarge"
-          parallelism: 8
+          parallelism: 9
           requires:
             - cancel_previous_pipelines
       - scala_test:
