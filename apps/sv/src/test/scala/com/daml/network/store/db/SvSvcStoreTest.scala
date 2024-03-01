@@ -51,7 +51,7 @@ import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
-import com.daml.network.sv.history.{SvcRulesCloseVoteRequest2, SvcRulesExecuteDefiniteVote}
+import com.daml.network.sv.history.SvcRulesCloseVoteRequest2
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.sv.store.{SvStore, SvSvcStore}
@@ -322,30 +322,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         } yield {
           val contracts = result.map(_.contract)
           contracts should contain theSameElementsAs Seq(expiresAtRound3)
-        }
-      }
-
-    }
-
-    "listExpiredVoteRequests" should {
-
-      "return all vote requests that are expired as of now" in {
-        val expired = (1 to 3).map(n =>
-          voteRequest(requester = userParty(n), expiry = Instant.now.minusSeconds(n.toLong * 3600))
-        )
-        val notExpired = (4 to 6).map(n => voteRequest(requester = userParty(n)))
-        for {
-          store <- mkStore()
-          _ <- MonadUtil.sequentialTraverse(expired ++ notExpired)(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-          result <- store.listExpiredVoteRequests()(
-            CantonTimestamp.now(),
-            PageLimit.tryCreate(100),
-          )(traceContext)
-        } yield {
-          val contracts = result.map(_.contract)
-          contracts should contain theSameElementsAs expired
         }
       }
 
@@ -1051,174 +1027,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listVoteResults" should {
-
-      "list all past VoteResults" in {
-        for {
-          store <- mkStore()
-          voteRequestContract = voteRequest(requester = userParty(1))
-          _ <- dummyDomain.create(voteRequestContract)(store.multiDomainAcsStore)
-          votes = (1 to 4).map(n => vote(userParty(n), voteRequestContract.contractId)).toList
-          result = mkExecuteDefiniteVoteResult(voteRequestContract)
-          _ <- MonadUtil.sequentialTraverse(votes)(dummyDomain.create(_)(store.multiDomainAcsStore))
-          _ <- dummyDomain.exercise(
-            contract = svcRules(),
-            interfaceId = Some(SvcRules.TEMPLATE_ID),
-            choiceName = SvcRulesExecuteDefiniteVote.choice.name,
-            mkExecuteDefiniteVote(
-              voteRequestContract.contractId,
-              votes.map(v => Vote.ContractId.fromContractId(v.contractId)).asJava,
-            ),
-            result.toValue,
-          )(
-            store.multiDomainAcsStore
-          )
-        } yield {
-          store
-            .listVoteResults(
-              Some("AddMember"),
-              Some(true),
-              None,
-              None,
-              None,
-              PageLimit.tryCreate(1),
-            )
-            .futureValue
-            .toList
-            .loneElement shouldBe result
-          store
-            .listVoteResults(
-              Some("SRARC_AddMember"),
-              Some(false),
-              None,
-              None,
-              None,
-              PageLimit.tryCreate(1),
-            )
-            .futureValue
-            .toList
-            .size shouldBe (0)
-          store
-            .listVoteResults(
-              None,
-              None,
-              None,
-              None,
-              None,
-              PageLimit.tryCreate(1),
-            )
-            .futureValue
-            .toList
-            .size shouldBe (1)
-          store
-            .listVoteResults(
-              None,
-              None,
-              None,
-              Some(Instant.now().plusSeconds(3600).toString),
-              None,
-              PageLimit.tryCreate(1),
-            )
-            .futureValue
-            .toList
-            .size shouldBe (0)
-          store
-            .listVoteResults(
-              None,
-              None,
-              None,
-              Some(Instant.now().minusSeconds(3600).toString),
-              None,
-              PageLimit.tryCreate(1),
-            )
-            .futureValue
-            .toList
-            .size shouldBe (1)
-        }
-      }
-    }
-
-    "listVotesByVoteRequests" should {
-
-      "return all votes by their VoteRequest contract ids" in {
-        val goodVoteRequests =
-          (1 to 3).map(n => voteRequest(requester = userParty(n)))
-        val badVoteRequests =
-          (4 to 6).map(n => voteRequest(requester = userParty(n)))
-        val goodVotes =
-          (1 to 6).map(n => vote(userParty(n), goodVoteRequests((n - 1) % 3).contractId))
-        val badVotes = (1 to 3).map(n => vote(userParty(n), badVoteRequests(n - 1).contractId))
-        for {
-          store <- mkStore()
-          _ <- MonadUtil.sequentialTraverse(goodVoteRequests ++ badVoteRequests)(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-          _ <- MonadUtil.sequentialTraverse(goodVotes ++ badVotes)(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-          result <- store.listVotesByVoteRequests(goodVoteRequests.map(_.contractId))
-        } yield {
-          result should contain theSameElementsAs (goodVotes)
-        }
-      }
-
-    }
-
-    "lookupVoteRequestByThisSvAndActionWithOffset" should {
-
-      "find the vote request done by this SV and with the passed action" in {
-        val goodAction = addUser666Action
-        val goodVoteRequest =
-          voteRequest(
-            action = goodAction,
-            requester = storeSvParty,
-          )
-        val doneByAnotherSV =
-          voteRequest(
-            action = goodAction,
-            requester = providerParty(1234),
-          )
-        val differentAction =
-          voteRequest(
-            action = addUser667Action,
-            requester = storeSvParty,
-          )
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.create(doneByAnotherSV)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(differentAction)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(goodVoteRequest)(store.multiDomainAcsStore)
-          result <- store.lookupVoteRequestByThisSvAndActionWithOffset(goodAction)
-        } yield {
-          result.value should be(Some(goodVoteRequest))
-        }
-      }
-
-    }
-
-    "lookupVoteByThisSvAndVoteRequestWithOffset" should {
-
-      "find the vote by vote request done by this SV" in {
-        val goodRequest = voteRequest(requester = storeSvParty)
-        val badRequest = voteRequest(requester = providerParty(1234))
-        val goodVote = vote(storeSvParty, goodRequest.contractId)
-        val doneByAnother = vote(providerParty(1234), goodRequest.contractId)
-        val anotherRequest = vote(storeSvParty, badRequest.contractId)
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.create(goodRequest)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(badRequest)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(goodVote)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(doneByAnother)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(anotherRequest)(store.multiDomainAcsStore)
-          result <- store.lookupVoteByThisSvAndVoteRequestWithOffset(goodRequest.contractId)
-        } yield {
-          result.value should be(Some(goodVote))
-        }
-      }
-
-    }
-
   }
 
   lazy val addUser666Action = new ARC_SvcRules(
@@ -1249,30 +1057,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
   lazy val removeUserAction = new ARC_SvcRules(
     new SRARC_OffboardMember(new SvcRules_OffboardMember(userParty(666).toProtoPrimitive))
-  )
-
-  private def mkExecuteDefiniteVote(
-      requestId: VoteRequest.ContractId,
-      voteIds: util.List[Vote.ContractId],
-  ): DamlRecord = {
-    new SvcRules_ExecuteDefiniteVote(
-      requestId,
-      Optional.empty(),
-      voteIds,
-    ).toValue
-  }
-
-  private def mkExecuteDefiniteVoteResult(
-      voteRequestContract: Contract[VoteRequest.ContractId, VoteRequest]
-  ): VoteResult = new VoteResult(
-    voteRequestContract.payload.action,
-    true,
-    false,
-    voteRequestContract.payload.requester,
-    Instant.now(),
-    Instant.now(),
-    (1 to 4).map(n => userParty(n).toProtoPrimitive).toList.asJava,
-    List.empty.asJava,
   )
 
   private def cnsEntryContextPaymentAction(
@@ -1321,46 +1105,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     MonadUtil
       .sequentialTraverse(all)(dummyDomain.create(_)(store.multiDomainAcsStore))
       .map(_ => (oldest, middle, newest))
-  }
-
-  private def voteRequest(
-      requester: PartyId,
-      expiry: Instant = Instant.now().plusSeconds(3600L),
-      action: ActionRequiringConfirmation = addUser666Action,
-  ) = {
-    val template = new VoteRequest(
-      svcParty.toProtoPrimitive,
-      requester.toProtoPrimitive,
-      action,
-      new Reason("https://www.example.com", ""),
-      expiry,
-    )
-
-    contract(
-      VoteRequest.TEMPLATE_ID,
-      new VoteRequest.ContractId(nextCid()),
-      template,
-    )
-  }
-
-  private def vote(
-      requester: PartyId,
-      voteRequestCid: VoteRequest.ContractId,
-  ): Contract[Vote.ContractId, Vote] = {
-    val template = new Vote(
-      svcParty.toProtoPrimitive,
-      voteRequestCid,
-      requester.toProtoPrimitive,
-      true,
-      new Reason("url", "summary"),
-      Instant.now().plusSeconds(3600),
-    )
-
-    contract(
-      Vote.TEMPLATE_ID,
-      new Vote.ContractId(nextCid()),
-      template,
-    )
   }
 
   private def confirmation(n: Int, action: ActionRequiringConfirmation) = {

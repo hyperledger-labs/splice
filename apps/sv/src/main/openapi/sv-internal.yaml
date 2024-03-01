@@ -231,18 +231,6 @@ paths:
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
 
-  /v0/admin/sv/voterequests:
-    get:
-      tags: [sv]
-      x-jvm-package: sv_admin
-      operationId: "listSvcRulesVoteRequests"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListSvcRulesVoteRequestsResponse"
   /v0/admin/sv/voterequests2:
     get:
       tags: [ sv ]
@@ -255,24 +243,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListSvcRulesVoteRequestsResponse"
-  /v0/admin/sv/voteresults:
-    post:
-      tags: [ sv ]
-      x-jvm-package: sv_admin
-      operationId: "listSvcRulesVoteResults"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/ListVoteResultsRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListSvcRulesVoteResultsResponse"
   /v0/admin/sv/voteresults2:
     post:
       tags: [ sv ]
@@ -291,30 +261,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListSvcRulesVoteResultsResponse"
-  /v0/admin/sv/voterequests/{vote_request_contract_id}:
-    get:
-      tags: [sv]
-      x-jvm-package: sv_admin
-      operationId: "lookupSvcRulesVoteRequest"
-      parameters:
-        - name: "vote_request_contract_id"
-          in: "path"
-          required: true
-          schema:
-            type: string
-      responses:
-        "404":
-          description: "VoteRequest contract not found."
-          content:
-            application/json:
-              schema:
-                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/LookupSvcRulesVoteRequestResponse"
   /v0/admin/sv/voterequests2/{vote_request_contract_id}:
     get:
       tags: [ sv ]
@@ -369,43 +315,6 @@ paths:
                 "$ref": "#/components/schemas/GetElectionRequestResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /v0/admin/sv/votes:
-    post:
-      tags: [sv]
-      x-jvm-package: sv_admin
-      operationId: "castVote"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/CastVoteRequest"
-      responses:
-        "201":
-          description: Created
-        "400":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-    put:
-      tags: [sv]
-      x-jvm-package: sv_admin
-      operationId: "updateVote"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/UpdateVoteRequest"
-      responses:
-        "200":
-          description: ok
-        "400":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-        "404":
-          description: "VoteRequest contract not found."
-          content:
-            application/json:
-              schema:
-                $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ErrorResponse"
   /v0/admin/sv/votes2:
     post:
       tags: [ sv ]
@@ -422,24 +331,6 @@ paths:
           description: Created
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /v0/admin/sv/votes-by-request-ids:
-    post:
-      tags: [sv]
-      x-jvm-package: sv_admin
-      operationId: "BatchListVotesByVoteRequests"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/BatchListVotesByVoteRequestsRequest"
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListVotesResponse"
   /v0/admin/sv/voterequest2:
     post:
       tags: [ sv ]
@@ -458,22 +349,6 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListVoteRequest2ByTrackingCidResponse"
-  /v0/admin/sv/voterequest/create:
-    post:
-      tags: [sv]
-      x-jvm-package: sv_admin
-      operationId: "createVoteRequest"
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              "$ref": "#/components/schemas/CreateVoteRequest"
-      responses:
-        "200":
-          description: ok
-        "400":
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /v0/admin/sv/voterequest2/create:
     post:
       tags: [ sv ]
@@ -966,23 +841,6 @@ components:
         - reason_description
       properties:
         vote_request_contract_id:
-          type: string
-        is_accepted:
-          type: boolean
-        reason_url:
-          type: string
-        reason_description:
-          type: string
-
-    UpdateVoteRequest:
-      type: object
-      required:
-        - vote_contract_id
-        - is_accepted
-        - reason_url
-        - reason_description
-      properties:
-        vote_contract_id:
           type: string
         is_accepted:
           type: boolean

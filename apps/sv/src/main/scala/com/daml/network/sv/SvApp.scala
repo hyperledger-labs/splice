@@ -15,7 +15,6 @@ import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
-import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.sv_admin.SvAdminResource
@@ -865,71 +864,6 @@ object SvApp {
     } yield result
   }
 
-  def createVoteRequest(
-      requester: String,
-      action: Json,
-      reasonUrl: String,
-      reasonDescription: String,
-      expiration: Json,
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-      templateJsonDecoder: TemplateJsonDecoder,
-  ): Future[Either[String, Unit]] = {
-    val decodedExpiration = templateJsonDecoder.decodeValue(
-      RelTime.valueDecoder(),
-      RelTime._packageId,
-      "DA.Time.Types",
-      "RelTime",
-    )(expiration)
-    val decodedAction = templateJsonDecoder.decodeValue(
-      ActionRequiringConfirmation.valueDecoder(),
-      ActionRequiringConfirmation._packageId,
-      "CN.SvcRules",
-      "ActionRequiringConfirmation",
-    )(action)
-    svcStoreWithIngestion.store
-      .lookupVoteRequestByThisSvAndActionWithOffset(decodedAction)
-      .flatMap {
-        case QueryResult(_, Some(vote)) =>
-          Future.successful(
-            Left(s"This vote request has already been created ${vote.contractId}.")
-          )
-        case QueryResult(offset, None) =>
-          for {
-            svcRules <- svcStoreWithIngestion.store.getSvcRules()
-            reason = new Reason(reasonUrl, reasonDescription)
-            request = new SvcRules_RequestVote(
-              requester,
-              decodedAction,
-              reason,
-              java.util.Optional.of(decodedExpiration),
-            )
-            cmd = svcRules.exercise(_.exerciseSvcRules_RequestVote(request))
-            _ <- svcStoreWithIngestion.connection
-              .submit(
-                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
-                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
-                cmd,
-              )
-              .withDedup(
-                commandId = CNLedgerConnection.CommandId(
-                  "com.daml.network.sv.requestVote",
-                  Seq(
-                    svcStoreWithIngestion.store.key.svcParty,
-                    svcStoreWithIngestion.store.key.svParty,
-                  ),
-                  action.toString,
-                ),
-                deduplicationOffset = offset,
-              )
-              .yieldUnit()
-          } yield Right(())
-      }
-
-  }
-
   def createVoteRequest2(
       requester: String,
       action: Json,
@@ -994,57 +928,6 @@ object SvApp {
       }
   }
 
-  def castVote(
-      voteRequestCid: cn.svcrules.VoteRequest.ContractId,
-      isAccepted: Boolean,
-      reasonUrl: String,
-      reasonDescription: String,
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[Either[String, cn.svcrules.Vote.ContractId]] = {
-    svcStoreWithIngestion.store
-      .lookupVoteByThisSvAndVoteRequestWithOffset(voteRequestCid)
-      .flatMap {
-        case QueryResult(_, Some(_)) =>
-          Future.successful(
-            Left(s"This vote has already been created for vote request $voteRequestCid.")
-          )
-        case QueryResult(offset, None) =>
-          for {
-            svcRules <- svcStoreWithIngestion.store.getSvcRules()
-            reason = new Reason(reasonUrl, reasonDescription)
-            cmd = svcRules.exercise(
-              _.exerciseSvcRules_CastVote(
-                voteRequestCid,
-                svcStoreWithIngestion.store.key.svParty.toProtoPrimitive,
-                isAccepted,
-                reason,
-              )
-            )
-            res <- svcStoreWithIngestion.connection
-              .submit(
-                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
-                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
-                update = cmd,
-              )
-              .withDedup(
-                commandId = CNLedgerConnection.CommandId(
-                  "com.daml.network.sv.castVote",
-                  Seq(
-                    svcStoreWithIngestion.store.key.svcParty,
-                    svcStoreWithIngestion.store.key.svParty,
-                  ),
-                  voteRequestCid.contractId,
-                ),
-                deduplicationConfig = DedupOffset(offset = offset),
-              )
-              .yieldResult()
-          } yield Right(res.exerciseResult)
-      }
-  }
-
   def castVote2(
       trackingCid: cn.svcrules.VoteRequest2.ContractId,
       isAccepted: Boolean,
@@ -1090,50 +973,6 @@ object SvApp {
             logger,
           )
         } yield Right(res.exerciseResult)
-      }
-  }
-
-  def updateVote(
-      voteCid: cn.svcrules.Vote.ContractId,
-      isAccepted: Boolean,
-      reasonUrl: String,
-      reasonDescription: String,
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
-      logger: TracedLogger,
-  )(implicit
-      ec: ExecutionContext,
-      traceContext: TraceContext,
-  ): Future[Option[cn.svcrules.Vote.ContractId]] = {
-    val reason = new Reason(reasonUrl, reasonDescription)
-    svcStoreWithIngestion.store
-      .lookupVoteById(voteCid)
-      .flatMap {
-        case None =>
-          // The vote of contract id voteCid not found
-          Future.successful(None)
-        case Some(vote) if vote.payload.accept == isAccepted && vote.payload.reason == reason =>
-          logger.info(s"The vote has already been updated to these value ${vote.payload}.")
-          Future.successful(Some(voteCid))
-        case Some(_) =>
-          for {
-            svcRules <- svcStoreWithIngestion.store.getSvcRules()
-            cmd = svcRules.exercise(
-              _.exerciseSvcRules_UpdateVote(
-                voteCid,
-                svcStoreWithIngestion.store.key.svParty.toProtoPrimitive,
-                isAccepted,
-                reason,
-              )
-            )
-            res <- svcStoreWithIngestion.connection
-              .submit(
-                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
-                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
-                update = cmd,
-              )
-              .noDedup
-              .yieldResult()
-          } yield Some(res.exerciseResult)
       }
   }
 

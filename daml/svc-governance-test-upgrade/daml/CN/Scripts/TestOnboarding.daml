@@ -371,7 +371,7 @@ testSvMemberReonboarding = do
       sv = sv4
       beneficiaries = [(sv4, 3 * bpsMultiplier)]
 
-  initateAndAcceptVote2 app [sv1, sv2, sv3] $
+  initiateAndAcceptVote2 app [sv1, sv2, sv3] $
     ARC_SvcRules with
       svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
         member = sv4

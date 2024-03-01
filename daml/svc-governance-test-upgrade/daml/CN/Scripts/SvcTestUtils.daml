@@ -283,46 +283,6 @@ executeAllConfirmedActions app = do
       coinRulesCid = Some coinRulesCid
       confirmationCids = map fst cs
 
-executeAllDefinitiveVotes : CCApp -> Script ()
-executeAllDefinitiveVotes app = do
-  -- get rules and collective summary
-  [(coinRulesCid, _)] <- query @CoinRules app.svc
-  [(svcRulesCid, rules)] <- query @SvcRules app.svc
-  let s = summarizeCollective rules
-  -- query all voting requests visible to svc
-  requests <- query @VoteRequest app.svc
-  forA_ requests $ \(requestCid, _) -> do
-    -- fetch the corresponding votes
-    voteContracts <- queryFilter @Vote app.svc (\vote -> vote.requestCid == requestCid)
-    let votes = map (._2) voteContracts
-    let numYays = length $ filter (.accept) votes
-    let numNays = length $ filter (\vote -> not vote.accept) votes
-    when (numYays >= s.requiredNumVotes || numNays >= s.requiredNumVotes) $
-      void $ submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteDefiniteVote with
-        requestCid
-        coinRulesCid = Some coinRulesCid
-        voteCids = map fst voteContracts
-
-initateAndAcceptVote : CCApp -> [Party] -> ActionRequiringConfirmation -> Script ()
-initateAndAcceptVote _ [] _ = error "initiateAndAcceptVote: require at least one party"
-initateAndAcceptVote app (initiator::others) action = do
-  [(svcRulesCid, _)] <- query @SvcRules app.svc
-
-  requestCid <- submitMulti [initiator] [app.svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
-    requester = initiator
-    action
-    reason = Reason with url = ""; body = "let's get it done"
-    voteRequestTimeout = None
-
-  forA_ others $ \sv ->
-    submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
-        voter = sv
-        requestCid
-        accept = True
-        reason = Reason with url = ""; body = "✓"
-
-  executeAllDefinitiveVotes app
-
 -- TODO(#9298): drop the 2 suffix once the old version is gone
 executeAllDefinitiveVotes2 : CCApp -> Script ()
 executeAllDefinitiveVotes2 app = do
@@ -343,9 +303,9 @@ executeAllDefinitiveVotes2 app = do
         coinRulesCid = Some coinRulesCid
 
 -- TODO(#9298): drop the 2 suffix once the old version is gone
-initateAndAcceptVote2 : CCApp -> [Party] -> ActionRequiringConfirmation -> Script ()
-initateAndAcceptVote2 _ [] _ = error "initiateAndAcceptVote: require at least one party"
-initateAndAcceptVote2 app (initiator::others) action = do
+initiateAndAcceptVote2 : CCApp -> [Party] -> ActionRequiringConfirmation -> Script ()
+initiateAndAcceptVote2 _ [] _ = error "initiateAndAcceptVote: require at least one party"
+initiateAndAcceptVote2 app (initiator::others) action = do
     [(svcRulesCid, _)] <- query @SvcRules app.svc
     requestCid <- submitMulti [initiator] [app.svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
       requester = initiator
@@ -363,22 +323,6 @@ initateAndAcceptVote2 app (initiator::others) action = do
             accept = True
             reason = Reason with url = ""; body = "✓"
 
-
-expireAllExpiredContracts : Party -> Script ()
-expireAllExpiredContracts actor = do
-  now <- getTime
-  votes <- query @Vote actor
-  forA_ votes $ \(cid, vote) ->
-    when (vote.expiresAt <= now) $
-      submit actor $ exerciseCmd cid Vote_Expire
-  voteRequests <- query @VoteRequest actor
-  forA_ voteRequests $ \(cid, voteRequest) ->
-    when (voteRequest.expiresAt <= now) $
-      submit actor $ exerciseCmd cid VoteRequest_Expire
-  confirmation <- query @Confirmation actor
-  forA_ confirmation $ \(cid, confirmation) ->
-    when (confirmation.expiresAt <= now) $
-      submit actor $ exerciseCmd cid Confirmation_Expire
 
 -- | Update all currently desired prices to the target price
 updateAgreedCoinPrice : Party -> Decimal -> Script [ContractId CoinPriceVote]

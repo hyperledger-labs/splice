@@ -6,11 +6,8 @@ import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
-  Vote,
-  VoteRequest,
   VoteRequest2,
   VoteRequestResult2,
-  VoteResult,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
@@ -147,27 +144,6 @@ abstract class SvAppReference(
       httpCommand(HttpSvAdminAppClient.GetDomainNodeIdentitiesDump())
     }
 
-  @Help.Summary("Create a vote request (via admin API)")
-  def createVoteRequest(
-      requester: String,
-      action: ActionRequiringConfirmation,
-      reasonUrl: String,
-      reasonDescription: String,
-      expiration: RelTime,
-  )(implicit tc: TraceContext): Unit = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.CreateVoteRequest(
-          requester,
-          action,
-          reasonUrl,
-          reasonDescription,
-          expiration,
-        )
-      )
-    }
-  }
-
   @Help.Summary("Create a vote request")
   def createVoteRequest2(
       requester: String,
@@ -185,15 +161,6 @@ abstract class SvAppReference(
           reasonDescription,
           expiration,
         )
-      )
-    }
-  }
-
-  @Help.Summary("List vote requests (via admin API)")
-  def listVoteRequests(): Seq[Contract[VoteRequest.ContractId, VoteRequest]] = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.ListVoteRequests
       )
     }
   }
@@ -230,29 +197,6 @@ abstract class SvAppReference(
   }
 
   @Help.Summary("List vote results")
-  def listVoteResults(
-      actionName: Option[String],
-      executed: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: BigInt,
-  ): Seq[VoteResult] = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.ListVoteResults(
-          actionName,
-          executed,
-          requester,
-          effectiveFrom,
-          effectiveTo,
-          limit,
-        )()
-      )
-    }
-  }
-
-  @Help.Summary("List vote results")
   def listVoteRequestResults2(
       actionName: Option[String],
       executed: Option[Boolean],
@@ -275,20 +219,6 @@ abstract class SvAppReference(
     }
   }
 
-  @Help.Summary("Cast a vote (via admin API)")
-  def castVote(
-      voteRequestCid: VoteRequest.ContractId,
-      isAccepted: Boolean,
-      reasonUrl: String,
-      reasonDescription: String,
-  ): Unit = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.CastVote(voteRequestCid, isAccepted, reasonUrl, reasonDescription)
-      )
-    }
-  }
-
   @Help.Summary("Cast a vote")
   def castVote2(
       trackingCid: VoteRequest2.ContractId,
@@ -303,28 +233,6 @@ abstract class SvAppReference(
     }
   }
 
-  @Help.Summary("Update a vote (via admin API)")
-  def updateVote(
-      voteRequestCid: VoteRequest.ContractId,
-      isAccepted: Boolean,
-      reasonUrl: String,
-      reasonDescription: String,
-  ): Unit = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.UpdateVote(voteRequestCid, isAccepted, reasonUrl, reasonDescription)
-      )
-    }
-  }
-
-  @Help.Summary("List votes (via admin API)")
-  def listVotes(voteRequestCid: Vector[String]): Seq[Contract[Vote.ContractId, Vote]] = {
-    consoleEnvironment.run {
-      httpCommand(
-        HttpSvAdminAppClient.ListVotes(voteRequestCid)
-      )
-    }
-  }
 }
 
 final case class SvAppClientReference(

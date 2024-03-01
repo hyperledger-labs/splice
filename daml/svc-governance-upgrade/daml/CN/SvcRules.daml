@@ -252,67 +252,9 @@ data Vote2 = Vote2 with
     -- ^ The reason for voting this way.
   deriving(Eq, Show)
 
-
--- | A request for the other members to vote on the execution of an action requiring confirmation.
--- We use this for implementing on-ledger governance actions triggered by SV operators in a uniform way.
---
--- See the comments on `ActionRequiringConfirmation` for details.
-template VoteRequest
-  with
-    svc : Party
-    requester : Party
-    -- ^ The SV member that requested to execute the action.
-    action : ActionRequiringConfirmation
-    -- ^ The action whose confirmation is required.
-    reason : Reason
-    -- ^ The reason for requesting the execution of the action. Typically a reference to some off-ledger justification.
-    expiresAt : Time
-    -- ^ When this request and its corresponding votes expire.
-  where
-    signatory svc
-
-    choice VoteRequest_Expire : ()
-      controller svc
-      do now <- getTime
-         require "Contract has expired" (expiresAt <= now)
-
--- | A `Vote` created by an SV operator in response to a specific `VoteRequest`.
-template Vote
-  with
-    svc : Party
-    requestCid : ContractId VoteRequest
-    -- ^ The request being responded to.
-    voter : Party
-    accept : Bool
-    -- ^ Whether the responder accepted the request to execute the action or not.
-    reason : Reason
-    -- ^ The reason for voting this way.
-    expiresAt : Time
-    -- ^ When this response expires, which is always set equal to the expiry time of the `VoteRequest`.
-  where
-    signatory svc
-
-    choice Vote_Expire : ()
-      controller svc
-      do now <- getTime
-         require "Contract has expired" (expiresAt <= now)
-
 data Reason = Reason with
     url : Text -- ^ Url pointing to additional background on the reason, ideally using a https://w3c-ccg.github.io/hashlink/
     body : Text -- ^ Freeform text intended for human consumption.
-  deriving (Eq, Show)
-
--- TODO(#8737): solve post-MainNet issues
-data VoteResult = VoteResult with
-    action : ActionRequiringConfirmation -- ^ The action that was voted on.
-    executed : Bool -- ^ Whether the action was executed or not.
-    expired: Bool -- ^ Whether the vote request expired.
-    requester: Party -- ^ Who requested the vote on the action.
-    effectiveAt: Time -- ^ When the result of the vote is effective.
-    votedAt: Time -- ^ When the vote  was finalized.
-    acceptedBy : [Party] -- ^ Parties that definitely cast an accepting vote. There may be parties that did cast an accepting vote that are not listed here due to race conditions or malicious leader actions.
-    rejectedBy : [Party] -- ^ Parties that definitely cast an rejecting vote. There may be parties that did cast a rejecting vote that are not listed here due to race conditions or malicious leader actions.
-    -- TODO(#8737): use the tx-log for querying the votes cast for a particular request
   deriving (Eq, Show)
 
 
@@ -746,159 +688,6 @@ template SvcRules with
             outcome
 
 
-    -- Voting as part of on-ledger governance
-    -----------------------------------------
-
-    nonconsuming choice SvcRules_RequestVote : ContractId VoteRequest
-      with
-        requester : Party
-        action : ActionRequiringConfirmation
-        reason : Reason
-        voteRequestTimeout : Optional RelTime
-      controller requester
-      do
-        require "Initiator is a collective member" (requester `Map.member` members)
-        requireWellformedReason config reason
-        now <- getTime
-        let expiresAt = case voteRequestTimeout of
-              Some value ->
-                now `addRelTime` value
-              None ->
-                now `addRelTime` config.voteRequestTimeout
-        requestCid <- create VoteRequest with
-          svc
-          requester
-          action
-          reason
-          expiresAt
-        -- auto-accept as the requester
-        void $ create Vote with
-          svc
-          requestCid
-          voter = requester
-          accept = True
-          reason = Reason with url = ""; body = "I accept, as I requested the vote."
-          expiresAt
-        pure requestCid
-
-    nonconsuming choice SvcRules_CastVote : ContractId Vote
-      with
-        requestCid : ContractId VoteRequest
-        voter : Party
-        accept : Bool
-        reason : Reason
-      controller voter
-      do
-        -- validate vote parameters
-        requireWellformedReason config reason
-        require "Voter is a collective member" (voter `Map.member` members)
-        -- validate request
-        request <- fetchReferenceData (ForSvc with svc) requestCid
-        ensureNotExpired request.expiresAt
-        -- create vote
-        create Vote with
-          svc
-          requestCid
-          voter
-          accept
-          reason
-          expiresAt = request.expiresAt
-
-    -- | Votes can be updated, which also allows the requester of a `VoteRequest` to update their vote.
-    -- We do not allow `VoteRequest`s to be withdrawn to ensure requests that
-    -- were created are always visible to all SV's for their lifetime.
-    nonconsuming choice SvcRules_UpdateVote : ContractId Vote
-      with
-        voteCid : ContractId Vote
-        voter : Party
-        accept : Bool
-        reason : Reason
-      controller voter
-      do
-        -- validate response
-        requireWellformedReason config reason
-        require "Voter is a collective member" (voter `Map.member` members)
-        -- fetch and archive current vote
-        vote <- fetchAndArchive (ForOwner with svc; owner = voter) voteCid
-        ensureNotExpired vote.expiresAt
-        -- create new vote
-        create Vote with
-          svc
-          requestCid = vote.requestCid
-          voter
-          accept
-          reason
-          expiresAt = vote.expiresAt
-
-    nonconsuming choice SvcRules_ExecuteDefiniteVote : VoteResult
-      with
-        requestCid : ContractId VoteRequest
-        coinRulesCid : Optional( ContractId CoinRules )
-        voteCids : [ContractId Vote]
-      controller leader
-      do
-        -- validate and archive request
-        request <- fetchAndArchive (ForSvc with svc) requestCid
-        ensureNotExpired request.expiresAt
-        -- validate and archive votes
-        let s = summarizeCollective this
-        votes <- validateAndConsumeVotes voteCids svc requestCid members
-        let numYays = length $ filter (.accept) votes
-        let numNays = length $ filter (\vote -> not vote.accept) votes
-        require "A majority was reached" (numYays >= s.requiredNumVotes || numNays >= s.requiredNumVotes)
-        -- determine outcome and execute action if required
-        let execute = numYays >= s.requiredNumVotes
-        when execute $
-          executeActionRequiringConfirmation self coinRulesCid request.action
-        -- store the result of this vote on the return value of the choice
-        -- for display in a transaction history
-        now <- getTime
-        let (acceptedByVotes, rejectedByVotes) = partition (.accept) votes
-        pure $ VoteResult with
-          action = request.action
-          executed = execute
-          expired = False
-          requester = request.requester
-          effectiveAt = case request.action of
-                  ARC_CoinRules with .. ->
-                    case coinRulesAction of
-                      CRARC_AddFutureCoinConfigSchedule choiceArg -> choiceArg.newScheduleItem._1
-                      CRARC_RemoveFutureCoinConfigSchedule choiceArg -> choiceArg.scheduleTime
-                      CRARC_UpdateFutureCoinConfigSchedule choiceArg -> choiceArg.scheduleItem._1
-                      CRARC_MiningRound_Archive _ -> now
-                      CRARC_MiningRound_StartIssuing _ -> now
-                  ARC_SvcRules with .. -> now
-                  ARC_CnsEntryContext with .. -> now
-                  ExtActionRequiringConformation _dummyUnitField -> now
-          votedAt = now
-          acceptedBy = map (.voter) $ acceptedByVotes
-          rejectedBy = map (.voter) $ rejectedByVotes
-
-
-    nonconsuming choice SvcRules_VoteRequest_Expire : VoteResult
-      with
-        requestCid : ContractId VoteRequest
-        choiceArg : VoteRequest_Expire
-        voteCids : [ContractId Vote]
-      controller leader
-      do
-        -- request is consumed by the VoteRequest_Expire choice right below
-        request <- fetchButArchiveLater (ForSvc with svc) requestCid
-        exercise requestCid choiceArg
-        -- collect and archive votes
-        votes <- validateAndConsumeVotes voteCids svc requestCid members
-        let (acceptedByVotes, rejectedByVotes) = partition (.accept) votes
-        pure $ VoteResult with
-          action = request.action
-          executed = False
-          expired = True
-          requester = request.requester
-          effectiveAt = request.expiresAt
-          votedAt = request.expiresAt
-          acceptedBy = map (.voter) $ acceptedByVotes
-          rejectedBy = map (.voter) $ rejectedByVotes
-
-
     -- Voting on the coin price
     ---------------------------
 
@@ -1314,18 +1103,6 @@ template SvcRules with
 -- Utility functions
 --------------------
 
-validateAndConsumeVotes : [ContractId Vote] -> Party -> ContractId VoteRequest -> Map.Map Party MemberInfo -> Update [Vote]
-validateAndConsumeVotes voteCids svc requestCid members = do
-  let forSvc = ForSvc with svc
-  votes <- forA voteCids $ \voteCid -> do
-    vote <- fetchAndArchive forSvc voteCid
-    require "Request matches" (vote.requestCid == requestCid)
-    require "Confirmer is (still) a collective member" (vote.voter `Map.member` members)
-    pure vote
-  -- we expect the leader to pick at most one vote in case there are multiple
-  require "No duplicate voters" (unique $ map (.voter) votes)
-  pure votes
-
 summarizeCollective : SvcRules -> CollectiveSummary
 summarizeCollective svcRules = CollectiveSummary with
     leader = svcRules.leader
@@ -1484,9 +1261,6 @@ instance HasCheckedFetch ElectionRequest ForSvc where
 instance HasCheckedFetch VoteRequest2 ForSvc where
   contractGroupId VoteRequest2 {..} = ForSvc with svc
 
-instance HasCheckedFetch VoteRequest ForSvc where
-  contractGroupId VoteRequest {..} = ForSvc with svc
-
 instance HasCheckedFetch FeaturedAppRight ForSvc where
   contractGroupId FeaturedAppRight {..} = ForSvc with svc
 
@@ -1495,14 +1269,6 @@ instance HasCheckedFetch SvcReward ForSvc where
 
 instance HasCheckedFetch Confirmation ForSvc where
   contractGroupId Confirmation {..} = ForSvc with svc
-
-instance HasCheckedFetch Vote ForSvc where
-  contractGroupId Vote {..} = ForSvc with svc
-
-
-
-instance HasCheckedFetch Vote ForOwner where
-  contractGroupId Vote {..} = ForOwner with svc; owner = voter
 
 instance HasCheckedFetch SvReward ForOwner where
   contractGroupId SvReward {..} = ForOwner with svc; owner = sv

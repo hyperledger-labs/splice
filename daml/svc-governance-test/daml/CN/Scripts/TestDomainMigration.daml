@@ -108,7 +108,7 @@ executeSvcRulesConfigChange : CCApp -> (SvcRulesConfig -> SvcRulesConfig) -> Scr
 executeSvcRulesConfigChange app updateConfig = do
   [(_, svcRules)] <- query @SvcRules app.svc
   let newConfig = updateConfig svcRules.config
-  initateAndAcceptVote app (Map.keys svcRules.members) $
+  initiateAndAcceptVote2 app (Map.keys svcRules.members) $
     ARC_SvcRules with
       svcAction = SRARC_SetConfig SvcRules_SetConfig with newConfig
 
@@ -119,7 +119,7 @@ executeAddCoinConfigSchedule app updateConfig = do
   [(_, svcRules)] <- query @SvcRules app.svc
   [(_, coinRules)] <- query @CoinRules app.svc
   let newSchedule = updateConfig coinRules.configSchedule
-  initateAndAcceptVote app (Map.keys svcRules.members) $
+  initiateAndAcceptVote2 app (Map.keys svcRules.members) $
     ARC_CoinRules with
       coinRulesAction = CRARC_AddFutureCoinConfigSchedule CoinRules_AddFutureCoinConfigSchedule with
         newScheduleItem = head newSchedule.futureValues

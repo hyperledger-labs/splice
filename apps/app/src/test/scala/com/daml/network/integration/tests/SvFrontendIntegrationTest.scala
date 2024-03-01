@@ -3,7 +3,6 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.sv.automation.leaderbased.ExpireVoteRequestTrigger
 import com.daml.network.util.{FrontendLoginUtil, SvTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -21,6 +20,7 @@ import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.cc.coinconfig.CoinConfig
 import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome2.VRO_AcceptedButActionFailed
 import com.daml.network.codegen.java.cn.wallet.payment.Currency
+import com.daml.network.sv.automation.leaderbased.CloseVoteRequest2Trigger
 
 import java.util.Optional
 
@@ -755,7 +755,7 @@ class SvFrontendIntegrationTest
           )
 
           clue("Pausing vote request expiration automation") {
-            sv1Backend.leaderBasedAutomation.trigger[ExpireVoteRequestTrigger].pause().futureValue
+            sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequest2Trigger].pause().futureValue
           }
 
           actAndCheck(
@@ -786,7 +786,7 @@ class SvFrontendIntegrationTest
           )
 
           clue("Resuming vote request expiration automation") {
-            sv1Backend.leaderBasedAutomation.trigger[ExpireVoteRequestTrigger].resume()
+            sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequest2Trigger].resume()
           }
 
           clue("Voting to reject the other vote request") {

@@ -11,11 +11,8 @@ import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
-  Vote,
-  VoteRequest,
   VoteRequest2,
   VoteRequestResult2,
-  VoteResult,
 }
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -186,50 +183,6 @@ object HttpSvAdminAppClient {
       Right(())
     }
   }
-
-  case class CreateVoteRequest(
-      requester: String,
-      action: ActionRequiringConfirmation,
-      reasonUrl: String,
-      reasonDescription: String,
-      expiration: RelTime,
-  )(implicit elc: ErrorLoggingContext)
-      extends BaseCommand[http.CreateVoteRequestResponse, Unit] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.CreateVoteRequestResponse] =
-      client.createVoteRequest(
-        body = definitions.CreateVoteRequest(
-          requester,
-          io.circe.parser
-            .parse(
-              ApiCodecCompressed
-                .apiValueToJsValue(Contract.javaValueToLfValue(action.toValue))
-                .compactPrint
-            )
-            .valueOr(error => throw new IllegalArgumentException(error)),
-          reasonUrl,
-          reasonDescription,
-          io.circe.parser
-            .parse(
-              ApiCodecCompressed
-                .apiValueToJsValue(Contract.javaValueToLfValue(expiration.toValue))
-                .compactPrint
-            )
-            .valueOr(error => throw new IllegalArgumentException(error)),
-        ),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.CreateVoteRequestResponse.OK =>
-      Right(())
-    }
-  }
-
   case class CreateVoteRequest2(
       requester: String,
       action: ActionRequiringConfirmation,
@@ -270,28 +223,6 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.CreateVoteRequest2Response.OK =>
       Right(())
-    }
-  }
-
-  case object ListVoteRequests
-      extends BaseCommand[http.ListSvcRulesVoteRequestsResponse, Seq[
-        Contract[VoteRequest.ContractId, VoteRequest]
-      ]] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListSvcRulesVoteRequestsResponse] =
-      client.listSvcRulesVoteRequests(
-        headers = headers
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.ListSvcRulesVoteRequestsResponse.OK(response) =>
-      response.svcRulesVoteRequests
-        .traverse(req => Contract.fromHttp(VoteRequest.COMPANION)(req))
-        .leftMap(_.toString)
     }
   }
 
@@ -341,51 +272,6 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class ListVoteResults(
-      actionName: Option[String],
-      executed: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: BigInt,
-  )() extends BaseCommand[http.ListSvcRulesVoteResultsResponse, Seq[
-        VoteResult
-      ]] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListSvcRulesVoteResultsResponse] =
-      client.listSvcRulesVoteResults(
-        body = definitions.ListVoteResultsRequest(
-          actionName,
-          executed,
-          requester,
-          effectiveFrom,
-          effectiveTo,
-          limit,
-        ),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.ListSvcRulesVoteResultsResponse.OK(response) =>
-      Right(
-        response.svcRulesVoteResults
-          .map(e =>
-            decoder.decodeValue(
-              VoteResult.valueDecoder(),
-              VoteResult._packageId,
-              "CN.SvcRules",
-              "VoteResult",
-            )(e)
-          )
-          .toSeq
-      )
-    }
-  }
-
   case class ListVoteRequestResults2(
       actionName: Option[String],
       executed: Option[Boolean],
@@ -431,30 +317,6 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class CastVote(
-      voteRequestCid: VoteRequest.ContractId,
-      isAccepted: Boolean,
-      reasonUrl: String,
-      reasonDescription: String,
-  ) extends BaseCommand[http.CastVoteResponse, Unit] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.CastVoteResponse] =
-      client.castVote(
-        body = definitions
-          .CastVoteRequest(voteRequestCid.contractId, isAccepted, reasonUrl, reasonDescription),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.CastVoteResponse.Created =>
-      Right(())
-    }
-  }
-
   case class CastVote2(
       trackingCid: VoteRequest2.ContractId,
       isAccepted: Boolean,
@@ -476,54 +338,6 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.CastVote2Response.Created =>
       Right(())
-    }
-  }
-
-  case class UpdateVote(
-      voteRequestCid: VoteRequest.ContractId,
-      isAccepted: Boolean,
-      reasonUrl: String,
-      reasonDescription: String,
-  ) extends BaseCommand[http.UpdateVoteResponse, Unit] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.UpdateVoteResponse] =
-      client.updateVote(
-        body = definitions
-          .UpdateVoteRequest(voteRequestCid.contractId, isAccepted, reasonUrl, reasonDescription),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.UpdateVoteResponse.OK =>
-      Right(())
-    }
-  }
-
-  case class ListVotes(
-      voteRequestContractIds: Vector[String]
-  ) extends BaseCommand[http.BatchListVotesByVoteRequestsResponse, Seq[
-        Contract[Vote.ContractId, Vote]
-      ]] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.BatchListVotesByVoteRequestsResponse] =
-      client.batchListVotesByVoteRequests(
-        body = definitions.BatchListVotesByVoteRequestsRequest(voteRequestContractIds),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = { case http.BatchListVotesByVoteRequestsResponse.OK(response) =>
-      response.svcRulesVotes
-        .traverse(req => Contract.fromHttp(Vote.COMPANION)(req))
-        .leftMap(_.toString)
     }
   }
 

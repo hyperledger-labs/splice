@@ -6,7 +6,6 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc.coin.*
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
@@ -27,15 +26,9 @@ import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import MultiDomainAcsStore.QueryResult
+import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cn.svc.svstatus.SvStatusReport
-import com.daml.network.sv.store.TxLogEntry.mapActionName
-import com.daml.network.sv.store.{
-  AppRewardCouponsSum,
-  DefiniteVoteTxLogEntry,
-  SvStore,
-  SvSvcStore,
-  TxLogEntry,
-}
+import com.daml.network.sv.store.{AppRewardCouponsSum, SvStore, SvSvcStore, TxLogEntry}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.{
   AssignedContract,
@@ -49,7 +42,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -65,54 +57,6 @@ class InMemorySvSvcStore(
     with SvSvcStore
     with LimitHelpers {
   import InMemorySvSvcStore.*
-
-  override def listVoteResults(
-      actionName: Option[String],
-      executed: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[VoteResult]] = {
-    for {
-      entries <- multiDomainAcsStore
-        .collectTxLogIndicesType[DefiniteVoteTxLogEntry]
-      results = entries.map(_.result.getOrElse(throw txMissingField()))
-      ind = actionName match {
-        case Some(actionName) => results.filter(e => mapActionName(e.action).contains(actionName))
-        case None => results
-      }
-      ind2 = executed match {
-        case Some(executed) => ind.filter(_.executed == executed)
-        case None => ind
-      }
-      ind3 = requester match {
-        case Some(requester) => ind2.filter(_.requester.contains(requester))
-        case None => ind2
-      }
-      records = ind3.flatMap { entry =>
-        val effectiveAt = entry.effectiveAt
-        (effectiveFrom, effectiveTo) match {
-          case (Some(effectiveFromDate), Some(effectiveToDate))
-              if effectiveAt.isAfter(Instant.parse(effectiveFromDate)) && effectiveAt.isBefore(
-                Instant.parse(effectiveToDate)
-              ) =>
-            Some(entry)
-          case (Some(effectiveFromDate), None)
-              if effectiveAt.isAfter(Instant.parse(effectiveFromDate)) =>
-            Some(entry)
-          case (None, Some(effectiveToDate))
-              if effectiveAt.isBefore(Instant.parse(effectiveToDate)) =>
-            Some(entry)
-          case (None, None) =>
-            Some(entry)
-          case _ => None
-        }
-      }
-    } yield applyLimit("listVoteResults", limit, records)
-  }
 
   override def listVoteRequestResults2(
       actionName: Option[String],
@@ -476,20 +420,6 @@ class InMemorySvSvcStore(
       )
   }
 
-  override def listVotesByVoteRequests(
-      voteRequestCids: Seq[VoteRequest.ContractId],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[Contract[Vote.ContractId, Vote]]] = {
-    val cidSet = voteRequestCids.toSet
-    multiDomainAcsStore
-      .filterContracts(
-        cn.svcrules.Vote.COMPANION,
-        { (co: Contract[?, Vote]) => cidSet.contains(co.payload.requestCid) },
-        limit,
-      )
-      .map(_ map (_.contract))
-  }
-
   override def listVoteRequests2ByTrackingCid(
       voteRequestCids: Seq[VoteRequest2.ContractId],
       limit: Limit = Limit.DefaultLimit,
@@ -507,47 +437,11 @@ class InMemorySvSvcStore(
   ): Future[QueryResult[Option[Vote2]]] =
     throw new NotImplementedError("Not gonna bother.")
 
-  override def lookupVoteByThisSvAndVoteRequestWithOffset(voteRequestCid: VoteRequest.ContractId)(
-      implicit tc: TraceContext
-  ): Future[QueryResult[Option[Contract[Vote.ContractId, Vote]]]] =
-    multiDomainAcsStore
-      .findContractWithOffset(cn.svcrules.Vote.COMPANION) { (co: Contract[?, Vote]) =>
-        co.payload.requestCid == voteRequestCid && co.payload.voter == key.svParty.toProtoPrimitive
-      }
-      .map(_ map (_ map (_.contract)))
-
-  override def lookupVoteRequestByThisSvAndActionWithOffset(
-      action: ActionRequiringConfirmation
-  )(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[VoteRequest.ContractId, VoteRequest]]]
-  ] = for {
-    ct <- multiDomainAcsStore.findContractWithOffset(cn.svcrules.VoteRequest.COMPANION) {
-      (co: Contract[?, cn.svcrules.VoteRequest]) =>
-        co.payload.requester == key.svParty.toProtoPrimitive && co.payload.action.toValue == action.toValue
-    }
-  } yield ct map (_ map (_.contract))
-
   override def lookupVoteRequestByThisSvAndActionWithOffset2(
       action: ActionRequiringConfirmation
   )(implicit tc: TraceContext): Future[
     QueryResult[Option[Contract[VoteRequest2.ContractId, VoteRequest2]]]
   ] = throw new NotImplementedError("Not gonna bother.")
-
-  /** List the votes that are eligible to determine the outcome of a vote request;
-    * - the vote must refer to that request
-    * - the vote must be cast by one of the given members
-    * - there must not be any votes cast by the same member
-    */
-  override def listEligibleVotes(
-      voteRequestId: VoteRequest.ContractId,
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[Contract[Vote.ContractId, Vote]]] = for {
-    votes <- multiDomainAcsStore.filterContracts(
-      cn.svcrules.Vote.COMPANION,
-      (c: Contract[?, Vote]) => c.payload.requestCid == voteRequestId,
-      limit,
-    )
-  } yield votes.distinctBy(_.payload.voter).map(_.contract)
 
   override def lookupCoinPriceVoteByThisSv()(implicit
       tc: TraceContext

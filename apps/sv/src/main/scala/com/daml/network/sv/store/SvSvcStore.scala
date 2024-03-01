@@ -22,10 +22,8 @@ import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirm
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   SvcRules_ConfirmSvOnboarding,
-  VoteRequest,
   VoteRequest2,
   VoteRequestResult2,
-  VoteResult,
 }
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
@@ -93,17 +91,6 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   ] = multiDomainAcsStore
     .findAnyContractWithOffset(cn.svcrules.SvcRules.COMPANION)
     .map(_.map(_.flatMap(_.toAssignedContract)))
-
-  def listVoteResults(
-      actionName: Option[String],
-      executed: Option[Boolean],
-      requester: Option[String],
-      effectiveFrom: Option[String],
-      effectiveTo: Option[String],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[VoteResult]]
 
   def listVoteRequestResults2(
       actionName: Option[String],
@@ -274,9 +261,6 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   final def listLockedExpiredCoins
       : ListExpiredContracts[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin] =
     listExpiredRoundBased(cc.coin.LockedCoin.COMPANION)(_.coin)
-
-  def listExpiredVoteRequests(): ListExpiredContracts[VoteRequest.ContractId, VoteRequest] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest.COMPANION)(_.expiresAt)
 
   def listExpiredVoteRequests2(): ListExpiredContracts[VoteRequest2.ContractId, VoteRequest2] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest2.COMPANION)(_.voteBefore)
@@ -726,13 +710,6 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       .listContracts(cn.svc.coinprice.CoinPriceVote.COMPANION, limit)
       .map(_ map (_.contract))
 
-  def listVoteRequests(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
-    Seq[Contract[cn.svcrules.VoteRequest.ContractId, cn.svcrules.VoteRequest]]
-  ] =
-    multiDomainAcsStore
-      .listContracts(cn.svcrules.VoteRequest.COMPANION, limit)
-      .map(_ map (_.contract))
-
   def listVoteRequests2(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
     Seq[Contract[cn.svcrules.VoteRequest2.ContractId, cn.svcrules.VoteRequest2]]
   ] =
@@ -740,12 +717,11 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       .listContracts(cn.svcrules.VoteRequest2.COMPANION, limit)
       .map(_ map (_.contract))
 
-  def lookupVoteRequest(contractId: cn.svcrules.VoteRequest.ContractId)(implicit
+  def lookupVoteByThisSvAndVoteRequestWithOffset2(
+      voteRequestCid: cn.svcrules.VoteRequest2.ContractId
+  )(implicit
       tc: TraceContext
-  ): Future[Option[Contract[cn.svcrules.VoteRequest.ContractId, cn.svcrules.VoteRequest]]] =
-    multiDomainAcsStore
-      .lookupContractById(cn.svcrules.VoteRequest.COMPANION)(contractId)
-      .map(_ map (_.contract))
+  ): Future[QueryResult[Option[cn.svcrules.Vote2]]]
 
   def lookupVoteRequest2(contractId: cn.svcrules.VoteRequest2.ContractId)(implicit
       tc: TraceContext
@@ -762,15 +738,6 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       )
     )
 
-  def listVotesByVoteRequests(
-      voteRequestCids: Seq[cn.svcrules.VoteRequest.ContractId],
-      limit: Limit = Limit.DefaultLimit,
-  )(implicit
-      tc: TraceContext
-  ): Future[
-    Seq[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]
-  ]
-
   def listVoteRequests2ByTrackingCid(
       voteRequestCids: Seq[cn.svcrules.VoteRequest2.ContractId],
       limit: Limit = Limit.DefaultLimit,
@@ -780,45 +747,11 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
     Seq[Contract[VoteRequest2.ContractId, VoteRequest2]]
   ]
 
-  def lookupVoteByThisSvAndVoteRequestWithOffset(
-      voteRequestCid: cn.svcrules.VoteRequest.ContractId
-  )(implicit
-      tc: TraceContext
-  ): Future[QueryResult[Option[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]]]
-
-  def lookupVoteByThisSvAndVoteRequestWithOffset2(
-      voteRequestCid: cn.svcrules.VoteRequest2.ContractId
-  )(implicit
-      tc: TraceContext
-  ): Future[QueryResult[Option[cn.svcrules.Vote2]]]
-
-  def lookupVoteById(voteCid: cn.svcrules.Vote.ContractId)(implicit
-      tc: TraceContext
-  ): Future[Option[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]] =
-    multiDomainAcsStore
-      .lookupContractById(cn.svcrules.Vote.COMPANION)(voteCid)
-      .map(_ map (_.contract))
-
-  def lookupVoteRequestByThisSvAndActionWithOffset(action: ActionRequiringConfirmation)(implicit
-      tc: TraceContext
-  ): Future[
-    QueryResult[Option[Contract[cn.svcrules.VoteRequest.ContractId, cn.svcrules.VoteRequest]]]
-  ]
-
   def lookupVoteRequestByThisSvAndActionWithOffset2(action: ActionRequiringConfirmation)(implicit
       tc: TraceContext
   ): Future[
     QueryResult[Option[Contract[VoteRequest2.ContractId, VoteRequest2]]]
   ]
-
-  /** List the votes that are eligible to determine the outcome of a vote request;
-    * - the vote must refer to that request
-    * - the vote must be cast by one of the given members
-    * - there must not be any votes cast by the same member
-    */
-  def listEligibleVotes(voteRequestId: VoteRequest.ContractId, limit: Limit = Limit.DefaultLimit)(
-      implicit tc: TraceContext
-  ): Future[Seq[Contract[cn.svcrules.Vote.ContractId, cn.svcrules.Vote]]]
 
   def lookupCoinPriceVoteByThisSv()(implicit
       tc: TraceContext
@@ -1043,8 +976,6 @@ object SvSvcStore {
     Seq[ConstrainedTemplate](
       // CoinRules is specially handled so should *not* be listed here, even
       // though it follows SvcRules
-      svcr.Vote.COMPANION,
-      svcr.VoteRequest.COMPANION,
       svcr.VoteRequest2.COMPANION,
       svcr.Confirmation.COMPANION,
       svcr.SvReward.COMPANION,
@@ -1140,15 +1071,6 @@ object SvSvcStore {
           electionRequestEpoch = Some(contract.payload.epoch),
         )
       },
-      mkFilter(cn.svcrules.VoteRequest.COMPANION)(co => co.payload.svc == svc) { contract =>
-        SvcAcsStoreRowData(
-          contract,
-          contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
-          actionRequiringConfirmation =
-            Some(AcsJdbcTypes.payloadJsonFromDefinedDataType(contract.payload.action)),
-          requester = Some(PartyId.tryFromProtoPrimitive(contract.payload.requester)),
-        )
-      },
       mkFilter(cn.svcrules.VoteRequest2.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
@@ -1156,14 +1078,8 @@ object SvSvcStore {
           actionRequiringConfirmation =
             Some(AcsJdbcTypes.payloadJsonFromDefinedDataType(contract.payload.action)),
           requesterName = Some(contract.payload.requester),
-          trackingCid = Some(contract.payload.trackingCid.toScala.getOrElse(contract.contractId)),
-        )
-      },
-      mkFilter(cn.svcrules.Vote.COMPANION)(co => co.payload.svc == svc) { contract =>
-        SvcAcsStoreRowData(
-          contract,
-          voter = Some(PartyId.tryFromProtoPrimitive(contract.payload.voter)),
-          voteRequestCid = Some(contract.payload.requestCid),
+          voteRequestTrackingCid =
+            Some(contract.payload.trackingCid.toScala.getOrElse(contract.contractId)),
         )
       },
       mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc)(
