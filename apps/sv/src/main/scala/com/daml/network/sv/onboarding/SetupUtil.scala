@@ -1,11 +1,5 @@
 package com.daml.network.sv.onboarding
 
-import com.daml.network.environment.RetryProvider
-import com.daml.network.scan.admin.api.client.{ScanConnection, SingleScanConnection}
-import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.config.MigrateSvPartyConfig
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.topology.transaction.*
 import cats.data.EitherT
 import com.daml.network.environment.{
   BaseLedgerConnection,
@@ -13,11 +7,16 @@ import com.daml.network.environment.{
   DarResources,
   ParticipantAdminConnection,
   RetryFor,
+  RetryProvider,
 }
-import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.util.{TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.scan.admin.api.client.{ScanConnection, SingleScanConnection}
+import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.sv.config.{MigrateSvPartyConfig, SvAppBackendConfig}
+import com.daml.network.util.TemplateJsonDecoder
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.logging.{NamedLogging, NamedLoggerFactory}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{Identifier, ParticipantId, PartyId, UniqueIdentifier}
 import com.digitalasset.canton.topology.store.TopologyStoreId
@@ -167,12 +166,24 @@ private[onboarding] object SetupUtil {
     private def importAcs(
         partyId: PartyId,
         scanConfig: ScanAppClientConfig,
-    ): Future[Unit] =
+    ): Future[Unit] = {
+      val requiredDars =
+        Seq(DarResources.cantonCoin.bootstrap, DarResources.svcGovernance.bootstrap)
       for {
-        _ <- participantAdminConnection.uploadDarFiles(
-          Seq(DarResources.cantonCoin.bootstrap, DarResources.svcGovernance.bootstrap)
-            .map(UploadablePackage.fromResource(_)),
+        // dars are uploaded async during the init phase
+        _ <- retryProvider.waitUntil(
           RetryFor.WaitingOnInitDependency,
+          "Required dars are uploaded",
+          participantAdminConnection.listDars().map { dars =>
+            val availablesHases = dars.map(_.hash)
+            if (!requiredDars.forall(dar => availablesHases.contains(dar.darHash.toHexString)))
+              throw Status.FAILED_PRECONDITION
+                .withDescription(
+                  s"Required dars $requiredDars are not yet available"
+                )
+                .asRuntimeException()
+          },
+          logger,
         )
         _ <- participantAdminConnection.disconnectFromAllDomains()
         acsSnapshot <- withScanConnection(scanConfig, clock, retryProvider, loggerFactory) {
@@ -183,6 +194,7 @@ private[onboarding] object SetupUtil {
         _ <- participantAdminConnection.reconnectAllDomains()
         _ = logger.info("ACS import complete")
       } yield ()
+    }
 
     private def withScanConnection[T](
         scanConfig: ScanAppClientConfig,

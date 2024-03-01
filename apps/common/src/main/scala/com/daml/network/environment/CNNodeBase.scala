@@ -1,16 +1,5 @@
 package com.daml.network.environment
 
-import org.apache.pekko.actor.ActorSystem
-import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
-import org.apache.pekko.http.scaladsl.model.{
-  ContentTypes,
-  HttpEntity,
-  HttpHeader,
-  HttpRequest,
-  HttpResponse,
-}
-import org.apache.pekko.http.scaladsl.server.Directive0
-import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.CNNodeMetrics
 import com.daml.network.admin.api.HttpRequestLogger
@@ -37,7 +26,20 @@ import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import org.apache.pekko.actor.ActorSystem
+import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
+import org.apache.pekko.http.scaladsl.model.{
+  ContentTypes,
+  HttpEntity,
+  HttpHeader,
+  HttpRequest,
+  HttpResponse,
+}
+import org.apache.pekko.http.scaladsl.server.Directive0
+import org.apache.pekko.stream.scaladsl.{Flow, Sink, Source}
 
+import java.time
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLContext
 import scala.collection.immutable
@@ -261,6 +263,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
       description: String
   )(f: => Future[T]): Future[T] =
     TraceContext.withNewTraceContext(implicit tc => {
+      val starTime = Instant.now()
       logger.debug(s"$appInitMessage: $description started")(tc)
       // TODO(#5419): here we could pass on the trace context to inner function to make sure all log lines
       // produced by this initialization step are tagged with the same trace id.
@@ -271,7 +274,9 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
         case Success(asyncValue) =>
           asyncValue.transform {
             case result @ Success(_) =>
-              logger.info(s"$appInitMessage: $description finished")(tc)
+              logger.info(s"$appInitMessage: $description finished after ${time.Duration
+                  .between(starTime, Instant.now())
+                  .toString}")(tc)
               result
             case Failure(ex) =>
               logger.info(s"$appInitMessage: $description failed", ex)(tc)
@@ -303,15 +308,18 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   private val ledgerClientF = preInitialize1F.flatMap { _ =>
     appInitStep("Create ledger client") { createLedgerClient() }
   }
-  private val initializeF = ledgerClientF.flatMap { client =>
-    val initConnection = client.readOnlyConnection(
-      this.getClass.getSimpleName,
-      loggerFactory,
-    )
-    appInitStep("Wait for user") { waitForUser(initConnection) }.flatMap(_ =>
-      initializeNode(client)
-    )
+  private val initializeF = appInitStep("Initialize app") {
+    ledgerClientF.flatMap { client =>
+      val initConnection = client.readOnlyConnection(
+        this.getClass.getSimpleName,
+        loggerFactory,
+      )
+      appInitStep("Wait for user") { waitForUser(initConnection) }.flatMap(_ =>
+        appInitStep("Initialize node") { initializeNode(client) }
+      )
+    }
   }
+
   private[network] def getState = initializeF.value match {
     case Some(Success(state)) => Some(state)
     case _ => None

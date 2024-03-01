@@ -1,7 +1,7 @@
 package com.daml.network.sv
 
 import cats.data.OptionT
-import cats.implicits.catsSyntaxTuple2Semigroupal
+import cats.implicits.{catsSyntaxTuple2Semigroupal, catsSyntaxTuple6Semigroupal}
 import cats.instances.future.*
 import cats.syntax.either.*
 import cats.syntax.traverse.*
@@ -73,6 +73,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.DiscardOps
 import io.circe.Json
 import io.circe.syntax.*
 import io.grpc.Status
@@ -129,15 +130,32 @@ class SvApp(
       clock,
     )
     (for {
-      // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
-      _ <- appInitStep("Ensure version match") {
-        tryEnsureVersionMatch(config.onboarding)
-      }
       _ <-
         appInitStep("Ensure participant initialized with expected id") {
           config.onboarding match {
+            case Some(SvOnboardingConfig.JoinWithKey(_, svClient, _, _)) =>
+              (
+                // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
+                appInitStep("ensure version match") {
+                  retryProvider.waitUntil(
+                    RetryFor.WaitingOnInitDependency,
+                    "version checked via sponsor SV",
+                    // we checkVersionCompatibility on every CN app connection
+                    withSvConnection(svClient.adminApi)(_.checkActive()),
+                    logger,
+                  )
+                },
+                ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
+                  participantAdminConnection,
+                  config.participantBootstrappingDump,
+                  loggerFactory,
+                  retryProvider,
+                ),
+              ).tupled.map(_.discard)
             case Some(SvOnboardingConfig.DomainMigration(_, dumpFilePath)) =>
-              logger.info("We're restoring from a migration dump")
+              logger.info(
+                "We're restoring from a migration dump, ensuring participant is initialized and skipping version checks"
+              )
               val participantInitializer = new NodeInitializer(
                 participantAdminConnection,
                 retryProvider,
@@ -150,13 +168,15 @@ class SvApp(
                   .participant
               )
 
-            case _ =>
+            case _ => {
+              logger.info("Skipping version check")
               ParticipantInitializer.ensureParticipantInitializedWithExpectedId(
                 participantAdminConnection,
                 config.participantBootstrappingDump,
                 loggerFactory,
                 retryProvider,
               )
+            }
           }
         }
     } yield ()).andThen { case _ => participantAdminConnection.close() }
@@ -230,24 +250,26 @@ class SvApp(
     )
 
     for {
-      // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
-      // reconnect all domains at the beginning of SV initialization just in case.
-      _ <- appInitStep("Reconnect all domains") {
-        retryProvider.retry(
-          RetryFor.WaitingOnInitDependency,
-          "Reconnect all domains",
-          participantAdminConnection.reconnectAllDomains(),
-          logger,
-        )
-      }
-      participantId <- appInitStep("Get participant ID") {
-        retryProvider.getValueWithRetries(
-          RetryFor.WaitingOnInitDependency,
-          "Participant ID",
-          participantAdminConnection.getParticipantId(),
-          logger,
-        )
-      }
+      (_, participantId) <- (
+        // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
+        // reconnect all domains at the beginning of SV initialization just in case.
+        appInitStep("Reconnect all domains") {
+          retryProvider.retry(
+            RetryFor.WaitingOnInitDependency,
+            "Reconnect all domains",
+            participantAdminConnection.reconnectAllDomains(),
+            logger,
+          )
+        },
+        appInitStep("Get participant ID") {
+          retryProvider.getValueWithRetries(
+            RetryFor.WaitingOnInitDependency,
+            "Participant ID",
+            participantAdminConnection.getParticipantId(),
+            logger,
+          )
+        },
+      ).tupled
       newJoiningNodeInitializer = (joiningConfig: Option[SvOnboardingConfig.JoinWithKey]) =>
         new JoiningNodeInitializer(
           localDomainNode,
@@ -330,53 +352,63 @@ class SvApp(
           }
       }
 
-      // TODO(#5141) Remove the comment about DAR uploads.
-      // We create the validator user only after the SVC party migration and DAR uploads have completed. This avoids two issues:
-      // 1. The ValidatorLicense has both the SVC and the SV as a stakeholder.
-      //    That can cause problems during the SVC party migration because the contract is imported there
-      //    but could also be imported through the stream of the SV party. By only creating the validator user here
-      //    we ensure that the party migration has been completed before the contract is created.
-      // 2. Concurrent DAR uploads currently break Canton's topology state management.
-      _ <- appInitStep("Initialize validator") {
-        SvApp.initializeValidator(svcAutomation, config, retryProvider, logger)
-      }
+      (_, _, isDevNet, _, _, _) <- (
+        // TODO(#5141) Remove the comment about DAR uploads.
+        // We create the validator user only after the SVC party migration and DAR uploads have completed. This avoids two issues:
+        // 1. The ValidatorLicense has both the SVC and the SV as a stakeholder.
+        //    That can cause problems during the SVC party migration because the contract is imported there
+        //    but could also be imported through the stream of the SV party. By only creating the validator user here
+        //    we ensure that the party migration has been completed before the contract is created.
+        // 2. Concurrent DAR uploads currently break Canton's topology state management.
+        appInitStep("Initialize validator") {
+          SvApp.initializeValidator(svcAutomation, config, retryProvider, logger)
+        },
+        // Ensure Daml-level invariants for the SV
+        // ----------------------------------------
 
-      // Ensure Daml-level invariants for the SV
-      // ----------------------------------------
-
-      // At this point the complex setup of SVC party, sequencer, and mediators is done
-      // What remains is setting up some SV-level Daml state.
-      _ <- appInitStep("Expect configured validator onboardings") {
-        expectConfiguredValidatorOnboardings(
-          svAutomation,
-          globalDomain,
-          clock,
-        )
-      }
-      isDevNet <- appInitStep("Get CoinRules to determine if we are in a DevNet") {
-        retryProvider.getValueWithRetriesNoPretty(
-          RetryFor.WaitingOnInitDependency,
-          "get CoinRules to determine if we are in a DevNet",
-          svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
-          logger,
-        )
-      }
-
-      _ <- appInitStep("Ensure coin price has a vote") {
-        config.initialCoinPriceVote
-          .map(
-            ensureCoinPriceVoteHasCoinPrice(
-              _,
-              svcAutomation,
-              logger,
-            )
+        // At this point the complex setup of SVC party, sequencer, and mediators is done
+        // What remains is setting up some SV-level Daml state.
+        appInitStep("Expect configured validator onboardings") {
+          expectConfiguredValidatorOnboardings(
+            svAutomation,
+            globalDomain,
+            clock,
           )
-          .getOrElse(Future.unit)
-      }
-
-      _ <- appInitStep("Wait until configured onboarding contracts have been created") {
-        waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
-      }
+        },
+        appInitStep("Get CoinRules to determine if we are in a DevNet") {
+          retryProvider.getValueWithRetriesNoPretty(
+            RetryFor.WaitingOnInitDependency,
+            "get CoinRules to determine if we are in a DevNet",
+            svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
+            logger,
+          )
+        },
+        appInitStep("Ensure coin price has a vote") {
+          config.initialCoinPriceVote
+            .map(
+              ensureCoinPriceVoteHasCoinPrice(
+                _,
+                svcAutomation,
+                logger,
+              )
+            )
+            .getOrElse(Future.unit)
+        },
+        appInitStep("Dump identities") {
+          SvApp.backupNodeIdentities(
+            config,
+            localDomainNode,
+            svcStore,
+            participantAdminConnection,
+            clock,
+            logger,
+            loggerFactory,
+          )
+        },
+        appInitStep("Wait until configured onboarding contracts have been created") {
+          waitUntilConfiguredOnboardingContractsHaveBeenCreated(svStore)
+        },
+      ).tupled
 
       // We're registering the trafficBalanceService on the LedgerClient after all the SV onboarding steps
       // because we do not want the onboarding to be throttled by the balance check.
@@ -386,18 +418,6 @@ class SvApp(
       verifier = config.auth match {
         case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
         case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
-      }
-
-      _ <- appInitStep("Dump identities") {
-        SvApp.backupNodeIdentities(
-          config,
-          localDomainNode,
-          svcStore,
-          participantAdminConnection,
-          clock,
-          logger,
-          loggerFactory,
-        )
       }
 
       // Start the servers for the SvApp's APIs
@@ -553,34 +573,6 @@ class SvApp(
         )
       )
   }
-
-  private def tryEnsureVersionMatch(
-      onboardingO: Option[SvOnboardingConfig]
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    onboardingO match {
-      case Some(onboarding) =>
-        onboarding match {
-          case SvOnboardingConfig.JoinWithKey(_, svClient, _, _) =>
-            retryProvider.waitUntil(
-              RetryFor.WaitingOnInitDependency,
-              "version checked via sponsor SV",
-              // we checkVersionCompatibility on every CN app connection
-              withSvConnection(svClient.adminApi)(_.checkActive()),
-              logger,
-            )
-          case _: SvOnboardingConfig.FoundCollective =>
-            logger.info("Skipping early version check because we are the founding SV.")
-            Future.unit
-          case _: SvOnboardingConfig.DomainMigration =>
-            logger.info("Skipping version check because we are migrating to upgrade domain.")
-            Future.unit
-        }
-      case None =>
-        // Given that the helm charts we ship to customers always set an
-        // onboaring config, the risk of ending up in this condition is slim.
-        logger.info("Skipping early version check because no onboarding sponsor is configured.")
-        Future.unit
-    }
 
   private def withSvConnection[T](
       svConfig: NetworkAppClientConfig

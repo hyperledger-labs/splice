@@ -7,28 +7,28 @@ import cats.implicits.{
 }
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.*
 import com.daml.network.http.v0.definitions as http
-import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
+import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
-import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
-import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
 import com.daml.network.sv.onboarding.{
   DomainNodeReconciler,
   NodeInitializerUtil,
   SetupUtil,
   SvcPartyHosting,
 }
-import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
+import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
+import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
+import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -46,17 +46,17 @@ import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime}
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
+  StoredTopologyTransactionX,
   TopologyStoreId,
 }
-import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
 import com.digitalasset.canton.topology.transaction.{
   DecentralizedNamespaceDefinitionX,
   SignedTopologyTransactionX,
   TopologyChangeOpX,
   TopologyMappingX,
 }
+import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
@@ -66,7 +66,7 @@ import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.TimeUnit
-import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
@@ -123,19 +123,21 @@ class FoundingNodeInitializer(
         RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
-      svcParty <- setupSvcParty(domainId, initConnection, namespace)
-      svParty <- SetupUtil.setupSvParty(
-        initConnection,
-        config,
-        participantAdminConnection,
-        clock,
-        retryProvider,
-        loggerFactory,
-      )
-      _ <- participantAdminConnection.uploadDarFiles(
-        requiredDars,
-        RetryFor.WaitingOnInitDependency,
-      )
+      (svcParty, svParty, _) <- (
+        setupSvcParty(domainId, initConnection, namespace),
+        SetupUtil.setupSvParty(
+          initConnection,
+          config,
+          participantAdminConnection,
+          clock,
+          retryProvider,
+          loggerFactory,
+        ),
+        participantAdminConnection.uploadDarFiles(
+          requiredDars,
+          RetryFor.WaitingOnInitDependency,
+        ),
+      ).tupled
       storeKey = SvStore.Key(svParty, svcParty)
       svStore = newSvStore(storeKey, config.domainMigrationId)
       svcStore = newSvcStore(svStore.key, config.domainMigrationId)
@@ -144,8 +146,10 @@ class FoundingNodeInitializer(
         svcStore,
         ledgerClient,
       )
-      _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcParty)
-      globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
+      (_, globalDomain) <- (
+        SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcParty),
+        svStore.domains.waitForDomainConnection(config.domains.global.alias),
+      ).tupled
       svcPartyHosting = newSvcPartyHosting(storeKey)
       // NOTE: we assume that SVC party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the SVC party

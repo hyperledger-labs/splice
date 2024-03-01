@@ -111,6 +111,10 @@ class JoiningNodeInitializer(
             domainConfig,
             RetryFor.WaitingOnInitDependency,
           )
+          darUploads = participantAdminConnection.uploadDarFiles(
+            requiredDars,
+            RetryFor.WaitingOnInitDependency,
+          )
           svParty <- SetupUtil.setupSvParty(
             initConnection,
             config,
@@ -119,12 +123,9 @@ class JoiningNodeInitializer(
             retryProvider,
             loggerFactory,
           )
+          _ <- darUploads
         } yield svParty,
       ).tupled
-      _ <- participantAdminConnection.uploadDarFiles(
-        requiredDars,
-        RetryFor.WaitingOnInitDependency,
-      )
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey, config.domainMigrationId)
       svcStore = newSvcStore(svStore.key, config.domainMigrationId)
@@ -134,11 +135,11 @@ class JoiningNodeInitializer(
         ledgerClient,
       )
       globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
+      svcPartyHosting = newSvcPartyHosting(storeKey)
       // We need to first wait to ensure the CometBFT node is caught up
       // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any
       // fault tolerance then it might be blocked until the CometBFT node is caught up.
       _ <- waitUntilCometBftNodeHasCaughtUp
-      svcPartyHosting = newSvcPartyHosting(storeKey)
       svcPartyIsAuthorized <- svcPartyHosting.isSvcPartyAuthorizedOn(
         globalDomain,
         participantId,
@@ -219,24 +220,26 @@ class JoiningNodeInitializer(
       logger,
     )
     for {
-      // Register triggers once the SvcRules are visible and have been ingested
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
         show"the SvcRules and CoinRules are visible",
         svcStore.getSvcRules().map(_ => ()),
         logger,
       )
+      // Register triggers once the SvcRules are visible and have been ingested
       _ = svcAutomationService.registerPostOnboardingTriggers()
       // It is important to wait only here since at this point we may have been added
       // to the decentralized namespace so we depend on our own automation promoting us to
       // submission rights.
-      _ <- waitForSvParticipantToHaveSubmissionRights(svcPartyId, globalDomain)
-      _ <- waitForSvcMembership(svcStore)
-      _ <- SetupUtil.ensureSvcPartyMetadataAnnotation(
-        svSvAutomationService.connection,
-        config,
-        svcPartyId,
-      )
+      _ <- (
+        waitForSvParticipantToHaveSubmissionRights(svcPartyId, globalDomain),
+        waitForSvcMembership(svcStore),
+        SetupUtil.ensureSvcPartyMetadataAnnotation(
+          svSvAutomationService.connection,
+          config,
+          svcPartyId,
+        ),
+      ).tupled
       _ <- domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
         localDomainNode,
         globalDomain,
