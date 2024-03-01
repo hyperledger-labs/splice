@@ -2188,6 +2188,109 @@ function subcmd_hard_domain_migration() {
   _cluster_apply "$version"
 }
 
+# TODO(#9531): Currently, this is not tested regularly.
+subcommand_whitelist[disaster_recovery_test]='Test disaster recovery in a cluster'
+
+function subcmd_disaster_recovery_test() {
+  local version=""
+  version=$(get-snapshot-version)
+
+  _cluster_reset
+
+  _info "Deploying original domain (not prepared for upgrade)"
+  # TODO(#9531): Support validators in disaster recovery test
+  export CN_INSTALL_VALIDATOR1="false"
+  export CN_INSTALL_SPLITWELL="false"
+  _cluster_apply "$version"
+
+  _info "Getting identity dumps"
+  for sv in 1 2 3 4; do
+    token=$(subcmd_get_ui_credentials sv-${sv})
+    id=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/identities-dump" -H "authorization: Bearer ${token}")
+    echo "$id" > id-${sv}.json
+  done
+
+#    TODO(#10438): This test currently doesn't actually kill the domain because that breaks certain things.
+#   _info "Scaling down domain components"
+#   for sv in 1 2 3 4; do
+#     kubectl scale deployment -n sv-${sv} --replicas=0 global-domain-0-cometbft global-domain-0-mediator global-domain-0-sequencer
+#   done
+
+  _info "Finding agreed upon timestamp"
+  for sv in 1 2 3 4; do
+    token=$(subcmd_get_ui_credentials sv-${sv})
+    done=0
+    acs_time=$(date "+%Y-%m-%dT%R:%S.%NZ")
+    while [ $done == 0 ]; do
+        _info "Attempting to get ACS from time $acs_time"
+        data=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$acs_time"'"}' -X GET -H "Content-Type: application/json")
+        snapshot=$(echo "$data" | jq .data_snapshot)
+        if [ "$snapshot" == "null" ]; then
+            error=$(echo "$data" | jq -r .error)
+            if [[ "$error" == UNAVAILABLE_ACS_SNAPSHOT* ]]; then
+                _error "Participant has been pruned, ACS snapshot for requested timestamp is not available (look for UNAVAILABLE_ACS_SNAPSHOT in participant log for more details). Consider increasing journal-garbage-collection-delay in the participants"
+            elif [[ "$error" == INVALID_ACS_SNAPSHOT_TIMESTAMP* ]]; then
+                _info "SV $sv does not have an ACS snapshot for timestamp, trying an earlier one"
+                acs_time=$(date --date="$acs_time"'-5 seconds' "+%Y-%m-%dT%R:%S.%NZ")
+            fi
+        else
+            _info "SV $sv has an ACS snapshot for timestamp $acs_time"
+            done=1
+        fi
+    done
+    date --date "$acs_time" "+%s" >> acs_times
+  done
+
+  earliest=$(sort -n acs_times | head -1)
+  dump_timestamp=$(echo "$earliest" | xargs -I '&' date -d '@&' "+%Y-%m-%dT%R:%S.%NZ")
+  _info "Decided on timestmp for dumps: $dump_timestamp"
+  rm acs_times
+
+  _info "Getting data dumps"
+  for sv in 1 2 3 4; do
+    token=$(subcmd_get_ui_credentials sv-${sv})
+    data=$(curl -s "https://sv.sv-${sv}.svc.${GCP_CLUSTER_BASENAME}.network.canton.global/api/sv/v0/admin/domain/data-snapshot" -H "authorization: Bearer ${token}" -d '{"timestamp": "'"$dump_timestamp"'"}' -X GET -H "Content-Type: application/json")
+    snapshot=$(echo "$data" | jq .data_snapshot)
+    if [ "$snapshot" == "null" ]; then
+        error=$(echo "$data" | jq -r .error)
+        if [[ "$error" == UNAVAILABLE_ACS_SNAPSHOT* ]]; then
+            _error "Participant has been pruned, ACS snapshot for requested timestamp is not available (look for UNAVAILABLE_ACS_SNAPSHOT in participant log for more details). Consider increasing journal-garbage-collection-delay in the participants"
+        elif [[ "$error" == INVALID_ACS_SNAPSHOT_TIMESTAMP* ]]; then
+            _error "ACS dump not available, but is expected to be available from all SV apps for timestamp $dump_timestamp"
+        fi
+    fi
+    id=$(cat id-${sv}.json)
+    dump=$(echo "{\"migration_id\": 1} $id $data" | jq -s add)
+    echo "$dump" > dump${sv}.json
+  done
+
+  _info "Preparing for upgrade (will create the PVCs and mount them to sv apps)"
+  GLOBAL_DOMAIN_PREPARE_UPGRADE="true" _cluster_apply "$version"
+
+  for sv in 1 2 3 4; do
+    pod=$(kubectl get pod -n sv-${sv} -l 'app=sv-app' -o json | jq -r .items[0].metadata.name)
+
+    # Copy dump file to the pvc through the temporary pod
+    kubectl cp "dump${sv}.json" "sv-${sv}/${pod}:/domain-upgrade-dump/domain_migration_dump.json"
+    rm "dump${sv}.json"
+  done
+
+  _info "Deploying new domain"
+  export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
+  export GLOBAL_DOMAIN_PREPARE_UPGRADE="false"
+  _cluster_apply "$version"
+
+  _info "Switching to new domain"
+  unset GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID
+  export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
+  _cluster_apply "$version"
+
+  _info "Installing Splitwell & validator1"
+  export CN_INSTALL_VALIDATOR1="true"
+  export CN_INSTALL_SPLITWELL="true"
+  _cluster_apply "$version"
+}
+
 ################################
 ### Main
 ################################

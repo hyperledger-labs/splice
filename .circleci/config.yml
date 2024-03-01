@@ -2033,6 +2033,47 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
 
+  test_DR:
+    parameters:
+      <<: *cluster-parameter
+      channel_notify:
+        type: string
+        default: C05DT77QF5M
+    machine:
+      image: ubuntu-2204:2024.01.1
+    environment:
+      <<: *env
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - setup_vpn
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Run disaster recovery test
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET \
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET \
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET"
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster disaster_recovery_test
+          cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
+          cmd_retry_count: 2
+          cmd_before_retry: |-
+            echo "VPN connection seems to have died, restarting VPN and retrying..."
+            /tmp/vpn-scripts/restart-vpn.sh
+            cncluster prefresh
+
   preflight_check:
     parameters:
       <<: *cluster-parameter
@@ -3719,6 +3760,98 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - restore_node
+      - hold:
+          name: "hold_DR"
+          <<: *main-branch-never
+          type: approval
+      - docker_images_push:
+          name: "docker_images_push_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - deployment_test:
+          name: "deployment_test_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - test_DR:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchneta"
+          requires:
+            - deployment_test_DR
+            - docker_images_push_DR
+      - preflight_check:
+          name: preflight_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchneta"
+          migration_id: 1
+          parallelism: 1
+          requires:
+            - test_DR
+      - deploy_sv_runbook:
+          name: deploy_sv_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - test_DR
+      - preflight_sv_check:
+          name: preflight_sv_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - test_DR
+      - deploy_validator_runbook:
+          name: deploy_validator_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - test_DR
+      - preflight_validator_check:
+          name: preflight_validator_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - test_DR
+      - reset_cluster:
+          name: reset_cluster_DR
+          <<: *main-branch-never
+          cluster: "scratchneta"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_check_DR
+            - preflight_sv_check_DR
+            - preflight_validator_check_DR
 
   deploy_scratchnetb:
     when:
@@ -3990,6 +4123,98 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - restore_node
+      - hold:
+          name: "hold_DR"
+          <<: *main-branch-never
+          type: approval
+      - docker_images_push:
+          name: "docker_images_push_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - deployment_test:
+          name: "deployment_test_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - test_DR:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchnetb"
+          requires:
+            - deployment_test_DR
+            - docker_images_push_DR
+      - preflight_check:
+          name: preflight_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchnetb"
+          migration_id: 1
+          parallelism: 1
+          requires:
+            - test_DR
+      - deploy_sv_runbook:
+          name: deploy_sv_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - test_DR
+      - preflight_sv_check:
+          name: preflight_sv_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - test_DR
+      - deploy_validator_runbook:
+          name: deploy_validator_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - test_DR
+      - preflight_validator_check:
+          name: preflight_validator_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - test_DR
+      - reset_cluster:
+          name: reset_cluster_DR
+          <<: *main-branch-never
+          cluster: "scratchnetb"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_check_DR
+            - preflight_sv_check_DR
+            - preflight_validator_check_DR
 
   deploy_scratchnetc:
     when:
@@ -4261,6 +4486,98 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - restore_node
+      - hold:
+          name: "hold_DR"
+          <<: *main-branch-never
+          type: approval
+      - docker_images_push:
+          name: "docker_images_push_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - deployment_test:
+          name: "deployment_test_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - test_DR:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchnetc"
+          requires:
+            - deployment_test_DR
+            - docker_images_push_DR
+      - preflight_check:
+          name: preflight_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchnetc"
+          migration_id: 1
+          parallelism: 1
+          requires:
+            - test_DR
+      - deploy_sv_runbook:
+          name: deploy_sv_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - test_DR
+      - preflight_sv_check:
+          name: preflight_sv_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - test_DR
+      - deploy_validator_runbook:
+          name: deploy_validator_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - test_DR
+      - preflight_validator_check:
+          name: preflight_validator_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - test_DR
+      - reset_cluster:
+          name: reset_cluster_DR
+          <<: *main-branch-never
+          cluster: "scratchnetc"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_check_DR
+            - preflight_sv_check_DR
+            - preflight_validator_check_DR
 
   deploy_scratchnetd:
     when:
@@ -4532,6 +4849,98 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - restore_node
+      - hold:
+          name: "hold_DR"
+          <<: *main-branch-never
+          type: approval
+      - docker_images_push:
+          name: "docker_images_push_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - deployment_test:
+          name: "deployment_test_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - test_DR:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchnetd"
+          requires:
+            - deployment_test_DR
+            - docker_images_push_DR
+      - preflight_check:
+          name: preflight_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchnetd"
+          migration_id: 1
+          parallelism: 1
+          requires:
+            - test_DR
+      - deploy_sv_runbook:
+          name: deploy_sv_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - test_DR
+      - preflight_sv_check:
+          name: preflight_sv_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - test_DR
+      - deploy_validator_runbook:
+          name: deploy_validator_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - test_DR
+      - preflight_validator_check:
+          name: preflight_validator_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - test_DR
+      - reset_cluster:
+          name: reset_cluster_DR
+          <<: *main-branch-never
+          cluster: "scratchnetd"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_check_DR
+            - preflight_sv_check_DR
+            - preflight_validator_check_DR
 
   deploy_scratchnete:
     when:
@@ -4803,3 +5212,95 @@ workflows:
             - preflight_check
             - preflight_sv_check
             - restore_node
+      - hold:
+          name: "hold_DR"
+          <<: *main-branch-never
+          type: approval
+      - docker_images_push:
+          name: "docker_images_push_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - deployment_test:
+          name: "deployment_test_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - test_DR:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchnete"
+          requires:
+            - deployment_test_DR
+            - docker_images_push_DR
+      - preflight_check:
+          name: preflight_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "scratchnete"
+          migration_id: 1
+          parallelism: 1
+          requires:
+            - test_DR
+      - deploy_sv_runbook:
+          name: deploy_sv_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - test_DR
+      - preflight_sv_check:
+          name: preflight_sv_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - test_DR
+      - deploy_validator_runbook:
+          name: deploy_validator_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - test_DR
+      - preflight_validator_check:
+          name: preflight_validator_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "scratchnete"
+          requires:
+            - test_DR
+      - reset_cluster:
+          name: reset_cluster_DR
+          <<: *main-branch-never
+          cluster: "scratchnete"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_check_DR
+            - preflight_sv_check_DR
+            - preflight_validator_check_DR

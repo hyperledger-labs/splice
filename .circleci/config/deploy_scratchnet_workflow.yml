@@ -279,3 +279,96 @@
             - preflight_check
             - preflight_sv_check
             - restore_node
+      # DR test
+      - hold:
+          name: "hold_DR"
+          <<: *main-branch-never
+          type: approval
+      - docker_images_push:
+          name: "docker_images_push_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - deployment_test:
+          name: "deployment_test_DR"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - hold_DR
+      - test_DR:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - deployment_test_DR
+            - docker_images_push_DR
+      - preflight_check:
+          name: preflight_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "_CLUSTERNAME_"
+          migration_id: 1
+          parallelism: 1
+          requires:
+            - test_DR
+      - deploy_sv_runbook:
+          name: deploy_sv_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - test_DR
+      - preflight_sv_check:
+          name: preflight_sv_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - test_DR
+      - deploy_validator_runbook:
+          name: deploy_validator_runbook_DR
+          global_domain_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - test_DR
+      - preflight_validator_check:
+          name: preflight_validator_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "_CLUSTERNAME_"
+          requires:
+            - test_DR
+      - reset_cluster:
+          name: reset_cluster_DR
+          <<: *main-branch-never
+          cluster: "_CLUSTERNAME_"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_check_DR
+            - preflight_sv_check_DR
+            - preflight_validator_check_DR
