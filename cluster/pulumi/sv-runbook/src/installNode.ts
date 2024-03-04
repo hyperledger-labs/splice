@@ -215,7 +215,7 @@ async function installSvAndValidator(config: SvConfig) {
   );
   const participantPg = installPostgres(
     xns,
-    `participant-${migrationId}-pg`,
+    `participant-pg`,
     'participant-pg-secret',
     participantPgValues
   );

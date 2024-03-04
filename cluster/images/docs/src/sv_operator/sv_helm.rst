@@ -481,15 +481,10 @@ If you wish to run the Postgres instances as pods in your cluster, you can use t
 
 .. code-block:: bash
 
-    helm install sequencer-${MIGRATION_ID}-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-sequencer.yaml --wait
-    helm install mediator-${MIGRATION_ID}-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-mediator.yaml --wait
-    helm install participant-${MIGRATION_ID}-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-participant.yaml --wait
+    helm install sequencer-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-sequencer.yaml --wait
+    helm install mediator-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-mediator.yaml --wait
+    helm install participant-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-participant.yaml --wait
     helm install apps-pg canton-network-helm/cn-postgres -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/postgres-values-apps.yaml --wait
-
-Note that we use the migration ID when naming postgres releases used by the SV node's Canton components.
-This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
-
-.. TODO(#10511) ^ remove the last comment and fix all of this
 
 Cloud-Hosted Postgres
 +++++++++++++++++++++
@@ -501,7 +496,7 @@ If you wish to use cloud-hosted Postgres instances, please configure and initial
 - Create a user called ``cnadmin`` with the password as configured in the kubernetes secrets above
 
 Note that the default Helm values files used below assume that the Postgres instances are deployed using the Helm charts above,
-thus are accessible at hostname sequencer-0-pg, mediator-0-pg, etc. If you are using cloud-hosted Postgres instances,
+thus are accessible at hostname sequencer-pg, mediator-pg, etc. If you are using cloud-hosted Postgres instances,
 please override the hostnames under `persistence.host` with the IP addresses of the Postgres instances.
 To avoid conflicts across migration IDs,
 you will also need to ensure that `persistence.databaseName` is unique per component (participant, sequencer, mediator) and migration ID.
@@ -684,12 +679,12 @@ namespace. A typical query might look as follows:
     global-domain-0-cometbft-c584c9468-9r2v5     2/2     Running   2 (14m ago)   14m
     global-domain-0-mediator-7bfb5f6b6d-ts5zp    2/2     Running   0             13m
     global-domain-0-sequencer-6c85d98bb6-887c7   2/2     Running   0             13m
-    mediator-0-pg-0                              2/2     Running   0             14m
+    mediator-pg-0                                2/2     Running   0             14m
     participant-0-57579c64ff-wmzk5               2/2     Running   0             14m
-    participant-0-pg-0                           2/2     Running   0             14m
+    participant-pg-0                             2/2     Running   0             14m
     scan-app-b8456cc64-stjm2                     2/2     Running   0             10m
     scan-web-ui-7c6b5b59dc-fjxjg                 2/2     Running   0             10m
-    sequencer-0-pg-0                             2/2     Running   0             14m
+    sequencer-pg-0                               2/2     Running   0             14m
     sv-app-7f4b6f468c-sj7ch                      2/2     Running   0             13m
     sv-web-ui-67bfbdfc77-wwvp9                   2/2     Running   0             13m
     validator-app-667445fdfc-rcztx               2/2     Running   0             10m

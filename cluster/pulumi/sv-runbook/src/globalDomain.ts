@@ -27,7 +27,7 @@ export function installGlobalDomainNode(
   );
   const sequencerPg = installPostgres(
     svNamespace,
-    `sequencer-${migrationId}-pg`,
+    `sequencer-pg`,
     'sequencer-pg-secret',
     sequencerPgValues
   );
@@ -36,7 +36,7 @@ export function installGlobalDomainNode(
   );
   const mediatorPg = installPostgres(
     svNamespace,
-    `mediator-${migrationId}-pg`,
+    `mediator-pg`,
     'mediator-pg-secret',
     mediatorPgValues
   );

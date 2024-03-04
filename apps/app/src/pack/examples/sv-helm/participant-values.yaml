@@ -1,6 +1,5 @@
 persistence:
-  # replace MIGRATION_ID with the current migration ID of the global synchronizer
-  host: participant-MIGRATION_ID-pg
+  host: participant-pg
   secretName: participant-pg-secret
   databaseName: participant_MIGRATION_ID
   schema: participant

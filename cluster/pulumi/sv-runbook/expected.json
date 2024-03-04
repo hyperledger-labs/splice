@@ -352,7 +352,7 @@
         "mediator": {
           "persistence": {
             "databaseName": "mediator_0",
-            "host": "mediator-0-pg",
+            "host": "mediator-pg",
             "secretName": "mediator-pg-secret"
           }
         },
@@ -364,7 +364,7 @@
           },
           "persistence": {
             "databaseName": "sequencer_0",
-            "host": "sequencer-0-pg",
+            "host": "sequencer-pg",
             "secretName": "sequencer-pg-secret"
           }
         }
@@ -380,7 +380,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres/",
       "compat": "true",
-      "name": "mediator-0-pg",
+      "name": "mediator-pg",
       "namespace": "sv",
       "timeout": 480,
       "values": {
@@ -393,7 +393,7 @@
         }
       }
     },
-    "name": "mediator-0-pg",
+    "name": "mediator-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -406,29 +406,6 @@
     "name": "organization/infra/infra.svrun",
     "provider": "",
     "type": "pulumi:pulumi:StackReference"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-postgres/",
-      "compat": "true",
-      "name": "participant-0-pg",
-      "namespace": "sv",
-      "timeout": 480,
-      "values": {
-        "db": {
-          "volumeSize": "48Gi"
-        },
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "persistence": {
-          "secretName": "participant-pg-secret"
-        }
-      }
-    },
-    "name": "participant-0-pg",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
   },
   {
     "custom": true,
@@ -449,13 +426,36 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "persistence": {
           "databaseName": "participant_0",
-          "host": "participant-0-pg",
+          "host": "participant-pg",
           "schema": "participant",
           "secretName": "participant-pg-secret"
         }
       }
     },
     "name": "participant-0",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "participant-pg",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "db": {
+          "volumeSize": "48Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "secretName": "participant-pg-secret"
+        }
+      }
+    },
+    "name": "participant-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -492,7 +492,7 @@
     "inputs": {
       "chart": "/cluster/helm/cn-postgres/",
       "compat": "true",
-      "name": "sequencer-0-pg",
+      "name": "sequencer-pg",
       "namespace": "sv",
       "timeout": 480,
       "values": {
@@ -505,7 +505,7 @@
         }
       }
     },
-    "name": "sequencer-0-pg",
+    "name": "sequencer-pg",
     "provider": "",
     "type": "kubernetes:helm.sh/v3:Release"
   },
@@ -651,7 +651,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-mediator-0-pg-passwd",
+    "name": "sv-mediator-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -663,7 +663,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-participant-0-pg-passwd",
+    "name": "sv-participant-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },
@@ -675,7 +675,7 @@
       "overrideSpecial": "_%@",
       "special": true
     },
-    "name": "sv-sequencer-0-pg-passwd",
+    "name": "sv-sequencer-pg-passwd",
     "provider": "",
     "type": "random:index/randomPassword:RandomPassword"
   },

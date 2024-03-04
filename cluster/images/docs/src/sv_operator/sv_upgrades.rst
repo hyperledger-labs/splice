@@ -63,9 +63,6 @@ While doing so, please note the following:
 * Note that the exposed CometBFT port and CometBFT ``externalAddress`` are changed due to a limitation in CometBFT.
   There is no fundamental need to use the port numbers suggested in the runbook, the only requirement is that either the (external) host IP of the CometBFT pod must be different for each migration ID or its (external) port number.
 * Note that these instructions do not yet support an actual upgrade of the Canton software during a synchronizer migration. We will follow-up with instructions on configuring different Canton versions in a future iteration.
-* Note that you currently also need to repeat the installation steps for postgres components. This limitation will be removed very soon.
-
-.. TODO(#10511) ^ remove the last bullet
 
 .. _sv-upgrades-deploying-apps:
 
@@ -84,16 +81,14 @@ While doing so, please note the following:
   and do not uninstall any helm charts installed as part of the original deployment run (with the smaller migration ID).
 * No ingress rules need to be updated as part of this step.
   Once the redeployment is complete the existing ingress rules will apply to the updated pods.
-* Note that you currently also need to repeat the installation steps for postgres components. This limitation will be removed very soon.
-
-.. TODO(#10511) ^ remove the last bullet
 
 Coordination calls
 ------------------
 
 For keeping upgrade downtimes short and assisting with the quick resolution of individual issues, we propose to perform upgrades in a synchronized manner, with coordination over a group call (Zoom meeting). All SV operators will hereby be invited to join a call that starts shortly before the beginning of the downtime window (step 3 above) and ends once the upgrade and synchronizer migration has concluded (step 8 above). Our aim is that the core of the upgrade procedure (steps 3-8) can in principle be completed within one hour, realizing that the first coordinated tests will likely take longer.
 
-Due to the nature of the steps that SVs will be required to perform, each SV must be represented in these calls by at least one person that is:
+Each SV must be represented in these calls by at least one person that is capable of performing the steps described in :ref:`sv-upgrades-deploying-domain` and :ref:`sv-upgrades-deploying-apps`.
+The operators representing an SV must be:
 
 - Familiar with the technical details around the SV’s deployment.
 - Capable (in terms of both skills and permissions) to interact with the SV’s node deployment via Helm and (for debugging with support from the CN team) Kubernetes (kubectl) commands.
