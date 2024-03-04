@@ -2303,12 +2303,12 @@ jobs:
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> << parameters.expected_migration_id >> scan-app
-                cncluster wait << parameters.namespace_name >> << parameters.expected_migration_id >> sv-app
-                cncluster wait << parameters.namespace_name >> << parameters.expected_migration_id >> validator-app
+                cncluster wait << parameters.namespace_name >> scan-app << parameters.expected_migration_id >>
+                cncluster wait << parameters.namespace_name >> sv-app << parameters.expected_migration_id >>
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.expected_migration_id >>
                 ;;
               "validator1")
-                cncluster wait << parameters.namespace_name >> << parameters.expected_migration_id >> validator-app
+                cncluster wait << parameters.namespace_name >> validator-app << parameters.expected_migration_id >>
                 ;;
             esac
       - notify-cluster-fail:
