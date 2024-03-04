@@ -92,11 +92,6 @@ cluster-parameter: &cluster-parameter
     type: enum
     enum:
       [
-        "scratchneta",
-        "scratchnetb",
-        "scratchnetc",
-        "scratchnetd",
-        "scratchnete",
         "cimain",
         "cidaily",
         "cidaily-testnet",
@@ -105,6 +100,13 @@ cluster-parameter: &cluster-parameter
         "testnet",
         "testnet-preview",
         "observability",
+        "user-selected-scratchnet",
+        # The explicit scratchnets are currently only used by the reaper.
+        "scratchneta",
+        "scratchnetb",
+        "scratchnetc",
+        "scratchnetd",
+        "scratchnete",
         "none",
       ]
     default: "none"

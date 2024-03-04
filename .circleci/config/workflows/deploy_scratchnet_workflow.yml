@@ -1,38 +1,57 @@
 
-  deploy__CLUSTERNAME_:
+  deploy_scratchnet:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
-      - hold:
+      - hold_scratchnet:
           <<: *main-branch-never
+          name: use_scratchneta
           type: approval
-      # Deployment
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetb
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetc
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetd
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnete
+          type: approval
+      - set_scratchnet:
+          <<: *main-branch-never
       - docker_images_push:
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           requires:
-            - hold
+            - set_scratchnet
       - deployment_test:
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           requires:
-            - hold
+            - set_scratchnet
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           requires:
+            - set_scratchnet
             - deployment_test
             - docker_images_push
       - preflight_check:
@@ -42,18 +61,19 @@
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           wait_for_sv: false
           parallelism: 1
           requires:
             - docker_images_push
+            - set_scratchnet
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster_for_migration
       - preflight_sv_check:
@@ -63,13 +83,13 @@
              - artifactory
              - canton-network-vpn
              - slack-context
-           cluster: "_CLUSTERNAME_"
+           cluster: "user-selected-scratchnet"
            requires:
              - deploy_cluster_for_migration
       - backup_cluster:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           context:
             - artifactory
             - canton-network-vpn
@@ -84,7 +104,7 @@
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
           parallelism: 1
           wait_for_sv: false
@@ -98,7 +118,7 @@
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
@@ -114,7 +134,7 @@
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           migration_id: 1
           parallelism: 1
           requires:
@@ -125,7 +145,7 @@
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - trigger_global_domain_migration
           global_domain_active_migration_id: 1
@@ -139,7 +159,7 @@
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - trigger_global_domain_migration
       - deploy_validator_runbook:
@@ -152,7 +172,7 @@
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - migrate_cluster
       - preflight_validator_check:
@@ -163,13 +183,13 @@
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - trigger_global_domain_migration
       - restore_node:
           name: "restore_node_after_migration"
           <<: *main-branch-never
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           namespace_name: "sv-3"
           expected_migration_id: 1
           context:
@@ -182,7 +202,7 @@
             - preflight_check_migrated
       - reset_cluster:
           <<: *main-branch-never
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           context:
             - canton-network-vpn
           requires:
@@ -190,54 +210,79 @@
             - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
-      # Simple deployment with no migration
-      - hold:
-          name: "hold_basic"
+            - deploy_validator_runbook_migrated
+            - migrate_sv_runbook
+
+  # Simple deployment with no migration
+  deploy_scratchnet_basic:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold_scratchnet:
           <<: *main-branch-never
+          name: use_scratchneta
           type: approval
-      # Deployment
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetb
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetc
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetd
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnete
+          type: approval
+      - set_scratchnet:
+          <<: *main-branch-never
       - docker_images_push:
-          name: "docker_images_push_basic"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           requires:
-            - hold_basic
+            - set_scratchnet
       - deployment_test:
-          name: "deployment_test_basic"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           requires:
-            - hold_basic
+            - set_scratchnet
       - deploy_cluster:
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
           # So we want to avoid creating them.
           update_deployment_branch: false
           cancel_workflow_on_failure: true
           requires:
-            - deployment_test_basic
-            - docker_images_push_basic
+            - docker_images_push
+            - deployment_test
+            - set_scratchnet
       - preflight_check:
           <<: *main-branch-never
           context:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           parallelism: 1
           requires:
-            - docker_images_push_basic
+            - docker_images_push
+            - deployment_test
+            - set_scratchnet
       - backup_cluster:
           <<: *main-branch-never
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           context:
             - artifactory
             - canton-network-vpn
@@ -247,7 +292,7 @@
             - deploy_sv_runbook
       - restore_node:
           <<: *main-branch-never
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           namespace_name: "sv-3"
           context:
             - artifactory
@@ -263,7 +308,7 @@
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
       - preflight_sv_check:
@@ -272,7 +317,7 @@
              - artifactory
              - canton-network-vpn
              - slack-context
-           cluster: "_CLUSTERNAME_"
+           cluster: "user-selected-scratchnet"
            requires:
              - deploy_cluster
       - deploy_validator_runbook:
@@ -280,7 +325,7 @@
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
       - preflight_validator_check:
@@ -289,50 +334,71 @@
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
       - reset_cluster:
           <<: *main-branch-never
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           context:
             - canton-network-vpn
           requires:
             - preflight_validator_check
-            - preflight_check
             - preflight_sv_check
             - restore_node
-      # DR test
-      - hold:
-          name: "hold_DR"
+
+
+  deploy_scratchnet_DR:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold_scratchnet:
           <<: *main-branch-never
+          name: use_scratchneta
           type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetb
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetc
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetd
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnete
+          type: approval
+      - set_scratchnet:
+          <<: *main-branch-never
       - docker_images_push:
-          name: "docker_images_push_DR"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           requires:
-            - hold_DR
+            - set_scratchnet
       - deployment_test:
-          name: "deployment_test_DR"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           requires:
-            - hold_DR
+            - set_scratchnet
       - test_DR:
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
-            - deployment_test_DR
-            - docker_images_push_DR
+            - docker_images_push
+            - deployment_test
+            - set_scratchnet
       - preflight_check:
           name: preflight_check_DR
           <<: *main-branch-never
@@ -340,7 +406,7 @@
             - artifactory
             - slack-context
             - canton-network-vpn
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           migration_id: 1
           parallelism: 1
           requires:
@@ -352,7 +418,7 @@
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - test_DR
       - preflight_sv_check:
@@ -362,7 +428,8 @@
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
+          migration_id: 1
           requires:
             - test_DR
       - deploy_validator_runbook:
@@ -372,7 +439,7 @@
           context:
             - artifactory
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           requires:
             - test_DR
       - preflight_validator_check:
@@ -382,16 +449,19 @@
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
+          migration_id: 1
           requires:
             - test_DR
       - reset_cluster:
           name: reset_cluster_DR
           <<: *main-branch-never
-          cluster: "_CLUSTERNAME_"
+          cluster: "user-selected-scratchnet"
           context:
             - canton-network-vpn
           requires:
             - preflight_check_DR
             - preflight_sv_check_DR
             - preflight_validator_check_DR
+            - deploy_validator_runbook_DR
+            - deploy_sv_runbook_DR

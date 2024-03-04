@@ -3,6 +3,10 @@
 # relevant fragment in the .circleci/config directory. and
 # Run .circleci/build-config.sh to update this file.
 #
+# Scala CircleCI 2.0 configuration file
+#
+# Check https://circleci.com/docs/2.0/sample-config/ for more details
+#
 version: 2.1
 orbs:
   slack: circleci/slack@4.9.3
@@ -17,6 +21,8 @@ non_devnet_preflight_params: &non_devnet_preflight_params
   test_names_file: "test-full-class-names-core-preflight-non-devnet.log"
 
 parameters:
+  # Bump this when you change the definition of what is being cached to make sure
+  # old files don't pollute your build.
   cache-version:
     type: string
     default: "34"
@@ -47,15 +53,21 @@ parameters:
         mark-for-testnet,
       ]
     default: build
+  # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
   mark-for-devnet:
     type: boolean
     default: false
+  # Tag the current commit for the next DevNet release if no commit is tagged already.
   mark-for-devnet-if-unmarked:
     type: boolean
     default: false
+  # Overwrite the bootstrapping config for a cluster. If not set,
+  # the cluster will be bootstrapped from the preceeding version of the cluster.
   bootstrapping-config:
     type: string
     default: ""
+  # Whether the cluster should be reset before deploying.
+  # It only makes sense to unset this if you are planning to use CI to fix a broken deployment.
   reset-before-deploy:
     type: boolean
     default: true
@@ -70,8 +82,11 @@ notify-fail: &notify-fail
         command: |
           echo "Sending the following as input to slack/notify"
           echo "{ \"text\": \"*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)\" }"
+    # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
+    # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
     - slack/notify:
         branch_pattern: (deployment\/.*|main)
+        # #team-canton-network-internal-ci
         channel: C05DT77QF5M
         event: fail
         custom: |
@@ -82,11 +97,6 @@ cluster-parameter: &cluster-parameter
     type: enum
     enum:
       [
-        "scratchneta",
-        "scratchnetb",
-        "scratchnetc",
-        "scratchnetd",
-        "scratchnete",
         "cimain",
         "cidaily",
         "cidaily-testnet",
@@ -95,6 +105,13 @@ cluster-parameter: &cluster-parameter
         "testnet",
         "testnet-preview",
         "observability",
+        "user-selected-scratchnet",
+        # The explicit scratchnets are currently only used by the reaper.
+        "scratchneta",
+        "scratchnetb",
+        "scratchnetc",
+        "scratchnetd",
+        "scratchnete",
         "none",
       ]
     default: "none"
@@ -120,9 +137,14 @@ commands:
           mkdir -p ~/.ssh
           touch ~/.ssh/known_hosts
           tee ~/.ssh/known_hosts \<<EOF
+          # github.com:22 SSH-2.0-babeld-579dccec
           github.com ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABgQCj7ndNxQowgcQnjshcLrqPEiiphnt+VTTvDP6mHBL9j1aNUkY4Ue1gvwnGLVlOhGeYrnZaMgRK6+PKCUXaDbC7qtbW8gIkhL7aGCsOr/C56SJMy/BCZfxd1nWzAOxSDPgVsmerOBYfNqltV9/hWCqBywINIR+5dIg6JTJ72pcEpEjcYgXkE2YEFXV1JHnsKgbLWNlhScqb2UmyRkQyytRLtL+38TGxkxCflmO+5Z8CSSNY7GidjMIZ7Q4zMjA2n1nGrlTDkzwDCsw+wqFPGQA179cnfGWOWRVruj16z6XyvxvjJwbz0wQZ75XK5tKSb7FNyeIEs4TT4jk+S4dhPeAUC5y+bDYirYgM4GC7uEnztnZyaVWQ7B381AK4Qdrwt51ZqExKbQpTUNn+EjqoTwvqNj4kqx5QUCI0ThS/YkOxJCXmPUWZbhjpCg56i+2aB6CmK2JGhn57K5mj0MNdBXA4/WnwH6XoPWJzK5Nyu2zB3nAZp+S5hpQs+p1vN1/wsjk=
+          # github.com:22 SSH-2.0-babeld-579dccec
           github.com ecdsa-sha2-nistp256 AAAAE2VjZHNhLXNoYTItbmlzdHAyNTYAAAAIbmlzdHAyNTYAAABBBEmKSENjQEezOmxkZMy7opKgwFB9nkt5YRrYMjNuG5N87uRgg6CLrbo5wAdT/y6v0mKV0U2w0WZ2YB/++Tpockg=
+          # github.com:22 SSH-2.0-babeld-579dccec
           github.com ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl
+          # github.com:22 SSH-2.0-babeld-579dccec
+          # github.com:22 SSH-2.0-babeld-579dccec
           EOF
 
           checkout () {
@@ -132,6 +154,8 @@ commands:
 
             git fetch --tags --force origin
 
+            # We need to checkout main and $CIRCLE_BRANCH also because the todo checker uses `git log main..$CIRCLE_BRANCH`
+            # so both main and the branch have to be local refs
             git checkout main
             git checkout "$CIRCLE_BRANCH"
 
@@ -155,6 +179,7 @@ commands:
         - nix-{{ checksum "/tmp/nix-cache-key" }}
     - run:
        name: Setup Nix
+       # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
        no_output_timeout: "20m"
        command: |
          set -euo pipefail
@@ -162,6 +187,9 @@ commands:
          if [ -f ~/.config/nix/nix.conf ]; then
              exit 0
          fi
+         # Disabling sandbox because:
+         # 1. It doesn't work on CircleCI (sethostname is not allowed)
+         # 2. We don't plan to build anything, so the risk is fairly low
          mkdir -p ~/.config/nix
          cat \<<EOF > ~/.config/nix/nix.conf
          sandbox = false
@@ -189,19 +217,35 @@ commands:
         - /home/circleci/.config/nix
 
 
+  # Note: compiled_classes and sbt_cache commands are largely copied from the Canton repo
+  # save compiled target directories to cache (so we don't recompile everything again and again)
+  # uses the target directories in the project (e.g. `canton-network-node/target`) which sbt doesn't cache.
+  # This cache is not shared among CI jobs.
   save_compiled_classes:
     steps:
       - run:
           name: Creating archive of compiled classes
           command: |
             mkdir -p /tmp/classes
+            # We cache */target/scala/* files and */target/streams/* which
+            # includes everything that is required for SBT to do fast rebuilds
+            # while avoiding issues arising from caching typescript, daml files or anything else.
             find . -type f -a \( -path '*/target/scala*' -o -path '*/target/streams/*' \) | tar --use-compress-program=pigz -cf /tmp/classes/classes.tar.gz --exclude-vcs -T -
       - save_cache:
           name: Uploading archive with compiled classes to cache
+          # Key components:
+          # - classes: fixed prefix for uniqueness
+          # - branch: to prevent re-usage of classes between branches
+          # - dependencies: to prevent re-usage of classes with mismatching libraries (this can lead to subtle errors)
+          # - rev: to allow for updating the cache when sources have changed
+          # - openapi: guardrail does not track dependencies for schema changes properly so we disable the cache if the imported schema changes, see #2747
           key: &compiled_classes_key classes-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} openapi={{ checksum "openapi-cache-key.txt" }} rev:{{ .Revision }}
           paths:
             - /tmp/classes
 
+  # restore pre-compiled target directories from cache (so we don't recompile everything again and again)
+  # uses the target directories in the project (e.g. `canton-network-node/target`) which sbt doesn't cache.
+  # This cache is not shared among CI jobs.
   restore_precompiled_classes:
     parameters:
       reset_classes_if_requested:
@@ -215,8 +259,13 @@ commands:
       - restore_cache:
           name: Downloading archive with compiled classes from cache
           keys:
+            # First, try to download class files from the same revision
             - *compiled_classes_key
+            # Then, try to download the latest class files produced for the same branch.
+            # Make sure that library versions still match.
             - classes-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} openapi={{ checksum "openapi-cache-key.txt" }}
+            # Then, try to download the latest class files produced for the main branch.
+            # Make sure that library versions still match.
             - classes-<< pipeline.parameters.cache-version >> branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} openapi={{ checksum "openapi-cache-key.txt" }}
       - run:
           name: Extracting precompiled classes
@@ -231,10 +280,13 @@ commands:
             if [[ -e /tmp/classes/classes.tar.gz ]]; then
               tar --use-compress-program=pigz -xf /tmp/classes/classes.tar.gz
 
+              # For some reason, the reset below may change file modification times stamps, if we don't run `git status`.
               git status
 
+              # Reset changes to files under version control.
               git reset --hard
 
+              # Delete untracked files, except for ignored files.
               git clean -fd
               echo "Finished restoring the pre-compiled cache files"
 
@@ -246,30 +298,50 @@ commands:
     steps:
       - run:
           name: Make caches readable
+          # On machine executors, some files in the caches may be owned by root.
+          # Make them readable to the cirecleci user.
           command: |
             for dir in "$HOME/.ivy2/cache" "$HOME/.cache/coursier/v1" "$HOME/.sbt"; do
               if [[ -e "$dir" ]]; then
+                # The combination of sudo and `|| true` is a bit of a hack.
+                # The underlying assumption is that chmod is only needed when sudo is available.
+                # Unfortunately, there are jobs where sudo is not available.
                 sudo chmod -R a+r "$dir" || true
               fi
             done
 
       - save_cache:
           name: Uploading Coursier cache
+          # The cache is stored only when the build definition or dependencies change
           key: &coursier-cache-key coursier-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}-buildcommon:{{ checksum "project/BuildCommon.scala" }}-buildproperties={{ checksum "project/build.properties" }}-houserules={{ checksum "project/Houserules.scala" }}-plugins={{ checksum "project/plugins.sbt" }}-build={{ checksum "build.sbt" }}
+          # Components of the cache key:
+          # - Keyword "coursier" to indicate this stores the coursier cache.
+          # - Name of the job, to avoid interferences between jobs. (Different jobs populate the cached folders differently.)
+          # - Dockerfile to start with a clean state if build tools are updated.
+          # - Everything in project that may contain a dependency.
+          # - build.sbt as it may contain a hardcoded dependency.
           paths:
             - "~/.cache/coursier/v1/"
 
       - save_cache:
           name: Uploading Sbt caches
+          # The cache is stored only when the build definition or dependencies change
           key: &sbt-cache-key sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}-buildcommon:{{ checksum "project/BuildCommon.scala" }}-buildproperties={{ checksum "project/build.properties" }}-houserules={{ checksum "project/Houserules.scala" }}-plugins={{ checksum "project/plugins.sbt" }}-build={{ checksum "build.sbt" }}
+          # Components of the cache key:
+          # - Keyword "sbt" to indicate this stores Sbt caches.
+          # - Otherwise as for the coursier cache key.
           paths:
             - "~/.ivy2/cache" # despite sbt 1.3 using coursier it appears a handful of dependencies are placed in the ivy cache (core sbt plugins and coursier itself)
             - "~/.sbt"
 
   restore_sbt_cache:
+    # We are saving to / restoring from several caches to keep individual caches below 500MB.
+    # Otherwise, restore_cache may fail for no good reason.
+    # See https://circleci.com/docs/2.0/caching/#cache-size
     steps:
       - run:
           name: Deleting cache directories
+          # Delete the cache directories so that we don't include arbitrary stuff coming from the docker image.
           command: |
             for dir in "$HOME/.ivy2/cache" "$HOME/.cache/coursier/v1" "$HOME/.sbt"; do
               if [[ -e "$dir" ]]; then
@@ -280,18 +352,29 @@ commands:
       - restore_cache:
           name: Restoring Coursier cache
           keys:
+            # Restore the cache for the exact same build configuration.
             - *coursier-cache-key
+            # Previously, a cache matching CIRCLE_JOB and project/Dependencies.scala was also attempted but
+            # unfortunately sbt and/or coursier fail to detect and use credentials to retrieve missing artifacts
+            # from authenticated repos.
 
       - restore_cache:
           name: Restoring Sbt caches
           keys:
+            # First try to restore the cache for the exact same build configuration.
             - *sbt-cache-key
+            # If this is not possible and Dependencies.scala hasn't changed, populate the cache with slightly outdated data.
+            # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
 
   save_frontend_builds:
     steps:
       - save_cache:
           name: Uploading frontend build artifacts to cache
+          # Components of the cache key:
+          # - Keyword "frontend-builds" for uniqueness
+          # - The branch name
+          # - rev: to allow for updating the cache when sources have changed
           key: &frontend_builds_key frontend-builds-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} daml:{{ checksum "daml/dars.lock" }} openapi:{{ checksum "openapi-cache-key.txt" }} package-lock:{{ checksum "apps/package-lock.json" }} rev:{{ .Revision }}
           paths:
             - ./apps/common/frontend/target
@@ -316,8 +399,11 @@ commands:
       - restore_cache:
           name: Restoring frontend build artifacts from cache
           keys:
+            # Try to download a cache with an exact match
             - *frontend_builds_key
+            # Then, try to download a cache from the same branch
             - frontend-builds-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} daml:{{ checksum "daml/dars.lock" }} openapi:{{ checksum "openapi-cache-key.txt" }} package-lock:{{ checksum "apps/package-lock.json" }}
+            # Then, try to download a cache from main branch
             - frontend-builds-<< pipeline.parameters.cache-version >> branch:main daml:{{ checksum "daml/dars.lock" }} openapi:{{ checksum "openapi-cache-key.txt" }} package-lock:{{ checksum "apps/package-lock.json" }}
 
   save_frontend_node_modules:
@@ -330,6 +416,13 @@ commands:
             find apps/ \( -path '*openapi-ts-client/*' \)  | tar --use-compress-program=pigz -cf /tmp/npm_install/openapi-ts-client.tar.gz -T -
       - save_cache:
           name: Uploading node_modules cache
+          # Components of the cache key:
+          # - Keyword "frontend-npm-install" for uniqueness
+          # - The branch name
+          # - The NPM package lock file
+          # - OpenAPI definitions, since we do not currently version them, so cannot rely on their version number in package-lock
+          # - The BuildCommon sbt file, because it has settings that may affect openapi-typescript generation
+          # - rev: to allow for updating the cache when sources have changed
           key: &frontend_npm_install_key frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} rev:{{ .Revision }}
           paths:
             - /tmp/npm_install
@@ -343,8 +436,11 @@ commands:
       - restore_cache:
           name: Restore npm install cache
           keys:
+            # Try to download a cache with an exact match
             - *frontend_npm_install_key
+            # Then, try to download a cache from the same branch
             - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} buildcommon:{{ checksum "project/BuildCommon.scala" }}
+            # Then, try to download a cache from main branch
             - frontend-npm-install-<< pipeline.parameters.cache-version >> branch:main package-lock:{{ checksum "apps/package-lock.json" }} openapi:{{ checksum "openapi-cache-key.txt" }} buildcommon:{{ checksum "project/BuildCommon.scala" }}
       - run:
           name: Extracting archive of npm dependencies
@@ -365,6 +461,13 @@ commands:
             find . -type d -name ".daml" | tar --use-compress-program=pigz -cvf /tmp/daml/daml.tar.gz -T -
       - save_cache:
           name: Uploading artifacts generated from daml code
+          # Components of the cache key:
+          # - Keyword "daml-artifacts" for uniqueness
+          # - The branch name
+          # - The build configuration (build.properties, BuildCommon.scala, DamlPlugin.scala, build.sbt)
+          # - The CN dars lock file
+          # - The Canton dars lock file, since we cache also artifacts for those dars
+          # - rev: to allow for updating the cache when sources have changed
           key: &daml_artifacts daml-artifacts-<< pipeline.parameters.cache-version >> branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} build={{ checksum "build.sbt" }} daml:{{ checksum "daml/dars.lock" }} cantonDars:{{ checksum "canton/dars.lock" }} rev:{{ .Revision }}
           paths:
             - /tmp/daml
@@ -432,11 +535,14 @@ commands:
               post_slack_message "${slack_mention_text}: your lock on << parameters.cluster >> will :reaper: soon. Renew your lease to keep using it.\n*Don't forget to unlock & reset your cluster if you're done using it early!*"
             fi
 
+  # Largely copied from Canton's CI definition
   execute_sbt_command:
     description: |
       A context within which SBT commands can be run correctly for our needs
     parameters:
       cmd:
+        # This may contain several commands.
+        # The caller needs to quote commands that contain spaces, e.g. "\"testOnly myTest\"".
         type: string
       cmd_retry_count:
         description: Number of times to retry the command
@@ -461,6 +567,7 @@ commands:
         type: string
         default: "10m"
       succeed_on_error:
+        # Will cause the command to always succeed regardless of the sbt exit code.
         type: boolean
         default: false
       extra_parameters:
@@ -470,6 +577,7 @@ commands:
         type: string
         default: ""
       fail_on_error_in_output:
+        # Fail if there is an error in the sbt output.
         default: true
         type: boolean
       pre_sbt_cmd:
@@ -496,6 +604,7 @@ commands:
           cmd: |
             on_exit() {
               local CODE="$?"
+              # Provide some explanation on exit
               if [ "$CODE" == 0 ]
               then
                 echo "sbt terminated successfully."
@@ -516,23 +625,33 @@ commands:
             trap on_exit EXIT
 
             set -euo pipefail
+            # Necessary for tests of the REPL
             export TERM=dumb
 
+            # This might help resolve https://github.com/DACH-NY/canton-network-node/issues/8146
             export PROTOCBRIDGE_NO_CLEANUP="1"
 
             run_sbt() {
                export << parameters.extra_env_vars >>
+               # Define sbt command
                SBT_CMD=(sbt -verbose)
 
+               # Add extra parameters
                SBT_CMD+=(<< parameters.extra_parameters >>)
 
+               # Add sbt commands.
+               # Do not quote this, to allow the caller to pass in several commands.
+               # The caller needs to take care of quoting, if a command contains spaces.
                SBT_CMD+=(<< parameters.cmd >>)
 
+               # Setup heap size; corresponds to Canton large executors
                SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
+               # Run command
                timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
                  tee sbt_output
 
                 <<# parameters.fail_on_error_in_output >>
+                # Check and report whether sbt has output errors
                 .circleci/canton-scripts/check-sbt-output.sh "sbt_output"
                 <</ parameters.fail_on_error_in_output >>
             }
@@ -585,6 +704,8 @@ commands:
         type: boolean
         default: false
     steps:
+      - get_cluster:
+          cluster: << parameters.cluster >>
       - run:
           name: << parameters.cmd_name >>
           when: << parameters.when >>
@@ -595,6 +716,7 @@ commands:
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
             ADDITIONAL_NIX_ARGS="<< parameters.additional_nix_args >>"
 
+            # Attempt to build the nix env with retries to work around transient download failures
             MAX_RETRY_NIX_ENV=5
             NIX_ENV_TRY_COUNT=0
             until [ $NIX_ENV_TRY_COUNT -ge $MAX_RETRY_NIX_ENV ]
@@ -622,6 +744,7 @@ commands:
               exit 1
             fi
 
+            # Run the command for real within the nix environment
             nix develop \
               path:nix \
               --ignore-environment \
@@ -636,18 +759,20 @@ commands:
               --keep GCP_DA_CN_SCRATCHNET_KEY \
               --keep GCP_DA_CN_SCRATCHNET2_KEY \
               --keep CIRCLE_BRANCH \
+              --keep TARGET_CLUSTER \
               $ADDITIONAL_NIX_ARGS \
               --command bash \<<'EOF'
 
               set -euo pipefail
 
               . .envrc.vars
-              if [[ << parameters.cluster >> != none ]]; then
-                . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
+              if [[ "$TARGET_CLUSTER" != none ]]; then
+                . $REPO_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
               fi
 
               if [[ << parameters.gce_authenticate >> == true ]]; then
-                echo "Authenticating to cluster \"<< parameters.cluster >>\" in project \"${CLOUDSDK_CORE_PROJECT}\""
+                # Authenticate to the correct GCP project for the cluster
+                echo "Authenticating to cluster \"$TARGET_CLUSTER\" in project \"${CLOUDSDK_CORE_PROJECT}\""
                 case ${CLOUDSDK_CORE_PROJECT} in
                   da-cn-scratchnet)
                     export CN_ACTIVE_ENVIRONMENT_KEY="${GCP_DA_CN_SCRATCHNET_KEY}"
@@ -675,8 +800,11 @@ commands:
                     ;;
                 esac
 
+                # GOOGLE_CREDENTIALS variable is used by pulumi
                 export GOOGLE_CREDENTIALS=${CN_ACTIVE_ENVIRONMENT_KEY}
 
+                # TODO(#7702) Extract retry logic for CI tasks into command/script
+                # gcloud auth with a limited number of retries
                 MAX_AUTH_RETRIES=5
                 AUTH_TRY_COUNT=0
                 AUTH_RETRY_WAIT=30
@@ -684,6 +812,7 @@ commands:
                 do
                     echo "Trying gcloud auth. Attempt #$[AUTH_TRY_COUNT+1]"
 
+                    # Try to authenticate and break retry loop in case of success
                     echo ${CN_ACTIVE_ENVIRONMENT_KEY} | gcloud auth activate-service-account --key-file=- && break
 
                     AUTH_TRY_COUNT=$[$AUTH_TRY_COUNT+1]
@@ -702,6 +831,13 @@ commands:
               until [ $n -gt $MAX_RETRY ]
               do
                   cmd_wrapper() {
+                    # We write the cmd to a separate file. That way `set -e` statements in the cmd will take effect
+                    # despite us using this in a tested context below where they would usually be disabled.
+                    # See https://gist.github.com/cocreature/9c345b75b7dad05ed32865b21c1b0460 for a minimal example
+                    # of what happens if we just call parameters.cmd directly.
+                    # We enforce set -euo pipefail by including it in all the commands. Even if the command has already set it, then it will have no effect
+                    # but this way we ensure all the commands will fail on error and no lead to confusing behaviour
+                    # append random string to the cmd.sh file to avoid parallel steps writing and executing the same cmd.sh files
                     CMD_FILE=$(mktemp cmd-XXXXXX.sh)
                     cat \<<'EOF2' > $CMD_FILE
                     set -euo pipefail
@@ -732,6 +868,8 @@ commands:
         default: false
     steps:
       - upload_test_reports
+      # sbt caches are job-specific, so we're ignoring the upload_caches parameter,
+      # and saving those caches in every job
       - save_sbt_cache
       - when:
           condition: << parameters.upload_caches >>
@@ -751,6 +889,7 @@ commands:
           when: always
           command: |
             if [[ -d log ]]; then
+              # pigz fails if there is no file to compress, which can be the case if Canton just rolled its logs
               pigz -r log/* || true
             fi
       - store_artifacts:
@@ -768,6 +907,7 @@ commands:
             for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
             do
               mkdir -p test-reports/"$subproject"
+              # Keep going, if there is no test report.
               cp -v "$subproject"/target/test-reports/TEST-*.xml test-reports/"$subproject" || true
             done
       - store_test_results:
@@ -781,12 +921,14 @@ commands:
       - restore_frontend_node_modules
       - restore_daml_artifacts
 
+  # Adapted from Canton's CI definition
   split_tests_for_parallel_run:
     description: split tests for parallel execution
     parameters:
       test_names_file:
         type: string
     steps:
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
           cmd: "update"
           cmd_retry_count: 3
@@ -797,6 +939,9 @@ commands:
           name: Splitting tests
           command: |
             echo "[fix negative test times]"
+            # scalatest actually reported occasionally test times with negative numbers
+            # this confused the circleci test runner. the easiest fix (suggested by circleci)
+            # is to use sed to adapt any such time and set it to 0
             TIMING_DATA_FILE="$CIRCLE_INTERNAL_TASK_DATA/circle-test-results/results.json"
             if [[ -e $TIMING_DATA_FILE ]]; then
               sed -ri 's/"run_time": ?\-[0-9]+\.?[0-9]+,/"run_time":0.0,/g' "$TIMING_DATA_FILE"
@@ -804,6 +949,11 @@ commands:
             echo "[split tests ${extraargs}]"
             rm -f tests-to-run.txt
 
+            # Set time-default to 5 minutes so that tests with unknown duration get distributed evenly.
+            # (The default for tests with unknown duration would be 1s.)
+            # The tests run command wants to invoke the test runner for each test. That doesn't work for us.
+            # However, what we do instead is we just print the tests it wants to run into a file and pass
+            # that content then to sbt ...
             n=0
             MAX_RETRY=5
             until [ $n -gt $MAX_RETRY ]; do
@@ -818,6 +968,7 @@ commands:
             fi
 
 
+            # if we are re-running but don't have anything todo, then the file won't be there and we can halt
             if [ -e tests-to-run.txt ]; then
               splitted=$(cat tests-to-run.txt)
               tests=$(echo $splitted | tr '\n' ' ')
@@ -849,6 +1000,7 @@ commands:
             ./start-canton.sh << parameters.start_canton_options >> -b
           background: true
           additional_nix_args: "--keep CIRCLE_USERNAME --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_NUM --keep CIRCLE_JOB --keep CIRCLE_NODE_INDEX --keep PROMETHEUS_REMOTE_WRITE_JWT"
+          # Retrying as sometimes it fails finding the images
           cmd_retry_count: 3
 
   stop_canton:
@@ -876,6 +1028,7 @@ commands:
           cmd: |
             ./wait-for-canton.sh << parameters.start_canton_options >>
       - execute_sbt_command:
+          # run all tests except the live cluster ones
           pre_sbt_cmd: |
             << parameters.pre_sbt_cmd >>
           extra_env_vars: POSTGRES_DB=postgres
@@ -883,6 +1036,9 @@ commands:
           post_sbt_cmd: << parameters.post_sbt_cmd >>
           additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
           extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
+          # it is in our best interest for our tests to be faster than this,
+          # but failing CI because of slow tests is also not very nice
+          # TODO(#8608): reduce `timeout` to at least 25m again
           timeout: "35m"
           no_output_timeout: "20m"
       - execute_sbt_command:
@@ -893,6 +1049,7 @@ commands:
       - run:
           name: Install VPN client
           command: |
+            # Retry because we've seen Ubuntu be down sometimes.
             n=0
             until [ $n -gt 50 ]; do
               sudo apt-get update && break
@@ -917,18 +1074,30 @@ commands:
                            append = yes
                            default = 1
                      }
+                    # Uncomment to log also to stderr (but that pollutes also the test step in case we retry there after a VPN failure)
+                    #  stderr {
+                    #        ike = 2
+                    #  }
                  }
             }
       - run:
           name: Copy vpn-related scripts
           command: |
+            # We're copying the vpn scripts out of the repo so that we can use them also later,
+            # after we checkout an older commit for preflight checks. For vpn scripts, always
+            # using the latest version seems the most sensible anyway.
             cp -r .circleci/vpn-scripts /tmp
       - run:
           name: Dump public IP
           command: curl checkip.amazonaws.com
       - run:
           name: Start VPN connection
+          # the charon-cmd process must remain running throughout the whole job,
+          # so run this step in the background to allow subsequent steps to continue
           background: true
+          # we use an "expect" script to spawn charon-cmd, and supply credentials,
+          # because the interactive password prompt reads directly from
+          # /dev/tty rather than stdin, and simple IO piping doesn't work
           command: |
             /usr/bin/sudo touch /var/log/vpn.log
             /usr/bin/sudo chmod a+w /var/log/vpn.log
@@ -936,6 +1105,9 @@ commands:
       - run:
           name: Define local hostname
           command: |
+              # Some CircleCI machine failed to resolve local hostname to 127.0.0.1.
+              # Giving "sudo: unable to resolve host ip-172-28-55-xx" for sudo commands
+              # This (hacky) step should fix the issue (copied from https://circleci.com/developer/orbs/orb/kindred/kin-l2tp-vpn)
               hostname=$(cat /etc/hostname)
               grep -qxF "127.0.0.1 ${hostname}" /etc/hosts || echo "127.0.0.1 ${hostname}" | sudo tee -a /etc/hosts
       - run:
@@ -999,6 +1171,8 @@ commands:
           command: |
             echo "export FAILED_PARALLEL_RUN_URL=\"https://app.circleci.com/pipelines/github/${CIRCLE_PROJECT_USERNAME}/${CIRCLE_PROJECT_REPONAME}/<< pipeline.number >>/workflows/${CIRCLE_WORKFLOW_ID}/jobs/${CIRCLE_BUILD_NUM}/parallel-runs/${CIRCLE_NODE_INDEX}\"" >> "$BASH_ENV"
 
+  # Actually downloading the logs is too slow so we only print the command and ask people
+  # to run it for the apps they really need.
   print_gcloud_logs_commands:
     parameters:
       <<: *cluster-parameter
@@ -1009,6 +1183,7 @@ commands:
           cluster: << parameters.cluster >>
           gce_authenticate: true
           cmd: |
+            # download various interesting logs since "20 minutes ago"
             duration=1200
             now=$(date -u +%s)
             now_formatted=$(date -u -d @$now +"%Y-%m-%dT%H:%M:%S")
@@ -1034,26 +1209,34 @@ commands:
               echo "cncluster gcloud_logs $app '$query'"
             done
 
+  # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
   notify-cluster-fail:
     parameters:
       <<: *cluster-parameter
       channel_notify:
+        # This parameter allows selecting different notification channels, which can be handy when a subteam
+        # focuses on bringing a potentially noisy deployment under control; e.g., when we sped up devnet in #3126.
         type: string
+        # #team-canton-network-internal-ci
         default: C05DT77QF5M
     steps:
+      - get_cluster:
+          cluster: << parameters.cluster >>
       - set-failed-parallel-run-url
       - run:
           name: Dump input sent to slack/notify
           when: always
           command: |
             echo "Sending the following as input to slack/notify"
-            echo "{ \"text\": \"*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)\" }"
+            echo "{ \"text\": \"*Job '${CIRCLE_JOB}' failed on cluster '${TARGET_CLUSTER}'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)\" }"
+      # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
+      # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
       - slack/notify:
           channel: << parameters.channel_notify >>
           branch_pattern: (deployment\/.*|main)
           event: fail
           custom: |
-            { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
+            { "text": "*Job '${CIRCLE_JOB}' failed on cluster '${TARGET_CLUSTER}'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
 
   notify-cluster-deployment:
     parameters:
@@ -1062,12 +1245,14 @@ commands:
         type: string
         default: C05DT77QF5M
     steps:
+      - get_cluster:
+          cluster: << parameters.cluster >>
       - slack/notify:
           channel: << parameters.channel_notify >>
           branch_pattern: (deployment\/.*|main)
           event: pass
           custom: |
-            { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
+            { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '${TARGET_CLUSTER}'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
 
   docker_build:
     steps:
@@ -1078,6 +1263,7 @@ commands:
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
                               --keep NO_PROXY"
+         # Retrying as sometimes the download from docker.io fails
          cmd_retry_count: 5
          cmd: make docker-build -j
   docker_login_artifactory:
@@ -1098,6 +1284,7 @@ commands:
                               --keep ARTIFACTORY_USER \
                               --keep ARTIFACTORY_PASSWORD \
                               --keep NO_PROXY"
+         # Retrying as sometimes the login fails
          cmd_retry_count: 5
          cmd: |
            echo $ARTIFACTORY_PASSWORD | docker login digitalasset-canton-enterprise-docker.jfrog.io -u "$ARTIFACTORY_USER" --password-stdin
@@ -1111,6 +1298,7 @@ commands:
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
                               --keep NO_PROXY"
+          # Retrying as network stuff can be flaky
           cmd_retry_count: 5
           cmd: |
             docker pull ${COMETBFT_DOCKER_IMAGE}
@@ -1125,6 +1313,25 @@ commands:
           name: Cancel the entire workflow if this job failed
           command: |
             curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"
+
+  get_cluster:
+    parameters:
+      <<: *cluster-parameter
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run:
+          name: Setting TARGET_CLUSTER env var
+          command: |
+            if [ << parameters.cluster >> == user-selected-scratchnet ]; then
+              . /tmp/workspace/cn_env_vars
+              echo "export TARGET_CLUSTER=$TARGET_CLUSTER" >> "$BASH_ENV"
+            else
+              echo "export TARGET_CLUSTER=<< parameters.cluster >>" >> "$BASH_ENV"
+            fi
+      - run:
+          name: Print TARGET_CLUSTER for debugging
+          command: echo "TARGET_CLUSTER set to $TARGET_CLUSTER"
 jobs:
   deploy_sv_runbook:
     circleci_ip_ranges: true
@@ -1183,6 +1390,7 @@ jobs:
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
+            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
             if (env-bool RESTORE_CLUSTER); then
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
@@ -1268,6 +1476,7 @@ jobs:
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
+            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
             if (env-bool RESTORE_CLUSTER); then
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
@@ -1345,6 +1554,7 @@ jobs:
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
           no_output_timeout: "20m"
           cluster: << parameters.cluster >>
           cmd: |
@@ -1404,11 +1614,13 @@ jobs:
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
+            # Note that we allow for RESTORE_CLUSTER to be false while bootstrapping-config is set. This is important for the combined cidaily/cidaily-testnet deployment which needs to restore cidaily-testnet but not cidaily.
             if (env-bool RESTORE_CLUSTER); then
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
             fi
+            # All CI-deployed clusters use split postgres instances per app, to support backups.
             export SPLIT_POSTGRES_INSTANCES=1
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
@@ -1433,7 +1645,9 @@ jobs:
                 cluster: << parameters.cluster >>
                 additional_nix_args: "--keep GITHUB_TOKEN"
                 cmd: |
-                  if [[ << parameters.cluster >> != scratch* ]]; then
+                  # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
+                  # This is a safeguard against people manually running e.g. deploy_devnet on a scratchnet.
+                  if [[ << parameters.cluster >> != scratch* ]] && [[ << parameters.cluster >> != user-selected-scratchnet ]]; then
                     scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
                   else
                     echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
@@ -1456,6 +1670,7 @@ jobs:
       <<: *cluster-parameter
       channel_notify:
         type: string
+        # #team-canton-network-internal-ci
         default: C05DT77QF5M
     machine:
       image: ubuntu-2204:2024.01.1
@@ -1486,6 +1701,7 @@ jobs:
             cncluster prefresh
 
 
+  # Inspired by Canton, we put the lint-like checks into their own CI job
   static_tests:
     docker:
       - image: cimg/base:2024.01
@@ -1500,9 +1716,11 @@ jobs:
             source .envrc.vars
             .circleci/build-config.sh --check
       - setup_sbt_test_job
+      # Run the cheap checks before the sbt based ones to provide fast feedback
       - run_trailing_whitespace_check
       - run_daml_warts_check
       - run_todo_script
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
           cmd: "update"
           cmd_retry_count: 3
@@ -1510,6 +1728,7 @@ jobs:
           cmd: "Test/compile lint"
       - cleanup_sbt_test_job
 
+  # We put our Daml tests in their own job for more parallelization
   daml_test:
     docker:
       - image: cimg/base:2024.01
@@ -1523,6 +1742,7 @@ jobs:
           timeout: "10m"
           extra_env_vars: DAML_DEBUG=1
 
+  # Run UI unit tests
   ui_test:
     docker:
       - image: cimg/base:2024.01
@@ -1536,6 +1756,8 @@ jobs:
           fail_on_error_in_output: false # TODO(#7579) -- turn this back on when we figure out what to ignore/what not to
       - cleanup_sbt_test_job
 
+  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
+  # work on anything but the Scala tests is duplicated across all parallel runs of this job
   scala_test:
     machine:
       image: ubuntu-2204:2024.01.1
@@ -1566,8 +1788,14 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_sbt_test_job
+      # Used to pull docker images for cometbft
       - docker_login_artifactory
       - docker_pull_test_images
+      # Start canton before compiling, as it takes a long time to start
+      # Note that we start canton before connecting VPN, so some initial
+      # metrics from Canton will be lost. Currently, they're Canton metrics
+      # before our actual tests start are not of interest for us,
+      # so we accept that.
       - start_canton_in_background:
           start_canton_options: << parameters.start_canton_options >>
       - split_tests_for_parallel_run:
@@ -1588,10 +1816,12 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_sbt_test_job
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
           cmd: "update"
           cmd_retry_count: 3
       - execute_sbt_command:
+          # compile tests, as well as bundle, to make sure the cache that is uploaded here is complete
           cmd: "Test/compile bundle"
       - run:
           name: Copy bundle
@@ -1615,7 +1845,10 @@ jobs:
            export GOOGLE_CLOUD_PROJECT=da-cn-shared
            VERSION=$(get-snapshot-version)
            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
+           # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
+           # which would lead to an error due to a misisng `delete` permission
            gsutil cp -n /tmp/artifacts/*.tar.gz gs://cn-release-bundles
+         # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - cleanup_sbt_test_job:
           upload_caches: true
 
@@ -1643,6 +1876,7 @@ jobs:
     steps:
       - checkout_with_retry
       - setup_nix
+      # TODO(#6630): look into these caches
       - restore_precompiled_classes
       - restore_sbt_cache
       - execute_sbt_command:
@@ -1694,6 +1928,7 @@ jobs:
             git tag --force testnet-next $LATEST_SNAPSHOT
             git push --force origin testnet-next
       - slack/notify:
+          # #team-canton-network-internal-ci
           channel: C05DT77QF5M
           event: pass
           custom: |
@@ -1749,6 +1984,8 @@ jobs:
              cmd: |
                if make docker-check; then
                   echo "Docker images already exist"
+                  # Running a circleci-agent command from within run_bash_command_in_nix does not work, so we create a file
+                  # that represents the need to halt, and call `circleci-agent step halt` in a separate `run` step
                   touch .halt-build-step
                fi
           - run:
@@ -1831,6 +2068,9 @@ jobs:
              git push origin "${RELEASE_TAG}"
            fi
            if [[ << pipeline.parameters.mark-for-devnet >> == true ]]; then
+             # This is a mutating tag pointing to the most recent
+             # valid build for DevNet, and therefore the next build
+             # to go to DevNet.
              git tag --force devnet-next
              git push --force origin devnet-next
            elif [[ << pipeline.parameters.mark-for-devnet-if-unmarked >> == true ]] &&
@@ -1845,6 +2085,7 @@ jobs:
 
           steps:
             - slack/notify:
+                # #team-canton-network-internal-ci
                 channel: C05DT77QF5M
                 event: pass
                 custom: |
@@ -1877,6 +2118,7 @@ jobs:
     environment:
       <<: *env
     parameters:
+      # space separated strings of workflow names to wait for.
       workflow_names:
         type: string
       branch_filter:
@@ -1906,6 +2148,7 @@ jobs:
     environment:
       <<: *env
     parameters:
+      # space separated strings of workflow names to check if they exist and cancel current workflow if so.
       workflow_names:
         type: string
       branch_filter:
@@ -1921,6 +2164,7 @@ jobs:
         type: integer
         default: 28800  # limit search to pipelines that are 8 hours old
       only_if_running:
+        # if set to false, will cancel if a relevant pipeline is found, regardless of its current status
         type: boolean
         default: true
     steps:
@@ -1943,6 +2187,7 @@ jobs:
     environment:
       <<: *env
     parameters:
+      # space separated strings of workflow names to cancel if they exist.
       workflow_names:
         type: string
       branch_filter:
@@ -2019,6 +2264,7 @@ jobs:
           gce_authenticate: true
           cmd: |
             cncluster activate
+            # We use readiness of validator-app as an approximation to the node's readiness
             for ns in $(cat tests-to-run.txt); do
               cncluster wait $ns validator-app
             done
@@ -2072,6 +2318,7 @@ jobs:
       <<: *cluster-parameter
       channel_notify:
         type: string
+        # #team-canton-network-internal-ci
         default: C05DT77QF5M
     machine:
       image: ubuntu-2204:2024.01.1
@@ -2108,11 +2355,42 @@ jobs:
             /tmp/vpn-scripts/restart-vpn.sh
             cncluster prefresh
 
+  # Waits until one of the scratchnet hold jobs is released, and persists the choice to a CCI workspace
+  set_scratchnet:
+    parameters:
+      <<: *cluster-parameter
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - run: mkdir -p /tmp/workspace
+      - run:
+          name: Setting cluster in workspace
+          command: |
+            n=0
+            until [ $n -gt 360 ]; do
+              released=$(curl -s --location --request GET "https://circleci.com/api/v2/workflow/$CIRCLE_WORKFLOW_ID/job" --header "Circle-Token: ${CIRCLECI_TOKEN}" | jq -r '.items[]|select(.name | test("use_scratchnet*"))|select(.status == "success").name')
+              if [ -n "$released" ]; then
+                TARGET_CLUSTER=$(echo $released | sed s/use_//)
+                echo "The hold job $released has been released, using cluster: $cluster"
+                echo "export TARGET_CLUSTER=$TARGET_CLUSTER" >> /tmp/workspace/cn_env_vars
+                break
+              else
+                echo "No hold job has not been released yet (iteration $n)"
+                n=$((n+1))
+                sleep 5
+              fi
+            done
+      - persist_to_workspace:
+          root: /tmp/workspace
+          paths:
+              - cn_env_vars
+
   preflight_check:
     parameters:
       <<: *cluster-parameter
       channel_notify:
         type: string
+        # #team-canton-network-internal-ci
         default: C05DT77QF5M
       test_names_file:
         type: string
@@ -2142,6 +2420,8 @@ jobs:
     steps:
       - checkout_with_retry
       - run:
+          # necessary for npm/webpack dev server launched in start-frontends.sh later
+          # https://webpack.js.org/configuration/watch/#not-enough-watchers
           name: Set inotify fs watch
           command: |
             echo "Checking watch info..."
@@ -2161,6 +2441,7 @@ jobs:
           gce_authenticate: true
           cmd: cncluster activate
           cmd_retry_count: 5
+      # TODO(#6630): bundle all these restores into a command, consider merging with setup_sbt_test_job
       - restore_sbt_cache
       - restore_precompiled_classes
       - restore_frontend_node_modules
@@ -2178,6 +2459,7 @@ jobs:
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
             validator_app="validator-app"
+            # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
             if [[ << parameters.wait_for_splitwell >> == true ]]; then
               cncluster wait splitwell $validator_app << parameters.migration_id >>
             fi
@@ -2198,10 +2480,12 @@ jobs:
           cmd_before_retry: |-
             echo "VPN connection seems to have died, restarting VPN and retrying..."
             /tmp/vpn-scripts/restart-vpn.sh
+      - get_cluster:
+          cluster: << parameters.cluster >>
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
-            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
+            . cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -v -p
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-frontends.sh
@@ -2209,6 +2493,8 @@ jobs:
           extra_env_vars: POSTGRES_DB=postgres DOMAIN_URL=https://sequencer.sv-1.svc.${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global NETWORK_APPS_ADDRESS_PROTOCOL=https VALIDATOR_USER_NAME="auto_preflight" CN_MIGRATION_DOMAIN_INDEX=<< parameters.migration_id >>
           timeout: "15m"
           cmd_retry_count: 3
+          # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
+          # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
           cluster: << parameters.cluster >>
           cmd_before_retry: |
@@ -2231,6 +2517,7 @@ jobs:
       <<: *cluster-parameter
       channel_notify:
         type: string
+        # #team-canton-network-internal-ci
         default: C05DT77QF5M
       cluster_version:
         type: string
@@ -2263,6 +2550,7 @@ jobs:
       - restore_precompiled_classes
       - restore_frontend_node_modules
       - restore_daml_artifacts
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
           cmd: "update"
           cmd_retry_count: 3
@@ -2278,6 +2566,7 @@ jobs:
           cmd: |
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
+            # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
             cncluster wait sv validator-app << parameters.migration_id >>
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
@@ -2300,6 +2589,8 @@ jobs:
             export CN_MIGRATION_DOMAIN_INDEX=<< parameters.migration_id >>
             cncluster preflight_sv
           cmd_retry_count: 3
+          # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
+          # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
           cmd_before_retry: |
             echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
@@ -2320,6 +2611,7 @@ jobs:
       <<: *cluster-parameter
       channel_notify:
         type: string
+        # #team-canton-network-internal-ci
         default: C05DT77QF5M
       cluster_version:
         type: string
@@ -2352,6 +2644,7 @@ jobs:
       - restore_precompiled_classes
       - restore_frontend_node_modules
       - restore_daml_artifacts
+      # We run sbt update with retries first to ensure that all dependency artifacts have been downloaded
       - execute_sbt_command:
           cmd: "update"
           cmd_retry_count: 3
@@ -2367,6 +2660,7 @@ jobs:
           cmd: |
             VERSION=$(get-snapshot-version)
             cncluster wait_version $VERSION
+            # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
             cncluster wait validator validator-app << parameters.migration_id >>
             echo "Done waiting. All pods in the cluster are:"
             kubectl get pods -A
@@ -2388,6 +2682,8 @@ jobs:
             export CN_MIGRATION_DOMAIN_INDEX=<< parameters.migration_id >>
             cncluster preflight_validator
           cmd_retry_count: 3
+          # retry if VPN got disconnected (approximated by trying to fetch docs from the cluster.
+          # Note that this is expected to succeed even if the cluster deployment is down, because it fetches only the http->https redirect anyway)
           cmd_retry_condition: $(if curl --connect-timeout 5 -s ${GCP_CLUSTER_BASENAME}.network.canton.global; then echo "false"; else echo "true"; fi)
           cmd_before_retry: |
             echo "Test failed, but VPN connection seems to have died, restarting VPN and retrying..."
@@ -2432,8 +2728,11 @@ workflows:
             - slack-context
           workflow_names: "build"
           branch_filter: "$CIRCLE_BRANCH"
+          # cannot use a simple CCI branch filter for the job since this job is a dependency for all the other jobs in this workflow
+          # and cannot be skipped
           branch_ignores: "^(main|deployment/.*)$"
           max_pipeline_age_secs: 7776000  # 90 days which is the max that the CCI API allows for pipeline cancellation
+      # Linting and formatting
       - static_tests:
           <<: *notify-fail
           context:
@@ -2441,6 +2740,7 @@ workflows:
             - slack-context
           requires:
             - cancel_previous_pipelines
+      # Daml
       - daml_test:
           <<: *notify-fail
           context:
@@ -2448,6 +2748,7 @@ workflows:
             - slack-context
           requires:
             - cancel_previous_pipelines
+      # Scala
       - scala_test:
           <<: *notify-fail
           context:
@@ -2559,6 +2860,7 @@ workflows:
             - slack-context
           requires:
             - cancel_previous_pipelines
+      # Ops
       - update_pipeline_schedule:
           <<: *notify-fail
           <<: *main-branch-only
@@ -2629,6 +2931,7 @@ workflows:
             - canton-network-vpn
             - slack-context
           wait_for_sv: false
+          # Order: deploy_cluster->preflight_check->publish_public_release->deploy_sv_runbook->preflight_sv_check
           requires:
             - docker_images_push
             - deploy_cluster_cidaily
@@ -2641,6 +2944,7 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
+          # require deploy_cluster and deploy_sv_runbook for stability and reliability
           requires:
             - docker_images_push
             - deploy_cluster_cidaily_testnet
@@ -2759,6 +3063,7 @@ workflows:
           context:
             - artifactory
             - slack-context
+          # Only wait for sv runbook deployments and for backup-recovery, concurrent preflight checks are fine.
           workflow_names: "redeploy_sv_runbook_cidaily"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
@@ -2769,6 +3074,8 @@ workflows:
           context:
             - artifactory
             - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
           workflow_names: "deploy_cidaily_and_cidaily_testnet"
       - cancel_if_previous_pipeline:
           name: skip_during_catchup
@@ -2780,6 +3087,8 @@ workflows:
           context:
             - artifactory
             - slack-context
+          # Skip healthchecks for 45 minutes after starting an sv node restore from backup.
+          # ATM, some tests are expected to fail while an SV is catching up, others are prone to failure.
           max_pipeline_age_secs: 2700
           workflow_names: "restore_sv_cidaily"
           only_if_running: false
@@ -2811,6 +3120,7 @@ workflows:
           context:
             - artifactory
             - slack-context
+          # Only wait for backup-recovery, concurrent preflight checks are fine.
           workflow_names: "restore_validator_cidaily_testnet"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
@@ -2821,6 +3131,8 @@ workflows:
           context:
             - artifactory
             - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
           workflow_names: "deploy_cidaily_and_cidaily_testnet"
       - preflight_check:
           filters:
@@ -2930,6 +3242,7 @@ workflows:
               only:
                 - deployment/cidaily
           cluster: "cidaily"
+          # sv-3 chosen quite arbitrarily as one SV to restore from backup
           namespace_name: "sv-3"
           context:
             - artifactory
@@ -2965,6 +3278,7 @@ workflows:
           requires:
             - wait_for_previous_pipeline
 
+  # on cidaily-testnet we have only one SV, so restoring validator1 instead
   restore_validator_cidaily_testnet:
     when:
       equal: [ restore-validator-cidaily-testnet, << pipeline.parameters.run-job >> ]
@@ -3035,6 +3349,26 @@ workflows:
           cluster: "cilr"
           requires:
             - deploy_cluster
+       # TODO(#10017): See if we want to re-enable them at some point
+#      - preflight_check:
+#          cluster: "cilr"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          # require deploy_cluster and deploy_sv_runbook for stability and reliability
+#          requires:
+#            - docker_images_push
+#            - deploy_cluster
+#            - deploy_sv_runbook
+#      - publish_public_release:
+#          <<: *main-branch-only
+#          requires:
+#            - preflight_check
+#          context:
+#            - artifactory
+#            - slack-context
       - preflight_sv_check:
           <<: *main-branch-only
           context:
@@ -3067,6 +3401,7 @@ workflows:
           context:
             - artifactory
             - slack-context
+          # Only wait for deployments, concurrent preflight checks are fine.
           workflow_names: "redeploy_sv_runbook_cilr"
       - cancel_if_previous_pipeline:
           <<: *notify-fail
@@ -3077,6 +3412,8 @@ workflows:
           context:
             - artifactory
             - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
           workflow_names: "deploy_cilr"
       - preflight_check:
           filters:
@@ -3281,6 +3618,9 @@ workflows:
             - slack-context
           cluster: "cimain"
           global_domain_active_migration_id: 1
+          # TODO(#10441) uncomment once doing migration
+          # global_domain_migrate_from_id: 0
+          # global_domain_legacy_migration_id: 0
           requires:
             - migrate_cluster
       - preflight_validator_check:
@@ -3331,6 +3671,473 @@ workflows:
             - slack-context
             - artifactory
 
+  deploy_scratchnet:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchneta
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetb
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetc
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetd
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnete
+          type: approval
+      - set_scratchnet:
+          <<: *main-branch-never
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - set_scratchnet
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - set_scratchnet
+      - deploy_cluster:
+          name: "deploy_cluster_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          cancel_workflow_on_failure: true
+          requires:
+            - set_scratchnet
+            - deployment_test
+            - docker_images_push
+      - preflight_check:
+          name: "preflight_check_core"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          wait_for_sv: false
+          parallelism: 1
+          requires:
+            - docker_images_push
+            - set_scratchnet
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_sv_check:
+           name: "preflight_sv_check_before_migration"
+           <<: *main-branch-never
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "user-selected-scratchnet"
+           requires:
+             - deploy_cluster_for_migration
+      - backup_cluster:
+          name: "backup_cluster_before_migration"
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
+      - preflight_check:
+          name: "trigger_global_domain_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+          parallelism: 1
+          wait_for_sv: false
+          requires:
+            - preflight_check_core
+            - preflight_sv_check_before_migration
+            - backup_cluster_before_migration
+      - deploy_cluster:
+          name: "migrate_cluster"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
+          global_domain_legacy_migration_id: 0
+          requires:
+            - trigger_global_domain_migration
+      - preflight_check:
+          name: "preflight_check_migrated"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          migration_id: 1
+          parallelism: 1
+          requires:
+            - trigger_global_domain_migration
+      - deploy_sv_runbook:
+          name: "migrate_sv_runbook"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - trigger_global_domain_migration
+          global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
+          global_domain_legacy_migration_id: 0
+      - preflight_sv_check:
+          name: "preflight_sv_check_migrated"
+          migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - trigger_global_domain_migration
+      - deploy_validator_runbook:
+          name: "deploy_validator_runbook_migrated"
+          global_domain_active_migration_id: 1
+          # TODO(#10441) uncomment once doing migration
+          # global_domain_migrate_from_id: 0
+          # global_domain_legacy_migration_id: 0
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - migrate_cluster
+      - preflight_validator_check:
+          name: "preflight_validator_check_migrated"
+          migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - trigger_global_domain_migration
+      - restore_node:
+          name: "restore_node_after_migration"
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          namespace_name: "sv-3"
+          expected_migration_id: 1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          context:
+            - canton-network-vpn
+          requires:
+            - restore_node_after_migration
+            - preflight_sv_check_migrated
+            - preflight_validator_check_migrated
+            - preflight_check_migrated
+            - deploy_validator_runbook_migrated
+            - migrate_sv_runbook
+
+  # Simple deployment with no migration
+  deploy_scratchnet_basic:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchneta
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetb
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetc
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetd
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnete
+          type: approval
+      - set_scratchnet:
+          <<: *main-branch-never
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - set_scratchnet
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - set_scratchnet
+      - deploy_cluster:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          cancel_workflow_on_failure: true
+          requires:
+            - docker_images_push
+            - deployment_test
+            - set_scratchnet
+      - preflight_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          parallelism: 1
+          requires:
+            - docker_images_push
+            - deployment_test
+            - set_scratchnet
+      - backup_cluster:
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - deploy_cluster
+            - deploy_sv_runbook
+      - restore_node:
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          namespace_name: "sv-3"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_check
+            - preflight_sv_check
+            - preflight_validator_check
+            - backup_cluster
+      - deploy_sv_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - deploy_cluster
+      - preflight_sv_check:
+           <<: *main-branch-never
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "user-selected-scratchnet"
+           requires:
+             - deploy_cluster
+      - deploy_validator_runbook:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - deploy_cluster
+      - preflight_validator_check:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - deploy_cluster
+      - reset_cluster:
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_validator_check
+            - preflight_sv_check
+            - restore_node
+
+
+  deploy_scratchnet_DR:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchneta
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetb
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetc
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnetd
+          type: approval
+      - hold_scratchnet:
+          <<: *main-branch-never
+          name: use_scratchnete
+          type: approval
+      - set_scratchnet:
+          <<: *main-branch-never
+      - docker_images_push:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - set_scratchnet
+      - deployment_test:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          requires:
+            - set_scratchnet
+      - test_DR:
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "user-selected-scratchnet"
+          requires:
+            - docker_images_push
+            - deployment_test
+            - set_scratchnet
+      - preflight_check:
+          name: preflight_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "user-selected-scratchnet"
+          migration_id: 1
+          parallelism: 1
+          requires:
+            - test_DR
+      - deploy_sv_runbook:
+          name: deploy_sv_runbook_DR
+          global_domain_active_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - test_DR
+      - preflight_sv_check:
+          name: preflight_sv_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          migration_id: 1
+          requires:
+            - test_DR
+      - deploy_validator_runbook:
+          name: deploy_validator_runbook_DR
+          global_domain_active_migration_id: 1
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - test_DR
+      - preflight_validator_check:
+          name: preflight_validator_check_DR
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          migration_id: 1
+          requires:
+            - test_DR
+      - reset_cluster:
+          name: reset_cluster_DR
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          context:
+            - canton-network-vpn
+          requires:
+            - preflight_check_DR
+            - preflight_sv_check_DR
+            - preflight_validator_check_DR
+            - deploy_validator_runbook_DR
+            - deploy_sv_runbook_DR
+
   deploy_devnet:
     when:
       equal: [ deploy-devnet, << pipeline.parameters.run-job >> ]
@@ -3380,6 +4187,7 @@ workflows:
             - slack-context
           cluster: "devnet"
           cluster_version: "devnet-next"
+          # require deploy_cluster and deploy_sv_runbook for stability and reliability
           requires:
             - deploy_cluster
             - deploy_sv_runbook
@@ -3417,6 +4225,8 @@ workflows:
           context:
             - artifactory
             - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
           workflow_names: "deploy_devnet"
       - preflight_check:
           filters:
@@ -3524,6 +4334,8 @@ workflows:
           context:
             - artifactory
             - slack-context
+          # Cancel health check if any deploy is running as it's redundant to run it (they are run as part of the deployment)
+          # It doesn't make sense to run it as there are high chances that the old version pre-flights will fail on the new deployment
           workflow_names: "deploy_testnet"
       - preflight_check:
           <<: *non_devnet_preflight_params
@@ -3549,1539 +4361,3 @@ workflows:
             - artifactory
             - slack-context
 
-
-  deploy_scratchneta:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          name: "deploy_cluster_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test
-            - docker_images_push
-      - preflight_check:
-          name: "preflight_check_core"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          wait_for_sv: false
-          parallelism: 1
-          requires:
-            - docker_images_push
-      - deploy_sv_runbook:
-          name: "deploy_sv_runbook_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - deploy_cluster_for_migration
-      - preflight_sv_check:
-           name: "preflight_sv_check_before_migration"
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "scratchneta"
-           requires:
-             - deploy_cluster_for_migration
-      - backup_cluster:
-          name: "backup_cluster_before_migration"
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
-          wait_for_sv: false
-          requires:
-            - preflight_check_core
-            - preflight_sv_check_before_migration
-            - backup_cluster_before_migration
-      - deploy_cluster:
-          name: "migrate_cluster"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          update_deployment_branch: false
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-          requires:
-            - trigger_global_domain_migration
-      - preflight_check:
-          name: "preflight_check_migrated"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - trigger_global_domain_migration
-      - deploy_sv_runbook:
-          name: "migrate_sv_runbook"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - trigger_global_domain_migration
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - trigger_global_domain_migration
-      - deploy_validator_runbook:
-          name: "deploy_validator_runbook_migrated"
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - migrate_cluster
-      - preflight_validator_check:
-          name: "preflight_validator_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration"
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          namespace_name: "sv-3"
-          expected_migration_id: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          context:
-            - canton-network-vpn
-          requires:
-            - restore_node_after_migration
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - hold:
-          name: "hold_basic"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deployment_test:
-          name: "deployment_test_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test_basic
-            - docker_images_push_basic
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          parallelism: 1
-          requires:
-            - docker_images_push_basic
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - deploy_sv_runbook
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_check
-            - preflight_sv_check
-            - preflight_validator_check
-            - backup_cluster
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - deploy_cluster
-      - preflight_sv_check:
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "scratchneta"
-           requires:
-             - deploy_cluster
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - deploy_cluster
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - deploy_cluster
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_validator_check
-            - preflight_check
-            - preflight_sv_check
-            - restore_node
-      - hold:
-          name: "hold_DR"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - deployment_test:
-          name: "deployment_test_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - test_DR:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchneta"
-          requires:
-            - deployment_test_DR
-            - docker_images_push_DR
-      - preflight_check:
-          name: preflight_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchneta"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - test_DR
-      - deploy_sv_runbook:
-          name: deploy_sv_runbook_DR
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - test_DR
-      - preflight_sv_check:
-          name: preflight_sv_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - test_DR
-      - deploy_validator_runbook:
-          name: deploy_validator_runbook_DR
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - test_DR
-      - preflight_validator_check:
-          name: preflight_validator_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchneta"
-          requires:
-            - test_DR
-      - reset_cluster:
-          name: reset_cluster_DR
-          <<: *main-branch-never
-          cluster: "scratchneta"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_check_DR
-            - preflight_sv_check_DR
-            - preflight_validator_check_DR
-
-  deploy_scratchnetb:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          name: "deploy_cluster_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test
-            - docker_images_push
-      - preflight_check:
-          name: "preflight_check_core"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          wait_for_sv: false
-          parallelism: 1
-          requires:
-            - docker_images_push
-      - deploy_sv_runbook:
-          name: "deploy_sv_runbook_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - deploy_cluster_for_migration
-      - preflight_sv_check:
-           name: "preflight_sv_check_before_migration"
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "scratchnetb"
-           requires:
-             - deploy_cluster_for_migration
-      - backup_cluster:
-          name: "backup_cluster_before_migration"
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
-          wait_for_sv: false
-          requires:
-            - preflight_check_core
-            - preflight_sv_check_before_migration
-            - backup_cluster_before_migration
-      - deploy_cluster:
-          name: "migrate_cluster"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          update_deployment_branch: false
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-          requires:
-            - trigger_global_domain_migration
-      - preflight_check:
-          name: "preflight_check_migrated"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - trigger_global_domain_migration
-      - deploy_sv_runbook:
-          name: "migrate_sv_runbook"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - trigger_global_domain_migration
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - trigger_global_domain_migration
-      - deploy_validator_runbook:
-          name: "deploy_validator_runbook_migrated"
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - migrate_cluster
-      - preflight_validator_check:
-          name: "preflight_validator_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration"
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          namespace_name: "sv-3"
-          expected_migration_id: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          context:
-            - canton-network-vpn
-          requires:
-            - restore_node_after_migration
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - hold:
-          name: "hold_basic"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deployment_test:
-          name: "deployment_test_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test_basic
-            - docker_images_push_basic
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          parallelism: 1
-          requires:
-            - docker_images_push_basic
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - deploy_sv_runbook
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_check
-            - preflight_sv_check
-            - preflight_validator_check
-            - backup_cluster
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - deploy_cluster
-      - preflight_sv_check:
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "scratchnetb"
-           requires:
-             - deploy_cluster
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - deploy_cluster
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - deploy_cluster
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_validator_check
-            - preflight_check
-            - preflight_sv_check
-            - restore_node
-      - hold:
-          name: "hold_DR"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - deployment_test:
-          name: "deployment_test_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - test_DR:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchnetb"
-          requires:
-            - deployment_test_DR
-            - docker_images_push_DR
-      - preflight_check:
-          name: preflight_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchnetb"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - test_DR
-      - deploy_sv_runbook:
-          name: deploy_sv_runbook_DR
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - test_DR
-      - preflight_sv_check:
-          name: preflight_sv_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - test_DR
-      - deploy_validator_runbook:
-          name: deploy_validator_runbook_DR
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - test_DR
-      - preflight_validator_check:
-          name: preflight_validator_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetb"
-          requires:
-            - test_DR
-      - reset_cluster:
-          name: reset_cluster_DR
-          <<: *main-branch-never
-          cluster: "scratchnetb"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_check_DR
-            - preflight_sv_check_DR
-            - preflight_validator_check_DR
-
-  deploy_scratchnetc:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          name: "deploy_cluster_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test
-            - docker_images_push
-      - preflight_check:
-          name: "preflight_check_core"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          wait_for_sv: false
-          parallelism: 1
-          requires:
-            - docker_images_push
-      - deploy_sv_runbook:
-          name: "deploy_sv_runbook_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - deploy_cluster_for_migration
-      - preflight_sv_check:
-           name: "preflight_sv_check_before_migration"
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "scratchnetc"
-           requires:
-             - deploy_cluster_for_migration
-      - backup_cluster:
-          name: "backup_cluster_before_migration"
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
-          wait_for_sv: false
-          requires:
-            - preflight_check_core
-            - preflight_sv_check_before_migration
-            - backup_cluster_before_migration
-      - deploy_cluster:
-          name: "migrate_cluster"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          update_deployment_branch: false
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-          requires:
-            - trigger_global_domain_migration
-      - preflight_check:
-          name: "preflight_check_migrated"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - trigger_global_domain_migration
-      - deploy_sv_runbook:
-          name: "migrate_sv_runbook"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - trigger_global_domain_migration
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - trigger_global_domain_migration
-      - deploy_validator_runbook:
-          name: "deploy_validator_runbook_migrated"
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - migrate_cluster
-      - preflight_validator_check:
-          name: "preflight_validator_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration"
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          namespace_name: "sv-3"
-          expected_migration_id: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          context:
-            - canton-network-vpn
-          requires:
-            - restore_node_after_migration
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - hold:
-          name: "hold_basic"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deployment_test:
-          name: "deployment_test_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test_basic
-            - docker_images_push_basic
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          parallelism: 1
-          requires:
-            - docker_images_push_basic
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - deploy_sv_runbook
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_check
-            - preflight_sv_check
-            - preflight_validator_check
-            - backup_cluster
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - deploy_cluster
-      - preflight_sv_check:
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "scratchnetc"
-           requires:
-             - deploy_cluster
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - deploy_cluster
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - deploy_cluster
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_validator_check
-            - preflight_check
-            - preflight_sv_check
-            - restore_node
-      - hold:
-          name: "hold_DR"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - deployment_test:
-          name: "deployment_test_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - test_DR:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchnetc"
-          requires:
-            - deployment_test_DR
-            - docker_images_push_DR
-      - preflight_check:
-          name: preflight_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchnetc"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - test_DR
-      - deploy_sv_runbook:
-          name: deploy_sv_runbook_DR
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - test_DR
-      - preflight_sv_check:
-          name: preflight_sv_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - test_DR
-      - deploy_validator_runbook:
-          name: deploy_validator_runbook_DR
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - test_DR
-      - preflight_validator_check:
-          name: preflight_validator_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetc"
-          requires:
-            - test_DR
-      - reset_cluster:
-          name: reset_cluster_DR
-          <<: *main-branch-never
-          cluster: "scratchnetc"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_check_DR
-            - preflight_sv_check_DR
-            - preflight_validator_check_DR
-
-  deploy_scratchnetd:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          name: "deploy_cluster_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test
-            - docker_images_push
-      - preflight_check:
-          name: "preflight_check_core"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          wait_for_sv: false
-          parallelism: 1
-          requires:
-            - docker_images_push
-      - deploy_sv_runbook:
-          name: "deploy_sv_runbook_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - deploy_cluster_for_migration
-      - preflight_sv_check:
-           name: "preflight_sv_check_before_migration"
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "scratchnetd"
-           requires:
-             - deploy_cluster_for_migration
-      - backup_cluster:
-          name: "backup_cluster_before_migration"
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_for_migration
-            - deploy_sv_runbook_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
-          wait_for_sv: false
-          requires:
-            - preflight_check_core
-            - preflight_sv_check_before_migration
-            - backup_cluster_before_migration
-      - deploy_cluster:
-          name: "migrate_cluster"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          update_deployment_branch: false
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-          requires:
-            - trigger_global_domain_migration
-      - preflight_check:
-          name: "preflight_check_migrated"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - trigger_global_domain_migration
-      - deploy_sv_runbook:
-          name: "migrate_sv_runbook"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - trigger_global_domain_migration
-          global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - trigger_global_domain_migration
-      - deploy_validator_runbook:
-          name: "deploy_validator_runbook_migrated"
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - migrate_cluster
-      - preflight_validator_check:
-          name: "preflight_validator_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration"
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          namespace_name: "sv-3"
-          expected_migration_id: 1
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          context:
-            - canton-network-vpn
-          requires:
-            - restore_node_after_migration
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - hold:
-          name: "hold_basic"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deployment_test:
-          name: "deployment_test_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test_basic
-            - docker_images_push_basic
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          parallelism: 1
-          requires:
-            - docker_images_push_basic
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - deploy_sv_runbook
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_check
-            - preflight_sv_check
-            - preflight_validator_check
-            - backup_cluster
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - deploy_cluster
-      - preflight_sv_check:
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "scratchnetd"
-           requires:
-             - deploy_cluster
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - deploy_cluster
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - deploy_cluster
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_validator_check
-            - preflight_check
-            - preflight_sv_check
-            - restore_node
-      - hold:
-          name: "hold_DR"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - deployment_test:
-          name: "deployment_test_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - test_DR:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchnetd"
-          requires:
-            - deployment_test_DR
-            - docker_images_push_DR
-      - preflight_check:
-          name: preflight_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchnetd"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - test_DR
-      - deploy_sv_runbook:
-          name: deploy_sv_runbook_DR
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - test_DR
-      - preflight_sv_check:
-          name: preflight_sv_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - test_DR
-      - deploy_validator_runbook:
-          name: deploy_validator_runbook_DR
-          global_domain_active_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - test_DR
-      - preflight_validator_check:
-          name: preflight_validator_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - test_DR
-      - reset_cluster:
-          name: reset_cluster_DR
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_check_DR
-            - preflight_sv_check_DR
-            - preflight_validator_check_DR

@@ -94,10 +94,12 @@ jobs:
           cmd_before_retry: |-
             echo "VPN connection seems to have died, restarting VPN and retrying..."
             /tmp/vpn-scripts/restart-vpn.sh
+      - get_cluster:
+          cluster: << parameters.cluster >>
       - execute_sbt_command:
           pre_sbt_cmd: |
             set -eou pipefail
-            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
+            . cluster/deployment/${TARGET_CLUSTER}/.envrc.vars
             NETWORK_APPS_ADDRESS="${GCP_CLUSTER_BASENAME}.network.canton.global" ./start-frontends.sh -d -v -p
           cmd: "\"$RUN_SPLITTED_TESTS_CMD\""
           post_sbt_cmd: ./stop-frontends.sh

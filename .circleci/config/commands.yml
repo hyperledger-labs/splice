@@ -574,6 +574,8 @@ commands:
         type: boolean
         default: false
     steps:
+      - get_cluster:
+          cluster: << parameters.cluster >>
       - run:
           name: << parameters.cmd_name >>
           when: << parameters.when >>
@@ -627,19 +629,20 @@ commands:
               --keep GCP_DA_CN_SCRATCHNET_KEY \
               --keep GCP_DA_CN_SCRATCHNET2_KEY \
               --keep CIRCLE_BRANCH \
+              --keep TARGET_CLUSTER \
               $ADDITIONAL_NIX_ARGS \
               --command bash \<<'EOF'
 
               set -euo pipefail
 
               . .envrc.vars
-              if [[ << parameters.cluster >> != none ]]; then
-                . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
+              if [[ "$TARGET_CLUSTER" != none ]]; then
+                . $REPO_ROOT/cluster/deployment/$TARGET_CLUSTER/.envrc.vars
               fi
 
               if [[ << parameters.gce_authenticate >> == true ]]; then
                 # Authenticate to the correct GCP project for the cluster
-                echo "Authenticating to cluster \"<< parameters.cluster >>\" in project \"${CLOUDSDK_CORE_PROJECT}\""
+                echo "Authenticating to cluster \"$TARGET_CLUSTER\" in project \"${CLOUDSDK_CORE_PROJECT}\""
                 case ${CLOUDSDK_CORE_PROJECT} in
                   da-cn-scratchnet)
                     export CN_ACTIVE_ENVIRONMENT_KEY="${GCP_DA_CN_SCRATCHNET_KEY}"
@@ -1087,13 +1090,15 @@ commands:
         # #team-canton-network-internal-ci
         default: C05DT77QF5M
     steps:
+      - get_cluster:
+          cluster: << parameters.cluster >>
       - set-failed-parallel-run-url
       - run:
           name: Dump input sent to slack/notify
           when: always
           command: |
             echo "Sending the following as input to slack/notify"
-            echo "{ \"text\": \"*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)\" }"
+            echo "{ \"text\": \"*Job '${CIRCLE_JOB}' failed on cluster '${TARGET_CLUSTER}'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)\" }"
       # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
       # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
       - slack/notify:
@@ -1101,7 +1106,7 @@ commands:
           branch_pattern: (deployment\/.*|main)
           event: fail
           custom: |
-            { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
+            { "text": "*Job '${CIRCLE_JOB}' failed on cluster '${TARGET_CLUSTER}'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
 
   notify-cluster-deployment:
     parameters:
@@ -1110,12 +1115,14 @@ commands:
         type: string
         default: C05DT77QF5M
     steps:
+      - get_cluster:
+          cluster: << parameters.cluster >>
       - slack/notify:
           channel: << parameters.channel_notify >>
           branch_pattern: (deployment\/.*|main)
           event: pass
           custom: |
-            { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
+            { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '${TARGET_CLUSTER}'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
 
   docker_build:
     steps:
@@ -1176,3 +1183,22 @@ commands:
           name: Cancel the entire workflow if this job failed
           command: |
             curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"
+
+  get_cluster:
+    parameters:
+      <<: *cluster-parameter
+    steps:
+      - attach_workspace:
+          at: /tmp/workspace
+      - run:
+          name: Setting TARGET_CLUSTER env var
+          command: |
+            if [ << parameters.cluster >> == user-selected-scratchnet ]; then
+              . /tmp/workspace/cn_env_vars
+              echo "export TARGET_CLUSTER=$TARGET_CLUSTER" >> "$BASH_ENV"
+            else
+              echo "export TARGET_CLUSTER=<< parameters.cluster >>" >> "$BASH_ENV"
+            fi
+      - run:
+          name: Print TARGET_CLUSTER for debugging
+          command: echo "TARGET_CLUSTER set to $TARGET_CLUSTER"

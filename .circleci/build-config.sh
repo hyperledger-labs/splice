@@ -20,6 +20,11 @@ fi
 
 
 {
+    echo '# GENERATED FILE, DO NOT EDIT'
+    echo '# If you need to change the CircleCI configuration, edit the'
+    echo '# relevant fragment in the .circleci/config directory. and'
+    echo '# Run .circleci/build-config.sh to update this file.'
+    echo '#'
     cat "${REPO_ROOT}/.circleci/config/prelude.yml"
     echo
     cat "${REPO_ROOT}/.circleci/config/commands.yml"
@@ -36,27 +41,6 @@ fi
         echo
     done
 } > "${OUTPUT_CONF}"
-
-# TODO(#10479) add back scratchnete; removed because I've hit the CCI config size limit
-for clustername in scratchneta scratchnetb scratchnetc scratchnetd #scratchnete
-do
-    sed "s/_CLUSTERNAME_/${clustername}/g" \
-        < "${REPO_ROOT}/.circleci/config/deploy_scratchnet_workflow.yml" \
-        >> "${OUTPUT_CONF}"
-done
-
-# Remove comments from produced file to try and avoid hitting the circleci size limit
-grep -v "^[ ]*#" "${OUTPUT_CONF}" > "${OUTPUT_CONF}".tmp
-
-{
-    echo '# GENERATED FILE, DO NOT EDIT'
-    echo '# If you need to change the CircleCI configuration, edit the'
-    echo '# relevant fragment in the .circleci/config directory. and'
-    echo '# Run .circleci/build-config.sh to update this file.'
-    echo '#'
-    cat "${OUTPUT_CONF}".tmp
-} > "${OUTPUT_CONF}"
-rm "${OUTPUT_CONF}".tmp
 
 if [ -n "${check-}" ] ; then
     if ! diff -u "${REPO_ROOT}/.circleci/config-check-output.yml" "${REPO_ROOT}/.circleci/config.yml"; then
