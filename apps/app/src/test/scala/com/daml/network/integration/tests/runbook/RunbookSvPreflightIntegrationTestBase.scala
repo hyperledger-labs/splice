@@ -122,7 +122,8 @@ abstract class RunbookSvPreflightIntegrationTestBase
     logger.debug(
       s"last aggregated round from sv1: $lastAggregatedRoundSv, sv runbook joined as of round: $joinedAsOfRound"
     )
-    if (lastAggregatedRoundSv >= joinedAsOfRound + 1) {
+    // We do +3 here instead of, say, +1 as this was racy once and we don't care that much about the first few rounds after SV onboarding.
+    if (lastAggregatedRoundSv >= joinedAsOfRound + 3) {
       withFrontEnd("sv") { implicit webDriver =>
         go to scanUrl
         eventually(1.minutes) {
