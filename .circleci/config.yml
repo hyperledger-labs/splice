@@ -2031,6 +2031,9 @@ jobs:
       <<: *cluster-parameter
       namespace_name:
         type: string
+      expected_migration_id:
+        type: integer
+        default: 0
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2053,12 +2056,12 @@ jobs:
 
             case "<< parameters.namespace_name >>" in
               "sv-1"|"sv-2"|"sv-3"|"sv-4")
-                cncluster wait << parameters.namespace_name >> scan-app
-                cncluster wait << parameters.namespace_name >> sv-app
-                cncluster wait << parameters.namespace_name >> validator-app
+                cncluster wait << parameters.namespace_name >> << parameters.expected_migration_id >> scan-app
+                cncluster wait << parameters.namespace_name >> << parameters.expected_migration_id >> sv-app
+                cncluster wait << parameters.namespace_name >> << parameters.expected_migration_id >> validator-app
                 ;;
               "validator1")
-                cncluster wait << parameters.namespace_name >> validator-app
+                cncluster wait << parameters.namespace_name >> << parameters.expected_migration_id >> validator-app
                 ;;
             esac
       - notify-cluster-fail:
@@ -3295,6 +3298,7 @@ workflows:
           <<: *main-branch-only
           cluster: "cimain"
           namespace_name: "sv-3"
+          expected_migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -3710,6 +3714,7 @@ workflows:
           <<: *main-branch-never
           cluster: "scratchneta"
           namespace_name: "sv-3"
+          expected_migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -4093,6 +4098,7 @@ workflows:
           <<: *main-branch-never
           cluster: "scratchnetb"
           namespace_name: "sv-3"
+          expected_migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -4476,6 +4482,7 @@ workflows:
           <<: *main-branch-never
           cluster: "scratchnetc"
           namespace_name: "sv-3"
+          expected_migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
@@ -4859,6 +4866,7 @@ workflows:
           <<: *main-branch-never
           cluster: "scratchnetd"
           namespace_name: "sv-3"
+          expected_migration_id: 1
           context:
             - artifactory
             - canton-network-vpn

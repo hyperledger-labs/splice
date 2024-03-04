@@ -171,6 +171,7 @@
           <<: *main-branch-never
           cluster: "_CLUSTERNAME_"
           namespace_name: "sv-3"
+          expected_migration_id: 1
           context:
             - artifactory
             - canton-network-vpn
