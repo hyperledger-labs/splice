@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.*
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.*
 import com.daml.network.config.{
+  CNDbConfig,
   CNNodeConfigTransforms,
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
@@ -22,9 +23,9 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.typesafe.config.ConfigValueFactory
 
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -44,14 +45,13 @@ class SvReonboardingIntegrationTest
       "participant_sv4_reonboard_new",
       "sequencer_sv4_reonboard_new",
       "mediator_sv4_reonboard_new",
+      "cn_apps_reonboard",
     ) ++ super.usesDbs
 
   // Runs against a temporary Canton instance.
   override lazy val resetDecentralizedNamespace = false
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
-  // TODO(#9014) make it work with persistend stores
-  registerPlugin(new UseInMemoryStores(loggerFactory))
 
   val dumpPath = Files.createTempFile("participant-dump", ".json")
 
@@ -75,6 +75,17 @@ class SvReonboardingIntegrationTest
                 config
                   .svApps(InstanceName.tryCreate("sv4"))
                   .copy(
+                    storage = config.svApps(InstanceName.tryCreate("sv4")).storage match {
+                      case c: CNDbConfig.Postgres =>
+                        c.copy(
+                          config = c.config
+                            .withValue(
+                              "properties.databaseName",
+                              ConfigValueFactory.fromAnyRef("cn_apps_reonboard"),
+                            )
+                        )
+                      case _ => throw new IllegalArgumentException("Only Postgres is supported")
+                    },
                     participantBootstrappingDump =
                       Some(ParticipantBootstrapDumpConfig.File(dumpPath, Some("sv4ReonboardNew"))),
                     migrateSvParty = Some(
@@ -96,8 +107,7 @@ class SvReonboardingIntegrationTest
       )
       .withManualStart
 
-  // TODO(#8152): reenable it when it works with persistend stores
-  "restore SV from namespace only" ignore { implicit env =>
+  "restore SV from namespace only" in { implicit env =>
     // Mediators/sequencers that have been offboarded stay in a broken state which is fine in prod
     // (you can onboard a fresh mediator/sequencer)
     // but annoying in tests so we use a dedicated Canton instance for this test.
