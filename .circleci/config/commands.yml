@@ -864,7 +864,6 @@ commands:
           cmd_name: "Start canton"
           cmd: |
             mkdir -p log
-            top -b -o %MEM -c -w 256 > log/memory &
             ./start-canton.sh << parameters.start_canton_options >> -b
           background: true
           additional_nix_args: "--keep CIRCLE_USERNAME --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_NUM --keep CIRCLE_JOB --keep CIRCLE_NODE_INDEX --keep PROMETHEUS_REMOTE_WRITE_JWT"
@@ -874,10 +873,6 @@ commands:
   stop_canton:
     description: Stop Canton
     steps:
-      - run_bash_command_in_nix:
-          when: always
-          cmd_name: "Save Postgres Logs"
-          cmd: ./scripts/copy-postgres-logs.sh || true
       - run_bash_command_in_nix:
           when: always
           cmd_name: "Stop canton"
