@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirm
   SRARC_OffboardMember,
   SRARC_SetConfig,
 }
-import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome2.{
+import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome.{
   VRO_Accepted,
   VRO_Expired,
   VRO_Rejected,
@@ -28,8 +28,8 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.sv.automation.leaderbased.{
-  CloseVoteRequest2Trigger,
-  CloseVoteRequest2WithEarlyClosingTrigger,
+  CloseVoteRequestTrigger,
+  CloseVoteRequestWithEarlyClosingTrigger,
 }
 import com.daml.network.util.Codec
 
@@ -37,7 +37,7 @@ import java.time.Instant
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.*
 
-class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
+class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
   private def actionRequiring3VotesForEarlyClosing(member: String) = new ARC_SvcRules(
     new SRARC_OffboardMember(
@@ -60,11 +60,11 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )
   )
 
-  "SVs can create a VoteRequest2, vote on it and list them." in { implicit env =>
+  "SVs can create a VoteRequest, vote on it and list them." in { implicit env =>
     initSvc()
     val (_, voteRequest) = actAndCheck(
       "sv1 creates a vote request",
-      sv1Backend.createVoteRequest2(
+      sv1Backend.createVoteRequest(
         sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
         actionRequiring3VotesForEarlyClosing(sv4Backend.getSvcInfo().svParty.toProtoPrimitive),
         "url",
@@ -74,15 +74,15 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )(
       "vote request has been created",
       _ => {
-        val voteRequest = sv1Backend.listVoteRequests2().loneElement
-        sv1Backend.lookupVoteRequest2(voteRequest.contractId) shouldBe voteRequest
+        val voteRequest = sv1Backend.listVoteRequests().loneElement
+        sv1Backend.lookupVoteRequest(voteRequest.contractId) shouldBe voteRequest
         voteRequest
       },
     )
     actAndCheck(
       "sv1 updates his vote, sv2 and sv3 reject the vote request",
       Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
-        sv.castVote2(
+        sv.castVote(
           voteRequest.contractId,
           false,
           "url",
@@ -92,21 +92,21 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )(
       "vote request has been rejected because the majority of the votes are negative",
       _ => {
-        sv1Backend.listVoteRequests2() shouldBe empty
+        sv1Backend.listVoteRequests() shouldBe empty
 
         sv1Backend
-          .listVoteRequestResults2(None, Some(false), None, None, None, 1)
+          .listVoteRequestResults(None, Some(false), None, None, None, 1)
           .loneElement
           .outcome shouldBe a[VRO_Rejected]
       },
     )
   }
 
-  "VoteRequest2 expires with no definitive outcome." in { implicit env =>
+  "VoteRequest expires with no definitive outcome." in { implicit env =>
     initSvc()
     val (_, voteRequest) = actAndCheck(
       "sv1 creates a vote request that expires directly",
-      sv1Backend.createVoteRequest2(
+      sv1Backend.createVoteRequest(
         sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
         actionRequiring3VotesForEarlyClosing(sv4Backend.getSvcInfo().svParty.toProtoPrimitive),
         "url",
@@ -116,13 +116,13 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )(
       "vote request has been created",
       _ => {
-        sv1Backend.listVoteRequests2().loneElement
+        sv1Backend.listVoteRequests().loneElement
       },
     )
     actAndCheck(
       "A number of SVs less than the required number of voters cast a vote",
       Seq(sv1Backend, sv2Backend).foreach { sv =>
-        sv.castVote2(
+        sv.castVote(
           voteRequest.contractId,
           true,
           "url",
@@ -132,20 +132,20 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )(
       "vote request has expired",
       _ => {
-        sv1Backend.listVoteRequests2() shouldBe empty
+        sv1Backend.listVoteRequests() shouldBe empty
         sv1Backend
-          .listVoteRequestResults2(None, Some(false), None, None, None, 1)
+          .listVoteRequestResults(None, Some(false), None, None, None, 1)
           .loneElement
           .outcome shouldBe a[VRO_Expired]
       },
     )
   }
 
-  "VoteRequest2 expires with a definitive outcome." in { implicit env =>
+  "VoteRequest expires with a definitive outcome." in { implicit env =>
     initSvc()
     val (_, voteRequest) = actAndCheck(
       "sv1 creates a vote request that expires directly",
-      sv1Backend.createVoteRequest2(
+      sv1Backend.createVoteRequest(
         sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
         actionRequiring4VotesForEarlyClosing(
           sv4Backend.config.domains.global.alias.toProtoPrimitive
@@ -157,13 +157,13 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )(
       "vote request has been created",
       _ => {
-        sv1Backend.listVoteRequests2().loneElement
+        sv1Backend.listVoteRequests().loneElement
       },
     )
     actAndCheck(
       "A number of SVs less than the required number of voters cast a vote",
       Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
-        sv.castVote2(
+        sv.castVote(
           voteRequest.contractId,
           false,
           "url",
@@ -173,9 +173,9 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )(
       "vote request was rejected",
       _ => {
-        sv1Backend.listVoteRequests2() shouldBe empty
+        sv1Backend.listVoteRequests() shouldBe empty
         sv1Backend
-          .listVoteRequestResults2(None, Some(false), None, None, None, 1)
+          .listVoteRequestResults(None, Some(false), None, None, None, 1)
           .loneElement
           .outcome shouldBe a[VRO_Rejected]
       },
@@ -282,7 +282,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
         val (_, voteRequest) = actAndCheck(
           "Creating vote request",
           eventuallySucceeds() {
-            sv1Backend.createVoteRequest2(
+            sv1Backend.createVoteRequest(
               sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
               removeAction,
               "url",
@@ -290,12 +290,12 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
               sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
             )
           },
-        )("vote request has been created", _ => sv1Backend.listVoteRequests2().loneElement)
+        )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
         Seq(sv2Backend, sv4Backend).foreach { sv =>
           clue(s"${sv.name} accepts vote") {
             getTrackingId(voteRequest) shouldBe voteRequest.contractId
             eventuallySucceeds() {
-              sv.castVote2(
+              sv.castVote(
                 voteRequest.contractId,
                 true,
                 "url",
@@ -345,7 +345,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
         val action: ActionRequiringConfirmation =
           new ARC_SvcRules(new SRARC_SetConfig(new SvcRules_SetConfig(newConfig)))
 
-        sv1Backend.createVoteRequest2(
+        sv1Backend.createVoteRequest(
           sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
           action,
           "url",
@@ -356,16 +356,16 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )(
       "The vote request has been created, SV1 accepts as he created it and all other SVs observe it",
       _ => {
-        svs.foreach { sv => sv.listVoteRequests2() should not be empty }
-        val head = sv1Backend.listVoteRequests2().headOption.value.contractId
-        sv1Backend.lookupVoteRequest2(head).payload.votes should have size 1
+        svs.foreach { sv => sv.listVoteRequests() should not be empty }
+        val head = sv1Backend.listVoteRequests().headOption.value.contractId
+        sv1Backend.lookupVoteRequest(head).payload.votes should have size 1
         (head, sv1Backend.getSvcInfo().svcRules.payload.config.numUnclaimedRewardsThreshold)
       },
     )
 
     actAndCheck(
       "SV2 votes on accepting the new configuration", {
-        sv2Backend.castVote2(voteRequestCid, true, "url", "description")
+        sv2Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
       "The majority did not vote yet, thus the trigger should not change the svcRules",
@@ -381,7 +381,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
 
     actAndCheck(
       "SV3 refuses the new configuration", {
-        sv3Backend.castVote2(voteRequestCid, false, "url", "description")
+        sv3Backend.castVote(voteRequestCid, false, "url", "description")
       },
     )(
       "The majority has voted but without an acceptance majority, the trigger should not change the svcRules",
@@ -397,7 +397,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
 
     actAndCheck(
       "SV4 votes on accepting the new configuration", {
-        sv4Backend.castVote2(voteRequestCid, true, "url", "description")
+        sv4Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
       "The majority accepts, the trigger should change the svcRules accordingly",
@@ -455,7 +455,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
             )
           )
 
-        sv1Backend.createVoteRequest2(
+        sv1Backend.createVoteRequest(
           sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
           action,
           "url",
@@ -466,16 +466,16 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )(
       "The vote request has been created and SV1 accepts as he created it",
       _ => {
-        svs.foreach { sv => sv.listVoteRequests2() should not be empty }
-        val head = sv1Backend.listVoteRequests2().headOption.value.contractId
-        sv1Backend.lookupVoteRequest2(head).payload.votes should have size 1
+        svs.foreach { sv => sv.listVoteRequests() should not be empty }
+        val head = sv1Backend.listVoteRequests().headOption.value.contractId
+        sv1Backend.lookupVoteRequest(head).payload.votes should have size 1
         (head, sv1Backend.getSvcInfo().coinRules.payload.configSchedule.futureValues.size())
       },
     )
 
     actAndCheck(
       "SV2 votes on accepting the new configuration", {
-        sv2Backend.castVote2(voteRequestCid, true, "url", "description")
+        sv2Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
       "The majority did not vote yet, thus the trigger should not change the coin config futureValues",
@@ -492,7 +492,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
 
     actAndCheck(
       "SV3 refuses the new configuration", {
-        sv3Backend.castVote2(voteRequestCid, false, "url", "description")
+        sv3Backend.castVote(voteRequestCid, false, "url", "description")
       },
     )(
       "The majority has voted but without an acceptance majority, the trigger should not change the coin config futureValues",
@@ -509,7 +509,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
 
     actAndCheck(
       "SV4 votes on accepting the new configuration", {
-        sv4Backend.castVote2(voteRequestCid, true, "url", "description")
+        sv4Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
       "The majority accepts, the trigger should change the coin config futureValues",
@@ -528,7 +528,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
       eventually() {
         val voteResult =
           sv1Backend
-            .listVoteRequestResults2(None, Some(false), None, None, None, 1)
+            .listVoteRequestResults(None, Some(false), None, None, None, 1)
             .headOption
             .value
         voteResult.outcome shouldBe a[VRO_Accepted]
@@ -553,7 +553,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
       }
     }
     clue("Pausing vote request expiration automation") {
-      sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequest2Trigger].pause().futureValue
+      sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestTrigger].pause().futureValue
     }
     actAndCheck(
       "SV2 creates a vote request for removing SV1", {
@@ -563,7 +563,7 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
           new SRARC_OffboardMember(new SvcRules_OffboardMember(sv1Party.toProtoPrimitive))
         )
 
-        sv2Backend.createVoteRequest2(
+        sv2Backend.createVoteRequest(
           sv2Party.toProtoPrimitive,
           action,
           "url",
@@ -575,17 +575,17 @@ class SvStateManagementIntegrationTest2 extends SvIntegrationTestBase {
     )(
       "The vote request has been created and all SVs observe it",
       _ => {
-        sv1Backend.listVoteRequests2() should have size 1
-        sv2Backend.listVoteRequests2() should have size 1
+        sv1Backend.listVoteRequests() should have size 1
+        sv2Backend.listVoteRequests() should have size 1
       },
     )
     clue("Resuming vote request expiration automation") {
-      sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequest2WithEarlyClosingTrigger].resume()
+      sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestWithEarlyClosingTrigger].resume()
     }
     clue("Eventually the vote request expires and gets archived") {
       eventually() {
-        sv1Backend.listVoteRequests2() shouldBe empty
-        sv2Backend.listVoteRequests2() shouldBe empty
+        sv1Backend.listVoteRequests() shouldBe empty
+        sv2Backend.listVoteRequests() shouldBe empty
       }
     }
   }

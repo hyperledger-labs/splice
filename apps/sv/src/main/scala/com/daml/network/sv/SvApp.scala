@@ -871,7 +871,7 @@ object SvApp {
     } yield result
   }
 
-  def createVoteRequest2(
+  def createVoteRequest(
       requester: String,
       action: Json,
       reasonUrl: String,
@@ -896,7 +896,7 @@ object SvApp {
       "ActionRequiringConfirmation",
     )(action)
     svcStoreWithIngestion.store
-      .lookupVoteRequestByThisSvAndActionWithOffset2(decodedAction)
+      .lookupVoteRequestByThisSvAndActionWithOffset(decodedAction)
       .flatMap {
         case QueryResult(_, Some(vote)) =>
           Future.successful(
@@ -906,13 +906,13 @@ object SvApp {
           for {
             svcRules <- svcStoreWithIngestion.store.getSvcRules()
             reason = new Reason(reasonUrl, reasonDescription)
-            request = new SvcRules_RequestVote2(
+            request = new SvcRules_RequestVote(
               requester,
               decodedAction,
               reason,
               java.util.Optional.of(decodedExpiration),
             )
-            cmd = svcRules.exercise(_.exerciseSvcRules_RequestVote2(request))
+            cmd = svcRules.exercise(_.exerciseSvcRules_RequestVote(request))
             _ <- svcStoreWithIngestion.connection
               .submit(
                 actAs = Seq(svcStoreWithIngestion.store.key.svParty),
@@ -921,7 +921,7 @@ object SvApp {
               )
               .withDedup(
                 commandId = CNLedgerConnection.CommandId(
-                  "com.daml.network.sv.requestVote2",
+                  "com.daml.network.sv.requestVote",
                   Seq(
                     svcStoreWithIngestion.store.key.svcParty,
                     svcStoreWithIngestion.store.key.svParty,
@@ -935,8 +935,8 @@ object SvApp {
       }
   }
 
-  def castVote2(
-      trackingCid: cn.svcrules.VoteRequest2.ContractId,
+  def castVote(
+      trackingCid: cn.svcrules.VoteRequest.ContractId,
       isAccepted: Boolean,
       reasonUrl: String,
       reasonDescription: String,
@@ -946,22 +946,22 @@ object SvApp {
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[Either[String, cn.svcrules.VoteRequest2.ContractId]] = {
+  ): Future[Either[String, cn.svcrules.VoteRequest.ContractId]] = {
     svcStoreWithIngestion.store
-      .lookupVoteByThisSvAndVoteRequestWithOffset2(trackingCid)
+      .lookupVoteByThisSvAndVoteRequestWithOffset(trackingCid)
       .flatMap { case QueryResult(_, _) =>
         for {
           svcRules <- svcStoreWithIngestion.store.getSvcRules()
           res <- retryProvider.retryForClientCalls(
-            "castVote2",
+            "castVote",
             for {
-              resolvedVoteRequest <- svcStoreWithIngestion.store.getVoteRequest2(trackingCid)
+              resolvedVoteRequest <- svcStoreWithIngestion.store.getVoteRequest(trackingCid)
               resolvedCid = resolvedVoteRequest.contractId
               reason = new Reason(reasonUrl, reasonDescription)
               cmd = svcRules.exercise(
-                _.exerciseSvcRules_CastVote2(
+                _.exerciseSvcRules_CastVote(
                   resolvedCid,
-                  new Vote2(
+                  new Vote(
                     svcStoreWithIngestion.store.key.svParty.toProtoPrimitive,
                     isAccepted,
                     reason,

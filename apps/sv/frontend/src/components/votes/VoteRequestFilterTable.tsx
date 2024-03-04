@@ -7,14 +7,14 @@ import { DataGrid, GridEventListener, GridRenderCellParams, GridRowParams } from
 
 import {
   ActionRequiringConfirmation,
-  VoteRequest2,
+  VoteRequest,
 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 import { ContractId } from '@daml/types';
 
 interface ListVoteRequestsTableProps {
-  voteRequests: Contract<VoteRequest2>[];
+  voteRequests: Contract<VoteRequest>[];
   getAction: (action: ActionRequiringConfirmation) => string;
-  openModalWithVoteRequest: (voteRequestContractId: ContractId<VoteRequest2>) => void;
+  openModalWithVoteRequest: (voteRequestContractId: ContractId<VoteRequest>) => void;
   tableBodyId: string;
 }
 

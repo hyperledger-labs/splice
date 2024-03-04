@@ -35,7 +35,7 @@ class LeaderBasedAutomationService(
     registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
     if (config.automation.enableSvcGovernance) {
       registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
-      registerTrigger(new CloseVoteRequest2WithEarlyClosingTrigger(triggerContext, svTaskContext))
+      registerTrigger(new CloseVoteRequestWithEarlyClosingTrigger(triggerContext, svTaskContext))
     }
     registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
 
@@ -45,7 +45,7 @@ class LeaderBasedAutomationService(
 
     registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
-    registerTrigger(new CloseVoteRequest2Trigger(triggerContext, svTaskContext))
+    registerTrigger(new CloseVoteRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
     registerTrigger(new SvcRewardTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svTaskContext))
@@ -73,12 +73,12 @@ object LeaderBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[AdvanceOpenMiningRoundTrigger],
     aTrigger[CompletedSvOnboardingTrigger],
     aTrigger[ExecuteConfirmedActionTrigger],
-    aTrigger[CloseVoteRequest2WithEarlyClosingTrigger],
+    aTrigger[CloseVoteRequestWithEarlyClosingTrigger],
     aTrigger[MergeMemberTrafficContractsTrigger],
     aTrigger[ExpiredCoinTrigger],
     aTrigger[ExpiredLockedCoinTrigger],
     aTrigger[ExpiredSvOnboardingRequestTrigger],
-    aTrigger[CloseVoteRequest2Trigger],
+    aTrigger[CloseVoteRequestTrigger],
     aTrigger[ExpiredSvOnboardingConfirmedTrigger],
     aTrigger[SvcRewardTrigger],
     aTrigger[ExpireIssuingMiningRoundTrigger],

@@ -186,7 +186,7 @@ class SvTimeBasedOnboardingIntegrationTest
             val action: ActionRequiringConfirmation =
               new ARC_SvcRules(new SRARC_SetConfig(new SvcRules_SetConfig(newConfig)))
 
-            sv1Backend.createVoteRequest2(
+            sv1Backend.createVoteRequest(
               sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
               action,
               "url",
@@ -197,14 +197,14 @@ class SvTimeBasedOnboardingIntegrationTest
         )(
           "sv1 can see the new vote request",
           _ => {
-            sv1Backend.listVoteRequests2() should not be empty
+            sv1Backend.listVoteRequests() should not be empty
           },
         )
 
         actAndCheck("one week has passed", advanceTime(JavaDuration.ofDays(8)))(
           "the vote request is not displayed anymore",
           _ => {
-            sv1Backend.listVoteRequests2() shouldBe empty
+            sv1Backend.listVoteRequests() shouldBe empty
           },
         )
       }

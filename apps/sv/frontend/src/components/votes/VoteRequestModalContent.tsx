@@ -22,7 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { VoteRequest2 } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId, Party } from '@daml/types';
 
 import { useSvcInfos } from '../../contexts/SvContext';
@@ -34,7 +34,7 @@ import VoteForm from './VoteForm';
 import ActionView from './actions/views/ActionView';
 
 interface VoteRequestModalProps {
-  voteRequestContractId?: ContractId<VoteRequest2>;
+  voteRequestContractId?: ContractId<VoteRequest>;
   handleClose: () => void;
 }
 

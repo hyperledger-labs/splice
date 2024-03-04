@@ -3,7 +3,7 @@ import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
-import { VoteRequest2 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 dayjs.extend(utc);
 
@@ -13,7 +13,7 @@ export interface VoteRequestValidity {
 }
 
 function validateScheduleDateTime(
-  data: Contract<VoteRequest2>[],
+  data: Contract<VoteRequest>[],
   formattedUTCtime: string
 ): boolean {
   const takenTimes =
@@ -42,7 +42,7 @@ function validateScheduleDateTime(
 }
 
 export function isScheduleDateTimeValid(
-  data: Contract<VoteRequest2>[],
+  data: Contract<VoteRequest>[],
   time: string
 ): VoteRequestValidity {
   if (validateScheduleDateTime(data, time)) {

@@ -2,7 +2,7 @@ package com.daml.network.sv.store.db
 
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.svcrules.VoteRequest2
+import com.daml.network.codegen.java.cn.svcrules.VoteRequest
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.store.{Executed, StoreErrors, VoteRequestOutcome}
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
@@ -37,7 +37,7 @@ object SvcTables extends AcsTables with NamedLogging {
       validator: Option[PartyId] = None,
       totalTrafficPurchased: Option[Long] = None,
       voter: Option[PartyId] = None,
-      voteRequestTrackingCid: Option[VoteRequest2.ContractId] = None,
+      voteRequestTrackingCid: Option[VoteRequest.ContractId] = None,
       requester: Option[PartyId] = None,
       requesterName: Option[String] = None,
       electionRequestEpoch: Option[Long] = None,

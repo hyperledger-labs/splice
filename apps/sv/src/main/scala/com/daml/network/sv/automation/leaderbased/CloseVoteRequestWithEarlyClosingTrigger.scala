@@ -8,7 +8,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
-import com.daml.network.codegen.java.cn.svcrules.VoteRequest2
+import com.daml.network.codegen.java.cn.svcrules.VoteRequest
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -18,28 +18,28 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.RichOptional
 
-class CloseVoteRequest2WithEarlyClosingTrigger(
+class CloseVoteRequestWithEarlyClosingTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnAssignedContractTrigger.Template[VoteRequest2.ContractId, VoteRequest2](
+) extends OnAssignedContractTrigger.Template[VoteRequest.ContractId, VoteRequest](
       svTaskContext.svcStore,
-      VoteRequest2.COMPANION,
+      VoteRequest.COMPANION,
     )
-    with SvTaskBasedTrigger[AssignedContract[VoteRequest2.ContractId, VoteRequest2]] {
+    with SvTaskBasedTrigger[AssignedContract[VoteRequest.ContractId, VoteRequest]] {
 
   private val store = svTaskContext.svcStore
 
   override def completeTaskAsLeader(
-      voteRequestContract: AssignedContract[VoteRequest2.ContractId, VoteRequest2]
+      voteRequestContract: AssignedContract[VoteRequest.ContractId, VoteRequest]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val trackingCid =
       voteRequestContract.payload.trackingCid.toScala.getOrElse(voteRequestContract.contractId)
     for {
-      currentRequest <- store.lookupVoteRequest2(trackingCid)
+      currentRequest <- store.lookupVoteRequest(trackingCid)
       action = currentRequest.map(_.payload.action)
       currentRequestCid = currentRequest.map(_.contractId).getOrElse(voteRequestContract.contractId)
       isStale = currentRequest.isEmpty
@@ -76,7 +76,7 @@ class CloseVoteRequest2WithEarlyClosingTrigger(
                   coinRules <- store.getCoinRules()
                   coinRulesId = coinRules.contractId
                   cmd = svcRules.exercise(
-                    _.exerciseSvcRules_CloseVoteRequest2(
+                    _.exerciseSvcRules_CloseVoteRequest(
                       currentRequestCid,
                       java.util.Optional.of(coinRulesId),
                     )

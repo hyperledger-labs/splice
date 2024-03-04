@@ -1,33 +1,33 @@
 package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn.svcrules.VoteRequest2
+import com.daml.network.codegen.java.cn.svcrules.VoteRequest
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-class CloseVoteRequest2Trigger(
+class CloseVoteRequestTrigger(
     override protected val context: TriggerContext,
     override protected val svTaskContext: SvTaskBasedTrigger.Context,
 )(implicit
     override val ec: ExecutionContext,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
-      VoteRequest2.ContractId,
-      VoteRequest2,
+      VoteRequest.ContractId,
+      VoteRequest,
     ](
       svTaskContext.svcStore.multiDomainAcsStore,
-      svTaskContext.svcStore.listExpiredVoteRequests2(),
-      VoteRequest2.COMPANION,
+      svTaskContext.svcStore.listExpiredVoteRequests(),
+      VoteRequest.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-      VoteRequest2.ContractId,
-      VoteRequest2,
+      VoteRequest.ContractId,
+      VoteRequest,
     ]]] {
   type Task =
-    ScheduledTaskTrigger.ReadyTask[AssignedContract[VoteRequest2.ContractId, VoteRequest2]]
+    ScheduledTaskTrigger.ReadyTask[AssignedContract[VoteRequest.ContractId, VoteRequest]]
 
   private val store = svTaskContext.svcStore
 
@@ -42,7 +42,7 @@ class CloseVoteRequest2Trigger(
           Seq(svTaskContext.svcStore.key.svParty),
           Seq(svTaskContext.svcStore.key.svcParty),
           svcRules.exercise(
-            _.exerciseSvcRules_CloseVoteRequest2(
+            _.exerciseSvcRules_CloseVoteRequest(
               voteRequestCid,
               java.util.Optional.of(coinRulesId),
             )

@@ -653,7 +653,7 @@ class GlobalDomainMigrationIntegrationTest
 
           actAndCheck(
             "validate domain with create VoteRequest",
-            sv1LocalBackend.createVoteRequest2(
+            sv1LocalBackend.createVoteRequest(
               sv1Party.toProtoPrimitive,
               new ARC_SvcRules(
                 new SRARC_AddMember(
@@ -674,9 +674,9 @@ class GlobalDomainMigrationIntegrationTest
           )(
             "VoteRequest and Vote should be there",
             _ =>
-              inside(sv1LocalBackend.listVoteRequests2()) { case Seq(onlyReq) =>
+              inside(sv1LocalBackend.listVoteRequests()) { case Seq(onlyReq) =>
                 sv1LocalBackend
-                  .lookupVoteRequest2(
+                  .lookupVoteRequest(
                     onlyReq.contractId
                   )
                   .payload

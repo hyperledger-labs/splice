@@ -9,8 +9,8 @@ import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
 }
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
-  SvcRules_CloseVoteRequest2,
-  VoteRequestResult2,
+  SvcRules_CloseVoteRequest,
+  VoteRequestResult,
 }
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.daml.network.store.TxLogStore
@@ -39,8 +39,8 @@ class SvcTxLogParser(
     root match {
       case exercised: ExercisedEvent =>
         exercised match {
-          case SvcRulesCloseVoteRequest2(node) =>
-            State.fromCloseVoteRequest2(node)
+          case SvcRulesCloseVoteRequest(node) =>
+            State.fromCloseVoteRequest(node)
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
 
@@ -93,8 +93,8 @@ object SvcTxLogParser {
 
   object State {
 
-    def fromCloseVoteRequest2(
-        node: ExerciseNode[SvcRules_CloseVoteRequest2, VoteRequestResult2]
+    def fromCloseVoteRequest(
+        node: ExerciseNode[SvcRules_CloseVoteRequest, VoteRequestResult]
     ): State = {
       State(
         immutable.Queue(

@@ -1,4 +1,3 @@
--- TODO(#9298): make this the one test-suite for governance once the old version is removed
 module CN.Scripts.TestGovernance where
 
 import DA.Assert
@@ -34,7 +33,7 @@ testVoteRequest = do
   [] <- query @FeaturedAppRight provider
 
   -- sv1 initiates the granting of the featured app right for the provider
-  requestCid1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+  requestCid1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
     requester = sv1
     action = ARC_SvcRules with
       svcAction = SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight with
@@ -43,22 +42,22 @@ testVoteRequest = do
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
 
   -- sv2 rejects initially
-  requestCid <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+  requestCid <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
     requestCid = requestCid1
-    vote = Vote2 with
+    vote = Vote with
       sv = sv2
       accept = False
       reason = Reason with url = ""; body = "the justification is not good enough"
 
   -- there are two votes, which is not enough to consider the vote definitive and grant the app right
-  executeAllDefinitiveVotes2 app
+  executeAllDefinitiveVotes app
   [] <- query @FeaturedAppRight provider
 
   -- a day passes and sv2 updates their vote
   passTime (days 1)
-  requestCid <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+  requestCid <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
     requestCid
-    vote = Vote2 with
+    vote = Vote with
       sv = sv2
       accept = True
       reason = Reason with url = ""; body = "OK, after rereading the materials, I agree."
@@ -68,41 +67,41 @@ testVoteRequest = do
   voteRequest.trackingCid === Some requestCid1
 
   -- there are still only two votes, which is not enough to consider the vote definitive and grant the app right
-  executeAllDefinitiveVotes2 app
+  executeAllDefinitiveVotes app
   [] <- query @FeaturedAppRight provider
 
   -- sv3 accepts
-  requestCid <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+  requestCid <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
     requestCid
-    vote = Vote2 with
+    vote = Vote with
       sv = sv3
       accept = True
       reason = Reason with url = ""; body = "I agree!"
 
   -- there are now three votes in favor of the change, which are enough to grant the right,
   -- but the vote request can only be executed early if all members have voted
-  executeAllDefinitiveVotes2 app
+  executeAllDefinitiveVotes app
   [] <- query @FeaturedAppRight provider
 
   -- sv4 rejects
-  _requestCid <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+  _requestCid <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
     requestCid
-    vote = Vote2 with
+    vote = Vote with
       sv = sv4
       accept = False
       reason = Reason with url = ""; body = "I agree!"
 
   -- now all members have voted and the request can be closed
-  executeAllDefinitiveVotes2 app
+  executeAllDefinitiveVotes app
   [(rightCid, right)] <- query @FeaturedAppRight provider
   right === FeaturedAppRight with svc; provider
 
   -- the request has been archived
-  [] <- query @VoteRequest2 svc
+  [] <- query @VoteRequest svc
 
   -- we can remove the granted right using a vote request, provided enough parties answer in time
   -- This uses early closure of the vote request, which is only possible if all members have voted
-  initiateAndAcceptVote2 app [sv1, sv2, sv3, sv4] $
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
     ARC_SvcRules with
       svcAction = SRARC_RevokeFeaturedAppRight SvcRules_RevokeFeaturedAppRight with
         rightCid
@@ -122,7 +121,7 @@ testVoteRequestRejection = do
   [] <- query @FeaturedAppRight provider
 
   -- sv1 initiates the granting of the featured app right for the provider
-  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
     requester = sv1
     action = ARC_SvcRules with
       svcAction = SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight with
@@ -132,9 +131,9 @@ testVoteRequestRejection = do
 
   -- a super-majority rejects the request
   let rejectRequest sv requestCid =  do
-        submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+        submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
           requestCid
-          vote = Vote2 with
+          vote = Vote with
             sv = sv
             accept = False
             reason = Reason with url = ""; body = "nope!"
@@ -146,7 +145,7 @@ testVoteRequestRejection = do
   -- close aftet the 7 days have passed
   passTime (days 7)
   now <- getTime
-  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid
     coinRulesCid = None
 
@@ -165,7 +164,7 @@ testRacingMembershipRemoval = do
   [(svcRulesCid, _)] <- query @SvcRules svc
 
   -- sv1 is not happy with sv2, and issues two removal requests at the same time!
-  req1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+  req1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
     requester = sv1
     action = ARC_SvcRules with
       svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
@@ -173,7 +172,7 @@ testRacingMembershipRemoval = do
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
 
-  req2 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+  req2 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
     requester = sv1
     action = ARC_SvcRules with
       svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
@@ -182,7 +181,7 @@ testRacingMembershipRemoval = do
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
 
   -- sv2 counters and wants to remove sv1
-  req3 <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+  req3 <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
     requester = sv2
     action = ARC_SvcRules with
       svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
@@ -192,15 +191,15 @@ testRacingMembershipRemoval = do
 
   -- sv3 and sv4 are not happy with either of them, and accept both removal requests
   [req1, req2, req3] <- forA [req1, req2, req3] $ \requestCid -> do
-    requestCid <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+    requestCid <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
       requestCid
-      vote = Vote2 with
+      vote = Vote with
         sv = sv3
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
-    requestCid <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+    requestCid <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
       requestCid
-      vote = Vote2 with
+      vote = Vote with
         sv = sv4
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
@@ -208,7 +207,7 @@ testRacingMembershipRemoval = do
 
   -- sv1 attempts to immediatly accept the request to remove sv2, which succeeds as SV2 is not required to vote for its own offboarding
   now <- getTime
-  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req1
     coinRulesCid = None
 
@@ -219,7 +218,7 @@ testRacingMembershipRemoval = do
 
   -- and it eagerly accepts its other vote request as well
   [(svcRulesCid, _)] <- query @SvcRules svc
-  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req2
     coinRulesCid = None
 
@@ -230,7 +229,7 @@ testRacingMembershipRemoval = do
 
   -- and forgets to turn off automation, which now submits the closing of the vote request to remove SV1
   [(svcRulesCid, _)] <- query @SvcRules svc
-  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req3
     coinRulesCid = None
 
@@ -246,7 +245,7 @@ testRacingMembershipRemoval = do
 
   -- The story continues: sv3 tries to remove sv4
   [(svcRulesCid, _)] <- query @SvcRules svc
-  req4 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+  req4 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
     requester = sv3
     action = ARC_SvcRules with
       svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
@@ -256,13 +255,13 @@ testRacingMembershipRemoval = do
 
   -- early closing is not possible, as the outcome of the vote is not determined, and we thus leave
   -- time for some of the SV's to change their vote
-  submitMultiMustFail [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+  submitMultiMustFail [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req4
     coinRulesCid = None
 
   -- after enough time has passed the closing works
   passTime (seconds 1)
-  result <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+  result <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req4
     coinRulesCid = None
 
@@ -270,7 +269,7 @@ testRacingMembershipRemoval = do
   result.outcome === VRO_Expired
 
   -- Let's see if sv3 and sv4 can work together to also remove sv4
-  req5 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+  req5 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
     requester = sv3
     action = ARC_SvcRules with
       svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
@@ -278,16 +277,16 @@ testRacingMembershipRemoval = do
     reason = Reason with url = ""; body = "they want to leave!"
     voteRequestTimeout = Some (days 1)
 
-  req5 <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote2 with
+  req5 <- submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_CastVote with
     requestCid = req5
-    vote = Vote2 with
+    vote = Vote with
       sv = sv4
       accept = True
       reason = Reason with url = ""; body = "yes, let me go please!"
 
   -- and actually early closing is possible, as everybody has voted and the outcome is definite
   now <- getTime
-  result <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+  result <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req5
     coinRulesCid = None
 
@@ -309,7 +308,7 @@ testSvcRulesConfigChange = do
 
   -- run the voting process to change the config
   let newConfig = svcRules.config with maxTextLength = svcRules.config.maxTextLength + 1024 * 1024
-  initiateAndAcceptVote2 app [sv1, sv2, sv3, sv4] $
+  initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
     ARC_SvcRules with
       svcAction = SRARC_SetConfig SvcRules_SetConfig with
         newConfig
@@ -329,7 +328,7 @@ testOffboardMemberAndCoinPriceVotes = do
   svcRules.leader === sv1
 
   -- run the voting process to change the config and remove the current leader 'sv1'
-  initiateAndAcceptVote2 app [sv2, sv3, sv4] $
+  initiateAndAcceptVote app [sv2, sv3, sv4] $
     ARC_SvcRules with
       svcAction = SRARC_OffboardMember SvcRules_OffboardMember with
         member = sv1
@@ -340,7 +339,7 @@ testOffboardMemberAndCoinPriceVotes = do
 
   -- pass the default voting timeout
   passTime (svcRules.config.voteRequestTimeout)
-  executeAllDefinitiveVotes2 app
+  executeAllDefinitiveVotes app
 
   -- check that the member was removed and the leader changed to sv2
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
@@ -380,7 +379,7 @@ testVoteRequestExpire = do
   provider <- allocateParty "provider"
 
   [(svcRulesCid, _)] <- query @SvcRules svc
-  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote2 with
+  requestCid <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestVote with
     requester = sv1
     action = ARC_SvcRules with
       svcAction = SRARC_GrantFeaturedAppRight SvcRules_GrantFeaturedAppRight with
@@ -389,7 +388,7 @@ testVoteRequestExpire = do
     voteRequestTimeout = None
 
   -- attempt to close the vote request before its voting period
-  submitMultiMustFail [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+  submitMultiMustFail [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = requestCid
     coinRulesCid = None
 
@@ -397,7 +396,7 @@ testVoteRequestExpire = do
   now <- getTime
 
   -- close the vote request once the voting period is over
-  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest2 with
+  result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = requestCid
     coinRulesCid = None
 

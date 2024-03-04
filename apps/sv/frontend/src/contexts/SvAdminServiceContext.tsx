@@ -15,7 +15,7 @@ import {
   ListSvcRulesVoteRequestsResponse,
   ListSvcRulesVoteResultsResponse,
   ListValidatorLicensesResponse,
-  ListVoteRequest2ByTrackingCidResponse,
+  ListVoteRequestByTrackingCidResponse,
   ListVoteResultsRequest,
   LookupSvcRulesVoteRequestResponse,
   Middleware,
@@ -40,15 +40,15 @@ export interface SvAdminClient {
   isAuthorized: () => Promise<void>;
   getElectionRequest: () => Promise<GetElectionRequestResponse>;
   createElectionRequest: (requester: string, ranking: string[]) => Promise<void>;
-  createVoteRequest2: (
+  createVoteRequest: (
     requester: string,
     action: ActionRequiringConfirmation,
     url: string,
     description: string,
     expiration: RelTime
   ) => Promise<void>;
-  listSvcRulesVoteRequests2: () => Promise<ListSvcRulesVoteRequestsResponse>;
-  listVoteRequestResults2: (
+  listSvcRulesVoteRequests: () => Promise<ListSvcRulesVoteRequestsResponse>;
+  listVoteRequestResults: (
     limit: number,
     actionName?: string,
     requester?: string,
@@ -56,13 +56,13 @@ export interface SvAdminClient {
     effectiveTo?: string,
     executed?: boolean
   ) => Promise<ListSvcRulesVoteResultsResponse>;
-  lookupSvcRulesVoteRequest2: (
+  lookupSvcRulesVoteRequest: (
     voteRequestContractId: string
   ) => Promise<LookupSvcRulesVoteRequestResponse>;
-  listVoteRequests2ByTrackingCid: (
+  listVoteRequestsByTrackingCid: (
     voteRequestContractIds: string[]
-  ) => Promise<ListVoteRequest2ByTrackingCidResponse>;
-  castVote2: (
+  ) => Promise<ListVoteRequestByTrackingCidResponse>;
+  castVote: (
     voteRequestContractId: string,
     isAccepted: boolean,
     reasonUrl: string,
@@ -110,7 +110,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         };
         return await svAdminClient.createElectionRequest(request);
       },
-      createVoteRequest2: async (
+      createVoteRequest: async (
         requester,
         action: ActionRequiringConfirmation,
         url,
@@ -124,12 +124,12 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
           description,
           expiration: RelTime.encode(expiration),
         };
-        return await svAdminClient.createVoteRequest2(request);
+        return await svAdminClient.createVoteRequest(request);
       },
-      listSvcRulesVoteRequests2: async (): Promise<ListSvcRulesVoteRequestsResponse> => {
-        return await svAdminClient.listSvcRulesVoteRequests2();
+      listSvcRulesVoteRequests: async (): Promise<ListSvcRulesVoteRequestsResponse> => {
+        return await svAdminClient.listSvcRulesVoteRequests();
       },
-      listVoteRequestResults2: async (
+      listVoteRequestResults: async (
         limit: number,
         actionName?: string,
         requester?: string,
@@ -145,22 +145,22 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
           effectiveTo: effectiveTo,
           limit: limit,
         };
-        return await svAdminClient.listVoteRequestResults2(request);
+        return await svAdminClient.listVoteRequestResults(request);
       },
-      lookupSvcRulesVoteRequest2: async (
+      lookupSvcRulesVoteRequest: async (
         voteRequestContractId: string
       ): Promise<LookupSvcRulesVoteRequestResponse> => {
-        return await svAdminClient.lookupSvcRulesVoteRequest2(voteRequestContractId);
+        return await svAdminClient.lookupSvcRulesVoteRequest(voteRequestContractId);
       },
-      listVoteRequests2ByTrackingCid: async (
+      listVoteRequestsByTrackingCid: async (
         voteRequestContractIds: string[]
-      ): Promise<ListVoteRequest2ByTrackingCidResponse> => {
+      ): Promise<ListVoteRequestByTrackingCidResponse> => {
         const request = {
           vote_request_contract_ids: voteRequestContractIds,
         };
-        return await svAdminClient.listVoteRequests2ByTrackingCid(request);
+        return await svAdminClient.listVoteRequestsByTrackingCid(request);
       },
-      castVote2: async (
+      castVote: async (
         vote_request_contract_id,
         is_accepted,
         reason_url,
@@ -172,7 +172,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
           reason_url,
           reason_description,
         };
-        return await svAdminClient.castVote2(request);
+        return await svAdminClient.castVote(request);
       },
       prepareValidatorOnboarding: async (
         expires_in: number

@@ -202,8 +202,7 @@ template Confirmation with
 -- See the comments on `ActionRequiringConfirmation` for details.
 --
 -- Version2, which tracks all votes in a single contract.
--- TODO(#9298): make this the one version for votting (i.e. drop the '2'-suffixes), once we have migrated the apps to the new version
-template VoteRequest2
+template VoteRequest
   with
     svc : Party
     requester : Text
@@ -214,24 +213,24 @@ template VoteRequest2
     -- ^ The reason for requesting the execution of the action. Typically a reference to some off-ledger justification.
     voteBefore : Time
     -- ^ The time before which votes are accepted, and SHOULD be submitted.
-    votes : Map.Map Text Vote2
+    votes : Map.Map Text Vote
     -- ^ The votes cast by current (or previous members) of the SVC. These may be previous members in case
     -- there was a membership change after the vote was requested.
-    trackingCid : Optional (ContractId VoteRequest2)
+    trackingCid : Optional (ContractId VoteRequest)
     -- ^ An optional tracking ContractId to be used for tracking the vote request through its updates.
     -- This is always set to the first ContractId of the original vote request (None on creation).
   where
     signatory svc
 
-data VoteRequestResult2 = VoteRequestResult2 with
-    request : VoteRequest2 -- ^ The original vote request.
+data VoteRequestResult = VoteRequestResult with
+    request : VoteRequest -- ^ The original vote request.
     completedAt : Time -- ^ When the vote request was completed.
     offboardedVoters : [Text] -- ^ Members that voted but were offboarded before the vote completed.
     abstainingMembers : [Text] -- ^ Members that did not vote.
-    outcome : VoteRequestOutcome2  -- ^ The final result of the vote.
+    outcome : VoteRequestOutcome  -- ^ The final result of the vote.
   deriving (Eq, Show)
 
-data VoteRequestOutcome2
+data VoteRequestOutcome
   = VRO_AcceptedButActionFailed with
       description : Text -- ^ Description of the failure.
   | VRO_Accepted with -- The action was accepted by a super-majority.
@@ -244,7 +243,7 @@ data VoteRequestOutcome2
   deriving (Eq, Show)
 --
 -- | A vote cast by an SVC member.
-data Vote2 = Vote2 with
+data Vote = Vote with
     sv : Party -- ^ The SV party used to submit the vote.
     accept : Bool
     -- ^ Whether the responder accepted the request to execute the action or not.
@@ -579,7 +578,7 @@ template SvcRules with
     -----------------------------------------------------
 
     -- TODO(#9317): rate limit inidiviual SVs wrt requesting votes
-    nonconsuming choice SvcRules_RequestVote2 : ContractId VoteRequest2
+    nonconsuming choice SvcRules_RequestVote : ContractId VoteRequest
       with
         requester : Party
         action : ActionRequiringConfirmation
@@ -598,11 +597,11 @@ template SvcRules with
               None ->
                 now `addRelTime` config.voteRequestTimeout
         require "There is some time to vote" (now < voteBefore)
-        let requesterVote = Vote2 with
+        let requesterVote = Vote with
               sv = requester
               accept = True
               reason = Reason with url = ""; body = "I accept, as I requested the vote."
-        create VoteRequest2 with
+        create VoteRequest with
           svc
           requester = requesterName
           action
@@ -614,10 +613,10 @@ template SvcRules with
 
     -- Note that this choice can be used to both cast the initial vote, and update a vote.
     -- TODO(#9319): rate limit SVs wrt updating their votes
-    nonconsuming choice SvcRules_CastVote2 : ContractId VoteRequest2
+    nonconsuming choice SvcRules_CastVote : ContractId VoteRequest
       with
-        requestCid : ContractId VoteRequest2
-        vote : Vote2
+        requestCid : ContractId VoteRequest
+        vote : Vote
       controller vote.sv
       do
         -- validate vote parameters
@@ -636,9 +635,9 @@ template SvcRules with
 
     -- We expect the TxHistory log of the SV app to store the choice argument together
     -- with its result for historical reference.
-    nonconsuming choice SvcRules_CloseVoteRequest2 : VoteRequestResult2
+    nonconsuming choice SvcRules_CloseVoteRequest : VoteRequestResult
       with
-        requestCid : ContractId VoteRequest2
+        requestCid : ContractId VoteRequest
         coinRulesCid : Optional (ContractId CoinRules)
       controller leader
       do
@@ -680,7 +679,7 @@ template SvcRules with
             all (\m -> Some m == memberBeingOffboarded || m `Map.member` request.votes) activeMembers
           require "The outcome must be determined allow early closing" (outcome /= VRO_Expired)
         -- report the result
-        pure VoteRequestResult2 with
+        pure VoteRequestResult with
             request
             completedAt = now
             offboardedVoters
@@ -1223,7 +1222,7 @@ requireWellformedReason config reason = do
   require "Reason URL is not too long" (T.length reason.url <= config.maxTextLength)
   require "Reason body is not too long" (T.length reason.body <= config.maxTextLength)
 
-requireWellformedVote : SvcRulesConfig -> Vote2 -> Update ()
+requireWellformedVote : SvcRulesConfig -> Vote -> Update ()
 requireWellformedVote config vote = do
   requireWellformedReason config vote.reason
 
@@ -1258,8 +1257,8 @@ actionRequiringConfirmationEffectiveAt action =
 instance HasCheckedFetch ElectionRequest ForSvc where
   contractGroupId ElectionRequest {..} = ForSvc with svc
 
-instance HasCheckedFetch VoteRequest2 ForSvc where
-  contractGroupId VoteRequest2 {..} = ForSvc with svc
+instance HasCheckedFetch VoteRequest ForSvc where
+  contractGroupId VoteRequest {..} = ForSvc with svc
 
 instance HasCheckedFetch FeaturedAppRight ForSvc where
   contractGroupId FeaturedAppRight {..} = ForSvc with svc

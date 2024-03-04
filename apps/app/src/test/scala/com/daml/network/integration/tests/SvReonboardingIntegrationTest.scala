@@ -204,7 +204,7 @@ class SvReonboardingIntegrationTest
                 new ARC_SvcRules(
                   new SRARC_OffboardMember(new SvcRules_OffboardMember(sv4Party.toProtoPrimitive))
                 )
-              sv1Backend.createVoteRequest2(
+              sv1Backend.createVoteRequest(
                 sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
                 action,
                 "url",
@@ -214,14 +214,14 @@ class SvReonboardingIntegrationTest
             },
           )(
             "The vote request has been created",
-            _ => sv1Backend.listVoteRequests2().loneElement.contractId,
+            _ => sv1Backend.listVoteRequests().loneElement.contractId,
           )
 
           Seq(sv2Backend, sv3Backend).foreach { sv =>
             eventually() {
-              sv.listVoteRequests2() should have size 1
+              sv.listVoteRequests() should have size 1
             }
-            sv.castVote2(voteRequestCid, true, "url", "description")
+            sv.castVote(voteRequestCid, true, "url", "description")
           }
 
           eventually() {
@@ -344,7 +344,7 @@ class SvReonboardingIntegrationTest
           )
         actAndCheck(
           "SV4 can create vote requests",
-          sv4ReonboardBackend.createVoteRequest2(
+          sv4ReonboardBackend.createVoteRequest(
             sv4Party.toProtoPrimitive,
             action,
             "url",
@@ -354,10 +354,10 @@ class SvReonboardingIntegrationTest
         )(
           "vote request is observed by sv1-3",
           _ => {
-            val voteRequest = sv4ReonboardBackend.listVoteRequests2().loneElement
+            val voteRequest = sv4ReonboardBackend.listVoteRequests().loneElement
             voteRequest.payload.action shouldBe action
             Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
-              forExactly(1, sv.listVoteRequests2()) { _.contractId shouldBe voteRequest.contractId }
+              forExactly(1, sv.listVoteRequests()) { _.contractId shouldBe voteRequest.contractId }
             }
           },
         )

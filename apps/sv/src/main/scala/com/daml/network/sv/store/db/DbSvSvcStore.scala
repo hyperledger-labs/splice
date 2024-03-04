@@ -819,11 +819,11 @@ class DbSvSvcStore(
     } yield sum.getOrElse(0L)
   }
 
-  override def lookupVoteRequest2(
-      voteRequestCid: VoteRequest2.ContractId
+  override def lookupVoteRequest(
+      voteRequestCid: VoteRequest.ContractId
   )(implicit
       tc: TraceContext
-  ): Future[Option[Contract[VoteRequest2.ContractId, VoteRequest2]]] = waitUntilAcsIngested {
+  ): Future[Option[Contract[VoteRequest.ContractId, VoteRequest]]] = waitUntilAcsIngested {
     for {
       result <- storage
         .querySingle(
@@ -831,21 +831,21 @@ class DbSvSvcStore(
             SvcTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = (sql""" template_id_qualified_name = ${QualifiedName(VoteRequest2.TEMPLATE_ID)}
+            where = (sql""" template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
                        and vote_request_tracking_cid = $voteRequestCid """).toActionBuilder,
           ).headOption,
-          "lookupVoteRequest2",
+          "lookupVoteRequest",
         )
         .value
-    } yield result.map(contractFromRow(VoteRequest2.COMPANION)(_))
+    } yield result.map(contractFromRow(VoteRequest.COMPANION)(_))
   }
 
-  override def listVoteRequests2ByTrackingCid(
-      trackingCids: Seq[VoteRequest2.ContractId],
+  override def listVoteRequestsByTrackingCid(
+      trackingCids: Seq[VoteRequest.ContractId],
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[VoteRequest2.ContractId, VoteRequest2]]] = waitUntilAcsIngested {
+  ): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] = waitUntilAcsIngested {
     val voteRequestTrackingCidsSql = inClause(trackingCids)
     for {
       result <- storage
@@ -854,20 +854,20 @@ class DbSvSvcStore(
             SvcTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = (sql""" template_id_qualified_name = ${QualifiedName(VoteRequest2.TEMPLATE_ID)}
+            where = (sql""" template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
                           and vote_request_tracking_cid in """ ++ voteRequestTrackingCidsSql).toActionBuilder,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
-          "listVoteRequests2ByTrackingCid",
+          "listVoteRequestsByTrackingCid",
         )
-      records = applyLimit("listVoteRequests2ByTrackingCid", limit, result)
+      records = applyLimit("listVoteRequestsByTrackingCid", limit, result)
     } yield records
-      .map(contractFromRow(VoteRequest2.COMPANION)(_))
+      .map(contractFromRow(VoteRequest.COMPANION)(_))
   }
 
-  override def lookupVoteByThisSvAndVoteRequestWithOffset2(voteRequestCid: VoteRequest2.ContractId)(
+  override def lookupVoteByThisSvAndVoteRequestWithOffset(voteRequestCid: VoteRequest.ContractId)(
       implicit tc: TraceContext
-  ): Future[MultiDomainAcsStore.QueryResult[Option[Vote2]]] =
+  ): Future[MultiDomainAcsStore.QueryResult[Option[Vote]]] =
     waitUntilAcsIngested {
       (for {
         resultWithOffset <- storage
@@ -878,7 +878,7 @@ class DbSvSvcStore(
               domainMigrationId,
               where = sql"""
                               template_id_qualified_name = ${QualifiedName(
-                  VoteRequest2.TEMPLATE_ID
+                  VoteRequest.TEMPLATE_ID
                 )}
                           and vote_request_tracking_cid = $voteRequestCid
                             """,
@@ -889,15 +889,15 @@ class DbSvSvcStore(
       } yield MultiDomainAcsStore.QueryResult(
         resultWithOffset.offset,
         resultWithOffset.row
-          .map(contractFromRow(VoteRequest2.COMPANION)(_))
+          .map(contractFromRow(VoteRequest.COMPANION)(_))
           .flatMap(_.payload.votes.values().asScala.find(_.sv == key.svParty.toProtoPrimitive)),
       )).getOrRaise(offsetExpectedError())
     }
 
-  override def lookupVoteRequestByThisSvAndActionWithOffset2(
+  override def lookupVoteRequestByThisSvAndActionWithOffset(
       action: ActionRequiringConfirmation
   )(implicit tc: TraceContext): Future[
-    MultiDomainAcsStore.QueryResult[Option[Contract[VoteRequest2.ContractId, VoteRequest2]]]
+    MultiDomainAcsStore.QueryResult[Option[Contract[VoteRequest.ContractId, VoteRequest]]]
   ] = waitUntilAcsIngested {
     (for {
       resultWithOffset <- storage
@@ -907,7 +907,7 @@ class DbSvSvcStore(
             storeId,
             domainMigrationId,
             where = sql"""
-                           template_id_qualified_name = ${QualifiedName(VoteRequest2.TEMPLATE_ID)}
+                           template_id_qualified_name = ${QualifiedName(VoteRequest.TEMPLATE_ID)}
                        and action_requiring_confirmation = ${payloadJsonFromDefinedDataType(action)}
                        and requester_name = ${key.svParty}
                          """,
@@ -917,7 +917,7 @@ class DbSvSvcStore(
         )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
-      resultWithOffset.row.map(contractFromRow(VoteRequest2.COMPANION)(_)),
+      resultWithOffset.row.map(contractFromRow(VoteRequest.COMPANION)(_)),
     )).getOrRaise(offsetExpectedError())
   }
 
@@ -1193,7 +1193,7 @@ class DbSvSvcStore(
     )
   }
 
-  override def listVoteRequestResults2(
+  override def listVoteRequestResults(
       actionName: Option[String],
       executed: Option[Boolean],
       requester: Option[String],
@@ -1202,7 +1202,7 @@ class DbSvSvcStore(
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[VoteRequestResult2]] = {
+  ): Future[Seq[VoteRequestResult]] = {
     val dbType = EntryType.VoteRequestTxLogEntry
     val actionNameCondition = actionName match {
       case Some(actionName) =>
@@ -1240,9 +1240,9 @@ class DbSvSvcStore(
             ++ effectivenessCondition).toActionBuilder,
           orderLimit = sql"""limit ${sqlLimit(limit)}""",
         ),
-        "listVoteRequestResults2",
+        "listVoteRequestResults",
       )
-      recentVoteResults = applyLimit("listVoteRequestResults2", limit, rows)
+      recentVoteResults = applyLimit("listVoteRequestResults", limit, rows)
         .map(
           txLogEntryFromRow[VoteRequestTxLogEntry](txLogConfig)
         )

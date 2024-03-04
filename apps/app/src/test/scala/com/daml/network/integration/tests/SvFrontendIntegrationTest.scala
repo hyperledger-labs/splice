@@ -18,9 +18,9 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.cc.coinconfig.CoinConfig
-import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome2.VRO_AcceptedButActionFailed
+import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome.VRO_AcceptedButActionFailed
 import com.daml.network.codegen.java.cn.wallet.payment.Currency
-import com.daml.network.sv.automation.leaderbased.CloseVoteRequest2Trigger
+import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
 
 import java.util.Optional
 
@@ -755,7 +755,7 @@ class SvFrontendIntegrationTest
           )
 
           clue("Pausing vote request expiration automation") {
-            sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequest2Trigger].pause().futureValue
+            sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestTrigger].pause().futureValue
           }
 
           actAndCheck(
@@ -786,7 +786,7 @@ class SvFrontendIntegrationTest
           )
 
           clue("Resuming vote request expiration automation") {
-            sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequest2Trigger].resume()
+            sv1Backend.leaderBasedAutomation.trigger[CloseVoteRequestTrigger].resume()
           }
 
           clue("Voting to reject the other vote request") {
@@ -1497,7 +1497,7 @@ class SvFrontendIntegrationTest
           clue("The last action was accepted but failed") {
             eventually() {
               sv1Backend
-                .listVoteRequestResults2(
+                .listVoteRequestResults(
                   None,
                   Some(false),
                   Some("Canton-Foundation-2"),

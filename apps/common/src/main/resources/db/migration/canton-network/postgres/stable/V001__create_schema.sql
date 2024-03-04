@@ -619,16 +619,13 @@ create table svc_acs_store
     -- the SV in a CoinPriceVote contract, or the voter in a Vote contract
     voter                         text,
 
-    -- the contract id of a VoteRequest in a Vote contract
-    vote_request_cid              text,
-
-    -- the trackingCid in a VoteRequest2 contract
+    -- the trackingCid in a VoteRequest contract
     vote_request_tracking_cid     text,
 
-    -- the requester in a VoteRequest or ElectionRequest contract
+    -- the requester in an ElectionRequest contract
     requester                     text,
 
-    -- the requester in a VoteRequest2
+    -- the requester in a VoteRequest
     requester_name                text,
 
     -- the epoch in an ElectionRequest
@@ -709,16 +706,6 @@ create index svc_acs_store_sid_mid_tid_scp_scn
 create index svc_acs_store_sid_mid_tid_scn
     on svc_acs_store (store_id, migration_id, template_id_qualified_name, sv_candidate_name)
     where sv_candidate_name is not null;
-
--- list votes by voter & vote request contract id
-create index svc_acs_store_sid_mid_tid_v_vrc
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, voter, vote_request_cid)
-    where voter is not null;
-
--- list votes by vote request contract id
-create index svc_acs_store_sid_mid_tid_vrc
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, vote_request_cid)
-    where vote_request_cid is not null;
 
 -- list by validator
 create index svc_acs_store_sid_mid_tid_v_tp

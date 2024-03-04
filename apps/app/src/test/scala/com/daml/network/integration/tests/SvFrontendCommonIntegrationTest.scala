@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.svcrules.VoteRequest2
+import com.daml.network.codegen.java.cn.svcrules.VoteRequest
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.util.FrontendLoginUtil
 import org.openqa.selenium.{By, Keys}
@@ -18,7 +18,7 @@ abstract class SvFrontendCommonIntegrationTest
   )(implicit webDriver: WebDriverType) = {
     actAndCheck(
       s"${backend.config.ledgerApiUser} accepts the request",
-      backend.castVote2(new VoteRequest2.ContractId(requestId), isAccept, "", ""),
+      backend.castVote(new VoteRequest.ContractId(requestId), isAccept, "", ""),
     )(
       s"the number of accept votes increased to ${numberAccepts}",
       _ => {

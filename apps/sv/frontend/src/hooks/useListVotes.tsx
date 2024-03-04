@@ -2,30 +2,30 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import * as damlTypes from '@daml/types';
-import { Vote2, VoteRequest2 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { Vote, VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 import { ContractId } from '@daml/types';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 // TODO(#7675) - do we need this model?
 import { SvVote } from '../models/models';
 
-function getVoteStatus(votes: damlTypes.Map<string, Vote2>): Vote2[] {
-  const allVotes: Vote2[] = [];
+function getVoteStatus(votes: damlTypes.Map<string, Vote>): Vote[] {
+  const allVotes: Vote[] = [];
   votes.forEach((v, _) => allVotes.push(v));
   return allVotes;
 }
 
-export const useListVotes = (contractIds: ContractId<VoteRequest2>[]): UseQueryResult<SvVote[]> => {
-  const { listVoteRequests2ByTrackingCid } = useSvAdminClient();
+export const useListVotes = (contractIds: ContractId<VoteRequest>[]): UseQueryResult<SvVote[]> => {
+  const { listVoteRequestsByTrackingCid } = useSvAdminClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
-    queryKey: ['listVoteRequests2ByTrackingCid', contractIds],
+    queryKey: ['listVoteRequestsByTrackingCid', contractIds],
     queryFn: async () => {
       if (contractIds.length === 0) {
         return [];
       }
-      const { vote_requests } = await listVoteRequests2ByTrackingCid(contractIds);
-      const requests = vote_requests.map(v => Contract.decodeOpenAPI(v, VoteRequest2));
+      const { vote_requests } = await listVoteRequestsByTrackingCid(contractIds);
+      const requests = vote_requests.map(v => Contract.decodeOpenAPI(v, VoteRequest));
       return requests.flatMap(vr =>
         getVoteStatus(vr.payload.votes).map(vote => {
           return {

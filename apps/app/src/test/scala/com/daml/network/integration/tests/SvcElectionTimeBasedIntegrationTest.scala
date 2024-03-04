@@ -11,7 +11,7 @@ import CNNodeTests.BracketSynchronous.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.{ElectionRequest, SvcRules_OffboardMember}
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
-import com.daml.network.sv.automation.leaderbased.CloseVoteRequest2WithEarlyClosingTrigger
+import com.daml.network.sv.automation.leaderbased.CloseVoteRequestWithEarlyClosingTrigger
 
 import java.time.Duration as JavaDuration
 import scala.jdk.CollectionConverters.*
@@ -184,13 +184,13 @@ class SvcElectionTimeBasedIntegrationTest
         )
       )
       leaderBackend.leaderBasedAutomation
-        .trigger[CloseVoteRequest2WithEarlyClosingTrigger]
+        .trigger[CloseVoteRequestWithEarlyClosingTrigger]
         .pause()
         .futureValue
       val (_, voteRequest) = actAndCheck(
         "Creating vote request",
         eventuallySucceeds() {
-          sv1Backend.createVoteRequest2(
+          sv1Backend.createVoteRequest(
             sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
             removeAction,
             "url",
@@ -198,7 +198,7 @@ class SvcElectionTimeBasedIntegrationTest
             sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
           )
         },
-      )("vote request has been created", _ => sv1Backend.listVoteRequests2().loneElement)
+      )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
       Seq(sv2Backend, sv3Backend, sv4Backend)
         .filter(
           // current leader not voting
@@ -207,7 +207,7 @@ class SvcElectionTimeBasedIntegrationTest
         .foreach { sv =>
           clue(s"${sv.name} accepts vote") {
             eventuallySucceeds() {
-              sv.castVote2(
+              sv.castVote(
                 voteRequest.contractId,
                 true,
                 "url",
@@ -219,7 +219,7 @@ class SvcElectionTimeBasedIntegrationTest
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
         leaderBackend.leaderBasedAutomation
-          .trigger[CloseVoteRequest2WithEarlyClosingTrigger]
+          .trigger[CloseVoteRequestWithEarlyClosingTrigger]
           .resume(),
         entries => {
           forExactly(4, entries) { line =>

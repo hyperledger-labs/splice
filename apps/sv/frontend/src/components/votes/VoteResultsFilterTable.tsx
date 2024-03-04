@@ -18,11 +18,11 @@ import {
 import * as damlTypes from '@daml/types';
 import {
   ActionRequiringConfirmation,
-  Vote2,
-  VoteRequestResult2,
+  Vote,
+  VoteRequestResult,
 } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
-import { useListVoteRequestResult2 } from '../../hooks/useListVoteRequests';
+import { useListVoteRequestResult } from '../../hooks/useListVoteRequests';
 
 dayjs.extend(utc);
 
@@ -39,7 +39,7 @@ interface ListVoteResultsTableProps {
   validityColumnName?: string;
 }
 
-type VoteRequestResult2Row = {
+type VoteRequestResultRow = {
   id: number;
   actionName: string;
   requester: string;
@@ -76,12 +76,12 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
     effectiveTo: effectiveTo,
     effectiveFrom: effectiveFrom,
   });
-  const voteResultsQuery = useListVoteRequestResult2(queryOptions, QUERY_LIMIT);
+  const voteResultsQuery = useListVoteRequestResult(queryOptions, QUERY_LIMIT);
 
-  const [rows, setRows] = useState<VoteRequestResult2Row[]>([]);
+  const [rows, setRows] = useState<VoteRequestResultRow[]>([]);
 
   useEffect(() => {
-    const rows: VoteRequestResult2Row[] = getVoteRequestResult2RowsByCategory(
+    const rows: VoteRequestResultRow[] = getVoteRequestResultRowsByCategory(
       voteResultsQuery.data,
       tableType
     );
@@ -197,17 +197,17 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
     },
   ];
 
-  function getVoteStatus(votes: damlTypes.Map<string, Vote2>) {
-    const allVotes: Vote2[] = votes.entriesArray().map(v => v[1]);
+  function getVoteStatus(votes: damlTypes.Map<string, Vote>) {
+    const allVotes: Vote[] = votes.entriesArray().map(v => v[1]);
     const rejectedBy: string[] = allVotes.filter(v => !v.accept).map(sv => sv.sv);
     const acceptedBy: string[] = allVotes.filter(v => v.accept).map(sv => sv.sv);
     return [rejectedBy, acceptedBy];
   }
 
-  function getVoteRequestResult2RowsByCategory(
-    voteResults: VoteRequestResult2[] | undefined,
+  function getVoteRequestResultRowsByCategory(
+    voteResults: VoteRequestResult[] | undefined,
     tableType: VoteRequestResultTableType
-  ): VoteRequestResult2Row[] {
+  ): VoteRequestResultRow[] {
     const now = dayjs();
     const parsedVoteResults = voteResults
       ? voteResults.filter((result, _) => {

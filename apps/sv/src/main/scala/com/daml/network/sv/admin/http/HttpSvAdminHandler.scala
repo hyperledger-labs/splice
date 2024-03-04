@@ -230,13 +230,13 @@ class HttpSvAdminHandler(
     }
   }
 
-  def createVoteRequest2(respond: v0.SvAdminResource.CreateVoteRequest2Response.type)(
+  def createVoteRequest(respond: v0.SvAdminResource.CreateVoteRequestResponse.type)(
       body: definitions.CreateVoteRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.CreateVoteRequest2Response] = {
+  )(tuser: TracedUser): Future[v0.SvAdminResource.CreateVoteRequestResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.createVoteRequest2") { _ => _ =>
+    withSpan(s"$workflowId.createVoteRequest") { _ => _ =>
       SvApp
-        .createVoteRequest2(
+        .createVoteRequest(
           body.requester,
           body.action,
           body.url,
@@ -246,18 +246,18 @@ class HttpSvAdminHandler(
         )
         .flatMap {
           case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-          case Right(()) => Future.successful(v0.SvAdminResource.CreateVoteRequest2ResponseOK)
+          case Right(()) => Future.successful(v0.SvAdminResource.CreateVoteRequestResponseOK)
         }
     }
   }
 
-  def listSvcRulesVoteRequests2(
-      respond: v0.SvAdminResource.ListSvcRulesVoteRequests2Response.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListSvcRulesVoteRequests2Response] = {
+  def listSvcRulesVoteRequests(
+      respond: v0.SvAdminResource.ListSvcRulesVoteRequestsResponse.type
+  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListSvcRulesVoteRequestsResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.listSvcRulesVoteRequests2") { _ => _ =>
+    withSpan(s"$workflowId.listSvcRulesVoteRequests") { _ => _ =>
       for {
-        svcRulesVoteRequests <- svcStore.listVoteRequests2()
+        svcRulesVoteRequests <- svcStore.listVoteRequests()
       } yield {
         definitions.ListSvcRulesVoteRequestsResponse(
           svcRulesVoteRequests.map(_.toHttp).toVector
@@ -266,15 +266,15 @@ class HttpSvAdminHandler(
     }
   }
 
-  def listVoteRequestResults2(
-      respond: v0.SvAdminResource.ListVoteRequestResults2Response.type
+  def listVoteRequestResults(
+      respond: v0.SvAdminResource.ListVoteRequestResultsResponse.type
   )(
       body: definitions.ListVoteResultsRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequestResults2Response] = {
+  )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequestResultsResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.listSvcRulesVoteResults2") { _ => _ =>
+    withSpan(s"$workflowId.listSvcRulesVoteResults") { _ => _ =>
       for {
-        voteResults <- svcStore.listVoteRequestResults2(
+        voteResults <- svcStore.listVoteRequestResults(
           body.actionName,
           body.executed,
           body.requester,
@@ -297,21 +297,21 @@ class HttpSvAdminHandler(
     }
   }
 
-  def lookupSvcRulesVoteRequest2(
-      respond: v0.SvAdminResource.LookupSvcRulesVoteRequest2Response.type
+  def lookupSvcRulesVoteRequest(
+      respond: v0.SvAdminResource.LookupSvcRulesVoteRequestResponse.type
   )(
       voteRequestContractId: String
-  )(tuser: TracedUser): Future[v0.SvAdminResource.LookupSvcRulesVoteRequest2Response] = {
+  )(tuser: TracedUser): Future[v0.SvAdminResource.LookupSvcRulesVoteRequestResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.lookupSvcRulesVoteRequest2") { _ => _ =>
+    withSpan(s"$workflowId.lookupSvcRulesVoteRequest") { _ => _ =>
       svcStore
-        .lookupVoteRequest2(
-          new cn.svcrules.VoteRequest2.ContractId(voteRequestContractId)
+        .lookupVoteRequest(
+          new cn.svcrules.VoteRequest.ContractId(voteRequestContractId)
         )
         .flatMap {
           case Some(voteRequest) =>
             Future.successful(
-              v0.SvAdminResource.LookupSvcRulesVoteRequest2Response.OK(
+              v0.SvAdminResource.LookupSvcRulesVoteRequestResponse.OK(
                 definitions.LookupSvcRulesVoteRequestResponse(
                   voteRequest.toHttp
                 )
@@ -327,14 +327,14 @@ class HttpSvAdminHandler(
     }
   }
 
-  override def castVote2(respond: SvAdminResource.CastVote2Response.type)(
+  override def castVote(respond: SvAdminResource.CastVoteResponse.type)(
       body: definitions.CastVoteRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.CastVote2Response] = {
+  )(tuser: TracedUser): Future[v0.SvAdminResource.CastVoteResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.castVote2") { _ => _ =>
+    withSpan(s"$workflowId.castVote") { _ => _ =>
       SvApp
-        .castVote2(
-          new cn.svcrules.VoteRequest2.ContractId(body.voteRequestContractId),
+        .castVote(
+          new cn.svcrules.VoteRequest.ContractId(body.voteRequestContractId),
           body.isAccepted,
           body.reasonUrl,
           body.reasonDescription,
@@ -344,24 +344,24 @@ class HttpSvAdminHandler(
         )
         .flatMap {
           case Left(cause) => Future.failed(HttpErrorHandler.badRequest(cause))
-          case Right(_) => Future.successful(v0.SvAdminResource.CastVote2ResponseCreated)
+          case Right(_) => Future.successful(v0.SvAdminResource.CastVoteResponseCreated)
         }
     }
   }
 
-  override def listVoteRequests2ByTrackingCid(
-      respond: v0.SvAdminResource.ListVoteRequests2ByTrackingCidResponse.type
+  override def listVoteRequestsByTrackingCid(
+      respond: v0.SvAdminResource.ListVoteRequestsByTrackingCidResponse.type
   )(
       body: definitions.BatchListVotesByVoteRequestsRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequests2ByTrackingCidResponse] = {
+  )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequestsByTrackingCidResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.listVoteRequests2ByTrackingCid") { _ => _ =>
+    withSpan(s"$workflowId.listVoteRequestsByTrackingCid") { _ => _ =>
       for {
-        svcRulesVotes <- svcStore.listVoteRequests2ByTrackingCid(
-          body.voteRequestContractIds.map(new cn.svcrules.VoteRequest2.ContractId(_))
+        svcRulesVotes <- svcStore.listVoteRequestsByTrackingCid(
+          body.voteRequestContractIds.map(new cn.svcrules.VoteRequest.ContractId(_))
         )
       } yield {
-        definitions.ListVoteRequest2ByTrackingCidResponse(
+        definitions.ListVoteRequestByTrackingCidResponse(
           svcRulesVotes.map(_.toHttp).toVector
         )
       }

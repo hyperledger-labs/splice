@@ -18,7 +18,7 @@ import {
 } from '@mui/material';
 import Container from '@mui/material/Container';
 
-import { ActionRequiringConfirmation, VoteRequest2 } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { ActionRequiringConfirmation, VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId } from '@daml/types';
 
 import { useSvcInfos } from '../../contexts/SvContext';
@@ -85,13 +85,13 @@ const ListVoteRequests: React.FC = () => {
   const svcInfosQuery = useSvcInfos();
 
   const [voteRequestContractId, setVoteRequestContractId] = useState<
-    ContractId<VoteRequest2> | undefined
+    ContractId<VoteRequest> | undefined
   >(undefined);
   const [action, setAction] = useState<ActionRequiringConfirmation | undefined>(undefined);
   const [isVoteRequestModalOpen, setVoteRequestModalOpen] = useState<boolean>(false);
   const [isVoteResultModalOpen, setVoteResultModalOpen] = useState<boolean>(false);
 
-  const openModalWithVoteRequest = (voteRequestContractId: ContractId<VoteRequest2>) => {
+  const openModalWithVoteRequest = (voteRequestContractId: ContractId<VoteRequest>) => {
     setVoteRequestContractId(voteRequestContractId);
     setVoteRequestModalOpen(true);
   };

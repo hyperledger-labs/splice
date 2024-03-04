@@ -10,7 +10,7 @@ export const buildSvMock = (svUrl: string): RestHandler[] => [
   rest.get(`${svUrl}/v0/svc`, (_, res, ctx) => {
     return res(ctx.json<GetSvcInfoResponse>(svcInfo));
   }),
-  rest.get(`${svUrl}/v0/admin/sv/voterequests2`, (_, res, ctx) => {
+  rest.get(`${svUrl}/v0/admin/sv/voterequests`, (_, res, ctx) => {
     return res(
       ctx.json<ListSvcRulesVoteRequestsResponse>({
         svc_rules_vote_requests: [],

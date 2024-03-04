@@ -205,7 +205,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
     clue("create governance contracts of various kinds") {
       actAndCheck(
         "create VoteRequest",
-        sv1Backend.createVoteRequest2(
+        sv1Backend.createVoteRequest(
           sv1Party.toProtoPrimitive,
           new svcr.actionrequiringconfirmation.ARC_SvcRules(
             new svcr.svcrules_actionrequiringconfirmation.SRARC_AddMember(
@@ -226,8 +226,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       )(
         "VoteRequest and Vote should be there",
         _ =>
-          inside(sv1Backend.listVoteRequests2()) { case Seq(onlyReq) =>
-            sv1Backend.lookupVoteRequest2(onlyReq.contractId).payload.votes should have size 1
+          inside(sv1Backend.listVoteRequests()) { case Seq(onlyReq) =>
+            sv1Backend.lookupVoteRequest(onlyReq.contractId).payload.votes should have size 1
           },
       )
 
@@ -653,7 +653,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
     clue("see whether governance contracts follow svcrules") {
       import com.daml.network.sv.store.SvSvStore.templatesMovedByMyAutomation as templatesMovedBySvAutomation
       allContractsMigrated(
-        c(svcr.VoteRequest2.COMPANION),
+        c(svcr.VoteRequest.COMPANION),
         c(svcr.Confirmation.COMPANION),
         c(svcr.SvReward.COMPANION),
         c(svcr.ElectionRequest.COMPANION),

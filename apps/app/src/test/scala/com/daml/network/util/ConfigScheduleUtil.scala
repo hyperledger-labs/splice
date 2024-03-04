@@ -124,7 +124,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
     val voteRequestCid = clue("request vote for config schedule change") {
       val (_, voteRequestCid) = actAndCheck(
         "sv1 creates a vote request", {
-          sv1Backend.createVoteRequest2(
+          sv1Backend.createVoteRequest(
             sv1Party.toProtoPrimitive,
             action,
             "url",
@@ -135,9 +135,9 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
       )(
         "The vote request has been created and sv1 accepts",
         _ => {
-          sv1Backend.listVoteRequests2() should not be empty
-          val head = sv1Backend.listVoteRequests2().loneElement
-          sv1Backend.lookupVoteRequest2(head.contractId).payload.votes should have size 1
+          sv1Backend.listVoteRequests() should not be empty
+          val head = sv1Backend.listVoteRequests().loneElement
+          sv1Backend.lookupVoteRequest(head.contractId).payload.votes should have size 1
           head
         },
       )
@@ -154,14 +154,14 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
                   .requiredNumVotes(svcRules)
               ) {
                 eventually() {
-                  sv.listVoteRequests2()
+                  sv.listVoteRequests()
                     .filter(
                       _.payload.trackingCid == voteRequestCid.contractId
                     ) should have size 1
                 }
                 actAndCheck(
                   s"${sv.name} casts a vote", {
-                    sv.castVote2(
+                    sv.castVote(
                       voteRequestCid.contractId,
                       true,
                       "url",
@@ -172,10 +172,10 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
                 )(
                   s"the ${sv.name} vote has been cast",
                   _ => {
-                    sv.lookupVoteRequest2(voteRequestCid.contractId)
+                    sv.lookupVoteRequest(voteRequestCid.contractId)
                       .payload
                       .votes should have size voteCount
-                    sv.listVoteRequests2() shouldBe empty
+                    sv.listVoteRequests() shouldBe empty
                   },
                 )
               }

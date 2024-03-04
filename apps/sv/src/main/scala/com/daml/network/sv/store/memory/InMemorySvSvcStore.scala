@@ -58,7 +58,7 @@ class InMemorySvSvcStore(
     with LimitHelpers {
   import InMemorySvSvcStore.*
 
-  override def listVoteRequestResults2(
+  override def listVoteRequestResults(
       actionName: Option[String],
       executed: Option[Boolean],
       requester: Option[String],
@@ -67,7 +67,7 @@ class InMemorySvSvcStore(
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[VoteRequestResult2]] = {
+  ): Future[Seq[VoteRequestResult]] = {
     throw new NotImplementedError("Not gonna bother.")
   }
 
@@ -420,27 +420,27 @@ class InMemorySvSvcStore(
       )
   }
 
-  override def listVoteRequests2ByTrackingCid(
-      voteRequestCids: Seq[VoteRequest2.ContractId],
+  override def listVoteRequestsByTrackingCid(
+      voteRequestCids: Seq[VoteRequest.ContractId],
       limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[Contract[VoteRequest2.ContractId, VoteRequest2]]] = {
+  )(implicit tc: TraceContext): Future[Seq[Contract[VoteRequest.ContractId, VoteRequest]]] = {
     throw new NotImplementedError("Not gonna bother.")
   }
 
-  def lookupVoteRequest2(contractId: cn.svcrules.VoteRequest2.ContractId)(implicit
+  def lookupVoteRequest(contractId: cn.svcrules.VoteRequest.ContractId)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[cn.svcrules.VoteRequest2.ContractId, cn.svcrules.VoteRequest2]]] =
+  ): Future[Option[Contract[cn.svcrules.VoteRequest.ContractId, cn.svcrules.VoteRequest]]] =
     throw new NotImplementedError("Not gonna bother.")
 
-  override def lookupVoteByThisSvAndVoteRequestWithOffset2(voteRequestCid: VoteRequest2.ContractId)(
+  override def lookupVoteByThisSvAndVoteRequestWithOffset(voteRequestCid: VoteRequest.ContractId)(
       implicit tc: TraceContext
-  ): Future[QueryResult[Option[Vote2]]] =
+  ): Future[QueryResult[Option[Vote]]] =
     throw new NotImplementedError("Not gonna bother.")
 
-  override def lookupVoteRequestByThisSvAndActionWithOffset2(
+  override def lookupVoteRequestByThisSvAndActionWithOffset(
       action: ActionRequiringConfirmation
   )(implicit tc: TraceContext): Future[
-    QueryResult[Option[Contract[VoteRequest2.ContractId, VoteRequest2]]]
+    QueryResult[Option[Contract[VoteRequest.ContractId, VoteRequest]]]
   ] = throw new NotImplementedError("Not gonna bother.")
 
   override def lookupCoinPriceVoteByThisSv()(implicit

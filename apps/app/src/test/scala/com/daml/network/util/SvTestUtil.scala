@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
   DomainUpgradeSchedule,
   SvcRulesConfig,
   SvcRules_SetConfig,
-  VoteRequest2,
+  VoteRequest,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
@@ -66,8 +66,8 @@ trait SvTestUtil extends CNNodeTestCommon {
   }
 
   def getTrackingId(
-      voteRequest: Contract[VoteRequest2.ContractId, VoteRequest2]
-  ): VoteRequest2.ContractId = {
+      voteRequest: Contract[VoteRequest.ContractId, VoteRequest]
+  ): VoteRequest.ContractId = {
     voteRequest.payload.trackingCid.toScala
       .getOrElse(voteRequest.contractId)
   }
@@ -94,7 +94,7 @@ trait SvTestUtil extends CNNodeTestCommon {
     actAndCheck(timeUntilSuccess = 60.seconds)(
       "Voting on an SvcRules config change for scheduled migration", {
         def onlySetConfigVoteRequests(
-            voteRequests: Seq[Contract[VoteRequest2.ContractId, VoteRequest2]]
+            voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
         ) =
           voteRequests.filter {
             _.payload.action match {
@@ -110,7 +110,7 @@ trait SvTestUtil extends CNNodeTestCommon {
         val (_, voteRequest) = actAndCheck(
           "Creating vote request",
           eventuallySucceeds() {
-            svToCreateVoteRequest.createVoteRequest2(
+            svToCreateVoteRequest.createVoteRequest(
               svToCreateVoteRequest.getSvcInfo().svParty.toProtoPrimitive,
               action,
               "url",
@@ -122,20 +122,20 @@ trait SvTestUtil extends CNNodeTestCommon {
           },
         )(
           "vote request has been created",
-          _ => onlySetConfigVoteRequests(svToCreateVoteRequest.listVoteRequests2()).loneElement,
+          _ => onlySetConfigVoteRequests(svToCreateVoteRequest.listVoteRequests()).loneElement,
         )
 
         svsToCastVotes.parTraverse { sv =>
           Future {
             clue(s"${svsToCastVotes.map(_.name)} see the vote request") {
               val svVoteRequest = eventually() {
-                onlySetConfigVoteRequests(sv.listVoteRequests2()).loneElement
+                onlySetConfigVoteRequests(sv.listVoteRequests()).loneElement
               }
               getTrackingId(svVoteRequest) shouldBe voteRequest.contractId
             }
             clue(s"${sv.name} accepts vote") {
               eventuallySucceeds() {
-                sv.castVote2(
+                sv.castVote(
                   voteRequest.contractId,
                   true,
                   "url",

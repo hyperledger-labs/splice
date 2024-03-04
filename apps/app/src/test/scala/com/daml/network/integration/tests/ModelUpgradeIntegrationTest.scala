@@ -110,7 +110,7 @@ class ModelUpgradeIntegrationTest
           val (_, voteRequest) = actAndCheck(
             "Creating vote request",
             eventuallySucceeds() {
-              sv1Backend.createVoteRequest2(
+              sv1Backend.createVoteRequest(
                 sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
                 upgradeAction,
                 "url",
@@ -118,12 +118,12 @@ class ModelUpgradeIntegrationTest
                 sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
               )
             },
-          )("vote request has been created", _ => sv1Backend.listVoteRequests2().loneElement)
+          )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
 
           clue(s"sv2 and sv3 accept") {
             Seq(sv2Backend, sv3Backend).map(sv =>
               eventuallySucceeds() {
-                sv.castVote2(
+                sv.castVote(
                   voteRequest.contractId,
                   true,
                   "url",
@@ -172,7 +172,7 @@ class ModelUpgradeIntegrationTest
           val (_, voteRequest) = actAndCheck(
             "Creating vote request",
             eventuallySucceeds() {
-              sv1Backend.createVoteRequest2(
+              sv1Backend.createVoteRequest(
                 sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
                 dummyUpgradeAction,
                 "url",
@@ -180,11 +180,11 @@ class ModelUpgradeIntegrationTest
                 sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
               )
             },
-          )("vote request has been created", _ => sv1Backend.listVoteRequests2().loneElement)
+          )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
           clue(s"sv2 and sv3 accept") {
             Seq(sv2Backend, sv3Backend).map(sv =>
               eventuallySucceeds() {
-                sv.castVote2(
+                sv.castVote(
                   voteRequest.contractId,
                   true,
                   "url",
