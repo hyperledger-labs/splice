@@ -55,8 +55,12 @@ final class ScanAggregator(
       _ <- lastClosedRoundO match {
         case Some(lastClosedRound) =>
           for {
-            _ <- appendRoundTotals(previousRoundTotals, lastClosedRound)
-            _ <- appendRoundPartyTotals(lastClosedRound)
+            _ <- storage.update_(
+              aggregateRoundTotals(previousRoundTotals, lastClosedRound).andThen(
+                aggregateRoundPartyTotals(lastClosedRound).transactionally
+              ),
+              "aggregate round totals and round party totals",
+            )
           } yield ()
         case None =>
           skipAggregation(previousRoundTotals)
@@ -75,7 +79,7 @@ final class ScanAggregator(
   def backFillAggregates()(implicit
       tc: TraceContext
   ): Future[Boolean] = {
-    for {
+    (for {
       earliestClosedRound <- getEarliestAggregatedRound()
       res <-
         earliestClosedRound match {
@@ -90,11 +94,14 @@ final class ScanAggregator(
           case Some(closedRound) =>
             val backFillRound = closedRound - 1L
             logger.debug(
-              s"Backfilling round $backFillRound."
+              s"Backfilling round $backFillRound. (Earliest closed round = $closedRound)"
             )
             backFill(backFillRound).map(_ => true)
         }
-    } yield res
+    } yield res).recover { case CannotAdvance(msg) =>
+      logger.debug(msg)
+      false
+    }
   }
 
   def backFill(round: Long)(implicit
@@ -249,7 +256,7 @@ final class ScanAggregator(
         ${rt.totalCoinBalance}
       )
       on conflict do nothing
-    """.asUpdate.andThen(DBIO.successful(()))
+    """.asUpdate.map(_ => ())
   }
 
   def insertRoundPartyTotals(
@@ -297,7 +304,6 @@ final class ScanAggregator(
     DBIOAction
       .sequence(roundPartyTotals.map(insert))
       .map(_ => ())
-      .andThen(DBIO.successful(()))
       .transactionally
   }
 
@@ -541,21 +547,21 @@ final class ScanAggregator(
       .map(_.flatten)
   }
 
-  /** Appends the RoundTotals to the round_totals table,
-    * calculating cumulative sums starting from previous round_totals,
+  /** Aggregates the RoundTotals in the round_totals table,
+    * calculating cumulative sums starting from previous round_totals, inserting the new sums and cumulative sums,
     * up to including the last closed round.
     */
-  def appendRoundTotals(
+  def aggregateRoundTotals(
       previousRoundTotalsO: Option[RoundTotals],
       lastClosedRound: Long,
   )(implicit
       traceContext: TraceContext
-  ): Future[Unit] = {
+  ): DBIOAction[Unit, NoStream, Effect.Write] = {
     val previousRoundTotals = previousRoundTotalsO.getOrElse(
       RoundTotals(closedRound = -1L)
     )
     def doQuery = {
-      val q = sql"""
+      sql"""
       with new_totals_per_entry as(
         select    round,
                   0 as closed_round_effective_at,
@@ -660,11 +666,7 @@ final class ScanAggregator(
                   ct.cumulative_change_to_initial_amount_as_of_round_zero - ct.cumulative_change_to_holding_fees_rate * (ct.round + 1)
       from        cumulative_totals ct
       on conflict do nothing
-    """.asUpdate
-
-      storage
-        .update(q, "appendRoundTotals")
-        .map(_ => ())
+    """.asUpdate.andThen(DBIO.successful(()))
     }
     val extraMsg = previousRoundTotalsO
       .map(pr => s", previously aggregated round: ${pr.closedRound}")
@@ -672,25 +674,30 @@ final class ScanAggregator(
     logger.info(
       s"""Aggregating round_totals for rounds up to including round ${lastClosedRound}$extraMsg."""
     )
-
     doQuery
   }
 
-  def appendRoundPartyTotals(
+  /** Aggregates the RoundPartyTotals in the round_party_totals table,
+    * calculating cumulative sums starting from previous round_party_totals, inserting the new sums and cumulative sums,
+    * up to including the last closed round.
+    */
+  def aggregateRoundPartyTotals(
       lastClosedRound: Long
   )(implicit
       traceContext: TraceContext
-  ): Future[Unit] = {
+  ): DBIOAction[Unit, NoStream, Effect.Write] = {
     def doQuery = {
-      /* The round_party_totals will only contain rows for parties which have been rewarded or purchased extra traffic in rounds.
+      /* The round_party_totals will only contain rows for parties which have balance change or have been rewarded or purchased extra traffic in rounds.
        * Sum per round and party, where the party is the rewarded_party or extra_traffic_validator,
        * since the most recently recorded rounds in round_party_totals, up until including the last closed round.
        * Gets the previous cumulative sums for each party, for the most recent round that registered activity for that party
        * (parties can be missing in rounds, since they did not get rewarded, or did not by traffic).
        * Calculate cumulative sums left joining with possibly existing previous cumulative sums per party, keeping track of the most recent round per party.
+       * The left join with sums over all rounds grouped by parties ensures that all parties balance changes, rewards and purchases are included in the next result,
+       * and that it is safe to start the aggregation from any previously aggregated round, even if some parties are missing in some rounds.
        * finally inserting the sums and cumulative sums in the round_party_totals table.
        */
-      val q = sql"""
+      sql"""
       with previously_aggregated as(
         select coalesce(max(closed_round), -1) as last_closed_round from round_party_totals where store_id = $storeId
       ),
@@ -847,11 +854,7 @@ final class ScanAggregator(
                   ct.cumulative_change_to_holding_fees_rate
       from        cumulative_totals ct
       on conflict do nothing
-      """.asUpdate
-
-      storage
-        .update(q, "appendRoundPartyTotals")
-        .map(_ => ())
+      """.asUpdate.andThen(DBIOAction.successful(()))
     }
     logger.info(
       s"Aggregating round_party_totals for rounds up to including round ${lastClosedRound}."

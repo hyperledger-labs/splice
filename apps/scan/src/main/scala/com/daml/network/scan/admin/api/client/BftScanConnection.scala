@@ -172,7 +172,10 @@ class BftScanConnection(
           .getAggregatedRounds()
           .map(_.map(scan -> _))
           .recover { case e: Throwable =>
-            logger.info(s"Failed to get aggregated rounds from scan ${scan.config.adminApi.url}", e)
+            logger.info(
+              s"Failed to get aggregated rounds from scan ${scan.config.adminApi.url}, while getting round aggregate for round $round",
+              e,
+            )
             None
           }
       })
@@ -181,24 +184,63 @@ class BftScanConnection(
     scansWithRounds.flatMap { scansWithRounds =>
       val roundsPerScan = scansWithRounds
         .map { case (s, r) => s.config.adminApi.url -> r }
-      logger.debug(s"Aggregate rounds per scan: ${roundsPerScan}")
+      logger.debug(
+        s"Aggregate rounds per scan: ${roundsPerScan}, while getting round aggregate for round $round"
+      )
       if (scansWithRounds.isEmpty) {
-        Future.failed(ScanAggregator.CannotAdvance("No scans have any aggregated rounds available"))
+        Future.failed(
+          ScanAggregator.CannotAdvance(
+            s"No scans have any aggregated rounds available, while getting round aggregate for round $round"
+          )
+        )
       } else {
         getRoundAggregatesWithinRound(scansWithRounds, round).flatMap { roundAggregates =>
+          val nrScans = scansWithRounds.size
           if (roundAggregates.isEmpty) {
             Future.failed(
               ScanAggregator.CannotAdvance(
-                s"No RoundAggregates reported by ${scansWithRounds.size} scans"
+                s"No RoundAggregates for round $round reported by ${nrScans} scans, while scans reported to have aggregate rounds per scan: ${roundsPerScan}"
               )
             )
-          } else if (roundAggregates.toList.distinct.size == 1) {
-            Future.successful(roundAggregates.headOption)
+          } else if (roundAggregates.values.toList.distinct.size == 1) {
+            Future.successful(roundAggregates.values.headOption)
           } else {
-            logger.warn(
-              s"""The RoundAggregates reported by ${scansWithRounds.size} scans (${roundsPerScan.keys}) do not match:\n ${roundAggregates}"""
-            )
-            Future.successful(roundAggregates.headOption)
+            val roundAggregatesList = roundAggregates.values.toList
+            val roundTotalsList = roundAggregatesList.map(_.roundTotals)
+            val roundPartyTotalsList = roundAggregatesList.map(_.roundPartyTotals)
+            val scanUrls = roundAggregates.keys.toList
+              .sortBy(_.toString())
+            if (roundTotalsList.distinct.size == 1) {
+              val agreedUponRoundTotals = roundTotalsList.headOption
+              logger.warn(
+                s"RoundAggregates for round $round reported by ${nrScans} scans do not agree, but the RoundTotals do match: ${agreedUponRoundTotals}"
+              )
+            } else {
+              val details = scanUrls
+                .map { url =>
+                  s"Scan($url): ${roundAggregates(url).roundTotals}"
+                }
+                .mkString("\n")
+              logger.warn(
+                s"The RoundAggregates for round $round reported by ${nrScans} scans do not agree on RoundTotals:\n $details"
+              )
+            }
+            if (roundPartyTotalsList.distinct.size == 1) {
+              val agreedUponRoundPartyTotals = roundPartyTotalsList.headOption
+              logger.warn(
+                s"RoundAggregates for round $round reported by ${nrScans} scans do not agree, but the RoundPartyTotals do match: ${agreedUponRoundPartyTotals}"
+              )
+            } else {
+              val details = scanUrls
+                .map { url =>
+                  s"Scan($url): ${roundAggregates(url).roundPartyTotals}"
+                }
+                .mkString("\n")
+              logger.warn(
+                s"The RoundAggregates for round $round reported by ${nrScans} scans do not agree on RoundPartyTotals:\n $details"
+              )
+            }
+            Future.successful(roundAggregates.values.headOption)
           }
         }
       }
@@ -210,18 +252,21 @@ class BftScanConnection(
       round: Long,
   )(implicit
       tc: TraceContext
-  ): Future[Iterable[ScanAggregator.RoundAggregate]] = {
+  ): Future[Map[Uri, ScanAggregator.RoundAggregate]] = {
     val scansHavingRound = scansWithRounds
       .filter(_._2.contains(round))
       .keys
       .toSeq
-    def getRoundAggregateFromScan(scan: SingleScanConnection) = {
+    def getRoundAggregateFromScan(
+        scan: SingleScanConnection
+    ): Future[(Uri, ScanAggregator.RoundAggregate)] = {
       logger
         .debug(
           s"Getting RoundAggregate for round $round from scan ${scan.config.adminApi.url}"
         )
       scan
         .getRoundAggregate(round)
+        .map(_.map(scan.config.adminApi.url -> _))
         .flatMap {
           _.map(Future.successful).getOrElse(
             Future
@@ -237,7 +282,7 @@ class BftScanConnection(
           Future.failed(e)
         }
     }
-    Future.traverse(scansHavingRound)(getRoundAggregateFromScan)
+    Future.traverse(scansHavingRound)(getRoundAggregateFromScan).map(_.toMap)
   }
 
   override def getMigrationSchedule()(implicit

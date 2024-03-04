@@ -168,7 +168,13 @@ class ScanAggregatorTest
       val lastClosedRound = 1L
       val previousRoundTotals = Some(RoundTotals(closedRound = 2L))
 
-      val _ = aggr.appendRoundTotals(previousRoundTotals, lastClosedRound).futureValue
+      val _ =
+        storage
+          .update_(
+            aggr.aggregateRoundTotals(previousRoundTotals, lastClosedRound),
+            "aggregate round totals",
+          )
+          .futureValue
       val roundTotals = aggr.getLastAggregatedRoundTotals().futureValue
       roundTotals shouldBe None
     }
@@ -208,7 +214,13 @@ class ScanAggregatorTest
       } yield {
         val lastClosedRound = 2L
         val previousRoundTotals = aggr.getLastAggregatedRoundTotals().futureValue
-        aggr.appendRoundTotals(previousRoundTotals, lastClosedRound).futureValue
+        val _ = storage
+          .update_(
+            aggr.aggregateRoundTotals(previousRoundTotals, lastClosedRound),
+            "aggregate round totals",
+          )
+          .futureValue
+
         val roundTotals0 = aggr.getRoundTotals(0L).futureValue.value
         roundTotals0.copy(closedRoundEffectiveAt = CantonTimestamp.MinValue) shouldBe
           RoundTotals(
@@ -291,8 +303,12 @@ class ScanAggregatorTest
         val closedRound = 1L
         val lastClosedRound = closedRound
         val previousRoundTotals = aggr.getLastAggregatedRoundTotals().futureValue
-
-        aggr.appendRoundTotals(previousRoundTotals, lastClosedRound).futureValue
+        val _ = storage
+          .update_(
+            aggr.aggregateRoundTotals(previousRoundTotals, lastClosedRound),
+            "aggregate round totals",
+          )
+          .futureValue
         val prevTotals = aggr.getLastAggregatedRoundTotals().futureValue.value
 
         val expectedRound1CumulativeChangeToInitialAmountAsOfRoundZero =
@@ -317,7 +333,12 @@ class ScanAggregatorTest
           store.storeId,
         ).futureValue shouldBe prevTotals.totalCoinBalance
 
-        val _ = aggr.appendRoundTotals(Some(prevTotals), lastRound.toLong).futureValue
+        val _ = storage
+          .update_(
+            aggr.aggregateRoundTotals(Some(prevTotals), lastRound.toLong),
+            "aggregate round totals",
+          )
+          .futureValue
         val lastTotals = aggr.getLastAggregatedRoundTotals().futureValue.value
         val expectedRound10CumulativeChangeToInitialAmountAsOfRoundZero =
           BigDecimal((1 + lastRound) * balanceChangeRoundZero)
@@ -409,10 +430,17 @@ class ScanAggregatorTest
           .map(_.flatten)
           .map(sumRoundPartyTotalsPerRound)
       } yield {
-        for (i <- 0 to lastRound.toInt) {
-          val _ = aggr.appendRoundTotals(None, i.toLong).futureValue
-          val _ = aggr.appendRoundPartyTotals(i.toLong).futureValue
-        }
+        val _ = MonadUtil
+          .sequentialTraverse(0 to lastRound.toInt) { i =>
+            storage
+              .update(
+                aggr
+                  .aggregateRoundTotals(None, i.toLong)
+                  .andThen(aggr.aggregateRoundPartyTotals(i.toLong)),
+                "aggregate",
+              )
+          }
+          .futureValue
         val limit = 10
         for (i <- 0 to lastRound.toInt) {
           val round = i.toLong
@@ -475,7 +503,7 @@ class ScanAggregatorTest
         res <- store.backFillAggregates()
       } yield {
         res
-      }).failed.futureValue shouldBe an[CannotAdvance]
+      }).futureValue shouldBe false
     }
 
     "backfill aggregates before existing rounds total, up to round zero" in {
