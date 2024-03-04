@@ -101,7 +101,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       }
 
       actAndCheck(
-        "Create spliwell install requests",
+        "Create splitwell install requests",
         aliceSplitwellClient.createInstallRequests(),
       )(
         "Wait for splitwell installs",

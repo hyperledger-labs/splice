@@ -12,6 +12,7 @@ import com.daml.network.console.{
   SplitwellAppClientReference,
   WalletAppClientReference,
 }
+import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
@@ -143,6 +144,18 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       senderWallet.acceptAppPaymentRequest(request.contractId)
     }
 
+  }
+
+  protected def getSingleRequestOnGlobalDomain(
+      walletClient: WalletAppClientReference
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val request = walletClient
+      .listAppPaymentRequests()
+      .loneElement
+    inside(request.state) { case ContractState.Assigned(domain) =>
+      domain should be(globalDomainId)
+    }
+    request
   }
 
 }

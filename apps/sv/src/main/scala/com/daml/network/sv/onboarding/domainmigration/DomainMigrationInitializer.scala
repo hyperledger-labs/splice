@@ -210,6 +210,12 @@ class DomainMigrationInitializer(
       retryProvider,
     )
     logger.info(s"Init new domain nodes from snapshot $domainTopologyTransactions")
+    logger.info(
+      s"sequencerInitTopologyTransactions ${domainTopologyTransactions.sequencerInitTopologyTransactions.size}"
+    )
+    logger.info(
+      s"topologyTransactionsToSubmit ${domainTopologyTransactions.topologyTransactionsToSubmit.size}"
+    )
     for {
       _ <- initializeSequencer(
         domainNodeInitiaizer,
@@ -243,6 +249,9 @@ class DomainMigrationInitializer(
             Some(TopologyStoreId.DomainStore(nodeIdentities.domainId))
           )
         } yield {
+          logger.info(
+            s"!! sequencerTopology.size ${sequencerTopology.size}  mediatorTopology.size ${mediatorTopology.size} "
+          )
           if (sequencerTopology.size != mediatorTopology.size) {
             throw Status.FAILED_PRECONDITION
               .withDescription("Mediator topology is not synchronized")

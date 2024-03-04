@@ -635,6 +635,18 @@ object CNNodeConfigTransforms {
       )
     })
 
+  def useGlobalDomainSplitwell(): CNNodeConfigTransform =
+    updateAllSplitwellAppConfigs_(c => {
+      c.copy(
+        domains = c.domains.copy(
+          splitwell = SplitwellDomains(
+            DomainConfig(DomainAlias.tryCreate("global")),
+            Seq.empty,
+          )
+        )
+      )
+    })
+
   def ingestFromParticipantBeginInSv: CNNodeConfigTransform =
     updateAllSvAppConfigs_(c =>
       c.copy(

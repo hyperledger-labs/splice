@@ -12,7 +12,11 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
   def dbsSuffix: String
 
   override def usesDbs = {
-    Seq(s"sequencer_driver_${dbsSuffix}", s"participant_extra_$dbsSuffix") ++
+    Seq(
+      s"sequencer_driver_${dbsSuffix}",
+      s"participant_extra_$dbsSuffix",
+      s"participant_splitwell_$dbsSuffix",
+    ) ++
       (1 to 4)
         .map(index =>
           Seq(
@@ -40,8 +44,8 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
       overrideSvDbsSuffix: Option[String] = None,
       overrideSequencerDriverDbSuffix: Option[String] = None,
       portsRange: Option[Int] = None,
-      extraParticipant: Boolean = false,
-      extraParticipantUser: Option[String] = None,
+      extraParticipantsConfigFileName: Option[String] = None,
+      extraParticipantsEnvMap: Map[String, String] = Map.empty,
   )(extraEnv: (String, String)*)(test: => A)(implicit tc: TraceContext): A = {
 
     def conditionalConf(condition: Boolean, filename: String) =
@@ -59,7 +63,10 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
         ) ++
         conditionalConf(sv4 && participants, "standalone-participant-sv4.conf") ++
         conditionalConf(sv4 && sequencersMediators, "standalone-sequencer-mediator-sv4.conf") ++
-        conditionalConf(extraParticipant, "standalone-participant-extra.conf")
+        conditionalConf(
+          extraParticipantsConfigFileName.isDefined,
+          "standalone-participant-extra.conf",
+        )
 
     def adminUserEnv(index: Integer) = {
       adminUsersFromSvBackends
@@ -80,8 +87,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
           )
         )
         .flatten :+
-        "SEQUENCER_DRIVER_DB" -> s"sequencer_driver_${sequencerDriverDbSuffix}" :+
-        "EXTRA_PARTICIPANT_DB" -> s"participant_extra_${dbsSuffix}"
+        "SEQUENCER_DRIVER_DB" -> s"sequencer_driver_${sequencerDriverDbSuffix}"
     }
 
     val portsEnv = portsRange.fold(Seq(): Seq[(String, String)])(range =>
@@ -103,9 +109,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
         (1 to 4).map(adminUserEnv(_)).flatten ++
         portsEnv ++
         dbNamesEnv :+
-        ("AUTO_INIT_ALL" -> autoInit.toString)) ++ extraParticipantUser
-        .map("EXTRA_PARTICIPANT_ADMIN_USER" -> _)
-        .toList
+        ("AUTO_INIT_ALL" -> autoInit.toString)) ++ extraParticipantsEnvMap.toList
 
     logger.debug(
       s"Starting standalone canton with config files:\n  ${configs

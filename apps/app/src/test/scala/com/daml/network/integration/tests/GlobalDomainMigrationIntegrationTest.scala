@@ -1,14 +1,18 @@
 package com.daml.network.integration.tests
 
 import better.files.File.apply
-import cats.implicits.{catsSyntaxOptionId, catsSyntaxParallelTraverse1}
+import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.cn.splitwell.Group
+import com.daml.network.codegen.java.cn.splitwell.balanceupdatetype.Transfer
 import com.daml.network.codegen.java.cn.svcrules.{DomainUpgradeSchedule, SvcRules_AddMember}
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
+import com.daml.network.codegen.java.cn.wallet.payment.ReceiverCCAmount
 import com.daml.network.config.{
   CNNodeConfigTransforms,
   CNParticipantClientConfig,
+  DomainConfig,
   NetworkAppClientConfig,
 }
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
@@ -34,6 +38,9 @@ import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.migrationDumpDir
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
+import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
+import com.daml.network.splitwell.config.{SplitwellDomainConfig, SplitwellDomains}
 import com.daml.network.sv.automation.singlesv.SvRewardTrigger
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
@@ -41,6 +48,7 @@ import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   DomainMigrationUtil,
   ProcessTestUtil,
+  SplitwellTestUtil,
   StandaloneCanton,
   SvTestUtil,
   WalletTestUtil,
@@ -60,6 +68,7 @@ import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.OptionValues
 import org.scalatest.time.{Minute, Span}
 import org.slf4j.event.Level
@@ -78,17 +87,21 @@ class GlobalDomainMigrationIntegrationTest
     with SvTestUtil
     with WalletTestUtil
     with DomainMigrationUtil
-    with StandaloneCanton {
+    with StandaloneCanton
+    with SplitwellTestUtil {
 
   override def dbsSuffix = "domain_migration"
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
+
+  private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withZeroSequencerAvailabilityDelay
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.useGlobalDomainSplitwell()(config))
       .addConfigTransforms((_, config) => {
         config.copy(
           svApps = config.svApps ++
@@ -135,16 +148,16 @@ class GlobalDomainMigrationIntegrationTest
                   domainMigrationId = 1L,
                 )
           ) + (
-            InstanceName.tryCreate("aliceValidatorLocal") -> {
-              val aliceValidatorConfig = config
-                .validatorApps(InstanceName.tryCreate("aliceValidator"))
-              aliceValidatorConfig
+            InstanceName.tryCreate("bobValidatorLocal") -> {
+              val bobValidatorConfig = config
+                .validatorApps(InstanceName.tryCreate("bobValidator"))
+              bobValidatorConfig
                 .copy(
                   participantClient = CNParticipantClientConfig(
                     ClientConfig(port = Port.tryCreate(5902)),
-                    aliceValidatorConfig.participantClient.ledgerApi.copy(
+                    bobValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
-                        aliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                        bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
                           port = Port.tryCreate(5901)
                         )
                     ),
@@ -152,13 +165,13 @@ class GlobalDomainMigrationIntegrationTest
                 )
             }
           ) + (
-            InstanceName.tryCreate("bobValidatorLocal") -> {
-              val bobValidatorConfig = config
-                .validatorApps(InstanceName.tryCreate("bobValidator"))
-              bobValidatorConfig
+            InstanceName.tryCreate("aliceValidatorLocal") -> {
+              val aliceValidatorConfig = config
+                .validatorApps(InstanceName.tryCreate("aliceValidator"))
+              aliceValidatorConfig
                 .copy(
                   adminApi =
-                    bobValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
+                    aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
                   domains = ValidatorDomainConfig(global =
                     ValidatorGlobalDomainConfig(
@@ -168,17 +181,17 @@ class GlobalDomainMigrationIntegrationTest
                   ),
                   participantClient = CNParticipantClientConfig(
                     ClientConfig(port = Port.tryCreate(27502)),
-                    bobValidatorConfig.participantClient.ledgerApi.copy(
+                    aliceValidatorConfig.participantClient.ledgerApi.copy(
                       clientConfig =
-                        bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                        aliceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
                           port = Port.tryCreate(27501)
                         )
                     ),
                   ),
                   restoreFromMigrationDump = Some(
-                    (migrationDumpDir("bobValidator") / "domain_migration_dump.json").path
+                    (migrationDumpDir("aliceValidator") / "domain_migration_dump.json").path
                   ),
-                  onboarding = bobValidatorConfig.onboarding.map(onboarding =>
+                  onboarding = aliceValidatorConfig.onboarding.map(onboarding =>
                     onboarding.copy(
                       svClient = onboarding.svClient.copy(adminApi =
                         NetworkAppClientConfig(url = "http://localhost:27114")
@@ -189,6 +202,47 @@ class GlobalDomainMigrationIntegrationTest
                 )
 
             }
+          ) + (
+            InstanceName.tryCreate("splitwellValidatorLocal") -> {
+              val splitwellValidatorConfig = config
+                .validatorApps(InstanceName.tryCreate("splitwellValidator"))
+              splitwellValidatorConfig
+                .copy(
+                  adminApi = splitwellValidatorConfig.adminApi.copy(internalPort =
+                    Some(Port.tryCreate(27703))
+                  ),
+                  scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
+                  domains = ValidatorDomainConfig(global =
+                    ValidatorGlobalDomainConfig(
+                      alias = DomainAlias.tryCreate("global"),
+                      url = Some("http://localhost:27108"),
+                    )
+                  ),
+                  participantClient = CNParticipantClientConfig(
+                    ClientConfig(port = Port.tryCreate(27702)),
+                    splitwellValidatorConfig.participantClient.ledgerApi.copy(
+                      clientConfig =
+                        splitwellValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                          port = Port.tryCreate(27701)
+                        )
+                    ),
+                  ),
+                  restoreFromMigrationDump = Some(
+                    (migrationDumpDir("splitwellValidator") / "domain_migration_dump.json").path
+                  ),
+                  onboarding = splitwellValidatorConfig.onboarding.map(onboarding =>
+                    onboarding.copy(
+                      svClient = onboarding.svClient.copy(adminApi =
+                        NetworkAppClientConfig(url = "http://localhost:27114")
+                      )
+                    )
+                  ),
+                  appManager = splitwellValidatorConfig.appManager.map(
+                    _.copy(initialRegisteredApps = Map.empty)
+                  ),
+                  domainMigrationId = 1L,
+                )
+            }
           ),
           walletAppClients = config.walletAppClients + (
             InstanceName.tryCreate("sv1WalletLocal") ->
@@ -198,12 +252,84 @@ class GlobalDomainMigrationIntegrationTest
                   adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27103")
                 )
           ) + (
-            InstanceName.tryCreate("bobWalletLocal") ->
+            InstanceName.tryCreate("aliceWalletLocal") ->
               config
-                .walletAppClients(InstanceName.tryCreate("bobWallet"))
+                .walletAppClients(InstanceName.tryCreate("aliceWallet"))
                 .copy(
                   adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27603")
                 )
+          ) + (
+            InstanceName.tryCreate("charlieWalletLocal") ->
+              config
+                .walletAppClients(InstanceName.tryCreate("charlieWallet"))
+                .copy(
+                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27603")
+                )
+          ) + (
+            InstanceName.tryCreate("splitwellProviderWalletLocal") ->
+              config
+                .walletAppClients(InstanceName.tryCreate("splitwellProviderWallet"))
+                .copy(
+                  adminApi = NetworkAppClientConfig(url = "http://127.0.0.1:27703")
+                )
+          ),
+          splitwellApps = config.splitwellApps + (
+            InstanceName.tryCreate("providerSplitwellBackendLocal") -> {
+              val splitwellBackendConfig =
+                config.splitwellApps(InstanceName.tryCreate("providerSplitwellBackend"))
+              splitwellBackendConfig
+                .copy(
+                  scanClient = ScanAppClientConfig(
+                    adminApi = NetworkAppClientConfig(
+                      Uri("http://127.0.0.1:27012")
+                    )
+                  ),
+                  adminApi = splitwellBackendConfig.adminApi.copy(internalPort =
+                    Some(Port.tryCreate(27113))
+                  ),
+                  participantClient = CNParticipantClientConfig(
+                    ClientConfig(port = Port.tryCreate(27702)),
+                    splitwellBackendConfig.participantClient.ledgerApi.copy(
+                      clientConfig =
+                        splitwellBackendConfig.participantClient.ledgerApi.clientConfig.copy(
+                          port = Port.tryCreate(27701)
+                        )
+                    ),
+                  ),
+                  domains = SplitwellDomainConfig(
+                    splitwell = SplitwellDomains(
+                      preferred = DomainConfig(
+                        alias = DomainAlias.tryCreate("global")
+                      ),
+                      others = Seq.empty,
+                    )
+                  ),
+                )
+            }
+          ),
+          splitwellAppClients = config.splitwellAppClients + (
+            InstanceName.tryCreate("aliceSplitwellLocal") -> {
+              val aliceSplitwellAppClientConfig = config
+                .splitwellAppClients(InstanceName.tryCreate("aliceSplitwell"))
+              aliceSplitwellAppClientConfig.copy(
+                scanClient = ScanAppClientConfig(
+                  adminApi = NetworkAppClientConfig(
+                    Uri("http://127.0.0.1:27012")
+                  )
+                ),
+                adminApi =
+                  aliceSplitwellAppClientConfig.adminApi.copy(url = Uri("http://127.0.0.1:27113")),
+                participantClient = CNParticipantClientConfig(
+                  ClientConfig(port = Port.tryCreate(27502)),
+                  aliceSplitwellAppClientConfig.participantClient.ledgerApi.copy(
+                    clientConfig =
+                      aliceSplitwellAppClientConfig.participantClient.ledgerApi.clientConfig.copy(
+                        port = Port.tryCreate(27501)
+                      )
+                  ),
+                ),
+              )
+            }
           ),
         )
       })
@@ -224,10 +350,10 @@ class GlobalDomainMigrationIntegrationTest
             .bumpSomeValidatorAppPortsBy(22_000, Seq("sv1ValidatorLocal")))(conf)
       )
       .addConfigTransform(
-        // update validator app config for the bobValidator to set the migrationDumpPath
+        // update validator app config for the aliceValidator and splitwellValidator to set the migrationDumpPath
         (_, conf) =>
           CNNodeConfigTransforms.updateAllValidatorConfigs((name, validatorConfig) =>
-            if (name == "bobValidator")
+            if (name == "aliceValidator" || name == "splitwellValidator")
               validatorConfig.copy(
                 domainMigrationDumpPath =
                   Some((migrationDumpDir(name) / "domain_migration_dump.json").path)
@@ -335,20 +461,21 @@ class GlobalDomainMigrationIntegrationTest
       validatorBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
         true
       )
+      walletUserParty
     }
 
-    val aliceValidatorLocalBackend: ValidatorAppBackendReference = v("aliceValidatorLocal")
+    val bobValidatorLocalBackend: ValidatorAppBackendReference = v("bobValidatorLocal")
 
     withCanton(
       Seq(
         testResourcesPath / "unavailable-validator-topology-canton.conf"
       ),
       Seq(),
-      "stop-alice-validator-before-domain-migration",
-      "VALIDATOR_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
+      "stop-bob-validator-before-domain-migration",
+      "VALIDATOR_ADMIN_USER" -> bobValidatorLocalBackend.config.ledgerApiUser,
     ) {
-      startValidatorAndTapCoin(aliceValidatorLocalBackend, aliceWalletClient)
-      aliceValidatorLocalBackend.stop()
+      startValidatorAndTapCoin(bobValidatorLocalBackend, bobWalletClient)
+      bobValidatorLocalBackend.stop()
     }
 
     withClueAndLog(
@@ -356,12 +483,12 @@ class GlobalDomainMigrationIntegrationTest
     ) {
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
-          aliceValidatorLocalBackend.participantClientWithAdminToken.health.status
+          bobValidatorLocalBackend.participantClientWithAdminToken.health.status
         },
         logEntries => {
           forExactly(1, logEntries) { logEntry =>
             logEntry.message should startWith(
-              s"""Request failed for remote participant for `aliceValidatorLocal`, with admin token. Is the server running? Did you configure the server address as 0.0.0.0? Are you using the right TLS settings? (details logged as DEBUG)
+              s"""Request failed for remote participant for `bobValidatorLocal`, with admin token. Is the server running? Did you configure the server address as 0.0.0.0? Are you using the right TLS settings? (details logged as DEBUG)
                  |  GrpcServiceUnavailable: UNAVAILABLE/io exception""".stripMargin
             )
           }
@@ -378,16 +505,23 @@ class GlobalDomainMigrationIntegrationTest
       ),
       logSuffix = "global-domain-migration",
       autoInit = false,
-      extraParticipant = true,
-      extraParticipantUser = bobValidatorBackend.config.ledgerApiUser.some,
+      extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+      extraParticipantsEnvMap = Map(
+        "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
+        "EXTRA_PARTICIPANT_DB" -> s"participant_extra_${dbsSuffix}",
+        "SPLITWELL_PARTICIPANT_DB" -> s"participant_splitwell_${dbsSuffix}",
+        "SPLITWELL_PARTICIPANT_ADMIN_USER" -> splitwellValidatorBackend.config.ledgerApiUser,
+      ),
     )() {
-      startValidatorAndTapCoin(bobValidatorBackend, bobWalletClient)
+      aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
+      val aliceUserParty = startValidatorAndTapCoin(aliceValidatorBackend, aliceWalletClient)
+      val splitwellGroupKey = createSplitwellGroupAndTransfer(aliceUserParty)
 
       val sequencerUrlSetBeforeUpgrade = clue("validator should connect to all sequencer urls") {
         eventually() {
           val urlSet =
             getSequencerUrlSet(
-              bobValidatorBackend.participantClientWithAdminToken,
+              aliceValidatorBackend.participantClientWithAdminToken,
               globalDomainAlias,
             )
           urlSet should have size 4
@@ -500,9 +634,11 @@ class GlobalDomainMigrationIntegrationTest
 
           withClueAndLog("dump has been written in the configured location for the validator.") {
             eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
-              (migrationDumpDir(
-                bobValidatorBackend.name
-              ) / "domain_migration_dump.json").path.exists shouldBe true
+              Seq(aliceValidatorBackend, splitwellValidatorBackend).foreach { validator =>
+                (migrationDumpDir(
+                  validator.name
+                ) / "domain_migration_dump.json").path.exists shouldBe true
+              }
             }
           }
 
@@ -590,19 +726,24 @@ class GlobalDomainMigrationIntegrationTest
           startAllSync(
             sv1ScanLocalBackend,
             sv1ValidatorLocalBackend,
+            v("splitwellValidatorLocal"),
+            sw("providerSplitwellBackendLocal"),
           )
 
-          val bobValidatorLocal = v("bobValidatorLocal")
+          val aliceValidatorLocal = v("aliceValidatorLocal")
           withClueAndLog("validator can migrate to the new domain") {
-            val validatorThatMigrates = bobValidatorLocal
+            val validatorThatMigrates = aliceValidatorLocal
             startValidatorAndTapCoin(
               validatorThatMigrates,
-              uwc("bobWalletLocal"),
-              expectedCoins = 99 to 100,
+              uwc("aliceWalletLocal"),
+              // tap 2 times (100) minus splitwell transfer (42)
+              expectedCoins = 57 to 58,
             )
           }
 
-          clue("validator should connect to sequencers in upgraded domain") {
+          val charlieUserParty = onboardWalletUser(uwc("charlieWalletLocal"), aliceValidatorLocal)
+
+          clue(s"validator should connect to sequencers in upgraded domain $charlieUserParty") {
             eventually() {
               inside(sv1ScanLocalBackend.listSvcSequencers()) {
                 case Seq(DomainSequencers(domainId, sequencers)) =>
@@ -616,13 +757,22 @@ class GlobalDomainMigrationIntegrationTest
                   }
               }
               val sequencerUrlSet = getSequencerUrlSet(
-                bobValidatorLocal.participantClientWithAdminToken,
+                aliceValidatorLocal.participantClientWithAdminToken,
                 globalDomainAlias,
               )
               sequencerUrlSet should have size 4
               sequencerUrlSet.intersect(sequencerUrlSetBeforeUpgrade) shouldBe Set.empty
             }
           }
+
+          startValidatorAndTapCoin(
+            v("splitwellValidatorLocal"),
+            uwc("splitwellProviderWalletLocal"),
+          )
+
+          startAllSync(
+            sw("providerSplitwellBackendLocal")
+          )
 
           sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
 
@@ -658,10 +808,10 @@ class GlobalDomainMigrationIntegrationTest
               new ARC_SvcRules(
                 new SRARC_AddMember(
                   new SvcRules_AddMember(
-                    "alice",
-                    "Alice",
+                    "bob",
+                    "Bob",
                     SvUtil.DefaultFoundingNodeWeight,
-                    "alice-participant-id",
+                    "bob-participant-id",
                     new Round(42),
                     globalDomainId.toProtoPrimitive,
                   )
@@ -683,6 +833,53 @@ class GlobalDomainMigrationIntegrationTest
                   .votes should have size 1
               },
           )
+
+          withClueAndLog("3rd party app works after domain migration") {
+            val (_, paymentRequest) =
+              actAndCheck(timeUntilSuccess = 40.seconds, maxPollInterval = 1.second)(
+                "alice initiates transfer after domain migration",
+                rsw("aliceSplitwellLocal").initiateTransfer(
+                  splitwellGroupKey,
+                  Seq(
+                    new ReceiverCCAmount(
+                      charlieUserParty.toProtoPrimitive,
+                      BigDecimal(43.0).bigDecimal,
+                    )
+                  ),
+                ),
+              )(
+                "alice sees payment request",
+                _ => {
+                  getSingleRequestOnGlobalDomain(uwc("aliceWalletLocal"))
+                },
+              )
+
+            actAndCheck(
+              "alice initiates payment accept request after domain migration",
+              uwc("aliceWalletLocal").acceptAppPaymentRequest(paymentRequest.contractId),
+            )(
+              "alice sees balance update",
+              _ =>
+                inside(rsw("aliceSplitwellLocal").listBalanceUpdates(splitwellGroupKey)) {
+                  case Seq(update1, update2) =>
+                    Seq(update1, update2).foreach { update =>
+                      aliceValidatorLocal.participantClient.ledger_api_extensions.acs
+                        .lookup_contract_domain(
+                          aliceUserParty,
+                          Set(update.contractId.contractId),
+                        ) shouldBe Map(
+                        update.contractId.contractId -> globalDomainId
+                      )
+                    }
+                    inside(update1.payload.update) { case transfer: Transfer =>
+                      transfer.amount shouldBe BigDecimal("42.0000000000").bigDecimal
+                    }
+                    inside(update2.payload.update) { case transfer: Transfer =>
+                      transfer.amount shouldBe BigDecimal("43.0000000000").bigDecimal
+                    }
+                },
+            )
+          }
 
           withClueAndLog("apps can be restarted") {
             withClueAndLog("sv1 restarts with dump onboarding type") {
@@ -767,6 +964,116 @@ class GlobalDomainMigrationIntegrationTest
         case GrpcSequencerConnection(endpoints, _, _, _) => endpoints
       }
     } yield endpoint.toString).toSet
+  }
+
+  private def createSplitwellGroupAndTransfer(
+      aliceUserParty: PartyId
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
+    val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
+    startAllSync(
+      splitwellValidatorBackend,
+      splitwellBackend,
+    )
+    clue("setup splitwell group") {
+
+      val group = "group1"
+      // The provider's wallet is auto-onboarded, so we just need to wait for it to be ready
+      waitForWalletUser(splitwellWalletClient)
+
+      splitwellBackend.getProviderPartyId()
+
+      clue("setup install contracts") {
+        Seq(
+          (aliceSplitwellClient, aliceUserParty),
+          (charlieSplitwellClient, charlieUserParty),
+        ).foreach { case (splitwell, party) =>
+          createSplitwellInstalls(splitwell, party)
+        }
+      }
+
+      actAndCheck("create 'group1'", aliceSplitwellClient.requestGroup(group))(
+        "Alice sees 'group1'",
+        _ => aliceSplitwellClient.listGroups() should have size 1,
+      )
+
+      // Wait for the group contract to be visible to Alice's Ledger API
+      aliceSplitwellClient.ledgerApi.ledger_api_extensions.acs
+        .awaitJava(Group.COMPANION)(aliceUserParty)
+
+      val (_, invite) = actAndCheck(
+        "create a generic invite for 'group1'",
+        aliceSplitwellClient.createGroupInvite(
+          group
+        ),
+      )(
+        "alice observes the invite",
+        _ => aliceSplitwellClient.listGroupInvites().loneElement.toAssignedContract.value,
+      )
+
+      actAndCheck("charlie asks to join 'group1'", charlieSplitwellClient.acceptInvite(invite))(
+        "alice sees the accepted invite",
+        _ => aliceSplitwellClient.listAcceptedGroupInvites(group) should not be empty,
+      )
+
+      actAndCheck(
+        "charlie joins 'group1'",
+        inside(aliceSplitwellClient.listAcceptedGroupInvites(group)) { case Seq(accepted) =>
+          aliceSplitwellClient.joinGroup(accepted.contractId)
+        },
+      )(
+        "charlie is in 'group1'",
+        _ => {
+          charlieSplitwellClient.listGroups() should have size 1
+          aliceSplitwellClient.listAcceptedGroupInvites(group) should be(empty)
+        },
+      )
+
+      val key = HttpSplitwellAppClient.GroupKey(
+        group,
+        aliceUserParty,
+      )
+
+      clue("grant featured app right to splitwell provider") {
+        grantFeaturedAppRight(splitwellWalletClient)
+      }
+
+      val (_, paymentRequest) =
+        actAndCheck(timeUntilSuccess = 40.seconds, maxPollInterval = 1.second)(
+          "alice initiates transfer",
+          aliceSplitwellClient.initiateTransfer(
+            key,
+            Seq(
+              new ReceiverCCAmount(
+                charlieUserParty.toProtoPrimitive,
+                BigDecimal(42.0).bigDecimal,
+              )
+            ),
+          ),
+        )(
+          "alice sees payment request",
+          _ => {
+            getSingleRequestOnGlobalDomain(aliceWalletClient)
+          },
+        )
+
+      actAndCheck(
+        "alice initiates payment accept request on global domain",
+        aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
+      )(
+        "alice sees balance update on splitwell domain",
+        _ =>
+          inside(aliceSplitwellClient.listBalanceUpdates(key)) { case Seq(update) =>
+            aliceValidatorBackend.participantClient.ledger_api_extensions.acs
+              .lookup_contract_domain(
+                aliceUserParty,
+                Set(update.contractId.contractId),
+              ) shouldBe Map(
+              update.contractId.contractId -> globalDomainId
+            )
+          },
+      )
+      key
+    }
   }
 }
 

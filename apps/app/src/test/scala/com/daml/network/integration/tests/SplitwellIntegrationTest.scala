@@ -3,7 +3,6 @@ package com.daml.network.integration.tests
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
-import com.daml.network.console.WalletAppClientReference
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -11,7 +10,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.splitwell.automation.AcceptedAppPaymentRequestsTrigger
-import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
@@ -36,18 +34,6 @@ class SplitwellIntegrationTest
       })
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
-
-  private def getSingleRequestOnGlobalDomain(
-      walletClient: WalletAppClientReference
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val request = walletClient
-      .listAppPaymentRequests()
-      .loneElement
-    inside(request.state) { case ContractState.Assigned(domain) =>
-      domain should be(globalDomainId)
-    }
-    request
-  }
 
   "splitwell" should {
     "restart cleanly" in { implicit env =>

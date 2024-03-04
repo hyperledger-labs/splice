@@ -119,7 +119,7 @@ export async function installValidator1(
 
 function installIngress(
   xns: ExactNamespace,
-  spliwell: boolean,
+  splitwell: boolean,
   globalDomainMigrationConfig: GlobalDomainMigrationConfig
 ) {
   installCNHelmChart(
@@ -134,7 +134,7 @@ function installIngress(
       },
       withSvIngress: false,
       ingress: {
-        splitwell: spliwell,
+        splitwell: splitwell,
         globalDomain: {
           activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
         },
