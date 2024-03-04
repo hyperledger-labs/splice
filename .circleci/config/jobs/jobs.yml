@@ -655,7 +655,21 @@ jobs:
             /tmp/vpn-scripts/restart-vpn.sh
             cncluster prefresh
 
-  # Waits until one of the scratchnet hold jobs is released, and persists the choice to a CCI workspace
+  release_hold_set_scratchnet:
+    docker:
+      - image: cimg/base:2024.01
+    steps:
+      - run:
+          name: Release main hold job
+          command: |
+            approval_id=$(curl -s --location --request GET "https://circleci.com/api/v2/workflow/$CIRCLE_WORKFLOW_ID/job" --header "Circle-Token: ${CIRCLECI_TOKEN}" | jq -r '.items[]|select(.name == "hold_set_scratchnet").approval_request_id')
+            if [ -n "$approval_id" ]; then
+              curl -s --location --request POST "https://circleci.com/api/v2/workflow/$CIRCLE_WORKFLOW_ID/approve/$approval_id" --header "Circle-Token: ${CIRCLECI_TOKEN}"
+            else
+              echo "No approval request found for hold_set_scratchnet"
+            fi
+
+  # Persists the choice of scratchnet cluster to a CCI workspace
   set_scratchnet:
     parameters:
       <<: *cluster-parameter
@@ -664,22 +678,24 @@ jobs:
     steps:
       - run: mkdir -p /tmp/workspace
       - run:
-          name: Setting cluster in workspace
+          name: Getting selected cluster and setting it in workspace
           command: |
             n=0
-            until [ $n -gt 360 ]; do
+            until [ $n -gt 5 ]; do
               released=$(curl -s --location --request GET "https://circleci.com/api/v2/workflow/$CIRCLE_WORKFLOW_ID/job" --header "Circle-Token: ${CIRCLECI_TOKEN}" | jq -r '.items[]|select(.name | test("use_scratchnet*"))|select(.status == "success").name')
               if [ -n "$released" ]; then
                 TARGET_CLUSTER=$(echo $released | sed s/use_//)
                 echo "The hold job $released has been released, using cluster: $cluster"
                 echo "export TARGET_CLUSTER=$TARGET_CLUSTER" >> /tmp/workspace/cn_env_vars
-                break
+                exit 0
               else
                 echo "No hold job has not been released yet (iteration $n)"
                 n=$((n+1))
                 sleep 5
               fi
             done
+            echo "ERROR! No cluster hold job has been released, did you accidentally manually release the set_scratchnet one?"
+            exit 1
       - persist_to_workspace:
           root: /tmp/workspace
           paths:

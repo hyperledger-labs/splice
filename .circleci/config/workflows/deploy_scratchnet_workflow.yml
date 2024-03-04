@@ -7,24 +7,44 @@
           <<: *main-branch-never
           name: use_scratchneta
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchneta
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnetb
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnetb
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnetc
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnetc
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnetd
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnetd
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnete
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnete
+      - hold_set_scratchnet:
+          <<: *main-branch-never
+          type: approval
       - set_scratchnet:
           <<: *main-branch-never
+          requires:
+            - hold_set_scratchnet
       - docker_images_push:
           <<: *main-branch-never
           context:
@@ -222,24 +242,44 @@
           <<: *main-branch-never
           name: use_scratchneta
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchneta
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnetb
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnetb
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnetc
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnetc
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnetd
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnetd
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnete
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnete
+      - hold_set_scratchnet:
+          <<: *main-branch-never
+          type: approval
       - set_scratchnet:
           <<: *main-branch-never
+          requires:
+            - hold_set_scratchnet
       - docker_images_push:
           <<: *main-branch-never
           context:
@@ -356,24 +396,44 @@
           <<: *main-branch-never
           name: use_scratchneta
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchneta
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnetb
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnetb
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnetc
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnetc
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnetd
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnetd
       - hold_scratchnet:
           <<: *main-branch-never
           name: use_scratchnete
           type: approval
+      - release_hold_set_scratchnet:
+          requires:
+            - use_scratchnete
+      - hold_set_scratchnet:
+          <<: *main-branch-never
+          type: approval
       - set_scratchnet:
           <<: *main-branch-never
+          requires:
+            - hold_set_scratchnet
       - docker_images_push:
           <<: *main-branch-never
           context:
