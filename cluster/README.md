@@ -928,19 +928,10 @@ Creating a new alert can be done through the UI.
 
 ###### Updating an alert
 
-Updating a grafana alert is not that straightforward, as the UI doesn't let us edit it if it's provisioned through files.
 To edit an alert follow the following steps:
-- Go to the alert and click Copy
-- Accept the warning that it will not be copied as a provisioned rule
+- Go to the alert and click `Modify export`
 - Edit the alert as you wish
-- Set a new `Evaluation group`. This is required so that we can save the alert.
-- Save the new alert
-- View the new alert, and click `View Yaml`
-- Copy the yaml in the repository overwriting the existing alert
-- Revert the changes to the alert title, uid and evaluation group
-
-This can be simplified in the future if we change to use a database for the grafana storage. Allowing us to manually `unmark` the alerts as
-provisioned.
+- Once done, click export and copy the resulting yaml
 
 #### JVM debug information
 

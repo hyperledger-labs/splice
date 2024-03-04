@@ -321,6 +321,15 @@
           "gateway": "cluster-ingress/cn-apps-gateway",
           "port": "26056"
         },
+        "metrics": {
+          "enable": true,
+          "labels": [
+            {
+              "key": "active_migration",
+              "value": "true"
+            }
+          ]
+        },
         "node": {
           "externalAddress": "global-domain-0-cometbft.sv.svc.svrun.network.canton.global:26056",
           "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",

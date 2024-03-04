@@ -58,6 +58,7 @@ export class GlobalDomainNode extends ComponentResource {
       cometbft.onboardingName,
       cometbft.nodeConfigs,
       domainMigrationId,
+      active,
       cometbft.syncSource,
       { parent: this }
     );

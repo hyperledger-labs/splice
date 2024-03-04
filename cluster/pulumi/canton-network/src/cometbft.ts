@@ -33,6 +33,7 @@ export function installCometBftNode(
     peers: StaticCometBftConfigWithNodeName[];
   },
   migrationId: DomainMigrationIndex,
+  isActiveDomain: boolean,
   syncSource?: Release,
   opts?: CustomResourceOptions
 ): Service {
@@ -86,6 +87,7 @@ export function installCometBftNode(
       },
       metrics: {
         enable: true,
+        labels: isActiveDomain ? [{ key: 'active_migration', value: 'true' }] : [],
       },
       db: {
         volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',

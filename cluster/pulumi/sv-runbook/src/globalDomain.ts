@@ -18,9 +18,16 @@ export function installGlobalDomainNode(
   svNamespace: ExactNamespace,
   svName: string,
   migrationId: DomainMigrationIndex,
+  isActiveDomain: boolean,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
-  const cometbft = installCometBftNode(svNamespace, svName, migrationId, dependencies);
+  const cometbft = installCometBftNode(
+    svNamespace,
+    svName,
+    migrationId,
+    isActiveDomain,
+    dependencies
+  );
 
   const sequencerPgValues = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-sequencer.yaml`

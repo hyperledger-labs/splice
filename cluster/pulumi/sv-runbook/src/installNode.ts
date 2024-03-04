@@ -177,7 +177,13 @@ async function installSvAndValidator(config: SvConfig) {
     validatorWalletUserName,
   } = config;
 
-  const globalDomain = installGlobalDomainNode(xns, onboardingName, migrationId, imagePullDeps);
+  const globalDomain = installGlobalDomainNode(
+    xns,
+    onboardingName,
+    migrationId,
+    true,
+    imagePullDeps
+  );
 
   const participantValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {

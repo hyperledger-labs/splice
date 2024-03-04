@@ -1559,6 +1559,12 @@
         "metrics": {
           "enable": true,
           "interval": "30s",
+          "labels": [
+            {
+              "key": "active_migration",
+              "value": "true"
+            }
+          ],
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
@@ -2493,6 +2499,12 @@
         "metrics": {
           "enable": true,
           "interval": "30s",
+          "labels": [
+            {
+              "key": "active_migration",
+              "value": "true"
+            }
+          ],
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
@@ -3394,6 +3406,12 @@
         "metrics": {
           "enable": true,
           "interval": "30s",
+          "labels": [
+            {
+              "key": "active_migration",
+              "value": "true"
+            }
+          ],
           "release": "prometheus-grafana-monitoring"
         },
         "node": {
@@ -4295,6 +4313,12 @@
         "metrics": {
           "enable": true,
           "interval": "30s",
+          "labels": [
+            {
+              "key": "active_migration",
+              "value": "true"
+            }
+          ],
           "release": "prometheus-grafana-monitoring"
         },
         "node": {

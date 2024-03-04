@@ -28,6 +28,7 @@ export function installCometBftNode(
   xns: ExactNamespace,
   svName: string,
   migrationId: DomainMigrationIndex,
+  isActiveDomain: boolean,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
   const cometBftValues = loadYamlFromFile(
@@ -75,6 +76,10 @@ export function installCometBftNode(
           `${CLUSTER_BASENAME}`.startsWith('scratch') && !isDevNet
             ? 'test'
             : cometBftValues.genesis.chainId,
+      },
+      metrics: {
+        enable: true,
+        labels: isActiveDomain ? [{ key: 'active_migration', value: 'true' }] : [],
       },
     }),
     localCharts,

@@ -9,10 +9,16 @@ metadata:
   namespace: {{ .Release.Namespace }}
 spec:
   endpoints:
-
   - port: cometbft-metrics
     interval: {{ .Values.metrics.interval }}
-
+    {{- if .Values.metrics.labels }}
+    metricRelabelings:
+    {{- range .Values.metrics.labels }}
+      - sourceLabels: [ __name__ ]
+        targetLabel: {{ .key | quote }}
+        replacement: {{ .value | quote }}
+    {{- end }}
+    {{- end }}
   selector:
     matchLabels:
       name: {{ $fullRpcHostName }}
