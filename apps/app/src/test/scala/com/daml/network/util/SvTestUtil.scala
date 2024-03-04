@@ -12,6 +12,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
   SvcRules_SetConfig,
   VoteRequest2,
 }
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CNParticipantClientReference,
   SvAppBackendReference,
@@ -25,6 +26,7 @@ import com.daml.network.util.SvTestUtil.ConfirmingSv
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -89,7 +91,7 @@ trait SvTestUtil extends CNNodeTestCommon {
       )
     )
 
-    actAndCheck(
+    actAndCheck(timeUntilSuccess = 60.seconds)(
       "Voting on an SvcRules config change for scheduled migration", {
         def onlySetConfigVoteRequests(
             voteRequests: Seq[Contract[VoteRequest2.ContractId, VoteRequest2]]
@@ -113,7 +115,9 @@ trait SvTestUtil extends CNNodeTestCommon {
               action,
               "url",
               "description",
-              svToCreateVoteRequest.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+              // We give everyone 30 seconds to vote. Hopefully that is a good sweet spot between
+              // the vote failing because of a timeout and the test taking too long.
+              new RelTime(30 * 1000 * 1000),
             )
           },
         )(

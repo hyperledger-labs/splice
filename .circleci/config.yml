@@ -1144,12 +1144,21 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
-      global_domain_migration_id:
-        type: integer
-        default: 0
       send_deployment_notification:
         type: boolean
         default: true
+      global_domain_active_migration_id:
+        type: integer
+        default: 0
+      global_domain_upgrade_migration_id:
+        type: integer
+        default: 0
+      global_domain_legacy_migration_id:
+        type: integer
+        default: -1
+      global_domain_migrate_from_id:
+        type: integer
+        default: -1
     steps:
       - checkout_with_retry
       - when:
@@ -1171,7 +1180,6 @@ jobs:
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
-            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_migration_id >>
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -1179,6 +1187,17 @@ jobs:
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
+            fi
+            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
+            if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+            fi
+            if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
+              export CN_INSTALL_SPLITWELL="false"
+              export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
+            fi
+            if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
             fi
             cncluster activate
             cncluster ci_pdown_sv
@@ -1213,9 +1232,18 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
-      global_domain_migration_id:
+      global_domain_active_migration_id:
         type: integer
         default: 0
+      global_domain_upgrade_migration_id:
+        type: integer
+        default: 0
+      global_domain_legacy_migration_id:
+        type: integer
+        default: -1
+      global_domain_migrate_from_id:
+        type: integer
+        default: -1
     steps:
       - checkout_with_retry
       - when:
@@ -1237,7 +1265,6 @@ jobs:
           additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
-            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_migration_id >>
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -1245,6 +1272,17 @@ jobs:
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
+            fi
+            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
+            if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+            fi
+            if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
+              export CN_INSTALL_SPLITWELL="false"
+              export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
+            fi
+            if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
             fi
             cncluster activate
             VERSION=""
@@ -3115,6 +3153,7 @@ workflows:
             - slack-context
           workflow_names: "deploy_cimain"
       - deploy_cluster:
+          name: "deploy_cluster_for_migration"
           <<: *main-branch-only
           context:
             - artifactory
@@ -3138,7 +3177,27 @@ workflows:
           requires:
             - wait_for_previous_pipeline
             - docker_images_push
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_sv_check:
+           name: "preflight_sv_check_before_migration"
+           <<: *main-branch-never
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "cimain"
+           requires:
+             - deploy_cluster_for_migration
       - backup_cluster:
+          name: "backup_cluster_before_migration"
           <<: *main-branch-only
           cluster: "cimain"
           context:
@@ -3146,7 +3205,8 @@ workflows:
             - canton-network-vpn
             - slack-context
           requires:
-            - deploy_cluster
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-only
@@ -3160,7 +3220,8 @@ workflows:
           wait_for_sv: false
           requires:
             - preflight_check
-            - backup_cluster
+            - preflight_sv_check_before_migration
+            - backup_cluster_before_migration
       - deploy_cluster:
           name: "migrate_cluster"
           <<: *main-branch-only
@@ -3187,6 +3248,7 @@ workflows:
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
+          name: "migrate_sv_runbook"
           <<: *main-branch-only
           context:
             - artifactory
@@ -3194,8 +3256,10 @@ workflows:
           cluster: "cimain"
           send_deployment_notification: false
           requires:
-            - migrate_cluster
-          global_domain_migration_id: 1
+            - trigger_global_domain_migration
+          global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
+          global_domain_legacy_migration_id: 0
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1
@@ -3213,7 +3277,7 @@ workflows:
             - artifactory
             - slack-context
           cluster: "cimain"
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           requires:
             - migrate_cluster
       - preflight_validator_check:
@@ -3527,6 +3591,25 @@ workflows:
           parallelism: 1
           requires:
             - docker_images_push
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchneta"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_sv_check:
+           name: "preflight_sv_check_before_migration"
+           <<: *main-branch-never
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "scratchneta"
+           requires:
+             - deploy_cluster_for_migration
       - backup_cluster:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
@@ -3537,6 +3620,7 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -3550,6 +3634,7 @@ workflows:
           wait_for_sv: false
           requires:
             - preflight_check_core
+            - preflight_sv_check_before_migration
             - backup_cluster_before_migration
       - deploy_cluster:
           name: "migrate_cluster"
@@ -3577,15 +3662,17 @@ workflows:
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_sv_runbook_migrated"
+          name: "migrate_sv_runbook"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "scratchneta"
           requires:
-            - migrate_cluster
-          global_domain_migration_id: 1
+            - trigger_global_domain_migration
+          global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
+          global_domain_legacy_migration_id: 0
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1
@@ -3599,7 +3686,7 @@ workflows:
             - trigger_global_domain_migration
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_migrated"
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -3793,7 +3880,7 @@ workflows:
             - test_DR
       - deploy_sv_runbook:
           name: deploy_sv_runbook_DR
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -3813,7 +3900,7 @@ workflows:
             - test_DR
       - deploy_validator_runbook:
           name: deploy_validator_runbook_DR
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -3887,6 +3974,25 @@ workflows:
           parallelism: 1
           requires:
             - docker_images_push
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetb"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_sv_check:
+           name: "preflight_sv_check_before_migration"
+           <<: *main-branch-never
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "scratchnetb"
+           requires:
+             - deploy_cluster_for_migration
       - backup_cluster:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
@@ -3897,6 +4003,7 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -3910,6 +4017,7 @@ workflows:
           wait_for_sv: false
           requires:
             - preflight_check_core
+            - preflight_sv_check_before_migration
             - backup_cluster_before_migration
       - deploy_cluster:
           name: "migrate_cluster"
@@ -3937,15 +4045,17 @@ workflows:
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_sv_runbook_migrated"
+          name: "migrate_sv_runbook"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "scratchnetb"
           requires:
-            - migrate_cluster
-          global_domain_migration_id: 1
+            - trigger_global_domain_migration
+          global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
+          global_domain_legacy_migration_id: 0
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1
@@ -3959,7 +4069,7 @@ workflows:
             - trigger_global_domain_migration
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_migrated"
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4153,7 +4263,7 @@ workflows:
             - test_DR
       - deploy_sv_runbook:
           name: deploy_sv_runbook_DR
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4173,7 +4283,7 @@ workflows:
             - test_DR
       - deploy_validator_runbook:
           name: deploy_validator_runbook_DR
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4247,6 +4357,25 @@ workflows:
           parallelism: 1
           requires:
             - docker_images_push
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetc"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_sv_check:
+           name: "preflight_sv_check_before_migration"
+           <<: *main-branch-never
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "scratchnetc"
+           requires:
+             - deploy_cluster_for_migration
       - backup_cluster:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
@@ -4257,6 +4386,7 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -4270,6 +4400,7 @@ workflows:
           wait_for_sv: false
           requires:
             - preflight_check_core
+            - preflight_sv_check_before_migration
             - backup_cluster_before_migration
       - deploy_cluster:
           name: "migrate_cluster"
@@ -4297,15 +4428,17 @@ workflows:
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_sv_runbook_migrated"
+          name: "migrate_sv_runbook"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "scratchnetc"
           requires:
-            - migrate_cluster
-          global_domain_migration_id: 1
+            - trigger_global_domain_migration
+          global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
+          global_domain_legacy_migration_id: 0
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1
@@ -4319,7 +4452,7 @@ workflows:
             - trigger_global_domain_migration
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_migrated"
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4513,7 +4646,7 @@ workflows:
             - test_DR
       - deploy_sv_runbook:
           name: deploy_sv_runbook_DR
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4533,7 +4666,7 @@ workflows:
             - test_DR
       - deploy_validator_runbook:
           name: deploy_validator_runbook_DR
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4607,6 +4740,25 @@ workflows:
           parallelism: 1
           requires:
             - docker_images_push
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "scratchnetd"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_sv_check:
+           name: "preflight_sv_check_before_migration"
+           <<: *main-branch-never
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "scratchnetd"
+           requires:
+             - deploy_cluster_for_migration
       - backup_cluster:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
@@ -4617,6 +4769,7 @@ workflows:
             - slack-context
           requires:
             - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -4630,6 +4783,7 @@ workflows:
           wait_for_sv: false
           requires:
             - preflight_check_core
+            - preflight_sv_check_before_migration
             - backup_cluster_before_migration
       - deploy_cluster:
           name: "migrate_cluster"
@@ -4657,15 +4811,17 @@ workflows:
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
-          name: "deploy_sv_runbook_migrated"
+          name: "migrate_sv_runbook"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "scratchnetd"
           requires:
-            - migrate_cluster
-          global_domain_migration_id: 1
+            - trigger_global_domain_migration
+          global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
+          global_domain_legacy_migration_id: 0
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1
@@ -4679,7 +4835,7 @@ workflows:
             - trigger_global_domain_migration
       - deploy_validator_runbook:
           name: "deploy_validator_runbook_migrated"
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
@@ -4873,372 +5029,12 @@ workflows:
             - test_DR
       - deploy_sv_runbook:
           name: deploy_sv_runbook_DR
-          global_domain_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - test_DR
-      - preflight_sv_check:
-          name: preflight_sv_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - test_DR
-      - deploy_validator_runbook:
-          name: deploy_validator_runbook_DR
-          global_domain_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - test_DR
-      - preflight_validator_check:
-          name: preflight_validator_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnetd"
-          requires:
-            - test_DR
-      - reset_cluster:
-          name: reset_cluster_DR
-          <<: *main-branch-never
-          cluster: "scratchnetd"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_check_DR
-            - preflight_sv_check_DR
-            - preflight_validator_check_DR
-
-  deploy_scratchnete:
-    when:
-      equal: [ build, << pipeline.parameters.run-job >> ]
-    jobs:
-      - hold:
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold
-      - deploy_cluster:
-          name: "deploy_cluster_for_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test
-            - docker_images_push
-      - preflight_check:
-          name: "preflight_check_core"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnete"
-          wait_for_sv: false
-          parallelism: 1
-          requires:
-            - docker_images_push
-      - backup_cluster:
-          name: "backup_cluster_before_migration"
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster_for_migration
-      - preflight_check:
-          name: "trigger_global_domain_migration"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnete"
-          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
-          parallelism: 1
-          wait_for_sv: false
-          requires:
-            - preflight_check_core
-            - backup_cluster_before_migration
-      - deploy_cluster:
-          name: "migrate_cluster"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
-          update_deployment_branch: false
           global_domain_active_migration_id: 1
-          global_domain_migrate_from_id: 0
-          global_domain_legacy_migration_id: 0
-          requires:
-            - trigger_global_domain_migration
-      - preflight_check:
-          name: "preflight_check_migrated"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnete"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - trigger_global_domain_migration
-      - deploy_sv_runbook:
-          name: "deploy_sv_runbook_migrated"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
-          cluster: "scratchnete"
-          requires:
-            - migrate_cluster
-          global_domain_migration_id: 1
-      - preflight_sv_check:
-          name: "preflight_sv_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - trigger_global_domain_migration
-      - deploy_validator_runbook:
-          name: "deploy_validator_runbook_migrated"
-          global_domain_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - migrate_cluster
-      - preflight_validator_check:
-          name: "preflight_validator_check_migrated"
-          migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - trigger_global_domain_migration
-      - restore_node:
-          name: "restore_node_after_migration"
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          context:
-            - canton-network-vpn
-          requires:
-            - restore_node_after_migration
-            - preflight_sv_check_migrated
-            - preflight_validator_check_migrated
-            - preflight_check_migrated
-      - hold:
-          name: "hold_basic"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deployment_test:
-          name: "deployment_test_basic"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_basic
-      - deploy_cluster:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
-          update_deployment_branch: false
-          cancel_workflow_on_failure: true
-          requires:
-            - deployment_test_basic
-            - docker_images_push_basic
-      - preflight_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnete"
-          parallelism: 1
-          requires:
-            - docker_images_push_basic
-      - backup_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - deploy_cluster
-            - deploy_sv_runbook
-      - restore_node:
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          namespace_name: "sv-3"
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          requires:
-            - preflight_check
-            - preflight_sv_check
-            - preflight_validator_check
-            - backup_cluster
-      - deploy_sv_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - deploy_cluster
-      - preflight_sv_check:
-           <<: *main-branch-never
-           context:
-             - artifactory
-             - canton-network-vpn
-             - slack-context
-           cluster: "scratchnete"
-           requires:
-             - deploy_cluster
-      - deploy_validator_runbook:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - deploy_cluster
-      - preflight_validator_check:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - canton-network-vpn
-            - slack-context
-          cluster: "scratchnete"
-          requires:
-            - deploy_cluster
-      - reset_cluster:
-          <<: *main-branch-never
-          cluster: "scratchnete"
-          context:
-            - canton-network-vpn
-          requires:
-            - preflight_validator_check
-            - preflight_check
-            - preflight_sv_check
-            - restore_node
-      - hold:
-          name: "hold_DR"
-          <<: *main-branch-never
-          type: approval
-      - docker_images_push:
-          name: "docker_images_push_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - deployment_test:
-          name: "deployment_test_DR"
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - hold_DR
-      - test_DR:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchnete"
-          requires:
-            - deployment_test_DR
-            - docker_images_push_DR
-      - preflight_check:
-          name: preflight_check_DR
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-            - canton-network-vpn
-          cluster: "scratchnete"
-          migration_id: 1
-          parallelism: 1
-          requires:
-            - test_DR
-      - deploy_sv_runbook:
-          name: deploy_sv_runbook_DR
-          global_domain_migration_id: 1
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          cluster: "scratchnete"
+          cluster: "scratchnetd"
           requires:
             - test_DR
       - preflight_sv_check:
@@ -5248,17 +5044,17 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "scratchnete"
+          cluster: "scratchnetd"
           requires:
             - test_DR
       - deploy_validator_runbook:
           name: deploy_validator_runbook_DR
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
-          cluster: "scratchnete"
+          cluster: "scratchnetd"
           requires:
             - test_DR
       - preflight_validator_check:
@@ -5268,13 +5064,13 @@ workflows:
             - artifactory
             - canton-network-vpn
             - slack-context
-          cluster: "scratchnete"
+          cluster: "scratchnetd"
           requires:
             - test_DR
       - reset_cluster:
           name: reset_cluster_DR
           <<: *main-branch-never
-          cluster: "scratchnete"
+          cluster: "scratchnetd"
           context:
             - canton-network-vpn
           requires:

@@ -489,6 +489,8 @@ If you wish to run the Postgres instances as pods in your cluster, you can use t
 Note that we use the migration ID when naming postgres releases used by the SV node's Canton components.
 This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
 
+.. TODO(#10511) ^ remove the last comment and fix all of this
+
 Cloud-Hosted Postgres
 +++++++++++++++++++++
 
@@ -593,6 +595,13 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 - Please set `domain.sequencerPublicUrl` to the URL to your sequencer service in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
 - Please set `scan.publicUrl` to the URL to your Scan app in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
 
+If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``sv-values.yaml``:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
+    :language: yaml
+    :start-after: MIGRATION_START
+    :end-before: MIGRATION_END
+
 Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVC members. The bundled artifacts consist of the lists of recommended values as follows:
 
 - ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-test.yaml`` - the list of currently SVC-approved identities for `TestNet`
@@ -616,12 +625,14 @@ we are assuming you've stored the dump in a file called ``participant-identities
 You also need to configure the participant to not initialize automatically by uncommenting the following section in your ``participant-values.yaml``.
 
 .. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
+    :language: yaml
     :start-after: PARTICIPANT_BOOTSTRAP_START
     :end-before: PARTICIPANT_BOOTSTRAP_END
 
 Lastly, you need to configure the SV app to bootstrap the participant from the content of your secret by uncommenting the following section in your ``sv-values.yaml``.
 
 .. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
+    :language: yaml
     :start-after: PARTICIPANT_BOOTSTRAP_START
     :end-before: PARTICIPANT_BOOTSTRAP_END
 
@@ -637,8 +648,8 @@ Installing the Helm Charts
 With these files in place, you can execute the following helm commands
 in sequence. It's generally a good idea to wait until each deployment
 reaches a stable state prior to moving on to the next step.
-Note that we use the migration ID when naming Canton components.
-This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
+
+Install the Canton and CometBFT components:
 
 .. code-block:: bash
 
@@ -646,11 +657,21 @@ This is to support operating multiple instances of these components side by side
     helm install global-domain-${MIGRATION_ID}-cometbft canton-network-helm/cn-cometbft -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml --wait
     helm install global-domain-${MIGRATION_ID} canton-network-helm/cn-global-domain -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml --wait
     helm install participant-${MIGRATION_ID} canton-network-helm/cn-participant -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml --wait
+
+Note that we use the migration ID when naming Canton components.
+This is to support operating multiple instances of these components side by side as part of a :ref:`synchronizer migration <sv-upgrades>`.
+
+Install the SV node apps (replace ``helm install`` in these commands with ``helm upgrade`` if you are following :ref:`sv-upgrades-deploying-apps`):
+
+.. code-block:: bash
+
     helm install sv canton-network-helm/cn-sv-node -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-values.yaml -f ${SV-IDENTITIES-FILE} --wait
     helm install validator canton-network-helm/cn-validator -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml --wait
     helm install scan canton-network-helm/cn-scan -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml --wait
 
-Once this is running, you should be able to inspect the state of the
+
+
+Once everything is running, you should be able to inspect the state of the
 cluster and observe pods running in the new
 namespace. A typical query might look as follows:
 
@@ -681,7 +702,6 @@ particularly if all helm charts are deployed at the same time. The
 ``participant`` cannot start until ``postgres`` is running.
 
 .. _helm-sv-ingress:
-
 
 Configuring the Cluster Ingress
 -------------------------------

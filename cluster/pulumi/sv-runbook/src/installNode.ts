@@ -83,7 +83,8 @@ export async function installNode(
   const xns = exactNamespace(svNamespaceStr, true);
 
   const migrationId = globalDomainMigrationConfig.activeMigrationId;
-  console.error(`Using migration ID: ${migrationId}`);
+  const isMigrating = globalDomainMigrationConfig.isRunningMigration();
+  console.error(`Using migration ID: ${migrationId}; ${isMigrating ? '' : 'not '}migrating`);
 
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
@@ -106,6 +107,7 @@ export async function installNode(
   const { sv, validator } = await installSvAndValidator({
     xns,
     migrationId,
+    isMigrating,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,
@@ -145,6 +147,7 @@ type SvConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
   migrationId: DomainMigrationIndex;
+  isMigrating: boolean;
   onboarding?: ExpectedValidatorOnboarding;
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
@@ -161,6 +164,7 @@ async function installSvAndValidator(config: SvConfig) {
   const {
     xns,
     migrationId,
+    isMigrating,
     participantBootstrapDumpSecret,
     topupConfig,
     auth0Client,
@@ -273,6 +277,10 @@ async function installSvAndValidator(config: SvConfig) {
     domain: {
       ...(valuesFromYamlFile.domain || {}),
       sequencerPruningConfig,
+    },
+    migration: {
+      migrating: isMigrating ? true : valuesFromYamlFile.migration.migrating,
+      ...valuesFromYamlFile.migration,
     },
   };
 

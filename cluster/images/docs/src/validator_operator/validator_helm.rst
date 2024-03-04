@@ -346,6 +346,7 @@ we are assuming you've stored the dump in a file called ``participant-identities
 You also need to configure the participant to not initialize automatically by uncommenting the following section in your ``participant-values.yaml``.
 
 .. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
+    :language: yaml
     :start-after: PARTICIPANT_BOOTSTRAP_START
     :end-before: PARTICIPANT_BOOTSTRAP_END
 

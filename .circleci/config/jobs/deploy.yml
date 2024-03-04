@@ -17,12 +17,21 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
-      global_domain_migration_id:
-        type: integer
-        default: 0
       send_deployment_notification:
         type: boolean
         default: true
+      global_domain_active_migration_id:
+        type: integer
+        default: 0
+      global_domain_upgrade_migration_id:
+        type: integer
+        default: 0
+      global_domain_legacy_migration_id:
+        type: integer
+        default: -1
+      global_domain_migrate_from_id:
+        type: integer
+        default: -1
     steps:
       - checkout_with_retry
       - when:
@@ -44,7 +53,6 @@ jobs:
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
-            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_migration_id >>
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -53,6 +61,17 @@ jobs:
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
+            fi
+            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
+            if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+            fi
+            if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
+              export CN_INSTALL_SPLITWELL="false"
+              export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
+            fi
+            if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
             fi
             cncluster activate
             cncluster ci_pdown_sv
@@ -87,9 +106,18 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
-      global_domain_migration_id:
+      global_domain_active_migration_id:
         type: integer
         default: 0
+      global_domain_upgrade_migration_id:
+        type: integer
+        default: 0
+      global_domain_legacy_migration_id:
+        type: integer
+        default: -1
+      global_domain_migrate_from_id:
+        type: integer
+        default: -1
     steps:
       - checkout_with_retry
       - when:
@@ -111,7 +139,6 @@ jobs:
           additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
           cmd: |
-            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_migration_id >>
             if [[ << parameters.restore_cluster >> == true ]]; then
               export RESTORE_CLUSTER=1
             fi
@@ -120,6 +147,17 @@ jobs:
               if [[ -n '<< pipeline.parameters.bootstrapping-config >>' ]]; then
                 export BOOTSTRAPPING_CONFIG='<< pipeline.parameters.bootstrapping-config >>'
               fi
+            fi
+            export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=<< parameters.global_domain_active_migration_id >>
+            if [[ << parameters.global_domain_legacy_migration_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+            fi
+            if [[ << parameters.global_domain_upgrade_migration_id >> -ne 0 ]]; then
+              export CN_INSTALL_SPLITWELL="false"
+              export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
+            fi
+            if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
             fi
             cncluster activate
             VERSION=""

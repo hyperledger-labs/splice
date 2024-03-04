@@ -17,6 +17,7 @@ workflow:
             - slack-context
           workflow_names: "deploy_cimain"
       - deploy_cluster:
+          name: "deploy_cluster_for_migration"
           <<: *main-branch-only
           context:
             - artifactory
@@ -40,7 +41,27 @@ workflow:
           requires:
             - wait_for_previous_pipeline
             - docker_images_push
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_sv_check:
+           name: "preflight_sv_check_before_migration"
+           <<: *main-branch-never
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "cimain"
+           requires:
+             - deploy_cluster_for_migration
       - backup_cluster:
+          name: "backup_cluster_before_migration"
           <<: *main-branch-only
           cluster: "cimain"
           context:
@@ -48,7 +69,8 @@ workflow:
             - canton-network-vpn
             - slack-context
           requires:
-            - deploy_cluster
+            - deploy_cluster_for_migration
+            - deploy_sv_runbook_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-only
@@ -62,7 +84,8 @@ workflow:
           wait_for_sv: false
           requires:
             - preflight_check
-            - backup_cluster
+            - preflight_sv_check_before_migration
+            - backup_cluster_before_migration
       - deploy_cluster:
           name: "migrate_cluster"
           <<: *main-branch-only
@@ -89,6 +112,7 @@ workflow:
           requires:
             - trigger_global_domain_migration
       - deploy_sv_runbook:
+          name: "migrate_sv_runbook"
           <<: *main-branch-only
           context:
             - artifactory
@@ -96,8 +120,10 @@ workflow:
           cluster: "cimain"
           send_deployment_notification: false
           requires:
-            - migrate_cluster
-          global_domain_migration_id: 1
+            - trigger_global_domain_migration
+          global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
+          global_domain_legacy_migration_id: 0
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1
@@ -115,7 +141,10 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cimain"
-          global_domain_migration_id: 1
+          global_domain_active_migration_id: 1
+          # TODO(#10441) uncomment once doing migration
+          # global_domain_migrate_from_id: 0
+          # global_domain_legacy_migration_id: 0
           requires:
             - migrate_cluster
       - preflight_validator_check:

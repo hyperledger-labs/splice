@@ -12,6 +12,12 @@ Release Notes
     Please revisit the section on :ref:`Helm-based SV deployment <sv-helm>`,
     paying attention to the new ``MIGRATION_ID`` variable (should be set to ``0`` until further notice).
 
+* Documentation
+
+  * Added more detailed instructions for SV node operators on participating in a synchronizer upgrade.
+    Please see the updated section on :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`,
+    as well as the updates in :ref:`sv-helm`.
+
 2024-03-04
 ----------
 

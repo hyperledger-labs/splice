@@ -37,7 +37,8 @@ fi
     done
 } > "${OUTPUT_CONF}"
 
-for clustername in scratchneta scratchnetb scratchnetc scratchnetd scratchnete
+# TODO(#10479) add back scratchnete; removed because I've hit the CCI config size limit
+for clustername in scratchneta scratchnetb scratchnetc scratchnetd #scratchnete
 do
     sed "s/_CLUSTERNAME_/${clustername}/g" \
         < "${REPO_ROOT}/.circleci/config/deploy_scratchnet_workflow.yml" \

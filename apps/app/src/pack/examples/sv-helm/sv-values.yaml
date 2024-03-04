@@ -2,7 +2,7 @@ joinWithKeyOnboarding:
   sponsorApiUrl: "https://sv.sv-1.svc.TARGET_CLUSTER.network.canton.global"
 # Replace YOUR_SV_NAME with the name you provided for your SV identity
 onboardingName: YOUR_SV_NAME
-# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
 globalDomainUrl: "https://sequencer-MIGRATION_ID.sv-1.svc.TARGET_CLUSTER.network.canton.global"
 auth:
   # The default value of audience is ``https://canton.network.global``.
@@ -20,16 +20,20 @@ cometBFT:
 #  secretName: participant-identities-dump
 # PARTICIPANT_BOOTSTRAP_END
 
-# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+# MIGRATION_START
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
 migration:
   id: "MIGRATION_ID"
+  # Uncomment this when redeploying as part of a migration, i.e., MIGRATION_ID was incremented and a migration dump was exported to the attached pvc.
+  # migrating: true
+#MIGRATION_END
 
-# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
 participantAddress: "participant-MIGRATION_ID"
 
 # Please make the ``global-domain-sequencer`` service accessible for other validators to subscribe to, and set the URL below to your sequencer service.
 # Make sure your cluster's ingress is correctly configured for the sequencer service and can be accessed through the provided URL.
-# Replace MIGRATION_ID with the current migration ID of the global synchronizer.
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
 domain:
   sequencerAddress: "global-domain-MIGRATION_ID-sequencer"
   mediatorAddress: "global-domain-MIGRATION_ID-mediator"
