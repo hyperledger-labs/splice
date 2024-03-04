@@ -29,8 +29,10 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import scala.util.{Failure, Success, Try}
 
-final case class HttpErrorWithGrpcStatus(status: Status, message: String) extends Exception
-final case class HttpErrorWithHttpCode(code: StatusCode, message: String) extends Exception
+final case class HttpErrorWithGrpcStatus(status: Status, message: String)
+    extends Exception(s"HTTP request failed with status $status: $message")
+final case class HttpErrorWithHttpCode(code: StatusCode, message: String)
+    extends Exception(s"HTTP request failed with status code $code: $message")
 
 object HttpErrorHandler {
   def apply(loggerFactory: NamedLoggerFactory)(implicit traceContext: TraceContext): Directive0 =
