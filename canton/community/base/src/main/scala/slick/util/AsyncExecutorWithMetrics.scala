@@ -17,7 +17,7 @@ import java.util
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger, AtomicReference}
 import java.util.concurrent.{TimeUnit, *}
 import javax.management.{InstanceNotFoundException, ObjectName}
-import scala.annotation.tailrec
+import scala.annotation.{nowarn, tailrec}
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.*
@@ -440,6 +440,7 @@ class AsyncExecutorWithMetrics(
       logger.warn("Abandoning ThreadPoolExecutor (not yet destroyed after 30 seconds)")
   }
 
+  @nowarn("cat=deprecation")
   private class DaemonThreadFactory(namePrefix: String) extends ThreadFactory {
     private[this] val group =
       Option(System.getSecurityManager).fold(Thread.currentThread.getThreadGroup)(_.getThreadGroup)

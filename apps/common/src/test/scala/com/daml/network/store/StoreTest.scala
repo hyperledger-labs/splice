@@ -52,6 +52,7 @@ import com.digitalasset.canton.protocol.LfContractId
 import com.google.protobuf.ByteString
 
 import java.time.{Duration, Instant}
+import java.time.temporal.ChronoUnit
 import java.util.Optional
 import scala.concurrent.blocking
 import scala.concurrent.Future
@@ -132,8 +133,8 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       svc.toProtoPrimitive,
       new Round(round),
       numeric(coinPrice),
-      Instant.now(),
-      Instant.now().plusSeconds(600),
+      Instant.now().truncatedTo(ChronoUnit.MICROS),
+      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(600),
       new RelTime(1_000_000),
       CNNodeUtil.defaultTransferConfig(10, holdingFee),
       CNNodeUtil.issuanceConfig(10.0, 10.0, 10.0),
@@ -194,7 +195,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val coinTemplate = coin(owner, amount, createdAtRound, ratePerRound).payload
     val template = new coinCodegen.LockedCoin(
       coinTemplate,
-      new expiryCodegen.TimeLock(java.util.List.of(), Instant.now()),
+      new expiryCodegen.TimeLock(java.util.List.of(), Instant.now().truncatedTo(ChronoUnit.MICROS)),
     )
     contract(
       identifier = templateId,

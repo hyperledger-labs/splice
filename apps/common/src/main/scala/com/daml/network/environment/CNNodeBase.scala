@@ -263,7 +263,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
       description: String
   )(f: => Future[T]): Future[T] =
     TraceContext.withNewTraceContext(implicit tc => {
-      val starTime = Instant.now()
+      val startTime = Instant.now()
       logger.debug(s"$appInitMessage: $description started")(tc)
       // TODO(#5419): here we could pass on the trace context to inner function to make sure all log lines
       // produced by this initialization step are tagged with the same trace id.
@@ -275,7 +275,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
           asyncValue.transform {
             case result @ Success(_) =>
               logger.info(s"$appInitMessage: $description finished after ${time.Duration
-                  .between(starTime, Instant.now())
+                  .between(startTime, Instant.now())
                   .toString}")(tc)
               result
             case Failure(ex) =>

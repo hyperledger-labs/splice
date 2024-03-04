@@ -47,6 +47,7 @@ import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext
 import org.scalatest.{Assertion, Succeeded}
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util.UUID
 import scala.concurrent.Future
 
@@ -1171,7 +1172,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       name,
       entryUrl,
       entryDescription,
-      Instant.now().plusSeconds(3600),
+      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
     )
     contract(
       identifier = templateId,
@@ -1265,7 +1266,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           "receiver",
           new paymentCodegen.PaymentAmount(BigDecimal(1.0).bigDecimal, paymentCodegen.Currency.CC),
           "desc",
-          Instant.now().plusSeconds(60),
+          Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(60),
           trackingId,
         ).toValue,
         new transferOffersCodegen.TransferOffer.ContractId(transferOfferCid).toValue,
@@ -1349,7 +1350,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           domainId.toProtoPrimitive,
           domainMigrationId,
           trafficAmount,
-          Instant.now().plusSeconds(60),
+          Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(60),
           trackingId,
         ).toValue,
         new trafficRequestCodegen.BuyTrafficRequest.ContractId(trafficRequestCid).toValue,

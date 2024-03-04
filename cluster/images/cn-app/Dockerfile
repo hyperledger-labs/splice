@@ -1,5 +1,5 @@
 # This Dockerfile is a modified version of Canton's Dockerfile
-FROM openjdk:11-jdk-slim
+FROM openjdk:17-jdk-slim
 
 # Install screen for running the console in a headless server,
 # and curl for getting onboarding secrets.

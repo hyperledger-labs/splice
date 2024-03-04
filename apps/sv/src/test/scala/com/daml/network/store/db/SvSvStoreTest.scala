@@ -17,6 +17,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 
 abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
@@ -94,7 +95,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
       new vo.ValidatorOnboarding(
         storeSvParty.toProtoPrimitive,
         secret,
-        Instant.now().plusSeconds(3600),
+        Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
       )
     val templateId = vo.ValidatorOnboarding.TEMPLATE_ID
 

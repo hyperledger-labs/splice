@@ -51,6 +51,8 @@ import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import scala.reflect.ClassTag
 import com.digitalasset.canton.util.MonadUtil
+
+import java.time.temporal.ChronoUnit
 import scala.concurrent.ExecutionContext
 
 abstract class ScanStoreTest
@@ -1399,7 +1401,7 @@ trait CoinTransferUtil { self: StoreTest =>
       name,
       s"https://example.com/$name",
       s"Test with $name",
-      Instant.now().plusSeconds(3600),
+      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
     )
 
     contract(

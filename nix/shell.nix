@@ -39,7 +39,7 @@ in pkgs.mkShell {
     nodePackages.node2nix
     npmPkgs.syncpack
     openapi-generator-cli
-    openjdk11
+    openjdk17
     pigz
     popeye
     postgresql_14

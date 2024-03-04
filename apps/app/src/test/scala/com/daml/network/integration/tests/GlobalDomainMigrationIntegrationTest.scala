@@ -455,7 +455,12 @@ class GlobalDomainMigrationIntegrationTest
             // So we pick a date that is far enough in the future that we can complete the voting process
             // before it is reached but close enough that we don't need to wait for long.
             // 12 seconds seems to work well empirically.
-            val scheduledTime = Instant.now().plus(12, ChronoUnit.SECONDS)
+            val scheduledTime = Instant
+              .now()
+              .truncatedTo(
+                ChronoUnit.MICROS
+              )
+              .plus(12, ChronoUnit.SECONDS)
             scheduleDomainMigration(
               sv1Backend,
               Seq(sv2Backend, sv3Backend, sv4Backend),

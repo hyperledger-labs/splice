@@ -3,13 +3,15 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinrules.AppTransferContext
-import com.daml.network.codegen.java.cc.coinrules.CoinRules_MiningRound_Archive
-import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.coinimport.importpayload.{IP_Coin, IP_ValidatorLicense}
 import com.daml.network.codegen.java.cc.coinimport.{ImportCrate, ImportPayload}
+import com.daml.network.codegen.java.cc.coinimport.importpayload.{IP_Coin, IP_ValidatorLicense}
+import com.daml.network.codegen.java.cc.coinrules.{
+  AppTransferContext,
+  CoinRules_MiningRound_Archive,
+}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
+import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.cns.*
 import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
@@ -17,7 +19,6 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainNodeConfigLimits,
   SvcGlobalDomainConfig,
 }
-import com.daml.network.sv.store.SvSvcStore.IdleCnsSubscription
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CnsEntryContext,
@@ -48,13 +49,14 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
+import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.history.SvcRulesCloseVoteRequest2
+import com.daml.network.sv.store.{SvStore, SvSvcStore}
 import com.daml.network.sv.store.db.DbSvSvcStore
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
-import com.daml.network.sv.store.{SvStore, SvSvcStore}
+import com.daml.network.sv.store.SvSvcStore.IdleCnsSubscription
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   AssignedContract,
@@ -62,6 +64,7 @@ import com.daml.network.util.{
   ResourceTemplateDecoder,
   TemplateJsonDecoder,
 }
+import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
@@ -70,9 +73,9 @@ import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFa
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.util.MonadUtil
-import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 
 import java.time.Instant
+import java.time.temporal.ChronoUnit
 import java.util
 import java.util.{Collections, Optional}
 import scala.concurrent.Future
@@ -676,7 +679,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             userParty(n),
             s"participant-id-${n.toString}",
             n.toString,
-            Instant.now().minusSeconds(n.toLong * 3600),
+            Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(n.toLong * 3600),
           )
         )
         val notExpired =
@@ -715,7 +718,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
             n.toString,
             userParty(n),
             s"PAR::sv${n.toString}::12345",
-            Instant.now().minusSeconds(n.toLong * 3600),
+            Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(n.toLong * 3600),
           )
         )
         val notExpired =
@@ -862,8 +865,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         for {
           store <- mkStore()
           // 1 to 3 are expired, 4 to 6 are not
-          data = ((1 to 3).map(n => n -> Instant.now().minusSeconds(n * 1000L)) ++ (4 to 6)
-            .map(n => n -> Instant.now().plusSeconds(n * 1000L)))
+          data = ((1 to 3).map(n =>
+            n -> Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(n * 1000L)
+          ) ++ (4 to 6)
+            .map(n => n -> Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(n * 1000L)))
             .map { case (n, nextPaymentDueAt) =>
               val contextContract =
                 cnsEntryContext(n, n.toString)
@@ -1112,7 +1117,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       svcParty.toProtoPrimitive,
       storeSvParty.toProtoPrimitive,
       action,
-      Instant.now().plusSeconds(3600),
+      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
     )
     contract(
       Confirmation.TEMPLATE_ID,
@@ -1210,7 +1215,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       name,
       s"https://example.com/$name",
       s"Test with $name",
-      Instant.now().plusSeconds(3600),
+      Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
     )
 
     contract(
@@ -1272,7 +1277,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       candidate: PartyId,
       participantId: String,
       token: String,
-      expiry: Instant = Instant.now().plusSeconds(3600),
+      expiry: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
   ) = {
     val template = new SvOnboardingRequest(
       name,
@@ -1295,7 +1300,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       name: String,
       candidate: PartyId,
       participantId: String,
-      expiry: Instant = Instant.now().plusSeconds(3600),
+      expiry: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600),
   ) = {
     val template = new SvOnboardingConfirmed(
       candidate.toProtoPrimitive,
@@ -1465,7 +1470,7 @@ class DbSvSvcStoreTest
             None,
             None,
             None,
-            Some(Instant.now().plusSeconds(3600).toString),
+            Some(Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600).toString),
             None,
             PageLimit.tryCreate(1),
           )
@@ -1477,7 +1482,7 @@ class DbSvSvcStoreTest
             None,
             None,
             None,
-            Some(Instant.now().minusSeconds(3600).toString),
+            Some(Instant.now().truncatedTo(ChronoUnit.MICROS).minusSeconds(3600).toString),
             None,
             PageLimit.tryCreate(1),
           )
@@ -1495,7 +1500,7 @@ class DbSvSvcStoreTest
         voteRequest2(
           requester = userParty(n),
           votes = Seq.empty,
-          expiry = Instant.now.minusSeconds(n.toLong * 3600),
+          expiry = Instant.now.truncatedTo(ChronoUnit.MICROS).minusSeconds(n.toLong * 3600),
         )
       )
       val notExpired =
@@ -1621,16 +1626,16 @@ class DbSvSvcStoreTest
       voteRequestContract: Contract[VoteRequest2.ContractId, VoteRequest2]
   ): VoteRequestResult2 = new VoteRequestResult2(
     voteRequestContract.payload,
-    Instant.now(),
+    Instant.now().truncatedTo(ChronoUnit.MICROS),
     util.List.of(),
     util.List.of(),
-    new VRO_Accepted(Instant.now()),
+    new VRO_Accepted(Instant.now().truncatedTo(ChronoUnit.MICROS)),
   )
 
   private def voteRequest2(
       requester: PartyId,
       votes: Seq[Vote2],
-      expiry: Instant = Instant.now().plusSeconds(3600L),
+      expiry: Instant = Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(3600L),
       action: ActionRequiringConfirmation = addUser666Action,
   ) = {
     val cid = new VoteRequest2.ContractId(nextCid())
