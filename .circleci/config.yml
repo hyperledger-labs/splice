@@ -1746,6 +1746,7 @@ jobs:
   ui_test:
     docker:
       - image: cimg/base:2024.01
+    resource_class: "xlarge"
     environment:
       <<: *env
     steps:
