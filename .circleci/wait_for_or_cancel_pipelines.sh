@@ -74,7 +74,7 @@ write_pages() {
     local cutoff_date="$3"
     local response next_page_token new_url next_page_url earliest_date
 
-    response=$(get_url "$url")
+    response=$(get_url "$url") || return $?
     next_page_token=$(jq -r '.next_page_token' <<<"$response")
     while IFS= read -r page; do
         echo "$page" >>"$output_file"
@@ -123,12 +123,12 @@ fetch_previous_pipelines_on_branch() {
     fi
     local tmp_pipelines_file="/tmp/pipelines.json"
     if [[ "$branch_filter_is_regex" == "true" ]]; then
-        fetch_pages "$BASE_CCI_API_URL/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline" "$tmp_pipelines_file" "$cutoff_date"
+        fetch_pages "$BASE_CCI_API_URL/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline" "$tmp_pipelines_file" "$cutoff_date" || return $?
         # Note that .vcs.branch can be null if the workflow is triggered on a tag
         filtered_pipelines=$(jq -c ".items | map(select((.vcs.branch // \"\" | test(\"$branch_filter\")) and (.number|tonumber < $CURRENT_PIPELINE_NUMBER)))" <"$tmp_pipelines_file")
     else
         branch_name_enc=$(url_encode "$branch_filter")
-        fetch_pages "$BASE_CCI_API_URL/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=$branch_name_enc" "$tmp_pipelines_file" "$cutoff_date"
+        fetch_pages "$BASE_CCI_API_URL/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=$branch_name_enc" "$tmp_pipelines_file" "$cutoff_date" || return $?
         filtered_pipelines=$(jq -c ".items | map(select(.number|tonumber < $CURRENT_PIPELINE_NUMBER))" <"$tmp_pipelines_file")
     fi
     if [[ -n "$cutoff_date" ]]; then
@@ -140,7 +140,7 @@ fetch_previous_pipelines_on_branch() {
 fetch_pipeline_workflows() {
     local pipeline_id="$1"
     local tmp_workflows_file="/tmp/workflows.json"
-    fetch_pages "$BASE_CCI_API_URL/pipeline/$pipeline_id/workflow" "$tmp_workflows_file"
+    fetch_pages "$BASE_CCI_API_URL/pipeline/$pipeline_id/workflow" "$tmp_workflows_file" || return $?
     jq -c ".items | .[]" <"$tmp_workflows_file"
 }
 
@@ -148,7 +148,7 @@ pipeline_workflows_complete() {
     local pipeline_id="$1"
     local pipeline_workflows result
 
-    pipeline_workflows=$(fetch_pipeline_workflows "$pipeline_id")
+    pipeline_workflows=$(fetch_pipeline_workflows "$pipeline_id") || return $?
     echo "workflows for pipeline $pipeline_id:"
     echo "$pipeline_workflows"
     echo ""
@@ -193,14 +193,14 @@ cancel_workflow() {
 cancel_self_if_pipeline_running() {
     local pipeline_id="$1"
     if ! pipeline_workflows_complete "$pipeline_id"; then
-        cancel_workflow "$CIRCLE_WORKFLOW_ID"
+        cancel_workflow "$CIRCLE_WORKFLOW_ID" || return $?
     fi
 }
 
 cancel_all_pipeline_workflows() {
     local pipeline_id="$1"
     local pipeline_workflows workflow_id workflow_name workflow_status
-    pipeline_workflows=$(fetch_pipeline_workflows "$pipeline_id")
+    pipeline_workflows=$(fetch_pipeline_workflows "$pipeline_id") || return $?
     while IFS= read -r workflow; do
         workflow_id=$(jq -r '.id' <<<"$workflow")
         workflow_name=$(jq -r '.name' <<<"$workflow")
@@ -210,34 +210,34 @@ cancel_all_pipeline_workflows() {
         # "Auto-cancel redundant workflows" set (https://circleci.com/docs/skip-build/#auto-cancel)
         if [[ "$workflow_status" == "running" || "$workflow_status" == "failing" || "$workflow_status" == "on_hold" ]]; then
             echo "Cancelling workflow $workflow_name ($workflow_id) with status $workflow_status"
-            cancel_workflow "$workflow_id"
+            cancel_workflow "$workflow_id" || return $?
         fi
     done <<<"$pipeline_workflows"
 }
 
 run() {
-    PREVIOUS_PIPELINES=$(fetch_previous_pipelines_on_branch "$BRANCH_FILTER" "$BRANCH_FILTER_IS_REGEX" "$MAX_AGE_SECONDS")
+    PREVIOUS_PIPELINES=$(fetch_previous_pipelines_on_branch "$BRANCH_FILTER" "$BRANCH_FILTER_IS_REGEX" "$MAX_AGE_SECONDS") || return $?
     if [ "${#PREVIOUS_PIPELINES}" -gt 0 ]; then
         while IFS= read -r PIPELINE; do
             PIPELINE_NUMBER=$(jq <<<"$PIPELINE" -r '.number')
             PIPELINE_ID=$(jq <<<"$PIPELINE" -r '.id')
             echo "Checking pipeline $PIPELINE_NUMBER ($PIPELINE_ID) ..."
-            PIPELINE_WORKFLOWS=$(fetch_pipeline_workflows "$PIPELINE_ID")
+            PIPELINE_WORKFLOWS=$(fetch_pipeline_workflows "$PIPELINE_ID") || return $?
             while IFS= read -r workflow; do
                 WORKFLOW_NAME=$(jq -r '.name' <<<"$workflow")
                 if [[ " ${WORKFLOW_NAMES} " == *" ${WORKFLOW_NAME} "* ]]; then
                     if [ "$WAIT_OR_CANCEL" = "cancel_self" ]; then
                         echo "Pipeline contains workflow $WORKFLOW_NAME, cancelling current workflow if pipeline is still running..."
-                        cancel_self_if_pipeline_running "$PIPELINE_ID"
+                        cancel_self_if_pipeline_running "$PIPELINE_ID" || return $?
                     elif [ "$WAIT_OR_CANCEL" = "cancel_self_if_found" ]; then
                         echo "Pipeline contains workflow $WORKFLOW_NAME, cancelling current workflow (regardless of the found pipeline's status)"
-                        cancel_workflow "$CIRCLE_WORKFLOW_ID"
+                        cancel_workflow "$CIRCLE_WORKFLOW_ID" || return $?
                     elif [ "$WAIT_OR_CANCEL" = "cancel_pipeline" ]; then
                         echo "Pipeline contains workflow $WORKFLOW_NAME, cancelling all workflows for pipeline ..."
-                        cancel_all_pipeline_workflows "$PIPELINE_ID"
+                        cancel_all_pipeline_workflows "$PIPELINE_ID" || return $?
                     elif [ "$WAIT_OR_CANCEL" = "wait" ]; then
                         echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
-                        wait_for_pipeline_to_complete "$PIPELINE_ID"
+                        wait_for_pipeline_to_complete "$PIPELINE_ID" || return $?
                     else
                         echo "Invalid value for WAIT_OR_CANCEL: $WAIT_OR_CANCEL"
                         exit 1
