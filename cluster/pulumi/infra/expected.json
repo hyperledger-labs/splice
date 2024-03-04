@@ -1314,7 +1314,8 @@
           "prometheusSpec": {
             "enableFeatures": [
               "native-histograms",
-              "memory-snapshot-on-shutdown"
+              "memory-snapshot-on-shutdown",
+              "promql-experimental-functions"
             ],
             "enableRemoteWriteReceiver": true,
             "podMonitorSelectorNilUsesHelmValues": false,
@@ -1356,7 +1357,7 @@
           }
         }
       },
-      "version": "52.1.0"
+      "version": "56.20.0"
     },
     "name": "observability-metrics",
     "provider": "",

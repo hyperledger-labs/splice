@@ -105,7 +105,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   const prometheusStack = new k8s.helm.v3.Release('observability-metrics', {
     name: 'prometheus-grafana-monitoring',
     chart: 'kube-prometheus-stack',
-    version: '52.1.0',
+    version: '56.20.0',
     namespace: namespaceName,
     repositoryOpts: {
       repo: 'https://prometheus-community.github.io/helm-charts',
@@ -151,7 +151,11 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           // discover all pod/service monitors across all namespaces
           podMonitorSelectorNilUsesHelmValues: false,
           serviceMonitorSelectorNilUsesHelmValues: false,
-          enableFeatures: ['native-histograms', 'memory-snapshot-on-shutdown'],
+          enableFeatures: [
+            'native-histograms',
+            'memory-snapshot-on-shutdown',
+            'promql-experimental-functions',
+          ],
           enableRemoteWriteReceiver: true,
           retention: '1y',
           retentionSize: '100GB',
