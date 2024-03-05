@@ -47,6 +47,7 @@ class DomainDataRestorer(
             domainId = Some(domainId),
             sequencerConnections = sequencerConnections,
             manualConnect = false,
+            initializeFromTrustedDomain = true,
           )
           // We rely on the calls here being idempotent
           for {

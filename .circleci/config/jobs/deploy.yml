@@ -71,7 +71,7 @@ jobs:
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
             cncluster activate
             cncluster ci_pdown_sv
@@ -157,7 +157,7 @@ jobs:
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
             cncluster activate
             VERSION=""
@@ -187,6 +187,9 @@ jobs:
       use_published_artifacts:
         type: boolean
         default: false
+      reset_cluster:
+        type: boolean
+        default: true
       update_deployment_branch:
         type: boolean
         default: true
@@ -230,6 +233,7 @@ jobs:
           condition:
             and:
               - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
+              - equal: [ true, <<parameters.reset_cluster>> ]
               - equal: [ 0, <<parameters.global_domain_active_migration_id>> ]
           steps:
             - run_bash_command_in_nix:
@@ -300,7 +304,7 @@ jobs:
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
             cncluster ci_apply
       - when:

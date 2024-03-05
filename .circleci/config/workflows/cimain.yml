@@ -87,6 +87,21 @@ workflow:
             - preflight_sv_check_before_migration
             - backup_cluster_before_migration
       - deploy_cluster:
+          name: "deploy_canton_migration_nodes"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          send_deployment_notification: false
+          update_deployment_branch: false  # No need to create a deployment branch for cimain
+          cancel_workflow_on_failure: true
+          reset_cluster: false
+          global_domain_active_migration_id: 0
+          global_domain_upgrade_migration_id: 1
+          requires:
+            - deploy_cluster_for_migration
+      - deploy_cluster:
           name: "migrate_cluster"
           <<: *main-branch-only
           context:

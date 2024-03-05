@@ -1405,7 +1405,7 @@ jobs:
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
             cncluster activate
             cncluster ci_pdown_sv
@@ -1491,7 +1491,7 @@ jobs:
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
             cncluster activate
             VERSION=""
@@ -1521,6 +1521,9 @@ jobs:
       use_published_artifacts:
         type: boolean
         default: false
+      reset_cluster:
+        type: boolean
+        default: true
       update_deployment_branch:
         type: boolean
         default: true
@@ -1564,6 +1567,7 @@ jobs:
           condition:
             and:
               - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
+              - equal: [ true, <<parameters.reset_cluster>> ]
               - equal: [ 0, <<parameters.global_domain_active_migration_id>> ]
           steps:
             - run_bash_command_in_nix:
@@ -1634,7 +1638,7 @@ jobs:
               export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=<< parameters.global_domain_upgrade_migration_id >>
             fi
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
-              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_legacy_migration_id >>
+              export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
             cncluster ci_apply
       - when:
@@ -3580,6 +3584,21 @@ workflows:
             - preflight_sv_check_before_migration
             - backup_cluster_before_migration
       - deploy_cluster:
+          name: "deploy_canton_migration_nodes"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          send_deployment_notification: false
+          update_deployment_branch: false  # No need to create a deployment branch for cimain
+          cancel_workflow_on_failure: true
+          reset_cluster: false
+          global_domain_active_migration_id: 0
+          global_domain_upgrade_migration_id: 1
+          requires:
+            - deploy_cluster_for_migration
+      - deploy_cluster:
           name: "migrate_cluster"
           <<: *main-branch-only
           context:
@@ -3806,6 +3825,21 @@ workflows:
           requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
+      - deploy_cluster:
+          name: "deploy_migration_canton_nodes"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          # deployment/scratchnet* branches break the workflow links from Github to CircleCI.
+          # So we want to avoid creating them.
+          update_deployment_branch: false
+          global_domain_active_migration_id: 0
+          global_domain_upgrade_migration_id: 1
+          reset_cluster: false
+          requires:
+            - deploy_cluster_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -3836,6 +3870,7 @@ workflows:
           global_domain_legacy_migration_id: 0
           requires:
             - trigger_global_domain_migration
+            - deploy_migration_canton_nodes
       - preflight_check:
           name: "preflight_check_migrated"
           <<: *main-branch-never

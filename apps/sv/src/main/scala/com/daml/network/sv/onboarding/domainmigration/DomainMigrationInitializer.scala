@@ -412,7 +412,6 @@ object DomainMigrationInitializer {
   ) {
 
     private val sequencerInitTransactions = Seq(
-      // TODO(#8761) reduce the number of identity we import just to the nodes we actually need (sequencer most likely)
       TopologyMappingX.Code.NamespaceDelegationX,
       TopologyMappingX.Code.OwnerToKeyMappingX,
       TopologyMappingX.Code.IdentifierDelegationX,
