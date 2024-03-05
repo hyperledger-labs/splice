@@ -19,6 +19,7 @@ export function installGlobalDomainNode(
   svName: string,
   migrationId: DomainMigrationIndex,
   isActiveDomain: boolean,
+  isMigrating: boolean,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
   const cometbft = installCometBftNode(
@@ -26,6 +27,7 @@ export function installGlobalDomainNode(
     svName,
     migrationId,
     isActiveDomain,
+    isMigrating,
     dependencies
   );
 

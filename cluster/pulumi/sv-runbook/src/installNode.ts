@@ -182,6 +182,7 @@ async function installSvAndValidator(config: SvConfig) {
     onboardingName,
     migrationId,
     true,
+    isMigrating,
     imagePullDeps
   );
 
