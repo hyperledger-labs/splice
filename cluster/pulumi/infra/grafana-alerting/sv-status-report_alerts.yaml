@@ -3,7 +3,8 @@ groups:
   - orgId: 1
     name: sv status reports
     folder: canton-network
-    interval: 1m
+    # TODO(#10584): revisit evaluation interval in case we lower the pending period for MainNet
+    interval: 5m
     rules:
       - uid: f15539f2-f6ea-4de4-8f7c-c56434d5bd52
         title: SV Status -  Mediator falling behind
@@ -88,7 +89,8 @@ groups:
         panelId: 14
         noDataState: NoData
         execErrState: Error
-        for: 5m
+        # TODO(#10584): pending period set to allow for redeploys w/o alerts ==> revisit for MainNet
+        for: 30m
         annotations:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "14"
@@ -180,7 +182,8 @@ groups:
         panelId: 9
         noDataState: NoData
         execErrState: Error
-        for: 5m
+        # TODO(#10584): pending period set to allow for redeploys w/o alerts ==> revisit for MainNet
+        for: 30m
         annotations:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "9"
@@ -271,7 +274,8 @@ groups:
         panelId: 15
         noDataState: NoData
         execErrState: Error
-        for: 0s
+        # TODO(#10584): pending period set to allow for redeploys w/o alerts ==> revisit for MainNet
+        for: 30m
         annotations:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "15"
@@ -362,7 +366,8 @@ groups:
         panelId: 5
         noDataState: NoData
         execErrState: Error
-        for: 0s
+        # TODO(#10584): pending period set to allow for redeploys w/o alerts ==> revisit for MainNet
+        for: 30m
         annotations:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "5"
