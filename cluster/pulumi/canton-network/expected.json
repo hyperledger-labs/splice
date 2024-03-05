@@ -2353,6 +2353,7 @@
           }
         },
         "scan": {
+          "internalUrl": "http://scan-app.sv-1:5012",
           "publicUrl": "https://scan.sv-1.svc.mock.network.canton.global"
         }
       }
@@ -3260,6 +3261,7 @@
           }
         },
         "scan": {
+          "internalUrl": "http://scan-app.sv-2:5012",
           "publicUrl": "https://scan.sv-2.svc.mock.network.canton.global"
         }
       }
@@ -4167,6 +4169,7 @@
           }
         },
         "scan": {
+          "internalUrl": "http://scan-app.sv-3:5012",
           "publicUrl": "https://scan.sv-3.svc.mock.network.canton.global"
         }
       }
@@ -5074,6 +5077,7 @@
           }
         },
         "scan": {
+          "internalUrl": "http://scan-app.sv-4:5012",
           "publicUrl": "https://scan.sv-4.svc.mock.network.canton.global"
         }
       }

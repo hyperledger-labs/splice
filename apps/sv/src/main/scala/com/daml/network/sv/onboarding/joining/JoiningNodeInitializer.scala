@@ -233,7 +233,6 @@ class JoiningNodeInitializer(
     val domainNodeReconciler = new DomainNodeReconciler(
       svcStore,
       svcAutomationService.connection,
-      config.scan,
       clock,
       retryProvider,
       logger,

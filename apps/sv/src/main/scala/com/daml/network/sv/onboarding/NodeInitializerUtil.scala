@@ -12,9 +12,10 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 trait NodeInitializerUtil extends NamedLogging {
 
@@ -87,6 +88,8 @@ trait NodeInitializerUtil extends NamedLogging {
       ec: ExecutionContextExecutor,
       mat: Materializer,
       tracer: Tracer,
+      httpClient: HttpRequest => Future[HttpResponse],
+      templateJsonDecoder: TemplateJsonDecoder,
   ) =
     new SvSvcAutomationService(
       clock,

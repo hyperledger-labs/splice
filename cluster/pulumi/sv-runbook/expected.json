@@ -645,6 +645,7 @@
           "secretName": "apps-pg-secret"
         },
         "scan": {
+          "internalUrl": "http://scan-app.sv:5012",
           "publicUrl": "https://scan.sv.svc.svrun.network.canton.global"
         }
       }

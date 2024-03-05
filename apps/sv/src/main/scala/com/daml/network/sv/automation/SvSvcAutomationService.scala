@@ -26,17 +26,18 @@ import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
 import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.util.QualifiedName
+import com.daml.network.util.{QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.{Clock, WallClock}
 import io.opentelemetry.api.trace.Tracer
 import monocle.Monocle.toAppliedFocusOps
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.nio.file.Path
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 class SvSvcAutomationService(
     clock: Clock,
@@ -50,9 +51,11 @@ class SvSvcAutomationService(
     localDomainNode: Option[LocalDomainNode],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    ec: ExecutionContext,
+    ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
+    httpClient: HttpRequest => Future[HttpResponse],
+    templateJsonDecoder: TemplateJsonDecoder,
 ) extends CNNodeAppAutomationService(
       config.automation,
       clock,
@@ -289,7 +292,6 @@ class SvSvcAutomationService(
             svcStore,
             connection,
             node,
-            config.scan,
           )
         )
         registerTrigger(
@@ -300,6 +302,17 @@ class SvSvcAutomationService(
           )
         )
       }
+    }
+
+    config.scan.foreach { scan =>
+      registerTrigger(
+        new PublishScanConfigTrigger(
+          triggerContext,
+          svcStore,
+          connection,
+          scan,
+        )
+      )
     }
 
   }
@@ -414,6 +427,7 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
       aTrigger[SvOnboardingMediatorProposalTrigger],
       aTrigger[GlobalDomainMigrationTrigger],
       aTrigger[PublishLocalCometBftNodeConfigTrigger],
+      aTrigger[PublishScanConfigTrigger],
       aTrigger[ReconcileCometBftNetworkConfigWithSvcRulesTrigger],
       aTrigger[LocalSequencerConnectionsTrigger],
       aTrigger[SequencerPruningTrigger],

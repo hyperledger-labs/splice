@@ -252,6 +252,7 @@ spec:
             - name: ADDITIONAL_CONFIG_SCAN_PUBLIC_URL
               value: |
                 canton.sv-apps.sv.scan.public-url = {{ .Values.scan.publicUrl | quote }}
+                canton.sv-apps.sv.scan.internal-url = {{ .Values.scan.internalUrl | quote }}
           ports:
             - name: sv-api
               containerPort: 5014

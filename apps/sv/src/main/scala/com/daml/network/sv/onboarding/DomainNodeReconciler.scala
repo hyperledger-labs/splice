@@ -3,16 +3,16 @@ package com.daml.network.sv.onboarding
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
   DomainNodeConfig,
   MediatorConfig,
-  ScanConfig,
   SequencerConfig,
 }
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.{CNLedgerConnection, RetryFor, RetryProvider}
 import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.config.SvScanConfig
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.{LocalMediatorConfig, LocalSequencerConfig}
+import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
@@ -27,13 +27,32 @@ import scala.jdk.OptionConverters.{RichOption, RichOptional}
 class DomainNodeReconciler(
     svcStore: SvSvcStore,
     connection: CNLedgerConnection,
-    scanConfig: Option[SvScanConfig],
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,
 ) {
 
-  private val damlScanConfig = scanConfig.map(c => new ScanConfig(c.publicUrl.toString()))
+  private val svParty = svcStore.key.svParty
+  private val svcParty = svcStore.key.svcParty
+
+  private def setConfig(
+      domainId: DomainId,
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      nodeConfig: DomainNodeConfig,
+  )(implicit tc: TraceContext) = {
+    logger.info(show"Setting domain node config to $nodeConfig")
+    val cmd = svcRules.exercise(
+      _.exerciseSvcRules_SetDomainNodeConfig(
+        svParty.toProtoPrimitive,
+        domainId.toProtoPrimitive,
+        nodeConfig,
+      )
+    )
+    connection
+      .submit(Seq(svParty), Seq(svcParty), cmd)
+      .noDedup
+      .yieldResult()
+  }
 
   def reconcileDomainNodeConfigIfRequired(
       localDomainNode: Option[LocalDomainNode],
@@ -44,9 +63,6 @@ class DomainNodeReconciler(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Unit] = {
-    val svParty = svcStore.key.svParty
-    val svcParty = svcStore.key.svcParty
-
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode, migrationId)
       localMediatorConfig <- SvUtil.getMediatorConfig(localDomainNode)
@@ -58,7 +74,7 @@ class DomainNodeReconciler(
       domainNodeConfig = domainNodes.get(domainId.toProtoPrimitive)
       sequencerConfig = domainNodeConfig.flatMap(_.sequencer.toScala)
       mediatorConfig = domainNodeConfig.flatMap(_.mediator.toScala)
-      existingScanConfig = domainNodeConfig.flatMap(_.scan.toScala)
+      existingScanConfig = domainNodeConfig.flatMap(_.scan.toScala).toJava
       existingSequencerConfig = sequencerConfig.map(c =>
         LocalSequencerConfig(c.sequencerId, c.url, c.migrationId)
       )
@@ -76,7 +92,6 @@ class DomainNodeReconciler(
         if (
           existingSequencerConfig != localSequencerConfig ||
           existingMediatorConfig != localMediatorConfig ||
-          existingScanConfig != damlScanConfig ||
           shouldMarkSequencerAsOnboarded
         ) {
           val nodeConfig = new DomainNodeConfig(
@@ -112,20 +127,9 @@ class DomainNodeReconciler(
                 )
               )
               .toJava,
-            damlScanConfig.toJava,
+            existingScanConfig,
           )
-          logger.info(show"Setting domain node config to $nodeConfig")
-          val cmd = svcRules.exercise(
-            _.exerciseSvcRules_SetDomainNodeConfig(
-              svParty.toProtoPrimitive,
-              domainId.toProtoPrimitive,
-              nodeConfig,
-            )
-          )
-          connection
-            .submit(Seq(svParty), Seq(svcParty), cmd)
-            .noDedup
-            .yieldResult()
+          setConfig(domainId, svcRules, nodeConfig)
         } else {
           logger.info(s"Not setting domain node config because it is the same as the existing one.")
           Future.unit

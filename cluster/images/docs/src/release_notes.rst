@@ -11,6 +11,8 @@ Release Notes
   * Multiple changes to the way SV nodes are deployed, to prepare for supporting :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`.
     Please revisit the section on :ref:`Helm-based SV deployment <sv-helm>`,
     paying attention to the new ``MIGRATION_ID`` variable (should be set to ``0`` until further notice).
+  * ``sv-values.yaml`` now also requires you to specify an ``internalUrl`` for your scan instance that the SV app
+    can use to query its status.
 
 * Documentation
 

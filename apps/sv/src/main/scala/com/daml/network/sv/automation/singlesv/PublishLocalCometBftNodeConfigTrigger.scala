@@ -9,10 +9,13 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.codegen.java.cn.cometbft.SequencingKeyConfig
-import com.daml.network.codegen.java.cn.svc.globaldomain.{MediatorConfig, SequencerConfig}
+import com.daml.network.codegen.java.cn.svc.globaldomain.{
+  ScanConfig,
+  MediatorConfig,
+  SequencerConfig,
+}
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.SvScanConfig
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.drivers as proto
@@ -35,7 +38,6 @@ class PublishLocalCometBftNodeConfigTrigger(
     store: SvSvcStore,
     connection: CNLedgerConnection,
     cometBftNode: CometBftNode,
-    scanConfig: Option[SvScanConfig],
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -67,8 +69,8 @@ class PublishLocalCometBftNodeConfigTrigger(
       svcRules,
       domainNodeConfig.flatMap(_.sequencer.toScala).toJava,
       domainNodeConfig.flatMap(_.mediator.toScala).toJava,
+      domainNodeConfig.flatMap(_.scan.toScala).toJava,
       localSvNodeConfig,
-      scanConfig,
       domainId,
     )).value
       .map(_.toList)
@@ -112,8 +114,8 @@ object PublishLocalCometBftNodeConfigTrigger {
       svcRules: AssignedContract[daml.svcrules.SvcRules.ContractId, daml.svcrules.SvcRules],
       sequencerConfig: Optional[SequencerConfig],
       mediatorConfig: Optional[MediatorConfig],
+      scanConfig: Optional[ScanConfig],
       localSvNodeConfig: proto.cometbft.SvNodeConfig,
-      scanConfig: Option[SvScanConfig],
       domainId: DomainId,
   ) extends PrettyPrinting {
 
@@ -147,7 +149,7 @@ object PublishLocalCometBftNodeConfigTrigger {
         ),
         sequencerConfig,
         mediatorConfig,
-        scanConfig.map(c => new daml.svc.globaldomain.ScanConfig(c.publicUrl.toString)).toJava,
+        scanConfig,
       )
   }
 }

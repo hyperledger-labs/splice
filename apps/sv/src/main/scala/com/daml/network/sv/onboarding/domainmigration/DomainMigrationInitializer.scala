@@ -44,6 +44,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.io.FileNotFoundException
@@ -65,6 +66,7 @@ class DomainMigrationInitializer(
     joiningNodeInitializer: JoiningNodeInitializer,
 )(implicit
     ec: ExecutionContextExecutor,
+    httpClient: HttpRequest => Future[HttpResponse],
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,

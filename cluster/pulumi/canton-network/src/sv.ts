@@ -343,7 +343,7 @@ async function installValidator(
     svValidator: true,
     participantAddress: sv.participant.name,
     globalDomainUrl: globalDomainUrl,
-    scanAddress: pulumi.interpolate`http://scan-app.${svConfig.nodeName}:5012`,
+    scanAddress: internalScanUrl(svConfig),
     secrets: validatorSecrets,
   });
 
@@ -435,6 +435,10 @@ function installMigrationIdSpecificComponents(
   );
 }
 
+function internalScanUrl(config: SvConfig): pulumi.Output<string> {
+  return pulumi.interpolate`http://scan-app.${config.nodeName}:5012`;
+}
+
 function installSvApp(
   globalDomainMigrationConfig: GlobalDomainMigrationConfig,
   config: SvConfig,
@@ -472,6 +476,7 @@ function installSvApp(
       },
     scan: {
       publicUrl: `https://scan.${config.nodeName}.svc.${clusterUrl}`,
+      internalUrl: internalScanUrl(config),
     },
     expectedValidatorOnboardings: config.expectedValidatorOnboardings.map(onboarding => ({
       expiresIn: onboarding.expiresIn,

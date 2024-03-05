@@ -233,7 +233,8 @@ final case class SvMediatorConfig(
 )
 
 final case class SvScanConfig(
-    publicUrl: Uri
+    publicUrl: Uri,
+    internalUrl: Uri,
 )
 
 final case class SvDomainNodeConfig(
