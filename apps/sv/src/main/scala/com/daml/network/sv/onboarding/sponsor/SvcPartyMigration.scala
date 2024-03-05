@@ -9,13 +9,13 @@ import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.SvcPartyHosting.SvcPartyMigrationFailure
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.digitalasset.canton.LfTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.admin.repair.RepairServiceError
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
-import io.grpc.StatusRuntimeException
+import io.grpc.{Status, StatusRuntimeException}
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -86,50 +86,43 @@ class SvcPartyMigration(
     // 1. The snapshot can only be acquired at a "clean" timestamp which means there are no outstanding ACS commitments.
     //    To ensure that the timestamp will eventually be clean we need to submit a transaction visible to the participant (submitDummyTransaction) and
     //    retry the download afterwards. Note that due to the second issue, this transaction must not change contracts with SVC as the stakeholder.
-    // 2. Concurrent ACS pruning in Canton can prune the data for that timestamp. In that case, we need to fetch the data at a later timestamp.
-    //    Of course this is only safe if there have not been any relevant changes in between. We ensure this using the SvcRules lock.
-    //    In that case, we again need to submit a dummy transaction to ensure that the updated timestamp is clean.
+    // 2. Concurrent ACS pruning in Canton can prune the data for that timestamp. In that case, we give up.
     for {
-      _ <- submitDummyTransaction()
       snapshot <- {
-        var acsOffset = authorizedAt
         retryProvider.retry(
           RetryFor.ClientCalls,
-          show"Download ACS snapshot for SVC at $acsOffset",
+          show"Download ACS snapshot for SVC at $authorizedAt",
           participantAdminConnection
             .downloadAcsSnapshot(
               Set(svcParty),
               filterDomainId = Some(globalDomain),
-              timestamp = Some(acsOffset),
+              timestamp = Some(authorizedAt),
             )
             .recoverWith { case ex: StatusRuntimeException =>
               val errorDetails = ErrorDetails.from(ex: StatusRuntimeException)
               for {
+                // Special case some exceptions
                 _ <- errorDetails.traverse_ {
-                  case ErrorDetails.ErrorInfoDetail("UNAVAILABLE_ACS_SNAPSHOT", metadata) =>
-                    metadata.get("prunedTimestamp") match {
-                      case None =>
-                        logger.warn(
-                          s"UNAVAILABLE_ACS_SNAPSHOT has no prunedTimestamp field: $metadata"
-                        )
-                        Future.unit
-                      case Some(timestamp) =>
-                        LfTimestamp.fromString(timestamp) match {
-                          case Left(err) =>
-                            logger.warn(
-                              s"Failed to convert pruned timestamp from error details into an LfTimestamp: $err"
-                            )
-                            Future.unit
-                          case Right(timestamp) =>
-                            // The pruned timestamp is the latest timestamp that has been pruned
-                            // so we need to increase it by one
-                            acsOffset = timestamp.addMicros(1).toInstant
-                            submitDummyTransaction()
-                        }
-                    }
+                  case ErrorDetails
+                        .ErrorInfoDetail(RepairServiceError.UnavailableAcsSnapshot.id, metadata) =>
+                    val msg =
+                      s"Requested record time $authorizedAt has been pruned: $metadata, make sure that journal-garbage-collection-delay is configured sufficiently high"
+                    logger.warn(msg)
+                    Future.failed(Status.INVALID_ARGUMENT.withDescription(msg).asRuntimeException())
+                  case ErrorDetails.ErrorInfoDetail(
+                        RepairServiceError.InvalidAcsSnapshotTimestamp.id,
+                        metadata,
+                      ) =>
+                    logger.info(
+                      s"Requested record time $authorizedAt is not yet clean: $metadata, submitting dummy transaction"
+                    )
+                    submitDummyTransaction()
                   case _ => Future.unit
                 }
-              } yield throw ex
+              } yield {
+                // Rethrow everything else
+                throw ex
+              }
             },
           logger,
         )
