@@ -285,7 +285,7 @@ groups:
           dashboardUid: UJyurCTWz
           panelId: 66
           noDataState: OK
-          execErrState: Error
+          execErrState: OK
           for: 10m
           annotations:
             __dashboardUid__: UJyurCTWz
@@ -475,7 +475,7 @@ groups:
           dashboardUid: UJyurCTWz
           panelId: 66
           noDataState: OK
-          execErrState: Error
+          execErrState: OK
           for: 5m
           annotations:
             __dashboardUid__: UJyurCTWz
@@ -484,5 +484,8 @@ groups:
                 Blocks not signed: {{ index $values "current_blocks_not_signed" }}
                 Latest signed block: {{ index $values "latest_signed_block" }}
                 Latest block: {{ index $values "latest_block_height" }}
+            runbook_url: ""
             summary: Node in namespace {{ $labels.namespace }} didn't sign {{ index $values "current_blocks_not_signed" }} in the last 5 minutes
+          labels:
+            "": ""
           isPaused: false
