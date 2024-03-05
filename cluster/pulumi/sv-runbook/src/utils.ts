@@ -18,3 +18,5 @@ export const localCharts = version == '' || version == undefined; // Whether to 
 export const validatorWalletUserName = isDevNet
   ? 'auth0|64b16b9ff7a0dfd00ea3704e'
   : 'auth0|64553aa683015a9687d9cc2e';
+
+export const DEFAULT_AUDIENCE = 'https://canton.network.global';

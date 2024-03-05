@@ -13,6 +13,7 @@ import {
   imagePullSecretByNamespaceName,
   installCNRunbookHelmChart,
   installCNRunbookHelmChartByNamespaceName,
+  installMigrationIdSpecificComponent,
   isDevNet,
   loadYamlFromFile,
   participantBootstrapDumpSecretName,
@@ -28,7 +29,6 @@ import {
   CnInput,
   sequencerPruningConfig,
   GlobalDomainMigrationConfig,
-  DomainMigrationIndex,
   ValidatorTopupConfig,
   svValidatorTopupConfig,
 } from 'cn-pulumi-common';
@@ -82,9 +82,7 @@ export async function installNode(
 
   const xns = exactNamespace(svNamespaceStr, true);
 
-  const migrationId = globalDomainMigrationConfig.activeMigrationId;
-  const isMigrating = globalDomainMigrationConfig.isRunningMigration();
-  console.error(`Using migration ID: ${migrationId}; ${isMigrating ? '' : 'not '}migrating`);
+  console.error(`Using migration config: ${globalDomainMigrationConfig}`);
 
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
@@ -106,8 +104,7 @@ export async function installNode(
 
   const { sv, validator } = await installSvAndValidator({
     xns,
-    migrationId,
-    isMigrating,
+    globalDomainMigrationConfig,
     participantBootstrapDumpSecret,
     auth0Client,
     imagePullDeps,
@@ -146,8 +143,7 @@ export async function installNode(
 type SvConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
-  migrationId: DomainMigrationIndex;
-  isMigrating: boolean;
+  globalDomainMigrationConfig: GlobalDomainMigrationConfig;
   onboarding?: ExpectedValidatorOnboarding;
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
@@ -163,8 +159,7 @@ type SvConfig = {
 async function installSvAndValidator(config: SvConfig) {
   const {
     xns,
-    migrationId,
-    isMigrating,
+    globalDomainMigrationConfig,
     participantBootstrapDumpSecret,
     topupConfig,
     auth0Client,
@@ -180,27 +175,9 @@ async function installSvAndValidator(config: SvConfig) {
   const globalDomain = installGlobalDomainNode(
     xns,
     onboardingName,
-    migrationId,
-    true,
-    isMigrating,
+    globalDomainMigrationConfig,
     imagePullDeps
   );
-
-  const participantValues: ChartValues = {
-    ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`, {
-      MIGRATION_ID: migrationId.toString(),
-      OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
-    }),
-    disableAutoInit: !!participantBootstrapDumpSecret,
-  };
-
-  const participantValuesWithSpecifiedAud: ChartValues = {
-    ...participantValues,
-    auth: {
-      ...participantValues.auth,
-      targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
-    },
-  };
 
   const svNameSpaceAuth0Clients = auth0Client.getCfg().namespaceToUiToClientId['sv'];
   if (!svNameSpaceAuth0Clients) {
@@ -216,6 +193,7 @@ async function installSvAndValidator(config: SvConfig) {
     auth0Client,
     svUiClientId
   );
+  const svKeySecret_ = svKeySecret(xns, svKey);
 
   const participantPgValues = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-participant.yaml`
@@ -227,17 +205,41 @@ async function installSvAndValidator(config: SvConfig) {
     participantPgValues
   );
 
-  const participant = installCNRunbookHelmChart(
-    xns,
-    `participant-${migrationId}`,
-    'cn-participant',
-    participantValuesWithSpecifiedAud,
-    localCharts,
-    version,
-    imagePullDeps
-      .concat([participantPg, svAppSecret, svKeySecret(xns, svKey)])
-      .concat(loopback !== null ? loopback : [])
-  );
+  const participant = installMigrationIdSpecificComponent(
+    globalDomainMigrationConfig,
+    migrationId => {
+      const participantValues: ChartValues = {
+        ...loadYamlFromFile(
+          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
+          {
+            MIGRATION_ID: migrationId.toString(),
+            OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
+          }
+        ),
+        disableAutoInit: !!participantBootstrapDumpSecret,
+      };
+
+      const participantValuesWithSpecifiedAud: ChartValues = {
+        ...participantValues,
+        auth: {
+          ...participantValues.auth,
+          targetAudience: auth0Client.getCfg().appToApiAudience['participant'] || DEFAULT_AUDIENCE,
+        },
+      };
+
+      return installCNRunbookHelmChart(
+        xns,
+        `participant-${migrationId}`,
+        'cn-participant',
+        participantValuesWithSpecifiedAud,
+        localCharts,
+        version,
+        imagePullDeps
+          .concat([participantPg, svAppSecret, svKeySecret_])
+          .concat(loopback !== null ? loopback : [])
+      );
+    }
+  ).activeComponent;
 
   const appsPgValues = loadYamlFromFile(
     `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/postgres-values-apps.yaml`
@@ -271,7 +273,7 @@ async function installSvAndValidator(config: SvConfig) {
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
-      MIGRATION_ID: migrationId.toString(),
+      MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
     }
   );
 
@@ -286,7 +288,9 @@ async function installSvAndValidator(config: SvConfig) {
       sequencerPruningConfig,
     },
     migration: {
-      migrating: isMigrating ? true : valuesFromYamlFile.migration.migrating,
+      migrating: globalDomainMigrationConfig.isRunningMigration()
+        ? true
+        : valuesFromYamlFile.migration.migrating,
       ...valuesFromYamlFile.migration,
     },
   };
@@ -336,7 +340,7 @@ async function installSvAndValidator(config: SvConfig) {
   const scanValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      MIGRATION_ID: migrationId.toString(),
+      MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
     }),
   };
 
@@ -366,7 +370,7 @@ async function installSvAndValidator(config: SvConfig) {
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
         TARGET_CLUSTER: TARGET_CLUSTER,
-        MIGRATION_ID: migrationId.toString(),
+        MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
       }
     ),
     participantIdentitiesDumpPeriodicBackup: backupConfig,

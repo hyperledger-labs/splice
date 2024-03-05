@@ -326,7 +326,7 @@
           "labels": [
             {
               "key": "active_migration",
-              "value": "true"
+              "value": true
             }
           ]
         },
@@ -339,7 +339,6 @@
         },
         "nodeName": "DA-Helm-Test-Node",
         "stateSync": {
-          "enable": true,
           "rpcServers": "https://sv.sv-1.svc.svrun.network.com.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.svc.svrun.network.com.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
         }
       }

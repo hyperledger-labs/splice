@@ -58,6 +58,8 @@ While doing so, please note the following:
   which they need to do for successfully completing their part of the migration.
 * Note that repeating the process with the incremented migration ID will result in the deployment of new pods with new Canton components and a new CometBFT node.
   Among other things, these deployments differ in k8s-internal host names, which are formed based on the migration ID.
+* We recommend disabling CometBFT :ref:`state sync <helm-cometbft-state-sync>` while going through a synchronizer migration, to reduce dependencies on the readiness of other SVs.
+  To do so, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/cometbft-values.yaml`` so that ``stateSync.enable`` is set to ``false``.
 * Please ensure that your ingress rules are extended accordingly to accommodate the new pods.
   Revisit :ref:`helm-sv-ingress` with the updated migration ID in mind.
 * Note that the exposed CometBFT port and CometBFT ``externalAddress`` are changed due to a limitation in CometBFT.
