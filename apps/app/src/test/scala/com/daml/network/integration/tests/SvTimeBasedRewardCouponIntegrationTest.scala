@@ -3,13 +3,16 @@ package com.daml.network.integration.tests
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.BaseLedgerConnection
+import com.daml.network.http.v0.definitions.TransactionHistoryRequest
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
+import com.daml.network.store.Limit
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
+import com.daml.network.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
@@ -20,7 +23,8 @@ import scala.math.Ordering.Implicits.*
 class SvTimeBasedRewardCouponIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with SvTimeBasedIntegrationTestUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with WalletTxLogTestUtil {
 
   override def environmentDefinition: CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition
@@ -116,25 +120,78 @@ class SvTimeBasedRewardCouponIntegrationTest
             .subtract(config.validatorRewardPercentage)
         )
         .divide(RoundsPerYear, RoundingMode.HALF_UP)
+      val eachSvGetInRound0 =
+        coinsToIssueToSvc
+          .divide(BigDecimal(svs.size).bigDecimal, RoundingMode.HALF_UP)
+          .setScale(10, RoundingMode.HALF_UP)
+      val sv1Party = sv1Backend.getSvcInfo().svParty
+      val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
+      val expectedAliceAmount = eachSvGetInRound0.multiply(new java.math.BigDecimal("0.3333"))
 
       eventually() {
-        val eachSvGetInRound0 =
-          coinsToIssueToSvc
-            .divide(BigDecimal(svs.size).bigDecimal, RoundingMode.HALF_UP)
-            .setScale(10, RoundingMode.HALF_UP)
-
         checkWallet(
-          sv1Backend.getSvcInfo().svParty,
+          sv1Party,
           sv1WalletClient,
           Seq(BigDecimal(eachSvGetInRound0) - smallAmount -> eachSvGetInRound0),
         )
 
-        val expectedAliceAmount = eachSvGetInRound0.multiply(new java.math.BigDecimal("0.3333"))
         checkWallet(
-          aliceValidatorBackend.getValidatorPartyId(),
+          aliceValidatorParty,
           aliceValidatorWalletClient,
           Seq(BigDecimal(expectedAliceAmount) - smallAmount -> expectedAliceAmount),
         )
+      }
+
+      clue("The claimed reward appear in SV1's wallet history") {
+        checkTxHistory(
+          sv1WalletClient,
+          Seq[CheckTxHistoryFn] { case b: BalanceChangeTxLogEntry =>
+            b.receiver should be(sv1Party.toProtoPrimitive)
+            b.amount should beWithin(BigDecimal(eachSvGetInRound0) - smallAmount, eachSvGetInRound0)
+          },
+        )
+      }
+
+      clue("The claimed reward appears in alice's wallet history") {
+        checkTxHistory(
+          aliceValidatorWalletClient,
+          Seq[CheckTxHistoryFn] { case b: BalanceChangeTxLogEntry =>
+            b.receiver should be(aliceValidatorParty.toProtoPrimitive)
+            b.amount should beWithin(
+              BigDecimal(expectedAliceAmount) - smallAmount,
+              expectedAliceAmount,
+            )
+          },
+        )
+      }
+
+      clue("The claims appear in the scan history") {
+        eventually() {
+          val txs = (for {
+            tx <- sv1ScanBackend
+              .listTransactions(
+                None,
+                TransactionHistoryRequest.SortOrder.Desc,
+                Limit.MaxPageSize,
+              )
+              .filter(
+                _.svRewardCollected
+                  .map(_.coinOwner)
+                  .exists(
+                    Seq(sv1Party.toProtoPrimitive, aliceValidatorParty.toProtoPrimitive).contains
+                  )
+              )
+            reward <- tx.svRewardCollected
+          } yield (reward.coinOwner, reward.coinAmount)).toMap
+          BigDecimal(txs(sv1Party.toProtoPrimitive)) should beWithin(
+            BigDecimal(eachSvGetInRound0) - smallAmount,
+            eachSvGetInRound0,
+          )
+          BigDecimal(txs(aliceValidatorParty.toProtoPrimitive)) should beWithin(
+            BigDecimal(expectedAliceAmount) - smallAmount,
+            expectedAliceAmount,
+          )
+        }
       }
     }
   }

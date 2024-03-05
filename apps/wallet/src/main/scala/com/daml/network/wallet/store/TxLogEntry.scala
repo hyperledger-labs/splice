@@ -538,4 +538,10 @@ object TxLogEntry extends StoreErrors {
       values.get((choiceName, coinOperationConstructor))
   }
 
+  def transferNonEmpty(transfer: TransferTxLogEntry): Boolean = {
+    transfer.receivers.nonEmpty ||
+    transfer.appRewardsUsed > BigDecimal(0) ||
+    transfer.validatorRewardsUsed > BigDecimal(0)
+  }
+
 }

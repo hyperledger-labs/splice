@@ -49,7 +49,7 @@ import com.daml.network.history.{
 }
 import com.daml.network.store.TxLogStore
 import com.daml.network.util.ExerciseNode
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.time.Instant
@@ -58,6 +58,7 @@ import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
+import com.daml.network.store.events.SvRewardCoupon_ArchiveAsBeneficiary
 import com.daml.network.wallet.store.TxLogEntry.{
   BalanceChangeTransactionSubtype,
   NotificationTransactionSubtype,
@@ -545,7 +546,7 @@ class UserWalletTxLogParser(
 
           case Transfer(node) =>
             // Note: we do not parse the child events, as we can extract all information about the transfer from this node
-            now(State.fromTransfer(tree, root, node, TransferTransactionSubtype.Transfer))
+            now(State.fromTransfer(tree, exercised, node, TransferTransactionSubtype.Transfer))
 
           // ------------------------------------------------------------------
           // Minting new coins
@@ -846,7 +847,7 @@ object UserWalletTxLogParser {
 
       // The code below works only if there is exactly one transfer.
       // Otherwise the balance changes are lost or duplicated by adding them to multiple transfers.
-      assert(entries.collect { case t: TransferTxLogEntry => t }.length == 1)
+      assert(entries.collect { case t: TransferTxLogEntry => t }.length == 1, s"Entries: $entries")
 
       val newEntries: Queue[TxLogEntry] = entries.flatMap {
         case t: TransferTxLogEntry =>
@@ -1009,25 +1010,59 @@ object UserWalletTxLogParser {
 
     def fromTransfer(
         tx: TransactionTree,
-        event: TreeEvent,
+        event: ExercisedEvent,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
         transactionSubtype: TransferTransactionSubtype,
-    ): State = {
-      val newEntry = TransferTxLogEntry(
-        eventId = event.getEventId,
-        subtype = Some(transactionSubtype.toProto),
-        date = Some(tx.getEffectiveAt),
-        provider = node.argument.value.transfer.provider,
-        sender = Some(parseSender(node.argument.value, node.result.value)),
-        receivers = parseReceivers(node.argument.value, node.result.value),
-        senderHoldingFees = node.result.value.summary.holdingFees,
-        coinPrice = node.result.value.summary.coinPrice,
-        appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
-        validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
+    )(implicit elc: ErrorLoggingContext): State = {
+      val sender = parseSender(node.argument.value, node.result.value)
+      val receivers = parseReceivers(node.argument.value, node.result.value)
+      val transferEntry = Option(
+        TransferTxLogEntry(
+          eventId = event.getEventId,
+          subtype = Some(transactionSubtype.toProto),
+          date = Some(tx.getEffectiveAt),
+          provider = node.argument.value.transfer.provider,
+          sender = Some(sender),
+          receivers = receivers,
+          senderHoldingFees = node.result.value.summary.holdingFees,
+          coinPrice = node.result.value.summary.coinPrice,
+          appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
+          validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
+        )
       )
+      // Workaround:
+      // We want to have separate logs between the transfer and the SV reward collection.
+      // So we need to extract a separate event id to respect the unique constraint over it.
+      // Note that this lumps together all the rewards from different SV operators and rounds together.
+      // This is a current limitation that might be revisited later.
+      val svRewardEntry = event.getChildEventIds.asScala
+        .find { eventId =>
+          tx.getEventsById.get(eventId) match {
+            case SvRewardCoupon_ArchiveAsBeneficiary(_) => true
+            case _ => false
+          }
+        }
+        .map { archiveSvRewardEventId =>
+          BalanceChangeTxLogEntry(
+            eventId = archiveSvRewardEventId,
+            subtype = Some(transactionSubtype.toProto),
+            date = Some(tx.getEffectiveAt),
+            amount = node.result.value.summary.inputSvRewardAmount,
+            receiver = sender.party,
+            coinPrice = node.result.value.summary.coinPrice,
+          )
+        }
 
       State(
-        entries = immutable.Queue(newEntry)
+        // Regarding the order: the SV reward collection should be considered as happening before the transfer.
+        entries = immutable
+          .Queue[Option[TxLogEntry]](
+            svRewardEntry,
+            transferEntry.filter(transfer =>
+              TxLogEntry.transferNonEmpty(transfer) || svRewardEntry.isEmpty
+            ),
+          )
+          .flatten
       )
     }
 

@@ -11,7 +11,7 @@ import com.daml.network.store.TxLogStore
 import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.util.{Codec, ExerciseNode}
 import com.daml.network.util.CNNodeUtil.dollarsToCC
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -21,6 +21,7 @@ import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 import com.daml.network.environment.ledger.api.ActiveContract
 import com.daml.network.environment.ledger.api.IncompleteReassignmentEvent
+import com.daml.network.store.events.SvRewardCoupon_ArchiveAsBeneficiary
 import com.digitalasset.canton.topology.DomainId
 
 class ScanTxLogParser(
@@ -40,7 +41,7 @@ class ScanTxLogParser(
       case exercised: ExercisedEvent =>
         exercised match {
           case Transfer(node) =>
-            State.fromTransfer(tree, root, domainId, node)
+            State.fromTransfer(tree, exercised, domainId, node)
           case Tap(node) =>
             State.fromCoinCreateSummary(
               tree,
@@ -346,11 +347,11 @@ object ScanTxLogParser {
 
     def fromTransfer(
         tx: TransactionTree,
-        event: TreeEvent,
+        event: ExercisedEvent,
         domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
         rootEventId: Option[String] = None,
-    ): State = {
+    )(implicit elc: ErrorLoggingContext): State = {
       val sender = Codec
         .decode(Codec.Party)(node.argument.value.transfer.sender)
         .getOrElse(
@@ -394,9 +395,42 @@ object ScanTxLogParser {
       val activityEntry = State(
         transferTxLogEntry(tx, event, domainId, node)
       )
-      rewardEntries
+
+      val stateWithoutSvRewards = rewardEntries
         .appended(balanceChangeEntry)
         .appended(activityEntry)
+
+      // Workaround:
+      // We want to have separate logs between the transfer and the SV reward collection.
+      // So we need to extract a separate event id for pagination of `listTransactions` to work.
+      // Note that this lumps together all the rewards from different SV operators and rounds together.
+      // This is a current limitation that might be revisited later.
+      val archiveSvRewardEventIdOpt = event.getChildEventIds.asScala
+        .find { eventId =>
+          tx.getEventsById.get(eventId) match {
+            case SvRewardCoupon_ArchiveAsBeneficiary(_) => true
+            case _ => false
+          }
+        }
+
+      archiveSvRewardEventIdOpt match {
+        case Some(archiveSvRewardEventId) =>
+          val svRewardEntry = State(
+            SvRewardCollectedTxLogEntry(
+              offset = tx.getOffset,
+              eventId = archiveSvRewardEventId,
+              domainId = domainId,
+              date = Some(tx.getEffectiveAt),
+              coinOwner = sender,
+              coinAmount = node.result.value.summary.inputSvRewardAmount,
+              coinPrice = node.result.value.summary.coinPrice,
+              round = round.number, // Of the collection, not the round the coupon is received.
+            )
+          )
+          stateWithoutSvRewards.appended(svRewardEntry)
+        case None =>
+          stateWithoutSvRewards
+      }
     }
 
     def transferTxLogEntry(
