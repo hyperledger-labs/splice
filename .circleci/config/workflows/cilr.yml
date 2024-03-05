@@ -135,6 +135,18 @@ workflow:
             - artifactory
             - slack-context
           workflow_names: "deploy_cilr redeploy_sv_runbook_cilr cilr_health_check"
+      - cancel_if_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cilr
+          context:
+            - artifactory
+            - slack-context
+          # Cancel runbook deployment if any deploy is running as it will try to deploy an old version
+          # because the branch is not yet updated.
+          workflow_names: "deploy_cilr"
       - docker_images_push:
           <<: *notify-fail
           context:
