@@ -400,6 +400,10 @@ object CNNodeTests {
             logger.debug("Auth0 exception raised, triggering retry...")
             fail(auth0Exception)
           }
+          case ioException: java.io.IOException => {
+            logger.debug("IOException raised, triggering retry...")
+            fail(ioException)
+          }
           case ex: Throwable => throw ex // throw anything else
         }
       }
