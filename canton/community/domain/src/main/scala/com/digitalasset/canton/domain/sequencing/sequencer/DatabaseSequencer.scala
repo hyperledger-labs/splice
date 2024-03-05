@@ -391,7 +391,7 @@ class DatabaseSequencer(
     Future.successful(SequencerTrafficStatus(Seq.empty))
   override def setTrafficBalance(
       member: Member,
-      serial: NonNegativeLong,
+      serial: PositiveInt,
       totalTrafficBalance: NonNegativeLong,
       sequencerClient: SequencerClient,
   )(implicit

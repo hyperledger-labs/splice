@@ -8,6 +8,7 @@ import com.daml.network.scan.store.ScanStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -46,21 +47,13 @@ class HttpExternalScanHandler(
               HttpErrorHandler.badRequest(s"Could not decode domain ID: $error")
             )
         }
-        sequencerResponse <- sequencerAdminConnection.getSequencerTrafficStatus(Seq(member))
-        actual <- sequencerResponse.members match {
-          case Seq() =>
-            Future.failed(
-              HttpErrorHandler.notFound(
-                s"No traffic status found for member: $memberId"
-              )
-            )
-          case Seq(m) => Future.successful(m.trafficState)
-          case _ =>
-            Future.failed(
-              HttpErrorHandler.internalServerError(
-                s"Received more than one traffic status response for member: $memberId."
-              )
-            )
+        trafficState <- sequencerAdminConnection.lookupSequencerTrafficControlState(member)
+        actual <- trafficState match {
+          case None =>
+            throw Status.NOT_FOUND
+              .withDescription(s"No traffic status found for member: $memberId")
+              .asRuntimeException()
+          case Some(m) => Future.successful(m.trafficState)
         }
         actualConsumed = actual.extraTrafficConsumed.value
         actualLimit = actual.extraTrafficLimit.fold(0L)(_.value)

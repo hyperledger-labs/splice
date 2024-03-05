@@ -6,7 +6,9 @@ package com.digitalasset.canton.traffic
 import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.admin.traffic.v30.MemberTrafficStatus as MemberTrafficStatusP
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.sequencing.protocol.SequencedEventTrafficState
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.Member
@@ -16,7 +18,9 @@ final case class MemberTrafficStatus(
     timestamp: CantonTimestamp,
     trafficState: SequencedEventTrafficState,
     currentAndFutureTopUps: List[TopUpEvent],
-) {
+    balanceSerial: Option[PositiveInt],
+) extends Product
+    with PrettyPrinting {
   def toProtoV30: MemberTrafficStatusP = {
     MemberTrafficStatusP(
       member.toProtoPrimitive,
@@ -24,8 +28,11 @@ final case class MemberTrafficStatus(
       trafficState.extraTrafficConsumed.value,
       currentAndFutureTopUps.map(_.toProtoV30),
       Some(timestamp.toProtoTimestamp),
+      balanceSerial.map(_.value),
     )
   }
+
+  override def pretty: Pretty[this.type] = adHocPrettyInstance
 }
 
 object MemberTrafficStatus {
@@ -52,6 +59,7 @@ object MemberTrafficStatus {
         "ts",
         trafficStatusP.ts,
       )
+      balanceSerial <- trafficStatusP.balanceSerial.traverse(ProtoConverter.parsePositiveInt)
     } yield MemberTrafficStatus(
       member,
       ts,
@@ -60,6 +68,7 @@ object MemberTrafficStatus {
         totalExtraTrafficConsumed,
       ),
       topUps,
+      balanceSerial,
     )
   }
 }

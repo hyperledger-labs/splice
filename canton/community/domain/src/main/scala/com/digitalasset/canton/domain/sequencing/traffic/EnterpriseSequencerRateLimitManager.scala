@@ -100,7 +100,7 @@ class EnterpriseSequencerRateLimitManager(
             .toSequencedEventTrafficState
           currentAndFutureTopUps = rlm.pruneUntilAndGetAllTopUpsFor(ts)
         } yield List(
-          MemberTrafficStatus(member, state.timestamp, updatedState, currentAndFutureTopUps)
+          MemberTrafficStatus(member, state.timestamp, updatedState, currentAndFutureTopUps, None)
         )
       }
   }

@@ -88,6 +88,7 @@ class TrafficStateController(
                 }
                 .getOrElse(trafficState),
               topUpQueue.pruneUntilAndGetAllTopUpsFor(currentSnapshot.timestamp),
+              None,
             )
           }
 

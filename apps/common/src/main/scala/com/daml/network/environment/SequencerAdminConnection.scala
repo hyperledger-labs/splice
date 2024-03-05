@@ -19,8 +19,11 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerTrafficStatus
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.traffic.MemberTrafficStatus
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -81,6 +84,60 @@ class SequencerAdminConnection(
     runCmd(
       SequencerAdminCommands.GetTrafficControlState(filterMembers)
     )
+
+  def lookupSequencerTrafficControlState(
+      member: Member
+  )(implicit traceContext: TraceContext): Future[Option[MemberTrafficStatus]] = {
+    getSequencerTrafficStatus(Seq(member)).map(_.members match {
+      case Seq() => None
+      case Seq(m) => Some(m)
+      case memberList =>
+        throw Status.INTERNAL
+          .withDescription(
+            s"Received more than one traffic status response for member ${member}: ${memberList}"
+          )
+          .asRuntimeException()
+    })
+  }
+
+  private def setTrafficControlState(
+      member: Member,
+      newTotalExtraTrafficLimit: NonNegativeLong,
+      serial: PositiveInt,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    runCmd(
+      SequencerAdminCommands.SetTrafficControlBalance(member, newTotalExtraTrafficLimit, serial)
+    )
+  }
+
+  def ensureSequencerTrafficControlState(
+      member: Member,
+      newTotalExtraTrafficLimit: NonNegativeLong,
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    retryProvider.ensureThat(
+      RetryFor.WaitingOnInitDependency,
+      s"Extra traffic limit for $member set to $newTotalExtraTrafficLimit",
+      lookupSequencerTrafficControlState(member).map(result =>
+        Either.cond(
+          result
+            .flatMap(_.trafficState.extraTrafficLimit)
+            .fold(NonNegativeLong.zero)(_.toNonNegative) == newTotalExtraTrafficLimit,
+          (),
+          result,
+        )
+      ),
+      (previousOrNone: Option[MemberTrafficStatus]) =>
+        setTrafficControlState(
+          member,
+          newTotalExtraTrafficLimit,
+          serial =
+            previousOrNone.flatMap(_.balanceSerial).fold(PositiveInt.one)(_ + PositiveInt.one),
+        ).map(_ => ()),
+      logger,
+    )
+  }
 
   def getSequencerPruningStatus()(implicit
       traceContext: TraceContext

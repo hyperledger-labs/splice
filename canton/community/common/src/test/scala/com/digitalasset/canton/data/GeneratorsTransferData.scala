@@ -4,7 +4,7 @@
 package com.digitalasset.canton.data
 
 import com.digitalasset.canton.LfPartyId
-import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
 import com.digitalasset.canton.crypto.{GeneratorsCrypto, Salt, TestHash}
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.{
@@ -224,7 +224,7 @@ final class GeneratorsTransferData(
   implicit val setTrafficBalanceArb: Arbitrary[SetTrafficBalanceMessage] = Arbitrary(
     for {
       member <- Arbitrary.arbitrary[Member]
-      serial <- Arbitrary.arbitrary[NonNegativeLong]
+      serial <- Arbitrary.arbitrary[PositiveInt]
       trafficBalance <- Arbitrary.arbitrary[NonNegativeLong]
       domainId <- Arbitrary.arbitrary[DomainId]
     } yield SetTrafficBalanceMessage.apply(
