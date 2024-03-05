@@ -542,9 +542,23 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 
+If you are deploying a new instance of the participant as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``disableAutoInit`` to ``true`` in your ``participant-values.yaml``:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
+    :language: yaml
+    :start-after: PARTICIPANT_BOOTSTRAP_START
+    :end-before: PARTICIPANT_BOOTSTRAP_END
+
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` as follows:
 
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+
+If you are deploying new instances of your global domain components as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``disableAutoInit`` to ``true`` in your ``global-domain-values.yaml``:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/global-domain-values.yaml
+    :language: yaml
+    :start-after: DOMAIN_BOOTSTRAP_START
+    :end-before: DOMAIN_BOOTSTRAP_END
 
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/scan-values.yaml`` as follows:
 

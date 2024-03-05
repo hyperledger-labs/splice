@@ -357,6 +357,7 @@
       "namespace": "sv",
       "timeout": 480,
       "values": {
+        "disableAutoInit": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "mediator": {
           "persistence": {

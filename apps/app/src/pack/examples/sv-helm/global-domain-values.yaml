@@ -13,3 +13,7 @@ mediator:
     host: mediator-pg
     secretName: mediator-pg-secret
     databaseName: mediator_MIGRATION_ID
+# DOMAIN_BOOTSTRAP_START
+# Uncomment the line below if you are bootstrapping from a migration dump.
+# disableAutoInit: true
+# DOMAIN_BOOTSTRAP_END

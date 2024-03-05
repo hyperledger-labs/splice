@@ -139,6 +139,7 @@ workflow:
           global_domain_active_migration_id: 1
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
+          reset_cluster: false
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1

@@ -1350,6 +1350,9 @@ jobs:
       send_deployment_notification:
         type: boolean
         default: true
+      reset_cluster:
+        type: boolean
+        default: true
       global_domain_active_migration_id:
         type: integer
         default: 0
@@ -1377,8 +1380,21 @@ jobs:
           cmd: |
             make cluster/build
           cmd_retry_count: 2
+      - when:
+          condition:
+            and:
+              - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
+              - equal: [ true, <<parameters.reset_cluster>> ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Reset SV runbook
+                cluster: << parameters.cluster >>
+                gce_authenticate: true
+                cmd: |
+                  cncluster activate
+                  cncluster ci_pdown_sv
       - run_bash_command_in_nix:
-          cmd_name: Apply SV-runbook Kubernetes manifest to cluster
+          cmd_name: Apply SV runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
           gce_authenticate: true
@@ -1403,12 +1419,11 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
-            cncluster activate
-            cncluster ci_pdown_sv
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
+            cncluster activate
             cncluster ci_apply_sv $VERSION
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
@@ -1436,6 +1451,9 @@ jobs:
       restore_cluster:
         type: boolean
         default: false
+      reset_cluster:
+        type: boolean
+        default: true
       global_domain_active_migration_id:
         type: integer
         default: 0
@@ -1463,6 +1481,19 @@ jobs:
           cmd: |
             make cluster/build
           cmd_retry_count: 2
+      - when:
+          condition:
+            and:
+              - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
+              - equal: [ true, <<parameters.reset_cluster>> ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Reset Validator runbook
+                cluster: << parameters.cluster >>
+                gce_authenticate: true
+                cmd: |
+                  cncluster activate
+                  cncluster ci_pdown_validator
       - run_bash_command_in_nix:
           cmd_name: Apply Validator runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
@@ -1489,11 +1520,11 @@ jobs:
             if [[ << parameters.global_domain_migrate_from_id >> -ne -1 ]]; then
               export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=<< parameters.global_domain_migrate_from_id >>
             fi
-            cncluster activate
             VERSION=""
             if [[ << parameters.use_published_artifacts >> == true ]]; then
               VERSION=$(get-snapshot-version)
             fi
+            cncluster activate
             cncluster ci_apply_validator $VERSION
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
@@ -3656,6 +3687,7 @@ workflows:
           global_domain_active_migration_id: 1
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
+          reset_cluster: false
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1
@@ -3915,6 +3947,7 @@ workflows:
           global_domain_active_migration_id: 1
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
+          reset_cluster: false
       - preflight_sv_check:
           name: "preflight_sv_check_migrated"
           migration_id: 1

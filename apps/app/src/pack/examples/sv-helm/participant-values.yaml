@@ -11,7 +11,6 @@ auth:
   # targetAudience: "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
 enableHealthProbes: true
 # PARTICIPANT_BOOTSTRAP_START
-# Uncomment the line below if you are bootstrapping from an existing participant
-# identities dump.
+# Uncomment the line below if you are bootstrapping from an existing participant identities dump or from a migration dump.
 # disableAutoInit: true
 # PARTICIPANT_BOOTSTRAP_END

@@ -53,6 +53,7 @@ substituting the migration ID (``MIGRATION_ID``) with the target migration ID af
 While doing so, please note the following:
 
 * Please make sure to pick the correct (incremented) ``MIGRATION_ID`` when following the steps.
+* Please modify the files ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-values.yaml`` and ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` so that ``disableAutoInit`` is set to ``true`` in each of them.
 * Please don't uninstall any helm charts installed as part of the original deployment run (with the smaller migration ID).
   We deliberately keep core synchronizer components running longer so that validators get a chance to sync up to the latest state from before the pause,
   which they need to do for successfully completing their part of the migration.

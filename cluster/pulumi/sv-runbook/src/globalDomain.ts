@@ -47,23 +47,27 @@ export function installGlobalDomainNode(
     mediatorPgValues
   );
 
-  return installMigrationIdSpecificComponent(globalDomainMigrationConfig, migrationId => {
-    const globalDomainValues: ChartValues = {
-      ...loadYamlFromFile(
-        `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
-        {
-          MIGRATION_ID: migrationId.toString(),
-        }
-      ),
-    };
-    return installCNRunbookHelmChart(
-      svNamespace,
-      `global-domain-${migrationId}`,
-      'cn-global-domain',
-      globalDomainValues,
-      localCharts,
-      version,
-      dependencies.concat([cometbft, sequencerPg, mediatorPg])
-    );
-  }).activeComponent;
+  return installMigrationIdSpecificComponent(
+    globalDomainMigrationConfig,
+    (migrationId, isActive) => {
+      const globalDomainValues: ChartValues = {
+        ...loadYamlFromFile(
+          `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
+          {
+            MIGRATION_ID: migrationId.toString(),
+          }
+        ),
+        disableAutoInit: globalDomainMigrationConfig.isRunningMigration() || !isActive,
+      };
+      return installCNRunbookHelmChart(
+        svNamespace,
+        `global-domain-${migrationId}`,
+        'cn-global-domain',
+        globalDomainValues,
+        localCharts,
+        version,
+        dependencies.concat([cometbft, sequencerPg, mediatorPg])
+      );
+    }
+  ).activeComponent;
 }

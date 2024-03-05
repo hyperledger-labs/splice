@@ -207,7 +207,7 @@ async function installSvAndValidator(config: SvConfig) {
 
   const participant = installMigrationIdSpecificComponent(
     globalDomainMigrationConfig,
-    migrationId => {
+    (migrationId, isActive) => {
       const participantValues: ChartValues = {
         ...loadYamlFromFile(
           `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
@@ -216,7 +216,10 @@ async function installSvAndValidator(config: SvConfig) {
             OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
           }
         ),
-        disableAutoInit: !!participantBootstrapDumpSecret,
+        disableAutoInit:
+          !!participantBootstrapDumpSecret ||
+          globalDomainMigrationConfig.isRunningMigration() ||
+          !isActive,
       };
 
       const participantValuesWithSpecifiedAud: ChartValues = {

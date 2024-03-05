@@ -39,6 +39,25 @@ spec:
                   type = "domain-migration"
                   dump-file-path = "/domain-upgrade-dump/domain_migration_dump.json"
                 }
+            {{- else if .Values.joinWithKeyOnboarding }}
+            - name: ADDITIONAL_CONFIG_SV_ONBOARDING
+              value: |
+                _onboarding {
+                  type = "join-with-key"
+                  sv-client.admin-api.url = "{{ .Values.joinWithKeyOnboarding.sponsorApiUrl }}"
+                }
+            - name: CN_APP_SV_PUBLIC_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: public
+                  name: "cn-app-sv-key"
+                  optional: false
+            - name: CN_APP_SV_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: private
+                  name: "cn-app-sv-key"
+                  optional: false
             {{- else }}
               {{- if eq .Values.onboardingType "found-collective" }}
             - name: CN_APP_SV_IS_DEV_NET
@@ -108,26 +127,6 @@ spec:
                 secretKeyRef:
                   name: {{ $.Values.persistence.secretName }}
                   key: postgresPassword
-            {{- end }}
-            {{- with .Values.joinWithKeyOnboarding }}
-            - name: ADDITIONAL_CONFIG_SV_ONBOARDING
-              value: |
-                _onboarding {
-                  type = "join-with-key"
-                  sv-client.admin-api.url = "{{ .sponsorApiUrl }}"
-                }
-            - name: CN_APP_SV_PUBLIC_KEY
-              valueFrom:
-                secretKeyRef:
-                  key: public
-                  name: "cn-app-sv-key"
-                  optional: false
-            - name: CN_APP_SV_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  key: private
-                  name: "cn-app-sv-key"
-                  optional: false
             {{- end }}
             - name: ADDITIONAL_CONFIG_MIGRATION_ID
               value: |
