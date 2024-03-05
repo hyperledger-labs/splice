@@ -1,0 +1,373 @@
+apiVersion: 1
+groups:
+  - orgId: 1
+    name: sv status reports
+    folder: canton-network
+    interval: 1m
+    rules:
+      - uid: f15539f2-f6ea-4de4-8f7c-c56434d5bd52
+        title: SV Status -  Mediator falling behind
+        condition: progress_too_low
+        data:
+          - refId: progress
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by (namespace, report_publisher) (rate(cn_sv_status_report_mediator_domain_time_us{namespace=~"sv-1"}[5m])) / 1000000
+              instant: false
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: true
+              refId: progress
+          - refId: avg_progress
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: progress
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              refId: avg_progress
+              settings:
+                mode: dropNN
+              type: reduce
+          - refId: progress_too_low
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.75
+                      - 0
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: avg_progress
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: progress_too_low
+              type: threshold
+        dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
+        panelId: 14
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
+          __panelId__: "14"
+          description: At least one of the SVs' status reports shows that their mediator is falling behind wrt processing messages from the domain, or they fail to submit status reports.
+          summary: Mediator Domain Time progressing too slowly
+        labels:
+          topology_level: svc
+        isPaused: false
+      - uid: ea207f34-68d0-4fbb-9ae5-08020ff8b17d
+        title: SV Status -  Participant falling behind
+        condition: progress_too_low
+        data:
+          - refId: progress
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by (namespace, report_publisher) (rate(cn_sv_status_report_participant_domain_time_us{namespace=~"sv-1"}[5m])) / 1000000
+              instant: false
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: true
+              refId: progress
+          - refId: avg_progress
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: progress
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: mean
+              refId: avg_progress
+              settings:
+                mode: dropNN
+              type: reduce
+          - refId: progress_too_low
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0.75
+                      - 0
+                    type: lt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: avg_progress
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: progress_too_low
+              type: threshold
+        dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
+        panelId: 9
+        noDataState: NoData
+        execErrState: Error
+        for: 5m
+        annotations:
+          __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
+          __panelId__: "9"
+          description: At least one of the SVs' status reports shows that their participant is falling behind wrt processing messages from the domain, or they fail to submit status reports.
+          summary: Participant Domain Time progressing too slowly
+        labels:
+          topology_level: svc
+        isPaused: false
+      - uid: f60b1225-4458-483a-8168-240baac4f6fe
+        title: SV Status - Unexpected CometBFT Lag
+        condition: cometbft_lag
+        data:
+          - refId: cometbft_height_lag
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_cometbft_height{namespace=~"sv-1"}) ) - min by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_cometbft_height{namespace=~"sv-1"}))
+              instant: false
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: true
+              refId: cometbft_height_lag
+          - refId: cometbft_lag
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 1000
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: min_comet_bft_lag
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: cometbft_lag
+              type: threshold
+          - refId: min_comet_bft_lag
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: cometbft_height_lag
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: min
+              refId: min_comet_bft_lag
+              settings:
+                mode: dropNN
+              type: reduce
+        dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
+        panelId: 15
+        noDataState: NoData
+        execErrState: Error
+        for: 0s
+        annotations:
+          __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
+          __panelId__: "15"
+          description: The SV status reports observed by sv-1 exhibit an unexpectedly high lag in CometBFT height.
+          summary: Unexpected CometBFT lag in SV status reports
+        labels:
+          topology_level: svc
+        isPaused: false
+      - uid: d28ac95d-4724-4a82-a848-49198c5c6d80
+        title: SV Status - Unexpected Mining Round Lag
+        condition: lag_check
+        data:
+          - refId: lag_series
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              expr: max by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_latest_open_round{namespace=~"sv-1"}) ) - min by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_latest_open_round{namespace=~"sv-1"}))
+              instant: false
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: true
+              refId: lag_series
+          - refId: lag_check
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 10
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params:
+                      - C
+                  reducer:
+                    params: []
+                    type: last
+                  type: query
+              datasource:
+                type: __expr__
+                uid: __expr__
+              expression: min_lag
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: lag_check
+              type: threshold
+          - refId: min_lag
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: lag_series
+              intervalMs: 1000
+              maxDataPoints: 43200
+              reducer: min
+              refId: min_lag
+              settings:
+                mode: dropNN
+              type: reduce
+        dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
+        panelId: 5
+        noDataState: NoData
+        execErrState: Error
+        for: 0s
+        annotations:
+          __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
+          __panelId__: "5"
+          description: The SV status reports observed by sv-1 exhibit an unexpectedly high lag in the latest open mining round number.
+          summary: Unexpected mining round lag in SV status reports
+        labels:
+          topology_level: svc
+        isPaused: false

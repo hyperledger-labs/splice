@@ -338,6 +338,7 @@ function createGrafanaAlerting(namespace: Input<string>) {
           'load-tester_alerts.yaml': readFile('load-tester_alerts.yaml'),
           'cometbft_alerts.yaml': readFile('cometbft_alerts.yaml'),
           'automation_alerts.yaml': readFile('automation_alerts.yaml'),
+          'sv-status-report_alerts.yaml': readFile('sv-status-report_alerts.yaml'),
           'templates.yaml': readFile('templates.yaml')
             .replaceAll('$CLUSTER_BASENAME', CLUSTER_BASENAME)
             .replaceAll('$GRAFANA_EXTERNAL_URL', grafanaExternalUrl),
