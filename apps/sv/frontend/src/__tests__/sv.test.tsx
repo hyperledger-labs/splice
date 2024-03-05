@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { test, expect, describe } from 'vitest';
 
@@ -29,5 +29,30 @@ describe('SV user can', () => {
     await user.click(screen.getByText('Governance'));
 
     expect(await screen.findByText('Vote Requests')).toBeDefined();
+  });
+
+  test('set next scheduled domain upgrade', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('Governance')).toBeDefined();
+    await user.click(screen.getByText('Governance'));
+
+    expect(await screen.findByText('Vote Requests')).toBeDefined();
+    expect(await screen.findByText('Governance')).toBeDefined();
+    // const dropdown = screen.getByTestId('display-actions').querySelector('select');
+    const dropdown = screen.getByTestId('display-actions');
+    expect(dropdown).toBeDefined();
+    fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
+
+    expect(screen.queryByText('nextScheduledDomainUpgrade.time')).toBeNull();
+    expect(await screen.findByText('nextScheduledDomainUpgrade')).toBeDefined();
+
+    // const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
+    const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
+    await user.click(checkBox);
+
+    expect(screen.queryByText('nextScheduledDomainUpgrade')).toBeNull();
+    expect(await screen.findByText('nextScheduledDomainUpgrade.time')).toBeDefined();
   });
 });

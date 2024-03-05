@@ -45,7 +45,13 @@ export const ListVoteRequestsFilterTable: React.FC<ListVoteRequestsTableProps> =
       headerName: 'Tracking Id',
       width: 250,
       renderCell: (params: GridRenderCellParams) => {
-        return <CopyableTypography text={params.value} maxWidth={'150px'} />;
+        return (
+          <CopyableTypography
+            text={params.value}
+            maxWidth={'150px'}
+            className={'vote-row-tracking-id'}
+          />
+        );
       },
     },
     {

@@ -228,7 +228,11 @@ const VoteRequest: React.FC = () => {
             <Typography variant="h5">Action</Typography>
             <FormControl fullWidth>
               <NativeSelect
-                inputProps={{ id: 'display-actions' }}
+                inputProps={{
+                  id: 'display-actions',
+                  // @ts-ignore
+                  'data-testid': 'display-actions',
+                }}
                 value={actionName}
                 onChange={e => setActionName(e.target.value)}
               >
