@@ -8,10 +8,12 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleMacros
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.topology.transaction.DecentralizedNamespaceDefinitionX
 import io.grpc
 import io.grpc.StatusRuntimeException
+import org.slf4j.event.Level
 
 /** The decentralized namespace is reset to contain only sv1 after each env is used
   * When onboarding SVs their participant namespace is added to the decentralized namespace, so for a "clean" test we have to remove them
@@ -78,15 +80,20 @@ class ResetDecentralizedNamespace
 
                 def proposeDecentralizedNamespaceReset(
                     client: CNParticipantClientReference
-                ): Unit = {
-                  client.topology.decentralized_namespaces
-                    .propose(
-                      Set(sv1ParticipantNamespace),
-                      PositiveInt.one,
-                      store,
-                      serial = Some(existingDecentralizedNamespace.context.serial + PositiveInt.one),
-                    )
-                    .discard
+                ) = {
+                  loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
+                    client.topology.decentralized_namespaces
+                      .propose(
+                        Set(sv1ParticipantNamespace),
+                        PositiveInt.one,
+                        store,
+                        serial =
+                          Some(existingDecentralizedNamespace.context.serial + PositiveInt.one),
+                      )
+                      .discard,
+                    logs =>
+                      forAll(logs)(_.message should contain("FAILED_PRECONDITION/SERIAL_MISMATCH")),
+                  )
                 }
 
                 try {
