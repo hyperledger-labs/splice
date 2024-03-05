@@ -19,16 +19,13 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.sv.cometbft.{CometBftConnectionConfig, CometBftHttpRpcClient}
 import com.daml.network.sv.config.CometBftConfig
 import com.daml.network.util.SvTestUtil
-import com.digitalasset.canton.drivers.cometbft.data.{CometBftTx, SequencerTx}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import io.circe.Json
 import monocle.macros.syntax.lens.*
 
-import java.util.UUID
 import scala.concurrent.ExecutionContext
 import scala.concurrent.duration.*
-import scala.util.Random
 
 class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironment with SvTestUtil {
 
@@ -93,7 +90,6 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
       }
     }
     eventually(timeUntilSuccess = 2.minute, maxPollInterval = 1.second) {
-      sendEmptyTransactionToIncreaseBlockHeight(Random.shuffle(svs).head)
       cometbftClientForSvApp(sv4Backend)
         .nodeStatus()
         .valueOrFail("sv4 node status")
@@ -147,29 +143,7 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
     sv.cometBftNodeStatus().catchingUp shouldBe false
     // validate dump
     sv.cometBftNodeDump().abciInfo.isObject shouldBe true
-    sendEmptyTransactionToIncreaseBlockHeight(sv)
     sv.cometBftNodeStatus().votingPower.doubleValue should be(1d)
-  }
-
-  // The changes to a validator is visible only in height H+1, and take effect in H+2,
-  // therefore for us to see the changes we need to make sure the height increases
-  private def sendEmptyTransactionToIncreaseBlockHeight(
-      sv: SvAppBackendReference
-  ): Unit = {
-    cometbftClientForSvApp(sv)
-      .sendAndWaitForCommit(
-        CometBftTx(
-          CometBftTx.Message.SequencerTx(
-            SequencerTx(
-              // We send a sequencer transaction with a random UUID because sending the same transaction would be rejected as a duplicate
-              // by the CometBFT memory pool
-              uuid = UUID.randomUUID().toString
-            )
-          )
-        ).toByteArray
-      )
-      .valueOrFail("empty transaction")
-      .futureValue
   }
 
   private def cometbftClientForSvApp(sv: SvAppBackendReference) = {

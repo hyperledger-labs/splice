@@ -212,12 +212,6 @@ class DomainMigrationInitializer(
       retryProvider,
     )
     logger.info(s"Init new domain nodes from snapshot $domainTopologyTransactions")
-    logger.info(
-      s"sequencerInitTopologyTransactions ${domainTopologyTransactions.sequencerInitTopologyTransactions.size}"
-    )
-    logger.info(
-      s"topologyTransactionsToSubmit ${domainTopologyTransactions.topologyTransactionsToSubmit.size}"
-    )
     for {
       _ <- initializeSequencer(
         domainNodeInitiaizer,
@@ -251,12 +245,12 @@ class DomainMigrationInitializer(
             Some(TopologyStoreId.DomainStore(nodeIdentities.domainId))
           )
         } yield {
-          logger.info(
-            s"!! sequencerTopology.size ${sequencerTopology.size}  mediatorTopology.size ${mediatorTopology.size} "
-          )
           if (sequencerTopology.size != mediatorTopology.size) {
             throw Status.FAILED_PRECONDITION
-              .withDescription("Mediator topology is not synchronized")
+              .withDescription(
+                s"""Mediator topology is not synchronized.
+                   |Sequencer topology size [${sequencerTopology.size}], mediator topology size [${mediatorTopology.size}].""".stripMargin
+              )
               .asRuntimeException()
           }
         },
@@ -427,15 +421,12 @@ object DomainMigrationInitializer {
           if (sequencerInitTransactions.contains(transaction.mapping.code)) {
             // reset sequenced time to ensure it's included in all the init calls
             // use same value as for the founding bootstrap
+            // We don't overwrite the validFrom because if there will be multiple overlapping transactions with the same valid from, canton will consider them all valid
             transaction.copy(
               sequenced = SequencedTime(CantonTimestamp.MinValue.immediateSuccessor)
             )
           } else {
-            if (
-              isFoundingTopologyTransaction(transaction) && !sequencerInitTransactions.contains(
-                transaction.mapping.code
-              )
-            ) {
+            if (isFoundingTopologyTransaction(transaction)) {
               // ensure transaction is valid to be able to replay
               transaction.copy(validUntil = None)
             } else {

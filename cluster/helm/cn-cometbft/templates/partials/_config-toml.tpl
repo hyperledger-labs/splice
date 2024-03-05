@@ -424,8 +424,9 @@ double_sign_check_height = 0
 skip_timeout_commit = true
 
 # EmptyBlocks mode and possible interval between empty blocks
-create_empty_blocks = false
-create_empty_blocks_interval = "0"
+create_empty_blocks = true
+# Ensure that time advances as sequenced time is taken when the block is initialized (#10451)
+create_empty_blocks_interval = "5s"
 
 # Reactor sleep duration parameters
 peer_gossip_sleep_duration = "10ms" #lower to reduce latency
