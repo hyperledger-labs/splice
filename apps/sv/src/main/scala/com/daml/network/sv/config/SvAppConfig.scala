@@ -90,6 +90,8 @@ object SvOnboardingConfig {
       privateKey: String, // the private key we use for authenticating ourselves
   ) extends SvOnboardingConfig
 
+  object JoinWithKey
+
   // TODO(#3232) Consider adding `JoinWithToken` based on an already signed token instead of the raw keys
 
   case class DomainMigration(
