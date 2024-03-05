@@ -97,4 +97,6 @@ Auth0 exception raised, triggering retry
 # canton unused proto imports
 com/digitalasset/canton/.*.proto.* warning: Import .* is unused.
 
+npm-install.sh.*returned non-zero exit code: .*, retrying
+
 # Make sure to have a trailing newline
