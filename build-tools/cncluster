@@ -108,6 +108,16 @@ function _needs_auth0_validator_management_api_creds() {
     fi
 }
 
+function _infra_up() {
+      _info "Activating infrastructure Pulumi stack"
+
+      subcmd_install_dns01_key
+
+      _uses_pulumi_stack infra
+
+      subcmd_pulumi infra up --yes --skip-preview
+}
+
 function _cluster_apply() {
     IMAGE_TAG=$1
 
@@ -116,7 +126,7 @@ function _cluster_apply() {
     fi
 
     _info "Applying Pulumi Infra Stack"
-    subcmd_infra_up
+    _infra_up
 
     _info "Applying Pulumi Stack"
 
@@ -712,13 +722,10 @@ function subcmd_uninstall_data_export_bucket_key() {
 subcommand_whitelist[infra_up]='Apply the infra Pulumi stack.'
 
 function subcmd_infra_up() {
-    _info "Activating infrastructure Pulumi stack"
-
-    subcmd_install_dns01_key
-
-    _uses_pulumi_stack infra
-
-    subcmd_pulumi infra up --yes --skip-preview
+    _cluster_must_exist
+    _prompt_to_confirm
+    make -C "${REPO_ROOT}" cluster/build -j
+    _infra_up
 }
 
 ###
@@ -811,7 +818,7 @@ function subcmd_create() {
     FW_NAME=$(gcloud compute firewall-rules list --filter="name~gke-cn-${GCP_CLUSTER_BASENAME}net-[0-9a-z]*-master" --format=json | jq -r '.[].name')
     gcloud compute firewall-rules update "${FW_NAME}" --allow tcp:10250,tcp:443,tcp:15017
 
-    subcmd_infra_up
+    _infra_up
 
     _log "Determining cluster ingress IP address"
     IPADDR=$(_cluster_ip)
@@ -1469,7 +1476,7 @@ function subcmd_apply() {
         fi
 
         if [ -z "${skipInfra:-}" ]; then
-            subcmd_infra_up
+            _infra_up
         else
             _info "Skipping infra deployment"
         fi
