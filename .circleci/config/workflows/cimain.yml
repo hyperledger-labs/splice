@@ -48,6 +48,7 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cimain"
+          send_deployment_notification: false
           requires:
             - deploy_cluster_for_migration
       - preflight_sv_check:
