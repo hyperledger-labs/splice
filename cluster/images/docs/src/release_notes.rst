@@ -15,9 +15,11 @@ Release Notes
     can use to query its status.
 
   * In preparation for the mainnet deployment and testing real
-    upgrades, testnet no longer preserves coin balances. No
-    configuration changes are required for this. Note that this affects only testnet so
-    will only take effect on March 18th.
+    upgrades, testnet no longer preserves coin balances and validator licenses. No
+    configuration changes are required for this. However, any validator secrets created
+    through the UI or API now need to be regenerated on each reset. Validator secrets
+    configured in ``expected-validator-onboardings`` will automatically be recreated.
+    Note that this affects only testnet so will only take effect on March 18th.
 
 * Documentation
 
