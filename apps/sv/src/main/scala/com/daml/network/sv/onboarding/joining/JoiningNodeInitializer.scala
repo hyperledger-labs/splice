@@ -176,7 +176,7 @@ class JoiningNodeInitializer(
             _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThatB(
               RetryFor.WaitingOnInitDependency,
-              show"the SvcRules list the SV party ${svcStore.key.svParty} as a member",
+              show"the SvcRules list the SV party ${svcStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
               isOnboarded(svcStore), {
                 val (joiningConfig, svConnection) = sponsorSvConnectionAndConfig.getOrElse(
                   sys.error(
@@ -660,9 +660,27 @@ class JoiningNodeInitializer(
 
   private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
     svcRules <- svcStore.lookupSvcRules()
-  } yield svcRules.exists(
-    _.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
-  )
+    isInSvcRulesMembers = svcRules.exists(
+      _.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
+    )
+    isMemberOfDecentralizedNamespace <-
+      if (isInSvcRulesMembers) {
+        participantAdminConnection
+          .getDecentralizedNamespaceDefinition(
+            svcRules
+              .map(_.domain)
+              .getOrElse(
+                throw Status.NOT_FOUND
+                  .withDescription("Domain not found in SvcRules")
+                  .asRuntimeException()
+              ),
+            svcStore.key.svcParty.uid.namespace,
+          )
+          .map(_.mapping.owners.contains(svcStore.key.svParty.uid.namespace))
+      } else {
+        Future.successful(false)
+      }
+  } yield isInSvcRulesMembers && isMemberOfDecentralizedNamespace
 
   private def withLocalDomainNode[A](
       localDomainNodeO: Option[LocalDomainNode]
