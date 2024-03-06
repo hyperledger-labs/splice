@@ -51,6 +51,7 @@ class UserWalletService(
       loggerFactory,
       retryProvider,
       domainMigrationId,
+      participantAdminConnection,
     )
 
   val treasury: TreasuryService = new TreasuryService(

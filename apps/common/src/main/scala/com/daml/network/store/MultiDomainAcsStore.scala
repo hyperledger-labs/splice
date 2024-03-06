@@ -16,6 +16,7 @@ import com.daml.network.environment.ledger.api.{
   ReassignmentEvent,
   TreeUpdate,
 }
+import com.daml.network.store.MultiDomainAcsStore.HasIngestionSink
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.AcsRowData
 import com.daml.network.util.Contract.Companion
@@ -44,7 +45,7 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
-trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
+trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with NamedLogging {
   private implicit val mc: MetricsContext = MetricsContext(
     "store_name" -> this.getClass.getSimpleName
   )
@@ -227,6 +228,10 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
 }
 
 object MultiDomainAcsStore {
+
+  trait HasIngestionSink {
+    def ingestionSink: MultiDomainAcsStore.IngestionSink
+  }
 
   /** Static specification of a set of create events in scope for ingestion into an MultiDomainAcsStore. */
   trait ContractFilter[R <: AcsRowData] {

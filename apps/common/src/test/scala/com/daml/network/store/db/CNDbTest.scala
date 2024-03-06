@@ -62,7 +62,13 @@ trait CNDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 store_descriptors,
                 store_last_ingested_offsets,
                 round_totals,
-                round_party_totals
+                round_party_totals,
+                update_history_descriptors,
+                update_history_last_ingested_offsets,
+                update_history_transactions,
+                update_history_exercises,
+                update_history_creates,
+                update_history_reassignments
             RESTART IDENTITY CASCADE""".asUpdate,
         "resetAllCnAppTables",
       )

@@ -28,6 +28,8 @@ abstract class InMemoryCNNodeAppStore[TXE](implicit protected val ec: ExecutionC
       retryProvider,
     )
 
+  override def updateHistory: Option[UpdateHistory] = None
+
   override def close(): Unit = ()
 }
 

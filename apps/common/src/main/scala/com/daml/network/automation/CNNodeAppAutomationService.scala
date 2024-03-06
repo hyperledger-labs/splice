@@ -56,6 +56,19 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?]](
     )
   )
 
+  store.updateHistory.foreach(history =>
+    registerService(
+      new UpdateIngestionService(
+        store.getClass.getSimpleName,
+        history.ingestionSink,
+        connection,
+        triggerContext.retryProvider,
+        triggerContext.loggerFactory,
+        ingestFromParticipantBegin = true,
+      )
+    )
+  )
+
   registerTrigger(
     new DomainIngestionService(
       store.domains.ingestionSink,

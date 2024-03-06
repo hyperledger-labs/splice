@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
 import com.daml.network.scan.store.TxLogEntry.EntryType
@@ -43,6 +43,7 @@ class DbScanStore(
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     override val domainMigrationId: Long,
+    participantIdSource: ParticipantAdminConnection.HasParticipantId,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -58,6 +59,8 @@ class DbScanStore(
         "svc_party" -> Json.fromString(svcParty.toProtoPrimitive),
       ),
       domainMigrationId,
+      participantIdSource,
+      storeUpdateHistory = true,
     )
     with ScanStore
     with AcsTables

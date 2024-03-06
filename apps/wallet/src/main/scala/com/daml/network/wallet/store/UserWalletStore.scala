@@ -5,10 +5,10 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.{
-  validatorlicense as validatorCodegen,
   coin as coinCodegen,
   coinrules as coinrulesCodegen,
   round as roundCodegen,
+  validatorlicense as validatorCodegen,
 }
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
@@ -19,7 +19,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.{CNNodeAppStore, Limit, PageLimit, TxLogStore}
@@ -505,6 +505,7 @@ object UserWalletStore {
       retryProvider: RetryProvider,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
+      participantIdSource: ParticipantAdminConnection.HasParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -525,6 +526,7 @@ object UserWalletStore {
           loggerFactory,
           retryProvider,
           domainMigrationId,
+          participantIdSource,
         )
     }
   }

@@ -53,13 +53,34 @@ class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest wit
       } yield fetched.head).futureValue should be(row)
     }
 
-    "read contract id arrays" in {
+    "set and get contract id arrays" in {
+      val value = Array("a", "b", "c").map(new ContractId[Any](_))
       for {
         result <- storage.querySingle(
-          sql"select ARRAY['a', 'b', 'c']".as[Array[ContractId[Any]]].headOption,
+          sql"select $value".as[Array[ContractId[Any]]].headOption,
           "array",
         )
-      } yield result should be(Array("a", "b", "c").map(new ContractId[Any](_)))
+      } yield result should contain theSameElementsAs value
+    }
+
+    "set and get string arrays" in {
+      val value = Array("a", "b", "c")
+      for {
+        result <- storage.querySingle(
+          sql"select ${value.map(lengthLimited)}".as[Array[String]].headOption,
+          "array",
+        )
+      } yield result should contain theSameElementsAs value
+    }
+
+    "set and get string sequences" in {
+      val value = Seq("a", "b", "c")
+      for {
+        result <- storage.querySingle(
+          sql"select ${value.map(lengthLimited)}".as[Seq[String]].headOption,
+          "array",
+        )
+      } yield result should contain theSameElementsAs value
     }
   }
 

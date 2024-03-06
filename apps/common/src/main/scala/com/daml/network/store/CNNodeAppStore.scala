@@ -21,6 +21,7 @@ trait CNNodeAppStore[TXE] extends NamedLogging with AutoCloseable with StoreErro
 
   def multiDomainAcsStore: MultiDomainAcsStore
 
+  def updateHistory: Option[UpdateHistory]
 }
 
 /** A coin app store whose TxLog is always empty.

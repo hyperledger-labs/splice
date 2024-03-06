@@ -28,7 +28,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.environment.{PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{PackageIdResolver, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.*
@@ -924,6 +924,7 @@ object SvSvcStore {
       retryProvider: RetryProvider,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
+      participantIdSource: ParticipantAdminConnection.HasParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -944,6 +945,7 @@ object SvSvcStore {
           loggerFactory,
           retryProvider,
           domainMigrationId,
+          participantIdSource,
         )
     }
   }

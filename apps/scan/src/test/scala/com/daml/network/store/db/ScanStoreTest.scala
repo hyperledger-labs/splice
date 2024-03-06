@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.cn.cns.CnsEntry
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
 import com.daml.network.codegen.java.cn.svc.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.{DarResources, RetryProvider}
+import com.daml.network.environment.{DarResources, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.history.{CoinExpire, LockedCoinExpireCoin, Transfer}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.{
@@ -1458,6 +1458,7 @@ class DbScanStoreTest
           def close(): Unit = ()
         },
       domainMigrationId,
+      participantIdSource = ParticipantAdminConnection.HasParticipantId.ForTesting,
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {

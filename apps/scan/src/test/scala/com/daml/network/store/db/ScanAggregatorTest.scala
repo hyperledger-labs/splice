@@ -2,9 +2,9 @@ package com.daml.network.store.db
 
 import scala.concurrent.Future
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import com.daml.network.environment.DarResources
+import com.daml.network.environment.{DarResources, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.history.Transfer
-import com.daml.network.scan.store.db.{ScanAggregator, ScanAggregatesReader, DbScanStore}
+import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
 import com.daml.network.scan.store.db.ScanAggregator.*
 import com.daml.network.store.StoreTest
 import com.daml.network.store.StoreErrors
@@ -21,9 +21,9 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.TxLogEntry.EntryType
+
 import scala.concurrent.ExecutionContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.topology.ParticipantId
@@ -679,6 +679,7 @@ class ScanAggregatorTest
       ),
       createReader,
       domainMigrationId = 0,
+      participantIdSource = ParticipantAdminConnection.HasParticipantId.ForTesting,
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

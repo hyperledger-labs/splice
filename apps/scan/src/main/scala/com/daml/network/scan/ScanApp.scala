@@ -105,7 +105,13 @@ class ScanApp(
         httpClient,
         templateDecoder,
       )
-
+      participantAdminConnection = new ParticipantAdminConnection(
+        config.participantClient.adminApi,
+        coinAppParameters.loggingConfig.api,
+        loggerFactory,
+        retryProvider,
+        clock,
+      )
       store = ScanStore(
         serviceUserPrimaryParty = serviceUserPrimaryParty,
         svcParty = svcParty,
@@ -118,13 +124,7 @@ class ScanApp(
           ScanAggregatesReader(store, scanAggregatesReaderContext)
         },
         config.domainMigrationId,
-      )
-      participantAdminConnection = new ParticipantAdminConnection(
-        config.participantClient.adminApi,
-        coinAppParameters.loggingConfig.api,
-        loggerFactory,
-        retryProvider,
-        clock,
+        participantAdminConnection,
       )
       sequencerAdminConnection = new SequencerAdminConnection(
         config.sequencerAdminClient,

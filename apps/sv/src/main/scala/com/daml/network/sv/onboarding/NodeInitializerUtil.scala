@@ -66,6 +66,7 @@ trait NodeInitializerUtil extends NamedLogging {
       key: SvStore.Key,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
+      participantIdSource: ParticipantAdminConnection.HasParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
@@ -77,6 +78,7 @@ trait NodeInitializerUtil extends NamedLogging {
       loggerFactory,
       retryProvider,
       domainMigrationId,
+      participantIdSource,
     )
   }
 

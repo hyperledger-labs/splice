@@ -45,6 +45,7 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.history.{AppRewardCreate, CoinCreate}
+import com.daml.network.store.MultiDomainAcsStore.HasIngestionSink
 import com.daml.network.store.db.TxLogRowData
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -619,13 +620,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   // Convenient syntax to make the tests easy to read.
   protected implicit class DomainSyntax(private val domain: DomainId) {
 
-    def create[TCid <: ContractId[T], T](
+    def create[TCid <: ContractId[T], T, Sink](
         c: Contract[TCid, T],
         offset: String = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(svcParty),
         workflowId: String = "",
-    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+    )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
         Seq(c),
@@ -649,7 +650,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         txEffectiveAt: Instant = defaultEffectiveAt,
         createdEventSignatories: Seq[PartyId] = Seq(svcParty),
         workflowId: String = "",
-    )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
+    )(implicit stores: Seq[HasIngestionSink]): Future[TransactionTree] = {
       val tx = mkCreateTx(
         offset,
         Seq(c),
@@ -673,7 +674,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     def archive[TCid <: ContractId[T], T](
         c: Contract[TCid, T],
         txEffectiveAt: Instant = defaultEffectiveAt,
-    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+    )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkTx(nextOffset(), Seq(toArchivedEvent(c)), domain, txEffectiveAt)
       store.ingestionSink
         .ingestUpdate(
@@ -687,7 +688,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
     def ingest(
         makeTx: String => TransactionTree
-    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+    )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = makeTx(nextOffset())
       store.ingestionSink
         .ingestUpdate(
@@ -701,7 +702,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
     def ingestMulti(
         makeTx: String => TransactionTree
-    )(implicit stores: Seq[MultiDomainAcsStore]): Future[TransactionTree] = {
+    )(implicit stores: Seq[HasIngestionSink]): Future[TransactionTree] = {
       val tx = makeTx(nextOffset())
       val txUpdate = TransactionTreeUpdate(tx)
       // Note: runs the futures sequentially in order to get deterministic tests
@@ -719,7 +720,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         contractAndDomain: (Contract[TCid, T], DomainId),
         reassignmentId: String,
         counter: Long,
-    )(implicit store: MultiDomainAcsStore): Future[Reassignment[ReassignmentEvent.Unassign]] = {
+    )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Unassign]] = {
       val reassignment = mkReassignment(
         nextOffset(),
         toUnassignEvent(
@@ -743,7 +744,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         contractAndDomain: (Contract[TCid, T], DomainId),
         reassignmentId: String,
         counter: Long,
-    )(implicit store: MultiDomainAcsStore): Future[Reassignment[ReassignmentEvent.Assign]] = {
+    )(implicit store: HasIngestionSink): Future[Reassignment[ReassignmentEvent.Assign]] = {
       val reassignment = mkReassignment(
         nextOffset(),
         toAssignEvent(
@@ -771,7 +772,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         exerciseResult: damlValue,
         offset: String = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
-    )(implicit store: MultiDomainAcsStore): Future[TransactionTree] = {
+    )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkTx(
         offset,
         Seq(mkExercise(contract, interfaceId, choiceName, choiceArgument, exerciseResult)),

@@ -7,7 +7,7 @@ import slick.jdbc.{
   PositionedResult,
   SetParameter,
   StatementInvoker,
-  StreamingInvokerAction
+  StreamingInvokerAction,
 }
 import slick.sql.{SqlAction, SqlStreamingAction}
 
@@ -39,9 +39,9 @@ object ActionBasedSQLInterpolation {
   }
 
   def sqlImpl(ctxt: blackbox.Context)(param: ctxt.Expr[Any]*): ctxt.Expr[SQLActionBuilder] = {
-    import ctxt.universe._
+    import ctxt.universe.*
     reify {
-      val builder = slick.jdbc.ActionBasedSQLInterpolation.sqlImpl(ctxt)(param.toList: _*).splice
+      val builder = slick.jdbc.ActionBasedSQLInterpolation.sqlImpl(ctxt)(param.toList*).splice
       SQLActionBuilder(builder.queryParts, builder.unitPConv)
     }
   }
@@ -49,24 +49,36 @@ object ActionBasedSQLInterpolation {
 }
 
 final case class SQLActionBuilder(queryParts: Seq[Any], unitPConv: SetParameter[Unit]) {
-  private def asInternal[R, E <: Effect](implicit rconv: GetResult[R]): SqlStreamingAction[Vector[R], R, E] = {
+  private def asInternal[R, E <: Effect](implicit
+      rconv: GetResult[R]
+  ): SqlStreamingAction[Vector[R], R, E] = {
     val query =
-      if (queryParts.length == 1 && queryParts(0).isInstanceOf[String]) queryParts(0).asInstanceOf[String]
+      if (queryParts.length == 1 && queryParts(0).isInstanceOf[String])
+        queryParts(0).asInstanceOf[String]
       else queryParts.iterator.map(String.valueOf).mkString
     new StreamingInvokerAction[Vector[R], R, E] {
       def statements = List(query)
       protected[this] def createInvoker(statements: Iterable[String]) = new StatementInvoker[R] {
-        val getStatement                                    = statements.head
-        protected def setParam(st: PreparedStatement)       = unitPConv((), new PositionedParameters(st))
+        val getStatement = statements.head
+        protected def setParam(st: PreparedStatement) = unitPConv((), new PositionedParameters(st))
         protected def extractValue(rs: PositionedResult): R = rconv(rs)
       }
       protected[this] def createBuilder = Vector.newBuilder[R]
     }
   }
 
-  def as[R](implicit rconv: GetResult[R]): SqlStreamingAction[Vector[R], R, Effect.Read] = asInternal[R, Effect.Read]
-  def asUpdate: SqlStreamingAction[Vector[Int], Int, Effect.Write]#ResultAction[Int, NoStream, Effect.Write] =
+  def as[R](implicit rconv: GetResult[R]): SqlStreamingAction[Vector[R], R, Effect.Read] =
+    asInternal[R, Effect.Read]
+  def asUpdate: SqlStreamingAction[Vector[Int], Int, Effect.Write]#ResultAction[
+    Int,
+    NoStream,
+    Effect.Write,
+  ] =
     asInternal[Int, Effect.Write](GetResult.GetUpdateValue).head
+  def asUpdateReturning[R](implicit
+      rconv: GetResult[R]
+  ): SqlStreamingAction[Vector[R], R, Effect.Read & Effect.Write] =
+    asInternal[R, Effect.Read & Effect.Write]
 
   def stripMargin(marginChar: Char): SQLActionBuilder =
     copy(queryParts.map(_.asInstanceOf[String].stripMargin(marginChar)))

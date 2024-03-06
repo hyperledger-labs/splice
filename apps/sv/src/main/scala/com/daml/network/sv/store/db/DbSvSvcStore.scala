@@ -21,7 +21,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionInitialPayment,
   SubscriptionRequest,
 }
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
@@ -60,6 +60,7 @@ class DbSvSvcStore(
     override protected val retryProvider: RetryProvider,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     override val domainMigrationId: Long,
+    participantIdSource: ParticipantAdminConnection.HasParticipantId,
 )(implicit
     override protected val ec: ExecutionContext,
     override protected val templateJsonDecoder: TemplateJsonDecoder,
@@ -76,6 +77,9 @@ class DbSvSvcStore(
         "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),
       ),
       domainMigrationId,
+      participantIdSource,
+      // We disable the update history for the Sv app, as the same history is already persisted by the Scan app.
+      storeUpdateHistory = false,
     )
     with SvSvcStore
     with AcsTables

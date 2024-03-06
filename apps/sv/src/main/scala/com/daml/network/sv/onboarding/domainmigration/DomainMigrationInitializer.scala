@@ -118,7 +118,7 @@ class DomainMigrationInitializer(
         storeKey.svParty,
       )
       svStore = newSvStore(storeKey, config.domainMigrationId)
-      svcStore = newSvcStore(svStore.key, config.domainMigrationId)
+      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantAdminConnection)
       svAutomation = newSvSvAutomationService(
         svStore,
         svcStore,

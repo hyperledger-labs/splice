@@ -3,16 +3,16 @@ package com.daml.network.scan.store
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
-import com.daml.network.environment.{PackageIdResolver, RetryProvider}
+import com.daml.network.environment.{PackageIdResolver, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.{
   DbScanStore,
-  ScanTables,
-  ScanAggregator,
   ScanAggregatesReader,
+  ScanAggregator,
+  ScanTables,
 }
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.util.{CoinConfigSchedule, Contract, ContractWithState, TemplateJsonDecoder}
@@ -23,6 +23,7 @@ import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
+
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -227,6 +228,7 @@ object ScanStore {
       createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
+      participantIdSource: ParticipantAdminConnection.HasParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -251,6 +253,7 @@ object ScanStore {
           retryProvider,
           createScanAggregatesReader,
           domainMigrationId,
+          participantIdSource,
         )
     }
   }

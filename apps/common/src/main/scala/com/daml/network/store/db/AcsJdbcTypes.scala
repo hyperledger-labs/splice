@@ -16,7 +16,7 @@ import io.circe.parser.parse as circeParse
 import slick.ast.FieldSymbol
 import slick.jdbc.{GetResult, JdbcType, PositionedParameters, PositionedResult, SetParameter}
 
-import java.sql.{PreparedStatement, ResultSet}
+import java.sql.{JDBCType, PreparedStatement, ResultSet}
 import com.google.protobuf.ByteString
 
 import java.io.StringWriter
@@ -71,6 +71,9 @@ trait AcsJdbcTypes {
     GetResult.GetStringOption.andThen(_.map(new ContractId[T](_)))
 
   protected implicit def contractIdArrayGetResult[T]: GetResult[Array[ContractId[T]]] =
+    stringArrayGetResult.andThen(_.map(new ContractId[T](_)))
+
+  protected implicit lazy val stringArrayGetResult: GetResult[Array[String]] =
     (r: PositionedResult) => {
       (r.rs
         .getArray(r.skip.currentPos)
@@ -79,11 +82,32 @@ trait AcsJdbcTypes {
           arr
         case x =>
           throw new IllegalStateException(
-            s"Expected an array of strings, but got $x. Are you sure you selected a contract_id (text) array column?"
+            s"Expected an array of strings, but got $x. Are you sure you selected a text array column?"
           )
       })
-        .map(new ContractId[T](_))
     }
+
+  protected implicit lazy val stringSeqGetResult: GetResult[Seq[String]] =
+    stringArrayGetResult.andThen(_.toSeq)
+
+  private val stringArraySetParameter: SetParameter[Array[String]] =
+    (strings: Array[String], pp: PositionedParameters) =>
+      pp.setObject(
+        pp.ps.getConnection.createArrayOf("text", strings.map(x => x)),
+        JDBCType.ARRAY.getVendorTypeNumber,
+      )
+
+  protected implicit lazy val string2066ArraySetParameter: SetParameter[Array[String2066]] =
+    (strings: Array[String2066], pp: PositionedParameters) =>
+      stringArraySetParameter(strings.map(_.str), pp)
+
+  protected implicit lazy val string2066SeqSetParameter: SetParameter[Seq[String2066]] =
+    (strings: Seq[String2066], pp: PositionedParameters) =>
+      stringArraySetParameter(strings.map(_.str).toArray, pp)
+
+  protected implicit def contractIdArraySetParameter[T]: SetParameter[Array[ContractId[T]]] =
+    (ids: Array[ContractId[T]], pp: PositionedParameters) =>
+      stringArraySetParameter(ids.map(_.contractId), pp)
 
   protected implicit def partyIdGetResult[T]: GetResult[PartyId] =
     GetResult.GetString.andThen(PartyId.tryFromProtoPrimitive)

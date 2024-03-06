@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.environment.RetryProvider
+import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
@@ -40,6 +40,7 @@ class DbUserWalletStore(
     override protected val retryProvider: RetryProvider,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     override val domainMigrationId: Long,
+    participantIdSource: ParticipantAdminConnection.HasParticipantId,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -58,6 +59,12 @@ class DbUserWalletStore(
         "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),
       ),
       domainMigrationId,
+      participantIdSource,
+      // Note: this causes the app to persist the original update stream for each wallet end user.
+      // The data in this stream overlaps with (but is not a subset of) the data in the validator operator
+      // update stream, which is used in the DbValidatorWalletStore.
+      // An alternative would be to use one fused update stream for all local parties, but we don't have that.
+      storeUpdateHistory = true,
     )
     with UserWalletStore
     with AcsTables

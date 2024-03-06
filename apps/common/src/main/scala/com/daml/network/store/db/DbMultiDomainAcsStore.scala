@@ -568,7 +568,9 @@ final class DbMultiDomainAcsStore[TXE](
         lastIngestedOffset.foreach(oldState.signalOffsetChanged)
 
         if (alreadyIngestedAcs) {
-          logger.info(s"Store $storeDescriptor resumed with storeId $newStoreId domainMigrationId")
+          logger.info(
+            s"Store $storeDescriptor resumed with storeId $newStoreId and $domainMigrationId"
+          )
           finishedAcsIngestion.trySuccess(()).discard
         } else {
           logger.info(s"Store $storeDescriptor initialized with storeId $newStoreId")

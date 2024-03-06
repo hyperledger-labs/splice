@@ -44,7 +44,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionRequest,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.{DarResources, RetryProvider}
+import com.daml.network.environment.{DarResources, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -1315,6 +1315,7 @@ class DbSvSvcStoreTest
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       domainMigrationId,
+      participantIdSource = ParticipantAdminConnection.HasParticipantId.ForTesting,
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()
