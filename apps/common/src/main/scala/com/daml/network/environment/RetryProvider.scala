@@ -36,6 +36,7 @@ import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import org.apache.pekko.stream.StreamTcpException
 
 import java.io.IOException
+import java.net.ConnectException
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.Collections
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -610,6 +611,12 @@ object RetryProvider {
               )
               FatalErrorKind
             }
+          // Retry for transient DNS failures #10545
+          case Failure(ex: ConnectException) =>
+            logger.info(
+              s"The operation ${operationName.singleQuoted} failed with a $transientDescription error (full stack trace omitted): $ex"
+            )
+            TransientErrorKind
           // We encounter this with toxiproxy if the upstream is not yet up.
           // The exception type is org.apache.pekko.http.impl.engine.client.OutgoingConnectionBlueprint.UnexpectedConnectionClosureException
           // but pekko-http does not expose that so we match on the message instead.
