@@ -84,18 +84,13 @@ class WalletTxLogAcsIntegrationTest
         onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
       }
 
-      // Arbitrary coin price assigned by the user wallet tx log parser
-      val unknownCoinPrice = BigDecimal(1)
-
       checkTxHistory(
         sv1WalletClient,
         Seq(
           { case logEntry: BalanceChangeTxLogEntry =>
-            // Entry appears as a mint even though the coin was created with a tap,
-            // since we cannot determine how coins in the initial ACS were created.
-            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Mint.toProto
+            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount.bigDecimal shouldBe mintAmount
-            logEntry.coinPrice shouldBe unknownCoinPrice
+            logEntry.coinPrice shouldBe coinPrice
           }
         ),
       )

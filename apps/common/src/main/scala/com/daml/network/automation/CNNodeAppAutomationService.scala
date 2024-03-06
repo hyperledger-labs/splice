@@ -26,7 +26,7 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?]](
     packageIdResolver: PackageIdResolver,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
-    ingestFromParticipantBegin: Boolean = false,
+    ingestFromParticipantBegin: Boolean = true,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,

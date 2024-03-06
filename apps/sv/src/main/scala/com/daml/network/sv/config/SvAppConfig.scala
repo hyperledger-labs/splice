@@ -187,7 +187,7 @@ case class SvAppBackendConfig(
     onLedgerStatusReportInterval: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofMinutes(1),
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
-    ingestFromParticipantBegin: Boolean = false,
+    ingestFromParticipantBegin: Boolean = true,
     extraBeneficiaries: Map[PartyId, BigDecimal] = Map.empty,
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"

@@ -23,6 +23,7 @@ case class ScanAppBackendConfig(
     override val participantClient: CNParticipantClientConfig,
     sequencerAdminClient: ClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
+    // only the founder should ingest from participant begin
     ingestFromParticipantBegin: Boolean = false,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration] = None,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here

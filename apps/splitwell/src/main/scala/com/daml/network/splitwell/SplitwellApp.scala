@@ -17,6 +17,7 @@ import com.daml.network.environment.{
   CNNodeStatus,
   DarResources,
   ParticipantAdminConnection,
+  RetryFor,
 }
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.splitwell.SplitwellResource
@@ -188,29 +189,35 @@ class SplitwellApp(
   private def createSplitwellRules(
       domain: DomainId,
       automation: SplitwellAutomationService,
-  ): Future[Unit] =
-    automation.store.lookupSplitwellRules(domain).flatMap {
-      case QueryResult(offset, None) =>
-        automation.connection
-          .submit(
-            Seq(automation.store.key.providerParty),
-            Seq.empty,
-            new splitwellCodegen.SplitwellRules(
-              automation.store.key.providerParty.toProtoPrimitive
-            ).create,
-          )
-          .withDomainId(domain)
-          .withDedup(
-            CNLedgerConnection.CommandId(
-              "com.daml.network.splitwell.createSplitwellRules",
+  ): Future[Unit] = {
+    retryProvider.waitUntil(
+      RetryFor.ClientCalls,
+      s"Wait for splitwell rules to be created for domain $domain",
+      automation.store.lookupSplitwellRules(domain).flatMap {
+        case QueryResult(offset, None) =>
+          automation.connection
+            .submit(
               Seq(automation.store.key.providerParty),
-              domain.toProtoPrimitive,
-            ),
-            offset,
-          )
-          .yieldUnit()
-      case QueryResult(_, Some(_)) => Future.unit
-    }
+              Seq.empty,
+              new splitwellCodegen.SplitwellRules(
+                automation.store.key.providerParty.toProtoPrimitive
+              ).create,
+            )
+            .withDomainId(domain)
+            .withDedup(
+              CNLedgerConnection.CommandId(
+                "com.daml.network.splitwell.createSplitwellRules",
+                Seq(automation.store.key.providerParty),
+                domain.toProtoPrimitive,
+              ),
+              offset,
+            )
+            .yieldUnit()
+        case QueryResult(_, Some(_)) => Future.unit
+      },
+      logger,
+    )
+  }
 
   override lazy val requiredPackageIds = Set(DarResources.splitwell.bootstrap.packageId)
 

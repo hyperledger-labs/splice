@@ -587,8 +587,8 @@ object CNNodeConfigTransforms {
 
   private def updateAllLedgerApiClientConfigs(
       enableAuth: (String, CNLedgerApiClientConfig) => CNLedgerApiClientConfig
-  ): CNNodeConfigTransform = { config =>
-    val transforms: Seq[CNNodeConfigTransform] = Seq(
+  ): CNNodeConfigTransform = {
+    combineAllTransforms(
       updateAllValidatorConfigs_(c => {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
@@ -605,7 +605,6 @@ object CNNodeConfigTransforms {
         c.focus(_.participantClient.ledgerApi).modify(enableAuth(c.ledgerApiUser, _))
       }),
     )
-    transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
   def selfSignedTokenAuthSourceTransform(clockConfig: ClockConfig, secret: String)(
@@ -647,20 +646,6 @@ object CNNodeConfigTransforms {
       )
     })
 
-  def ingestFromParticipantBeginInSv: CNNodeConfigTransform =
-    updateAllSvAppConfigs_(c =>
-      c.copy(
-        ingestFromParticipantBegin = true
-      )
-    )
-
-  def ingestFromParticipantBeginInValidator: CNNodeConfigTransform =
-    updateAllValidatorAppConfigs_(c =>
-      c.copy(
-        ingestFromParticipantBegin = true
-      )
-    )
-
   def ingestFromParticipantBeginInScan: CNNodeConfigTransform =
     updateAllScanAppConfigs_(c =>
       c.copy(
@@ -683,8 +668,8 @@ object CNNodeConfigTransforms {
           String,
           CNDbConfig,
       ) => CNDbConfig
-  ): CNNodeConfigTransform = { config =>
-    val transforms: Seq[CNNodeConfigTransform] = Seq(
+  ): CNNodeConfigTransform = {
+    combineAllTransforms(
       updateAllValidatorConfigs((name, config) =>
         config
           .focus(_.storage)
@@ -701,6 +686,9 @@ object CNNodeConfigTransforms {
           .modify(storage => storageConfigModifier(name, storage))
       ),
     )
+  }
+
+  private def combineAllTransforms(transforms: CNNodeConfigTransform*) = { (config: CNNodeConfig) =>
     transforms.foldLeft(config)((c, tf) => tf(c))
   }
 

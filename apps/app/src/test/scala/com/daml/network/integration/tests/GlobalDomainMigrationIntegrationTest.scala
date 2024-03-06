@@ -390,13 +390,7 @@ class GlobalDomainMigrationIntegrationTest
           )(conf),
       )
       .addConfigTransforms(
-        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInSv(c) }
-      )
-      .addConfigTransformsToFront(
         { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
-      )
-      .addConfigTransformsToFront(
-        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInValidator(c) }
       )
       .withManualStart
 
