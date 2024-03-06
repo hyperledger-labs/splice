@@ -11,14 +11,17 @@ import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 
 import scala.jdk.OptionConverters.*
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvOnboardingStatus
-import com.daml.network.util.WalletTestUtil
+import com.daml.network.util.{SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.transaction.ParticipantPermission
 import org.slf4j.event.Level
 
 import scala.concurrent.duration.*
 
-class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletTestUtil {
+class SvOnboardingAddlIntegrationTest
+    extends SvIntegrationTestBase
+    with WalletTestUtil
+    with SvTestUtil {
 
   override def environmentDefinition =
     super.environmentDefinition
@@ -27,7 +30,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
           if (name == "sv3") {
             config.copy(
               approvedSvIdentities = config.approvedSvIdentities.filter(
-                _.name != "Canton-Foundation-4"
+                _.name != getSvName(4)
               )
             )
           } else config
@@ -76,7 +79,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
               .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty)
           ) {
             case Seq(svOnboarding) => {
-              svOnboarding.data.candidateName shouldBe "Canton-Foundation-4"
+              svOnboarding.data.candidateName shouldBe getSvName(4)
               svOnboarding.data.candidateParty shouldBe sv4Party.toProtoPrimitive
               svOnboarding.data.candidateParticipantId shouldBe sv4Backend.participantClient.id.toProtoPrimitive
               svOnboarding.data.sponsor shouldBe sv1Party.toProtoPrimitive
@@ -86,7 +89,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
               SvOnboardingToken
                 .verifyAndDecode(svOnboarding.data.token)
                 .value shouldBe SvOnboardingToken(
-                "Canton-Foundation-4",
+                getSvName(4),
                 "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA==",
                 sv4Party,
                 sv4Backend.participantClient.id,
@@ -118,7 +121,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
             case a: ARC_SvcRules =>
               a.svcAction match {
                 case confirm: SRARC_ConfirmSvOnboarding =>
-                  confirm.svcRules_ConfirmSvOnboardingValue.newMemberName == "Canton-Foundation-4"
+                  confirm.svcRules_ConfirmSvOnboardingValue.newMemberName == getSvName(4)
                 case _ => false
               }
             case _ => false
@@ -134,11 +137,11 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
     clue("SV4's onboarding status is reported correctly.") {
       eventually()(inside(sv1Backend.getSvOnboardingStatus(sv4Party)) {
         case status: SvOnboardingStatus.Requested => {
-          status.name shouldBe "Canton-Foundation-4"
+          status.name shouldBe getSvName(4)
           status.svOnboardingRequestCid shouldBe svOnboardingRequestCid
-          status.confirmedBy.sorted shouldBe Vector("Canton-Foundation-1")
+          status.confirmedBy.sorted shouldBe Vector(getSvName(1))
           status.requiredNumConfirmations shouldBe 2
-          sv1Backend.getSvOnboardingStatus("Canton-Foundation-4") shouldBe sv1Backend
+          sv1Backend.getSvOnboardingStatus(getSvName(4)) shouldBe sv1Backend
             .getSvOnboardingStatus(
               sv4Party
             )
@@ -158,9 +161,9 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
     clue("SV4's onboarding status is reported as completed.") {
       eventually()(inside(sv1Backend.getSvOnboardingStatus(sv4Party)) {
         case status: SvOnboardingStatus.Completed => {
-          status.name shouldBe "Canton-Foundation-4"
+          status.name shouldBe getSvName(4)
           status.svcRulesCid shouldBe sv1Backend.getSvcInfo().svcRules.contractId
-          sv1Backend.getSvOnboardingStatus("Canton-Foundation-4") shouldBe sv1Backend
+          sv1Backend.getSvOnboardingStatus(getSvName(4)) shouldBe sv1Backend
             .getSvOnboardingStatus(
               sv4Party
             )
@@ -237,7 +240,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
 
       clue("Unknown parties have unknown SV onboarding status") {
         inside(sv1Backend.getSvOnboardingStatus(sv2Party)) { case SvOnboardingStatus.Unknown() =>
-          sv1Backend.getSvOnboardingStatus("Canton-Foundation-2") shouldBe sv1Backend
+          sv1Backend.getSvOnboardingStatus(getSvName(2)) shouldBe sv1Backend
             .getSvOnboardingStatus(
               sv2Party
             )
@@ -252,7 +255,7 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
               new SRARC_ConfirmSvOnboarding(
                 new SvcRules_ConfirmSvOnboarding(
                   sv2Party.toProtoPrimitive,
-                  "Canton-Foundation-2",
+                  getSvName(2),
                   "PAR::sv2::1220f3e2",
                   SvUtil.DefaultFoundingNodeWeight,
                   "no reason",
@@ -266,8 +269,8 @@ class SvOnboardingAddlIntegrationTest extends SvIntegrationTestBase with WalletT
         _ =>
           inside(sv1Backend.getSvOnboardingStatus(sv2Party)) {
             case status: SvOnboardingStatus.Confirmed => {
-              status.name shouldBe "Canton-Foundation-2"
-              sv1Backend.getSvOnboardingStatus("Canton-Foundation-2") shouldBe sv1Backend
+              status.name shouldBe getSvName(2)
+              sv1Backend.getSvOnboardingStatus(getSvName(2)) shouldBe sv1Backend
                 .getSvOnboardingStatus(
                   sv2Party
                 )

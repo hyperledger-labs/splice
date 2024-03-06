@@ -36,9 +36,9 @@
   "app_state": {
     "sv_node_id":
     {{- if eq (include "isTestNet" .) "true" }}
-      "Canton-Foundation",
+      "Foundation",
     {{- else }}
-      "Canton-Foundation-1",
+      "Foundation-1",
     {{ end }}
     "governance_keys": [
       {

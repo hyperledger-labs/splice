@@ -72,11 +72,11 @@ abstract class RunbookSvPreflightIntegrationTestBase
           inside(find(id("comet-bft-debug-network"))) { case Some(e) =>
             if (isDevNet) {
               forAll(Range(1, 5)) { _ =>
-                e.text should include(s"\"moniker\": \"Canton-Foundation-1\"")
+                e.text should include(s"\"moniker\": \"${getSvName(1)}\"")
               }
             } else {
               forAll(Range(1, 2)) { _ =>
-                e.text should include(s"\"moniker\": \"Canton-Foundation\"")
+                e.text should include(s"\"moniker\": \"Foundation\"")
               }
             }
           }

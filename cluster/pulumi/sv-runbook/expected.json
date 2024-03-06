@@ -568,17 +568,17 @@
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-2",
+            "name": "Digital-Asset-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-3",
+            "name": "Digital-Asset-3",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-4",
+            "name": "Digital-Asset-4",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==",
             "rewardWeightBps": 10000
           },

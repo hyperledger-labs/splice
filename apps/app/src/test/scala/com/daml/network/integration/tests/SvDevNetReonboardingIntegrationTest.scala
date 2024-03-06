@@ -95,7 +95,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
         members should have size 3
         val sv3PartyId = sv3Backend.getSvcInfo().svParty
         inside(members.get(sv3PartyId.toProtoPrimitive)) { case Some(memberInfo) =>
-          memberInfo.name shouldBe "Canton-Foundation-3"
+          memberInfo.name shouldBe getSvName(3)
         }
         sv3PartyId
       }
@@ -146,7 +146,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
             newMembers
               .get(newSv3PartyId.toProtoPrimitive)
           ) { case Some(memberInfo) =>
-            memberInfo.name shouldBe "Canton-Foundation-3"
+            memberInfo.name shouldBe getSvName(3)
           }
         },
       )

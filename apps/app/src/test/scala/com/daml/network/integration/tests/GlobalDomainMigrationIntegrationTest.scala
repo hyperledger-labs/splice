@@ -112,7 +112,7 @@ class GlobalDomainMigrationIntegrationTest
                   .copy(
                     onboarding = Some(
                       DomainMigration(
-                        name = s"Canton-Foundation-$sv",
+                        name = getSvName(sv),
                         dumpFilePath = Path.of(""),
                       )
                     ),

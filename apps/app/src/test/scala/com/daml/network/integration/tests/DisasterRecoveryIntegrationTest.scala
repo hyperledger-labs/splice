@@ -18,7 +18,7 @@ import com.daml.network.sv.automation.singlesv.SvRewardTrigger
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
-import com.daml.network.util.{DomainMigrationUtil, ProcessTestUtil, StandaloneCanton}
+import com.daml.network.util.{DomainMigrationUtil, ProcessTestUtil, StandaloneCanton, SvTestUtil}
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -43,7 +43,8 @@ class DisasterRecoveryIntegrationTest
     extends CNNodeIntegrationTest
     with ProcessTestUtil
     with DomainMigrationUtil
-    with StandaloneCanton {
+    with StandaloneCanton
+    with SvTestUtil {
 
   override def dbsSuffix = "disaster_recovery"
 
@@ -95,7 +96,7 @@ class DisasterRecoveryIntegrationTest
                       .copy(
                         onboarding = Some(
                           DomainMigration(
-                            name = s"Canton-Foundation-${sv}",
+                            name = getSvName(sv),
                             dumpFilePath = migrationDumpFilePath(s"sv${sv}").path,
                           )
                         ),

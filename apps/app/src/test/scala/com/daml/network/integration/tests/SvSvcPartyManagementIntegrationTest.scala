@@ -86,7 +86,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         assertThrowsAndLogsCommandFailures(
           sv1Backend.startSvOnboarding(
             SvOnboardingToken(
-              "Canton-Foundation-1",
+              getSvName(1),
               publicKey,
               unAuthorizedParty,
               sv3Backend.participantClient.id,
@@ -107,7 +107,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         assertThrowsAndLogsCommandFailures(
           sv3Backend.startSvOnboarding(
             SvOnboardingToken(
-              "Canton-Foundation-4",
+              getSvName(4),
               publicKey,
               sv3PartyWithWrongNamespace,
               sv3Backend.participantClient.id,

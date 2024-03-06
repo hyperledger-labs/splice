@@ -6,7 +6,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{ConfigScheduleUtil, WalletTestUtil}
+import com.daml.network.util.{ConfigScheduleUtil, SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
@@ -17,7 +17,8 @@ import scala.jdk.OptionConverters.*
 class BftScanConnectionIntegrationTest
     extends CNNodeIntegrationTest
     with ConfigScheduleUtil
-    with WalletTestUtil {
+    with WalletTestUtil
+    with SvTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -57,7 +58,7 @@ class BftScanConnectionIntegrationTest
         (logs
           .map(_.message)
           .forall(
-            _.contains("Failed to connect to scan of Canton-Foundation-2 (http://localhost:5112).")
+            _.contains(s"Failed to connect to scan of ${getSvName(2)} (http://localhost:5112).")
           ) should be(true)).withClue(s"Actual Logs: $logs"),
     )
 

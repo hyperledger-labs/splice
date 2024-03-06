@@ -445,7 +445,7 @@ class SvFrontendIntegrationTest
             }
             inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
               seleniumText(element) should matchText(
-                "Canton-Foundation-1"
+                getSvName(1)
               )
             }
             inside(find(id("vote-request-modal-reason-body"))) { case Some(element) =>
@@ -1501,7 +1501,7 @@ class SvFrontendIntegrationTest
                 .listVoteRequestResults(
                   None,
                   Some(false),
-                  Some("Canton-Foundation-2"),
+                  Some(getSvName(2)),
                   None,
                   None,
                   1,

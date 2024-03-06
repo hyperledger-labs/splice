@@ -78,6 +78,12 @@ trait SvTestUtil extends CNNodeTestCommon {
   def getConfirmingSvs(svBackends: Seq[SvAppBackendReference]): Seq[ConfirmingSv] =
     svBackends.map(sv => ConfirmingSv(sv.participantClientWithAdminToken, sv.getSvcInfo().svParty))
 
+  def getSvName(sv: Integer): String =
+    if (sv == 1) {
+      "Foundation-1"
+    } else
+      s"Digital-Asset-${sv}"
+
   def scheduleDomainMigration(
       svToCreateVoteRequest: SvAppReference,
       svsToCastVotes: Seq[SvAppReference],

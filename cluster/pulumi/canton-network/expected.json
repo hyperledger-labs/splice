@@ -1584,7 +1584,7 @@
             "publicKey": "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
           }
         },
-        "nodeName": "Canton-Foundation-1",
+        "nodeName": "Foundation-1",
         "peers": [
           {
             "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
@@ -2207,17 +2207,17 @@
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-2",
+            "name": "Digital-Asset-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-3",
+            "name": "Digital-Asset-3",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-4",
+            "name": "Digital-Asset-4",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==",
             "rewardWeightBps": 10000
           },
@@ -2329,7 +2329,7 @@
           "migrating": false
         },
         "onboardingFoundingSvRewardWeightBps": 70000,
-        "onboardingName": "Canton-Foundation-1",
+        "onboardingName": "Foundation-1",
         "onboardingType": "found-collective",
         "participantAddress": "participant-0",
         "persistence": {
@@ -2525,7 +2525,7 @@
             "publicKey": "BVSM9/uPGLU7lJj72SUw1a261z2L6Yy2XKLhpUvbxqE="
           }
         },
-        "nodeName": "Canton-Foundation-2",
+        "nodeName": "Digital-Asset-2",
         "peers": [
           {
             "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-3.svc.cluster.local:26656",
@@ -3144,17 +3144,17 @@
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-2",
+            "name": "Digital-Asset-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-3",
+            "name": "Digital-Asset-3",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-4",
+            "name": "Digital-Asset-4",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==",
             "rewardWeightBps": 10000
           },
@@ -3237,7 +3237,7 @@
           "id": 0,
           "migrating": false
         },
-        "onboardingName": "Canton-Foundation-2",
+        "onboardingName": "Digital-Asset-2",
         "onboardingType": "join-with-key",
         "participantAddress": "participant-0",
         "persistence": {
@@ -3433,7 +3433,7 @@
             "publicKey": "dxm4n1MRP/GuSEkJIwbdB4zVcGAeacohFKNtbKK8oRA="
           }
         },
-        "nodeName": "Canton-Foundation-3",
+        "nodeName": "Digital-Asset-3",
         "peers": [
           {
             "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
@@ -4052,17 +4052,17 @@
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-2",
+            "name": "Digital-Asset-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-3",
+            "name": "Digital-Asset-3",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-4",
+            "name": "Digital-Asset-4",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==",
             "rewardWeightBps": 10000
           },
@@ -4145,7 +4145,7 @@
           "id": 0,
           "migrating": false
         },
-        "onboardingName": "Canton-Foundation-3",
+        "onboardingName": "Digital-Asset-3",
         "onboardingType": "join-with-key",
         "participantAddress": "participant-0",
         "persistence": {
@@ -4341,7 +4341,7 @@
             "publicKey": "2umZdUS97a6VUXMGsgKJ/VbQbanxWaFUxK1QimhlEjo="
           }
         },
-        "nodeName": "Canton-Foundation-4",
+        "nodeName": "Digital-Asset-4",
         "peers": [
           {
             "externalAddress": "global-domain-0-cometbft-cometbft-p2p.sv-2.svc.cluster.local:26656",
@@ -4960,17 +4960,17 @@
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-2",
+            "name": "Digital-Asset-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-3",
+            "name": "Digital-Asset-3",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==",
             "rewardWeightBps": 10000
           },
           {
-            "name": "Canton-Foundation-4",
+            "name": "Digital-Asset-4",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==",
             "rewardWeightBps": 10000
           },
@@ -5053,7 +5053,7 @@
           "id": 0,
           "migrating": false
         },
-        "onboardingName": "Canton-Foundation-4",
+        "onboardingName": "Digital-Asset-4",
         "onboardingType": "join-with-key",
         "participantAddress": "participant-0",
         "persistence": {
