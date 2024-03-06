@@ -15,6 +15,7 @@ import com.daml.network.environment.{
   CNLedgerConnection,
   CNNode,
   CNNodeStatus,
+  DarResource,
   DarResources,
   ParticipantAdminConnection,
   RetryFor,
@@ -76,6 +77,8 @@ class SplitwellApp(
     ) {
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
+
+  override def packages: Seq[DarResource] = super.packages ++ DarResources.splitwell.all
 
   override def initialize(
       ledgerClient: CNLedgerClient,

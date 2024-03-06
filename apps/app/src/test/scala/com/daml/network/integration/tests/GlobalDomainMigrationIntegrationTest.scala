@@ -304,6 +304,7 @@ class GlobalDomainMigrationIntegrationTest
                       others = Seq.empty,
                     )
                   ),
+                  domainMigrationId = 1L,
                 )
             }
           ),

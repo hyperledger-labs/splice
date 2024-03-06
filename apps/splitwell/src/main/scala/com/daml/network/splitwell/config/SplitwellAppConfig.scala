@@ -2,6 +2,7 @@ package com.daml.network.splitwell.config
 
 import com.daml.network.config.{
   AutomationConfig,
+  CNDbConfig,
   CNNodeBackendConfig,
   CNNodeParametersConfig,
   CNParticipantClientConfig,
@@ -28,7 +29,7 @@ case class SplitwellDomains(
 
 case class SplitwellAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
-    override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
+    override val storage: CNDbConfig,
     providerUser: String,
     participantClient: CNParticipantClientConfig,
     scanClient: ScanAppClientConfig,

@@ -198,7 +198,7 @@ class DbSplitwellStore(
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.AcceptedGroupInvite.COMPANION.TEMPLATE_ID
               )} and group_owner = ${owner}
-              and group_key = ${lengthLimited(groupKey(owner, groupId).id.unpack)}
+              and group_id = ${lengthLimited(groupKey(owner, groupId).id.unpack)}
               """,
           ),
           "listAcceptedGroupInvites",
@@ -226,7 +226,7 @@ class DbSplitwellStore(
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.BalanceUpdate.COMPANION.TEMPLATE_ID
-              )} and group_key = ${lengthLimited(key.id.unpack)}
+              )} and group_id = ${lengthLimited(key.id.unpack)}
               """,
           ),
           "listBalanceUpdates",
@@ -297,7 +297,7 @@ class DbSplitwellStore(
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
                 splitwellCodegen.SplitwellInstall.COMPANION.TEMPLATE_ID
-              )} and user = ${user}
+              )} and install_user = ${user}
               and assigned_domain is not null
               """,
           ),
