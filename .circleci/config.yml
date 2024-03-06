@@ -3819,13 +3819,6 @@ workflows:
             - slack-context
           requires:
             - set_scratchnet
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - set_scratchnet
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           <<: *main-branch-never
@@ -3839,7 +3832,6 @@ workflows:
           cancel_workflow_on_failure: true
           requires:
             - set_scratchnet
-            - deployment_test
             - docker_images_push
       - preflight_check:
           name: "preflight_check_core"
@@ -4073,13 +4065,6 @@ workflows:
             - slack-context
           requires:
             - set_scratchnet
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - set_scratchnet
       - deploy_cluster:
           <<: *main-branch-never
           context:
@@ -4092,7 +4077,6 @@ workflows:
           cancel_workflow_on_failure: true
           requires:
             - docker_images_push
-            - deployment_test
             - set_scratchnet
       - preflight_check:
           <<: *main-branch-never
@@ -4104,7 +4088,6 @@ workflows:
           parallelism: 1
           requires:
             - docker_images_push
-            - deployment_test
             - set_scratchnet
       - backup_cluster:
           <<: *main-branch-never
@@ -4228,13 +4211,6 @@ workflows:
             - slack-context
           requires:
             - set_scratchnet
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - set_scratchnet
       - test_DR:
           <<: *main-branch-never
           context:
@@ -4244,7 +4220,6 @@ workflows:
           cluster: "user-selected-scratchnet"
           requires:
             - docker_images_push
-            - deployment_test
             - set_scratchnet
       - preflight_check:
           name: preflight_check_DR

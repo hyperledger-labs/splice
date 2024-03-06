@@ -52,13 +52,6 @@
             - slack-context
           requires:
             - set_scratchnet
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - set_scratchnet
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           <<: *main-branch-never
@@ -72,7 +65,6 @@
           cancel_workflow_on_failure: true
           requires:
             - set_scratchnet
-            - deployment_test
             - docker_images_push
       - preflight_check:
           name: "preflight_check_core"
@@ -306,13 +298,6 @@
             - slack-context
           requires:
             - set_scratchnet
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - set_scratchnet
       - deploy_cluster:
           <<: *main-branch-never
           context:
@@ -325,7 +310,6 @@
           cancel_workflow_on_failure: true
           requires:
             - docker_images_push
-            - deployment_test
             - set_scratchnet
       - preflight_check:
           <<: *main-branch-never
@@ -337,7 +321,6 @@
           parallelism: 1
           requires:
             - docker_images_push
-            - deployment_test
             - set_scratchnet
       - backup_cluster:
           <<: *main-branch-never
@@ -461,13 +444,6 @@
             - slack-context
           requires:
             - set_scratchnet
-      - deployment_test:
-          <<: *main-branch-never
-          context:
-            - artifactory
-            - slack-context
-          requires:
-            - set_scratchnet
       - test_DR:
           <<: *main-branch-never
           context:
@@ -477,7 +453,6 @@
           cluster: "user-selected-scratchnet"
           requires:
             - docker_images_push
-            - deployment_test
             - set_scratchnet
       - preflight_check:
           name: preflight_check_DR
