@@ -3591,7 +3591,7 @@ workflows:
             - docker_images_push
       - deploy_sv_runbook:
           name: "deploy_sv_runbook_for_migration"
-          <<: *main-branch-never
+          <<: *main-branch-only
           context:
             - artifactory
             - slack-context
@@ -3600,7 +3600,7 @@ workflows:
             - deploy_cluster_for_migration
       - preflight_sv_check:
            name: "preflight_sv_check_before_migration"
-           <<: *main-branch-never
+           <<: *main-branch-only
            context:
              - artifactory
              - canton-network-vpn
