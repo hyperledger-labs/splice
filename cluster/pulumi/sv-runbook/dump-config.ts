@@ -57,7 +57,9 @@ async function main() {
     walletUserName: utils.validatorWalletUserName,
   };
 
-  installNode.installNode(authOClient, utils.SV_NAMESPACE, svAppConfig, validatorAppConfig);
+  installNode.installNode(authOClient, utils.SV_NAMESPACE, svAppConfig, validatorAppConfig, () =>
+    Promise.resolve('dummy::partyId')
+  );
 }
 
 main();

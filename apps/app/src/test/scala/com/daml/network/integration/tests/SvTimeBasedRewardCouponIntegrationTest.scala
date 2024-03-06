@@ -17,7 +17,6 @@ import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
 
-import java.math.RoundingMode
 import scala.math.Ordering.Implicits.*
 
 class SvTimeBasedRewardCouponIntegrationTest
@@ -109,21 +108,8 @@ class SvTimeBasedRewardCouponIntegrationTest
         aliceValidatorWalletClient.listSvRewardCoupons() should have size expectedSize
       }
 
-      val config = defaultIssuanceCurve.initialValue
-      val RoundsPerYear =
-        BigDecimal(365 * 24 * 60 * 60).bigDecimal
-          .divide(BigDecimal(defaultTickDuration.duration.toSeconds).bigDecimal)
-      val coinsToIssueToSvc = config.coinToIssuePerYear
-        .multiply(
-          BigDecimal(1.0).bigDecimal
-            .subtract(config.appRewardPercentage)
-            .subtract(config.validatorRewardPercentage)
-        )
-        .divide(RoundsPerYear, RoundingMode.HALF_UP)
       val eachSvGetInRound0 =
-        coinsToIssueToSvc
-          .divide(BigDecimal(svs.size).bigDecimal, RoundingMode.HALF_UP)
-          .setScale(10, RoundingMode.HALF_UP)
+        computeSvRewardInRound0(defaultIssuanceCurve.initialValue, defaultTickDuration, svs.size)
       val sv1Party = sv1Backend.getSvcInfo().svParty
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
       val expectedAliceAmount = eachSvGetInRound0.multiply(new java.math.BigDecimal("0.3333"))

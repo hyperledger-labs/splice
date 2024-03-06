@@ -7,7 +7,6 @@ import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.Contract
 
 import scala.concurrent.duration.*
-import java.math.RoundingMode
 
 class SvTimeBasedIssuanceIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithSharedEnvironment {
@@ -24,17 +23,7 @@ class SvTimeBasedIssuanceIntegrationTest
 
     // one tick - round 0 closes.
     advanceRoundsByOneTick
-    val config = defaultIssuanceCurve.initialValue
-    val RoundsPerYear =
-      BigDecimal(365 * 24 * 60 * 60).bigDecimal
-        .divide(BigDecimal(defaultTickDuration.duration.toSeconds).bigDecimal)
-    val coinsToIssueToSvc = config.coinToIssuePerYear
-      .multiply(
-        BigDecimal(1.0).bigDecimal
-          .subtract(config.appRewardPercentage)
-          .subtract(config.validatorRewardPercentage)
-      )
-      .divide(RoundsPerYear, RoundingMode.HALF_UP)
+
     eventually() {
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
@@ -43,9 +32,7 @@ class SvTimeBasedIssuanceIntegrationTest
 
       // All of SV1 to SV4 join as of round 0 and get a reward
       val eachSvGetInRound0 =
-        coinsToIssueToSvc
-          .divide(BigDecimal(svs.size).bigDecimal, RoundingMode.HALF_UP)
-          .setScale(10, RoundingMode.HALF_UP)
+        computeSvRewardInRound0(defaultIssuanceCurve.initialValue, defaultTickDuration, svs.size)
 
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map { sv =>
         inside(
