@@ -36,14 +36,6 @@ class WalletAppRewardsTimeBasedIntegrationTest
           _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
         )(config)
       )
-      .addConfigTransforms((_, config) =>
-        CNNodeConfigTransforms.updateAllAutomationConfigs(
-          // we use advanceTimeByPollingInterval for ReceiveFaucetCouponTrigger to re-check the open round.
-          // 1ms pollingInterval vs the round tick duration (which is a few minutes) should give enough margin.
-          // Larger than miningRoundsCacheTimeToLiveOverride to guarantee the cache is never used.
-          _.copy(pollingInterval = NonNegativeFiniteDuration.ofMillis(2))
-        )(config)
-      )
 
   "A wallet" should {
 
