@@ -159,3 +159,30 @@ workflow:
           cluster: "devnet"
           requires:
             - deploy_sv_runbook
+
+  backup_devnet:
+    when:
+      equal: [ backup-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_devnet"
+      - backup_cluster:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          cluster: "devnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline

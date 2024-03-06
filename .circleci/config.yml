@@ -47,6 +47,8 @@ parameters:
         restore-sv-cidaily,
         backup-cidaily-testnet,
         restore-validator-cidaily-testnet,
+        backup-devnet,
+        backup-testnet,
         publish-public-artifacts,
         auth0-user-cleanup,
         cluster-lock-reaper,
@@ -4465,6 +4467,33 @@ workflows:
           requires:
             - deploy_sv_runbook
 
+  backup_devnet:
+    when:
+      equal: [ backup-devnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_devnet"
+      - backup_cluster:
+          filters:
+            branches:
+              only:
+                - deployment/devnet
+          cluster: "devnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+
   deploy_testnet:
     when:
       equal: [ deploy-testnet, << pipeline.parameters.run-job >> ]
@@ -4538,4 +4567,31 @@ workflows:
           context:
             - artifactory
             - slack-context
+
+  backup_testnet:
+    when:
+      equal: [ backup-testnet, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/testnet
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_testnet"
+      - backup_cluster:
+          filters:
+            branches:
+              only:
+                - deployment/testnet
+          cluster: "testnet"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
 

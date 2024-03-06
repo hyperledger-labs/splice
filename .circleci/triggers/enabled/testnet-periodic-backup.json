@@ -1,0 +1,16 @@
+{
+    "name": "TestNet Backup",
+    "description": "Periodic backup of TestNet",
+    "attribution-actor": "system",
+    "parameters": {
+      "branch": "deployment/testnet",
+      "run-job": "backup-testnet"
+    },
+    "timetable": {
+      "per-hour": 1,
+      "hours-of-day": [0, 4, 8, 12, 16, 20],
+      "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}
