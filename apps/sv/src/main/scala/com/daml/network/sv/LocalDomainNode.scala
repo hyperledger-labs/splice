@@ -240,11 +240,56 @@ final class LocalDomainNode(
 
   /** Onboard the sequencer operated by this SV to the domain if it is not already.
     */
-  def onboardLocalSequencerIfRequired(
+  def addLocalSequencerIdentityIfRequired(
       domainAlias: DomainAlias,
       domainId: DomainId,
       participantAdminConnection: ParticipantAdminConnection,
-      svConnection: SvConnection,
+  )(implicit traceContext: TraceContext): Future[Unit] =
+    retryProvider
+      .getValueWithRetries(
+        RetryFor.WaitingOnInitDependency,
+        "sequencer status",
+        sequencerAdminConnection.getStatus.map(statusToEither),
+        logger,
+      )
+      .flatMap {
+        case Left(NodeStatus.NotInitialized(_)) =>
+          logger.info("Adding sequencer identity")
+          addLocalSequencerIdentity(
+            domainAlias,
+            domainId,
+            participantAdminConnection,
+          )
+        case Right(NodeStatus.Success(_)) =>
+          logger.info("Sequencer identity is already added")
+          Future.unit
+      }
+
+  private def addLocalSequencerIdentity(
+      domainAlias: DomainAlias,
+      domainId: DomainId,
+      participantAdminConnection: ParticipantAdminConnection,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    logger.info(
+      s"Adding sequencer identity transactions for domain ${domainAlias.toProtoPrimitive}"
+    )
+    for {
+      sequencerId <- sequencerAdminConnection.getSequencerId
+      identity <- sequencerAdminConnection.getIdentityTransactions(sequencerId.uid, domainId = None)
+      _ <- addIdentityTransactions(
+        "sequencer",
+        domainId,
+        sequencerId.uid,
+        participantAdminConnection,
+        identity,
+      )
+    } yield ()
+  }
+
+  /** Onboard the sequencer operated by this SV to the domain if it is not already.
+    */
+  def onboardLocalSequencerIfRequired(
+      svConnection: SvConnection
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
       .getValueWithRetries(
@@ -257,10 +302,7 @@ final class LocalDomainNode(
         case Left(NodeStatus.NotInitialized(_)) =>
           logger.info("Onboarding sequencer")
           onboardLocalSequencer(
-            domainAlias,
-            domainId,
-            participantAdminConnection,
-            svConnection,
+            svConnection
           )
         case Right(NodeStatus.Success(_)) =>
           logger.info("Sequencer is already onboarded")
@@ -268,23 +310,10 @@ final class LocalDomainNode(
       }
 
   private def onboardLocalSequencer(
-      domainAlias: DomainAlias,
-      domainId: DomainId,
-      participantAdminConnection: ParticipantAdminConnection,
-      svConnection: SvConnection,
+      svConnection: SvConnection
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    logger.info("Adding sequencer identity transactions")
-    logger.info(domainAlias.toProtoPrimitive)
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
-      identity <- sequencerAdminConnection.getIdentityTransactions(sequencerId.uid, domainId = None)
-      _ <- addIdentityTransactions(
-        "sequencer",
-        domainId,
-        sequencerId.uid,
-        participantAdminConnection,
-        identity,
-      )
       _ = logger.info(s"Onboarding sequencer $sequencerId through sponsoring SV")
       snapshot <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,

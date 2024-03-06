@@ -258,20 +258,27 @@ class JoiningNodeInitializer(
           svcPartyId,
         ),
       ).tupled
-      _ <- domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
-        localDomainNode,
-        globalDomain,
-        Onboarding,
-        config.domainMigrationId,
-      )
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
+          // First, make sure the identity of the new sequencer is known on the domain
           _ <-
-            localDomainNode.onboardLocalSequencerIfRequired(
+            localDomainNode.addLocalSequencerIdentityIfRequired(
               config.domains.global.alias,
               globalDomain,
               participantAdminConnection,
-              svConnection,
+            )
+          // Then, add the new local domain node to the SVC rules with an "onboarding" status
+          // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
+          _ <- domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
+            Some(localDomainNode),
+            globalDomain,
+            Onboarding,
+            config.domainMigrationId,
+          )
+          // Finally, fully onboard the sequencer and mediator
+          _ <-
+            localDomainNode.onboardLocalSequencerIfRequired(
+              svConnection
             )
           _ <- localDomainNode.onboardLocalMediatorIfRequired(
             globalDomain,
