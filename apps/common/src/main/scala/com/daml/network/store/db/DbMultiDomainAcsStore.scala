@@ -2,7 +2,6 @@ package com.daml.network.store.db
 
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
-import cats.data.OptionT
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.ledger.javaapi.data.codegen.ContractId
@@ -1269,43 +1268,6 @@ final class DbMultiDomainAcsStore[TXE](
       counter = row.stateRow.reassignmentCounter,
     )
   }
-
-  override def getJsonAcsSnapshot(
-      ignoredContracts: Set[QualifiedName]
-  )(implicit tc: TraceContext): Future[JsonAcsSnapshot] = {
-    val qualifiedNamesSql = ignoredContracts
-      .map(q => sql"$q")
-      .reduceOption { (acc, next) =>
-        (acc ++ sql"," ++ next).toActionBuilder
-      }
-      .getOrElse(sql"")
-
-    waitUntilAcsIngested {
-      for {
-        rows <- storage.query(
-          selectFromAcsTableWithOffset(
-            acsTableName,
-            storeId,
-            domainMigrationId,
-            (sql"template_id_qualified_name not in (" ++ qualifiedNamesSql ++ sql")").toActionBuilder,
-          ),
-          "getJsonAcsSnapshot",
-        )
-        offset <- OptionT
-          .fromOption[Future](rows.headOption)
-          .getOrRaise(offsetExpectedError())
-          .map(_.offset)
-        contracts <- rows.flatMap(_.row).traverse { row =>
-          OptionT
-            .fromOption[Future](contractFilter.decodeMatchingContractFromRow(row))
-            .getOrRaise(
-              new IllegalStateException("Stored a contract that is not in the contract filter.")
-            )
-        }
-      } yield JsonAcsSnapshot(offset, contracts)
-    }
-  }
-
 }
 
 object DbMultiDomainAcsStore {

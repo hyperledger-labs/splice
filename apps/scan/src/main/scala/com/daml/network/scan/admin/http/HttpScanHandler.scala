@@ -18,7 +18,6 @@ import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
 import com.daml.network.http.v0.scan.ScanResource
 import com.daml.network.scan.store.{ScanStore, SortOrder, TxLogEntry}
-import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{Codec, Contract, ContractWithState}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -498,31 +497,6 @@ class HttpScanHandler(
         .transform(
           HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
         )
-    }
-  }
-
-  override def listImportCrates(respond: v0.ScanResource.ListImportCratesResponse.type)(
-      receiverPartyId: String
-  )(extracted: TraceContext): Future[v0.ScanResource.ListImportCratesResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.listImportCrates") { _ => _ =>
-      {
-        for {
-          crates <- store.listImportCrates(PartyId.tryFromProtoPrimitive(receiverPartyId))
-        } yield definitions.ListImportCratesResponse(
-          crates
-            .map(crate =>
-              MaybeCachedContractWithState(
-                Some(crate.contract.toHttp),
-                crate.state match {
-                  case ContractState.InFlight => None
-                  case ContractState.Assigned(domainId) => Some(domainId.toProtoPrimitive)
-                },
-              )
-            )
-            .toVector
-        )
-      }
     }
   }
 

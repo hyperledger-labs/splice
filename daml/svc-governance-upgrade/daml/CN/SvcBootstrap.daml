@@ -22,7 +22,6 @@ template SvcBootstrap with
     founderRewardWeight : Int -- ^ the weight of the founding SV in the reward distribution
     founderParticipantId : Text -- ^ the id of the participant of the founding SV
     founderDomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
-    initialRoundNumber : Int
     round0Duration : RelTime
     coinConfig : CoinConfig USD
     coinPrice : Decimal
@@ -50,7 +49,6 @@ template SvcBootstrap with
           config = cnsRulesConfig
         -- bootstrap rounds
         exercise coinRulesCid CoinRules_Bootstrap_Rounds with
-          initialRoundNumber
           round0Duration
           coinPrice
         -- create initial coin price vote of the founder
@@ -70,8 +68,8 @@ template SvcBootstrap with
         -- create the SVC rules with the founding member as the sole member
         let founderInfo = MemberInfo with
               name = founderName
-              joinedAsOfRound = Round initialRoundNumber
-              lastReceivedRewardFor = Round (initialRoundNumber - 1)
+              joinedAsOfRound = Round 0
+              lastReceivedRewardFor = Round (- 1)
               numRewardCouponsMissed = 0
               svRewardWeight = founderRewardWeight
               participantId = founderParticipantId

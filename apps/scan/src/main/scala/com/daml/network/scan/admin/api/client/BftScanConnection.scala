@@ -4,7 +4,6 @@ import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
@@ -150,14 +149,6 @@ class BftScanConnection(
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
     bftCall(_.lookupFeaturedAppRight(providerPartyId))
-  }
-
-  override def listImportCrates(
-      party: PartyId
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[ContractWithState[ImportCrate.ContractId, ImportCrate]]] = {
-    bftCall(_.listImportCrates(party))
   }
 
   // TODO(#9841) BFT

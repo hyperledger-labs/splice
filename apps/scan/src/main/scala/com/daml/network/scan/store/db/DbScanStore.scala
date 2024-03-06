@@ -2,7 +2,6 @@ package com.daml.network.scan.store.db
 
 import cats.implicits.*
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
@@ -317,31 +316,6 @@ class DbScanStore(
         entries = rows.map(txLogEntryFromRow[TxLogEntry.TransactionTxLogEntry](txLogConfig))
       } yield entries
 
-    }
-
-  override def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit
-      tc: TraceContext
-  ): Future[Seq[ContractWithState[ImportCrate.ContractId, ImportCrate]]] =
-    waitUntilAcsIngested {
-      for {
-        rows <- storage
-          .query(
-            selectFromAcsTableWithState(
-              ScanTables.acsTableName,
-              storeId,
-              domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(
-                  ImportCrate.TEMPLATE_ID
-                )} and acs.import_crate_receiver = $receiverParty""",
-              orderLimit = sql"""order by event_number limit ${sqlLimit(limit)}""",
-            ),
-            "listImportCrates",
-          )
-        limited = applyLimit("listImportCrates", limit, rows)
-        withState = limited.map(
-          contractWithStateFromRow(ImportCrate.COMPANION)(_)
-        )
-      } yield withState
     }
 
   override def findFeaturedAppRight(

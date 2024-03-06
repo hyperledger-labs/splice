@@ -105,18 +105,6 @@ abstract class SvAppReference(
       }
       .fold(throw _, identity)
 
-  @Help.Summary("Trigger and a dump of the ACS visible to the SVC party")
-  def triggerAcsDump(): definitions.TriggerAcsDumpResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.TriggerAcsDump())
-    }
-
-  @Help.Summary("Trigger and a dump of the ACS visible to the SVC party")
-  def getAcsStoreDump(): definitions.GetAcsStoreDumpResponse =
-    consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetAcsStoreDump())
-    }
-
   @Help.Summary("Pause the global domain")
   def pauseGlobalDomain(): Unit =
     consoleEnvironment.run {

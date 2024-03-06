@@ -16,7 +16,6 @@ import {
   exactNamespace,
   ExpectedValidatorOnboarding,
   fetchAndInstallParticipantBootstrapDump,
-  getLatestSvcAcsDumpFile,
   GlobalDomainMigrationConfig,
   installAuth0Secret,
   installAuth0UISecret,
@@ -114,14 +113,6 @@ type InstalledMigrationSpecificSv = {
   globalDomain: GlobalDomainNode;
   participant: Release;
 };
-
-async function getAcsBootstrappingDump(xns: ExactNamespace, config: BootstrappingDumpConfig) {
-  const file = await getLatestSvcAcsDumpFile(xns, config);
-  return {
-    path: file.name,
-    bucket: config.bucket,
-  };
-}
 
 const clusterUrl = `${CLUSTER_BASENAME}.network.canton.global`;
 
@@ -492,11 +483,6 @@ function installSvApp(
     approvedSvIdentities: config.approvedSvIdentities,
     persistence: persistenceConfig(postgres, svDbName),
     identitiesExport: config.identitiesBackupLocation,
-    acsDumpPeriodicExport: config.periodicBackupConfig,
-    acsDumpImport:
-      config.bootstrappingDumpConfig && config.onboarding.type === 'found-collective'
-        ? getAcsBootstrappingDump(xns, config.bootstrappingDumpConfig)
-        : undefined,
     participantIdentitiesDumpImport: config.bootstrappingDumpConfig
       ? { secretName: participantBootstrapDumpSecretName }
       : undefined,

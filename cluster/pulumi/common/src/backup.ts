@@ -124,20 +124,6 @@ async function getLatestParticipantIdentitiesDump(
   return fetchBucketFile(bucket, latestObject);
 }
 
-export function getLatestSvcAcsDumpFile(
-  xns: ExactNamespace,
-  config: BootstrappingDumpConfig
-): Promise<File> {
-  const bucket = openGcpBucket(config.bucket);
-  return getLatestObjectInDateRange(
-    bucket,
-    `${bucketPath(config.cluster, xns)}/svc_acs_dump_`,
-    '.json',
-    config.start,
-    config.end
-  );
-}
-
 export function installParticipantIdentitiesSecret(
   xns: ExactNamespace,
   secretName: string,

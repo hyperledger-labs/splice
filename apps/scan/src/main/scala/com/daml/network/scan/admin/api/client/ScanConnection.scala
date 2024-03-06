@@ -1,7 +1,6 @@
 package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
 import com.daml.network.codegen.java.cc.types.Round
@@ -19,7 +18,6 @@ import com.daml.network.scan.admin.api.client.ScanConnection.*
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.store.AcsStoreDump
 import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.*
 import com.digitalasset.canton.data.CantonTimestamp
@@ -28,7 +26,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
@@ -85,12 +82,6 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
       mat: Materializer,
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
-
-  def listImportCrates(
-      party: PartyId
-  )(implicit tc: TraceContext): Future[
-    Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]
-  ]
 
   def listSvcSequencers()(implicit
       tc: TraceContext
@@ -187,27 +178,6 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
         case None => Left("round is not an open mining round")
       }
     }
-  }
-
-  def getImportShipment(
-      party: PartyId
-  )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment] = {
-    for {
-      // Important: we need to query the open-round before we list crates, as the availability of an open round signals
-      // that all crates have been ingested in scan.
-      (openRounds, _) <- getOpenAndIssuingMiningRounds()
-      // We're explicitly not checking for the round to be open, as we only need it to supply the CoinPrice for scan.
-      openRound = openRounds
-        .collectFirst(Function.unlift(_.toAssignedContract))
-        .getOrElse(
-          throw Status.Code.FAILED_PRECONDITION.toStatus
-            .withDescription(
-              show"There is at least one open round in $openRounds that is assigned to a domain."
-            )
-            .asRuntimeException()
-        )
-      crates <- listImportCrates(party)
-    } yield AcsStoreDump.ImportShipment(openRound, crates)
   }
 
   def getMigrationSchedule()(implicit

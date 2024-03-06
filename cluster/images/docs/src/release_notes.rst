@@ -14,6 +14,11 @@ Release Notes
   * ``sv-values.yaml`` now also requires you to specify an ``internalUrl`` for your scan instance that the SV app
     can use to query its status.
 
+  * In preparation for the mainnet deployment and testing real
+    upgrades, testnet no longer preserves coin balances. No
+    configuration changes are required for this. Note that this affects only testnet so
+    will only take effect on March 18th.
+
 * Documentation
 
   * Added more detailed instructions for SV node operators on participating in a synchronizer upgrade.

@@ -39,7 +39,6 @@ import com.daml.network.history.{
   CoinCreate,
   CoinExpire,
   CoinRules_BuyMemberTraffic,
-  ImportCrate_ReceiveCoin,
   LockedCoinExpireCoin,
   LockedCoinOwnerExpireLock,
   LockedCoinUnlock,
@@ -578,17 +577,6 @@ class UserWalletTxLogParser(
                 tree,
                 root,
                 node.result.value,
-                BalanceChangeTransactionSubtype.Mint,
-              )
-            )
-
-          case ImportCrate_ReceiveCoin(node) =>
-            now(
-              State.fromCoinCreateSummary(
-                tree,
-                root,
-                node.result.value,
-                // We show imports as minted coins.
                 BalanceChangeTransactionSubtype.Mint,
               )
             )

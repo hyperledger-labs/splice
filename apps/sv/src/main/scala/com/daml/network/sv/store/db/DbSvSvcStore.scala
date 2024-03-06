@@ -8,7 +8,6 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.*
-import com.daml.network.codegen.java.cc.coinimport.ImportCrate
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
@@ -26,13 +25,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
-import com.daml.network.store.{
-  AcsStoreDump,
-  IngestionSummary,
-  Limit,
-  LimitHelpers,
-  MultiDomainAcsStore,
-}
+import com.daml.network.store.{IngestionSummary, Limit, LimitHelpers, MultiDomainAcsStore}
 import com.daml.network.sv.store.TxLogEntry.EntryType
 import com.daml.network.sv.store.{
   AppRewardCouponsSum,
@@ -1077,30 +1070,6 @@ class DbSvSvcStore(
         )
       limited = applyLimit("listExpiredElectionRequests", limit, result)
     } yield limited.map(contractFromRow(ElectionRequest.COMPANION)(_))
-  }
-
-  override def getImportShipmentFor(receiver: PartyId)(implicit
-      tc: TraceContext
-  ): Future[AcsStoreDump.ImportShipment] = waitUntilAcsIngested {
-    for {
-      openRound <- getLatestActiveOpenMiningRound()
-      result <- storage
-        .query(
-          selectFromAcsTableWithState(
-            SvcTables.acsTableName,
-            storeId,
-            domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(ImportCrate.TEMPLATE_ID)}
-                           and import_crate_receiver = $receiver""",
-            orderLimit = sql"""limit ${sqlLimit(Limit.DefaultLimit)}""",
-          ),
-          "getImportShipmentFor",
-        )
-      limited = applyLimit("getImportShipmentFor", Limit.DefaultLimit, result)
-      withState = limited.map(
-        contractWithStateFromRow(ImportCrate.COMPANION)(_)
-      )
-    } yield AcsStoreDump.ImportShipment(openRound, withState)
   }
 
   override def lookupCnsEntryByNameWithOffset(

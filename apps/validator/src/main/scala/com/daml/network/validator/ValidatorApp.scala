@@ -27,7 +27,7 @@ import com.daml.network.scan.admin.api.client.{BftScanConnection, MinimalScanCon
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
-import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{
   BackupDump,
@@ -550,21 +550,6 @@ class ValidatorApp(
           )
         }
       })
-      // Receive the import crates for the validator party here, so that we can skip onboarding if there is a crate
-      // containing a validator license. This MAY contend in a benign fashion with the crate receipt in the
-      // 'UserWalletService' in case the validator app is restarted within its initialization sequence.
-      _ <- appInitStep(s"Receive import crates") {
-        AcsStoreDump.receiveCratesFor(
-          validatorParty,
-          (party: PartyId, tc0: TraceContext) => scanConnection.getImportShipment(party)(tc0),
-          // Use the ValidatorStore's associated connection, so the later check whether a ValidatorLicense exists runs
-          // against the store updated with the results of the crate import.
-          automation.connection,
-          retryProvider,
-          logger,
-          CommandPriority.High,
-        )
-      }
       _ <- appInitStep(s"Onboard validator") {
         ValidatorUtil.onboard(
           endUserName = config.validatorWalletUser.getOrElse(config.ledgerApiUser),

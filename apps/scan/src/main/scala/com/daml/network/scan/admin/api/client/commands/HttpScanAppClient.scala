@@ -26,7 +26,6 @@ import com.daml.network.http.v0.external.scan as externalHttp
 import com.daml.network.http.v0.definitions.{GetCnsRulesRequest, GetCoinRulesRequest}
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.store.MultiDomainAcsStore
-import com.daml.network.codegen.java.cc
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -614,27 +613,6 @@ object HttpScanAppClient {
     }
   }
 
-  case class ListImportCrates(party: PartyId)
-      extends InternalBaseCommand[http.ListImportCratesResponse, Seq[
-        ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]
-      ]] {
-    override def submitRequest(
-        client: http.ScanClient,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[
-      Throwable,
-      HttpResponse,
-    ], http.ListImportCratesResponse] =
-      client.listImportCrates(party.toProtoPrimitive, headers)
-
-    override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.ListImportCratesResponse.OK(response) =>
-        response.crates
-          .traverse(co =>
-            ContractWithState.handleMaybeCached(cc.coinimport.ImportCrate.COMPANION)(None, co)
-          )
-    }
-  }
   case class ListSvcSequencers()
       extends InternalBaseCommand[
         http.ListSvcSequencersResponse,

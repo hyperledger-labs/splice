@@ -32,14 +32,9 @@ import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.*
-import com.daml.network.store.MultiDomainAcsStore.{
-  ConstrainedTemplate,
-  JsonAcsSnapshot,
-  QueryResult,
-  TemplateFilter,
-}
+import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
 import com.daml.network.store.db.AcsJdbcTypes
-import com.daml.network.sv.store.SvSvcStore.{ignoredContractsForAcsDump, noActiveSvcRules}
+import com.daml.network.sv.store.SvSvcStore.noActiveSvcRules
 import com.daml.network.sv.store.db.{DbSvSvcStore, SvcTables}
 import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
 import com.daml.network.sv.store.memory.InMemorySvSvcStore
@@ -792,13 +787,6 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
     cn.svcrules.ElectionRequest,
   ]]]
 
-  def getJsonAcsSnapshot()(implicit tc: TraceContext): Future[JsonAcsSnapshot] =
-    multiDomainAcsStore.getJsonAcsSnapshot(ignoredContractsForAcsDump)
-
-  def getImportShipmentFor(
-      receiver: PartyId
-  )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment]
-
   private[this] def listLaggingSvcRulesFollowers(
       targetDomain: DomainId,
       participantIdSource: HasParticipantId,
@@ -960,16 +948,6 @@ object SvSvcStore {
     }
   }
 
-  val ignoredContractsForAcsDump: Set[QualifiedName] = Set(
-    // Note: these four kinds of contracts are not included in an ACS dump due to the ExpireUnclaimedRewards trigger
-    // being disabled, which leads to a too high growth of the ACS export per hour.
-    QualifiedName(cc.coin.AppRewardCoupon.TEMPLATE_ID),
-    QualifiedName(cc.coin.ValidatorRewardCoupon.TEMPLATE_ID),
-    QualifiedName(cc.validatorlicense.ValidatorFaucetCoupon.TEMPLATE_ID),
-    QualifiedName(cc.coin.SvRewardCoupon.TEMPLATE_ID),
-    QualifiedName(cc.round.ClosedMiningRound.TEMPLATE_ID),
-  )
-
   private val svcRulesFollowers: Seq[ConstrainedTemplate] = {
     import com.daml.network.codegen.java.cn.svcrules as svcr
     Seq[ConstrainedTemplate](
@@ -993,7 +971,6 @@ object SvSvcStore {
     cc.coin.FeaturedAppRight.COMPANION,
     cc.coin.SvcReward.COMPANION,
     cc.coin.UnclaimedReward.COMPANION,
-    cc.coinimport.ImportCrate.COMPANION,
     cc.validatorlicense.ValidatorLicense.COMPANION,
     cn.cns.CnsEntry.COMPANION,
     cn.cns.CnsEntryContext.COMPANION,
@@ -1129,12 +1106,6 @@ object SvSvcStore {
         SvcAcsStoreRowData(
           contract,
           coinRoundOfExpiry = Some(CNNodeUtil.coinExpiresAt(contract.payload.coin).number),
-        )
-      },
-      mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc) { contract =>
-        SvcAcsStoreRowData(
-          contract,
-          importCrateReceiver = Some(PartyId.tryFromProtoPrimitive(contract.payload.receiver)),
         )
       },
       mkFilter(cc.coin.SvcReward.COMPANION)(co => co.payload.svc == svc)(SvcAcsStoreRowData(_)),

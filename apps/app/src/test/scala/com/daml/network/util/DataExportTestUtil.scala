@@ -1,10 +1,8 @@
 package com.daml.network.util
 
 import com.daml.network.config.GcpBucketConfig
-import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.{NodeIdentitiesDump, NodeIdentitiesStore}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
-import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.topology.ParticipantId
 
 import java.nio.file.{Path, Paths}
@@ -40,12 +38,5 @@ trait DataExportTestUtil extends CNNodeTestCommon {
       namespace,
       NodeIdentitiesStore.dumpFilename(_),
       NodeIdentitiesDump.fromJsonString(ParticipantId.tryFromProtoPrimitive, _),
-    )
-
-  def testRecentAcsDump(namespace: String) =
-    testRecentDump(
-      namespace,
-      SvUtil.acsStoreDumpFilename(_),
-      io.circe.parser.decode[http.GetAcsStoreDumpResponse](_).left.map(_.getMessage),
     )
 }

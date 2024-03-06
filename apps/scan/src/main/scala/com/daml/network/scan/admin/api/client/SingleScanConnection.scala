@@ -1,7 +1,6 @@
 package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
@@ -176,16 +175,6 @@ class SingleScanConnection private[client] (
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] = {
     runHttpCmd(config.adminApi.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
-
-  override def listImportCrates(
-      party: PartyId
-  )(implicit tc: TraceContext): Future[
-    Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]
-  ] =
-    runHttpCmd(
-      config.adminApi.url,
-      HttpScanAppClient.ListImportCrates(party),
-    )
 
   override def listSvcSequencers()(implicit
       tc: TraceContext

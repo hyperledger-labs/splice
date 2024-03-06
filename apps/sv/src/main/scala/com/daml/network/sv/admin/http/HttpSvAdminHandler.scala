@@ -4,7 +4,6 @@ import cats.implicits.catsSyntaxApplicativeId
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.codegen.java.cn
-import com.daml.network.config.PeriodicBackupDumpConfig
 import com.daml.network.environment.{
   CNNodeStatus,
   MediatorAdminConnection,
@@ -25,7 +24,6 @@ import com.daml.network.sv.migration.{
   DomainNodeIdentities,
 }
 import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
-import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{BackupDump, Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -35,7 +33,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.circe.syntax.EncoderOps
-import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import java.nio.file.Path
@@ -389,57 +386,6 @@ class HttpSvAdminHandler(
             )
           )
       }
-    }
-  }
-
-  override def triggerAcsDump(respond: v0.SvAdminResource.TriggerAcsDumpResponse.type)()(
-      tuser: TracedUser
-  ): Future[v0.SvAdminResource.TriggerAcsDumpResponse] = {
-    implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.triggerAcsDump") { _ => _ =>
-      config.acsStoreDump match {
-        case None =>
-          Future.failed(
-            Status.FAILED_PRECONDITION
-              .withDescription("No ACS store dump directory configured")
-              .asRuntimeException()
-          )
-        case Some(acsDumpConfig: PeriodicBackupDumpConfig) =>
-          for {
-            // Note: we expect the snapshots to be small enough to be delivered within the request timeout.
-            (filename, snapshot) <- SvUtil.writeAcsStoreDump(
-              acsDumpConfig.location,
-              loggerFactory,
-              svcStore,
-              clock.now,
-            )
-          } yield v0.SvAdminResource.TriggerAcsDumpResponseOK(
-            definitions.TriggerAcsDumpResponse(
-              filename = filename.toString,
-              numEvents = snapshot.contracts.size,
-              offset = snapshot.offset,
-            )
-          )
-      }
-    }
-  }
-  override def getAcsStoreDump(
-      respond: v0.SvAdminResource.GetAcsStoreDumpResponse.type
-  )()(tuser: TracedUser): scala.concurrent.Future[
-    v0.SvAdminResource.GetAcsStoreDumpResponse
-  ] = {
-    implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.getAcsStoreDump") { _ => _ =>
-      svcStore
-        .getJsonAcsSnapshot()
-        .map(snapshot =>
-          v0.SvAdminResource.GetAcsStoreDumpResponse.OK(
-            definitions.GetAcsStoreDumpResponse(
-              offset = snapshot.offset,
-              contracts = snapshot.contracts.map(_.toHttp).toVector,
-            )
-          )
-        )
     }
   }
 

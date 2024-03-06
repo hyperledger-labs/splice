@@ -7,7 +7,6 @@ import com.daml.network.config.{
   PeriodicBackupDumpConfig,
 }
 import com.daml.network.environment.CNNodeEnvironmentImpl
-import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -21,7 +20,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.ParticipantId
 import org.slf4j.event.Level
 
-import java.nio.file.Paths
+import java.nio.file.{Path, Paths}
 
 abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
     extends CNNodeIntegrationTest {
@@ -39,52 +38,16 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // start only sv1 but not sv2-4
-      .addConfigTransformsToFront(
-        (_, conf) =>
-          CNNodeConfigTransforms.updateAllValidatorAppConfigs_(c =>
-            c.copy(participantIdentitiesBackup = Some(backupDumpConfig))
-          )(conf),
-        (_, conf) =>
-          CNNodeConfigTransforms.updateAllSvAppConfigs_(c =>
-            c.copy(acsStoreDump = Some(backupDumpConfig))
-          )(conf),
+      .addConfigTransformsToFront((_, conf) =>
+        CNNodeConfigTransforms.updateAllValidatorAppConfigs_(c =>
+          c.copy(participantIdentitiesBackup = Some(backupDumpConfig))
+        )(conf)
       )
       .withManualStart
 
   "founding SV and alice's validator" should {
-    val acsDumpLogLineRegex =
-      "Wrote ACS store dump.*at path: (.*\\.json)".r
-
     "produce backup dumps in the background" in { implicit env =>
-      clue("start SvApp for SV1 and observe acs store dump being produced") {
-        loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
-          initSvcWithSv1Only(),
-          logEntries => {
-            forAtLeast(
-              1,
-              logEntries,
-            )(logEntry => {
-              inside((logEntry.loggerName, logEntry.message)) {
-                case (name, acsDumpLogLineRegex(filename)) if name.endsWith("SV=sv1") =>
-                  val dump = readDump(filename)
-                  io.circe.parser
-                    .decode[http.GetAcsStoreDumpResponse](dump)
-                    .fold(
-                      err =>
-                        throw new IllegalArgumentException(
-                          s"Failed to parse dump: $err from $filename"
-                        ),
-                      result => result,
-                    )
-                  // No assertion apart from parsing the dump, as it is typically empty due to getting triggered as
-                  // soon as the store ingested the ACS.
-                  succeed
-              }
-            })
-          },
-        )
-      }
-
+      initSvcWithSv1Only()
       val participantIdentitiesLogLineRegex =
         "Wrote node identities dump.*at path: (.*\\.json)".r
       clue("start alice's validator and observe participant identities dump being produced ")(
@@ -121,10 +84,13 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
 final class DirectoryPeriodicBackupIntegrationTest
     extends PeriodicBackupIntegrationTestBase[BackupDumpConfig.Directory] {
 
+  private val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
+
+  // Not using temp-files so test-generated outputs are easy to inspect.
+  private val testDumpOutputDir: Path = testDumpDir.resolve("test-outputs")
+
   override def backupDumpLocation = {
-    BackupDumpConfig.Directory(
-      AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir
-    )
+    BackupDumpConfig.Directory(testDumpOutputDir)
   }
 
   override def readDump(filename: String) = {

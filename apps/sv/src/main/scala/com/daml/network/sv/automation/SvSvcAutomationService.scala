@@ -86,16 +86,6 @@ class SvSvcAutomationService(
 
   // Triggers that require namespace permissions and the existence of the SvcRules and CoinRules contracts
   def registerPostOnboardingTriggers(): Unit = {
-    config.acsStoreDump.foreach(backupConfig =>
-      registerTrigger(
-        new PeriodicAcsStoreBackupTrigger(
-          backupConfig,
-          triggerContext,
-          svcStore,
-        )
-      )
-    )
-
     registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
     registerTrigger(
       new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, config, connection)
@@ -402,7 +392,6 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
   // registerPostOnboardingTriggers
   override protected[this] def expectedTriggerClasses: Seq[TriggerClass] =
     CNNodeAppAutomationService.expectedTriggerClasses ++ Seq(
-      aTrigger[PeriodicAcsStoreBackupTrigger],
       aTrigger[SummarizingMiningRoundTrigger],
       aTrigger[SvOnboardingRequestTrigger],
       aTrigger[SvRewardTrigger],

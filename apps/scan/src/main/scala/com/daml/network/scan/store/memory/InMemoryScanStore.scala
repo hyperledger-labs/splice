@@ -2,7 +2,6 @@ package com.daml.network.scan.store.memory
 
 import cats.implicits.*
 import cats.kernel.Monoid
-import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
@@ -371,18 +370,6 @@ class InMemoryScanStore(
           .sum
       )
   }
-
-  def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit
-      tc: TraceContext
-  ): Future[
-    Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]
-  ] =
-    multiDomainAcsStore.filterContracts(
-      cc.coinimport.ImportCrate.COMPANION,
-      (co: Contract[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]) =>
-        co.payload.receiver == receiverParty.toProtoPrimitive,
-      limit,
-    )
 
   override def findFeaturedAppRight(
       providerPartyId: PartyId

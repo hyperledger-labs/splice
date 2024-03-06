@@ -3,7 +3,6 @@ package com.daml.network.wallet
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.*
 import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.store.AcsStoreDump
 import com.daml.network.util.{HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
@@ -13,8 +12,6 @@ import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -86,21 +83,13 @@ class UserWalletService(
     loggerFactory,
   )
 
-  private val receiveImportCratesF = AcsStoreDump.receiveCratesFor(
-    key.endUserParty,
-    (party: PartyId, tc0: TraceContext) => scanConnection.getImportShipment(party)(tc0),
-    automation.connection,
-    retryProvider,
-    logger,
-  )
-
   /** The connection to use when submitting commands based on reads from the WalletStore.
     * The submission will wait for the store to ingest the effect of the command before completing the future.
     */
   val connection: CNLedgerConnection = automation.connection
 
   override def isHealthy: Boolean =
-    automation.isHealthy && treasury.isHealthy && !receiveImportCratesF.value.exists(_.isFailure)
+    automation.isHealthy && treasury.isHealthy
 
   override def onClosed(): Unit = {
     // Close treasury early, that will result in it no longer accepting new requests

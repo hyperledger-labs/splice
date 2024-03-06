@@ -20,7 +20,7 @@ import com.daml.network.http.v0.sv.SvResource
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.migration.AcsExporter
 import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
-import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion}
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.automation.{
@@ -1110,14 +1110,6 @@ object SvApp {
     val svParty = store.key.svParty
     logger.debug("Receiving or creating validator license for SV party")
     for {
-      _ <- AcsStoreDump.receiveCratesFor(
-        svParty,
-        (party: PartyId, tc0: TraceContext) =>
-          svcStoreWithIngestion.store.getImportShipmentFor(party)(tc0),
-        svcStoreWithIngestion.connection,
-        retryProvider,
-        logger,
-      )
       _ <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "Create validator license for SV party",

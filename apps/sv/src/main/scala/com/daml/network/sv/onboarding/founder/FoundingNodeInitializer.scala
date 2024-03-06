@@ -7,16 +7,15 @@ import cats.implicits.{
 }
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.*
-import com.daml.network.http.v0.definitions as http
-import com.daml.network.store.{AcsStoreDump, CNNodeAppStoreWithIngestion, PageLimit}
+import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.config.{SvAppBackendConfig, SvBootstrapDumpConfig, SvOnboardingConfig}
+import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{
   DomainNodeReconciler,
   NodeInitializerUtil,
@@ -27,7 +26,7 @@ import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.{AssignedContract, GcpBucket, TemplateJsonDecoder, UploadablePackage}
+import com.daml.network.util.{AssignedContract, TemplateJsonDecoder, UploadablePackage}
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
@@ -66,7 +65,7 @@ import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import java.util.concurrent.TimeUnit
-import scala.concurrent.{blocking, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
@@ -395,85 +394,7 @@ class FoundingNodeInitializer(
       )
     }
 
-    private def importAcsSnapshot(
-        coinConfig: cc.coinconfig.CoinConfig[cc.coinconfig.USD]
-    ): Future[Option[cc.types.Round]] =
-      foundingConfig.bootstrappingDump match {
-        case None =>
-          logger.debug("Skipping importing an ACS snapshot, as none was configured.")
-          Future.successful(None)
-        case Some(config) =>
-          logger.debug(s"Attempting to import ACS snapshot from ${config.description}")
-          for {
-            existingCrates <- svcStore.multiDomainAcsStore.listAssignedContracts(
-              cc.coinimport.ImportCrate.COMPANION,
-              PageLimit.tryCreate(10),
-            )
-            _ = if (existingCrates.nonEmpty) {
-              logger.error(
-                show"Aborting founding node initialization, as the following crates already exist (probably due to a earlier partial init of the founding node):\n$existingCrates"
-              )
-              throw new IllegalStateException(
-                "Cannot import the ACS snapshot, as there already was an earlier partial or different import."
-              )
-            }
-            jsonDump <- Future {
-              blocking {
-                val jsonString = config match {
-                  case SvBootstrapDumpConfig.File(file) =>
-                    better.files.File(file).contentAsString
-                  case SvBootstrapDumpConfig.Gcp(bucketConfig, path) =>
-                    val bucket = new GcpBucket(bucketConfig, loggerFactory)
-                    bucket.readStringFromBucket(path)
-                }
-                io.circe.parser
-                  .decode[http.GetAcsStoreDumpResponse](jsonString)
-                  .fold(
-                    err =>
-                      throw new IllegalArgumentException(
-                        s"Failed to parse ${config.description}: $err"
-                      ),
-                    result => result,
-                  )
-              }
-            }
-            cmds = AcsStoreDump.extractImportCommands(svcParty, coinConfig)(
-              jsonDump.contracts.toSeq
-            )
-            _ <-
-              if (cmds.isEmpty) {
-                logger.debug(
-                  show"Extracted zero import commands; not going to submit any transaction."
-                )
-                Future.unit
-              } else {
-                logger.debug(
-                  show"Extracted ${cmds.size} import commands; attempting to submit them in one transaction"
-                )
-                // Note: we assume that the Acs dump is small enough to be imported in a single transaction.
-                svcStoreWithIngestion.connection
-                  .submit(actAs = Seq(svcParty), readAs = Seq.empty, cmds)
-                  .withDomainId(domainId)
-                  .noDedup
-                  .yieldUnit()
-              }
-          } yield {
-            if (cmds.isEmpty) {
-              logger.debug(
-                "Skipping importing an ACS snapshot, as no ImportCommands are extracted from the acs dump."
-              )
-              None
-            } else {
-              val initialOpenMiningRound = Some(new cc.types.Round(0L))
-              logger.info(
-                s"Completed importing ACS store dump by submitting ${cmds.size} commands in one transaction."
-              )
-              initialOpenMiningRound
-            }
-          }
-      }
-
-    // Import AcsSnapshot and Create SvcRules and CoinRules and open the first mining round
+    // Create SvcRules and CoinRules and open the first mining round
     private def bootstrapSvc(): Future[Unit] = {
       val svcRulesConfig = SvUtil.defaultSvcRulesConfig(domainId)
       for {
@@ -518,8 +439,6 @@ class FoundingNodeInitializer(
                   foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor.value,
                 )
                 for {
-                  optInitialOpenMiningRound <- importAcsSnapshot(coinConfig)
-                  initialRoundNumber = optInitialOpenMiningRound.fold(0L)(_.number)
                   founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(
                     cometBftNode,
                     localDomainNode,
@@ -530,7 +449,7 @@ class FoundingNodeInitializer(
                   )
                   _ = logger
                     .info(
-                      s"Bootstrapping SVC as $svcParty with initial round number $initialRoundNumber and BFT nodes $founderDomainNodes"
+                      s"Bootstrapping SVC as $svcParty and BFT nodes $founderDomainNodes"
                     )
                   _ <- svcStoreWithIngestion.connection
                     .submit(
@@ -543,7 +462,6 @@ class FoundingNodeInitializer(
                         foundingConfig.founderSvRewardWeightBps,
                         participantId.toProtoPrimitive,
                         founderDomainNodes,
-                        initialRoundNumber,
                         new RelTime(
                           TimeUnit.NANOSECONDS.toMicros(
                             foundingConfig.roundZeroDuration

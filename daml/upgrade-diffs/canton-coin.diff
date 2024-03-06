@@ -9,17 +9,6 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/Coin.daml da
    where
      signatory svc, owner
      ensure validExpiringAmount amount
-diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinImport.daml daml/canton-coin-upgrade/daml/CC/CoinImport.daml
---- daml/canton-coin/daml/CC/CoinImport.daml
-+++ daml/canton-coin-upgrade/daml/CC/CoinImport.daml
-@@ -39,6 +39,7 @@
-               svc = svc
-               owner = receiver
-               amount = coin.amount
-+              upgrade = Some ()
-             return $ Some CoinCreateSummary with
-               coin = coinCid
-               -- NOTE: this price is not the price at which the original coin was created.
 diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.daml daml/canton-coin-upgrade/daml/CC/CoinRules.daml
 --- daml/canton-coin/daml/CC/CoinRules.daml
 +++ daml/canton-coin-upgrade/daml/CC/CoinRules.daml
@@ -47,7 +36,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
                    ..
          return CoinCreateSummary with
                    coin
-@@ -558,6 +561,7 @@
+@@ -557,6 +560,7 @@
    return TransferResult with
      round = csum.openRound.round
      summary = summary
@@ -55,7 +44,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
      ..
  
  
-@@ -861,11 +865,13 @@
+@@ -860,11 +864,13 @@
              svc
              owner = sender
              amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
@@ -69,7 +58,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
  
        case out.lock of
          None -> TransferResultCoin <$> create coin
-@@ -994,6 +1000,7 @@
+@@ -993,6 +999,7 @@
      provider : Party
      inputs : [TransferInput]
      outputs : [TransferOutput]
@@ -77,7 +66,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/canton-coin/daml/CC/CoinRules.da
    deriving (Eq, Ord, Show)
  
  -- | An individual output for a batch transfer.
-@@ -1019,6 +1026,7 @@
+@@ -1018,6 +1025,7 @@
      senderChangeCoin: Optional (ContractId Coin)
        -- ^ Optional reference to the coin for the change returned to the sender.
        -- Only created if there was some change to be returned after deducting the fee for returning change.

@@ -62,27 +62,6 @@ spec:
               {{- if eq .Values.onboardingType "found-collective" }}
             - name: CN_APP_SV_IS_DEV_NET
               value: {{ .Values.isDevNet | quote }}
-                {{- with .Values.acsDumpImport }}
-            - name: ADDITIONAL_CONFIG_ACS_DUMP_IMPORT
-              value: |
-                canton.sv-apps.sv.onboarding.bootstrapping-dump {
-                  type = gcp
-                  bucket {
-                    project-id = {{ .bucket.projectId }}
-                    bucket-name = {{ .bucket.bucketName }}
-                    credentials {
-                      type = service-account
-                      json-credentials = ${CN_APP_SV_BOOTSTRAPPING_DUMP_SERVICE_ACCOUNT_CREDENTIALS}
-                    }
-                  }
-                  path = {{ .path | quote }}
-                }
-            - name: CN_APP_SV_BOOTSTRAPPING_DUMP_SERVICE_ACCOUNT_CREDENTIALS
-              valueFrom:
-                secretKeyRef:
-                  key: "json-credentials"
-                  name: {{ .bucket.secretName }}
-                {{- end }}
               {{- end }}
               {{ if .Values.onboardingType }}
             - name: CN_APP_SV_ONBOARDING_TYPE
@@ -194,30 +173,6 @@ spec:
                   public-key = {{ $sv.publicKey | quote }}
                   reward-weight-bps = {{ $sv.rewardWeightBps | quote }}
                 }
-            {{- end }}
-            {{- with .Values.acsDumpPeriodicExport }}
-            - name: ADDITIONAL_CONFIG_CN_APP_SV_ACS_DUMP_PERIODIC_EXPORT
-              value: |
-                canton.sv-apps.sv.acs-store-dump = {
-                  location {
-                    type = gcp
-                    bucket {
-                      project-id = {{ .location.bucket.projectId }}
-                      bucket-name = {{ .location.bucket.bucketName }}
-                      credentials {
-                        type = service-account
-                        json-credentials = ${CN_APP_SV_ACS_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS}
-                      }
-                    }
-                    prefix = {{ .location.prefix | quote }}
-                  }
-                  backup-interval = {{ .backupInterval }}
-                }
-            - name: CN_APP_SV_ACS_BACKUP_BUCKET_SERVICE_ACCOUNT_CREDENTIALS
-              valueFrom:
-                secretKeyRef:
-                  key: "json-credentials"
-                  name: {{ .location.bucket.secretName }}
             {{- end }}
             {{- with .Values.identitiesExport }}
             - name: ADDITIONAL_CONFIG_CN_APP_SV_IDENTITIES_EXPORT

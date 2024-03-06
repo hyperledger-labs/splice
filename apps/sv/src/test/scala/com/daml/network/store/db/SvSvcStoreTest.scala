@@ -3,8 +3,6 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinimport.{ImportCrate, ImportPayload}
-import com.daml.network.codegen.java.cc.coinimport.importpayload.{IP_Coin, IP_ValidatorLicense}
 import com.daml.network.codegen.java.cc.coinrules.{
   AppTransferContext,
   CoinRules_MiningRound_Archive,
@@ -12,7 +10,6 @@ import com.daml.network.codegen.java.cc.coinrules.{
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.cns.*
 import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
@@ -797,68 +794,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "getImportShipmentFor" should {
-
-      "return the ImportShipment for the receiver" in {
-        val receiver = userParty(1)
-        val receiverCoins = (1 to 3).map(n =>
-          importCrate(
-            receiver,
-            new IP_Coin(coin(receiver, n.toDouble, n.toLong, n.toDouble).payload),
-          )
-        )
-        val receiverLicenses = (1 to 3).map(_ =>
-          importCrate(
-            receiver,
-            new IP_ValidatorLicense(
-              new ValidatorLicense(
-                userParty(1).toProtoPrimitive,
-                storeSvParty.toProtoPrimitive,
-                svcParty.toProtoPrimitive,
-                Optional.empty(),
-              )
-            ),
-          )
-        )
-        val coinsOfOthers = (4 to 6).map(n =>
-          importCrate(
-            userParty(n),
-            new IP_Coin(coin(userParty(n), n.toDouble, n.toLong, n.toDouble).payload),
-          )
-        )
-        val validatorLicensesOfOthers = (4 to 6).map(n =>
-          importCrate(
-            userParty(n),
-            new IP_ValidatorLicense(
-              new ValidatorLicense(
-                userParty(n).toProtoPrimitive,
-                storeSvParty.toProtoPrimitive,
-                svcParty.toProtoPrimitive,
-                Optional.empty(),
-              )
-            ),
-          )
-        )
-
-        for {
-          store <- mkStore()
-          (_, _, newest) <- createMiningRoundsTriple(store, startRound = 500L)
-          _ <- MonadUtil.sequentialTraverse(
-            receiverCoins ++ coinsOfOthers ++ receiverLicenses ++ validatorLicensesOfOthers
-          )(
-            dummyDomain.create(_)(store.multiDomainAcsStore)
-          )
-          result <- store.getImportShipmentFor(receiver)(traceContext)
-        } yield {
-          result.openRound.contract should be(newest)
-          result.crates.map(
-            _.contract
-          ) should contain theSameElementsAs (receiverCoins ++ receiverLicenses)
-        }
-      }
-
-    }
-
     "listExpiredCnsSubscriptions" should {
 
       "return all entries where subscription_next_payment_due_at < now" in {
@@ -1315,20 +1250,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     contract(
       SvOnboardingConfirmed.TEMPLATE_ID,
       new SvOnboardingConfirmed.ContractId(nextCid()),
-      template,
-    )
-  }
-
-  private def importCrate(receiver: PartyId, payload: ImportPayload) = {
-    val template = new ImportCrate(
-      svcParty.toProtoPrimitive,
-      receiver.toProtoPrimitive,
-      payload,
-    )
-
-    contract(
-      ImportCrate.TEMPLATE_ID,
-      new ImportCrate.ContractId(nextCid()),
       template,
     )
   }

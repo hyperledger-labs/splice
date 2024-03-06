@@ -179,10 +179,6 @@ trait ScanStore
       tc: TraceContext
   ): Future[Long]
 
-  def listImportCrates(receiverParty: PartyId, limit: Limit = Limit.DefaultLimit)(implicit
-      tc: TraceContext
-  ): Future[Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]]]
-
   def findFeaturedAppRight(providerPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[FeaturedAppRight.ContractId, FeaturedAppRight]]]
@@ -321,12 +317,6 @@ object ScanStore {
             contract = contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.lock.expiresAt)),
             amount = Some(contract.payload.coin.amount.initialAmount),
-          )
-        },
-        mkFilter(cc.coinimport.ImportCrate.COMPANION)(co => co.payload.svc == svc) { contract =>
-          ScanAcsStoreRowData(
-            contract = contract,
-            importCrateReceiver = Some(contract.payload.receiver),
           )
         },
         mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc) { contract =>

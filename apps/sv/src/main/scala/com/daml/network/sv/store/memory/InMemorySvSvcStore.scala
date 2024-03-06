@@ -577,20 +577,6 @@ class InMemorySvSvcStore(
       )
     } yield contracts map (_.contract)
 
-  override def getImportShipmentFor(
-      receiver: PartyId
-  )(implicit tc: TraceContext): Future[AcsStoreDump.ImportShipment] = for {
-    openRound <- this.getLatestActiveOpenMiningRound()
-    // Listing all crates is OK, as we assume the number of crates is small.
-    allCrates <- multiDomainAcsStore.listContracts(cc.coinimport.ImportCrate.COMPANION)
-    cratesForReceiver = allCrates.filter(crate =>
-      crate.payload.receiver == receiver.toProtoPrimitive
-    )
-  } yield AcsStoreDump.ImportShipment(
-    openRound,
-    cratesForReceiver,
-  )
-
   override def lookupCnsEntryByNameWithOffset(
       name: String
   )(implicit tc: TraceContext): Future[

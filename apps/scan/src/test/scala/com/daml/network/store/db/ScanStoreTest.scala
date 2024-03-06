@@ -3,8 +3,6 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.Coin
-import com.daml.network.codegen.java.cc.coinimport.ImportCrate
-import com.daml.network.codegen.java.cc.coinimport.importpayload.IP_Coin
 import com.daml.network.codegen.java.cc.coinrules.BuyMemberTrafficResult
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.types.Round
@@ -806,27 +804,6 @@ abstract class ScanStoreTest
       }
     }
 
-    "listImportCrates" should {
-
-      "return all import crates of a receiver" in {
-        val wanted1 = importCrate(userParty(1), 1)
-        val unwanted = importCrate(userParty(2), 1)
-        val wanted2 = importCrate(userParty(1), 2)
-        for {
-          store <- mkStore()
-          _ <- dummyDomain.create(wanted1)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
-          _ <- dummyDomain.create(wanted2)(store.multiDomainAcsStore)
-        } yield {
-          store
-            .listImportCrates(userParty(1))
-            .futureValue
-            .map(_.contract) should contain theSameElementsAs Set(wanted1, wanted2)
-        }
-      }
-
-    }
-
     "findFeaturedAppRight" should {
 
       "return the FeaturedAppRight of the wanted provider" in {
@@ -1323,19 +1300,6 @@ trait CoinTransferUtil { self: StoreTest =>
       new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
       new java.math.BigDecimal(changeToHoldingFeesRate),
     ).toValue
-
-  def importCrate(receiver: PartyId, n: Int) = {
-    val template = new ImportCrate(
-      svcParty.toProtoPrimitive,
-      receiver.toProtoPrimitive,
-      new IP_Coin(coinTemplate(n.toDouble, receiver)),
-    )
-    contract(
-      ImportCrate.TEMPLATE_ID,
-      new ImportCrate.ContractId(s"${receiver.toProtoPrimitive}::$n"),
-      template,
-    )
-  }
 
   def coinTemplate(amount: Double, owner: PartyId) = {
     new Coin(

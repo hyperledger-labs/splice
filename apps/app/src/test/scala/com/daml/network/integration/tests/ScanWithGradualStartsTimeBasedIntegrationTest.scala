@@ -9,7 +9,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.codegen.java.cc
 import scala.util.Try
 
 class ScanWithGradualStartsTimeBasedIntegrationTest
@@ -26,26 +25,11 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
   "initialize a scan app that joins late" in { implicit env =>
     startAllSync(sv1ScanBackend, sv1Backend, aliceValidatorBackend, bobValidatorBackend)
 
-    val (aliceUserParty, _) = onboardAliceAndBob()
+    val _ = onboardAliceAndBob()
 
     clue("Tap some coin before sv2 scan app starts") {
       aliceWalletClient.tap(20)
       bobWalletClient.tap(3)
-    }
-
-    clue("Create an importCrate for alice with the same value as her existing coin") {
-      val aliceCoin = aliceValidatorBackend.participantClient.ledger_api_extensions.acs
-        .awaitJava(cc.coin.Coin.COMPANION)(aliceUserParty)
-      sv1Backend.participantClient.ledger_api_extensions.commands.submitWithResult(
-        userId = sv1Backend.config.ledgerApiUser,
-        actAs = Seq(svcParty),
-        readAs = Seq.empty,
-        update = new cc.coinimport.ImportCrate(
-          svcParty.toProtoPrimitive,
-          aliceUserParty.toProtoPrimitive,
-          new cc.coinimport.importpayload.IP_Coin(aliceCoin.data),
-        ).create,
-      )
     }
 
     clue("Start sv2 app and scan") {
@@ -80,10 +64,10 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     clue("Aggregated total coin balance on both scan apps should match") {
       val expectedTotalsRanges = Seq(
         (
-          45.9,
-          46.0,
-        ), // Alice has 23 CC in Coin + 20 in ImportCrate, Bob has 3 CC, all minus holding fees
-        (66642.1, 66642.2),
+          25.9,
+          26.0,
+        ), // Alice has 23 CC in Coin, Bob has 3 CC, all minus holding fees
+        (66622.1, 66622.2),
       )
       (0 to 1).foreach { i =>
         val round = 2L + i.toLong

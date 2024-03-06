@@ -149,9 +149,6 @@ final class Sv1NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightInt
 
   override protected def svNumber = 1
 
-  "Check that there is a recent ACS snapshot on GCP" in { _ =>
-    testRecentAcsDump("sv-1")
-  }
   "Check that sv-1 responds with a recent aggregated round" in { implicit env =>
     val latestOpenMiningRound =
       Try(

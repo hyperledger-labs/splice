@@ -70,7 +70,6 @@ genericSetupApp svcPrefix = do
 
   submitExerciseCoinRulesByKey app [svc] [] CoinRules_Bootstrap_Rounds with
       coinPrice = 1.0
-      initialRoundNumber = 0
       round0Duration = hours 24 -- extra time for all initial members to join
 
   -- return the off-ledger reference to the app for later script steps

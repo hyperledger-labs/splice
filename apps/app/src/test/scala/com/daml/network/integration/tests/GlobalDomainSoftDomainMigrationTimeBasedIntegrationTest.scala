@@ -339,27 +339,6 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       createSampleAndEnsurePresence(cc.coin.UnclaimedReward.COMPANION)(
         new cc.coin.UnclaimedReward(svcParty.toProtoPrimitive, dummyDecimal)
       )
-
-      createSampleAndEnsurePresence(cc.coinimport.ImportCrate.COMPANION) {
-        val svc = svcParty.toProtoPrimitive
-        val receiver = svc
-        new cc.coinimport.ImportCrate(
-          svc,
-          receiver,
-          new cc.coinimport.importpayload.IP_Coin(
-            new cc.coin.Coin(
-              svc,
-              receiver,
-              new cc.fees.ExpiringAmount(
-                dummyDecimal,
-                dummyRound,
-                new cc.fees.RatePerRound(dummyDecimal),
-              ),
-              java.util.Optional.empty,
-            )
-          ),
-        )
-      }
     }
 
     val dummyDistantRelTime = new RelTime(1000000000000L)

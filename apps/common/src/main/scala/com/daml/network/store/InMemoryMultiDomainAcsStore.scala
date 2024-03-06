@@ -8,14 +8,13 @@ import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpired
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ledger.api.*
 import com.daml.network.store.db.AcsRowData
-import com.daml.network.util.{AssignedContract, Contract, ContractWithState, QualifiedName, Trees}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState, Trees}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status
 
 import java.time.Instant
 import scala.collection.immutable.{Queue, SortedMap}
@@ -572,33 +571,6 @@ class InMemoryMultiDomainAcsStore[TXE](
     Future.successful(stateVar.incompleteReassignmentsById)
 
   override def close(): Unit = ()
-
-  override def getJsonAcsSnapshot(
-      ignoredContracts: Set[QualifiedName]
-  )(implicit tc: TraceContext): Future[JsonAcsSnapshot] =
-    Future {
-      val state = stateVar
-      state.offset match {
-        case None =>
-          throw Status.NOT_FOUND
-            .withDescription("ACS has not yet been fully ingested.")
-            .asRuntimeException()
-        case Some(offset) =>
-          JsonAcsSnapshot(
-            offset,
-            state.createEvents.values
-              .collect(
-                Function.unlift({ ev =>
-                  if (ignoredContracts.contains(QualifiedName(ev.getTemplateId)))
-                    None
-                  else
-                    contractFilter.decodeMatchingContract(ev)
-                })
-              )
-              .toSeq,
-          )
-      }
-    }
 }
 
 object InMemoryMultiDomainAcsStore {

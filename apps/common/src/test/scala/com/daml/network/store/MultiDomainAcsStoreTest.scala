@@ -4,13 +4,13 @@ import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time
-import com.daml.network.codegen.java.cc.coin.{AppRewardCoupon, Coin, ValidatorRewardCoupon}
+import com.daml.network.codegen.java.cc.coin.AppRewardCoupon
 import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.AppPaymentRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.ledger.api.ReassignmentEvent
 import com.daml.network.store.db.{AcsRowData, IndexColumnValue}
-import com.daml.network.util.{AssignedContract, Contract, ContractWithState, QualifiedName}
+import com.daml.network.util.{AssignedContract, Contract, ContractWithState}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
@@ -663,38 +663,6 @@ abstract class MultiDomainAcsStoreTest[
           c.contract.identifier.getPackageId shouldBe upgradedPackageId
         }
       } yield succeed
-    }
-
-    "getJsonAcsSnapshot" in {
-      val contractFilter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = {
-        import MultiDomainAcsStore.mkFilter
-
-        MultiDomainAcsStore.SimpleContractFilter(
-          svcParty,
-          templateFilters = Map(
-            mkFilter(AppRewardCoupon.COMPANION)(_ => true)(GenericAcsRowData(_)),
-            mkFilter(ValidatorRewardCoupon.COMPANION)(_ => true)(GenericAcsRowData(_)),
-            mkFilter(Coin.COMPANION)(_ => true)(GenericAcsRowData(_)),
-          ),
-        )
-      }
-
-      implicit val store = mkStore(filter = contractFilter)
-      val appReward1 = appRewardCoupon(1, svcParty)
-      val appReward2 = appRewardCoupon(2, userParty(2))
-      val validatorReward = validatorRewardCoupon(3, userParty(3))
-      for {
-        _ <- acs(Seq((appReward1, d1, 0L)))
-        _ <- d1.create(appReward2)
-        _ <- d1.create(validatorReward)
-        _ <- d1.create(coin(userParty(4), 4.2, 3, 0.01))
-        result <- store.getJsonAcsSnapshot(ignoredContracts = Set(QualifiedName(Coin.TEMPLATE_ID)))
-      } yield {
-        result.contracts.size should be(3)
-        result.contracts should contain(appReward1)
-        result.contracts should contain(appReward2)
-        result.contracts should contain(validatorReward)
-      }
     }
 
     "have 900-1000 test contracts for the mismatch test" in {

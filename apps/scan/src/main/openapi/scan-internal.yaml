@@ -338,24 +338,6 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /v0/bootstrap/import-crates:
-    get:
-      tags: [scan]
-      x-jvm-package: scan
-      operationId: "listImportCrates"
-      parameters:
-        - in: query
-          name: receiver_party_id
-          required: true
-          schema:
-            type: string
-      responses:
-        "200":
-          description: ok
-          content:
-            application/json:
-              schema:
-                "$ref": "#/components/schemas/ListImportCratesResponse"
   /v0/svc-sequencers:
     get:
       tags: [scan]

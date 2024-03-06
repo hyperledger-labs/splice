@@ -10,7 +10,6 @@ import com.daml.network.config.{
   CNParticipantClientConfig,
   GcpBucketConfig,
   ParticipantBootstrapDumpConfig,
-  PeriodicBackupDumpConfig,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.SvAppClientConfig
@@ -178,7 +177,6 @@ case class SvAppBackendConfig(
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     // Migrate the SV party from an existing participant with the same namespace.
     migrateSvParty: Option[MigrateSvPartyConfig] = None,
-    acsStoreDump: Option[PeriodicBackupDumpConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
     domainMigrationDumpPath: Option[Path] = None,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here

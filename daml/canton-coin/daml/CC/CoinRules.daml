@@ -208,7 +208,6 @@ template CoinRules
       : ContractId OpenMiningRound
       with
         coinPrice : Decimal
-        initialRoundNumber : Int
         round0Duration : RelTime
         -- Duration of the very first round, typically set to a number large enough for all initial members to complete joining and grab their SvReward coupon.
       controller svc
@@ -216,7 +215,7 @@ template CoinRules
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
         let tickDuration = configUsd.tickDuration
-        let nr0 = initialRoundNumber
+        let nr0 = 0
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
 

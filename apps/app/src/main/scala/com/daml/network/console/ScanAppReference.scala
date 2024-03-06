@@ -260,18 +260,6 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    "List the import crates available for a party"
-  )
-  def listImportCrates(
-      party: PartyId
-  ): Seq[ContractWithState[cc.coinimport.ImportCrate.ContractId, cc.coinimport.ImportCrate]] =
-    consoleEnvironment.run {
-      httpCommand(
-        HttpScanAppClient.ListImportCrates(party)
-      )
-    }
-
-  @Help.Summary(
     "List the SVC sequencers"
   )
   def listSvcSequencers(): Seq[HttpScanAppClient.DomainSequencers] =

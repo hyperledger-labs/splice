@@ -220,11 +220,6 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
 
   def ingestionSink: MultiDomainAcsStore.IngestionSink
 
-  /** Get a snapshot of all contracts in the ACS encoded as JSON. */
-  def getJsonAcsSnapshot(ignoredContracts: Set[QualifiedName])(implicit
-      tc: TraceContext
-  ): Future[JsonAcsSnapshot]
-
   /** Testing API: returns all contracts that have in-flight reassignments */
   private[store] def listIncompleteReassignments()(implicit
       tc: TraceContext
@@ -232,10 +227,6 @@ trait MultiDomainAcsStore extends AutoCloseable with NamedLogging {
 }
 
 object MultiDomainAcsStore {
-
-  case class SnapshotSummary(offset: String, numEvents: Int)
-
-  case class JsonAcsSnapshot(offset: String, contracts: Seq[Contract[?, ?]])
 
   /** Static specification of a set of create events in scope for ingestion into an MultiDomainAcsStore. */
   trait ContractFilter[R <: AcsRowData] {

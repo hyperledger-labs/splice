@@ -66,8 +66,6 @@ class ScanTxLogParser(
               node.result.value,
               TransactionType.SvRewardCollected,
             )
-          case ImportCrate_Receive(_) =>
-            State.empty
           case CoinRules_BuyMemberTraffic(node) =>
             State.fromBuyMemberTraffic(exercised, domainId, node)
           case CoinExpire(node) =>
@@ -89,17 +87,10 @@ class ScanTxLogParser(
 
       case created: CreatedEvent =>
         created match {
-          case CoinImportCrate(coin) =>
-            State.fromCoinImportCrate(root, domainId, coin)
           case OpenMiningRoundCreate(round) =>
             State.fromOpenMiningRoundCreate(root, domainId, round)
           case ClosedMiningRoundCreate(round) =>
             State.fromClosedMiningRoundCreate(tree, root, domainId, round)
-          case CoinImportCrate(ic) =>
-            val eventId = created.getContractId
-            State(
-              entryFromCoin(eventId, domainId, ic)
-            )
           case CoinCreate(_) =>
             throw new RuntimeException(
               s"Unexpected coin create event for coin ${created.getContractId} in transaction ${tree.getUpdateId}"
@@ -200,29 +191,6 @@ object ScanTxLogParser {
 
       override def combine(a: State, b: State) =
         a.appended(b)
-    }
-
-    def fromCoinImportCrate(
-        event: TreeEvent,
-        domainId: DomainId,
-        coin: cc.coin.Coin,
-    ): State = {
-      val amountAO0 = amountAsOfRoundZero(coin.amount)
-      State(
-        BalanceChangeTxLogEntry(
-          eventId = event.getEventId(),
-          domainId = domainId,
-          round = coin.amount.createdAt.number,
-          changeToInitialAmountAsOfRoundZero = amountAO0,
-          changeToHoldingFeesRate = coin.amount.ratePerRound.rate,
-          partyBalanceChanges = Map(
-            PartyId.tryFromProtoPrimitive(coin.owner) -> PartyBalanceChange(
-              amountAO0,
-              coin.amount.ratePerRound.rate,
-            )
-          ),
-        )
-      )
     }
 
     private def getCoinFromSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](

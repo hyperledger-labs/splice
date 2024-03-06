@@ -18,31 +18,24 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
 import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
 import com.daml.network.codegen.java.cn.{cometbft, svc}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.config.BackupDumpConfig
-import com.daml.network.environment.BuildInfo
-import com.daml.network.http.v0.definitions as http
-import com.daml.network.store.MultiDomainAcsStore.JsonAcsSnapshot
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvScanConfig
-import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.{AssignedContract, BackupDump}
+import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
 import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.nio.file.{Path, Paths}
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
 import java.security.spec.{EncodedKeySpec, PKCS8EncodedKeySpec, X509EncodedKeySpec}
 import java.security.{KeyFactory, SecureRandom, Signature}
-import java.time.{Instant, Duration as JavaDuration}
+import java.time.{Duration as JavaDuration}
 import java.util.{Base64, Optional}
 import java.util.concurrent.TimeUnit
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
@@ -283,52 +276,6 @@ object SvUtil {
   def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
     duration.toInternal.toScala.toMicros
   )
-
-  def acsStoreDumpFilename(now: Instant) =
-    Paths.get(
-      s"svc_acs_dump_${now}.json"
-    )
-
-  def writeAcsStoreDump(
-      acsDumpConfig: BackupDumpConfig,
-      loggerFactory: NamedLoggerFactory,
-      svcStore: SvSvcStore,
-      now: CantonTimestamp,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[(Path, JsonAcsSnapshot)] = {
-    val logger = loggerFactory.getTracedLogger(this.getClass)
-    implicit val elc: ErrorLoggingContext =
-      ErrorLoggingContext(logger, NamedLoggerFactory.root.properties, tc)
-
-    val filename = acsStoreDumpFilename(now.toInstant)
-    logger.debug(
-      s"Attempting to write ACS store dump to ${acsDumpConfig.locationDescription} at path: $filename"
-    )
-    for {
-      snapshot <- svcStore.getJsonAcsSnapshot()
-      response <- Future {
-        blocking {
-          import io.circe.syntax.*
-
-          val httpSnapshot = http.GetAcsStoreDumpResponse(
-            offset = snapshot.offset,
-            contracts = snapshot.contracts.map(_.toHttp).toVector,
-            version = Some(BuildInfo.compiledVersion),
-          )
-          val fileDesc =
-            s"ACS store dump for offset ${snapshot.offset} containing ${snapshot.contracts.size} contracts"
-          val path = BackupDump.write(
-            acsDumpConfig,
-            filename,
-            httpSnapshot.asJson.noSpaces,
-            loggerFactory,
-          )
-
-          logger.info(s"Wrote $fileDesc to ${acsDumpConfig.locationDescription} at path: $filename")
-          (path, snapshot)
-        }
-      }
-    } yield response
-  }
 
   def listActiveSvParticipantsAndMediators(
       svcRules: AssignedContract[SvcRules.ContractId, SvcRules]

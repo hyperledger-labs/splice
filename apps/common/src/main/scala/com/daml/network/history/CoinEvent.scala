@@ -1,19 +1,13 @@
 package com.daml.network.history
 
-import com.daml.ledger.javaapi.data.{CreatedEvent, DamlOptional, ExercisedEvent, Value}
-import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.coinimport
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleState
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, QualifiedName}
-import com.digitalasset.canton.logging.ErrorLoggingContext
-
-import java.util.Optional
-import scala.jdk.OptionConverters.*
 
 case class Transfer(
     node: ExerciseNode[
@@ -73,49 +67,6 @@ object Mint extends ExerciseNodeCompanion {
       new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
     )
   override def resToValue(res: Res) = res.toValue(_.toValue)
-}
-
-object ImportCrate_Receive extends ExerciseNodeCompanion {
-  override type Tpl = cc.coinimport.ImportCrate
-  override type Arg = cc.coinimport.ImportCrate_Receive
-  override type Res = Optional[cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId]]
-
-  override val template = cc.coinimport.ImportCrate.COMPANION
-  override val choice = cc.coinimport.ImportCrate.CHOICE_ImportCrate_Receive
-
-  override val argDecoder = cc.coinimport.ImportCrate_Receive.valueDecoder()
-
-  override def argToValue(arg: Arg) = arg.toValue
-
-  override val resDecoder = {
-    PrimitiveValueDecoders.fromOptional(
-      cc.coin.CoinCreateSummary.valueDecoder(cid =>
-        new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
-      )
-    )
-  }
-
-  override def resToValue(res: Res) = {
-    val optValue: Optional[Value] = res.map(_.toValue(_.toValue))
-    DamlOptional.of(optValue)
-  }
-}
-
-object ImportCrate_ReceiveCoin {
-  def unapply(
-      event: ExercisedEvent
-  )(implicit lc: ErrorLoggingContext): Option[
-    ExerciseNode[cc.coinimport.ImportCrate_Receive, cc.coin.CoinCreateSummary[
-      coinCodegen.Coin.ContractId
-    ]]
-  ] =
-    ImportCrate_Receive
-      .unapply(event)
-      .flatMap(node =>
-        node.result.value.toScala.map(summary =>
-          node.copy(result = new com.daml.network.util.Value(summary))
-        )
-      )
 }
 
 object LockedCoinUnlock extends ExerciseNodeCompanion {
@@ -245,34 +196,6 @@ object CoinCreate {
   ): Option[ContractType] = {
     Contract.fromCreatedEvent(companion)(event)
   }
-}
-
-object ImportCrate {
-  type TCid = coinimport.ImportCrate.ContractId
-  type T = coinimport.ImportCrate
-  type ContractType = Contract[TCid, T]
-  val companion = coinimport.ImportCrate.COMPANION
-
-  def unapply(
-      event: CreatedEvent
-  ): Option[ContractType] = {
-    Contract.fromCreatedEvent(companion)(event)
-  }
-}
-
-object CoinImportCrate {
-  def unapply(
-      event: CreatedEvent
-  ): Option[coinCodegen.Coin] =
-    ImportCrate
-      .unapply(event)
-      .flatMap(crate =>
-        crate.payload.payload match {
-          case coinPayload: coinimport.importpayload.IP_Coin =>
-            Some(coinPayload.coinValue)
-          case _ => None
-        }
-      )
 }
 
 object LockedCoinCreate {

@@ -2,7 +2,6 @@ module CN.Scripts.TestOnboarding where
 
 import DA.Assert
 import DA.Foldable (forA_)
-import DA.List (sort)
 import DA.Optional (fromSome)
 import qualified DA.Map as Map
 import Daml.Script
@@ -17,9 +16,7 @@ import CN.SvOnboarding
 
 import CC.Scripts.Util
 import CN.Scripts.SvcTestUtils
-import CC.Coin (Coin)
 import CC.CoinRules (CoinRules)
-import CC.Round
 import CC.Types
 
 
@@ -431,29 +428,5 @@ testSvMemberReonboarding = do
 
   -- check status reports
   checkSvStatusReports app
-
-  pure ()
-
-testTapAfterRestoringOpenRounds : Script ()
-testTapAfterRestoringOpenRounds = do
-  (app, _, _) <- initCollective 10 True
-  -- all members are onboarded in the earliest open round, which is required as
-  -- they all were members of that round when the data export happened
-  -- NOTE: members that join later after a data import will though miss some SvRewards. We're OK with this.
-  [(_, svcRules)] <- query @SvcRules app.svc
-  sort (map (.joinedAsOfRound) $ Map.values (svcRules.members)) ===
-    replicate 4 (Round 10)
-
-
-  (alice, _) <- setupSelfHostedUser app "alice"
-
-  -- the user setup taps 1.0 coin, which gets tapped at the most recent open round, which is round 11
-  [(_, coin)] <- query @Coin alice.primaryParty
-  (coin.amount.createdAt, coin.amount.initialAmount) === (Round 11, 1.0)
-
-  -- next issuance runs successfully and creates IssuingRound 10
-  runNextIssuanceD app 3.0
-  [(_, issuingRound)] <- query @IssuingMiningRound app.svc
-  issuingRound.round === Round 10
 
   pure ()

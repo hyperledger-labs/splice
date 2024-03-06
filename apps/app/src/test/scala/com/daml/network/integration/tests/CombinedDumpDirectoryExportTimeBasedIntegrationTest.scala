@@ -1,25 +1,17 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.config.{BackupDumpConfig, PeriodicBackupDumpConfig}
-import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
+import com.daml.network.integration.tests.CNNodeTests.{
+  CNNodeIntegrationTest,
+  CNNodeTestConsoleEnvironment,
+}
+import java.nio.file.{Files, Path, Paths}
 
-final class CombinedDumpDirectoryExportTimeBasedIntegrationTest
-    extends AcsStoreDumpExportTimeBasedIntegrationTestBase {
-  override def acsStoreDumpConfig(testContext: String) =
-    PeriodicBackupDumpConfig(
-      location = BackupDumpConfig.Directory(
-        AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir
-      ),
-      NonNegativeFiniteDuration.ofMinutes(10),
-    )
+final class CombinedDumpDirectoryExportIntegrationTest extends CNNodeIntegrationTest {
 
-  override def readDump(filename: String) = {
-    import better.files.File
-    val dumpFile =
-      File(AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir) / filename
-    dumpFile.contentAsString
-  }
+  private val testDumpDir: Path = Paths.get("apps/app/src/test/resources/dumps")
+
+  // Not using temp-files so test-generated outputs are easy to inspect.
+  private val testDumpOutputDir: Path = testDumpDir.resolve("test-outputs")
 
   // we write out participant identities dumps manually
   // because it give us more convenient control over file name and storage location
@@ -30,7 +22,8 @@ final class CombinedDumpDirectoryExportTimeBasedIntegrationTest
     val filename = s"${nodeName}_participant_dump_${now}.json"
     import better.files.File
     val dumpFile =
-      File(AcsStoreDumpTriggerExportTimeBasedIntegrationTest.testDumpOutputDir) / filename
+      File(testDumpOutputDir) / filename
+    Files.createDirectories(dumpFile.path.getParent())
     dumpFile.overwrite(content)
   }
 
