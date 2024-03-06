@@ -5,20 +5,21 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.integration.tests.runbook.SvUiIntegrationTestUtil
+import com.daml.network.util.SvFrontendTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.openqa.selenium.support.ui.Select
 import org.openqa.selenium.{By, Keys}
 
-import java.time.Instant
+import java.time.{Instant, ZoneOffset}
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
-
 import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
 
 class GlobalDomainUpgradeClusterPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
-    with SvUiIntegrationTestUtil {
+    with SvUiIntegrationTestUtil
+    with SvFrontendTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -47,8 +48,9 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
 
         click on "enable-next-scheduled-domain-upgrade"
 
+        val now = Instant.now()
         val scheduledUpgradeTime = DateTimeFormatter.ISO_INSTANT.format(
-          Instant.now().plusSeconds(120).truncatedTo(ChronoUnit.SECONDS)
+          now.plusSeconds(150).truncatedTo(ChronoUnit.SECONDS)
         )
         inside(find(id("nextScheduledDomainUpgrade.time-value"))) { case Some(element) =>
           element.underlying.clear()
@@ -67,6 +69,17 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
         inside(find(id("create-reason-url"))) { case Some(element) =>
           element.underlying.sendKeys(requestReasonUrl)
         }
+
+        setDateTime(
+          "sv1",
+          "datetime-picker-vote-request-expiration",
+          DateTimeFormatter
+            .ofPattern("MM/dd/yyyy hh:mm a")
+            .withZone(ZoneOffset.UTC)
+            .format(
+              now.plusSeconds(120)
+            ),
+        )
 
         clue("wait for the submit button to become clickable") {
           eventually(5.seconds)(
@@ -152,7 +165,7 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
     }
 
     clue("Domain migration should be scheduled") {
-      eventuallySucceeds() {
+      eventuallySucceeds(timeUntilSuccess = 120.seconds) {
         val nextScheduledDomainUpgrade = sv1
           .getSvcInfo()
           .svcRules

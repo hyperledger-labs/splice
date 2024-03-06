@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, SvTestUtil}
+import com.daml.network.util.{FrontendLoginUtil, SvFrontendTestUtil, SvTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -27,6 +27,7 @@ import java.util.Optional
 class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
     with SvTestUtil
+    with SvFrontendTestUtil
     with FrontendLoginUtil {
 
   override def environmentDefinition
@@ -1523,27 +1524,6 @@ class SvFrontendIntegrationTest
       webDriver: WebDriverType
   ) = {
     setDateTime(party, "datetime-picker-coin-configuration", dateTime)
-  }
-
-  def setDateTime(party: String, pickerId: String, dateTime: String)(implicit
-      webDriver: WebDriverType
-  ) = {
-    clue(s"$party selects the date $dateTime") {
-      val dateTimePicker = webDriver.findElement(By.id(pickerId))
-      eventually() {
-        dateTimePicker.clear()
-        dateTimePicker.click()
-        // Typing in the "filler" characters can mess up the input badly
-        // Note: this breaks on Feb 29th because the date library validates that the day
-        // of the month is valid for the year you enter and because the year is entered
-        // one digit at a time that fails and it resets it to Feb 28th. Luckily,
-        // this does not happen very often …
-        dateTimePicker.sendKeys(dateTime.replaceAll("[^0-9APM]", ""))
-        eventually()(
-          dateTimePicker.getAttribute("value") shouldBe dateTime
-        )
-      }
-    }
   }
 
   def getVoteRequestsInProgressSize()(implicit webDriver: WebDriverType) = {
