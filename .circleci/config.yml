@@ -2792,16 +2792,12 @@ workflows:
           context:
             - artifactory
             - slack-context
-          requires:
-            - cancel_previous_pipelines
       # Daml
       - daml_test:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
-          requires:
-            - cancel_previous_pipelines
       # Scala
       - scala_test:
           <<: *notify-fail
@@ -2814,8 +2810,6 @@ workflows:
           start_canton_options: "-w -f -m"
           resource_class: "xlarge"
           parallelism: 9
-          requires:
-            - cancel_previous_pipelines
       - scala_test:
           <<: *notify-fail
           context:
@@ -2827,8 +2821,6 @@ workflows:
           start_canton_options: "-s"
           resource_class: "xlarge"
           parallelism: 5
-          requires:
-            - cancel_previous_pipelines
       - scala_test:
           <<: *notify-fail
           context:
@@ -2842,8 +2834,6 @@ workflows:
           post_sbt_cmd: "./stop-frontends.sh"
           resource_class: "2xlarge"
           parallelism: 4
-          requires:
-            - cancel_previous_pipelines
       - scala_test:
           <<: *notify-fail
           context:
@@ -2857,8 +2847,6 @@ workflows:
           post_sbt_cmd: "./stop-frontends.sh"
           resource_class: "xlarge"
           parallelism: 1
-          requires:
-            - cancel_previous_pipelines
       - scala_test:
           <<: *notify-fail
           context:
@@ -2872,8 +2860,6 @@ workflows:
           post_sbt_cmd: "./stop-frontends.sh"
           resource_class: "xlarge"
           parallelism: 1
-          requires:
-            - cancel_previous_pipelines
       - scala_test:
           <<: *notify-fail
           context:
@@ -2885,8 +2871,6 @@ workflows:
           start_canton_options: "-s -g"
           resource_class: "xlarge"
           parallelism: 1
-          requires:
-            - cancel_previous_pipelines
       - scala_test:
           <<: *notify-fail
           context:
@@ -2898,22 +2882,16 @@ workflows:
           start_canton_options: "-w"
           resource_class: "xlarge"
           parallelism: 1
-          requires:
-            - cancel_previous_pipelines
       - ui_test:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
-          requires:
-            - cancel_previous_pipelines
       - bundle:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
-          requires:
-            - cancel_previous_pipelines
       # Ops
       - update_pipeline_schedule:
           <<: *notify-fail
@@ -2921,22 +2899,16 @@ workflows:
           context:
             - artifactory
             - slack-context
-          requires:
-            - cancel_previous_pipelines
       - deployment_test:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
-          requires:
-            - cancel_previous_pipelines
       - docker_images_build:
           <<: *notify-fail
           context:
             - artifactory
             - slack-context
-          requires:
-            - cancel_previous_pipelines
 
   deploy_cidaily_and_cidaily_testnet:
     when:
