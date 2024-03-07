@@ -1375,6 +1375,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "maxConnections": 300,
           "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
@@ -2090,6 +2091,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "maxConnections": 300,
           "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
@@ -3027,6 +3029,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "maxConnections": 300,
           "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
@@ -3935,6 +3938,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "maxConnections": 300,
           "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
@@ -4843,6 +4847,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "maxConnections": 300,
           "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"
@@ -5417,6 +5422,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "db": {
+          "maxConnections": 300,
           "pvcTemplateName": "pg-data",
           "volumeSize": "240Gi",
           "volumeStorageClass": "standard-rwo"

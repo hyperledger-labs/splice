@@ -12,6 +12,7 @@
     "./cluster/pulumi/common",
     "./cluster/pulumi/gcp",
     "./cluster/pulumi/infra",
+    "./cluster/pulumi/multi-validator",
     "./cluster/pulumi/sv-runbook",
     "./cluster/pulumi/validator-runbook"
   ],

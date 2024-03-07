@@ -857,6 +857,7 @@ function _cluster_reset() {
     _info "Uninstalling Pulumi canton-network and runbook stacks"
 
     _down_stack canton-network
+    _down_stack multi-validator
     _down_stack sv-runbook
     _down_stack validator-runbook
 
@@ -1693,6 +1694,34 @@ function subcmd_ci_pdown_validator(){
     fi
 
     subcmd_pulumi validator-runbook down --yes --skip-preview
+}
+
+###
+
+subcommand_whitelist[apply_multi]="Apply the multi-validator Pulumi stack"
+
+function subcmd_apply_multi() {
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    local -x IMAGE_TAG
+    IMAGE_TAG=$(get-snapshot-version)
+
+    _uses_pulumi_stack multi-validator
+    subcmd_pulumi multi-validator up --yes --skip-preview --show-sames "${args[@]}"
+}
+
+###
+
+subcommand_whitelist[pdown_multi]="Take the current multi-validator Pulumi configuration down"
+
+function subcmd_pdown_multi(){
+    _production_gate
+    _prompt_to_confirm
+    _cluster_must_exist
+
+    subcmd_pulumi multi-validator down --yes --skip-preview
 }
 
 ###

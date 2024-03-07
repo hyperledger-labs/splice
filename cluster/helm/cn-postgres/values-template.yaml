@@ -13,10 +13,10 @@ db:
   volumeSize: 480Gi
   volumeStorageClass: standard-rwo
   pvcTemplateName: pg-data
+  maxConnections: 300
 
 persistence:
   secretName: "postgres-secrets"
-
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

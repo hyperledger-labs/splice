@@ -23,6 +23,8 @@ images := \
 	docs \
 	gcs-proxy \
 	load-tester \
+	multi-validator \
+	multi-participant \
 
 canton-image := cluster/images/canton
 cn-image := cluster/images/cn-app
