@@ -11,25 +11,23 @@ import com.daml.network.environment.*
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
-import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Codec, Contract}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.ShowUtil.*
-import io.grpc.Status.Code
 import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.Status.Code
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.Base64
@@ -414,24 +412,6 @@ class HttpSvHandler(
       )
   }
 
-  def onboardSvMediator(
-      respond: v0.SvResource.OnboardSvMediatorResponse.type
-  )(
-      body: definitions.OnboardSvMediatorRequest
-  )(extracted: TraceContext): Future[v0.SvResource.OnboardSvMediatorResponse] = {
-    implicit val tc = extracted
-    withSpan(s"$workflowId.onboardSvMediator") { _ => _ =>
-      (for {
-        mediatorId <- Codec.decode(Codec.Mediator)(body.mediatorId)
-      } yield {
-        onboardMediator(mediatorId)
-      }).fold(
-        errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
-        _.map(_ => v0.SvResource.OnboardSvMediatorResponseOK),
-      )
-    }
-  }
-
   def onboardSvSequencer(
       respond: v0.SvResource.OnboardSvSequencerResponse.type
   )(
@@ -541,55 +521,6 @@ class HttpSvHandler(
       topologySnapshot = Base64.getEncoder.encodeToString(topologySnapshot.toProtoV30.toByteArray),
       sequencerSnapshot = Base64.getEncoder.encodeToString(sequencerSnapshot.toByteArray),
     )
-  }
-
-  private def addMediatorToTopologyState(
-      mediatorId: MediatorId
-  )(implicit traceContext: TraceContext): Future[Unit] =
-    for {
-      ourParticipant <- participantAdminConnection.getParticipantId()
-      globalDomain <- svcStore.getSvcRules().map(_.domain)
-      _ <- participantAdminConnection.ensureMediatorDomainStateAdditionProposal(
-        globalDomain,
-        mediatorId,
-        ourParticipant.uid.namespace.fingerprint,
-        RetryFor.ClientCalls,
-      )
-    } yield ()
-
-  // TODO(#5196) Replace this in favor of a Daml based flow. Note that for now
-  // there is no authorization check here. The daml flow will naturally give us one
-  // so implementing it here seems like wasted effort.
-  private def onboardMediator(
-      mediatorId: MediatorId
-  )(implicit traceContext: TraceContext) = {
-    for {
-      _ <- addMediatorToTopologyState(mediatorId)
-      globalDomain <- svcStore.getSvcRules().map(_.domain)
-      _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
-        "Mediator has been granted unlimited traffic",
-        participantAdminConnection
-          .lookupTrafficControlState(
-            globalDomain,
-            mediatorId,
-          )
-          .map {
-            case None =>
-              throw Status.NOT_FOUND
-                .withDescription(show"No traffic state for mediator $mediatorId")
-                .asRuntimeException
-            case Some(traffic) if traffic.mapping.totalExtraTrafficLimit != PositiveLong.MaxValue =>
-              throw Status.FAILED_PRECONDITION
-                .withDescription(
-                  show"Mediator $mediatorId does not have unlimited traffic limit, current limit: abc"
-                )
-                .asRuntimeException()
-            case _ => ()
-          },
-        logger,
-      )
-    } yield ()
   }
 
   private def isCompleted(

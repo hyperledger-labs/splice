@@ -59,11 +59,13 @@ class SvOnboardingSequencerProposalTrigger(
           )
       val sequencersToAdd =
         configuredSequencers.filterNot(sequencerDomainState.mapping.active.contains)
-      logger.info {
-        import com.digitalasset.canton.util.ShowUtil.showPretty
-        import com.daml.network.util.PrettyInstances.prettyCodegenContractId
-        show"Planning to add sequencers $sequencersToAdd to match SvcRules ${svcRules.contractId} at $svcRulesOffset"
-      }
+
+      if (sequencersToAdd.nonEmpty)
+        logger.info {
+          import com.digitalasset.canton.util.ShowUtil.showPretty
+          import com.daml.network.util.PrettyInstances.prettyCodegenContractId
+          show"Planning to add sequencers $sequencersToAdd to match SvcRules ${svcRules.contractId} at $svcRulesOffset"
+        }
       sequencersToAdd
     }
   }
@@ -73,6 +75,7 @@ class SvOnboardingSequencerProposalTrigger(
   ): Future[TaskOutcome] = {
     for {
       svcRules <- svcStore.getSvcRules()
+      _ = logger.info(show"Adding sequencer $task to domain ${svcRules.domain}")
       _ <- participantAdminConnection.ensureSequencerDomainStateAddition(
         svcRules.domain,
         task,

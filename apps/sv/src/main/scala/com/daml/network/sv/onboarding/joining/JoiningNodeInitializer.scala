@@ -2,7 +2,12 @@ package com.daml.network.sv.onboarding.joining
 
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
-import cats.implicits.{catsSyntaxTuple3Semigroupal, catsSyntaxTuple4Semigroupal, toTraverseOps}
+import cats.implicits.{
+  catsSyntaxTuple2Semigroupal,
+  catsSyntaxTuple3Semigroupal,
+  catsSyntaxTuple4Semigroupal,
+  toTraverseOps,
+}
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.NetworkAppClientConfig
@@ -260,13 +265,15 @@ class JoiningNodeInitializer(
       ).tupled
       _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
         for {
-          // First, make sure the identity of the new sequencer is known on the domain
+          // First, make sure the identity of the new domain nodes is known on the domain
           _ <-
-            localDomainNode.addLocalSequencerIdentityIfRequired(
-              config.domains.global.alias,
-              globalDomain,
-              participantAdminConnection,
-            )
+            (
+              localDomainNode.addLocalSequencerIdentityIfRequired(
+                config.domains.global.alias,
+                globalDomain,
+              ),
+              localDomainNode.addLocalMediatorIdentityIfRequired(globalDomain),
+            ).tupled
           // Then, add the new local domain node to the SVC rules with an "onboarding" status
           // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
           _ <- domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
@@ -280,10 +287,8 @@ class JoiningNodeInitializer(
             localDomainNode.onboardLocalSequencerIfRequired(
               svConnection
             )
-          _ <- localDomainNode.onboardLocalMediatorIfRequired(
-            globalDomain,
-            participantAdminConnection,
-            svConnection,
+          _ <- localDomainNode.initializeLocalMediatorIfRequired(
+            globalDomain
           )
         } yield ()
       }
