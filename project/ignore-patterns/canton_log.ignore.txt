@@ -41,41 +41,23 @@ GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
 # We can't do log suppression for Canton, so instead we ignore this.
 NOT_FOUND/USER_NOT_FOUND.*: getting user failed for unknown user \\"sv_user\\".*invoked from sv-participant\.sc
 
-# TODO(#3933) We expect these logs when topology change during party migration.
-MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants
-ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
-# Also triggered by party migrations. Unfortunately the participant doesn't log anything more specific here
-# that we could ignore.
-A security-sensitive error has been received.*TransactionProcessingSteps:participant=
-
 # TODO(#7924): remove once txs in-flight during party migrations do not produce any more warnings
 # Made as specific as possible to avoid ignoring other SYNC_SERVICE_ALARMS
 SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*PAR::sv.*Participant::.*Discarding.*with all ancestors
 SYNC_SERVICE_ALARM.*Received a request.*where the view.*has extra recipients.*PAR::sv.*Participant::.*Continue processing
 LOCAL_VERDICT_MALFORMED_PAYLOAD.*Rejected transaction due to malformed payload within views.*WrongRecipients
-
-# TODO(#5706): investigate and remove once fixed (note that the latter seems to be a rename of the former, see https://github.com/DACH-NY/canton/commit/d4ee0ccb187802e363d71f5c7379cbe5a4473903)
-MEDIATOR_INVALID_MESSAGE.*Received a mediator response.*with an unknown request id.*Discarding response
-MEDIATOR_INVALID_MESSAGE.*Received a confirmation response.*with an unknown request id.*Discarding response
-
-# TODO(#8596): These two might be expected and benign, but let's investigate to be sure (note that the latter seems to be a rename of the former, see https://github.com/DACH-NY/canton/commit/d4ee0ccb187802e363d71f5c7379cbe5a4473903)
+MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Missing root hash message for informee participants
+ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS.+Rejected transaction is referring to locked contracts
+A security-sensitive error has been received.*TransactionProcessingSteps:participant=
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Reason: Superfluous root hash message
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a mediator response.*with an invalid root hash
 MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received a confirmation response.*with an invalid root hash
 
-# TODO(#6106): Remove this when we can
-Failed to handle Mediator events
-Synchronous event processing failed for event batch with sequencer counters.*
-.*java.lang.IllegalStateException: Unable to fetch domain parameters.*
-
 # Detailed API logging is extremely useful for debugging so we turn this on in our tests.
 Your detailed API event logging is turned on but you are doing quite a few concurrent requests.
 
-# TODO(#8295): Remove this once fixed in Canton
+# # TODO(#10653): Remove once we start namespace triggers only after being added to the namespace
 UNAUTHORIZED_TOPOLOGY_TRANSACTION
-
-# TODO(#8091): investigate and remove once fixed
-MEDIATOR_RECEIVED_MALFORMED_MESSAGE.*Received an unauthorized mediator response
 
 # TODO(#8507): investigate and decide if we want to remove it once fixed
 Late processing \(or clock skew\) of batch with counter.*after sequencing
@@ -83,21 +65,8 @@ Late processing \(or clock skew\) of batch with counter.*after sequencing
 # Shows up during global domain migration test, when the domain is frozen
 Failed to submit submission due to .*\(Overloaded\(Submission rate exceeds rate limit of 0/s\.\)\)
 
-# TODO(#8594): investigate and decide if we can remove it.
-Sender .* of send request .* is not registered so cannot send or receive events\. Dropping send request\.
-
 # This is happenening during party migration and is expected. We can remove this in the future if/when canton detects and handles this warning
 .*Received a commitment where we have no shared contract.*ACS_MISMATCH_NO_SHARED_CONTRACTS.*
-
-# TODO(#9485) Figure out if those timeouts are really ok and not a bug in Canton
-Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=.*ParticipantReonboard
-
-# TODO(#9504) Find a better way to deal with ACS commitments during SV reonboarding
-sv\dParticipantReonboard.*ACS_COMMITMENT_MISMATCH.*
-
-# TODO(#9500) Remove this once Canton fixes the bug
-INVALID_ACKNOWLEDGEMENT_SIGNATURE.*sequencer
-INVALID_SUBMISSION_REQUEST_SIGNATURE.*sequencer
 
 # TODO(#9694) Remove this once Canton fixes their metrics
 has recorded multiple values for the same attributes
@@ -105,9 +74,6 @@ Too many log messages detected..*AsynchronousMetricStorage
 
 # TODO(#9544): remove once the slowdown in Canton has been fixed
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
-
-# TODO(#9852) Remove once Canton fixes the log level for this
-Unable to get topology snapshot to check whether informees are hosted on the domain
 
 # Shows up during the test case in SvOnboardingAddlIntegrationTest when submitting command with actAs = SVC and there are more than 1 SV onboarded
 Received a request with id RequestId\(.*\) with a view that is not correctly authorized.*is not authorized to submit on behalf of the submitting parties SVC-.*
