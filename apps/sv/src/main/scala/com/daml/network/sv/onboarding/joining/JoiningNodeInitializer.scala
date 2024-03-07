@@ -7,6 +7,7 @@ import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
+import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
@@ -35,6 +36,7 @@ import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, SequencerConnections}
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -92,9 +94,12 @@ class JoiningNodeInitializer(
       SequencerConnections.single(
         GrpcSequencerConnection.tryCreate(config.domains.global.url)
       ),
+      // Set manualConnect = true to avoid any issues with interrupted SV onboardings.
+      // This is changed to false after SV onboarding completes.
+      manualConnect = true,
     )
     for {
-      (svcPartyId, sponsorSvConnectionAndConfig, svParty) <- (
+      (svcPartyId, sponsorSvConnectionAndConfig, _) <- (
         getSvcPartyId(initConnection),
         // TODO(#5803) Consider removing this once Canton stops falling apart.
         // Wait for the sponsoring SV which also ensures the domain is initialized.
@@ -109,7 +114,9 @@ class JoiningNodeInitializer(
           )
         },
         for {
-          _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
+          // Register domain with manualConnect=true. Confusingly, this still connects the first time.
+          // However, it won't connect if we crash and get here again which is what we're really after.
+          _ <- participantAdminConnection.ensureDomainRegisteredNoHandshake(
             domainConfig,
             RetryFor.WaitingOnInitDependency,
           )
@@ -117,17 +124,17 @@ class JoiningNodeInitializer(
             requiredDars,
             RetryFor.WaitingOnInitDependency,
           )
-          svParty <- SetupUtil.setupSvParty(
-            initConnection,
-            config,
-            participantAdminConnection,
-            clock,
-            retryProvider,
-            loggerFactory,
-          )
-          _ <- darUploads
-        } yield svParty,
+        } yield (),
       ).tupled
+      _ <- connectToDomainUnlessMigratingSvcParty(svcPartyId)
+      svParty <- SetupUtil.setupSvParty(
+        initConnection,
+        config,
+        participantAdminConnection,
+        clock,
+        retryProvider,
+        loggerFactory,
+      )
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey, config.domainMigrationId)
       svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantAdminConnection)
@@ -137,6 +144,7 @@ class JoiningNodeInitializer(
         ledgerClient,
       )
       globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
+      _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
       svcPartyHosting = newSvcPartyHosting(storeKey)
       // We need to first wait to ensure the CometBFT node is caught up
       // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any
@@ -210,6 +218,11 @@ class JoiningNodeInitializer(
               joiningConfig,
             )
         }
+      // Set autoConnect=true now that SVC party migration is complete
+      _ <- participantAdminConnection.modifyDomainConnectionConfig(
+        config.domains.global.alias,
+        config => if (config.manualConnect) Some(config.copy(manualConnect = false)) else None,
+      )
       _ <- onboard(globalDomain, svcAutomation, svAutomation)
     } yield {
       (
@@ -624,7 +637,7 @@ class JoiningNodeInitializer(
     private def startHostingSvcPartyInParticipant(): Future[Unit] = {
       svcPartyHosting
         // TODO(#5364): consider inlining the relevant parts from SvcPartyHosting
-        .hostPartyOnOwnParticipant(domainId, participantId, svParty)
+        .hostPartyOnOwnParticipant(config.domains.global.alias, domainId, participantId, svParty)
         .map(
           _.getOrElse(
             sys.error(s"Failed to host SVC party on participant $participantId")
@@ -732,6 +745,29 @@ class JoiningNodeInitializer(
       logger,
     )
   }
+
+  private def connectToDomainUnlessMigratingSvcParty(svcPartyId: PartyId): Future[Unit] = for {
+    globalDomainId <- participantAdminConnection.getDomainId(config.domains.global.alias)
+    participantId <- participantAdminConnection.getParticipantId()
+    // Check if we have a proposal for hosting the SVC party signed by our particpant. If so,
+    // we are in the middle of an SVC party migration so don't reconnect to the domain.
+    proposals <- participantAdminConnection.listPartyToParticipant(
+      TopologyStoreId.DomainStore(globalDomainId).filterName,
+      filterParty = svcPartyId.filterString,
+      filterParticipant = participantId.filterString,
+      proposals = TopologyTransactionType.ProposalSignedBy(participantId.uid.namespace.fingerprint),
+    )
+    _ <-
+      if (proposals.nonEmpty) {
+        logger.info(
+          "Participant is in process of hosting the SVC party, not reconnecting to domain to avoid inconsistent ACS"
+        )
+        Future.unit
+      } else {
+        logger.info("Reconnecting to global domain")
+        participantAdminConnection.connectDomain(config.domains.global.alias)
+      }
+  } yield ()
 }
 
 object JoiningNodeInitializer {}

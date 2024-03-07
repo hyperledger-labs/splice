@@ -192,6 +192,7 @@ private[onboarding] object SetupUtil {
         }
         _ <- participantAdminConnection.uploadAcsSnapshot(acsSnapshot)
         _ <- participantAdminConnection.reconnectAllDomains()
+        _ <- participantAdminConnection.connectDomain(config.domains.global.alias)
         _ = logger.info("ACS import complete")
       } yield ()
     }

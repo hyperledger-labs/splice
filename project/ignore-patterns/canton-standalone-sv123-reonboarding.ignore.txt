@@ -6,4 +6,7 @@ ACS_COMMITMENT_MISMATCH
 # TODO(#9485): figure out why this happens, as in principle the confirmations from three of the mediators and counter-participants should be sufficient
 Response message for request.*timed out.*c.d.c.p.p.TransactionProcessor:participant=sv
 
+# TODO(#10682)
+Rejected transaction due to a participant determined timeout
+
 RequestRefused\(SenderUnknown\(The following senders in the aggregation rule are unknown: .*MED::sv4StandaloneMediator

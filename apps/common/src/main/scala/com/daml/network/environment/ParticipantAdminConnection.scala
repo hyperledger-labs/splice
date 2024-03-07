@@ -1,8 +1,5 @@
 package com.daml.network.environment
 
-import cats.syntax.foldable.*
-import cats.syntax.traverse.*
-import com.daml.lf.archive.DarParser
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
@@ -133,6 +130,26 @@ class ParticipantAdminConnection(
     } yield ()
   }
 
+  def ensureDomainRegisteredNoHandshake(
+      config: DomainConnectionConfig,
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
+    require(
+      config.manualConnect,
+      "manualConnect must be true when trying to register only",
+    )
+    for {
+      _ <- retryProvider
+        .ensureThat(
+          retryFor,
+          s"participant registered ${config.domain}",
+          lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
+          (_: Unit) => registerDomain(config, handshakeOnly = false),
+          logger,
+        )
+    } yield ()
+  }
+
   def ensureDomainRegisteredAndConnected(
       config: DomainConnectionConfig,
       retryFor: RetryFor,
@@ -247,28 +264,38 @@ class ParticipantAdminConnection(
       ParticipantAdminCommands.DomainConnectivity.ModifyDomainConnection(config)
     )
 
+  def modifyDomainConnectionConfig(
+      domain: DomainAlias,
+      f: DomainConnectionConfig => Option[DomainConnectionConfig],
+  )(implicit traceContext: TraceContext): Future[Boolean] =
+    for {
+      oldConfig <- getDomainConnectionConfig(domain)
+      newConfig = f(oldConfig)
+      configModified <- newConfig match {
+        case None =>
+          logger.trace("No update to domain connection config required")
+          Future.successful(false)
+        case Some(config) =>
+          logger.info(s"Updating to new domain connection config for domain $domain")
+          for {
+            _ <- setDomainConnectionConfig(config)
+          } yield true
+      }
+    } yield configModified
+
   def modifyDomainConnectionConfigAndReconnect(
       domain: DomainAlias,
       f: DomainConnectionConfig => Option[DomainConnectionConfig],
   )(implicit traceContext: TraceContext): Future[Unit] =
     for {
-      oldConfig <- getDomainConnectionConfig(domain)
-      newConfig = f(oldConfig)
-      _ <- newConfig match {
-        case None =>
-          logger.trace("No update to domain connection config required")
-          Future.unit
-        case Some(config) =>
-          logger.info(s"Updating to new domain connection config for domain $domain")
-          for {
-            _ <- setDomainConnectionConfig(config)
-            _ = logger.info(
-              s"reconnect to the domain $domain for new sequencer configuration to take effect"
-            )
-            //
-            _ <- reconnectDomain(config.domain)
-          } yield ()
-      }
+      configModified <- modifyDomainConnectionConfig(domain, f)
+      _ <-
+        if (configModified) {
+          logger.info(
+            s"reconnect to the domain $domain for new sequencer configuration to take effect"
+          )
+          reconnectDomain(domain)
+        } else Future.unit
     } yield ()
 
   def uploadDarFiles(
@@ -296,7 +323,6 @@ class ParticipantAdminConnection(
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Unit] =
     uploadDarFileInternal(
-      pkg.packageId,
       pkg.resourcePath,
       ByteString.readFrom(pkg.inputStream()),
       retryFor,
@@ -310,8 +336,7 @@ class ParticipantAdminConnection(
       darFile <- Future {
         ByteString.readFrom(Files.newInputStream(path))
       }
-      hash = DarParser.assertReadArchiveFromFile(path.toFile).main.getHash
-      _ <- uploadDarFileInternal(hash, path.toString, darFile, retryFor)
+      _ <- uploadDarFileInternal(path.toString, darFile, retryFor)
     } yield ()
 
   def lookupDar(hash: Hash)(implicit traceContext: TraceContext): Future[Option[ByteString]] =
@@ -355,7 +380,6 @@ class ParticipantAdminConnection(
   }
 
   private def uploadDarFileInternal(
-      packageId: String,
       path: String,
       darFile: => ByteString,
       retryFor: RetryFor,
@@ -382,47 +406,7 @@ class ParticipantAdminConnection(
           ).map(_ => ()),
           logger,
         )
-      _ <- retryProvider.waitUntil(
-        retryFor,
-        s"Package $packageId is vetted",
-        packageIsVetted(packageId),
-        logger,
-      )
     } yield ()
-  }
-
-  // TODO(tech-debt) consider removing this clunky code once Canton actually blocks on vetting (Canton issue #11255)
-  private def packageIsVetted(
-      packageId: String
-  )(implicit traceContext: TraceContext): Future[Unit] = for {
-    participantId <- getParticipantId()
-    domains <- listConnectedDomains()
-    vettedPackagesResults <-
-      if (domains.isEmpty) {
-        Future.failed(
-          Status.FAILED_PRECONDITION
-            .withDescription(
-              s"We shouldn't check package vetting if we are not connected to any domains."
-            )
-            .asRuntimeException()
-        )
-      } else {
-        // TODO(tech-debt) we could also replace this with a single call to the API and filter by domains ourselves
-        domains.traverse(domain => listVettedPackages(participantId, domain.domainId))
-      }
-  } yield {
-    if (
-      !vettedPackagesResults.forall(
-        // there really should be just one result per domain, but let's not make too many assumptions about Canton
-        _.exists(vr =>
-          vr.mapping.participantId == participantId && vr.mapping.packageIds.contains(packageId)
-        )
-      )
-    ) {
-      throw Status.FAILED_PRECONDITION
-        .withDescription(s"Package $packageId is not vetted")
-        .asRuntimeException()
-    }
   }
 
   def ensureInitialPartyToParticipant(
@@ -447,24 +431,6 @@ class ParticipantAdminConnection(
         ).map(_ => ()),
         logger,
       )
-      _ <-
-        if (store == TopologyStoreId.AuthorizedStore)
-          retryProvider.waitUntil(
-            RetryFor.WaitingOnInitDependency,
-            show"Party allocation of $partyId is visible on all connected domains",
-            for {
-              domains <- listConnectedDomains()
-              _ = if (domains.isEmpty)
-                throw Status.FAILED_PRECONDITION
-                  .withDescription("No domain connected")
-                  .asRuntimeException()
-              else ()
-              // TODO(tech-debt) we could also replace this with a single call to the API and filter by domains ourselves
-              _ <- domains.traverse_(domain => getPartyToParticipant(domain.domainId, partyId))
-            } yield (),
-            logger,
-          )
-        else Future.unit
     } yield ()
 
   def getDomainTime(domainAlias: DomainAlias, timeout: NonNegativeDuration)(implicit

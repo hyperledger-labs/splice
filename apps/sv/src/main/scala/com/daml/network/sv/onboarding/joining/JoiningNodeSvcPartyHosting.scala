@@ -7,6 +7,7 @@ import com.daml.network.sv.config.SvOnboardingConfig
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.util.TemplateJsonDecoder
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -30,8 +31,13 @@ class JoiningNodeSvcPartyHosting(
     mat: Materializer,
 ) extends NamedLogging {
 
-  def hostPartyOnOwnParticipant(domainId: DomainId, participantId: ParticipantId, svParty: PartyId)(
-      implicit traceContext: TraceContext
+  def hostPartyOnOwnParticipant(
+      domainAlias: DomainAlias,
+      domainId: DomainId,
+      participantId: ParticipantId,
+      svParty: PartyId,
+  )(implicit
+      traceContext: TraceContext
   ): Future[Either[String, Unit]] = {
     getSponsorSvConfig(onboardingConfig) match {
       case Some(sponsorSvConfig) =>
@@ -92,10 +98,10 @@ class JoiningNodeSvcPartyHosting(
                     case proposalNotFound: OnboardSvPartyMigrationAuthorizeProposalNotFound =>
                       // Reconnect so that the participant gets its state in sync before the next retry
                       logger.info(
-                        "Reconnecting to all the domains so that the proposal can be recreated from the latest base."
+                        "Reconnecting to global domain so that the proposal can be recreated from the latest base."
                       )
                       for {
-                        _ <- participantAdminConnection.reconnectAllDomains()
+                        _ <- participantAdminConnection.connectDomain(domainAlias)
                         _ <- retryProvider.waitUntil(
                           RetryFor.WaitingOnInitDependency,
                           s"Serial ${proposalNotFound.partyToParticipantMappingSerial} expected by sponsor is observed",
@@ -134,6 +140,8 @@ class JoiningNodeSvcPartyHosting(
             "Imported Acs snapshot from sponsor SV participant to candidate participant"
           )
           _ <- participantAdminConnection.reconnectAllDomains()
+          // Explicitly connect to global domain as that has manualConnect=false
+          _ <- participantAdminConnection.connectDomain(domainAlias)
           _ = logger.info("candidate SV participant reconnected to global domain")
           _ <- svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
             domainId,
