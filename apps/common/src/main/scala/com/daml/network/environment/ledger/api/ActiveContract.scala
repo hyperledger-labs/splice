@@ -1,6 +1,6 @@
 package com.daml.network.environment.ledger.api
 
-import com.daml.ledger.api.v1.event as scalaEvent
+import com.daml.ledger.api.v2.event as scalaEvent
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}

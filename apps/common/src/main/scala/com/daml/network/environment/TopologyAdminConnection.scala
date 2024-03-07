@@ -1393,13 +1393,13 @@ abstract class TopologyAdminConnection(
   def exportKeyPair(fingerprint: Fingerprint)(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
-    runCmd(VaultAdminCommands.ExportKeyPair(fingerprint, ProtocolVersion.latest))
+    runCmd(VaultAdminCommands.ExportKeyPair(fingerprint, ProtocolVersion.latest, password = None))
   }
 
   def importKeyPair(keyPair: Array[Byte], name: Option[String])(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
-    runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name))
+    runCmd(VaultAdminCommands.ImportKeyPair(ByteString.copyFrom(keyPair), name, password = None))
   }
 
 }

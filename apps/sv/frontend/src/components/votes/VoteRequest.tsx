@@ -20,7 +20,7 @@ import {
 } from '@mui/material';
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
-import { RelTime } from '@daml.js/b47113ba94c31372c553e3869fffed9a45ef1c0f5ac1be3287857cd9450c0bae/lib/DA/Time/Types';
+import { RelTime } from '@daml.js/f141230257fa9c6467b03e6ae3cc73a42ff1fdaf14ff172d91ec78cfeb181633/lib/DA/Time/Types';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';

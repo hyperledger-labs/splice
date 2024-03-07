@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.api.v1.event.CreatedEvent.toJavaProto
-import com.daml.ledger.api.v1.transaction.TreeEvent
+import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
+import com.daml.ledger.api.v2.transaction.TreeEvent
 import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.network.history.CoinCreate

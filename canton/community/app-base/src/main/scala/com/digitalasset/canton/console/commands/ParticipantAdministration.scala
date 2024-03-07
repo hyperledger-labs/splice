@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.console.commands
 
-import com.google.protobuf.ByteString
 import cats.implicits.toBifunctorOps
 import cats.syntax.option.*
 import cats.syntax.traverse.*
@@ -71,6 +70,7 @@ import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.*
 import com.digitalasset.canton.{DiscardOps, DomainAlias, SequencerAlias, config}
+import com.google.protobuf.ByteString
 
 import java.time.Instant
 import scala.concurrent.duration.Duration

@@ -394,7 +394,7 @@ class SvOnboardingAddlIntegrationTest
 
       inside(
         sv1Backend.participantClientWithAdminToken.topology.party_to_participant_mappings.list(
-          filterStore = globalDomainId.filterString,
+          domain = globalDomainId,
           filterParty = svcParty.toProtoPrimitive,
         )
       ) { case Seq(mapping) =>

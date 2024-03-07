@@ -24,7 +24,7 @@ fi
 
 # Determine the operating system
 if [[ "$(uname -s)" == "Linux" ]]; then
-    os="linux"
+    os="linux-intel"
 elif [[ "$(uname -s)" == "Darwin" ]]; then
     os="macos"
 else

@@ -5,11 +5,11 @@ stdenv.mkDerivation rec {
   name = "daml2js";
   version = sources.version;
   src = builtins.fetchurl {
-    url = "https://digitalasset.jfrog.io/artifactory/assembly/daml/${sources.sdk_version}/daml-sdk-${sources.sdk_version}-${if stdenv.isDarwin then "macos" else "linux"}.tar.gz";
+    url = "https://digitalasset.jfrog.io/artifactory/assembly/daml/${sources.sdk_version}/daml-sdk-${sources.sdk_version}-${if stdenv.isDarwin then "macos" else "linux-intel"}.tar.gz";
     sha256 =
       if stdenv.isDarwin
-      then "sha256:1qznslp47idvp3yw2vzbrl0vx161gbb6i4ljnskdl5vf47dqkj62"
-      else "sha256:1msr2bq8kp7hrbdfyv6vk9gbh7ypmqfsc0sgssc3b4v3arpr2ya1";
+      then "sha256:11sf7y2k4abx1jas5vsagi2l7y4kki8d14pxgpr3sa228c4fn45n"
+      else "sha256:157jcnxnvmqfp9ysxcv6ajc7qnnmcn2wfvlqab604si6lqhmjgz4";
   };
   dontUnpack = true;
   installPhase = ''

@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.ledger.api.v1.TraceContextOuterClass
+import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.codegen.{ContractId, DamlRecord as CodegenDamlRecord}
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
@@ -365,6 +365,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       Seq.empty[String].asJava,
       "dummyEventId",
       contract.identifier,
+      "dummyPackageName",
       contract.contractId.contractId,
       contract.payload.toValue,
       contract.createdEventBlob,
@@ -439,6 +440,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         created.getWitnessParties,
         eventId,
         created.getTemplateId,
+        "dummyPackageName",
         created.getContractId,
         created.getArguments,
         created.getCreatedEventBlob,
@@ -813,6 +815,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       rootEventIds.asJava,
       domainId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
+      effectiveAt, // we equate record time and effectiveAt for simplicity
     )
   }
 
@@ -841,6 +844,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       rootEventIds.asJava,
       domainId.toProtoPrimitive,
       TraceContextOuterClass.TraceContext.getDefaultInstance,
+      effectiveAt, // we equate record time and effectiveAt for simplicity
     )
   }
 

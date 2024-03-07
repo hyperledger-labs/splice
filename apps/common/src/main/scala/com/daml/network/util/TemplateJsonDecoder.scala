@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.ledger.api.v1.value as scalaValue
+import com.daml.ledger.api.v2.value as scalaValue
 import com.daml.ledger.javaapi.data.Value
 import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion,

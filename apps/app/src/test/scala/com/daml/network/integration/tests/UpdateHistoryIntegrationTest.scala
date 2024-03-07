@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms
 import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.ledger.api.v1.TraceContextOuterClass
+import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
@@ -186,6 +186,8 @@ class UpdateHistoryIntegrationTest
       /*rootEventIds = */ tree.getRootEventIds,
       /*domainId = */ tree.getDomainId,
       /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance, // Not preserved
+      /*recordTime = */ tree.getEffectiveAt, // TODO(#10656): this is wrong! retrieve the actual record_time from the store
+
     )
   }
 
@@ -196,6 +198,7 @@ class UpdateHistoryIntegrationTest
           /*witnessParties = */ java.util.Collections.emptyList(), // Not preserved
           /*eventId = */ created.getEventId,
           /*templateId = */ created.getTemplateId,
+          /* packageName = */ "dummyPackageName", // TODO(#10656): retrieve from store
           /*contractId = */ created.getContractId,
           /*arguments = */ created.getArguments,
           /*createdEventBlob = */ ByteString.EMPTY, // Not preserved

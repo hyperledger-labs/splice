@@ -1,8 +1,8 @@
 package com.daml.network.console
 
-import com.daml.ledger.api.v1.CommandsOuterClass
-import com.daml.ledger.api.v1.commands.{Command, DisclosedContract}
-import com.daml.ledger.api.v1.event.CreatedEvent
+import com.daml.ledger.api.v2.CommandsOuterClass
+import com.daml.ledger.api.v2.commands.{Command, DisclosedContract}
+import com.daml.ledger.api.v2.event.CreatedEvent
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi

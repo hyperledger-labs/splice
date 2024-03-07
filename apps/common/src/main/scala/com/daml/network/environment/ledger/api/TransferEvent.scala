@@ -1,6 +1,6 @@
 package com.daml.network.environment.ledger.api
 
-import com.daml.ledger.api.v1.event as scalaEvent
+import com.daml.ledger.api.v2.event as scalaEvent
 import com.daml.ledger.javaapi.data.CreatedEvent
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.util.PrettyInstances.*
@@ -100,7 +100,7 @@ object ReassignmentEvent {
 
   object Assign {
     private[api] def fromProto(proto: multidomain.AssignedEvent): Assign = {
-      import com.daml.ledger.api.v1.event as scalaEvent
+      import com.daml.ledger.api.v2.event as scalaEvent
       Assign(
         submitter = PartyId.tryFromProtoPrimitive(proto.submitter),
         source = DomainId.tryFromString(proto.source),

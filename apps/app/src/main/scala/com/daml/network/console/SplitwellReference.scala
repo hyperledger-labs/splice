@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import org.apache.pekko.actor.ActorSystem
-import com.daml.ledger.api.v1.CommandsOuterClass
+import com.daml.ledger.api.v2.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Update
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen

@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.ledger.api.v1.TraceContextOuterClass
+import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
@@ -478,6 +478,7 @@ final class UpdateHistory(
             row.templateModuleName,
             row.templateEntityName,
           ),
+          /* packageName = */ "dummyPackageName", // TODO(#10656): retrieve from store
           /*contractId = */ row.contractId,
           /*arguments = */ deserializeValue(row.createArguments).asRecord().get(),
           /*createdEventBlob = */ ByteString.EMPTY,
@@ -526,6 +527,7 @@ final class UpdateHistory(
           /*rootEventIds = */ rootEventsIds.asJava,
           /*domainId = */ updateRow.domainId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
+          /*recordTime = */ updateRow.effectiveAt.toInstant, // TODO(#10656): this is wrong! retrieve the actual record_time from the store
         )
       ),
       domainId = DomainId.tryFromString(updateRow.domainId),
@@ -542,7 +544,7 @@ final class UpdateHistory(
   }
   private def deserializeValue(x: Array[Byte]): com.daml.ledger.javaapi.data.Value = {
     com.daml.ledger.javaapi.data.Value
-      .fromProto(com.daml.ledger.api.v1.ValueOuterClass.Value.parseFrom(x))
+      .fromProto(com.daml.ledger.api.v2.ValueOuterClass.Value.parseFrom(x))
   }
 
   private implicit lazy val GetResultSelectFromTransactions: GetResult[SelectFromTransactions] =

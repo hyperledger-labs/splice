@@ -34,6 +34,7 @@ import com.digitalasset.canton.topology.{
 }
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.traffic.TrafficControlErrors.InvalidTrafficControlBalanceMessage
+import com.digitalasset.canton.traffic.TrafficControlProcessor
 import com.digitalasset.canton.traffic.TrafficControlProcessor.TrafficControlSubscriber
 import com.digitalasset.canton.{BaseTest, HasExecutionContext, SequencerCounter}
 import org.scalatest.wordspec.AnyWordSpec
@@ -41,6 +42,7 @@ import org.scalatest.wordspec.AnyWordSpec
 import java.util.UUID
 import java.util.concurrent.atomic.AtomicReference
 import scala.collection.mutable
+import scala.concurrent.Future
 
 class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExecutionContext {
 
@@ -123,9 +125,12 @@ class TrafficControlProcessorTest extends AnyWordSpec with BaseTest with HasExec
           traceContext: TraceContext
       ): Unit = observedTs.updateAndGet(_ += timestamp)
 
-      override def balanceUpdate(update: SetTrafficBalanceMessage)(implicit
+      override def balanceUpdate(
+          update: SetTrafficBalanceMessage,
+          sequencingTimestamp: CantonTimestamp,
+      )(implicit
           traceContext: TraceContext
-      ): Unit = updates.updateAndGet(_ += update)
+      ): Future[Unit] = Future.successful(updates.updateAndGet(_ += update))
     })
 
     (tcp, observedTs, updates)

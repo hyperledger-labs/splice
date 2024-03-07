@@ -18,7 +18,7 @@ ensure_damlc_exists() {
     if [ ! -f "${XDG_CACHE_HOME:-$HOME/.cache}/daml-build/${SDK_VERSION}/damlc/damlc" ]; then
         dir=$HOME/.cache/daml-build/${SDK_VERSION}/
         if [ "$(uname -s)" == "Linux" ]; then
-            os="linux"
+            os="linux-intel"
         else
             os="macos"
         fi

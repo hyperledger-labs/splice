@@ -9,7 +9,7 @@
 
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
 import com.digitalasset.canton.topology.PartyId
-import com.daml.ledger.api.v1.transaction.TransactionTree
+import com.daml.ledger.api.v2.transaction.TransactionTree
 import scala.collection.mutable.ListBuffer
 import java.nio.file.{Paths, Files}
 import java.nio.charset.StandardCharsets

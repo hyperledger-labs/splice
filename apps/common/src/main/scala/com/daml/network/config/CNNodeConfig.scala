@@ -14,7 +14,7 @@ abstract class CNNodeBackendConfig extends LocalNodeConfig {
   override val init: InitConfig = InitConfig()
   override val crypto: CryptoConfig = CommunityCryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
-  override val topologyX: TopologyXConfig = TopologyXConfig()
+  override val topology: TopologyConfig = TopologyConfig()
 
   override val monitoring: NodeMonitoringConfig = NodeMonitoringConfig()
   def participantClient: CNParticipantClientConfig
@@ -59,4 +59,6 @@ case class SharedCNNodeAppParameters(
     override val batchingConfig: BatchingConfig,
 ) extends CantonNodeParameters {
   override val delayLoggingThreshold = delayLoggingThreshold_.toInternal
+  override val useNewTrafficControl: Boolean =
+    false // irrelevant for CN, as this is an impl. config for Canton nodes only
 }

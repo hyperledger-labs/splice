@@ -404,14 +404,14 @@ object MultiDomainAcsStore {
     def toTransactionFilter: LapiTransactionFilter =
       LapiTransactionFilter(
         Map(
-          primaryParty.toProtoPrimitive -> com.daml.ledger.api.v1.transaction_filter.Filters(
+          primaryParty.toProtoPrimitive -> com.daml.ledger.api.v2.transaction_filter.Filters(
             inclusive = Some(
-              com.daml.ledger.api.v1.transaction_filter.InclusiveFilters(
+              com.daml.ledger.api.v2.transaction_filter.InclusiveFilters(
                 templateFilters = templateIds
                   .map(tmpl =>
-                    com.daml.ledger.api.v1.transaction_filter.TemplateFilter(
+                    com.daml.ledger.api.v2.transaction_filter.TemplateFilter(
                       templateId = Some(
-                        com.daml.ledger.api.v1.value.Identifier(
+                        com.daml.ledger.api.v2.value.Identifier(
                           packageId = s"#${tmpl.packageName}",
                           moduleName = tmpl.qualifiedName.moduleName,
                           entityName = tmpl.qualifiedName.entityName,

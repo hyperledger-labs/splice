@@ -4,7 +4,7 @@ import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.pekko.ClientAdapter
-import com.daml.ledger.api.v1.admin.*
+import com.daml.ledger.api.v2.admin.*
 import com.daml.ledger.api.v2.*
 import com.daml.ledger.javaapi.data.{
   Command,
@@ -24,15 +24,15 @@ import com.digitalasset.canton.admin.api.client.data.PartyDetails
 import com.digitalasset.canton.ledger.client.{GrpcChannel, LedgerCallCredentials}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.daml.ledger.api.v1.admin.package_management_service.{
+import com.daml.ledger.api.v2.admin.package_management_service.{
   PackageManagementServiceGrpc,
   UploadDarFileRequest,
 }
-import com.daml.ledger.api.v1.admin.party_management_service.{
+import com.daml.ledger.api.v2.admin.party_management_service.{
   GetPartiesRequest,
   PartyManagementServiceGrpc,
 }
-import com.daml.ledger.api.v1.admin.user_management_service as v1User
+import com.daml.ledger.api.v2.admin.user_management_service as v1User
 import com.daml.ledger.api.v2.command_service.CommandServiceGrpc
 import com.daml.ledger.api.v2.package_service.{ListPackagesRequest, PackageServiceGrpc}
 import com.daml.ledger.api.v2 as lapi

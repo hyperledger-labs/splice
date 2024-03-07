@@ -6,7 +6,7 @@ object CantonDependencies {
   val version: String = "3.0.0-snapshot.20240304.12844.0.v58f5c70d"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
-  val daml_compiler_version = "3.0.0-snapshot.20240222.12809.0.v6607acd0"
+  val daml_compiler_version = version
   val daml_java_codegen_version = version
   val use_custom_daml_version = false
 

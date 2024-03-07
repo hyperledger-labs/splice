@@ -17,7 +17,6 @@ final case class MemberTrafficStatus(
     member: Member,
     timestamp: CantonTimestamp,
     trafficState: SequencedEventTrafficState,
-    currentAndFutureTopUps: List[TopUpEvent],
     balanceSerial: Option[PositiveInt],
 ) extends Product
     with PrettyPrinting {
@@ -26,12 +25,11 @@ final case class MemberTrafficStatus(
       member.toProtoPrimitive,
       trafficState.extraTrafficLimit.map(_.value),
       trafficState.extraTrafficConsumed.value,
-      currentAndFutureTopUps.map(_.toProtoV30),
+      List.empty,
       Some(timestamp.toProtoTimestamp),
       balanceSerial.map(_.value),
     )
   }
-
   override def pretty: Pretty[this.type] = adHocPrettyInstance
 }
 
@@ -47,13 +45,15 @@ object MemberTrafficStatus {
       totalExtraTrafficLimitOpt <- trafficStatusP.totalExtraTrafficLimit.traverse(
         ProtoConverter.parseNonNegativeLong
       )
+      balanceSerialOpt <- trafficStatusP.balanceSerial.traverse(
+        ProtoConverter.parsePositiveInt
+      )
       totalExtraTrafficConsumed <- ProtoConverter.parseNonNegativeLong(
         trafficStatusP.totalExtraTrafficConsumed
       )
       totalExtraTrafficRemainder <- ProtoConverter.parseNonNegativeLong(
         totalExtraTrafficLimitOpt.map(_.value - totalExtraTrafficConsumed.value).getOrElse(0L)
       )
-      topUps <- trafficStatusP.topUpEvents.toList.traverse(TopUpEvent.fromProtoV30)
       ts <- ProtoConverter.parseRequired(
         CantonTimestamp.fromProtoTimestamp,
         "ts",
@@ -67,8 +67,7 @@ object MemberTrafficStatus {
         totalExtraTrafficRemainder,
         totalExtraTrafficConsumed,
       ),
-      topUps,
-      balanceSerial,
+      balanceSerialOpt,
     )
   }
 }

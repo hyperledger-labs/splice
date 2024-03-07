@@ -1,6 +1,6 @@
 package com.daml.network.util
 
-import com.daml.ledger.api.v1.CommandsOuterClass.DisclosedContract as Lav1DisclosedContract
+import com.daml.ledger.api.v2.CommandsOuterClass.DisclosedContract as Lav1DisclosedContract
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.nonempty.{NonEmpty, Singleton}
 import com.daml.nonempty.NonEmptyReturningOps.*

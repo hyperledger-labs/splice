@@ -5,4 +5,7 @@ import com.digitalasset.canton.config.{BatchingConfig, CachingConfigs, LocalNode
 final case class CNNodeParametersConfig(
     batching: BatchingConfig = BatchingConfig(),
     caching: CachingConfigs = CachingConfigs(),
-) extends LocalNodeParametersConfig
+) extends LocalNodeParametersConfig {
+  override val useNewTrafficControl: Boolean =
+    false // irrelevant for CN, as this is an impl. config for Canton nodes only
+}

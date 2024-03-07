@@ -8,7 +8,7 @@ import cats.syntax.traverse.*
 import com.daml.error.ErrorResource
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ResourceInfoDetail
-import com.daml.ledger.api.v1.admin.ObjectMetaOuterClass
+import com.daml.ledger.api.v2.admin.ObjectMetaOuterClass
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,

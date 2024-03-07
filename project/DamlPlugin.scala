@@ -353,7 +353,7 @@ object DamlPlugin extends AutoPlugin {
       if (System.getProperty("os.name").toLowerCase.startsWith("mac os x"))
         "macos"
       else
-        "linux"
+        "linux-intel"
     ensureArtifactAvailable(
       url = artifactoryUrl(damlVersion),
       artifactFilename = s"damlc-${damlVersion}-$os.tar.gz",

@@ -497,6 +497,7 @@ object BuildCommon {
           postgres,
           pprint,
           scaffeine,
+          tink,
           daml_nonempty_cats,
           daml_lf_transaction,
           CantonDependencies.grpc_services % "protobuf",

@@ -143,7 +143,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         sv1Participant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOpX.Replace),
-            filterStore = globalDomainId.filterString,
+            domain = globalDomainId,
             filterParty = svcPartyStr,
             filterParticipant = sv3Participant.id.toProtoPrimitive,
           ) should have size 1
@@ -151,7 +151,7 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
         sv3Participant.topology.party_to_participant_mappings
           .list(
             operation = Some(TopologyChangeOpX.Replace),
-            filterStore = globalDomainId.filterString,
+            domain = globalDomainId,
             filterParty = svcPartyStr,
             filterParticipant = sv3Participant.id.toProtoPrimitive,
           ) should have size 1

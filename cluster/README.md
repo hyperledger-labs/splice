@@ -1475,7 +1475,7 @@ import com.daml.ledger.javaapi.data._
 val archiveCommand = new ExerciseCommand(new Identifier("", "CN.SvOnboarding", "ApprovedSvIdentity"), contract.event.contractId, "Archive", new DamlRecord())
 
 // Submit it (getting an error here doesn't have to mean that this failed)
-participant.ledger_api.commands.submit(actAs=Seq(svParty), commands=Seq(com.daml.ledger.api.v1.commands.Command.fromJavaProto(archiveCommand.toProtoCommand)))
+participant.ledger_api.commands.submit(actAs=Seq(svParty), commands=Seq(com.daml.ledger.api.v2.commands.Command.fromJavaProto(archiveCommand.toProtoCommand)))
 
 // Verify that the contract is gone
 participant.ledger_api.acs.of_party(svParty, filterTemplates=Seq(TemplateId("", "CN.SvOnboarding", "ApprovedSvIdentity"))).filter(_ == contract)

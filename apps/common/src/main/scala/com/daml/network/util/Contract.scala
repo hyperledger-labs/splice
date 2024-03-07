@@ -4,7 +4,7 @@
 package com.daml.network.util
 
 import cats.syntax.either.*
-import com.daml.ledger.api.v1.{CommandsOuterClass, value as scalaValue}
+import com.daml.ledger.api.v2.{CommandsOuterClass, value as scalaValue}
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Value}
 import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion,
@@ -72,7 +72,7 @@ final case class Contract[TCid, T](
   }
 
   def toDisclosedContract: CommandsOuterClass.DisclosedContract = {
-    com.daml.ledger.api.v1.CommandsOuterClass.DisclosedContract
+    com.daml.ledger.api.v2.CommandsOuterClass.DisclosedContract
       .newBuilder()
       .setCreatedEventBlob(createdEventBlob)
       .setContractId(contractId.contractId)

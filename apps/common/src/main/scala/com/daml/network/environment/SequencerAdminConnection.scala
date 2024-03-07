@@ -104,9 +104,9 @@ class SequencerAdminConnection(
       member: Member,
       newTotalExtraTrafficLimit: NonNegativeLong,
       serial: PositiveInt,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Option[CantonTimestamp]] = {
     runCmd(
-      SequencerAdminCommands.SetTrafficControlBalance(member, newTotalExtraTrafficLimit, serial)
+      SequencerAdminCommands.SetTrafficBalance(member, serial, newTotalExtraTrafficLimit)
     )
   }
 
