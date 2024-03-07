@@ -51,7 +51,7 @@ class CloseVoteRequestTrigger(
         .noDedup
         .yieldUnit()
     } yield TaskSuccess(
-      s"Closing VoteRequest2 with action ${task.work.contract.payload.action.toValue} as it expired."
+      s"Closing VoteRequest with action ${task.work.contract.payload.action.toValue} as it expired."
     )
   }
 }

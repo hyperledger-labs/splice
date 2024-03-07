@@ -165,7 +165,12 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
     }
 
     clue("Domain migration should be scheduled") {
-      eventuallySucceeds(timeUntilSuccess = 120.seconds) {
+      // 300 to account for
+      // - 120s expiration time of the vote request
+      // - 60s buffer because we only set minutes not seconds
+      // - 30s polling interval for the trigger to kick in
+      // - general slowness
+      eventuallySucceeds(timeUntilSuccess = 300.seconds) {
         val nextScheduledDomainUpgrade = sv1
           .getSvcInfo()
           .svcRules
