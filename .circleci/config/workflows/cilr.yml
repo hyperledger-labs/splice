@@ -30,6 +30,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: "cilr"
           requires:
             - deploy_cluster
@@ -161,6 +162,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: "cilr"
           use_published_artifacts: false
           requires:

@@ -25,6 +25,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: "devnet"
           deploy_version: "devnet-next"
           use_published_artifacts: true
@@ -142,6 +143,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: "devnet"
           use_published_artifacts: false
           requires:

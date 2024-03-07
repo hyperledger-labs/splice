@@ -630,6 +630,12 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv.svc.svrun.network.canton.global"
         },
+        "extraBeneficiaries": [
+          {
+            "partyId": "dummy::partyId",
+            "percentage": "33.33"
+          }
+        ],
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {

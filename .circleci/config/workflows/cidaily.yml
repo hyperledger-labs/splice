@@ -77,6 +77,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: "cidaily"
           use_published_artifacts: true
           requires:
@@ -88,6 +89,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: "cidaily-testnet"
           restore_cluster: true
           requires:
@@ -304,6 +306,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: "cidaily"
           use_published_artifacts: false
           requires:

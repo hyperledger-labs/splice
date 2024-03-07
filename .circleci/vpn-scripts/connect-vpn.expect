@@ -7,6 +7,16 @@ set VPN_HOST_NAME [lindex $argv 0]
 set VPN_USER [lindex $argv 1]
 set VPN_PASSWORD [lindex $argv 2]
 
+if { $VPN_HOST_NAME eq "" || $VPN_USER eq "" } {
+    puts "Error: VPN_HOST_NAME or VPN_USER not set. Did you forget to set them in your job's environment in CircleCI?"
+    exit 1
+}
+
+if { $VPN_PASSWORD eq "" } {
+    puts "Error: VPN_PASSWORD is not set. Did you forget to use the canton-network-vpn context in CircleCI?"
+    exit 1
+}
+
 spawn echo $VPN_USER $VPN_PASSWORD
 for {set tries 0} {$tries < 3} {incr tries} {
   # 3 chances for wait-for-vpn-and-del-default-route.sh to succeed

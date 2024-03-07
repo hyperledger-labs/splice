@@ -27,6 +27,11 @@ Release Notes
     Please see the updated section on :ref:`Synchronizer Upgrades with Downtime <sv-upgrades>`,
     as well as the updates in :ref:`sv-helm`.
 
+  * Added a section on how to configure the `extraBeneficiaries` to the SV rewards so that the SV can distribute its SV rewards to other parties.
+    Please see the new section in :ref:`sv-helm`.
+
+* The SV rewards are now issued in accordance to CIP-0001.
+
 2024-03-04
 ----------
 

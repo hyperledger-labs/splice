@@ -52,3 +52,12 @@ scan:
 persistence:
   host: apps-pg
   secretName: apps-pg-secret
+
+extraBeneficiaries:
+  # Uncomment as required. The sum of all percentages must be less than or equal to 100.
+  # Any leftover percentage is assigned to the SV operator party. Therefore, if the sum is exactly 100, the SV operator party receives no share.
+  # Up to two decimals points are supported for the percentage.
+  # - partyId: "BENEFICIARY_1_PARTY_ID"
+  #   percentage: 10.0
+  # - partyId: "BENEFICIARY_2_PARTY_ID"
+  #   percentage: 33.33

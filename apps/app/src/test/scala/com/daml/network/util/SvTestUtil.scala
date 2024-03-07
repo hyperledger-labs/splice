@@ -2,6 +2,7 @@ package com.daml.network.util
 
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
@@ -23,9 +24,11 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.util.SvTestUtil.ConfirmingSv
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 
+import java.math.RoundingMode
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -201,6 +204,34 @@ trait SvTestUtil extends CNNodeTestCommon {
     svcRulesConfig.globalDomain,
     domainUpgradeSchedule.toJava,
   )
+
+  def computeCoinsToIssueToSvc(
+      config: IssuanceConfig,
+      tickDuration: NonNegativeFiniteDuration,
+  ): java.math.BigDecimal = {
+    val RoundsPerYear =
+      BigDecimal(365 * 24 * 60 * 60).bigDecimal
+        .divide(BigDecimal(tickDuration.duration.toSeconds).bigDecimal)
+    config.coinToIssuePerYear
+      .multiply(
+        BigDecimal(1.0).bigDecimal
+          .subtract(config.appRewardPercentage)
+          .subtract(config.validatorRewardPercentage)
+      )
+      .divide(RoundsPerYear, RoundingMode.HALF_UP)
+  }
+
+  /** This assumes the weight is equal across all SVs.
+    */
+  def computeSvRewardInRound0(
+      config: IssuanceConfig,
+      tickDuration: NonNegativeFiniteDuration,
+      svcSize: Int,
+  ): java.math.BigDecimal = {
+    computeCoinsToIssueToSvc(config, tickDuration)
+      .divide(BigDecimal(svcSize).bigDecimal, RoundingMode.HALF_UP)
+      .setScale(10, RoundingMode.HALF_UP)
+  }
 }
 
 object SvTestUtil {

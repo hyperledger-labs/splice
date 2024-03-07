@@ -1,11 +1,12 @@
 jobs:
   deploy_sv_runbook:
-    circleci_ip_ranges: true
-    docker:
-      - image: cimg/base:2024.01
+    machine:
+      image: ubuntu-2204:2024.01.1
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
     parameters:
       <<: *cluster-parameter
       use_published_artifacts:
@@ -63,6 +64,9 @@ jobs:
                 cmd: |
                   cncluster activate
                   cncluster ci_pdown_sv
+      - setup_vpn # VPN is required to resolve Validator1's PartyId
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
           cmd_name: Apply SV runbook Kubernetes manifest to cluster
           cluster: << parameters.cluster >>

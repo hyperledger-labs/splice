@@ -47,6 +47,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: "cimain"
           send_deployment_notification: false
           requires:
@@ -133,6 +134,7 @@ workflow:
           context:
             - artifactory
             - slack-context
+            - canton-network-vpn
           cluster: "cimain"
           send_deployment_notification: false
           requires:
