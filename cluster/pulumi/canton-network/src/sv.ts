@@ -106,6 +106,7 @@ export interface SvConfig extends StaticSvConfig {
   topupConfig?: ValidatorTopupConfig;
   sequencerPruningConfig: SequencerPruningConfig;
   splitPostgresInstances: boolean;
+  onboardingPollingInterval?: string;
 }
 
 type InstalledMigrationSpecificSv = {
@@ -491,6 +492,7 @@ function installSvApp(
     },
     additionalJvmOptions: jmxOptions(),
     participantAddress: participant.name,
+    onboardingPollingInterval: config.onboardingPollingInterval,
   } as ChartValues;
 
   if (config.onboarding.type == 'join-with-key') {

@@ -7,6 +7,7 @@ export interface StaticSvConfig {
   validatorWalletUser: string;
   auth0ValidatorAppName: string;
   cometBft: StaticCometBftConfig;
+  onboardingPollingInterval?: string;
 }
 
 export type StaticCometBftConfig = {

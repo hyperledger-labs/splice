@@ -71,6 +71,8 @@ export const sequencerPruningConfig = enableSequencerPruning
     }
   : { enabled: false };
 
+export const svOnboardingPollingInterval = process.env['SV_ONBOARDING_POLLING_INTERVAL'];
+
 const enableCometbftPruning = envFlag('ENABLE_COMETBFT_PRUNING', true);
 export const cometbftRetainBlocks = enableCometbftPruning
   ? parseInt(requireEnv('COMETBFT_RETAIN_BLOCKS'))

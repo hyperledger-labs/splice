@@ -1828,6 +1828,14 @@ This is currently disabled by default. To enable it, set
 export ENABLE_CHAOS_MESH=1
 ```
 
+## Onboarding polling interval
+
+To speed up SV initialization at the expense of fairly noisy logs you can set this option:
+
+```
+export SV_ONBOARDING_POLLING_INTERVAL=5s
+```
+
 ## Appendix: Kubernetes and Other Deployment Resources
 
 * Kubernetes Documentation

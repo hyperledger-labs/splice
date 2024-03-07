@@ -10,6 +10,7 @@ import {
   sequencerPruningConfig,
   svValidatorTopupConfig,
   nonSvValidatorTopupConfig,
+  svOnboardingPollingInterval,
 } from 'cn-pulumi-common';
 
 import { installChaosMesh } from './chaosMesh';
@@ -149,6 +150,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     splitPostgresInstances,
     sequencerPruningConfig,
     globalDomainUpgradeConfig,
+    onboardingPollingInterval: svOnboardingPollingInterval,
   });
 
   const allSvs = await svc.allSvs;

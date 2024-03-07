@@ -31,6 +31,7 @@ import {
   GlobalDomainMigrationConfig,
   ValidatorTopupConfig,
   svValidatorTopupConfig,
+  svOnboardingPollingInterval,
 } from 'cn-pulumi-common';
 import { retry } from 'cn-pulumi-common/src/retries';
 import fetch from 'node-fetch';
@@ -308,6 +309,7 @@ async function installSvAndValidator(
         percentage: '33.33',
       },
     ],
+    onboardingPollingInterval: svOnboardingPollingInterval,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {

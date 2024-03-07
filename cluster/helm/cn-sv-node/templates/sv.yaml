@@ -217,6 +217,11 @@ spec:
                     {{ $sv.partyId | quote }} = {{ $sv.percentage | quote }}
                   {{- end }}
                 }
+            {{- with .Values.onboardingPollingInterval }}
+            - name: ADDITIONAL_CONFIG_ONBOARDING_POLLING_INTERVAL
+              value: |
+                canton.sv-apps.sv.onboarding-polling-interval = {{ . }}
+            {{- end }}
           ports:
             - name: sv-api
               containerPort: 5014

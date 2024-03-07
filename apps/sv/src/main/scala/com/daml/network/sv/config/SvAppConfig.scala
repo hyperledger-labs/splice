@@ -187,6 +187,7 @@ case class SvAppBackendConfig(
     parameters: CNNodeParametersConfig = CNNodeParametersConfig(batching = BatchingConfig()),
     ingestFromParticipantBegin: Boolean = true,
     extraBeneficiaries: Map[PartyId, BigDecimal] = Map.empty,
+    onboardingPollingInterval: Option[NonNegativeFiniteDuration],
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

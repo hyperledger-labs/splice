@@ -40,6 +40,7 @@ interface SvcArgs {
   splitPostgresInstances: boolean;
   sequencerPruningConfig: SequencerPruningConfig;
   globalDomainUpgradeConfig: GlobalDomainMigrationConfig;
+  onboardingPollingInterval?: string;
 }
 
 export class Svc extends pulumi.ComponentResource {
@@ -105,6 +106,7 @@ export class Svc extends pulumi.ComponentResource {
         topupConfig: this.args.topupConfig,
         splitPostgresInstances: this.args.splitPostgresInstances,
         sequencerPruningConfig: this.args.sequencerPruningConfig,
+        onboardingPollingInterval: this.args.onboardingPollingInterval,
       },
       this.args.globalDomainUpgradeConfig,
       cometBftSyncSource

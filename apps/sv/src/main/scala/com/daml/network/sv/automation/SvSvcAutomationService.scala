@@ -185,6 +185,12 @@ class SvSvcAutomationService(
       .replace(
         new WallClock(triggerContext.timeouts, triggerContext.loggerFactory)
       )
+
+    val onboardingTriggerContext = wallClockTriggerContext
+      .focus(_.config.pollingInterval)
+      .replace(
+        config.onboardingPollingInterval.getOrElse(wallClockTriggerContext.config.pollingInterval)
+      )
     registerTrigger(
       new SvOffboardingPartyToParticipantProposalTrigger(
         triggerContext,
@@ -201,7 +207,7 @@ class SvSvcAutomationService(
     )
     registerTrigger(
       new SvOnboardingUnlimitedTrafficTrigger(
-        wallClockTriggerContext,
+        onboardingTriggerContext,
         svcStore,
         participantAdminConnection,
       )
@@ -222,35 +228,35 @@ class SvSvcAutomationService(
     )
     registerTrigger(
       new SvNamespaceMembershipTrigger(
-        wallClockTriggerContext,
+        onboardingTriggerContext,
         svcStore,
         participantAdminConnection,
       )
     )
     registerTrigger(
       new SvOnboardingPromoteParticipantToSubmitterTrigger(
-        wallClockTriggerContext,
+        onboardingTriggerContext,
         svcStore,
         participantAdminConnection,
       )
     )
     registerTrigger(
       new SvOnboardingPartyToParticipantProposalTrigger(
-        wallClockTriggerContext,
+        onboardingTriggerContext,
         svcStore,
         participantAdminConnection,
       )
     )
     registerTrigger(
       new SvOnboardingSequencerProposalTrigger(
-        wallClockTriggerContext,
+        onboardingTriggerContext,
         svcStore,
         participantAdminConnection,
       )
     )
     registerTrigger(
       new SvOnboardingMediatorProposalTrigger(
-        wallClockTriggerContext,
+        onboardingTriggerContext,
         svcStore,
         participantAdminConnection,
       )
