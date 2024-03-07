@@ -603,11 +603,6 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 - Update the ``auth.jwksUrl`` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - Please set `domain.sequencerPublicUrl` to the URL to your sequencer service in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
 - Please set `scan.publicUrl` to the URL to your Scan app in the SV configuration. If you are using the ingress configuration of this runbook, you can just replace ``YOUR_HOSTNAME`` with your host name.
-- If you would like to redistribute all or part of the SV rewards with other parties, you can fill up the `extraBeneficiaries` section with the desired parties and the percentage of the reward that corresponds to them.
-  Note that the party you register must be known on the network for the reward coupon issuance to succeed.
-  Furthermore, that party must be hosted on a validator node for its wallet to collect the SV reward coupons. That collection will happen automatically if the wallet is running.
-  If it is not running during the time that the reward coupon can be collected, the corresponding reward is marked as unclaimed, and stored in an SVC-wide unclaimed reward pool.
-  The `extraBeneficiaries` can be changed with just a restart of the SV app.
 
 If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``sv-values.yaml``:
 

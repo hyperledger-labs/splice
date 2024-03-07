@@ -85,7 +85,6 @@
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster_for_migration
@@ -174,7 +173,6 @@
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "user-selected-scratchnet"
           requires:
             - trigger_global_domain_migration
@@ -350,7 +348,6 @@
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "user-selected-scratchnet"
           requires:
             - deploy_cluster
@@ -473,7 +470,6 @@
           context:
             - artifactory
             - slack-context
-            - canton-network-vpn
           cluster: "user-selected-scratchnet"
           requires:
             - test_DR

@@ -4,18 +4,10 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{
-  CnsFrontendTestUtil,
-  FrontendLoginUtil,
-  SvTestUtil,
-  WalletFrontendTestUtil,
-}
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
+import com.daml.network.util.{CnsFrontendTestUtil, FrontendLoginUtil, WalletFrontendTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.DomainId
 
-import java.math.RoundingMode
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.Random
@@ -27,8 +19,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
     with SvUiIntegrationTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil
-    with CnsFrontendTestUtil
-    with SvTestUtil {
+    with CnsFrontendTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -39,8 +30,6 @@ abstract class RunbookSvPreflightIntegrationTestBase
   protected def svUsername: String
   protected def isDevNet: Boolean
   protected val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
-  val scanUrl = s"https://scan.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
-  val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
   "The SV UI of the node is working as expected" in { _ =>
     val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
@@ -86,6 +75,8 @@ abstract class RunbookSvPreflightIntegrationTestBase
   }
 
   "The SV can log in to their wallet" in { _ =>
+    val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
+
     withFrontEnd("sv") { implicit webDriver =>
       actAndCheck(
         s"Logging in to wallet at ${walletUrl}", {
@@ -108,99 +99,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
     }
   }
 
-  "The SV rewards are claimed by the SV, with 33.33% going to validator1" in { implicit env =>
-    val svClient = svcl("sv")
-    val sv1ScanClient = scancl("sv1Scan")
-
-    val svcInfo = svClient.getSvcInfo()
-    val svParty = svcInfo.svParty.toProtoPrimitive
-    val memberInfo = svcInfo.svcRules.payload.members.asScala.get(svParty).value
-    val joinedAsOfRound = memberInfo.joinedAsOfRound.number
-    val earliestOpenRound =
-      sv1ScanClient.getOpenAndIssuingMiningRounds()._1.minBy(_.payload.opensAt).payload.round.number
-
-    logger.debug(
-      s"Earliest open round: $earliestOpenRound, sv runbook joined as of round: $joinedAsOfRound"
-    )
-    // Make sure that the SV would've received & claimed SvRewardCoupons
-    if (earliestOpenRound >= joinedAsOfRound + 3) {
-      val coinsToIssueToSvc = computeCoinsToIssueToSvc(
-        sv1ScanClient.getCoinConfigAsOf(CantonTimestamp.now()).issuanceCurve.initialValue,
-        NonNegativeFiniteDuration.ofMillis(
-          svcInfo.coinRules.payload.configSchedule.initialValue.tickDuration.microseconds / 1000
-        ),
-      )
-      val svcWeight = svcInfo.svcRules.payload.members.asScala.map(_._2.svRewardWeight.toLong).sum
-      val svWeight = svcInfo.svcRules.payload.members.get(svParty).svRewardWeight
-      val svGetsInRound =
-        coinsToIssueToSvc
-          .multiply(BigDecimal(svWeight).bigDecimal)
-          .divide(BigDecimal(svcWeight).bigDecimal, RoundingMode.HALF_UP)
-          .setScale(10, RoundingMode.HALF_UP)
-      val maxValidatorFaucetCouponAmount = 2.85
-
-      withFrontEnd("sv") { implicit webDriver =>
-        actAndCheck(
-          s"Logging in to SV wallet at ${walletUrl}", {
-            completeAuth0LoginWithAuthorization(
-              walletUrl,
-              svUsername,
-              svPassword,
-              () => find(id("logout-button")) should not be empty,
-            )
-          },
-        )(
-          "There's a transaction worth 66.67% of an SV reward",
-          _ => {
-            val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
-
-            // 0.6667 = 1.0 - 0.3333. This is because we're using basis points.
-            val minExpected = BigDecimal(svGetsInRound) * BigDecimal("0.6667") - smallAmount
-            val maxExpected =
-              BigDecimal(svGetsInRound) * BigDecimal("0.6667") + maxValidatorFaucetCouponAmount
-            (txs.exists { tx =>
-              val gte = tx.ccAmount >= minExpected
-              val lte = tx.ccAmount <= maxExpected
-              gte && lte
-            } shouldBe true)
-              .withClue(s"Min Expected: $minExpected; Max Expected: $maxExpected; Txs: $txs")
-          },
-        )
-
-        val validator1WalletUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/"
-        actAndCheck(
-          s"Logging in to validator1 wallet at ${validator1WalletUrl}", {
-            completeAuth0LoginWithAuthorization(
-              validator1WalletUrl,
-              "admin@validator1.com",
-              "NobodyCares!",
-              () => find(id("logout-button")) should not be empty,
-            )
-          },
-        )(
-          "There's a transaction worth 33.33% of an SV reward",
-          _ => {
-            val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
-
-            val minExpected = BigDecimal(svGetsInRound) * BigDecimal("0.3333") - smallAmount
-            val maxExpected =
-              BigDecimal(svGetsInRound) * BigDecimal("0.3333") + maxValidatorFaucetCouponAmount
-            (txs.exists { tx =>
-              val gte = tx.ccAmount >= minExpected
-              val lte = tx.ccAmount <= maxExpected
-              gte && lte
-            } shouldBe true)
-              .withClue(s"Min Expected: $minExpected; Max Expected: $maxExpected; Txs: $txs")
-          },
-        )
-      }
-    } else {
-      logger.debug(
-        "Skipping checking SV rewards, the SV might not yet have claimed any SV rewards."
-      )
-    }
-  }
-
+  val scanUrl = s"https://scan.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
   "The Scan UI is working" in { _ =>
     withFrontEnd("sv") { implicit webDriver =>
       go to scanUrl

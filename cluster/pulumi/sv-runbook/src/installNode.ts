@@ -32,8 +32,6 @@ import {
   ValidatorTopupConfig,
   svValidatorTopupConfig,
 } from 'cn-pulumi-common';
-import { retry } from 'cn-pulumi-common/src/retries';
-import fetch from 'node-fetch';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installGlobalDomainNode } from './globalDomain';
@@ -72,8 +70,7 @@ export async function installNode(
   auth0Client: Auth0Client,
   svNamespaceStr: string,
   svAppConfig: SvAppConfig,
-  validatorAppConfig: ValidatorAppConfig,
-  resolveValidator1PartyId: () => Promise<string> = getValidator1PartyId
+  validatorAppConfig: ValidatorAppConfig
 ): Promise<void> {
   console.error(
     localCharts
@@ -105,23 +102,20 @@ export async function installNode(
 
   const svKey = svKeyFromSecret('sv');
 
-  const { sv, validator } = await installSvAndValidator(
-    {
-      xns,
-      globalDomainMigrationConfig,
-      participantBootstrapDumpSecret,
-      auth0Client,
-      imagePullDeps,
-      loopback,
-      backupConfigSecret,
-      backupConfig,
-      topupConfig: svValidatorTopupConfig,
-      svKey,
-      onboardingName: svAppConfig.onboardingName,
-      validatorWalletUserName: validatorAppConfig.walletUserName,
-    },
-    resolveValidator1PartyId
-  );
+  const { sv, validator } = await installSvAndValidator({
+    xns,
+    globalDomainMigrationConfig,
+    participantBootstrapDumpSecret,
+    auth0Client,
+    imagePullDeps,
+    loopback,
+    backupConfigSecret,
+    backupConfig,
+    topupConfig: svValidatorTopupConfig,
+    svKey,
+    onboardingName: svAppConfig.onboardingName,
+    validatorWalletUserName: validatorAppConfig.walletUserName,
+  });
 
   const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installCNRunbookHelmChartByNamespaceName(
@@ -162,10 +156,7 @@ type SvConfig = {
   validatorWalletUserName: string;
 };
 
-async function installSvAndValidator(
-  config: SvConfig,
-  resolveValidator1PartyId: () => Promise<string> = getValidator1PartyId
-) {
+async function installSvAndValidator(config: SvConfig) {
   const {
     xns,
     globalDomainMigrationConfig,
@@ -285,7 +276,6 @@ async function installSvAndValidator(
     }
   );
 
-  const validator1PartyId: pulumi.Output<string> = pulumi.Output.create(resolveValidator1PartyId());
   const svValues: ChartValues = {
     ...valuesFromYamlFile,
     participantIdentitiesDumpImport: participantBootstrapDumpSecret
@@ -302,12 +292,6 @@ async function installSvAndValidator(
         : valuesFromYamlFile.migration.migrating,
       ...valuesFromYamlFile.migration,
     },
-    extraBeneficiaries: [
-      {
-        partyId: validator1PartyId,
-        percentage: '33.33',
-      },
-    ],
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {
@@ -431,20 +415,4 @@ async function installSvAndValidator(
   );
 
   return { sv, validator };
-}
-
-async function getValidator1PartyId(): Promise<string> {
-  return retry('getValidator1PartyId', 1000, 100, async () => {
-    const response = await fetch(
-      `https://wallet.validator1.${CLUSTER_BASENAME}.network.canton.global/api/validator/v0/validator-user`
-    );
-    const json = await response.json();
-    if (!response.ok) {
-      throw new Error(`Response is not OK: ${JSON.stringify(json)}`);
-    } else if (!json.party_id) {
-      throw new Error(`JSON does not contain party_id: ${JSON.stringify(json)}`);
-    } else {
-      return json.party_id;
-    }
-  });
 }
