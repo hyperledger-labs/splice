@@ -34,6 +34,8 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
 
   protected def existingDumpFileMigrationId(dump: T): Long
 
+  protected def existingDumpFileTimestamp(dump: T): Instant
+
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[migration.DomainMigrationTrigger.Task]] = {
@@ -47,21 +49,28 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
         schedule.time
       )
       task <-
-        // check if the domain time is after the scheduled time for migration
-        // and the dump does not exist or the dump exists and the migrationId is different compared to the scheduled one
         if (
-          domainTimeIsAfterTheScheduledTime
-          && currentMigrationId + 1 == schedule.migrationId && (!BackupDump
-            .fileExists(dumpPath) || !readMigrationIdFromExistingDump().contains(
-            schedule.migrationId
-          ))
+          domainTimeIsAfterTheScheduledTime && currentMigrationId + 1 == schedule.migrationId && !expectedDumpExists(
+            schedule
+          )
         )
           OptionT.pure[Future](DomainMigrationTrigger.Task(domainId, schedule.migrationId))
         else OptionT.none[Future, DomainMigrationTrigger.Task]
     } yield task).value.map(_.toList)
   }
 
-  private def readMigrationIdFromExistingDump()(implicit tc: TraceContext) = {
+  private def expectedDumpExists(
+      schedule: DomainMigrationTrigger.ScheduledMigration
+  )(implicit tc: TraceContext) = {
+    BackupDump.fileExists(dumpPath) && readExistingDump()
+      .map(dump =>
+        existingDumpFileMigrationId(dump) == schedule.migrationId && existingDumpFileTimestamp(dump)
+          .isAfter(schedule.time)
+      )
+      .getOrElse(false)
+  }
+
+  private def readExistingDump()(implicit tc: TraceContext) = {
     BackupDump
       .readFromPath[T](dumpPath)
       .fold(
@@ -69,19 +78,16 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
           logger.error(s"Failed to read domain migration dump from path $dumpPath", err)
           None
         },
-        dump => Some(existingDumpFileMigrationId(dump)),
+        dump => Some(dump),
       )
   }
 
   override protected def completeTask(task: migration.DomainMigrationTrigger.ReadyTask)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    if (!BackupDump.fileExists(dumpPath)) {
-      for {
-        _ <- exportMigrationDump(task.work)
-      } yield TaskSuccess(show"Triggered migration dump export for ${task.work}")
-    } else
-      Future.successful(TaskSuccess(show"migration dump already exists. skipping ${task.work}"))
+    for {
+      _ <- exportMigrationDump(task.work)
+    } yield TaskSuccess(show"Triggered migration dump export for ${task.work}")
   }
 
   override protected def isStaleTask(

@@ -41,7 +41,7 @@ class DomainDataSnapshotGenerator(
     dars,
   )
 
-  def getDomainMigrationSnapshot()(implicit
+  def getDomainMigrationSnapshot(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[DomainDataSnapshot] = for {
@@ -49,13 +49,25 @@ class DomainDataSnapshotGenerator(
     domainParamsStateTopology <- participantAdminConnection.getDomainParametersState(globalDomain)
     topologySnapshot <- getTopologySnapshot(globalDomain, domainParamsStateTopology.base.validFrom)
     acsSnapshot <- acsExporter
-      .safeExportParticipantPartiesAcsFromPausedDomain(
-        globalDomain
-      )
+      .safeExportParticipantPartiesAcsFromPausedDomain(globalDomain)
       .leftMap(failure =>
         Status.FAILED_PRECONDITION.withDescription(failure.toString).asRuntimeException()
       )
       .rethrowT
+    dars <- darExporter.exportAllDars()
+  } yield DomainDataSnapshot(
+    topologySnapshot,
+    acsSnapshot,
+    dars,
+  )
+
+  def getDomainMigrationSnapshotForTesting(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+  ): Future[DomainDataSnapshot] = for {
+    globalDomain <- svcStore.getSvcRules().map(_.domain)
+    acsSnapshot <- acsExporter.exportParticipantPartiesAcsForTesting(globalDomain)
+    topologySnapshot <- getTopologySnapshot(globalDomain, Instant.now())
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
     topologySnapshot,

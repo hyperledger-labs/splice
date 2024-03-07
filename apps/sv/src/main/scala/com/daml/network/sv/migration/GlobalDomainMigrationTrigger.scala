@@ -15,6 +15,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import java.nio.file.Path
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
@@ -54,6 +55,9 @@ final class GlobalDomainMigrationTrigger(
 
   override protected def existingDumpFileMigrationId(dump: DomainMigrationDump): Long =
     dump.migrationId
+
+  override protected def existingDumpFileTimestamp(dump: DomainMigrationDump): Instant =
+    dump.createdAt
 
   override protected def generateDump(task: DomainMigrationTrigger.Task)(implicit
       tc: TraceContext

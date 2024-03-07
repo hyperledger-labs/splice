@@ -8,6 +8,7 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
 class DomainMigrationDumpGenerator(
@@ -45,6 +46,7 @@ class DomainMigrationDumpGenerator(
         participant = nodeIdentities,
         acsSnapshot = acsSnapshot,
         dars = dars,
+        createdAt = Instant.now(),
       )
     }
   }

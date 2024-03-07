@@ -376,6 +376,7 @@ class DisasterRecoveryIntegrationTest
       migrationId = 1,
       ids,
       dump,
+      createdAt = Instant.now(),
     )
     fullDumpFile.write(fullDump.asJson.spaces2)
   }

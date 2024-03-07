@@ -1139,6 +1139,8 @@ components:
         migration_id:
           type: integer
           format: int64
+        for_testing:
+          type: boolean
 
     GetDomainMigrationDumpResponse:
       type: object
@@ -1146,6 +1148,7 @@ components:
         - migration_id
         - identities
         - data_snapshot
+        - created_at
       properties:
         migration_id:
           type: integer
@@ -1154,6 +1157,8 @@ components:
           $ref: "#/components/schemas/DomainNodeIdentities"
         data_snapshot:
           $ref: "#/components/schemas/DomainDataSnapshot"
+        created_at:
+          type: string
 
     GetDomainNodeIdentitiesDumpResponse:
       type: object

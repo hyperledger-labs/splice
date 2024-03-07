@@ -10,6 +10,7 @@ import io.circe.{Codec, Decoder, Encoder}
 import io.circe.generic.semiauto.deriveCodec
 
 import java.util.Base64
+import java.time.Instant
 import scala.annotation.nowarn
 
 case class DomainMigrationDump(
@@ -18,6 +19,7 @@ case class DomainMigrationDump(
     participant: NodeIdentitiesDump,
     acsSnapshot: ByteString,
     dars: Seq[Dar],
+    createdAt: Instant,
 )
 
 object DomainMigrationDump {

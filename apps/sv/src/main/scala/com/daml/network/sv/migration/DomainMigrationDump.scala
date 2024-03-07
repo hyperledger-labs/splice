@@ -12,17 +12,21 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.circe.{Codec, Decoder}
 import io.circe.syntax.*
 
+import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Try
 
 case class DomainMigrationDump(
     migrationId: Long,
     nodeIdentities: DomainNodeIdentities,
     domainDataSnapshot: DomainDataSnapshot,
+    createdAt: Instant,
 ) {
   def toHttp: http.GetDomainMigrationDumpResponse = http.GetDomainMigrationDumpResponse(
     migrationId,
     nodeIdentities.toHttp(),
     domainDataSnapshot.toHttp,
+    createdAt.toString,
   )
 }
 
@@ -43,10 +47,12 @@ object DomainMigrationDump {
   ): Either[String, DomainMigrationDump] = for {
     identities <- DomainNodeIdentities.fromHttp(response.identities)
     snapshot <- DomainDataSnapshot.fromHttp(response.dataSnapshot)
+    timestamp <- Try(Instant.parse(response.createdAt)).toEither.leftMap(_.getMessage)
   } yield DomainMigrationDump(
     response.migrationId,
     nodeIdentities = identities,
     domainDataSnapshot = snapshot,
+    createdAt = timestamp,
   )
 
   def getDomainMigrationDump(
@@ -57,6 +63,7 @@ object DomainMigrationDump {
       svcStore: SvSvcStore,
       migrationId: Long,
       domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
+      forTesting: Boolean = false,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -69,11 +76,17 @@ object DomainMigrationDump {
         domainAlias,
         loggerFactory,
       )
-      snapshot <- domainDataSnapshotGenerator.getDomainMigrationSnapshot()
+      snapshot <-
+        if (forTesting) {
+          domainDataSnapshotGenerator.getDomainMigrationSnapshotForTesting
+        } else {
+          domainDataSnapshotGenerator.getDomainMigrationSnapshot
+        }
     } yield DomainMigrationDump(
       migrationId,
       identities,
       snapshot,
+      Instant.now(),
     )
   }
 

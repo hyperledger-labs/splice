@@ -430,15 +430,32 @@ class GlobalDomainMigrationIntegrationTest
       },
     )
 
-    eventually() {
-      inside(sv1ScanBackend.listSvcSequencers()) {
-        case Seq(DomainSequencers(domainId, sequencers)) =>
-          domainId shouldBe globalDomainId
-          sequencers should have size 4
-          sequencers.foreach { sequencer =>
-            sequencer.migrationId shouldBe 0
-          }
+    clue("All sequencers are registered") {
+      eventually() {
+        inside(sv1ScanBackend.listSvcSequencers()) {
+          case Seq(DomainSequencers(domainId, sequencers)) =>
+            domainId shouldBe globalDomainId
+            sequencers should have size 4
+            sequencers.foreach { sequencer =>
+              sequencer.migrationId shouldBe 0
+            }
+        }
       }
+    }
+
+    clue("We can export a migration dump before the domain is paused (for individual tests)") {
+      // note that IRL, this endpoint should only ever be called as part of individual upgrade tests run by a partner
+      // (where the SV is deployed into a cluster with no other SVs, so the domain is stopped already on the CometBFT layer)
+      val expectedDumpPath = migrationDumpDir("sv4") / "domain_migration_dump.json"
+      if (expectedDumpPath.path.exists) {
+        expectedDumpPath.path.delete()
+      }
+      sv4Backend.triggerGlobalDomainMigrationDump(migrationId = 1L, forTesting = true)
+      eventually()(
+        expectedDumpPath.path.exists shouldBe true
+      )
+      // we deliberately don't remove the dump file to be sure that it will get overwritten later
+      // (if it doesn't get overwritten SV4 will run into errors during or shortly after the migration)
     }
 
     def startValidatorAndTapCoin(
