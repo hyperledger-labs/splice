@@ -4,14 +4,18 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{CnsFrontendTestUtil, FrontendLoginUtil, WalletFrontendTestUtil}
+import com.daml.network.util.{
+  CnsFrontendTestUtil,
+  FrontendLoginUtil,
+  SvTestUtil,
+  WalletFrontendTestUtil,
+}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.DomainId
 
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
-import scala.util.Random
-import scala.util.Try
+import scala.util.{Random, Try}
 
 abstract class RunbookSvPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
@@ -19,7 +23,8 @@ abstract class RunbookSvPreflightIntegrationTestBase
     with SvUiIntegrationTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil
-    with CnsFrontendTestUtil {
+    with CnsFrontendTestUtil
+    with SvTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
