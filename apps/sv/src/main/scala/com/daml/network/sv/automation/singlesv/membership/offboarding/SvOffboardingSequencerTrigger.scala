@@ -1,7 +1,6 @@
 package com.daml.network.sv.automation.singlesv.membership.offboarding
 
 import cats.implicits.showInterpolator
-import cats.syntax.traverse.*
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -9,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
-import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, SequencerAdminConnection}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.topology.SequencerId
@@ -31,7 +30,6 @@ class SvOffboardingSequencerTrigger(
     override protected val context: TriggerContext,
     svcStore: SvSvcStore,
     participantAdminConnection: ParticipantAdminConnection,
-    sequencerAdminConnection: Option[SequencerAdminConnection],
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -48,7 +46,6 @@ class SvOffboardingSequencerTrigger(
       currentSequencerState <- participantAdminConnection.getSequencerDomainState(
         svcRules.domain
       )
-      ourSequencerId <- sequencerAdminConnection.traverse(_.getSequencerId)
     } yield {
       val svcRulesCurrentSequencers = getSequencerIds(
         svcRules.contract.payload.members
@@ -57,9 +54,7 @@ class SvOffboardingSequencerTrigger(
           .flatMap(_.domainNodes.values().asScala)
       )
       val sequencersToRemove = currentSequencerState.mapping.active
-        // TODO(#9813) Consider removing the filter for our own sequencer
-        // once Canton is fixed.
-        .filterNot(e => svcRulesCurrentSequencers.contains(e) || ourSequencerId.contains(e))
+        .filterNot(e => svcRulesCurrentSequencers.contains(e))
       logger.info {
         import com.digitalasset.canton.util.ShowUtil.showPretty
         import com.daml.network.util.PrettyInstances.prettyCodegenContractId

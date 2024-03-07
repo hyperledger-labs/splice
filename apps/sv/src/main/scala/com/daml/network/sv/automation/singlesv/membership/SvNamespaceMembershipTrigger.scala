@@ -65,10 +65,7 @@ class SvNamespaceMembershipTrigger(
           decentralizedNamespace.mapping.owners
             .contains(svcMemberParty.uid.namespace) && !svcRulesMembers
             .map(_.uid.namespace)
-            .contains(svcMemberParty.uid.namespace) &&
-            // TODO(#9813) Consider removing the filter for our own SV party
-            // once Canton is fixed.
-            svcMemberParty != svcStore.key.svParty
+            .contains(svcMemberParty.uid.namespace)
         )
       namespaceAdditions.map[NamespaceDiff](AddToNamespace(svcRules.domain, _)) ++ namespaceRemovals
         .map[NamespaceDiff](

@@ -197,7 +197,6 @@ class SvSvcAutomationService(
         wallClockTriggerContext,
         svcStore,
         participantAdminConnection,
-        localDomainNode.map(_.mediatorAdminConnection),
       )
     )
     registerTrigger(
@@ -212,7 +211,6 @@ class SvSvcAutomationService(
         wallClockTriggerContext,
         svcStore,
         participantAdminConnection,
-        localDomainNode.map(_.sequencerAdminConnection),
       )
     )
     registerTrigger(

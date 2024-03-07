@@ -35,7 +35,6 @@ class SvOffboardingPartyToParticipantProposalTrigger(
       tc: TraceContext
   ): Future[Seq[ParticipantId]] = {
     for {
-      ourParticipantId <- participantAdminConnection.getParticipantId()
       svcRules <- svcStore.getSvcRules()
       offboardedMembers = svcRules.contract.payload.offboardedMembers
       offboardedParticipants = offboardedMembers
@@ -50,11 +49,7 @@ class SvOffboardingPartyToParticipantProposalTrigger(
           svcParty,
         )
         .map(_.mapping.participantIds)
-    } yield currentHostingParticipantIds.filter(e =>
-      // TODO(#9813) Consider removing the filter for our own participant
-      // once Canton is fixed.
-      offboardedParticipants.contains(e) && e != ourParticipantId
-    )
+    } yield currentHostingParticipantIds.filter(e => offboardedParticipants.contains(e))
   }
 
   override protected def completeTask(task: ParticipantId)(implicit
