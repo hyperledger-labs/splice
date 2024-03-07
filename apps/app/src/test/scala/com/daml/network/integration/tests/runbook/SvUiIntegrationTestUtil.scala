@@ -138,7 +138,7 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
     val svUsername = s"admin@sv$i-dev.com";
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD")
 
-    withFrontEnd("sv") { implicit webDriver =>
+    withFrontEnd(s"sv$i") { implicit webDriver =>
       clue(s"Logging in to SV UI at: ${svUiUrl}") {
         completeAuth0LoginWithAuthorization(
           svUiUrl,
@@ -147,12 +147,7 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
           () => find(id("logout-button")) should not be empty,
         )
       }
-      val result = f(webDriver)
-      clue(s"We can log out of this SV's UI") {
-        click on "logout-button"
-        waitForQuery(id("oidc-login-button"))
-      }
-      result
+      f(webDriver)
     }
   }
 }

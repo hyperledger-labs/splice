@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests.migration
 
+import cats.syntax.parallel.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -7,17 +8,20 @@ import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvir
 import com.daml.network.integration.tests.runbook.SvUiIntegrationTestUtil
 import com.daml.network.util.SvFrontendTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.util.FutureInstances.*
 import org.openqa.selenium.support.ui.Select
 import org.openqa.selenium.{By, Keys}
+import org.scalatest.time.{Minute, Span}
 
 import java.time.{Instant, ZoneOffset}
 import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
+import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
 
 class GlobalDomainUpgradeClusterPreflightIntegrationTest
-    extends FrontendIntegrationTestWithSharedEnvironment("sv")
+    extends FrontendIntegrationTestWithSharedEnvironment("sv1", "sv2", "sv3", "sv4")
     with SvUiIntegrationTestUtil
     with SvFrontendTestUtil {
 
@@ -27,7 +31,11 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
       this.getClass.getSimpleName
     )
 
+  override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
+
   "Global domain upgrade is scheduled" in { implicit env =>
+    import env.executionContext
+
     // This triggers the pausing of the domain and the creation of dumps later on
 
     val requestReasonUrl = "This is a request reason url."
@@ -50,7 +58,7 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
 
         val now = Instant.now()
         val scheduledUpgradeTime = DateTimeFormatter.ISO_INSTANT.format(
-          now.plusSeconds(150).truncatedTo(ChronoUnit.SECONDS)
+          now.plusSeconds(80).truncatedTo(ChronoUnit.SECONDS)
         )
         inside(find(id("nextScheduledDomainUpgrade.time-value"))) { case Some(element) =>
           element.underlying.clear()
@@ -77,7 +85,7 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
             .ofPattern("MM/dd/yyyy hh:mm a")
             .withZone(ZoneOffset.UTC)
             .format(
-              now.plusSeconds(120)
+              now.plusSeconds(60)
             ),
         )
 
@@ -100,77 +108,77 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
     }
 
     clue(s"other sv case vote on request") {
-      for (i <- 2 to 4) {
-        withWebUiSv(i) { implicit webDriver =>
-          click on "navlink-votes"
-          val tbody = find(id("sv-voting-action-needed-table-body"))
-          val reviewButtonOpt = inside(tbody) { case Some(tb) =>
-            val rows = tb.findAllChildElements(className("MuiDataGrid-row")).toSeq
-            val row = rows.find { row =>
-              row
-                .findAllChildElements(className("vote-row-tracking-id"))
-                .toSeq
-                .headOption
-                .exists(
-                  _.text == newVoteRequestCid
-                )
+      Seq(2, 3, 4).parTraverse { svIndex =>
+        Future {
+          withWebUiSv(svIndex) { implicit webDriver =>
+            click on "navlink-votes"
+            val tbody = find(id("sv-voting-action-needed-table-body"))
+            val reviewButton = eventually() {
+              inside(tbody) { case Some(tb) =>
+                val rows = tb.findAllChildElements(className("MuiDataGrid-row")).toSeq
+                val row = rows.find { row =>
+                  row
+                    .findAllChildElements(className("vote-row-tracking-id"))
+                    .toSeq
+                    .headOption
+                    .exists(
+                      _.text == newVoteRequestCid
+                    )
+                }.value
+                row.findAllChildElements(className("vote-row-action")).toSeq.headOption.value
+              }
             }
-            row.flatMap(_.findAllChildElements(className("vote-row-action")).toSeq.headOption)
-          }
-          reviewButtonOpt match {
-            case None => () // domain upgrade is already scheduled
-            case Some(reviewButton) =>
-              actAndCheck(
-                "sv operator can review the vote request", {
-                  reviewButton.underlying.click()
-                },
-              )(
-                "sv operator can see the new vote request detail",
-                _ => {
-                  inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
-                    element.text should matchText("SRARC_SetConfig")
-                  }
-                },
-              )
+            actAndCheck(
+              "sv operator can review the vote request", {
+                reviewButton.underlying.click()
+              },
+            )(
+              "sv operator can see the new vote request detail",
+              _ => {
+                inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
+                  element.text should matchText("SRARC_SetConfig")
+                }
+              },
+            )
 
-              val voteReasonBody = "vote reason body"
-              val voteReasonUrl = "vote reason url"
-              actAndCheck(
-                "sv operator can cast vote", {
-                  click on "cast-vote-button"
-                  click on "accept-vote-button"
-                  inside(find(id("vote-reason-url"))) { case Some(element) =>
-                    element.underlying.sendKeys(voteReasonUrl)
-                  }
-                  inside(find(id("vote-reason-body"))) { case Some(element) =>
-                    element.underlying.sendKeys(voteReasonBody)
-                  }
-                  click on "save-vote-button"
-                },
-              )(
-                "sv2 can see the new vote request detail",
-                _ => {
-                  inside(find(id("vote-request-modal-vote-reason-body"))) { case Some(element) =>
-                    element.text should matchText(voteReasonBody)
-                  }
-                  inside(find(id("vote-request-modal-vote-reason-url"))) { case Some(element) =>
-                    element.text should matchText(voteReasonUrl)
-                  }
-                },
-              )
-              webDriver.findElement(By.tagName("body")).sendKeys(Keys.ESCAPE)
+            val voteReasonBody = "vote reason body"
+            val voteReasonUrl = "vote reason url"
+            actAndCheck(
+              "sv operator can cast vote", {
+                click on "cast-vote-button"
+                click on "accept-vote-button"
+                inside(find(id("vote-reason-url"))) { case Some(element) =>
+                  element.underlying.sendKeys(voteReasonUrl)
+                }
+                inside(find(id("vote-reason-body"))) { case Some(element) =>
+                  element.underlying.sendKeys(voteReasonBody)
+                }
+                click on "save-vote-button"
+              },
+            )(
+              "sv can see the new vote request detail",
+              _ => {
+                inside(find(id("vote-request-modal-vote-reason-body"))) { case Some(element) =>
+                  element.text should matchText(voteReasonBody)
+                }
+                inside(find(id("vote-request-modal-vote-reason-url"))) { case Some(element) =>
+                  element.text should matchText(voteReasonUrl)
+                }
+              },
+            )
+            webDriver.findElement(By.tagName("body")).sendKeys(Keys.ESCAPE)
           }
         }
-      }
+      }.futureValue
     }
 
     clue("Domain migration should be scheduled") {
-      // 300 to account for
-      // - 120s expiration time of the vote request
+      // 240 to account for
+      // - 60s expiration time of the vote request
       // - 60s buffer because we only set minutes not seconds
       // - 30s polling interval for the trigger to kick in
       // - general slowness
-      eventuallySucceeds(timeUntilSuccess = 300.seconds) {
+      eventuallySucceeds(timeUntilSuccess = 240.seconds) {
         val nextScheduledDomainUpgrade = sv1
           .getSvcInfo()
           .svcRules
