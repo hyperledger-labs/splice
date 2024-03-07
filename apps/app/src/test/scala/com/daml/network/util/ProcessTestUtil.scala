@@ -21,14 +21,8 @@ object ProcessTestUtil {
   object Process {
     implicit val releasable: Releasable[Process] = (process: Process) => process.destroyAndWait()
   }
-}
 
-trait ProcessTestUtil {
-  import ProcessTestUtil.Process
-
-  val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
-
-  private def startProcess(
+  def startProcess(
       args: Seq[String],
       extraEnv: Seq[(String, String)],
       outputFile: Option[JFile] = None,
@@ -51,6 +45,12 @@ trait ProcessTestUtil {
       builder.start()
     )
   }
+}
+
+trait ProcessTestUtil {
+  import ProcessTestUtil.*
+
+  val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
 
   protected def withCanton[A](
       configs: Seq[File],
@@ -63,6 +63,27 @@ trait ProcessTestUtil {
         configs.flatMap(config => Seq("-c", config.toString)) ++ extraConfigs.flatMap(Seq("-C", _)),
         logSuffix,
         extraEnv*
+      )
+    )(_ => test)
+  }
+
+  protected def withBundledCN[A](
+      configs: Seq[File],
+      logSuffix: String,
+  )(test: => A): A = {
+    Using.resource(
+      startProcess(
+        Seq(
+          "cn-node",
+          "daemon",
+          "--log-level-canton=DEBUG",
+          "--log-level-stdout=OFF",
+          "--log-encoder",
+          "json",
+          "--log-file-name",
+          s"log/cn-node-${logSuffix}.clog",
+        ) ++ configs.flatMap(config => Seq("-c", config.toString)),
+        Seq(),
       )
     )(_ => test)
   }

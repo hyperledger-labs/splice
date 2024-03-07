@@ -1024,7 +1024,15 @@ commands:
         default: ""
       start_canton_options:
         type: string
+      with_bundle:
+        type: boolean
+        default: false
     steps:
+      - when:
+          condition: << parameters.with_bundle >>
+          steps:
+            - execute_sbt_command:
+                cmd: "bundle"
       - run_bash_command_in_nix:
           cmd_name: "Wait for canton to be ready before running tests"
           cmd: |
@@ -1814,6 +1822,9 @@ jobs:
         type: integer
       resource_class:
         type: string
+      with_bundle:
+        type: boolean
+        default: false
     resource_class: << parameters.resource_class >>
     environment:
       <<: *env
@@ -1842,6 +1853,7 @@ jobs:
           pre_sbt_cmd: << parameters.pre_sbt_cmd >>
           post_sbt_cmd: << parameters.post_sbt_cmd >>
           start_canton_options: << parameters.start_canton_options >>
+          with_bundle: << parameters.with_bundle >>
       - stop_canton
       - cleanup_sbt_test_job
 
@@ -2882,6 +2894,18 @@ workflows:
           start_canton_options: "-w"
           resource_class: "xlarge"
           parallelism: 1
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test app upgrade"
+          test_names_file: "test-full-class-names-app-upgrade.log"
+          start_canton_options: "-w"
+          resource_class: "xlarge"
+          parallelism: 1
+          with_bundle: true
       - ui_test:
           <<: *notify-fail
           context:

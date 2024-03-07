@@ -28,7 +28,6 @@ Seq(aliceValidator.participantClient, bobValidator.participantClient).foreach { 
 
 println("Onboarding users...")
 val charlieValidator = aliceValidator
-val charlieCns = aliceCns
 
 val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser)
 val bobUserParty = bobValidator.onboardUser(bobWallet.config.ledgerApiUser)

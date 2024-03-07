@@ -76,6 +76,9 @@ jobs:
         type: integer
       resource_class:
         type: string
+      with_bundle:
+        type: boolean
+        default: false
     resource_class: << parameters.resource_class >>
     environment:
       <<: *env
@@ -104,6 +107,7 @@ jobs:
           pre_sbt_cmd: << parameters.pre_sbt_cmd >>
           post_sbt_cmd: << parameters.post_sbt_cmd >>
           start_canton_options: << parameters.start_canton_options >>
+          with_bundle: << parameters.with_bundle >>
       - stop_canton
       - cleanup_sbt_test_job
 

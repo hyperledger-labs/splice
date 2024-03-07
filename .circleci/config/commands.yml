@@ -892,7 +892,15 @@ commands:
         default: ""
       start_canton_options:
         type: string
+      with_bundle:
+        type: boolean
+        default: false
     steps:
+      - when:
+          condition: << parameters.with_bundle >>
+          steps:
+            - execute_sbt_command:
+                cmd: "bundle"
       - run_bash_command_in_nix:
           cmd_name: "Wait for canton to be ready before running tests"
           cmd: |

@@ -126,6 +126,18 @@ workflow:
           start_canton_options: "-w"
           resource_class: "xlarge"
           parallelism: 1
+      - scala_test:
+          <<: *notify-fail
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          name: "scala_test app upgrade"
+          test_names_file: "test-full-class-names-app-upgrade.log"
+          start_canton_options: "-w"
+          resource_class: "xlarge"
+          parallelism: 1
+          with_bundle: true
       - ui_test:
           <<: *notify-fail
           context:
