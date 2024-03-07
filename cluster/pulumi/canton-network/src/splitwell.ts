@@ -59,6 +59,7 @@ export async function installSplitwell(
   );
 
   const swPostgres = sharedPostgres || postgres.installPostgres(xns, 'sw-pg', true);
+  const splitwellDbName = 'app_splitwell';
 
   const scanAddress = `http://scan-app.sv-1:5012`;
   installCNHelmChart(
@@ -75,6 +76,14 @@ export async function installSplitwell(
       },
       scanAddress: scanAddress,
       participantHost: participant.name,
+      persistence: {
+        host: swPostgres.address,
+        databaseName: pulumi.Output.create(splitwellDbName),
+        secretName: swPostgres.secretName,
+        schema: pulumi.Output.create(splitwellDbName),
+        user: pulumi.Output.create('cnadmin'),
+        port: pulumi.Output.create(5432),
+      },
     },
     { dependsOn: dependsOn.concat([participant]) }
   );

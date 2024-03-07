@@ -15,6 +15,14 @@ metrics:
   release: prometheus-grafana-monitoring
   interval: 30s
 
+persistence:
+  databaseName: cantonnet_splitwell
+  schema: splitwell
+  host: postgres
+  port: 5432
+  user: cnadmin
+  secretName: "postgres-secrets"
+
 migration:
   id: 0
 

@@ -1257,6 +1257,14 @@
           "id": 0
         },
         "participantHost": "participant-0",
+        "persistence": {
+          "databaseName": "app_splitwell",
+          "host": "splitwell-pg.splitwell.svc.cluster.local",
+          "port": 5432,
+          "schema": "app_splitwell",
+          "secretName": "postgres-secrets",
+          "user": "cnadmin"
+        },
         "postgres": "splitwell-pg.splitwell.svc.cluster.local",
         "resources": {
           "limits": {
