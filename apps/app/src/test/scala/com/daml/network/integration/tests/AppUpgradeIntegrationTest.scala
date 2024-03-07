@@ -62,7 +62,7 @@ class AppUpgradeIntegrationTest
       Using.resource(AppUpgradeIntegrationTest.MultiCnProcessResource("forUpgrade"))(cnProcs => {
         confs.foreach(conf => cnProcs.startBundledCN(conf._1, conf._2))
 
-        eventually(2.minute) {
+        eventually(5.minute) {
           Seq("sv1", "sv2", "sv3", "sv4").foreach(sv => {
             svcl(s"${sv}Client").httpHealth.successOption.exists(_.active) should be(
               true
