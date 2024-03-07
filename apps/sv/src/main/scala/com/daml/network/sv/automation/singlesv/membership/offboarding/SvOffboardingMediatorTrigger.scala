@@ -1,4 +1,4 @@
-package com.daml.network.sv.automation.singlesv.membership.offboarding
+package com.daml.network.sv.automation.singlesv.offboarding
 
 import cats.implicits.showInterpolator
 import com.daml.network.automation.{
@@ -10,7 +10,6 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.util.MemberIdUtil
 import com.digitalasset.canton.topology.MediatorId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -79,13 +78,20 @@ class SvOffboardingMediatorTrigger(
 
   private def getMediatorIds(
       members: Iterable[DomainNodeConfig]
-  ) = {
+  )(implicit tc: TraceContext) = {
     members
       .flatMap(_.mediator.toScala)
       .map(_.mediatorId)
-      .map(mediatorId =>
-        MemberIdUtil.MediatorId
-          .tryFromProtoPrimitive(mediatorId, "mediatorId")
+      .flatMap(mediatorId =>
+        MediatorId
+          .fromProtoPrimitive(mediatorId, "mediatorId")
+          .fold(
+            error => {
+              logger.warn(s"Failed to parse mediator id $mediatorId. $error")
+              None
+            },
+            Some(_),
+          )
       )
       .toSeq
   }

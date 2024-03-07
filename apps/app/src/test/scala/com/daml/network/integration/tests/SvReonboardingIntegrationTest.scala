@@ -1,5 +1,8 @@
 package com.daml.network.integration.tests
 
+import com.digitalasset.canton.health.admin.data.NodeStatus
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.*
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.*
@@ -9,31 +12,27 @@ import com.daml.network.config.{
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
 }
-import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
+import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingSequencerTrigger
+import com.daml.network.sv.config.MigrateSvPartyConfig
+import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.automation.singlesv.membership.offboarding.{
-  SvOffboardingMediatorTrigger,
-  SvOffboardingSequencerTrigger,
-}
-import com.daml.network.sv.config.MigrateSvPartyConfig
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton}
-import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.typesafe.config.ConfigValueFactory
+
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.Files
-import scala.concurrent.duration.*
-import scala.jdk.CollectionConverters.*
 
 class SvReonboardingIntegrationTest
     extends CNNodeIntegrationTest

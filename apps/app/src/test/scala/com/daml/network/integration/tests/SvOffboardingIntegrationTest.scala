@@ -4,17 +4,15 @@ import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.sv.automation.singlesv.membership.offboarding.{
-  SvOffboardingMediatorTrigger,
-  SvOffboardingSequencerTrigger,
-}
+import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingSequencerTrigger
+import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition

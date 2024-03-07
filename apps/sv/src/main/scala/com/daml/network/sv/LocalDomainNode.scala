@@ -24,7 +24,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
-import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import io.grpc.Status
 
 import java.time.Duration
@@ -35,7 +34,6 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   * TODO(#5195) Consider making this mandatory.
   */
 final class LocalDomainNode(
-    participantAdminConnection: ParticipantAdminConnection,
     val sequencerAdminConnection: SequencerAdminConnection,
     val mediatorAdminConnection: MediatorAdminConnection,
     val staticDomainParameters: StaticDomainParameters,
@@ -77,6 +75,7 @@ final class LocalDomainNode(
       node: String,
       domainId: DomainId,
       uid: UniqueIdentifier,
+      participantAdminConnection: ParticipantAdminConnection,
       identityTransactions: Seq[GenericSignedTopologyTransactionX],
   )(implicit traceContext: TraceContext) = {
     logger.info(s"Adding identity transactions for $node $uid")
@@ -92,7 +91,7 @@ final class LocalDomainNode(
               Some(domainId),
               identityTransactions,
             )
-            _ <- waitForIdentityTransaction(domainId, uid)
+            _ <- waitForIdentityTransaction(domainId, uid, participantAdminConnection)
           } yield ()
     } yield ()
   }
@@ -100,6 +99,7 @@ final class LocalDomainNode(
   private def waitForIdentityTransaction(
       domainId: DomainId,
       uid: UniqueIdentifier,
+      participantAdminConnection: ParticipantAdminConnection,
   )(implicit traceContext: TraceContext) =
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
@@ -129,25 +129,10 @@ final class LocalDomainNode(
 
   /** Onboard the mediator operated by this SV to the domain if it is not already initialized.
     */
-  def initializeLocalMediatorIfRequired(
-      domainId: DomainId
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    onMediatorNotInitialized {
-      logger.info("Onboarding mediator")
-      initializeLocalMediator(domainId)
-    }
-  }
-
-  def addLocalMediatorIdentityIfRequired(
-      domainId: DomainId
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    onMediatorNotInitialized {
-      addMediatorIdentityTransactions(domainId)
-    }
-  }
-
-  private def onMediatorNotInitialized(
-      action: => Future[Unit]
+  def onboardLocalMediatorIfRequired(
+      domainId: DomainId,
+      participantAdminConnection: ParticipantAdminConnection,
+      svConnection: SvConnection,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     retryProvider
       .getValueWithRetries(
@@ -158,16 +143,25 @@ final class LocalDomainNode(
       )
       .flatMap {
         case Left(NodeStatus.NotInitialized(_)) =>
-          action
+          logger.info("Onboarding mediator")
+          onboardLocalMediator(
+            domainId,
+            participantAdminConnection,
+            svConnection,
+          )
         case Right(NodeStatus.Success(_)) =>
           logger.info("Mediator is already onboarded")
           Future.unit
       }
   }
 
-  private def addMediatorIdentityTransactions(
-      domainId: DomainId
-  )(implicit traceContext: TraceContext) = {
+  /** Onboard the mediator operated by this SV to the domain if it is not already initialized.
+    */
+  private def onboardLocalMediator(
+      domainId: DomainId,
+      participantAdminConnection: ParticipantAdminConnection,
+      svConnection: SvConnection,
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info("Adding mediator identity transactions")
     for {
       mediatorId <- mediatorAdminConnection.getMediatorId
@@ -176,41 +170,17 @@ final class LocalDomainNode(
         "mediator",
         domainId,
         mediatorId.uid,
+        participantAdminConnection,
         identity,
       )
-    } yield ()
-  }
-
-  /** Onboard the mediator operated by this SV to the domain if it is not already initialized.
-    */
-  private def initializeLocalMediator(
-      domainId: DomainId
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    for {
-      mediatorId <- mediatorAdminConnection.getMediatorId
-      _ <- retryProvider.waitUntil(
+      _ = logger.info(s"Onboarding mediator $mediatorId through sponsoring SV")
+      _ <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
-        "Mediator has been granted unlimited traffic",
-        participantAdminConnection
-          .lookupTrafficControlState(
-            domainId,
-            mediatorId,
-          )
-          .map {
-            case None =>
-              throw Status.NOT_FOUND
-                .withDescription(show"No traffic state for mediator $mediatorId")
-                .asRuntimeException
-            case Some(traffic) if traffic.mapping.totalExtraTrafficLimit != PositiveLong.MaxValue =>
-              throw Status.FAILED_PRECONDITION
-                .withDescription(
-                  show"Mediator $mediatorId does not have unlimited traffic limit, current limit: ${traffic.mapping.totalExtraTrafficLimit}"
-                )
-                .asRuntimeException()
-            case _ => ()
-          },
+        "Onboarding mediator through sponsoring SV",
+        svConnection.onboardSvMediator(mediatorId),
         logger,
       )
+      _ = logger.info(s"Onboarded mediator $mediatorId")
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
         "local sequencer observes mediator as onboarded",
@@ -273,6 +243,7 @@ final class LocalDomainNode(
   def addLocalSequencerIdentityIfRequired(
       domainAlias: DomainAlias,
       domainId: DomainId,
+      participantAdminConnection: ParticipantAdminConnection,
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
       .getValueWithRetries(
@@ -287,6 +258,7 @@ final class LocalDomainNode(
           addLocalSequencerIdentity(
             domainAlias,
             domainId,
+            participantAdminConnection,
           )
         case Right(NodeStatus.Success(_)) =>
           logger.info("Sequencer identity is already added")
@@ -296,6 +268,7 @@ final class LocalDomainNode(
   private def addLocalSequencerIdentity(
       domainAlias: DomainAlias,
       domainId: DomainId,
+      participantAdminConnection: ParticipantAdminConnection,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(
       s"Adding sequencer identity transactions for domain ${domainAlias.toProtoPrimitive}"
@@ -307,6 +280,7 @@ final class LocalDomainNode(
         "sequencer",
         domainId,
         sequencerId.uid,
+        participantAdminConnection,
         identity,
       )
     } yield ()

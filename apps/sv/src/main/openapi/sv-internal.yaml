@@ -519,6 +519,22 @@ paths:
                 "$ref": "#/components/schemas/OnboardSvSequencerResponse"
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
+  /v0/onboard/sv/mediator:
+    post:
+      tags: [sv]
+      x-jvm-package: sv
+      operationId: "onboardSvMediator"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardSvMediatorRequest"
+      responses:
+        "200":
+          description: ok
+        "400":
+          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
   /v0/devnet/onboard/validator/prepare:
     post:
       tags: [sv]
