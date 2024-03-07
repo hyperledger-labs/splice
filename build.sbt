@@ -1545,11 +1545,6 @@ printTests := {
       "test-full-class-names-frontend-sim-time.log",
       (t: String) => isTimeBasedTest(t) && isFrontEndTest(t),
     ),
-    (
-      "disaster recovery tests",
-      "test-full-class-names-disaster-recovery.log",
-      (t: String) => !isTimeBasedTest(t) && isDisasterRecoveryTest(t),
-    ),
   )
 
   val rulesWithOpenFiles = testSplitRules.map { case (t, fileName, p) =>

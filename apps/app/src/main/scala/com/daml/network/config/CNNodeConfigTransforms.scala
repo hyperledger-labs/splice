@@ -430,6 +430,12 @@ object CNNodeConfigTransforms {
     Port.tryCreate((range * 1000) + port.unwrap % 1000)
   }
 
+  private def setPortPrefixInUrl(range: Int): String => String = { s =>
+    val uri = Uri(s)
+    val port = uri.effectivePort
+    uri.withPort((range * 1000) + port % 1000).toString()
+  }
+
   def setSomeSvAppPortsPrefix(range: Int, svApps: Seq[String]): CNNodeConfigTransform = {
     updateAllSvAppConfigs((name, config) => {
       if (svApps.contains(name)) {
@@ -445,6 +451,8 @@ object CNNodeConfigTransforms {
               .modify(setPortPrefix(range))
               .focus(_.sequencer.adminApi.port)
               .modify(setPortPrefix(range))
+              .focus(_.sequencer.externalPublicApiUrl)
+              .modify(setPortPrefixInUrl(range))
               .focus(_.mediator.adminApi.port)
               .modify(setPortPrefix(range))
           }))

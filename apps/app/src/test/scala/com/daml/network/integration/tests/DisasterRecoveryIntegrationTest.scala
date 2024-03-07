@@ -27,7 +27,6 @@ import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{NonNegativeDuration, ProcessingTimeout}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import io.circe.syntax.EncoderOps
@@ -37,7 +36,7 @@ import org.slf4j.event.Level
 import java.nio.file.{Files, Path}
 import java.time.Instant
 import scala.concurrent.duration.*
-import scala.util.{Failure, Success, Try, Using}
+import scala.util.Using
 
 class DisasterRecoveryIntegrationTest
     extends CNNodeIntegrationTest
@@ -228,17 +227,18 @@ class DisasterRecoveryIntegrationTest
 
         // In a real disaster, we would find the available ACS timestamp from each SV, and take the
         // minimum on a majority of SVs, but here we want to make sure all SVs have the tap in their
-        // ACS, so we wait until they all have "now" available.
+        // ACS, so we just make sure that the timestamp right after the tap that we want to retain is
+        // available on the SV participants.
         val timestampBeforeDisaster = Instant.now()
-        waitForSvParticipantsToCatchup(timestampBeforeDisaster)
 
         // Tap some more coin and wait for SVs to see it (even though we're going to recover to a point before it)
         sv1WalletClient.tap(1338)
-        waitForSvParticipantsToCatchup(Instant.now())
+        val timestampAfterLostTap = Instant.now()
 
         // Tap yet more coin without waiting for it to necessarily be ingested on all SVs
         sv1WalletClient.tap(1339)
 
+        waitForSvParticipantsToCatchup(timestampAfterLostTap)
         (identities, timestampBeforeDisaster)
       }
 
@@ -333,24 +333,14 @@ class DisasterRecoveryIntegrationTest
     }
   }
 
-  private def getAvailableACSTimestamp(svBackend: SvAppBackendReference, time: Instant): Instant = {
-    Try(svBackend.getDomainDataSnapshot(time)) match {
-      case Success(_) => time
-      case Failure(_: CommandFailure) =>
-        getAvailableACSTimestamp(svBackend, time.minusSeconds(5))
-      case Failure(ex) =>
-        throw ex
-    }
-  }
-
   private def waitForSvParticipantsToCatchup(timestamp: Instant)(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
-    eventually() {
+    clue(s"Waiting for all SVs participants to be caught up to ${timestamp}") {
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(svBackend =>
-        getAvailableACSTimestamp(svBackend, Instant.now()).isAfter(timestamp) should be(
-          true
-        ) withClue "SV participant should be caught up"
+        eventuallySucceeds() {
+          svBackend.getDomainDataSnapshot(timestamp)
+        }
       )
     }
   }
