@@ -183,7 +183,8 @@ abstract class HttpAppConnection(
     } yield {
       logger.debug(s"Found app version: $versionInfo")(TraceContext.empty)
       val myVersion = BuildInfo.compiledVersion
-      if (versionInfo.version != myVersion) {
+      val compatibleVersion = BuildInfo.compatibleVersion
+      if (versionInfo.version != myVersion && versionInfo.version != compatibleVersion) {
         val errorMsg = s"Version mismatch detected, please download the latest bundle. " +
           s"Your executable is on $myVersion, while the application you are connecting to is on ${versionInfo.version}"
         if (config.failOnVersionMismatch)
@@ -192,7 +193,7 @@ abstract class HttpAppConnection(
           logger.error(errorMsg)(TraceContext.empty)
       } else {
         logger.debug(
-          s"Version verification passed for $serviceName, server is on the same version as mine: ${versionInfo}"
+          s"Version verification passed for $serviceName, server is on the same version as mine, or a compatible one: ${versionInfo}"
         )(
           TraceContext.empty
         )

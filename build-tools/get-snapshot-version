@@ -1,10 +1,16 @@
 #! /usr/bin/env bash
 
+if [ $# -eq 1 ]; then
+    OVERRIDE_VERSION=$1
+fi
+
 # Default to OVERRIDE_VERSION=latest_snapshot_tag for deployment branches
 branch=${CIRCLE_BRANCH:-""}
 if [[ $branch == deployment/* && -z ${OVERRIDE_VERSION-} ]]; then
     OVERRIDE_VERSION="latest_snapshot_tag"
 fi
+
+sha=$(git rev-parse HEAD)
 
 # Overriding the version is useful when patching a deployment branch for an already deployed cluster
 # (see https://github.com/DACH-NY/canton-network-node/blob/main/cluster/README.md#patching-healthchecks-against-a-deployed-cluster)
@@ -13,26 +19,34 @@ fi
 # - deployed_cluster_version - use the version presently deployed on the current cluster (requires VPN access and assumes GCP_CLUSTER_BASENAME is set)
 #     Can be used for preflights on CI but not for SV runbook re-deployments since that workflow does not connect to the VPN.
 # - an explicit snapshot version string eg. 0.1.1-snapshot.20240111.4526.0.v552e1828 (useful for testing)
+# - latest_main - use the latest snapshot tag on the main branch (useful for testing upgrades)
 if [ -n "${OVERRIDE_VERSION-}" ]; then
     if [[ "${OVERRIDE_VERSION}" == "latest_snapshot_tag" ]]; then
         git describe --tags --match "*-snapshot.*" --abbrev=0 HEAD
+        exit 0
     elif [[ "${OVERRIDE_VERSION}" == "deployed_cluster_version" ]]; then
         # Cache the deployed cluster version so we don't make repeated network requests
         if [ ! -f "${REPO_ROOT}/deployed_cluster_version" ]; then
             "${REPO_ROOT}"/scripts/fetch-cluster-version.sh > "${REPO_ROOT}/deployed_cluster_version"
         fi
         cat "${REPO_ROOT}/deployed_cluster_version"
+        exit 0
     elif [[ "${OVERRIDE_VERSION}" =~ ^[0-9.]*-snapshot[0-9.]*v[0-9a-z]* ]]; then
         echo "${OVERRIDE_VERSION}"
+        exit 0
+    elif [[ "${OVERRIDE_VERSION}" == "latest_main" ]]; then
+        sha=$(get-latest-main-commit)
+        CNCLUSTER_STATIC_DIRTY_VERSION=""
+        CI=1
+        export ignore_dirty=1
     else
         >&2 echo "Invalid OVERRIDE_VERSION: ${OVERRIDE_VERSION}"
+        exit 1
     fi
-    exit 0
 fi
 
 prefix=$(<"${REPO_ROOT}"/HELM_CHART_VERSION)
 
-sha=$(git rev-parse HEAD)
 commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
 number_of_commits=$(git rev-list --count "$sha")
 commit_sha_8=$(git log -n1 --format=%h --abbrev=8 "$sha")
@@ -50,7 +64,7 @@ if [ -z "${CI}" ]; then
     user_suffix="-${USER}"
 fi
 
-if [[ $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
+if ! (env-bool ignore_dirty) && [[  $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
     if [ -z "${CI}" ]; then
         dirty_suffix="-dirty"
     else

@@ -76,9 +76,12 @@ jobs:
         type: integer
       resource_class:
         type: string
-      with_bundle:
-        type: boolean
-        default: false
+      skip_if_regex:
+        type: string
+        default: ""
+      skip_if_files_changed:
+        type: string
+        default: ""
     resource_class: << parameters.resource_class >>
     environment:
       <<: *env
@@ -90,6 +93,34 @@ jobs:
     parallelism: << parameters.parallelism >>
     steps:
       - checkout_with_retry
+      - when:
+          condition:
+            not:
+              equal: [ "", "<< parameters.skip_if_regex >>" ]
+          steps:
+            - run:
+                name: Checking git commit against regex << parameters.skip_if_regex >>
+                command: |
+                  base=$(build-tools/get-latest-main-commit)
+                  msg=$(git log "$base"..HEAD --pretty=%B)
+                  if [[ $msg =~ << parameters.skip_if_regex >> ]]; then
+                    echo "Commit message ($msg) matches regex (<< parameters.skip_if_regex >>), breaking"
+                    circleci-agent step halt
+                  fi
+      - when:
+          condition:
+            not:
+              equal: [ "", "<< parameters.skip_if_files_changed >>" ]
+          steps:
+            - run:
+                name: "Checking changed files against list: << parameters.skip_if_files_changed >>"
+                command: |
+                  base=$(build-tools/get-latest-main-commit)
+                  changed=$(git diff --name-only $base -- << parameters.skip_if_files_changed >>)
+                  if [ -n "$changed" ]; then
+                    echo "Lock files changed ($changed), breaking"
+                    circleci-agent step halt
+                  fi
       - setup_sbt_test_job
       # Used to pull docker images for cometbft
       - docker_login_artifactory
@@ -107,7 +138,6 @@ jobs:
           pre_sbt_cmd: << parameters.pre_sbt_cmd >>
           post_sbt_cmd: << parameters.post_sbt_cmd >>
           start_canton_options: << parameters.start_canton_options >>
-          with_bundle: << parameters.with_bundle >>
       - stop_canton
       - cleanup_sbt_test_job
 

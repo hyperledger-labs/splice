@@ -56,6 +56,7 @@
       - [Handling Errors in Integration Tests](#handling-errors-in-integration-tests)
     - [Testing CircleCI Deployment Config Changes](#testing-circleci-deployment-config-changes)
     - [Connecting external tools to the shared Canton instances](#connecting-external-tools-to-the-shared-canton-instances)
+    - [Testing App Upgrades](#testing-app-upgrades)
   - [Building and Running the Wallet and Splitwell Apps](#building-and-running-the-wallet-and-splitwell-apps)
     - [Building the Wallet and Splitwell Frontend](#building-the-wallet-and-splitwell-frontend)
     - [Running the Wallet and Splitwell Frontend](#running-the-wallet-and-splitwell-frontend)
@@ -1059,6 +1060,18 @@ run
 ```
 and point your tool to the displayed URL.
 Set the client id to the desired ledger API user name, and use an arbitrary value for the client secret.
+
+### Testing App Upgrades
+
+Upgrades of the CN apps are tested automatically in CI using AppUpgradeIntegrationTest.
+
+- Every PR is tested for upgrade from the commit in `main` from which it branched
+- Every commit to `main` is tested for upgrade from the previous commit
+
+PRs/commits that include `[breaking]` in their commit message, or that make Daml changes or bump the Canton binary are excluded from this test.
+
+The test spins up a full network in the source version, creates some activity, then gradually upgrades several of the components (SVs and validators)
+one-by-one to the current commit's version.
 
 ## Building and Running the Wallet and Splitwell Apps
 

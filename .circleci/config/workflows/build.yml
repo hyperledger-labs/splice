@@ -137,7 +137,8 @@ workflow:
           start_canton_options: "-w"
           resource_class: "xlarge"
           parallelism: 1
-          with_bundle: true
+          skip_if_regex: "\\[breaking\\]"
+          skip_if_files_changed: "daml/dars.lock nix/canton-sources.json"
       - ui_test:
           <<: *notify-fail
           context:

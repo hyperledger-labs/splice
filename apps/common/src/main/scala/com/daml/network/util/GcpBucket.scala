@@ -53,7 +53,7 @@ class GcpBucket(config: GcpBucketConfig, override val loggerFactory: NamedLogger
     blobs.result()
   }
 
-  private def readBytesFromBucket(fileName: String): Array[Byte] = {
+  def readBytesFromBucket(fileName: String): Array[Byte] = {
     val blobId = BlobId.of(config.bucketName, fileName)
     val blob = storage.get(blobId)
     blob.getContent()
