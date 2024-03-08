@@ -655,6 +655,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           filterNot Set(
             cc.coin.SvcReward.COMPANION, // TODO (#7210)
             cnw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
+            cc.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
           )
           map (c(_)): _*
       )

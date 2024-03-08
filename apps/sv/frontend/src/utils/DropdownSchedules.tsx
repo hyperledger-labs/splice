@@ -5,7 +5,7 @@ import React, { useState } from 'react';
 
 import { NativeSelect, Stack } from '@mui/material';
 
-import { Tuple2 } from '@daml.js/202599a30d109125440918fdd6cd5f35c9e76175ef43fa5c9d6d9fd1eb7b66ff/lib/DA/Types';
+import { Tuple2 } from '@daml.js/26b14ad5a8a2ed45d75e3c774aeb1c41a918ef2f4a7d2bd40f9716f26c46bfdf/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin/lib/CC/CoinConfig';
 
 dayjs.extend(utc);
