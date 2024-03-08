@@ -181,6 +181,7 @@ object CNNodeConfigTransforms {
       useSelfSignedTokensForLedgerApiAuth("test"),
       reducePollingInterval,
       withPauseSvDomainComponentsOffboardingTriggers(),
+      disableOnboardingParticipantPromotionDelay(),
     )
   }
 
@@ -240,6 +241,9 @@ object CNNodeConfigTransforms {
       cantonConfig
         .focus(_.scanApps)
         .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
+
+  private def disableOnboardingParticipantPromotionDelay(): CNNodeConfigTransform =
+    updateAllSvAppConfigs_(c => c.focus(_.enableOnboardingParticipantPromotionDelay).replace(false))
 
   private def updateAllValidatorAppConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig

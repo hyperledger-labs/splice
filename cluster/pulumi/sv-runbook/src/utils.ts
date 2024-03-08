@@ -1,4 +1,4 @@
-import { isDevNet, requireEnv } from 'cn-pulumi-common';
+import { envFlag, isDevNet, requireEnv } from 'cn-pulumi-common';
 
 export const CLUSTER_BASENAME = requireEnv(
   'GCP_CLUSTER_BASENAME',
@@ -10,6 +10,11 @@ export const TARGET_CLUSTER = requireEnv(
 );
 export const SV_NAME = 'DA-Helm-Test-Node';
 export const SV_NAMESPACE = 'sv';
+
+export const ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY = envFlag(
+  'ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY',
+  true
+);
 
 export const version = process.env.CHARTS_VERSION;
 export const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)

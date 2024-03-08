@@ -120,6 +120,8 @@ export async function installNode(
       svKey,
       onboardingName: svAppConfig.onboardingName,
       validatorWalletUserName: validatorAppConfig.walletUserName,
+      enableOnboardingParticipantPromotionDelay:
+        svAppConfig.enableOnboardingParticipantPromotionDelay,
     },
     resolveValidator1PartyId
   );
@@ -161,6 +163,7 @@ type SvConfig = {
   svKey: CnInput<SvIdKey>;
   onboardingName: string;
   validatorWalletUserName: string;
+  enableOnboardingParticipantPromotionDelay: boolean;
 };
 
 async function installSvAndValidator(

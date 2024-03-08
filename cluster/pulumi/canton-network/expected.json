@@ -2283,6 +2283,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global"
         },
+        "enableOnboardingParticipantPromotionDelay": true,
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",
@@ -3221,6 +3222,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-2.svc.mock.network.canton.global"
         },
+        "enableOnboardingParticipantPromotionDelay": true,
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -4130,6 +4132,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-3.svc.mock.network.canton.global"
         },
+        "enableOnboardingParticipantPromotionDelay": true,
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -5039,6 +5042,7 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-4.svc.mock.network.canton.global"
         },
+        "enableOnboardingParticipantPromotionDelay": true,
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",

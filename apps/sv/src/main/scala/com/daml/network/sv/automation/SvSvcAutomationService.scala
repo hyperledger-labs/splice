@@ -238,6 +238,7 @@ class SvSvcAutomationService(
         onboardingTriggerContext,
         svcStore,
         participantAdminConnection,
+        config.enableOnboardingParticipantPromotionDelay,
       )
     )
     registerTrigger(

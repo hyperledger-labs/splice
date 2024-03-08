@@ -210,6 +210,9 @@ spec:
             - name: ADDITIONAL_CONFIG_REWARD_ISSUANCE
               value: |
                 canton.sv-apps.sv.automation.use-new-sv-reward-issuance = true
+            - name: ADDITIONAL_CONFIG_ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY
+              value: |
+                canton.sv-apps.sv.enable-onboarding-participant-promotion-delay = {{ .Values.enableOnboardingParticipantPromotionDelay }}
             - name: ADDITIONAL_CONFIG_EXTRA_BENEFICIARIES
               value: |
                 canton.sv-apps.sv.extra-beneficiaries = {

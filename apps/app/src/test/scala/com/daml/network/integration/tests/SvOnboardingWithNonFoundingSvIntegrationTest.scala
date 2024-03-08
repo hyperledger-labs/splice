@@ -30,6 +30,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .withPreSetup(_ => ())
+      .withOnboardingParticipantPromotionDelayEnabled() // Test onboarding with participant promotion delay
       .addConfigTransformsToFront(
         (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(22_000)(conf),
         (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),

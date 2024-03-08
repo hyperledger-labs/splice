@@ -2,13 +2,19 @@ import * as pulumi from '@pulumi/pulumi';
 import { Auth0ClusterConfig, Auth0Fetch, infraStack, requireEnv } from 'cn-pulumi-common';
 
 import { installNode } from './installNode';
-import { SV_NAME, SV_NAMESPACE, validatorWalletUserName } from './utils';
+import {
+  SV_NAME,
+  SV_NAMESPACE,
+  ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY,
+  validatorWalletUserName,
+} from './utils';
 
 async function auth0CacheAndInstallNode(auth0Fetch: Auth0Fetch) {
   await auth0Fetch.loadAuth0Cache();
 
   const svAppConfig = {
     onboardingName: SV_NAME,
+    enableOnboardingParticipantPromotionDelay: ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY,
   };
   const validatorAppConfig = {
     walletUserName: validatorWalletUserName,

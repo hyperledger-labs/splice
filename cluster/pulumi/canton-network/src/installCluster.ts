@@ -41,6 +41,11 @@ const splitPostgresInstances = envFlag('SPLIT_POSTGRES_INSTANCES') || envFlag('E
 
 const enableChaosMesh = envFlag('ENABLE_CHAOS_MESH');
 
+const enableOnboardingParticipantPromotionDelay = envFlag(
+  'ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY',
+  true
+);
+
 type BootstrapCliConfig = {
   cluster: string;
   date: string;
@@ -151,6 +156,7 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
     sequencerPruningConfig,
     globalDomainUpgradeConfig,
     onboardingPollingInterval: svOnboardingPollingInterval,
+    enableOnboardingParticipantPromotionDelay: enableOnboardingParticipantPromotionDelay,
   });
 
   const allSvs = await svc.allSvs;

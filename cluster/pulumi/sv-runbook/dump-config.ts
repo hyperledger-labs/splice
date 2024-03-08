@@ -52,6 +52,7 @@ async function main() {
   };
   const svAppConfig = {
     onboardingName: utils.SV_NAME,
+    enableOnboardingParticipantPromotionDelay: true,
   };
   const validatorAppConfig = {
     walletUserName: utils.validatorWalletUserName,

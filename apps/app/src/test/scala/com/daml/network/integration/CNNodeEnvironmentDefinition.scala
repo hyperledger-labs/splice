@@ -215,6 +215,14 @@ case class CNNodeEnvironmentDefinition(
       )(config)
     )
 
+  def withOnboardingParticipantPromotionDelayEnabled(): CNNodeEnvironmentDefinition = {
+    addConfigTransform((_, config) =>
+      CNNodeConfigTransforms.updateAllSvAppConfigs_(c =>
+        c.focus(_.enableOnboardingParticipantPromotionDelay).replace(true)
+      )(config)
+    )
+  }
+
   def clearConfigTransforms(): CNNodeEnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
 
@@ -364,4 +372,5 @@ object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
       validator.config.ledgerApiUser,
       validator.participantClientWithAdminToken,
     )
+
 }

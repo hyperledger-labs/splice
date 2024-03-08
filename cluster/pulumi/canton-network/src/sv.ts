@@ -106,6 +106,7 @@ export interface SvConfig extends StaticSvConfig {
   topupConfig?: ValidatorTopupConfig;
   sequencerPruningConfig: SequencerPruningConfig;
   splitPostgresInstances: boolean;
+  enableOnboardingParticipantPromotionDelay: boolean;
   onboardingPollingInterval?: string;
 }
 
@@ -450,6 +451,7 @@ function installSvApp(
       config.onboarding.type == 'found-collective'
         ? config.onboarding.foundingSvRewardWeightBps
         : undefined,
+    enableOnboardingParticipantPromotionDelay: config.enableOnboardingParticipantPromotionDelay,
     cometBFT: {
       enabled: true,
       connectionUri: pulumi.interpolate`http://${globalDomain.cometbftRpcService.metadata.name}:26657`,

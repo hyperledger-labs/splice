@@ -1828,12 +1828,23 @@ This is currently disabled by default. To enable it, set
 export ENABLE_CHAOS_MESH=1
 ```
 
-## Onboarding polling interval
+## Onboarding
+
+### Polling interval
 
 To speed up SV initialization at the expense of fairly noisy logs you can set this option:
 
 ```
 export SV_ONBOARDING_POLLING_INTERVAL=5s
+```
+
+### Onboarding Participant Promotion Delay (set by default)
+
+To remove the delay added to the trigger that promotes participants to submitter status and respectively updates the Party
+to Participant threshold you can set the following option. This is enabled by default on scratchnets to speed up deployment.
+
+```
+export ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY=false
 ```
 
 ## Appendix: Kubernetes and Other Deployment Resources
