@@ -31,10 +31,9 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
-      .simpleTopology1Sv(this.getClass.getSimpleName)
+      .simpleTopology4Svs(this.getClass.getSimpleName)
       .withManualStart
       .withoutInitialManagerApps // TODO (#7539): this should no longer be required once app-instances is removed
-      .withSequencerConnectionsFromScanDisabled() // TODO(#8393) re-enable this when it is more robust to temporary domain disconnects
 
   "start and restart cleanly" in { implicit env =>
     initSvcWithSv1Only()
@@ -66,8 +65,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
   }
 
-  // TODO(#8393) re-enable this test case when it is more robust to temporary domain disconnects
-  "validator apps connect to all SVC sequencers" ignore { implicit env =>
+  "validator apps connect to all SVC sequencers" in { implicit env =>
     initSvc()
     // Start Alice’s validator
     aliceValidatorBackend.startSync()
