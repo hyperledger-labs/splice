@@ -6,7 +6,7 @@ import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.metrics.api.MetricsContext
 import com.daml.network.admin.api.client.commands.HttpCommandException
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{NonNegativeFiniteDuration, ProcessingTimeout}
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{
   FlagCloseable,
@@ -29,6 +29,7 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   TransientErrorKind,
 }
 import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.time.Clock
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 import org.apache.pekko.Done
@@ -145,6 +146,32 @@ final class RetryProvider(
     FutureUnlessShutdown(
       waitUnlessShutdown(waitForSignal.unwrap).onShutdown(UnlessShutdown.AbortedDueToShutdown)
     )
+
+  /** Schedule an action in the future with early termination on shutdown */
+  def scheduleAfterUnlessShutdown[A](
+      action: => Future[A],
+      clock: Clock,
+      delay: NonNegativeFiniteDuration,
+      jitter: Double,
+  )(implicit ec: ExecutionContext): FutureUnlessShutdown[A] = {
+    val pollingIntervalNanos = delay.unwrap.toNanos
+    val jitterNanos: Long =
+      (pollingIntervalNanos * jitter * (math.random() - 0.5)).toLong
+    val delayNanos =
+      (pollingIntervalNanos + jitterNanos).max(0L).min(2L * pollingIntervalNanos)
+    this
+      .waitUnlessShutdown(
+        clock
+          .scheduleAfter(
+            _ => {
+              // No work done here, as we are only interested in the scheduling notification
+              ()
+            },
+            java.time.Duration.ofNanos(delayNanos),
+          )
+      )
+      .flatMap(_ => FutureUnlessShutdown.outcomeF(action))
+  }
 
   /** Wait for a condition to become true with proper logging.
     *

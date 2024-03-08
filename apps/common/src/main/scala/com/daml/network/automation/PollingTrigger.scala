@@ -111,30 +111,15 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
             def exitPollingLoop(): Future[Done] =
               Future.successful(Done)
 
-            def loopWithDelay(newState: PollingTriggerState): Future[Done] = LoggerUtil.logOnThrow {
-              val config = context.config
-              val pollingIntervalNanos = config.pollingInterval.unwrap.toNanos
-              val jitterNanos: Long =
-                (pollingIntervalNanos * config.pollingJitter * (math.random() - 0.5)).toLong
-              val delayNanos =
-                (pollingIntervalNanos + jitterNanos).max(0L).min(2L * pollingIntervalNanos)
-              val continueOrShutdownSignal = context.retryProvider.waitUnlessShutdown(
-                context.pollingClock
-                  .scheduleAfter(
-                    _ => {
-                      // No work done here, as we are only interested in the scheduling notification
-                      ()
-                    },
-                    java.time.Duration.ofNanos(delayNanos),
-                  )
-              )
-              // Continue looping
-              continueOrShutdownSignal.unwrap.flatMap {
-                case UnlessShutdown.AbortedDueToShutdown =>
-                  exitPollingLoop()
-                case UnlessShutdown.Outcome(()) =>
-                  pollingLoop(newState, Future.successful(true))
-              }
+            def loopWithDelay(newState: PollingTriggerState): Future[Done] = {
+              context.retryProvider
+                .scheduleAfterUnlessShutdown(
+                  pollingLoop(newState, Future.successful(true)),
+                  context.pollingClock,
+                  context.config.pollingInterval,
+                  context.config.pollingJitter,
+                )
+                .onShutdown(Done)
             }
 
             // Here we tie the knot and ensure that once the previous iteration completes, we kick off another iteration.

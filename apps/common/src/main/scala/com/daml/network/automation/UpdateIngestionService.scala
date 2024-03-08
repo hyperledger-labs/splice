@@ -2,10 +2,12 @@ package com.daml.network.automation
 
 import org.apache.pekko.stream.Materializer
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
+import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerConnection, CNLedgerSubscription, RetryProvider}
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.store.MultiDomainAcsStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -20,6 +22,8 @@ class UpdateIngestionService(
     ingestionTargetName: String,
     ingestionSink: MultiDomainAcsStore.IngestionSink,
     connection: CNLedgerConnection,
+    config: AutomationConfig,
+    backoffClock: Clock,
     override protected val retryProvider: RetryProvider,
     baseLoggerFactory: NamedLoggerFactory,
     ingestFromParticipantBegin: Boolean,
@@ -27,7 +31,7 @@ class UpdateIngestionService(
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends LedgerIngestionService {
+) extends LedgerIngestionService(config, backoffClock) {
 
   private val filter = ingestionSink.ingestionFilter
 

@@ -1,11 +1,13 @@
 package com.daml.network.automation
 
+import com.daml.network.config.AutomationConfig
 import org.apache.pekko.Done
 import com.daml.network.environment.{CNLedgerSubscription, RetryFor, RetryProvider}
 import com.daml.network.util.HasHealth
-import com.digitalasset.canton.config.{NonNegativeDuration}
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.NamedLogging
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -16,7 +18,10 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Abstract class to share the retry and shutdown logic between different services for ingesting ledger data using
   * a subscription to a Ledger API stream.
   */
-abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: Tracer)
+abstract class LedgerIngestionService(
+    config: AutomationConfig,
+    backoffClock: Clock,
+)(implicit ec: ExecutionContext, tracer: Tracer)
     extends HasHealth
     with FlagCloseableAsync
     with RetryProvider.Has
@@ -52,41 +57,69 @@ abstract class LedgerIngestionService()(implicit ec: ExecutionContext, tracer: T
     withNewTrace("ledger ingestion loop")(implicit traceContext =>
       _ => {
         logger.debug(s"Starting ledger ingestion loop")
-        val retryLoopF = retryProvider
-          .retry(
-            RetryFor.LongRunningAutomation,
-            "ledger ingestion loop", {
-              newLedgerSubscription().flatMap(subscription => {
-                // Smuggle the current subscription out of the body here, so that we can use
-                // runOnShutdown outside to signal the termination via a call to .initiateShutdown().
-                currentSubscription.set(Some(subscription))
-                // The creation of the new subscription races with the call to close the content of `currentSubscription`, which is issued
-                // at most once from outside and might end up closing the previous subscription set in a retry loop.
-                // We resolve that race by checking here whether we are closing, and issuing the call ourselves.
-                if (retryProvider.isClosing) {
-                  logger.debug("detected shutdown, closing subscription")
-                  subscription.initiateShutdown()
-                }
-                // The actual return value of the future being retried is the future inside the CNLedgerConnection,
-                // which signals when the subscription terminated.
-                subscription.completed.map(_ => {
-                  // Defensive programming: resubscribe if the subscription terminates normally, outside of closing
-                  if (!retryProvider.isClosing) {
-                    val msg = "subscription terminated unexpectedly"
-                    logger.error(msg)
-                    throw Status.INTERNAL.withDescription(msg).asRuntimeException
-                  }
-                  Done
-                })
-              })
-            },
-            // couple the lifecycle of retrying to the lifecycle of the UpdateIngestionService
-            logger,
-            // also retry on the INTERNAL error above
-            Seq(Status.Code.INTERNAL),
-          )
+
+        // We use both an infinite loop and retries to ensure we always eventually log an error and
+        // always recover from unexpected errors.
+        def loopUntilShutdown(): Future[Done] =
+          if (retryProvider.isClosing)
+            Future.successful(Done)
+          else {
+            retryProvider
+              .retry(
+                // We use the Automation retry policy here, so that we eventually give up retrying and log an error
+                RetryFor.Automation,
+                "ledger ingestion subscription", {
+                  newLedgerSubscription().flatMap(subscription => {
+                    // Smuggle the current subscription out of the body here, so that we can use
+                    // runOnShutdown outside to signal the termination via a call to .initiateShutdown().
+                    currentSubscription.set(Some(subscription))
+                    // The creation of the new subscription races with the call to close the content of `currentSubscription`, which is issued
+                    // at most once from outside and might end up closing the previous subscription set in a retry loop.
+                    // We resolve that race by checking here whether we are closing, and issuing the call ourselves.
+                    if (retryProvider.isClosing) {
+                      logger.debug(
+                        "detected race between shutdown and subscription creation, closing subscription"
+                      )
+                      subscription.initiateShutdown()
+                    }
+                    // The actual return value of the future being retried is the future inside the CNLedgerConnection,
+                    // which signals when the subscription terminated.
+                    subscription.completed.map(_ =>
+                      if (retryProvider.isClosing)
+                        Done // This is the normal path that we hit when we are shutting down.
+                      else {
+                        // Here it looks like the server closed the subscription, which is unexpected.
+                        // We consider it transient error that we want to retry on in the hope of hitting a live server.
+                        throw Status.ABORTED
+                          .withDescription(
+                            "Unexpected closing of subscription, likely due to server shutdown."
+                          )
+                          .asRuntimeException()
+                      }
+                    )
+                  })
+                },
+                logger,
+              )
+              .recoverWith { ex =>
+                // Note: we want the same failure handling as PollingTriggers, and thus reuse their config
+                logger.info(
+                  s"Restarting ledger ingestion loop after ${config.pollingInterval} due to unexpected exception:",
+                  ex,
+                )
+                retryProvider
+                  .scheduleAfterUnlessShutdown(
+                    loopUntilShutdown(),
+                    backoffClock,
+                    config.pollingInterval,
+                    config.pollingJitter,
+                  )
+                  .onShutdown(Done)
+              }
+          }
+
         ingestionLoopTerminatedF.set(
-          retryLoopF.transform(
+          loopUntilShutdown().transform(
             retryProvider.logTerminationAndRecoverOnShutdown("ledger ingestion loop", logger)
           )
         )
