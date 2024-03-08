@@ -22,7 +22,7 @@ import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListOwnerToKeyMappingResult,
   ListSequencerDomainStateResult,
 }
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
 import com.digitalasset.canton.crypto.{Fingerprint, PublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -30,13 +30,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.protocol.DynamicDomainParameters
-import com.digitalasset.canton.time.{
-  Clock,
-  FetchTimeResponse,
-  NonNegativeFiniteDuration,
-  RemoteClock,
-  WallClock,
-}
+import com.digitalasset.canton.time.{Clock, FetchTimeResponse, RemoteClock, WallClock}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
@@ -103,14 +97,21 @@ abstract class TopologyAdminConnection(
 
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean]
 
-  def getDomainTime(domainId: DomainId)(implicit
-      traceContext: TraceContext
-  ): Future[FetchTimeResponse] =
+  /*
+   * @param The maximal time that we allow for the domain time lower-bound to lag wrt our wall-clock when reading it.
+   *  Use this to balance speed of the domain-time lower-bound advancing with the load created on the domain to fetch a
+   *  fresh domain-time proof.
+   */
+  def getDomainTimeLowerBound(
+      domainId: DomainId,
+      maxDomainTimeLag: NonNegativeFiniteDuration,
+  )(implicit traceContext: TraceContext): Future[FetchTimeResponse] =
     runCmd(
       DomainTimeCommands.FetchTime(
         Some(domainId),
-        NonNegativeFiniteDuration.Zero,
-        retryProvider.timeouts.default,
+        freshnessBound =
+          com.digitalasset.canton.time.NonNegativeFiniteDuration.fromConfig(maxDomainTimeLag),
+        timeout = retryProvider.timeouts.default,
       )
     )
 

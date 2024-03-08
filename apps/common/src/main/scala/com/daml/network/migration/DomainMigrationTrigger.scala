@@ -42,10 +42,11 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
     (for {
       schedule <- getSchedule
       domainId <- OptionT.liftF(getDomainId()(tc))
-      domainTime <- OptionT.liftF(
-        participantAdminConnection.getDomainTime(domainId)
+      domainTimeLowerBound <- OptionT.liftF(
+        participantAdminConnection
+          .getDomainTimeLowerBound(domainId, maxDomainTimeLag = context.config.pollingInterval)
       )
-      domainTimeIsAfterTheScheduledTime = domainTime.timestamp.toInstant.isAfter(
+      domainTimeIsAfterTheScheduledTime = domainTimeLowerBound.timestamp.toInstant.isAfter(
         schedule.time
       )
       task <-

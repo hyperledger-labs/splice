@@ -45,19 +45,24 @@ class SubmitSvStatusReportTrigger(
       openMiningRounds <- store.getOpenMiningRoundTriple()
       cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
       // TODO(#10297): make this code work properly with multiple mediators in the case of soft-domain migration
-      mediatorDomainTime <- mediatorAdminConnection.traverse(
-        // TODO(#10189): only request a time-proof more recent than the status report interval
-        _.getDomainTime(svcRules.domain)
+      mediatorDomainTimeLb <- mediatorAdminConnection.traverse(
+        _.getDomainTimeLowerBound(
+          svcRules.domain,
+          maxDomainTimeLag = context.config.pollingInterval,
+        )
       )
-      participantDomainTime <- participantAdminConnection.getDomainTime(svcRules.domain)
+      participantDomainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
+        svcRules.domain,
+        maxDomainTimeLag = context.config.pollingInterval,
+      )
       now = context.clock.now
       status = new SvStatus(
         now.toInstant,
         // Production deployments always define all of these values, which is why we don't embed the 'Option' value
         // into the status report. We'll only see the magic default values in our tests.
         cometBftHeight.getOrElse[Long](-1L),
-        mediatorDomainTime.fold(CantonTimestamp.MinValue)(_.timestamp).toInstant,
-        participantDomainTime.timestamp.toInstant,
+        mediatorDomainTimeLb.fold(CantonTimestamp.MinValue)(_.timestamp).toInstant,
+        participantDomainTimeLb.timestamp.toInstant,
         openMiningRounds.newest.payload.round,
       )
       cmd = svcRules.exercise(

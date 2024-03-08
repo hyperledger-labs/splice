@@ -14,7 +14,7 @@ package object singlesv {
   def getAvailableSequencerConfigFromSvcRules(
       svParty: PartyId,
       svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
-      time: Instant,
+      domainTimeLowerBound: Instant,
       globalDomainId: DomainId,
       migrationId: Long,
   ): Option[SequencerConfig] = for {
@@ -22,6 +22,6 @@ package object singlesv {
     domainNodeConfig <- memberInfo.domainNodes.asScala.get(globalDomainId.toProtoPrimitive)
     sequencerConfig <- domainNodeConfig.sequencer.toScala
     if sequencerConfig.migrationId == migrationId && sequencerConfig.url.nonEmpty && sequencerConfig.availableAfter.toScala
-      .exists(availableAfter => time.isAfter(availableAfter))
+      .exists(availableAfter => domainTimeLowerBound.isAfter(availableAfter))
   } yield sequencerConfig
 }

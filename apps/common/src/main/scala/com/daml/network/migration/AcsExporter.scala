@@ -7,6 +7,7 @@ import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.migration.AcsExporter.AcsExportFailure
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.topology.transaction.DomainParametersStateX
 import com.digitalasset.canton.tracing.TraceContext
@@ -126,13 +127,17 @@ class AcsExporter(
           RetryFor.WaitingOnInitDependency,
           "wait for mediator and participant response time after domain is paused",
           participantAdminConnection
-            .getDomainTime(domainId)
+            // This is an interactive call, and we'd rather not wait a full polling interval for it.
+            .getDomainTimeLowerBound(
+              domainId,
+              maxDomainTimeLag = NonNegativeFiniteDuration.ofSeconds(1),
+            )
             .map(domainTimeResponse => {
-              val domainTime = domainTimeResponse.timestamp.toInstant
-              if (domainTime.isBefore(readyForDumpAfter)) {
+              val domainTimeLowerBound = domainTimeResponse.timestamp.toInstant
+              if (domainTimeLowerBound.isBefore(readyForDumpAfter)) {
                 throw Status.FAILED_PRECONDITION
                   .withDescription(
-                    s"we should wait until $readyForDumpAfter to let all participants catch up with the paused domain state. Current domain time is $domainTime"
+                    s"we should wait until $readyForDumpAfter to let all participants catch up with the paused domain state. Current domain time is $domainTimeLowerBound"
                   )
                   .asRuntimeException()
               }
