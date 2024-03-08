@@ -126,7 +126,7 @@ class AcsExporter(
           RetryFor.WaitingOnInitDependency,
           "wait for mediator and participant response time after domain is paused",
           participantAdminConnection
-            .getDomainTime(domainId, retryProvider.timeouts.default)
+            .getDomainTime(domainId)
             .map(domainTimeResponse => {
               val domainTime = domainTimeResponse.timestamp.toInstant
               if (domainTime.isBefore(readyForDumpAfter)) {

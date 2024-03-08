@@ -22,7 +22,7 @@ import com.digitalasset.canton.admin.api.client.data.topologyx.{
   ListOwnerToKeyMappingResult,
   ListSequencerDomainStateResult,
 }
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeDuration}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
 import com.digitalasset.canton.crypto.{Fingerprint, PublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -103,14 +103,14 @@ abstract class TopologyAdminConnection(
 
   def isNodeInitialized()(implicit traceContext: TraceContext): Future[Boolean]
 
-  def getDomainTime(domainId: DomainId, timeout: NonNegativeDuration)(implicit
+  def getDomainTime(domainId: DomainId)(implicit
       traceContext: TraceContext
   ): Future[FetchTimeResponse] =
     runCmd(
       DomainTimeCommands.FetchTime(
         Some(domainId),
         NonNegativeFiniteDuration.Zero,
-        timeout,
+        retryProvider.timeouts.default,
       )
     )
 

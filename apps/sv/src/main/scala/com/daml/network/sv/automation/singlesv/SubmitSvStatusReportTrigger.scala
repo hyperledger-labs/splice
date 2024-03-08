@@ -47,12 +47,9 @@ class SubmitSvStatusReportTrigger(
       // TODO(#10297): make this code work properly with multiple mediators in the case of soft-domain migration
       mediatorDomainTime <- mediatorAdminConnection.traverse(
         // TODO(#10189): only request a time-proof more recent than the status report interval
-        _.getDomainTime(svcRules.domain, timeouts.shutdownShort)
+        _.getDomainTime(svcRules.domain)
       )
-      participantDomainTime <- participantAdminConnection.getDomainTime(
-        svcRules.domain,
-        timeouts.shutdownShort,
-      )
+      participantDomainTime <- participantAdminConnection.getDomainTime(svcRules.domain)
       now = context.clock.now
       status = new SvStatus(
         now.toInstant,

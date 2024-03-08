@@ -36,7 +36,7 @@ class ReconcileSequencerConnectionsTrigger(
     for {
       globalDomain <- coinRulesDomain()
       maybeDomainTime <- participantAdminConnection
-        .getDomainTime(globalDomain, timeouts.default)
+        .getDomainTime(globalDomain)
         .map(domainTime => Some(domainTime.timestamp))
         .recover {
           // Time tracker for domain not found. the domainTime is not yet available.

@@ -6,7 +6,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
   StatusAdminCommands,
 }
 import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeDuration}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -433,12 +433,12 @@ class ParticipantAdminConnection(
       )
     } yield ()
 
-  def getDomainTime(domainAlias: DomainAlias, timeout: NonNegativeDuration)(implicit
+  def getDomainTime(domainAlias: DomainAlias)(implicit
       traceContext: TraceContext
   ): Future[FetchTimeResponse] = {
     for {
       domainId <- getDomainId(domainAlias)
-      res <- getDomainTime(domainId, timeout)
+      res <- getDomainTime(domainId)
     } yield res
   }
 

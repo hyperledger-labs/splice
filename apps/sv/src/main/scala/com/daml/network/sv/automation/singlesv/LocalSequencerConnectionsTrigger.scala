@@ -34,7 +34,7 @@ class LocalSequencerConnectionsTrigger(
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
       svcRules <- store.getSvcRules()
-      domainTime <- participantAdminConnection.getDomainTime(globalDomainAlias, timeouts.default)
+      domainTime <- participantAdminConnection.getDomainTime(globalDomainAlias)
       globalDomainId <- store.getCoinRulesDomain()(traceContext)
       svcRulesActiveSequencerConfig = getAvailableSequencerConfigFromSvcRules(
         svParty,
