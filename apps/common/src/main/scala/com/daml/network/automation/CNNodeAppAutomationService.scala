@@ -59,7 +59,7 @@ abstract class CNNodeAppAutomationService[Store <: CNNodeAppStore[?]](
   store.updateHistory.foreach(history =>
     registerService(
       new UpdateIngestionService(
-        store.getClass.getSimpleName,
+        store.updateHistory.getClass.getSimpleName,
         history.ingestionSink,
         connection,
         triggerContext.retryProvider,

@@ -21,7 +21,7 @@ import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.{ExecutionContext, Future, blocking}
 
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
@@ -53,6 +53,41 @@ class UserWalletManager(
   private[this] val endUserWalletsMap
       : scala.collection.concurrent.Map[String, (RetryProvider, UserWalletService)] =
     TrieMap.empty
+
+  private[this] def removeEndUserWallet(
+      endUserName: String
+  ): Option[(RetryProvider, UserWalletService)] =
+    blocking {
+      this.synchronized {
+        endUserWalletsMap.remove(endUserName)
+      }
+    }
+
+  // Note: putIfAbsent() eagerly evaluates the value to be inserted, but we only want to start
+  // the new service if there is no existing service for the user yet.
+  // Accessing a concurrent map while modifying it is safe, so we only need to synchronize adding
+  // and removing users.
+  private[this] def addEndUserWallet(
+      endUserName: String,
+      endUserParty: PartyId,
+      createWallet: (String, PartyId) => (RetryProvider, UserWalletService),
+  ): Option[(RetryProvider, UserWalletService)] = blocking {
+    this.synchronized {
+      if (endUserWalletsMap.contains(endUserName)) {
+        logger.debug(
+          show"Wallet for user ${endUserName.singleQuoted} already exists, not creating a new one."
+        )(TraceContext.empty)
+        None
+      } else {
+        logger.debug(
+          show"Creating wallet service and retry provider for user ${endUserName.singleQuoted}."
+        )(TraceContext.empty)
+        val endUserWallet = createWallet(endUserName, endUserParty)
+        endUserWalletsMap.put(endUserName, endUserWallet): Unit
+        Some(endUserWallet)
+      }
+    }
+  }
 
   retryProvider.runOnShutdownWithPriority_(new RunOnShutdown {
     override def name = s"set per-user retry providers as closed"
@@ -100,63 +135,66 @@ class UserWalletManager(
     } else {
       val endUserName = install.payload.endUserName
       val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
-      val key =
-        UserWalletStore.Key(
-          svcParty = store.walletKey.svcParty,
-          store.walletKey.validatorParty,
-          endUserName,
-          endUserParty,
-        )
-      val userLoggerFactory = loggerFactory.append("user", key.endUserName)
-      // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
-      // without the entire node going down.
-      val userRetryProvider =
-        RetryProvider(
-          userLoggerFactory,
-          retryProvider.timeouts,
-          retryProvider.futureSupervisor,
-          retryProvider.metricsFactory,
-        )
-      val walletService = new UserWalletService(
-        ledgerClient,
-        participantAdminConnection,
-        key,
-        this,
-        automationConfig,
-        clock,
-        treasuryConfig,
-        storage,
-        userRetryProvider,
-        userLoggerFactory,
-        scanConnection,
-        domainMigrationId,
-        ingestFromParticipantBegin,
-      )
 
-      val wasUserAdded = endUserWalletsMap
-        .putIfAbsent(endUserName, (userRetryProvider, walletService))
-        .fold(true)(_ => {
-          // User was already there, close the newly created wallet.
-          userRetryProvider.close()
-          walletService.close()
-          false
-        })
+      val userRetryProviderAndWalletService =
+        addEndUserWallet(endUserName, endUserParty, createEndUserWallet)
+
       // There might have been a concurrent call to .close() that missed the above addition of this user
       if (retryProvider.isClosing) {
         logger.debug(
           show"Detected race between adding wallet for user ${endUserName.singleQuoted} and shutdown: closing wallet."
         )(TraceContext.empty)
-        userRetryProvider.close()
-        walletService.close()
+        userRetryProviderAndWalletService.foreach { case (userRetryProvider, walletService) =>
+          userRetryProvider.close()
+          walletService.close()
+        }
         UnlessShutdown.AbortedDueToShutdown
       } else {
-        UnlessShutdown.Outcome(wasUserAdded)
+        UnlessShutdown.Outcome(userRetryProviderAndWalletService.isDefined)
       }
     }
   }
 
+  private def createEndUserWallet(
+      endUserName: String,
+      endUserParty: PartyId,
+  ): (RetryProvider, UserWalletService) = {
+    val key = UserWalletStore.Key(
+      svcParty = store.walletKey.svcParty,
+      store.walletKey.validatorParty,
+      endUserName,
+      endUserParty,
+    )
+    val userLoggerFactory = loggerFactory.append("user", key.endUserName)
+    // We allocate a separate retry provider per user, since users can also be offboarded (thus their service closed)
+    // without the entire node going down.
+    val userRetryProvider =
+      RetryProvider(
+        userLoggerFactory,
+        retryProvider.timeouts,
+        retryProvider.futureSupervisor,
+        retryProvider.metricsFactory,
+      )
+    val walletService = new UserWalletService(
+      ledgerClient,
+      participantAdminConnection,
+      key,
+      this,
+      automationConfig,
+      clock,
+      treasuryConfig,
+      storage,
+      userRetryProvider,
+      userLoggerFactory,
+      scanConnection,
+      domainMigrationId,
+      ingestFromParticipantBegin,
+    )
+    (userRetryProvider, walletService)
+  }
+
   def offboardUser(username: String): Unit = {
-    endUserWalletsMap.remove(username) match {
+    removeEndUserWallet(username) match {
       case None =>
         throw Status.NOT_FOUND
           .withDescription(s"No wallet service found for user ${username}")

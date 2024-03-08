@@ -186,6 +186,7 @@ final class UpdateHistory(
       val action = readOffset()
         .flatMap({
           case None =>
+            logger.debug(s"History $historyId ingesting None => $offset")
             ingestUpdate_(update).andThen(updateOffset(offset))
           case Some(lastIngestedOffset) =>
             if (offset <= lastIngestedOffset) {
@@ -194,6 +195,7 @@ final class UpdateHistory(
               )
               DBIO.successful(())
             } else {
+              logger.debug(s"History $historyId ingesting $lastIngestedOffset => $offset")
               ingestUpdate_(update).andThen(updateOffset(offset))
             }
         })
