@@ -110,6 +110,14 @@ abstract class ValidatorAppReference(
     }
   }
 
+  def globalDomainConnectionConfig(): definitions.GetGlobalDomainConnectionConfigResponse = {
+    consoleEnvironment.run {
+      httpCommand(
+        HttpValidatorAdminAppClient.GetGlobalDomainConnectionConfig()
+      )
+    }
+  }
+
   def registerApp(
       providerUserId: String,
       configuration: definitions.AppConfiguration,

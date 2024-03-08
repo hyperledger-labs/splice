@@ -591,6 +591,7 @@ class ValidatorApp(
           validatorWalletUserName = config.validatorWalletUser,
           getCoinRulesDomain = scanConnection.getCoinRulesDomain,
           participantAdminConnection,
+          config.domains.global.alias,
           retryProvider = retryProvider,
           loggerFactory,
         )

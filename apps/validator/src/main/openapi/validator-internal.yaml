@@ -102,6 +102,19 @@ paths:
               schema:
                 "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/NodeIdentitiesDump"
 
+  /v0/admin/participant/global-domain-connection-config:
+    get:
+      tags: [ validator ]
+      x-jvm-package: validator_admin
+      operationId: "getGlobalDomainConnectionConfig"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetGlobalDomainConnectionConfigResponse"
+
   /v0/app-manager/apps/installed/{provider}/authorize:
     post:
       tags: [app_manager]
@@ -500,6 +513,14 @@ components:
         featured:
           type: boolean
 
+    GetGlobalDomainConnectionConfigResponse:
+      type: object
+      required:
+        - sequencer_connections
+      properties:
+        sequencer_connections:
+          $ref: "#/components/schemas/SequencerConnections"
+
     ListUsersResponse:
       type: object
       required:
@@ -790,3 +811,37 @@ components:
             Index into the release configurations specified on the app configuration.
           type: integer
           format: int32
+
+    SequencerConnections:
+      type: object
+      required:
+        - connections
+        - sequencer_trust_threshold
+        - submission_request_amplification
+      properties:
+        connections:
+          type: array
+          items:
+            $ref: "#/components/schemas/SequencerAliasToConnections"
+        sequencer_trust_threshold:
+          type: integer
+          format: int32
+        submission_request_amplification:
+          type: integer
+          format: int32
+
+    SequencerAliasToConnections:
+      type: object
+      required:
+        - sequencer_alias
+        - endpoints
+        - transport_security
+      properties:
+        sequencer_alias:
+          type: string
+        endpoints:
+          type: array
+          items:
+            type: string
+        transport_security:
+          type: boolean

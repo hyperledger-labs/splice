@@ -5,7 +5,7 @@ import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.http.v0.validator_admin as http
-import com.daml.network.http.v0.definitions.OnboardUserRequest
+import com.daml.network.http.v0.definitions
 import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.util.{Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
@@ -35,7 +35,7 @@ object HttpValidatorAdminAppClient {
         client: Client,
         headers: List[HttpHeader],
     ): EitherT[Future, Either[Throwable, HttpResponse], http.OnboardUserResponse] =
-      client.onboardUser(OnboardUserRequest(name), headers)
+      client.onboardUser(definitions.OnboardUserRequest(name), headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
@@ -86,4 +86,30 @@ object HttpValidatorAdminAppClient {
         NodeIdentitiesDump.fromHttp(ParticipantId.tryFromProtoPrimitive, response)
     }
   }
+
+  case class GetGlobalDomainConnectionConfig()
+      extends BaseCommand[
+        http.GetGlobalDomainConnectionConfigResponse,
+        definitions.GetGlobalDomainConnectionConfigResponse,
+      ] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.GetGlobalDomainConnectionConfigResponse] =
+      client.getGlobalDomainConnectionConfig(headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ): PartialFunction[
+      http.GetGlobalDomainConnectionConfigResponse,
+      Either[String, definitions.GetGlobalDomainConnectionConfigResponse],
+    ] = { case http.GetGlobalDomainConnectionConfigResponse.OK(response) =>
+      Right(response)
+    }
+  }
+
 }

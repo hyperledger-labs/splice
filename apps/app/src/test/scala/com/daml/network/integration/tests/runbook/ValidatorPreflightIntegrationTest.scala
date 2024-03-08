@@ -1,9 +1,11 @@
 package com.daml.network.integration.tests.runbook
 
+import com.daml.network.config.CNThresholds
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
@@ -334,6 +336,30 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   "can dump participant identities of validator" in { _ =>
     validatorClient.dumpParticipantIdentities()
+  }
+
+  "connect to all sequencers stated in latest SvcRules contract" in { implicit env =>
+    val sv1ScanClient = scancl("sv1Scan")
+    eventually() {
+      val connections = inside(sv1ScanClient.listSvcSequencers()) {
+        case Seq(DomainSequencers(_, connections)) => connections
+      }
+      connections should not be empty
+      val latestMigrationId = connections.map(_.migrationId).max
+      val sequencerConnections = connections.filter(_.migrationId == latestMigrationId)
+      sequencerConnections should not be empty
+      sequencerConnections.foreach { connection =>
+        connection.url should not be empty
+        connection.availableAfter.isBefore(env.environment.clock.now.toInstant) shouldBe true
+      }
+      val domainConnectionConfig = validatorClient.globalDomainConnectionConfig()
+      domainConnectionConfig.sequencerConnections.connections.size shouldBe sequencerConnections.size
+      domainConnectionConfig.sequencerConnections.sequencerTrustThreshold shouldBe CNThresholds
+        .sequencerConnectionsSizeThreshold(sequencerConnections.size)
+        .value
+      // TODO: (#10618) update this expectation to be the same as sequencerTrustThreshold
+      domainConnectionConfig.sequencerConnections.submissionRequestAmplification shouldBe 2
+    }
   }
 
   private def auth0Login(

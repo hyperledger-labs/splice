@@ -8,7 +8,9 @@ import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.api.trace.Tracer
@@ -22,6 +24,7 @@ class HttpValidatorAdminHandler(
     validatorWalletUserName: Option[String],
     getCoinRulesDomain: GetCoinRulesDomain,
     participantAdminConnection: ParticipantAdminConnection,
+    globalDomainAlias: DomainAlias,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -86,6 +89,39 @@ class HttpValidatorAdminHandler(
         .map(response =>
           v0.ValidatorAdminResource.DumpParticipantIdentitiesResponse.OK(response.toHttp)
         )
+    }
+  }
+
+  override def getGlobalDomainConnectionConfig(
+      respond: v0.ValidatorAdminResource.GetGlobalDomainConnectionConfigResponse.type
+  )()(
+      tuser: TracedUser
+  ): Future[v0.ValidatorAdminResource.GetGlobalDomainConnectionConfigResponse] = {
+    implicit val TracedUser(_, tracedContext) = tuser
+    withSpan(s"$workflowId.getGlobalDomainConnectionConfig") { _ => _ =>
+      for {
+        connectionConfig <- participantAdminConnection.getDomainConnectionConfig(globalDomainAlias)
+      } yield v0.ValidatorAdminResource.GetGlobalDomainConnectionConfigResponse.OK(
+        definitions.GetGlobalDomainConnectionConfigResponse(
+          definitions.SequencerConnections(
+            connectionConfig.sequencerConnections.aliasToConnection.values.map {
+              case GrpcSequencerConnection(
+                    endpoints,
+                    transportSecurity,
+                    _,
+                    sequencerAlias,
+                  ) =>
+                definitions.SequencerAliasToConnections(
+                  sequencerAlias.toProtoPrimitive,
+                  endpoints.map(_.toString).toVector,
+                  transportSecurity,
+                )
+            }.toVector,
+            connectionConfig.sequencerConnections.sequencerTrustThreshold.value,
+            connectionConfig.sequencerConnections.submissionRequestAmplification.value,
+          )
+        )
+      )
     }
   }
 
