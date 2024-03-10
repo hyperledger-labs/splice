@@ -1844,7 +1844,7 @@ To remove the delay added to the trigger that promotes participants to submitter
 to Participant threshold you can set the following option. This is enabled by default on scratchnets to speed up deployment.
 
 ```
-export ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY=false
+export DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY=true
 ```
 
 ## Appendix: Kubernetes and Other Deployment Resources

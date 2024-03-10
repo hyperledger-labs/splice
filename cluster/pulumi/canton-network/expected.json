@@ -2275,6 +2275,7 @@
           "enabled": true
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
           "sequencerAddress": "global-domain-0-sequencer",
@@ -2283,7 +2284,6 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global"
         },
-        "enableOnboardingParticipantPromotionDelay": true,
         "expectedValidatorOnboardings": [
           {
             "expiresIn": "24h",
@@ -3214,6 +3214,7 @@
           "enabled": true
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
           "sequencerAddress": "global-domain-0-sequencer",
@@ -3222,7 +3223,6 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-2.svc.mock.network.canton.global"
         },
-        "enableOnboardingParticipantPromotionDelay": true,
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -4124,6 +4124,7 @@
           "enabled": true
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
           "sequencerAddress": "global-domain-0-sequencer",
@@ -4132,7 +4133,6 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-3.svc.mock.network.canton.global"
         },
-        "enableOnboardingParticipantPromotionDelay": true,
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
@@ -5034,6 +5034,7 @@
           "enabled": true
         },
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
           "sequencerAddress": "global-domain-0-sequencer",
@@ -5042,7 +5043,6 @@
           },
           "sequencerPublicUrl": "https://sequencer-0.sv-4.svc.mock.network.canton.global"
         },
-        "enableOnboardingParticipantPromotionDelay": true,
         "expectedValidatorOnboardings": [],
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",

@@ -120,8 +120,8 @@ export async function installNode(
       svKey,
       onboardingName: svAppConfig.onboardingName,
       validatorWalletUserName: validatorAppConfig.walletUserName,
-      enableOnboardingParticipantPromotionDelay:
-        svAppConfig.enableOnboardingParticipantPromotionDelay,
+      disableOnboardingParticipantPromotionDelay:
+        svAppConfig.disableOnboardingParticipantPromotionDelay,
     },
     resolveValidator1PartyId
   );
@@ -163,7 +163,7 @@ type SvConfig = {
   svKey: CnInput<SvIdKey>;
   onboardingName: string;
   validatorWalletUserName: string;
-  enableOnboardingParticipantPromotionDelay: boolean;
+  disableOnboardingParticipantPromotionDelay: boolean;
 };
 
 async function installSvAndValidator(
@@ -183,6 +183,7 @@ async function installSvAndValidator(
     svKey,
     onboardingName,
     validatorWalletUserName,
+    disableOnboardingParticipantPromotionDelay,
   } = config;
 
   const globalDomain = installGlobalDomainNode(
@@ -313,6 +314,7 @@ async function installSvAndValidator(
       },
     ],
     onboardingPollingInterval: svOnboardingPollingInterval,
+    disableOnboardingParticipantPromotionDelay,
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {

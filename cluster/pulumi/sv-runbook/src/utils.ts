@@ -11,9 +11,9 @@ export const TARGET_CLUSTER = requireEnv(
 export const SV_NAME = 'DA-Helm-Test-Node';
 export const SV_NAMESPACE = 'sv';
 
-export const ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY = envFlag(
-  'ENABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY',
-  true
+export const DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY = envFlag(
+  'DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY',
+  false
 );
 
 export const version = process.env.CHARTS_VERSION;

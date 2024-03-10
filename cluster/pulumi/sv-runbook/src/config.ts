@@ -1,6 +1,6 @@
 export type SvAppConfig = {
   onboardingName: string;
-  enableOnboardingParticipantPromotionDelay: boolean;
+  disableOnboardingParticipantPromotionDelay: boolean;
 };
 
 export type ValidatorAppConfig = {
