@@ -48,4 +48,19 @@ class SvOnboardingConfigIntegrationTest extends CNNodeIntegrationTest with SvTes
       svcInfoFromSv2Onboarded shouldEqual svcInfoFromSv2
     }
   }
+
+  "An onboarded SV can initialize even if its onboarding sponsor is down" in { implicit env =>
+    startAllSync(
+      sv1Backend,
+      sv2Backend,
+    )
+    clue("Stopping SV1 and SV2") {
+      sv1Backend.stop()
+      sv2Backend.stop()
+    }
+    clue("SV2 can start back up without changing its onboarding config") {
+      sv2Backend.startSync()
+    }
+  }
+
 }

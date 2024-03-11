@@ -6,7 +6,6 @@ import cats.implicits.{
   catsSyntaxTuple2Semigroupal,
   catsSyntaxTuple3Semigroupal,
   catsSyntaxTuple4Semigroupal,
-  toTraverseOps,
 }
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
@@ -104,20 +103,9 @@ class JoiningNodeInitializer(
       manualConnect = true,
     )
     for {
-      (svcPartyId, sponsorSvConnectionAndConfig, _) <- (
+      (svcPartyId, _) <- (
+        // If we're not onboarded yet, this waits for the sponsoring SV
         getSvcPartyId(initConnection),
-        // TODO(#5803) Consider removing this once Canton stops falling apart.
-        // Wait for the sponsoring SV which also ensures the domain is initialized.
-        joiningConfig.traverse { conf =>
-          retryProvider.getValueWithRetriesNoPretty(
-            RetryFor.WaitingOnInitDependency,
-            "Sponsoring SV is active",
-            withSvConnection(conf.svClient.adminApi)(connection =>
-              connection.checkActive().map(_ => conf -> connection)
-            ),
-            logger,
-          )
-        },
         for {
           // Register domain with manualConnect=true. Confusingly, this still connects the first time.
           // However, it won't connect if we crash and get here again which is what we're really after.
@@ -125,7 +113,7 @@ class JoiningNodeInitializer(
             domainConfig,
             RetryFor.WaitingOnInitDependency,
           )
-          darUploads = participantAdminConnection.uploadDarFiles(
+          _ <- participantAdminConnection.uploadDarFiles(
             requiredDars,
             RetryFor.WaitingOnInitDependency,
           )
@@ -191,16 +179,18 @@ class JoiningNodeInitializer(
               RetryFor.WaitingOnInitDependency,
               show"the SvcRules list the SV party ${svcStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
               isOnboarded(svcStore), {
-                val (joiningConfig, svConnection) = sponsorSvConnectionAndConfig.getOrElse(
-                  sys.error(
-                    "An onboarding config is required."
+                for {
+                  (joiningConfig, svConnection) <- sponsorSvConnectionAndConfig.getOrElse(
+                    sys.error(
+                      "An onboarding config is required."
+                    )
                   )
-                )
-                withSvStore.startOnboardingWithSvcPartyHosted(
-                  svcAutomation,
-                  svConnection,
-                  joiningConfig,
-                )
+                  _ <- withSvStore.startOnboardingWithSvcPartyHosted(
+                    svcAutomation,
+                    svConnection,
+                    joiningConfig,
+                  )
+                } yield ()
               },
               logger,
             )
@@ -210,18 +200,20 @@ class JoiningNodeInitializer(
             "The SVC party is not authorized to our participant. " +
               "Starting onboarding with SVC party migration."
           )
-          val (joiningConfig, svConnection) = sponsorSvConnectionAndConfig.getOrElse(
-            sys.error(
-              "An onboarding config is required."
+          for {
+            (joiningConfig, svConnection) <- sponsorSvConnectionAndConfig.getOrElse(
+              sys.error(
+                "An onboarding config is required."
+              )
             )
-          )
-          withSvStore
-            .startOnboardingWithSvcPartyMigration(
-              initConnection,
-              svcStore,
-              svConnection,
-              joiningConfig,
-            )
+            svcAutomation <- withSvStore
+              .startOnboardingWithSvcPartyMigration(
+                initConnection,
+                svcStore,
+                svConnection,
+                joiningConfig,
+              )
+          } yield svcAutomation
         }
       // Set autoConnect=true now that SVC party migration is complete
       _ <- participantAdminConnection.modifyDomainConnectionConfig(
@@ -276,7 +268,7 @@ class JoiningNodeInitializer(
           svcPartyId,
         ),
       ).tupled
-      _ <- withLocalDomainNode(localDomainNode) { case (localDomainNode, svConnection) =>
+      _ <- localDomainNode.traverse_ { localDomainNode =>
         for {
           // First, make sure the identity of the new domain nodes is known on the domain
           _ <-
@@ -297,9 +289,7 @@ class JoiningNodeInitializer(
           )
           // Finally, fully onboard the sequencer and mediator
           _ <-
-            localDomainNode.onboardLocalSequencerIfRequired(
-              svConnection
-            )
+            localDomainNode.onboardLocalSequencerIfRequired(joiningConfig.map(_.svClient.adminApi))
           _ <- localDomainNode.initializeLocalMediatorIfRequired(
             globalDomain
           )
@@ -345,13 +335,13 @@ class JoiningNodeInitializer(
     )
   }
 
-  private def withSvConnection[T](
-      sponsorConfig: NetworkAppClientConfig
-  )(f: SvConnection => Future[T]): Future[T] = {
-    SvConnection(sponsorConfig, retryProvider, loggerFactory).flatMap(con =>
-      f(con).andThen(_ => con.close())
-    )
-  }
+  private def sponsorSvConnectionAndConfig
+      : Option[Future[(SvOnboardingConfig.JoinWithKey, SvConnection)]] =
+    joiningConfig.map { conf =>
+      SvConnection(conf.svClient.adminApi, retryProvider, loggerFactory).map { connection =>
+        (conf, connection)
+      }
+    }
 
   private def newCometBftClient = {
     cometBftNode.map(node =>
@@ -706,22 +696,6 @@ class JoiningNodeInitializer(
         Future.successful(false)
       }
   } yield isInSvcRulesMembers && isMemberOfDecentralizedNamespace
-
-  private def withLocalDomainNode[A](
-      localDomainNodeO: Option[LocalDomainNode]
-  )(f: (LocalDomainNode, SvConnection) => Future[A]): Future[Unit] =
-    (for {
-      localDomainNode <- localDomainNodeO
-      svConfig <- joiningConfig.map(_.svClient.adminApi)
-    } yield (localDomainNode, svConfig)).traverse_ { case (localDomainNode, svConfig) =>
-      SvConnection(
-        svConfig,
-        retryProvider,
-        loggerFactory,
-      ).flatMap { svConnection =>
-        f(localDomainNode, svConnection).andThen(_ => svConnection.close())
-      }
-    }
 
   private def waitForSvcMembership(svcStore: SvSvcStore): Future[Unit] = {
     val svParty = svcStore.key.svParty

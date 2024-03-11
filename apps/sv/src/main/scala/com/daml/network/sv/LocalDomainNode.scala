@@ -2,6 +2,7 @@ package com.daml.network.sv
 
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
+import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.config.SequencerPruningConfig
@@ -315,7 +316,7 @@ final class LocalDomainNode(
   /** Onboard the sequencer operated by this SV to the domain if it is not already.
     */
   def onboardLocalSequencerIfRequired(
-      svConnection: SvConnection
+      svConnectionConfig: Option[NetworkAppClientConfig]
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
       .getValueWithRetries(
@@ -327,9 +328,20 @@ final class LocalDomainNode(
       .flatMap {
         case Left(NodeStatus.NotInitialized(_)) =>
           logger.info("Onboarding sequencer")
-          onboardLocalSequencer(
-            svConnection
-          )
+          svConnectionConfig match {
+            case None =>
+              Future.failed(
+                Status.FAILED_PRECONDITION
+                  .withDescription(
+                    "Can't onboard sequencer without sponsoring SV connection config"
+                  )
+                  .asRuntimeException()
+              )
+            case Some(svConnectionConfig) =>
+              withSvConnection(svConnectionConfig) { svConnection =>
+                onboardLocalSequencer(svConnection)
+              }
+          }
         case Right(NodeStatus.Success(_)) =>
           logger.info("Sequencer is already onboarded")
           Future.unit
@@ -377,6 +389,14 @@ final class LocalDomainNode(
         "Sequencer is initialized"
       )
     } yield ()
+  }
+
+  private def withSvConnection[T](
+      config: NetworkAppClientConfig
+  )(f: SvConnection => Future[T])(implicit traceContext: TraceContext): Future[T] = {
+    SvConnection(config, retryProvider, loggerFactory).flatMap(con =>
+      f(con).andThen(_ => con.close())
+    )
   }
 
   override protected def onClosed(): Unit = {
