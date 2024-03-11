@@ -97,26 +97,27 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
           },
         )
         actAndCheck(
-          "Offboard SV1", {
-            sv2Backend.createVoteRequest(
-              sv2Backend.getSvcInfo().svParty.toProtoPrimitive,
-              new ARC_SvcRules(
-                new SRARC_OffboardMember(
-                  new SvcRules_OffboardMember(sv1Backend.getSvcInfo().svParty.toProtoPrimitive)
-                )
-              ),
-              "url",
-              "description",
-              sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
-            )
-            // note that the vote request requires two votes to be accepted
-            sv1Backend.castVote(
-              sv1Backend.listVoteRequests().loneElement.contractId,
-              isAccepted = true,
-              "url",
-              "description",
-            )
-          },
+          "SV2 creates a request to offboard SV1",
+          sv2Backend.createVoteRequest(
+            sv2Backend.getSvcInfo().svParty.toProtoPrimitive,
+            new ARC_SvcRules(
+              new SRARC_OffboardMember(
+                new SvcRules_OffboardMember(sv1Backend.getSvcInfo().svParty.toProtoPrimitive)
+              )
+            ),
+            "url",
+            "description",
+            sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+          ),
+        )("the request is created", _ => sv1Backend.listVoteRequests() should not be empty)
+        actAndCheck(
+          "SV1 accepts the request as it requires two votes",
+          sv1Backend.castVote(
+            sv1Backend.getLatestVoteRequestTrackingCid(),
+            isAccepted = true,
+            "url",
+            "description",
+          ),
         )(
           "SV2 is now the only member",
           _ => {
