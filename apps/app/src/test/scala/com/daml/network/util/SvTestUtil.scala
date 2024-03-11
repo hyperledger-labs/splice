@@ -16,8 +16,10 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CNParticipantClientReference,
+  ScanAppBackendReference,
   SvAppBackendReference,
   SvAppReference,
+  WalletAppClientReference,
 }
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
@@ -231,6 +233,17 @@ trait SvTestUtil extends CNNodeTestCommon {
     computeCoinsToIssueToSvc(config, tickDuration)
       .divide(BigDecimal(svcSize).bigDecimal, RoundingMode.HALF_UP)
       .setScale(10, RoundingMode.HALF_UP)
+  }
+
+  def ensureSvRewardCouponClaimedForCurrentRound(
+      scan: ScanAppBackendReference,
+      wallet: WalletAppClientReference,
+  ) = {
+    val currentRound =
+      scan.getOpenAndIssuingMiningRounds()._1.head.contract.payload.round.number
+    wallet
+      .listSvRewardCoupons()
+      .map(_.payload.round.number) should contain(currentRound)
   }
 }
 

@@ -13,6 +13,7 @@ import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.WalletTestUtil
 import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.store.BalanceChangeTxLogEntry
+import com.daml.network.wallet.store.TxLogEntry.BalanceChangeTransactionSubtype
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.topology.PartyId
 import monocle.macros.syntax.lens.*
@@ -132,6 +133,7 @@ class SvTimeBasedRewardCouponIntegrationTest
         checkTxHistory(
           sv1WalletClient,
           Seq[CheckTxHistoryFn] { case b: BalanceChangeTxLogEntry =>
+            b.subtype.value shouldBe BalanceChangeTransactionSubtype.SvRewardCollected.toProto
             b.receiver should be(sv1Party.toProtoPrimitive)
             b.amount should beWithin(BigDecimal(eachSvGetInRound0) - smallAmount, eachSvGetInRound0)
           },
@@ -142,6 +144,7 @@ class SvTimeBasedRewardCouponIntegrationTest
         checkTxHistory(
           aliceValidatorWalletClient,
           Seq[CheckTxHistoryFn] { case b: BalanceChangeTxLogEntry =>
+            b.subtype.value shouldBe BalanceChangeTransactionSubtype.SvRewardCollected.toProto
             b.receiver should be(aliceValidatorParty.toProtoPrimitive)
             b.amount should beWithin(
               BigDecimal(expectedAliceAmount) - smallAmount,

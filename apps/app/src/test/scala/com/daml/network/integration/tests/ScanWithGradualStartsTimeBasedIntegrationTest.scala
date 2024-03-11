@@ -1,20 +1,22 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.util.WalletTestUtil
-import com.daml.network.util.TimeTestUtil
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
+import com.daml.network.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+
 import scala.util.Try
 
 class ScanWithGradualStartsTimeBasedIntegrationTest
     extends CNNodeIntegrationTest
     with WalletTestUtil
-    with TimeTestUtil {
+    with TimeTestUtil
+    with SvTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -23,7 +25,13 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       .withManualStart
 
   "initialize a scan app that joins late" in { implicit env =>
-    startAllSync(sv1ScanBackend, sv1Backend, aliceValidatorBackend, bobValidatorBackend)
+    startAllSync(
+      sv1ScanBackend,
+      sv1Backend,
+      sv1ValidatorBackend,
+      aliceValidatorBackend,
+      bobValidatorBackend,
+    )
 
     val _ = onboardAliceAndBob()
 
@@ -52,7 +60,37 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       "Advancing time to close rounds",
       // TODO(#2930): Since we are reporting in getRoundOfLatestData() only the latest round that is aggregated (fully closed),
       // we must advance rounds until round 3 closes, which is the first round that sv2's scan is guaranteed to have seen.
-      (1 to 7).foreach(_ => advanceRoundsByOneTick),
+      (1 to 7).foreach(_ => {
+        clue("Ensure SvRewardCoupons are received") {
+          eventually() {
+            ensureSvRewardCouponClaimedForCurrentRound(sv1ScanBackend, sv1WalletClient)
+            // sv2 doesn't have a wallet, so it won't claim them anyway
+          }
+        }
+        clue("Ensure ValidatorFaucetCoupons are received") {
+          eventually() {
+            Seq(sv1WalletClient, aliceValidatorWalletClient, bobValidatorWalletClient).foreach {
+              walletClient =>
+                val currentRound =
+                  sv1ScanBackend
+                    .getOpenAndIssuingMiningRounds()
+                    ._1
+                    .head
+                    .contract
+                    .payload
+                    .round
+                    .number
+                (walletClient
+                  .listValidatorFaucetCoupons()
+                  .map(_.payload.round.number) should contain(currentRound))
+                  .withClue(
+                    s"Wallet: ${walletClient.name} did not receive a ValidatorFaucetCoupon."
+                  )
+            }
+          }
+        }
+        advanceRoundsByOneTick
+      }),
     )(
       "Waiting for scan apps to report rounds as closed",
       _ => {
@@ -61,39 +99,80 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       },
     )
 
+    clue("Ensure SvRewardCoupons are claimed") {
+      eventually() {
+        val coupons = sv1WalletClient
+          .listSvRewardCoupons()
+          .map(_.payload.round.number)
+        coupons should have size 3
+        // rounds 0 to 6 (total: 7) have advanced, and their coupons are claimed
+        coupons.min should be(6)
+      }
+    }
+
+    clue("Ensure ValidatorFaucetCoupons are claimed") {
+      eventually() {
+        Seq(sv1WalletClient, aliceValidatorWalletClient, bobValidatorWalletClient).foreach {
+          walletClient =>
+            {
+              val coupons = walletClient
+                .listValidatorFaucetCoupons()
+                .map(_.payload.round.number)
+              coupons should have size 3
+              // rounds 0 to 6 (total: 7) have advanced, and their coupons are claimed
+              coupons.min should be(6)
+            }.withClue(
+              s"Wallet: ${walletClient.name} did not claim all the expected ValidatorFaucetCoupons."
+            )
+        }
+      }
+    }
+
+    val validatorFaucetAmount = 2.85
     clue("Aggregated total coin balance on both scan apps should match") {
+      val svRewardPerRound =
+        BigDecimal(
+          computeSvRewardInRound0(
+            defaultIssuanceCurve.initialValue,
+            defaultTickDuration,
+            svcSize = 2,
+          )
+        )
       val expectedTotalsRanges = Seq(
+        // Alice has 23 CC in Coin, Bob has 3 CC, all minus holding fees
+        (BigDecimal(25.9), BigDecimal(26.0)),
+        // note that SV2 doesn't have a wallet, so it doesn't claim the rewards
+        // validator faucets: SV1, Alice, Bob
         (
-          25.9,
-          26.0,
-        ), // Alice has 23 CC in Coin, Bob has 3 CC, all minus holding fees
-        (66622.1, 66622.2),
+          26.0 + svRewardPerRound + validatorFaucetAmount * 3 - smallAmount,
+          26.0 + svRewardPerRound + validatorFaucetAmount * 3,
+        ),
       )
       (0 to 1).foreach { i =>
         val round = 2L + i.toLong
         val total1 = sv1ScanBackend.getTotalCoinBalance(round)
         val total2 = sv2ScanBackend.getTotalCoinBalance(round)
         total1 shouldBe total2
-        total1 should be >= BigDecimal(expectedTotalsRanges(i)._1)
-        total1 should be <= BigDecimal(expectedTotalsRanges(i)._2)
+        total1 should be >= expectedTotalsRanges(i)._1
+        total1 should be <= expectedTotalsRanges(i)._2
       }
     }
 
     clue("Aggregated rewards collected on both scan apps should match") {
       val expectedTotalsRanges = Seq(
         (
-          0.0,
-          0.0,
+          BigDecimal(0.0),
+          BigDecimal(0.0),
         ),
-        (5.6, 5.8), // validator rewards
+        (validatorFaucetAmount * 3 - smallAmount, BigDecimal(validatorFaucetAmount * 3)),
       )
       (0 to 1).foreach { i =>
         val round = 2L + i.toLong
         val rewards1 = sv1ScanBackend.getRewardsCollectedInRound(round)
         val rewards2 = sv2ScanBackend.getRewardsCollectedInRound(round)
         rewards1 shouldBe rewards2
-        rewards1 should be >= BigDecimal(expectedTotalsRanges(i)._1)
-        rewards1 should be <= BigDecimal(expectedTotalsRanges(i)._2)
+        rewards1 should be >= expectedTotalsRanges(i)._1
+        rewards1 should be <= expectedTotalsRanges(i)._2
       }
     }
   }

@@ -4,7 +4,7 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.sv.automation.leaderbased.{ExpiredCoinTrigger, ExpiredLockedCoinTrigger}
-import com.daml.network.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
+import com.daml.network.util.{SplitwellTestUtil, SvTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.{
   BalanceChangeTxLogEntry,
   TransferTxLogEntry,
@@ -20,7 +20,8 @@ class WalletTxLogTimeBasedIntegrationTest
     with WalletTestUtil
     with SplitwellTestUtil
     with WalletTxLogTestUtil
-    with TriggerTestUtil {
+    with TriggerTestUtil
+    with SvTestUtil {
 
   private val coinPrice = BigDecimal(1.25).setScale(10)
 
@@ -35,27 +36,6 @@ class WalletTxLogTimeBasedIntegrationTest
   }
 
   "A wallet" should {
-
-    "handle sv rewards" in { implicit env =>
-      actAndCheck(
-        "Advance round",
-        advanceRoundsByOneTick,
-      )(
-        "Wait for SV rewards to be collected",
-        _ => {
-          sv1WalletClient.balance().unlockedQty should be > BigDecimal(0)
-        },
-      )
-      checkTxHistory(
-        sv1WalletClient,
-        Seq[CheckTxHistoryFn](
-          { case logEntry: BalanceChangeTxLogEntry =>
-            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.SvRewardCollected.toProto
-            logEntry.amount should be > BigDecimal(0)
-          }
-        ),
-      )
-    }
 
     "handle app and validator rewards" in { implicit env =>
       val (aliceUserParty, bobUserParty) = onboardAliceAndBob()

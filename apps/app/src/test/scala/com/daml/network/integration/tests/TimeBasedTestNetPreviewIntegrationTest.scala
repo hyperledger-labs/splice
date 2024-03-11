@@ -33,8 +33,14 @@ class TimeBasedTestNetPreviewIntegrationTest
     val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
     actAndCheck(
-      "Advance round",
-      advanceRoundsByOneTick,
+      "Advance round", {
+        (1 to 3).foreach { _ =>
+          advanceRoundsByOneTick
+          eventually() {
+            ensureSvRewardCouponClaimedForCurrentRound(sv1ScanBackend, sv1WalletClient)
+          }
+        }
+      },
     )(
       "Wait for SV rewards to be collected",
       _ => {

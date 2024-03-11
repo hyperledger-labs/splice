@@ -1,9 +1,11 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms
+import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
+import com.daml.network.util.{DomainFeesTestUtil, SvTestUtil, WalletTestUtil}
+import com.daml.network.validator.automation.ReceiveFaucetCouponTrigger
 import com.daml.network.wallet.store.{
   BalanceChangeTxLogEntry,
   TransferTxLogEntry,
@@ -16,7 +18,8 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with DomainFeesTestUtil
-    with WalletTxLogTestUtil {
+    with WalletTxLogTestUtil
+    with SvTestUtil {
 
   private val coinPrice = BigDecimal(1.25).setScale(10)
 
@@ -28,14 +31,25 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
       .withTrafficTopupsDisabled
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Validator)(
+          _.withPausedTrigger[ReceiveFaucetCouponTrigger]
+        )(config)
+      )
   }
 
   "A wallet" should {
 
     "handle domain fees that have been paid (in a non DevNet cluster)" in { implicit env =>
       actAndCheck(
-        "Advance rounds",
-        advanceRoundsByOneTick,
+        "Advance enough rounds for SV1 to claim rewards", {
+          (0 to 3).foreach { _ =>
+            eventually() {
+              ensureSvRewardCouponClaimedForCurrentRound(sv1ScanBackend, sv1WalletClient)
+            }
+            advanceRoundsByOneTick
+          }
+        },
       )(
         "Wait for SV rewards to be collected",
         _ => sv1WalletClient.balance().unlockedQty should be > BigDecimal(0),
@@ -105,14 +119,17 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
                   receiver.amount shouldBe transferAmount
                 }
               },
-              { case logEntry: BalanceChangeTxLogEntry =>
-                logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.SvRewardCollected.toProto
-                logEntry.receiver shouldBe sv1ValidatorBackend
-                  .getValidatorPartyId()
-                  .toProtoPrimitive
-                logEntry.amount should be > totalCostCc
-              },
-            ),
+            ) ++ (1 to 3).flatMap { _ =>
+              Seq[CheckTxHistoryFn](
+                { case logEntry: BalanceChangeTxLogEntry =>
+                  logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.SvRewardCollected.toProto
+                  logEntry.receiver shouldBe sv1ValidatorBackend
+                    .getValidatorPartyId()
+                    .toProtoPrimitive
+                  logEntry.amount should be > totalCostCc
+                }
+              )
+            },
           )
         },
       )

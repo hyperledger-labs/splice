@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
+import com.daml.network.util.{FrontendLoginUtil, SvTestUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.OptionValues
 
@@ -14,6 +14,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
     with WalletTestUtil
     with WalletTxLogTestUtil
     with WalletFrontendTestUtil
+    with SvTestUtil
     with FrontendLoginUtil
     with OptionValues {
 
@@ -77,35 +78,6 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
 
         matchLockUnlockCnsPayment(txsAfter.take(2), entryForCns, isInitial = false)
         matchInitialTransactions(txsAfter.drop(2), entryForCns)
-      }
-    }
-
-    "show sv rewards collection in tx history" in { implicit env =>
-      withFrontEnd("sv1") { implicit webDriver =>
-        val sv1WalletUser = sv1ValidatorBackend.config.validatorWalletUser.value
-        browseToSv1Wallet(sv1WalletUser)
-        actAndCheck(
-          "Advance round",
-          advanceRoundsByOneTick,
-        )(
-          "Wait for SV rewards to be collected and show up in the tx history",
-          _ => {
-            val txs = findAll(className("tx-row")).toSeq
-            // We can get more than one entry, e.g., coin merging can also kick in
-            // so we only match on at least one entry being the reward collection.
-            forAtLeast(1, txs) { tx =>
-              matchTransactionAmountRange(tx)(
-                coinPrice = 2,
-                expectedAction = "Balance Change",
-                expectedSubtype = "SV Reward Collected",
-                expectedPartyDescription = None,
-                // Rewards depend on round activity which can fluctuate a bit due to automation so we accept a wide range.
-                expectedAmountCC = (BigDecimal(66500), BigDecimal(66600)),
-                expectedAmountUSD = (BigDecimal(133000), BigDecimal(133200)),
-              )
-            }
-          },
-        )
       }
     }
 

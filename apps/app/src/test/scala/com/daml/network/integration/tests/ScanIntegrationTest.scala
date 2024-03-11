@@ -498,28 +498,9 @@ class ScanIntegrationTest
     val appRewardCoupons = bobValidatorWalletClient.listAppRewardCoupons()
     val validatorRewardCoupons = bobValidatorWalletClient.listValidatorRewardCoupons()
 
-    clue("Advancing round and checking sv reward") {
+    clue("Advancing round") {
       eventually() {
         advanceTrigger.runOnce().futureValue should be(true)
-      }
-
-      eventually() {
-        val latestRound =
-          sv1ScanBackend
-            .getLatestOpenMiningRound(CantonTimestamp.now())
-            .contract
-            .payload
-            .round
-            .number
-        val activities = sv1ScanBackend
-          .listActivity(None, defaultPageSize)
-          .filter(_.svRewardCollected.nonEmpty)
-        activities.loneElement.round shouldBe latestRound
-        val svRewardsCollected = activities.flatMap(_.svRewardCollected)
-        val svRewardCollected = svRewardsCollected.loneElement
-        val balance = sv1WalletClient.balance().unlockedQty
-        BigDecimal(svRewardCollected.coinAmount) shouldBe balance
-        svRewardCollected.coinOwner shouldBe sv1Backend.getSvcInfo().svParty.toProtoPrimitive
       }
     }
 

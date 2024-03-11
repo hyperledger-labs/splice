@@ -1,8 +1,10 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
+import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -23,9 +25,16 @@ class SvFrontendTimeBasedIntegrationTest
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
-    CNNodeEnvironmentDefinition.simpleTopology4SvsWithSimTime(
-      this.getClass.getSimpleName
-    )
+    CNNodeEnvironmentDefinition
+      .simpleTopology4SvsWithSimTime(
+        this.getClass.getSimpleName
+      )
+      // prevent contention on SvcRules
+      .addConfigTransforms((_, conf) =>
+        updateAutomationConfig(ConfigurableApp.Sv)(
+          _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
+        )(conf)
+      )
 
   def assertRowContentsMatch(key: String, value: String)(implicit webDriver: WebDriver): Unit = {
     val queryResult = find(id(key))

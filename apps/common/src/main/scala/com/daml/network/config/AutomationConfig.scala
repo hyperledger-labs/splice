@@ -35,7 +35,7 @@ case class AutomationConfig(
       */
     enableSvRewards: Boolean = true,
     // TODO (#9149): this flag becomes unnecessary once we switch to the new system entirely
-    useNewSvRewardIssuance: Boolean = false,
+    useNewSvRewardIssuance: Boolean = true,
     /** Only intended for testing. Disables the expiration of Coin.
       */
     enableExpireCoin: Boolean = false,

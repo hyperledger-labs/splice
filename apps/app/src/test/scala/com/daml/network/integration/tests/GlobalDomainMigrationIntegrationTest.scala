@@ -41,7 +41,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainS
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.splitwell.config.{SplitwellDomainConfig, SplitwellDomains}
-import com.daml.network.sv.automation.singlesv.SvRewardTrigger
+import com.daml.network.sv.automation.singlesv.{ReceiveSvRewardCouponTrigger, SvRewardTrigger}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
 import com.daml.network.sv.util.SvUtil
@@ -387,7 +387,7 @@ class GlobalDomainMigrationIntegrationTest
         // stores handle hard domain migrations properly.
         (_, conf) =>
           updateAutomationConfig(ConfigurableApp.Sv)(
-            _.withPausedTrigger[SvRewardTrigger]
+            _.withPausedTrigger[SvRewardTrigger].withPausedTrigger[ReceiveSvRewardCouponTrigger]
           )(conf),
       )
       .addConfigTransforms(

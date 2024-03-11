@@ -27,6 +27,7 @@ import com.daml.network.sv.automation.leaderbased.{
   ExpiredCoinTrigger,
   ExpiredLockedCoinTrigger,
 }
+import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.util.{
   Contract,
   SplitwellTestUtil,
@@ -69,6 +70,12 @@ class WalletTimeBasedIntegrationTest
           // without this, the test "generate app rewards correctly" has as flaky balance.
           // None of the other tests care about it.
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
+        )(config)
+      )
+      .addConfigTransforms((_, config) =>
+        updateAutomationConfig(ConfigurableApp.Sv)(
+          // without this, alice's validator gets AppRewardCoupons that complicate testing
+          _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
         )(config)
       )
 

@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
+import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -8,6 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -107,6 +109,13 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
     .withManualStart
     // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
     .withoutAutomaticRewardsCollectionAndCoinMerging
+    .addConfigTransforms((_, config) =>
+      updateAutomationConfig(ConfigurableApp.Sv)(
+        // Since automatic rewards collection is disabled, closed rounds cannot be archived,
+        // so tests that assert that closed rounds are archived fail.
+        _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
+      )(config)
+    )
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

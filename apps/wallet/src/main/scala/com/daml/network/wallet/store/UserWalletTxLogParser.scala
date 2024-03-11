@@ -1033,7 +1033,7 @@ object UserWalletTxLogParser {
         .map { archiveSvRewardEventId =>
           BalanceChangeTxLogEntry(
             eventId = archiveSvRewardEventId,
-            subtype = Some(transactionSubtype.toProto),
+            subtype = Some(BalanceChangeTransactionSubtype.SvRewardCollected.toProto),
             date = Some(tx.getEffectiveAt),
             amount = node.result.value.summary.inputSvRewardAmount,
             receiver = sender.party,
