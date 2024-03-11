@@ -583,24 +583,17 @@ abstract class TopologyAdminConnection(
               retryProvider.retry(
                 retryFor,
                 s"check established $description",
-                check
-                  .leftFlatMap[TopologyResult[M], RuntimeException] { currentAuthorizedState =>
-                    if (currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial) {
-                      check
-                        .leftMap(_ =>
-                          Status.FAILED_PRECONDITION
-                            .withDescription("Condition is not yet observed.")
-                            .asRuntimeException()
-                        )
-                    } else {
-                      EitherT.leftT(
-                        AuthorizedStateChanged(
-                          currentAuthorizedState.base.serial
-                        )
-                      )
-                    }
+                check.leftMap { currentAuthorizedState =>
+                  if (currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial) {
+                    Status.FAILED_PRECONDITION
+                      .withDescription("Condition is not yet observed.")
+                      .asRuntimeException()
+                  } else {
+                    AuthorizedStateChanged(
+                      currentAuthorizedState.base.serial
+                    )
                   }
-                  .rethrowT,
+                }.rethrowT,
                 logger,
               )
             }
