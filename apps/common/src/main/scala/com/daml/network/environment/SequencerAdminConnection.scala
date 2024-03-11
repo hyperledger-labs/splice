@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import com.daml.network.admin.api.client.GrpcClientMetrics
 import com.digitalasset.canton.admin.api.client.commands.{
   EnterpriseSequencerAdminCommands,
   SequencerAdminCommands,
@@ -34,6 +35,7 @@ class SequencerAdminConnection(
     config: ClientConfig,
     apiLoggingConfig: ApiLoggingConfig,
     loggerFactory: NamedLoggerFactory,
+    grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
     clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
@@ -41,6 +43,7 @@ class SequencerAdminConnection(
       config,
       apiLoggingConfig,
       loggerFactory,
+      grpcClientMetrics,
       retryProvider,
       clock,
     ) {

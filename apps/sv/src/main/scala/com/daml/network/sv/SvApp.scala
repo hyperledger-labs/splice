@@ -123,6 +123,7 @@ class SvApp(
       config.participantClient.adminApi,
       coinAppParameters.loggingConfig.api,
       loggerFactory,
+      metrics.grpcClientMetrics,
       retryProvider,
       clock,
     )
@@ -172,6 +173,7 @@ class SvApp(
       config.participantClient.adminApi,
       coinAppParameters.loggingConfig.api,
       loggerFactory,
+      metrics.grpcClientMetrics,
       retryProvider,
       clock,
     )
@@ -184,6 +186,7 @@ class SvApp(
             config.sequencer.adminApi,
             coinAppParameters.loggingConfig.api,
             loggerFactory,
+            metrics.grpcClientMetrics,
             retryProvider,
             clock,
           ),
@@ -191,6 +194,7 @@ class SvApp(
             config.mediator.adminApi,
             coinAppParameters.loggingConfig.api,
             loggerFactory,
+            metrics.grpcClientMetrics,
             retryProvider,
             clock,
           ),

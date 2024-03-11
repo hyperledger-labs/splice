@@ -2,6 +2,7 @@ package com.daml.network.util
 
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.time.WallClock
+import com.daml.network.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -10,6 +11,7 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.BaseTest
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.digitalasset.canton.logging.SuppressingLogger
+import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -20,6 +22,11 @@ import scala.util.Using
 
 trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
   override val loggerFactory: SuppressingLogger = SuppressingLogger(getClass)
+  // This is all test code, don't wire up a metrics factory.
+  val grpcClientMetrics: GrpcClientMetrics = new DamlGrpcClientMetrics(
+    NoOpMetricsFactory,
+    "testing",
+  )
 
   def withClueAndLog[T](clueMessage: String)(fun: => T) = withClue(clueMessage) {
     clue(clueMessage)(fun)
@@ -122,6 +129,7 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
         ClientConfig(port = port),
         apiLoggingConfig,
         loggerFactoryWithKey,
+        grpcClientMetrics,
         retryProvider,
         wallClock,
       ),

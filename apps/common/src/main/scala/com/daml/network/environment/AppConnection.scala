@@ -2,7 +2,11 @@ package com.daml.network.environment
 
 import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, Uri}
 import org.apache.pekko.stream.Materializer
-import com.daml.network.admin.api.client.ApiClientRequestLogger
+import com.daml.network.admin.api.client.{
+  ApiClientRequestLogger,
+  GrpcClientMetrics,
+  GrpcMetricsClientInterceptor,
+}
 import com.daml.network.admin.api.client.HttpAdminAppClient
 import com.daml.network.admin.api.client.TraceContextPropagation.*
 import com.daml.network.admin.api.client.commands.HttpCommand
@@ -75,6 +79,7 @@ abstract class AppConnection(
     config: ClientConfig,
     apiLoggingConfig: ApiLoggingConfig,
     override val loggerFactory: NamedLoggerFactory,
+    grpcClientMetrics: GrpcClientMetrics,
 )(implicit ec: ExecutionContextExecutor)
     extends BaseAppConnection(loggerFactory)
     with FlagCloseableAsync
@@ -102,7 +107,8 @@ abstract class AppConnection(
           new ApiClientRequestLogger(
             loggerFactory,
             apiLoggingConfig,
-          )
+          ),
+          new GrpcMetricsClientInterceptor(grpcClientMetrics),
         )
 
     val svcAuth = credentials match {

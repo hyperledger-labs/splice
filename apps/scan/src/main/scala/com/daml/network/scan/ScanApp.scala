@@ -107,6 +107,7 @@ class ScanApp(
         config.participantClient.adminApi,
         coinAppParameters.loggingConfig.api,
         loggerFactory,
+        nodeMetrics.grpcClientMetrics,
         retryProvider,
         clock,
       )
@@ -130,6 +131,7 @@ class ScanApp(
         config.sequencerAdminClient,
         coinAppParameters.loggingConfig.api,
         loggerFactory,
+        nodeMetrics.grpcClientMetrics,
         retryProvider,
         clock,
       )

@@ -235,6 +235,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
       loggerFactory,
       tracerProvider,
       retryProvider,
+      nodeMetrics.grpcClientMetrics,
     )
   }
 

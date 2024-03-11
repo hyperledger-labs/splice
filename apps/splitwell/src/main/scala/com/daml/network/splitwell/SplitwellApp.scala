@@ -97,6 +97,7 @@ class SplitwellApp(
       config.participantClient.adminApi,
       coinAppParameters.loggingConfig.api,
       loggerFactory,
+      metrics.grpcClientMetrics,
       retryProvider,
       clock,
     )

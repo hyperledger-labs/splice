@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import com.daml.network.admin.api.client.GrpcClientMetrics
 import com.digitalasset.canton.admin.api.client.commands.{
   EnterpriseMediatorAdministrationCommands,
   StatusAdminCommands,
@@ -22,6 +23,7 @@ class MediatorAdminConnection(
     config: ClientConfig,
     apiLoggingConfig: ApiLoggingConfig,
     loggerFactory: NamedLoggerFactory,
+    grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
     clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
@@ -29,6 +31,7 @@ class MediatorAdminConnection(
       config,
       apiLoggingConfig,
       loggerFactory,
+      grpcClientMetrics,
       retryProvider,
       clock,
     ) {

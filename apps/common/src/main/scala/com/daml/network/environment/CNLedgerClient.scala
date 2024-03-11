@@ -2,7 +2,11 @@ package com.daml.network.environment
 
 import org.apache.pekko.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.admin.api.client.ApiClientRequestLogger
+import com.daml.network.admin.api.client.{
+  ApiClientRequestLogger,
+  GrpcClientMetrics,
+  GrpcMetricsClientInterceptor,
+}
 import com.daml.network.auth.AuthToken
 import com.daml.network.environment.ledger.api.LedgerClient
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
@@ -25,6 +29,7 @@ class CNLedgerClient(
     // client interceptors below
     val unusedTracerProvider: TracerProvider,
     override protected[this] val retryProvider: RetryProvider,
+    grpcClientMetrics: GrpcClientMetrics,
 )(implicit
     ec: ExecutionContextExecutor,
     as: ActorSystem,
@@ -44,12 +49,13 @@ class CNLedgerClient(
       .builderFor(config.address, config.port.unwrap)
       .executor(ec)
       .intercept(
-        new ApiClientRequestLogger(loggerFactory, apiLoggingConfig)
+        new ApiClientRequestLogger(loggerFactory, apiLoggingConfig),
         // The above interceptor handles both client request logging and trace-id allocation and propagation.
         // It does though not create proper spans, like they would be required for distributed tracing.
         // For that we either want to use the standard tracer below (with appropriate adjustments wrt context propagation),
         // or extend the above interceptor.
         // GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor()
+        new GrpcMetricsClientInterceptor(grpcClientMetrics),
       )
 
     val channel = builder.build

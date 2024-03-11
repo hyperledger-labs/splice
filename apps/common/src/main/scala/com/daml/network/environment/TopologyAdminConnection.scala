@@ -3,6 +3,7 @@ package com.daml.network.environment
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
 import cats.syntax.traverse.*
+import com.daml.network.admin.api.client.GrpcClientMetrics
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.environment.TopologyAdminConnection.{
@@ -62,6 +63,7 @@ abstract class TopologyAdminConnection(
     config: ClientConfig,
     apiLoggingConfig: ApiLoggingConfig,
     loggerFactory: NamedLoggerFactory,
+    grpcClientMetrics: GrpcClientMetrics,
     override protected[this] val retryProvider: RetryProvider,
     clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
@@ -69,6 +71,7 @@ abstract class TopologyAdminConnection(
       config,
       apiLoggingConfig,
       loggerFactory,
+      grpcClientMetrics,
     )
     with RetryProvider.Has {
   import TopologyAdminConnection.TopologyResult

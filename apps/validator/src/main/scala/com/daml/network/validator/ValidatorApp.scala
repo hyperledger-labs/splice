@@ -374,6 +374,7 @@ class ValidatorApp(
       config.participantClient.adminApi,
       coinAppParameters.loggingConfig.api,
       loggerFactory,
+      metrics.grpcClientMetrics,
       retryProvider,
       clock,
     )
@@ -416,6 +417,7 @@ class ValidatorApp(
         config.participantClient.adminApi,
         coinAppParameters.loggingConfig.api,
         loggerFactory,
+        metrics.grpcClientMetrics,
         retryProvider,
         clock,
       )
