@@ -7,9 +7,12 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import com.daml.network.util.*
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.topology.PartyId
 
+import java.net.URI
 import scala.collection.mutable
 import scala.concurrent.duration.*
 
@@ -346,16 +349,27 @@ abstract class ValidatorPreflightIntegrationTestBase
       }
       connections should not be empty
       val latestMigrationId = connections.map(_.migrationId).max
-      val sequencerConnections = connections.filter(_.migrationId == latestMigrationId)
-      sequencerConnections should not be empty
-      sequencerConnections.foreach { connection =>
-        connection.url should not be empty
-        connection.availableAfter.isBefore(env.environment.clock.now.toInstant) shouldBe true
-      }
+      val availableConnections = connections.filter(connection =>
+        connection.migrationId == latestMigrationId &&
+          connection.url != "" &&
+          // added 60s grace period for the polling trigger interval 30s + other latency
+          env.environment.clock.now.toInstant.isAfter(connection.availableAfter.plusSeconds(60))
+      )
+      val (expectedSequencerConnections, _) =
+        Endpoint
+          .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
+          .value
+
       val domainConnectionConfig = validatorClient.globalDomainConnectionConfig()
-      domainConnectionConfig.sequencerConnections.connections.size shouldBe sequencerConnections.size
+      val connectedEndpointSet =
+        domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
+
+      connectedEndpointSet should contain allElementsOf expectedSequencerConnections.map(_.toString)
+
       domainConnectionConfig.sequencerConnections.sequencerTrustThreshold shouldBe CNThresholds
-        .sequencerConnectionsSizeThreshold(sequencerConnections.size)
+        .sequencerConnectionsSizeThreshold(
+          domainConnectionConfig.sequencerConnections.connections.size
+        )
         .value
       // TODO: (#10618) update this expectation to be the same as sequencerTrustThreshold
       domainConnectionConfig.sequencerConnections.submissionRequestAmplification shouldBe 2
