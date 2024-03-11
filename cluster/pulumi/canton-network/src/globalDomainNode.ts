@@ -40,7 +40,8 @@ export class GlobalDomainNode extends ComponentResource {
       syncSource?: Release;
     },
     disableAutoInit: boolean,
-    active: boolean
+    active: boolean,
+    nodeIdentifier: string
   ) {
     super('canton:network:domain:global', `${xns.logicalName}-global-domain-${domainMigrationId}`);
     this.migrationId = domainMigrationId;
@@ -94,6 +95,7 @@ export class GlobalDomainNode extends ComponentResource {
         },
         additionalJvmOptions: jmxOptions(),
         disableAutoInit: disableAutoInit,
+        nodeIdentifier,
       },
       { dependsOn: [cometBftService], parent: this }
     );

@@ -55,6 +55,7 @@ export async function installSplitwell(
     xns,
     sharedPostgres,
     participantBootstrapDump,
+    'splitwell',
     [loopback]
   );
 

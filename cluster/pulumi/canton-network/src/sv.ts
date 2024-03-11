@@ -386,7 +386,8 @@ function installMigrationIdSpecificComponents(
         `participant-${migrationId}`,
         participantPostgres,
         auth0UserNameEnvVarSource('sv'),
-        isParticipantRestoringFromDump || mustBeManuallyInitialized
+        isParticipantRestoringFromDump || mustBeManuallyInitialized,
+        svConfig.onboardingName
       );
       const globalDomainNode = new GlobalDomainNode(
         migrationId,
@@ -395,7 +396,8 @@ function installMigrationIdSpecificComponents(
         mediatorPostgres,
         canSyncFromCometBft ? cometbft : { ...cometbft, syncSource: undefined },
         mustBeManuallyInitialized,
-        isActive
+        isActive,
+        svConfig.onboardingName
       );
       const migrationIngress = installCNHelmChart(
         xns,

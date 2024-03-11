@@ -62,6 +62,7 @@ export async function installValidator1(
     xns,
     defaultPostgres,
     participantBootstrapDump,
+    'validator1',
     [loopback]
   );
 

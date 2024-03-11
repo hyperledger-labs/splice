@@ -20,6 +20,7 @@ export function installMigrationSpecificValidatorParticipant(
   xns: ExactNamespace,
   defaultPostgres: postgres.Postgres | undefined,
   participantBootstrapDump: BootstrappingDumpConfig | undefined,
+  nodeIdentifier: string,
   dependsOn: pulumi.Resource[] = []
 ): Release {
   return installMigrationIdSpecificComponent(
@@ -35,6 +36,7 @@ export function installMigrationSpecificValidatorParticipant(
         auth0UserNameEnvVarSource('validator'),
         // We disable auto-init if we have a dump to bootstrap from.
         !!participantBootstrapDump || !isActive || globalDomainMigrationConfig.isRunningMigration(),
+        nodeIdentifier,
         dependsOn
       );
     }
@@ -47,6 +49,7 @@ export function installParticipant(
   postgres: Postgres,
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
   disableAutoInit = false,
+  nodeIdentifier: string,
   dependsOn: pulumi.Resource[] = []
 ): Release {
   const pgName = sanitizedForPostgres(name);
@@ -67,6 +70,7 @@ export function installParticipant(
       metrics: {
         enable: true,
       },
+      nodeIdentifier,
       additionalJvmOptions: jmxOptions(),
     },
     {

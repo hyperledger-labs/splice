@@ -1199,6 +1199,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "splitwell",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -1672,6 +1673,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "Foundation-1",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -1846,6 +1848,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "Foundation-1",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -2611,6 +2614,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "Digital-Asset-2",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -2785,6 +2789,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "Digital-Asset-2",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -3521,6 +3526,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "Digital-Asset-3",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -3695,6 +3701,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "Digital-Asset-3",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -4431,6 +4438,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "Digital-Asset-4",
         "resources": {
           "limits": {
             "memory": "4Gi"
@@ -4605,6 +4613,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "Digital-Asset-4",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
@@ -5305,6 +5314,7 @@
           "interval": "30s",
           "release": "prometheus-grafana-monitoring"
         },
+        "nodeIdentifier": "validator1",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",
