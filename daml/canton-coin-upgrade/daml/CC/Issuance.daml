@@ -65,8 +65,6 @@ data IssuingRoundParameters = IssuingRoundParameters with
     issuancePerFeaturedAppRewardCoupon : Decimal
     issuancePerUnfeaturedAppRewardCoupon : Decimal
     issuancePerSvRewardCoupon : Decimal
-    -- TODO(#9149): remove once we switched to the new SV reward model
-    coinsToIssueToSvc : Decimal
     unclaimedAppRewards : Decimal
     unclaimedValidatorRewards : Decimal
     unclaimedSvRewards : Decimal -- ^ Can be non-zero due to rounding, or no SV having had the chance to claim their coupons.
@@ -83,7 +81,6 @@ validateOpenMiningRoundSummary summary = do
 computeIssuingRoundParameters : RelTime -> Decimal -> IssuanceConfig -> OpenMiningRoundSummary -> IssuingRoundParameters
 computeIssuingRoundParameters tickDuration coinPrice config summary =
     IssuingRoundParameters with
-      coinsToIssueToSvc
       issuancePerValidatorRewardCoupon = validatorRewardIssuance.issuancePerCoupon
       issuancePerUnfeaturedAppRewardCoupon = unfeaturedAppIssuance.issuancePerCoupon
       issuancePerFeaturedAppRewardCoupon =

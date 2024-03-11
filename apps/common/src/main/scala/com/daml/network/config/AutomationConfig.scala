@@ -31,11 +31,6 @@ case class AutomationConfig(
     /** TODO(M3-63) Disables the attempt to expire unclaimed rewards. Remove this once we are resilient to unavailable validators
       */
     enableUnclaimedRewardExpiration: Boolean = false,
-    /** Only intended for testing. Disables the generation of SV rewards.
-      */
-    enableSvRewards: Boolean = true,
-    // TODO (#9149): this flag becomes unnecessary once we switch to the new system entirely
-    useNewSvRewardIssuance: Boolean = true,
     /** Only intended for testing. Disables the expiration of Coin.
       */
     enableExpireCoin: Boolean = false,

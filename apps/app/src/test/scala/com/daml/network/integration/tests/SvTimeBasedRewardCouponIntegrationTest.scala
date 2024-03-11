@@ -33,10 +33,6 @@ class SvTimeBasedRewardCouponIntegrationTest
         config
           .focus(_.svApps)
           .modify(_.map { case (name, svConfig) =>
-            // TODO (#9149): Remove this transform, as they will be enabled by default
-            val configWithNewIssuance =
-              svConfig.focus(_.automation.useNewSvRewardIssuance).replace(true)
-
             // sv4 gives part of its reward to alice
             val newConfig = if (name.unwrap == "sv4") {
               val aliceParticipant =
@@ -48,9 +44,9 @@ class SvTimeBasedRewardCouponIntegrationTest
                 .tryFromProtoPrimitive(
                   s"${BaseLedgerConnection.sanitizeUserIdToPartyString(aliceLedgerApiUser)}::${aliceParticipant.split("::").last}"
                 )
-              configWithNewIssuance
+              svConfig
                 .copy(extraBeneficiaries = Map(alicePartyId -> BigDecimal("33.33")))
-            } else configWithNewIssuance
+            } else svConfig
 
             name -> newConfig
           })

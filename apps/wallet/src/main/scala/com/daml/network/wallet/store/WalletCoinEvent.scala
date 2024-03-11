@@ -4,7 +4,6 @@ import com.daml.ledger.javaapi.data.{DamlOptional, Value}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coinrules as coinrulesCodegen
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cn.svcrules as svcCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
@@ -570,22 +569,4 @@ object SubscriptionPayment_Expire extends ExerciseNodeCompanion {
     _.toValue,
     _.toValue(_.toValue),
   )
-}
-
-object SvcRules_CollectSvReward extends ExerciseNodeCompanion {
-  override type Tpl = svcCodegen.SvcRules
-  override type Arg = svcCodegen.SvcRules_CollectSvReward
-  override type Res = coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId]
-
-  override val template = svcCodegen.SvcRules.COMPANION
-  override val choice = svcCodegen.SvcRules.CHOICE_SvcRules_CollectSvReward
-
-  override val argDecoder = svcCodegen.SvcRules_CollectSvReward.valueDecoder()
-  override def argToValue(arg: Arg) = arg.toValue
-
-  override val resDecoder =
-    coinCodegen.CoinCreateSummary.valueDecoder(cid =>
-      new coinCodegen.Coin.ContractId(cid.asContractId().get().getValue)
-    )
-  override def resToValue(res: Res) = res.toValue(_.toValue)
 }

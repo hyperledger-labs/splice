@@ -204,15 +204,6 @@ template ValidatorRewardCoupon
         requireMatchingContract rightCid (ValidatorRight with svc; validator, user)
 
 
--- | The reward for the SVC members for running a mining round.
--- TODO(#9149): remove this template once we switch to the new reward model.
-template SvcReward with
-    svc : Party
-    round : Round
-    amount : Decimal
-  where
-    signatory svc
-
 -- | A coupon for a beneficiary to receive part of the SVC issuance for a specific SV node and round.
 template SvRewardCoupon with
     svc : Party

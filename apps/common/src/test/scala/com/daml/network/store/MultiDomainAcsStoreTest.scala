@@ -672,16 +672,16 @@ abstract class MultiDomainAcsStoreTest[
 
     "read assignment-mismatched contracts in a stable order" in {
       import com.daml.lf.value.Value
-      import com.daml.network.codegen.java.cc.coin.{FeaturedAppRight, SvcReward}
+      import com.daml.network.codegen.java.cc.coin.{FeaturedAppRight, AppRewardCoupon}
       import MultiDomainAcsStore.ConstrainedTemplate
 
       // the specific templates don't matter, we just need 2 of them
       val sampleParticipantId = ParticipantId("foo")
       val evenCompanion = FeaturedAppRight.COMPANION
-      val oddCompanion = SvcReward.COMPANION
+      val oddCompanion = AppRewardCoupon.COMPANION
       def smallestContract(coid: Value.ContractId, ix: Int) =
         if (ix % 2 == 0) featuredAppRight(svcParty, coid.coid)
-        else svcReward(0, contractId = coid.coid)
+        else appRewardCoupon(1, svcParty, contractId = coid.coid)
       val coids = MultiDomainAcsStoreTest.generatedCoids.value
       val expectedOrder = InMemoryMultiDomainAcsStore.reassignmentContractOrder(
         coids,

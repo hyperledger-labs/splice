@@ -14,7 +14,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
-import com.daml.network.sv.automation.singlesv.{ReceiveSvRewardCouponTrigger, SvRewardTrigger}
+import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
@@ -82,7 +82,7 @@ class DisasterRecoveryIntegrationTest
       .addConfigTransforms(
         (_, conf) =>
           updateAutomationConfig(ConfigurableApp.Sv)(
-            _.withPausedTrigger[SvRewardTrigger].withPausedTrigger[ReceiveSvRewardCouponTrigger]
+            _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
           )(conf),
         (_, conf) =>
           conf.copy(

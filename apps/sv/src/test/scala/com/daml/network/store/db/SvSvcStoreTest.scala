@@ -844,8 +844,8 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
         val leaderContract = svcRules()
         val followerContract1 = coinRules()
-        val followerContract2 = svReward(storeSvParty, 1)
-        val alreadyReassigned = svReward(storeSvParty, 2)
+        val followerContract2 = memberRewardState("sv1")
+        val alreadyReassigned = memberRewardState("sv2")
         for {
           store <- mkStore()
           _ <- dummyDomain.create(leaderContract)(store.multiDomainAcsStore)
@@ -866,9 +866,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       "list followers" in {
 
         val leaderContract = coinRules()
-        val followerContract1 = openMiningRound(svcParty, 1, 1.0)
-        val followerContract2 = svcReward(1)
-        val alreadyReassigned = svcReward(2)
+        val followerContract1 = openMiningRound(svcParty, 3, 1.0)
+        val followerContract2 = closedMiningRound(svcParty, 1)
+        val alreadyReassigned = closedMiningRound(svcParty, 2)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(leaderContract)(store.multiDomainAcsStore)

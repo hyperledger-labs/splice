@@ -47,7 +47,6 @@ class LeaderBasedAutomationService(
     registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new CloseVoteRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
-    registerTrigger(new SvcRewardTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpireStaleConfirmationsTrigger(triggerContext, svTaskContext))
     registerTrigger(new GarbageCollectCoinPriceVotesTrigger(triggerContext, svTaskContext))
@@ -80,7 +79,6 @@ object LeaderBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExpiredSvOnboardingRequestTrigger],
     aTrigger[CloseVoteRequestTrigger],
     aTrigger[ExpiredSvOnboardingConfirmedTrigger],
-    aTrigger[SvcRewardTrigger],
     aTrigger[ExpireIssuingMiningRoundTrigger],
     aTrigger[ExpireStaleConfirmationsTrigger],
     aTrigger[GarbageCollectCoinPriceVotesTrigger],

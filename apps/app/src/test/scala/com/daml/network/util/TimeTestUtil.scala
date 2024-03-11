@@ -1,12 +1,10 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin.SvcReward
 import com.daml.network.codegen.java.cc.coinrules.TransferOutput
 import com.daml.network.codegen.java.cc.expiry.TimeLock
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cn.svcrules.SvReward
 import com.daml.network.console.*
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
@@ -62,7 +60,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
         // collection of app and validator rewards takes about the same time.
         //
         clue("wait for the system to quiet down after a round change") {
-          waitForAllSvcRewardsToBeCollected()
           // We additionally sleep 1.5s to give some extra time for activity to quiesce.
           Threading.sleep(1500)
         }
@@ -87,28 +84,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
               "Are participants configured with `testing-time.type = monotonic-time`?"
           )
         }
-      }
-    }
-  }
-
-  protected def waitForAllSvcRewardsToBeCollected()(implicit
-      env: CNNodeTestConsoleEnvironment
-  ): Unit = {
-    clue("wait for the all SvcRewards to be collected") {
-      eventually() {
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(SvcReward.COMPANION)(svcParty) shouldBe empty
-      }
-    }
-  }
-
-  protected def waitForAllSvRewardsToBeCollected()(implicit
-      env: CNNodeTestConsoleEnvironment
-  ): Unit = {
-    clue("wait for the all SvRewards to be collected") {
-      eventually() {
-        sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(SvReward.COMPANION)(svcParty) shouldBe empty
       }
     }
   }

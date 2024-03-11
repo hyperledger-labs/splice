@@ -63,7 +63,6 @@ expectedParameters_E1_0_0p5 = IssuingRoundParameters with
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 570.0
   issuancePerSvRewardCoupon = 6088.2800608828
-  coinsToIssueToSvc = 608828.0060882801
   unclaimedValidatorRewards = 7551.7503805175
   unclaimedAppRewards = 68395.2511415525
   unclaimedSvRewards = 0.0000000001
@@ -75,7 +74,6 @@ expectedParameters_E1_0p5_1p5 = IssuingRoundParameters with
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 570.0
   issuancePerSvRewardCoupon = 1826.4840182648
-  coinsToIssueToSvc = 182648.4018264840
   unclaimedValidatorRewards = 15162.1004566210
   unclaimedAppRewards = 106447.0015220700
   unclaimedSvRewards = 0.000000004
@@ -87,7 +85,6 @@ expectedParameters_E1_1p5_5 = IssuingRoundParameters with
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 570.0
   issuancePerSvRewardCoupon = 380.5175038052
-  coinsToIssueToSvc = 38051.7503805175
   unclaimedValidatorRewards = 3746.5753424658
   unclaimedAppRewards = 72200.4261796042
   unclaimedSvRewards = 0.0
@@ -99,7 +96,6 @@ expectedParameters_E1_5_10 = IssuingRoundParameters with
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 359.5433789954
   issuancePerSvRewardCoupon = 95.1293759513
-  coinsToIssueToSvc = 9512.9375951294
   unclaimedValidatorRewards = 0.0000000017
   unclaimedAppRewards = 19879.2694063927
   unclaimedSvRewards = 0.0
@@ -111,7 +107,6 @@ expectedParameters_E1_10plus = IssuingRoundParameters with
   issuancePerUnfeaturedAppRewardCoupon = 0.600000000
   issuancePerValidatorFaucetCoupon = 150.2587519026
   issuancePerSvRewardCoupon = 23.7823439878
-  coinsToIssueToSvc = 2378.2343987823
   unclaimedValidatorRewards = 0.0
   unclaimedAppRewards = 0.0000000152
   unclaimedSvRewards = 0.0000000023
@@ -145,7 +140,6 @@ expectedParameters_NoActivity_0_0p5 = IssuingRoundParameters with
   issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
   issuancePerValidatorFaucetCoupon = 570.0
   issuancePerSvRewardCoupon = 608828.0060882801
-  coinsToIssueToSvc = 608828.0060882801
   unclaimedValidatorRewards = 38051.7503805175
   unclaimedAppRewards = 114155.2511415525
   unclaimedSvRewards = 608828.0060882801
@@ -176,7 +170,6 @@ expectedParameters_E3_0_0p5 = IssuingRoundParameters with
   issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
   issuancePerValidatorFaucetCoupon = 570.0
   issuancePerSvRewardCoupon = 304414.0030441400
-  coinsToIssueToSvc = 608828.0060882801
   unclaimedValidatorRewards = 9511.7503805175
   unclaimedAppRewards = 104095.2511415525
   unclaimedSvRewards = 0.0000000001
@@ -207,7 +200,6 @@ expectedParameters_FullSvc_10plus = IssuingRoundParameters with
   issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
   issuancePerValidatorFaucetCoupon = 570.0
   issuancePerSvRewardCoupon = 0.000990931
-  coinsToIssueToSvc = 2378.2343987823
   unclaimedAppRewards = 35673.5159817352
   unclaimedValidatorRewards = 9512.9375951294
   unclaimedSvRewards = 0.0
@@ -217,15 +209,7 @@ testFullSvc = script do
   validateOpenMiningRoundSummary summaryExamplNoActivity
 
   let actual = computeIssuingRoundParameters tickDuration coinPrice issuanceConfig_10plus summaryExampleFullSvc
-  let actualUnclaimedSvRewards =
-        actual.coinsToIssueToSvc -
-        actual.issuancePerSvRewardCoupon * intToDecimal summaryExampleFullSvc.totalSvRewardWeight
   expectedParameters_FullSvc_10plus === actual
-
-  -- The maximal over-issuance is: 2.4e6 * 0.5e-10 * 1e4 = 0.00012, which is 1.2 USD at the high price of 10k USD per coin
-  -- We accept this, as it does not meanginfully impact the tokenomics.
-  -- In this concrete example, the over-issuance is two orders of magnitude lower: -0.0000012177
-  -0.0000012177 === actualUnclaimedSvRewards
 
 
 

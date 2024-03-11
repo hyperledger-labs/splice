@@ -314,12 +314,6 @@ template CoinRules
         let params = computeIssuingRoundParameters
               miningRound.tickDuration miningRound.coinPrice miningRound.issuanceConfig summary
 
-        -- record reward for the SVC
-        create SvcReward with
-          svc
-          round = miningRound.round
-          amount = params.coinsToIssueToSvc
-
         -- record unclaimed reward contract
         create UnclaimedReward with
           svc

@@ -26,6 +26,7 @@ import com.daml.network.config.CNNodeConfigTransforms.{
 }
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.sv.automation.singlesv.{
+  ReceiveSvRewardCouponTrigger,
   SubmitSvStatusReportTrigger,
   SvcRulesTransferTrigger,
 }
@@ -61,7 +62,6 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
               // Need to disable triggers so workflows stay open
               enableSvcGovernance = false,
               enableClosedRoundArchival = false,
-              enableSvRewards = false,
             )
           ) andThen updateAutomationConfig(ConfigurableApp.Sv)(
             _.withResumedTrigger[AssignTrigger]
@@ -69,6 +69,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
               .withResumedTrigger[TransferFollowTrigger]
               // TODO(#10297): re-enable once that trigger is compatible with soft domain-migrations
               .withPausedTrigger[SubmitSvStatusReportTrigger]
+              .withPausedTrigger[ReceiveSvRewardCouponTrigger]
           ))(config),
         (_, config) =>
           updateAllValidatorConfigs { case (name, c) =>
@@ -274,15 +275,6 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           sv1Party.toProtoPrimitive,
           "irrelevant secret",
           sv1ValidatorBackend.getValidatorPartyId().toProtoPrimitive,
-        )
-      )
-
-      createSampleAndEnsurePresence(svcr.SvReward.COMPANION)(
-        new svcr.SvReward(
-          svcParty.toProtoPrimitive,
-          sv1Party.toProtoPrimitive,
-          dummyRound,
-          new java.math.BigDecimal("42"),
         )
       )
 
@@ -634,7 +626,6 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       allContractsMigrated(
         c(svcr.VoteRequest.COMPANION),
         c(svcr.Confirmation.COMPANION),
-        c(svcr.SvReward.COMPANION),
         c(svcr.ElectionRequest.COMPANION),
         c(so.SvOnboardingRequest.COMPANION),
         c(so.SvOnboardingConfirmed.COMPANION),
@@ -653,7 +644,6 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       allContractsMigrated(
         SvSvcStore.coinRulesFollowers
           filterNot Set(
-            cc.coin.SvcReward.COMPANION, // TODO (#7210)
             cnw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
             cc.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
           )

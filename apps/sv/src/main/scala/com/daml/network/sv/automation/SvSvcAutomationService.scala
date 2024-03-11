@@ -90,20 +90,14 @@ class SvSvcAutomationService(
     registerTrigger(
       new SvOnboardingRequestTrigger(triggerContext, svcStore, svStore, config, connection)
     )
-    if (config.automation.enableSvRewards) {
-      if (config.automation.useNewSvRewardIssuance) {
-        registerTrigger(
-          new ReceiveSvRewardCouponTrigger(
-            triggerContext,
-            svcStore,
-            connection,
-            config.extraBeneficiaries,
-          )
-        )
-      } else {
-        registerTrigger(new SvRewardTrigger(triggerContext, svcStore, connection))
-      }
-    }
+    registerTrigger(
+      new ReceiveSvRewardCouponTrigger(
+        triggerContext,
+        svcStore,
+        connection,
+        config.extraBeneficiaries,
+      )
+    )
     if (config.automation.enableClosedRoundArchival)
       registerTrigger(new ArchiveClosedMiningRoundsTrigger(triggerContext, svcStore, connection))
 
@@ -398,7 +392,6 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
     CNNodeAppAutomationService.expectedTriggerClasses ++ Seq(
       aTrigger[SummarizingMiningRoundTrigger],
       aTrigger[SvOnboardingRequestTrigger],
-      aTrigger[SvRewardTrigger],
       aTrigger[ReceiveSvRewardCouponTrigger],
       aTrigger[ArchiveClosedMiningRoundsTrigger],
       aTrigger[ElectionRequestTrigger],

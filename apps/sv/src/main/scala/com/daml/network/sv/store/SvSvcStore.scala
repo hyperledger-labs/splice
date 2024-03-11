@@ -65,7 +65,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
     outerLoggerFactory.append("store", "svcParty")
 
   override lazy val acsContractFilter =
-    SvSvcStore.contractFilter(key.svcParty, key.svParty, domainMigrationId)
+    SvSvcStore.contractFilter(key.svcParty, domainMigrationId)
 
   override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
     override val parser = new SvcTxLogParser(loggerFactory)
@@ -958,7 +958,6 @@ object SvSvcStore {
       // though it follows SvcRules
       svcr.VoteRequest.COMPANION,
       svcr.Confirmation.COMPANION,
-      svcr.SvReward.COMPANION,
       svcr.ElectionRequest.COMPANION,
       so.SvOnboardingRequest.COMPANION,
       so.SvOnboardingConfirmed.COMPANION,
@@ -973,7 +972,6 @@ object SvSvcStore {
     cc.round.IssuingMiningRound.COMPANION,
     cc.round.ClosedMiningRound.COMPANION,
     cc.coin.FeaturedAppRight.COMPANION,
-    cc.coin.SvcReward.COMPANION,
     cc.coin.UnclaimedReward.COMPANION,
     cc.validatorlicense.ValidatorLicense.COMPANION,
     cn.cns.CnsEntry.COMPANION,
@@ -993,12 +991,10 @@ object SvSvcStore {
   /** Contract filter of an sv acs store for a specific acs party. */
   def contractFilter(
       svcParty: PartyId,
-      svParty: PartyId,
       domainMigrationId: Long,
   ): MultiDomainAcsStore.ContractFilter[SvcAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
     val svc = svcParty.toProtoPrimitive
-    val sv = svParty.toProtoPrimitive
 
     val svcFilters = Map[PackageQualifiedName, TemplateFilter[?, ?, SvcAcsStoreRowData]](
       mkFilter(cn.svc.coinprice.CoinPriceVote.COMPANION)(co => co.payload.svc == svc) { contract =>
@@ -1078,9 +1074,6 @@ object SvSvcStore {
             svName = Some(contract.payload.svName),
           )
       },
-      mkFilter(cn.svcrules.SvReward.COMPANION)(co => co.payload.svc == svc && co.payload.sv == sv)(
-        SvcAcsStoreRowData(_)
-      ),
       mkFilter(so.SvOnboardingRequest.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
@@ -1119,7 +1112,6 @@ object SvSvcStore {
           coinRoundOfExpiry = Some(CNNodeUtil.coinExpiresAt(contract.payload.coin).number),
         )
       },
-      mkFilter(cc.coin.SvcReward.COMPANION)(co => co.payload.svc == svc)(SvcAcsStoreRowData(_)),
       mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,

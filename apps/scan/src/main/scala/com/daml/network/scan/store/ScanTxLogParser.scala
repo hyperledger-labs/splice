@@ -58,14 +58,6 @@ class ScanTxLogParser(
               node.result.value,
               TransactionType.Mint,
             )
-          case SvcRules_CollectSvReward(node) =>
-            State.fromCoinCreateSummary(
-              tree,
-              exercised,
-              domainId,
-              node.result.value,
-              TransactionType.SvRewardCollected,
-            )
           case CoinRules_BuyMemberTraffic(node) =>
             State.fromBuyMemberTraffic(exercised, domainId, node)
           case CoinExpire(node) =>

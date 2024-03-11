@@ -561,16 +561,6 @@ class UserWalletTxLogParser(
               )
             )
 
-          case SvcRules_CollectSvReward(node) =>
-            now(
-              State.fromCoinCreateSummary(
-                tree,
-                root,
-                node.result.value,
-                BalanceChangeTransactionSubtype.SvRewardCollected,
-              )
-            )
-
           case Mint(node) =>
             now(
               State.fromCoinCreateSummary(

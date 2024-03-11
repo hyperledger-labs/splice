@@ -20,9 +20,7 @@ import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.cc.coinconfig.CoinConfig
 import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome.VRO_AcceptedButActionFailed
 import com.daml.network.codegen.java.cn.wallet.payment.Currency
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
-import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 
 import java.util.Optional
 
@@ -36,12 +34,6 @@ class SvFrontendIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
-      // prevent contention on SvcRules yielding NOT_FOUND when casting a vote
-      .addConfigTransforms((_, conf) =>
-        updateAutomationConfig(ConfigurableApp.Sv)(
-          _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
-        )(conf)
-      )
 
   "SV UIs" should {
     "have basic login functionality" in { implicit env =>

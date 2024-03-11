@@ -17,6 +17,7 @@ import com.daml.network.http.v0.definitions.{
   GetTransferOfferStatusResponse,
 }
 import com.daml.network.store.StoreErrors
+import com.daml.network.store.events.SvRewardCoupon_ArchiveAsBeneficiary
 import com.daml.network.util.{Codec, ExerciseNodeCompanion}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
 
@@ -463,7 +464,8 @@ object TxLogEntry extends StoreErrors {
 
     case object Tap extends BalanceChangeTransactionSubtype(com.daml.network.history.Tap)
     case object Mint extends BalanceChangeTransactionSubtype(com.daml.network.history.Mint)
-    case object SvRewardCollected extends BalanceChangeTransactionSubtype(SvcRules_CollectSvReward)
+    case object SvRewardCollected
+        extends BalanceChangeTransactionSubtype(SvRewardCoupon_ArchiveAsBeneficiary)
     case object AppPaymentRejected
         extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Reject)
     case object AppPaymentExpired extends BalanceChangeTransactionSubtype(AcceptedAppPayment_Expire)

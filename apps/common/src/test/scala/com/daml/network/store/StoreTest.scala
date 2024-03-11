@@ -25,7 +25,6 @@ import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
-import com.daml.network.codegen.java.cn.svcrules as svcCodegen
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -43,6 +42,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
+import com.daml.network.codegen.java.cn.svc.memberstate.{MemberRewardState, RewardState}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.history.{AppRewardCreate, CoinCreate}
 import com.daml.network.store.MultiDomainAcsStore.HasIngestionSink
@@ -325,35 +325,37 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  protected def svReward(
-      svParty: PartyId,
+  protected def svRewardCoupon(
       round: Int,
-      amount: Numeric.Numeric = numeric(1.0),
+      sv: PartyId,
+      beneficiary: PartyId,
+      weight: Long,
       contractId: String = nextCid(),
-  ): Contract[svcCodegen.SvReward.ContractId, svcCodegen.SvReward] =
+  ): Contract[coinCodegen.SvRewardCoupon.ContractId, coinCodegen.SvRewardCoupon] =
     contract(
-      identifier = svcCodegen.SvReward.TEMPLATE_ID,
-      contractId = new svcCodegen.SvReward.ContractId(contractId),
-      payload = new svcCodegen.SvReward(
+      identifier = coinCodegen.SvRewardCoupon.TEMPLATE_ID,
+      contractId = new coinCodegen.SvRewardCoupon.ContractId(contractId),
+      payload = new coinCodegen.SvRewardCoupon(
         svcParty.toProtoPrimitive,
-        svParty.toProtoPrimitive,
+        sv.toProtoPrimitive,
+        beneficiary.toProtoPrimitive,
         new Round(round),
-        amount,
+        weight,
       ),
     )
 
-  protected def svcReward(
-      round: Int,
-      amount: Numeric.Numeric = numeric(1.0),
+  protected def memberRewardState(
+      svName: String,
+      rewardState: RewardState = new RewardState(0L, 0L, new Round(0L), 0L),
       contractId: String = nextCid(),
-  ): Contract[coinCodegen.SvcReward.ContractId, coinCodegen.SvcReward] =
+  ): Contract[MemberRewardState.ContractId, MemberRewardState] =
     contract(
-      identifier = coinCodegen.SvcReward.TEMPLATE_ID,
-      contractId = new coinCodegen.SvcReward.ContractId(contractId),
-      payload = new coinCodegen.SvcReward(
+      identifier = MemberRewardState.TEMPLATE_ID,
+      contractId = new MemberRewardState.ContractId(contractId),
+      payload = new MemberRewardState(
         svcParty.toProtoPrimitive,
-        new Round(round),
-        amount,
+        svName,
+        rewardState,
       ),
     )
 

@@ -123,7 +123,7 @@ object GlobalDomainMigrationCoverageTest {
       ),
       (
         SvSvcStore,
-        SvSvcStore.contractFilter(dummyParty, dummyParty, domainMigrationId),
+        SvSvcStore.contractFilter(dummyParty, domainMigrationId),
         SvSvcStore.templatesMovedByMyAutomation,
       ),
       (
