@@ -2,7 +2,12 @@ package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
-import com.daml.network.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
+import com.daml.network.environment.ledger.api.{
+  LedgerClient,
+  ReassignmentEvent,
+  ReassignmentUpdate,
+  TransactionTreeUpdate,
+}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.resource.DbStorage
@@ -40,6 +45,33 @@ class UpdateHistoryTest
           updates,
           Seq(
             ExpectedCreate(cid1, domain1)
+          ),
+        )
+      }
+
+      "handle reassignments" in {
+        implicit val store = mkStore()
+        val c = appRewardCoupon(1, party1, contractId = cid1)
+        for {
+          _ <- initStore(store)
+          _ <- domain1.create(c)
+          _ <- domain1.unassign(c -> domain2, reassignmentId1, 1)
+          _ <- domain2.assign(c -> domain1, reassignmentId1, 1)
+          _ <- domain2.exercise(
+            c,
+            None,
+            "Archive",
+            com.daml.ledger.javaapi.data.Unit.getInstance(),
+            com.daml.ledger.javaapi.data.Unit.getInstance(),
+          )
+          updates <- updates(store)
+        } yield checkUpdates(
+          updates,
+          Seq(
+            ExpectedCreate(cid1, domain1),
+            ExpectedUnassign(cid1, domain1, domain2),
+            ExpectedAssign(cid1, domain1, domain2),
+            ExpectedExercise(cid1, domain2, "Archive"),
           ),
         )
       }
@@ -264,10 +296,24 @@ class UpdateHistoryTest
           case (rootEvent: CreatedEvent, ExpectedCreate(cid, domainId)) =>
             rootEvent.getContractId should be(cid)
             domain should be(domainId)
-          case (rootEvent: ExercisedEvent, ExpectedExercise(cid, domainId)) =>
+          case (rootEvent: ExercisedEvent, ExpectedExercise(cid, domainId, choice)) =>
             rootEvent.getContractId should be(cid)
+            rootEvent.getChoice should be(choice)
             domain should be(domainId)
           case _ => throw new RuntimeException("Unexpected event type")
+        }
+      case (GetTreeUpdatesResponse(ReassignmentUpdate(update), domain), expected) =>
+        (update.event, expected) match {
+          case (unassign: ReassignmentEvent.Unassign, expected: ExpectedUnassign) =>
+            unassign.contractId.contractId should be(expected.cid)
+            domain should be(expected.domainId)
+            unassign.source should be(expected.domainId)
+            unassign.target should be(expected.targetDomain)
+          case (assign: ReassignmentEvent.Assign, expected: ExpectedAssign) =>
+            assign.createdEvent.getContractId should be(expected.cid)
+            assign.source should be(expected.sourceDomain)
+            assign.target should be(expected.domainId)
+          case _ => throw new RuntimeException("Unexpected reassignment type")
         }
       case _ => throw new RuntimeException("Unexpected update type")
     }
@@ -323,10 +369,19 @@ class UpdateHistoryTest
 
   private val participant1 = ParticipantId("participant1")
   private val participant2 = ParticipantId("participant2")
+
+  private val reassignmentId1 = "%08d".format(1)
 }
 
 object UpdateHistoryTest {
-  sealed trait ExpectedUpdate
+  sealed trait ExpectedUpdate extends Product with Serializable
   final case class ExpectedCreate(cid: String, domainId: DomainId) extends ExpectedUpdate
-  final case class ExpectedExercise(cid: String, domainId: DomainId) extends ExpectedUpdate
+  final case class ExpectedExercise(cid: String, domainId: DomainId, choice: String)
+      extends ExpectedUpdate
+
+  final case class ExpectedAssign(cid: String, sourceDomain: DomainId, domainId: DomainId)
+      extends ExpectedUpdate
+
+  final case class ExpectedUnassign(cid: String, domainId: DomainId, targetDomain: DomainId)
+      extends ExpectedUpdate
 }

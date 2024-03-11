@@ -19,7 +19,9 @@ final case class Reassignment[+E](
 }
 
 object Reassignment {
-  private[api] def fromProto(proto: multidomain.Reassignment): Reassignment[ReassignmentEvent] = {
+  private[network] def fromProto(
+      proto: multidomain.Reassignment
+  ): Reassignment[ReassignmentEvent] = {
     val offset = new ParticipantOffset.Absolute(proto.offset)
     val event = proto.event match {
       case multidomain.Reassignment.Event.UnassignedEvent(out) =>

@@ -1,8 +1,16 @@
 package com.daml.network.store
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
-import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  ExercisedEvent,
+  Identifier,
+  ParticipantOffset,
+  TransactionTree,
+}
 import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
+import com.daml.network.environment.ledger.api.ReassignmentEvent.{Assign, Unassign}
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -234,14 +242,79 @@ final class UpdateHistory(
     private def ingestReassignment(
         reassignment: Reassignment[ReassignmentEvent]
     ): DBIOAction[?, NoStream, Effect.Write] = {
-      DBIO
-        .seq(
-          reassignment.event match {
-            // TODO(#10487): Implement reassignments
-            case _: ReassignmentEvent.Assign => DBIOAction.successful(())
-            case _: ReassignmentEvent.Unassign => DBIOAction.successful(())
-          }
+      reassignment match {
+        case Reassignment(_, _, event: ReassignmentEvent.Assign) =>
+          ingestAssignment(reassignment, event)
+        case Reassignment(_, _, event: ReassignmentEvent.Unassign) =>
+          ingestUnassignment(reassignment, event)
+      }
+    }
+
+    private def ingestUnassignment(
+        reassignment: Reassignment[?],
+        event: ReassignmentEvent.Unassign,
+    ): DBIOAction[?, NoStream, Effect.Write] = {
+      val safeUpdateId = lengthLimited(reassignment.updateId)
+      val safeRecordTime = CantonTimestamp.now()
+      val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
+      val safeUnassignId = lengthLimited(event.unassignId)
+      val safeContractId = lengthLimited(event.contractId.contractId)
+      sqlu"""
+        insert into update_history_unassignments(
+          history_id,update_id,record_time,
+          participant_offset,domain_id,migration_id,
+          reassignment_counter,target_domain,
+          reassignment_id,submitter,
+          contract_id
         )
+        values (
+          $historyId, $safeUpdateId, $safeRecordTime,
+          $safeParticipantOffset, ${event.source}, $domainMigrationId,
+          ${event.counter}, ${event.target},
+          $safeUnassignId, ${event.submitter},
+          $safeContractId
+        )
+      """
+    }
+
+    private def ingestAssignment(
+        reassignment: Reassignment[?],
+        event: ReassignmentEvent.Assign,
+    ): DBIOAction[?, NoStream, Effect.Write] = {
+      val safeUpdateId = lengthLimited(reassignment.updateId)
+      val safeRecordTime = CantonTimestamp.now()
+      val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
+      val safeUnassignId = lengthLimited(event.unassignId)
+      val safeContractId = lengthLimited(event.createdEvent.getContractId)
+      val safeEventId = lengthLimited(event.createdEvent.getEventId)
+      val templateId = event.createdEvent.getTemplateId
+      val templateIdModuleName = lengthLimited(templateId.getModuleName)
+      val templateIdEntityName = lengthLimited(templateId.getEntityName)
+      val templateIdPackageId = lengthLimited(templateId.getPackageId)
+      val createArguments = serializeValue(event.createdEvent.getArguments)
+      val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
+
+      import storage.DbStorageConverters.setParameterByteArray
+      sqlu"""
+        insert into update_history_assignments(
+          history_id,update_id,record_time,
+          participant_offset,domain_id,migration_id,
+          reassignment_counter,source_domain,
+          reassignment_id,submitter,
+          contract_id, event_id, created_at,
+          template_id_package_id, template_id_module_name, template_id_entity_name,
+          create_arguments
+        )
+        values (
+          $historyId, $safeUpdateId, $safeRecordTime,
+          $safeParticipantOffset, ${event.target}, $domainMigrationId,
+          ${event.counter}, ${event.source},
+          $safeUnassignId, ${event.submitter},
+          $safeContractId, $safeEventId, $safeCreatedAt,
+          $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
+          $createArguments
+        )
+      """
     }
 
     private def ingestTransactionTree(
@@ -433,6 +506,88 @@ final class UpdateHistory(
       )
   }
 
+  private def queryAssignments(
+      beginOffset: String,
+      endOffset: String,
+      count: Int,
+  )(implicit tc: TraceContext) = {
+    val safeBegin = lengthLimited(beginOffset)
+    val safeEnd = lengthLimited(endOffset)
+    for {
+      rows <- storage
+        .query(
+          sql"""
+      select
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        reassignment_counter,
+        source_domain,
+        reassignment_id,
+        submitter,
+        contract_id,
+        event_id,
+        created_at,
+        template_id_package_id,
+        template_id_module_name,
+        template_id_entity_name,
+        create_arguments
+      from update_history_assignments
+      where
+        history_id = $historyId and
+        migration_id = $domainMigrationId and
+        participant_offset > $safeBegin and
+        participant_offset <= $safeEnd
+      order by participant_offset
+      limit $count
+    """.as[SelectFromAssignments],
+          "queryAssignments",
+        )
+    } yield {
+      rows.lastOption.map(last => (last.participantOffset, rows))
+    }
+  }
+
+  private def queryUnassignments(
+      beginOffset: String,
+      endOffset: String,
+      count: Int,
+  )(implicit tc: TraceContext) = {
+    val safeBegin = lengthLimited(beginOffset)
+    val safeEnd = lengthLimited(endOffset)
+    for {
+      rows <- storage
+        .query(
+          sql"""
+      select
+        update_id,
+        record_time,
+        participant_offset,
+        domain_id,
+        migration_id,
+        reassignment_counter,
+        target_domain,
+        reassignment_id,
+        submitter,
+        contract_id
+      from update_history_unassignments
+      where
+        history_id = $historyId and
+        migration_id = $domainMigrationId and
+        participant_offset > $safeBegin and
+        participant_offset <= $safeEnd
+      order by participant_offset
+      limit $count
+    """.as[SelectFromUnassignments],
+          "queryUnassignments",
+        )
+    } yield {
+      rows.lastOption.map(last => (last.participantOffset, rows))
+    }
+  }
+
   def updateStream(
       beginOffset: String,
       endOffset: String,
@@ -451,11 +606,35 @@ final class UpdateHistory(
         } yield decodeTransaction(updateRow, creates, exercises)
       )
 
+    val assignments = Source
+      // Fetch assignments in batches of 10
+      .unfoldAsync(beginOffset)(queryAssignments(_, endOffset, 10))
+      .mapConcat(x => x.iterator)
+      // For each transaction, fetch all corresponding events
+      .map(decodeAssignment)
+
+    val unassignments = Source
+      // Fetch assignments in batches of 10
+      .unfoldAsync(beginOffset)(queryUnassignments(_, endOffset, 10))
+      .mapConcat(x => x.iterator)
+      // For each transaction, fetch all corresponding events
+      .map(decodeUnassignment)
+
+    // Merge transactions and assignments by offset
     transactions
+      .mergeSorted(assignments)(updateOrdering)
+      .mergeSorted(unassignments)(updateOrdering)
+  }
+
+  private val updateOrdering = Ordering.by[LedgerClient.GetTreeUpdatesResponse, String] {
+    case LedgerClient.GetTreeUpdatesResponse(TransactionTreeUpdate(tree), _) => tree.getOffset
+    case LedgerClient.GetTreeUpdatesResponse(ReassignmentUpdate(update), _) =>
+      update.offset.getOffset
   }
 
   private def tid(packageName: String, moduleName: String, entityName: String) =
     new Identifier(packageName, moduleName, entityName)
+
   private def decodeTransaction(
       updateRow: SelectFromTransactions,
       createRows: Seq[SelectFromCreateEvents],
@@ -498,7 +677,7 @@ final class UpdateHistory(
           /*interfaceId = */ java.util.Optional.empty(),
           /*contractId = */ row.contractId,
           /*choice = */ row.choice,
-          /*choiceArgument = */ deserializeValue(row.argument).asRecord().get(),
+          /*choiceArgument = */ deserializeValue(row.argument),
           /*actingParties = */ java.util.Collections.emptyList(),
           /*consuming = */ row.consuming,
           /*childEventIds = */ row.childEventIds.asJava,
@@ -525,6 +704,68 @@ final class UpdateHistory(
         )
       ),
       domainId = DomainId.tryFromString(updateRow.domainId),
+    )
+  }
+
+  private def decodeAssignment(
+      row: SelectFromAssignments
+  ): LedgerClient.GetTreeUpdatesResponse = {
+    LedgerClient.GetTreeUpdatesResponse(
+      ReassignmentUpdate(
+        Reassignment[Assign](
+          updateId = row.updateId,
+          offset = new ParticipantOffset.Absolute(row.participantOffset),
+          event = Assign(
+            submitter = row.submitter,
+            source = row.sourceDomain,
+            target = row.domainId,
+            unassignId = row.reassignmentId,
+            createdEvent = new CreatedEvent(
+              /*witnessParties = */ java.util.Collections.emptyList(),
+              /*eventId = */ row.eventId,
+              /*templateId = */ tid(
+                row.templatePackageId,
+                row.templateModuleName,
+                row.templateEntityName,
+              ),
+              /*packageName = */ "dummyPackageName", // #10656: retrieve from store
+              /*contractId = */ row.contractId,
+              /*arguments = */ deserializeValue(row.createArguments).asRecord().get(),
+              /*createdEventBlob = */ ByteString.EMPTY,
+              /*interfaceViews = */ java.util.Collections.emptyMap(),
+              /*failedInterfaceViews = */ java.util.Collections.emptyMap(),
+              /*contractKey = */ java.util.Optional.empty(),
+              /*signatories = */ java.util.Collections.emptyList(),
+              /*observers = */ java.util.Collections.emptyList(),
+              /*createdAt = */ row.createdAt.toInstant,
+            ),
+            counter = row.reassignmentCounter,
+          ),
+        )
+      ),
+      row.domainId,
+    )
+  }
+
+  private def decodeUnassignment(
+      row: SelectFromUnassignments
+  ): LedgerClient.GetTreeUpdatesResponse = {
+    LedgerClient.GetTreeUpdatesResponse(
+      ReassignmentUpdate(
+        Reassignment[Unassign](
+          updateId = row.updateId,
+          offset = new ParticipantOffset.Absolute(row.participantOffset),
+          event = Unassign(
+            submitter = row.submitter,
+            source = row.domainId,
+            target = row.targetDomain,
+            unassignId = row.reassignmentId,
+            counter = row.reassignmentCounter,
+            contractId = new ContractId(row.contractId),
+          ),
+        )
+      ),
+      row.domainId,
     )
   }
 
@@ -592,6 +833,50 @@ final class UpdateHistory(
         )
       )
     }
+
+  private implicit lazy val GetResultSelectFromAssignments: GetResult[SelectFromAssignments] =
+    GetResult { prs =>
+      import prs.*
+      (SelectFromAssignments.apply _).tupled(
+        (
+          <<[String],
+          <<[CantonTimestamp],
+          <<[String],
+          <<[DomainId],
+          <<[Long],
+          <<[Long],
+          <<[DomainId],
+          <<[String],
+          <<[PartyId],
+          <<[String],
+          <<[String],
+          <<[CantonTimestamp],
+          <<[String],
+          <<[String],
+          <<[String],
+          <<[Array[Byte]],
+        )
+      )
+    }
+
+  private implicit lazy val GetResultSelectFromUnassignments: GetResult[SelectFromUnassignments] =
+    GetResult { prs =>
+      import prs.*
+      (SelectFromUnassignments.apply _).tupled(
+        (
+          <<[String],
+          <<[CantonTimestamp],
+          <<[String],
+          <<[DomainId],
+          <<[Long],
+          <<[Long],
+          <<[DomainId],
+          <<[String],
+          <<[PartyId],
+          <<[String],
+        )
+      )
+    }
 }
 
 object UpdateHistory {
@@ -635,4 +920,37 @@ object UpdateHistory {
       argument: Array[Byte],
       result: Array[Byte],
   )
+
+  private case class SelectFromAssignments(
+      updateId: String,
+      recordTime: CantonTimestamp,
+      participantOffset: String,
+      domainId: DomainId,
+      migrationId: Long,
+      reassignmentCounter: Long,
+      sourceDomain: DomainId,
+      reassignmentId: String,
+      submitter: PartyId,
+      contractId: String,
+      eventId: String,
+      createdAt: CantonTimestamp,
+      templatePackageId: String,
+      templateModuleName: String,
+      templateEntityName: String,
+      createArguments: Array[Byte],
+  )
+
+  private case class SelectFromUnassignments(
+      updateId: String,
+      recordTime: CantonTimestamp,
+      participantOffset: String,
+      domainId: DomainId,
+      migrationId: Long,
+      reassignmentCounter: Long,
+      targetDomain: DomainId,
+      reassignmentId: String,
+      submitter: PartyId,
+      contractId: String,
+  )
+
 }

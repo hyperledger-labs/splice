@@ -642,7 +642,7 @@ object LedgerClient {
 
     import lapi.update_service.GetUpdateTreesResponse.Update as TU
 
-    private[LedgerClient] def fromProto(
+    private[network] def fromProto(
         proto: lapi.update_service.GetUpdateTreesResponse
     ): GetTreeUpdatesResponse = {
       proto.update match {

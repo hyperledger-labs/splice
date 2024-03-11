@@ -68,7 +68,8 @@ trait CNDbTest extends DbTest with BeforeAndAfterAll { this: Suite =>
                 update_history_transactions,
                 update_history_exercises,
                 update_history_creates,
-                update_history_reassignments
+                update_history_assignments,
+                update_history_unassignments
             RESTART IDENTITY CASCADE""".asUpdate,
         "resetAllCnAppTables",
       )
