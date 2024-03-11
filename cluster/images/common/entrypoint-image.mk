@@ -4,7 +4,7 @@ $(dir)/$(docker-build): \
 	$(dir)/target/entrypoint.sh \
 	$(dir)/target/bootstrap-entrypoint.sc \
 	$(dir)/target/tools.sh \
-	$(dir)/target/metrics.conf
+	$(dir)/target/monitoring.conf
 
 $(dir)/target:
 	mkdir -p $@
@@ -12,7 +12,7 @@ $(dir)/target:
 $(dir)/target/entrypoint.sh: $(dir)/../common/entrypoint.sh | $(dir)/target
 	cp $< $@
 
-$(dir)/target/metrics.conf: $(dir)/../common/metrics.conf | $(dir)/target
+$(dir)/target/monitoring.conf: $(dir)/../common/monitoring.conf | $(dir)/target
 	cp $< $@
 
 $(dir)/target/bootstrap-entrypoint.sc: $(dir)/../common/bootstrap-entrypoint.sc | $(dir)/target
