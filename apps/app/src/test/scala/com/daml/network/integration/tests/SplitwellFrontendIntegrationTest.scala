@@ -141,6 +141,9 @@ class SplitwellFrontendIntegrationTest
               Seq(charlieParty, "0.0000000000"),
             )(row2)
           }
+        }
+
+        eventually() {
           val rows = findAll(className("balance-updates-list-item")).toSeq
           rows should have size 4
           // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
