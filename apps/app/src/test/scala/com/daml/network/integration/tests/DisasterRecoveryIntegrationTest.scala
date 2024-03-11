@@ -154,28 +154,36 @@ class DisasterRecoveryIntegrationTest
   val dumpPath = Files.createTempFile("participant-dump", ".json")
 
   "Recover from losing the domain" in { implicit env =>
-    runTest((identities, timestampBeforeDisaster) => {
-      val svBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
-      val dumps = svBackends.map(_.getDomainDataSnapshot(timestampBeforeDisaster))
-      svBackends.zip(identities.zip(dumps)).foreach { case (sv, (ids, dump)) =>
-        writeMigrationDumpFile(sv, ids, dump)
-      }
-    })
+    runTest(
+      "lost-domain",
+      (identities, timestampBeforeDisaster) => {
+        val svBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
+        val dumps = svBackends.map(_.getDomainDataSnapshot(timestampBeforeDisaster))
+        svBackends.zip(identities.zip(dumps)).foreach { case (sv, (ids, dump)) =>
+          writeMigrationDumpFile(sv, ids, dump)
+        }
+      },
+    )
   }
 
   "Recover from losing all sequencers and most participants" in { implicit env =>
-    runTest((identities, timestampBeforeDisaster) => {
-      val dump =
-        sv2Backend.getDomainDataSnapshot(timestampBeforeDisaster, Some(identities.head.svcPartyId))
-      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
-        case (sv, ids) =>
-          writeMigrationDumpFile(sv, ids, dump)
-      }
-    })
+    runTest(
+      "lost-all-sequencers-most-participants",
+      (identities, timestampBeforeDisaster) => {
+        val dump =
+          sv2Backend
+            .getDomainDataSnapshot(timestampBeforeDisaster, Some(identities.head.svcPartyId))
+        Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
+          case (sv, ids) =>
+            writeMigrationDumpFile(sv, ids, dump)
+        }
+      },
+    )
   }
 
   private def runTest(
-      getAndWriteDumps: (Seq[DomainNodeIdentities], Instant) => Unit
+      cantonInstanceSuffix: String,
+      getAndWriteDumps: (Seq[DomainNodeIdentities], Instant) => Unit,
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
     import env.environment.scheduler
     import env.executionContext
@@ -194,13 +202,13 @@ class DisasterRecoveryIntegrationTest
 
     withCantonSvNodes(
       (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
-      "participants-before-disaster",
+      s"participants-before-disaster-$cantonInstanceSuffix",
       sequencersMediators = false,
     )() {
 
       val (identities, timestampBeforeDisaster) = withCantonSvNodes(
         (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
-        "sequencers-mediators-before-disaster",
+        s"sequencers-mediators-before-disaster-$cantonInstanceSuffix",
         participants = false,
       )() {
         startAllSync(
@@ -250,7 +258,7 @@ class DisasterRecoveryIntegrationTest
 
       withCantonSvNodes(
         (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
-        "disaster-recovery",
+        s"disaster-recovery-$cantonInstanceSuffix",
         overrideSvDbsSuffix = Some("disaster_recovery_new"),
         overrideSequencerDriverDbSuffix = Some("disaster_recovery_new"),
         autoInit = false,
