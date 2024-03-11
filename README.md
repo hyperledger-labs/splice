@@ -5,11 +5,11 @@ Reference applications for funding, operating, and incentivizing the use of a de
 
 # Scope of Lab
 ## Abstract
-Splice is a set of reference applications designed to allow entities to operate, fund, and govern publicly available Canton synchronizers that provide connectivity and interoperability infrastructure for the Canton Network, as well as to provide bootstrapping rewards and incentives to early users of that service. The Canton Network is the set of all applications built using the Daml blockchain application platform that form shared blockchain state via the Canton Protocol.
+Splice is a set of reference applications designed to allow entities to operate, fund, and govern publicly available decentralized Canton synchronizers that provide connectivity and interoperability infrastructure for the Canton Network, as well as to provide bootstrapping rewards and incentives to early users of that service. The Canton Network is the set of all applications, built using the Daml blockchain application platform, that form shared blockchain state via the Canton Protocol.
 
-A virtual Canton Service Provider (vCSP), henceforth “operating group” is a group of entities that collectively operate a deployment of a decentralized Canton synchronizer. Splice introduces a reference method for operating a publicly available decentralized synchronizer, using what Splice calls a Super Validator Collective (SVC) as the operating group.  Super Validators in a Collective operate the nodes of a decentralized Canton synchronizer. The group of Super Validators in the Collective act both individually and collectively to configure, monitor and govern the synchronizer.
+Splice introduces a reference method for operating a publicly available decentralized Canton synchronizer. Each node in the decentralized synchronizer is operated by an entity known in Splice as a "Super Validator". Splice refers to a group of Super Validators actively operating nodes in a decentralized synchronizer at any point in time as the "decentralized synchronizer operator" (dso). The Splice code uses a code construct called a "decentralized synchronizer operator party" (dso party) to accumulate signatures from and take actions on behalf of the currently-active set of Super Validators.  
 
-Splice aims to help operating groups create a transparent economic ecosystem that will, over time, fund operations of and extensions to multiple public synchronization services in the Canton Network.
+Splice aims to help Super Validator operating groups create a transparent economic ecosystem that will, over time, fund operations of and extensions to multiple public synchronization services in the Canton Network.
 
 ## Context
 Daml is a platform built by Digital Asset designed for deploying blockchains and developing blockchain applications. It includes a smart contract language, a set of APIs for calling smart contract code, a transaction processing engine, a query-optimized database for accessing smart contract state, and development tooling including an SDK. The open source and enterprise distributions of Daml also include a blockchain protocol, Canton, that creates synchronized state among nodes running the Daml platform.
@@ -45,7 +45,7 @@ Splice’s interlocking system of incentives and fees includes:<br>
 * Handles for amulet users, to make it easy to find counterparties on chain and exchange amulets with them. <br>
 
 ## Status
-The code that forms Splice was first implemented in June 2023 as part of a TestNet synchronizer operated by the members of an initial Super Validator Collective. At that time Splice was a set of applications with various names including Canton Coin and Canton Name Service. The TestNet synchronizer has operated continuously since that time, with regular tests and software upgrades, using the code proposed for Splice to implement its operations, governance and payment applications. In late December, Digital Asset and 46 separate financial institutions demonstrated 30 decentralized application deployments that synchronized roughly 350 financial transactions via the TestNet synchronizer. <br> <p>
+The code that forms Splice was first implemented in June 2023 as part of a TestNet synchronizer operated by the members of an initial  Validator Collective. At that time Splice was a set of applications with various names including Canton Coin and Canton Name Service. The TestNet synchronizer has operated continuously since that time, with regular tests and software upgrades, using the code proposed for Splice to implement its operations, governance and payment applications. In late December 2023, Digital Asset and 46 separate financial institutions demonstrated 30 decentralized application deployments that synchronized roughly 350 financial transactions via the TestNet synchronizer. <br> <p>
 The collective operating this TestNet currently includes Digital Asset and three other organizations, with four additional organizations currently in the process of applying to join. <br> <p>
 Digital Asset has funded an engineering team to develop the Splice reference applications. Digital Asset is working to build a team of collaborators who can decentralize responsibility for further development as part of the Open Source Software process. <br> <p>
 
@@ -65,11 +65,10 @@ We expect that contributors interested in Splice may contribute, for example, ex
 Any group operating a Canton synchronizer may accept and implement new versions of the Splice reference applications at its own discretion. The amulet configuration used by any Canton synchronizer operating group can be made publicly available (visible) by that operating group. <br>
 
 ## Architecture
-The following diagrams show how the Splice applications interact with the Daml platform from Digital Asset.<br>
+The following diagram shows how the Splice applications interact with the Daml platform from Digital Asset.<br>
 
-![SV Node Architecture](./images/Super%20Validator%20Architecture%20Diagram%20for%20Splice-1.jpg)
+![SV Node Architecture](./images/Splice-Canton-Global-Synchronizer.jpg)
 
-![Validator Node Architecture](./images/Super%20Validator%20Architecture%20Diagram%20for%20Splice-2.jpg)
 
 ### Notes:
 The Validator module contains the Wallet module and the Traffic Acquisition module.<br>
