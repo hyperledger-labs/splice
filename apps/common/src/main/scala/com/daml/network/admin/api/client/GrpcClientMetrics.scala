@@ -5,7 +5,7 @@ import com.daml.metrics.api.{MetricHandle, MetricName, MetricsContext}
 import com.daml.network.admin.api.client.DamlGrpcClientMetrics.GrpcClientMetricsPrefix
 
 object DamlGrpcClientMetrics {
-  val GrpcClientMetricsPrefix = MetricName.Daml :+ "grpc" :+ "server"
+  val GrpcClientMetricsPrefix = MetricName.Daml :+ "grpc" :+ "client"
 }
 
 class DamlGrpcClientMetrics(
