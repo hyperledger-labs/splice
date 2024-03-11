@@ -1099,8 +1099,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     new MemberInfo(
       name,
       new Round(1L),
-      new Round(123L),
-      456L,
       789L,
       s"PAR::${name}::12345",
       Collections.emptyMap(),

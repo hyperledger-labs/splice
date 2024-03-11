@@ -50,7 +50,8 @@ object SvcTables extends AcsTables with NamedLogging {
       subscriptionReferenceContractId: Option[sub.SubscriptionRequest.ContractId] = None,
       subscriptionNextPaymentDueAt: Option[Timestamp] = None,
       featuredAppRightProvider: Option[PartyId] = None,
-      svStatusReportSv: Option[PartyId] = None,
+      svParty: Option[PartyId] = None,
+      svName: Option[String] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "coin_round_of_expiry" -> coinRoundOfExpiry,
@@ -81,7 +82,8 @@ object SvcTables extends AcsTables with NamedLogging {
       "subscription_reference_contract_id" -> subscriptionReferenceContractId,
       "subscription_next_payment_due_at" -> subscriptionNextPaymentDueAt,
       "featured_app_right_provider" -> featuredAppRightProvider,
-      "sv_status_report_sv" -> svStatusReportSv,
+      "sv_party" -> svParty,
+      "sv_name" -> svName.map(lengthLimited),
     )
   }
 

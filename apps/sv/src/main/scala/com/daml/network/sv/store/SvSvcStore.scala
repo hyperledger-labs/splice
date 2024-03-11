@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cc.coinrules.{
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.validatorlicense as vl
 import com.daml.network.codegen.java.cn.svc.coinprice as cp
+import com.daml.network.codegen.java.cn.svc.memberstate.MemberRewardState
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CoinRules,
   ARC_SvcRules,
@@ -128,6 +129,10 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
           .asRuntimeException()
       )
     )
+
+  def lookupMemberRewardState(svName: String)(implicit
+      tc: TraceContext
+  ): Future[Option[AssignedContract[MemberRewardState.ContractId, MemberRewardState]]]
 
   def lookupCoinRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
@@ -958,6 +963,7 @@ object SvSvcStore {
       so.SvOnboardingRequest.COMPANION,
       so.SvOnboardingConfirmed.COMPANION,
       cn.svc.svstatus.SvStatusReport.COMPANION,
+      cn.svc.memberstate.MemberRewardState.COMPANION,
     )
   }
 
@@ -1062,8 +1068,15 @@ object SvSvcStore {
       mkFilter(cn.svc.svstatus.SvStatusReport.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
-          svStatusReportSv = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
+          svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
         )
+      },
+      mkFilter(cn.svc.memberstate.MemberRewardState.COMPANION)(co => co.payload.svc == svc) {
+        contract =>
+          SvcAcsStoreRowData(
+            contract,
+            svName = Some(contract.payload.svName),
+          )
       },
       mkFilter(cn.svcrules.SvReward.COMPANION)(co => co.payload.svc == svc && co.payload.sv == sv)(
         SvcAcsStoreRowData(_)

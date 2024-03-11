@@ -137,6 +137,13 @@ initCollective isDevNet = do
   pure (app, svc, (sv1, sv2, sv3, sv4))
 
 
+getMemberInfoByParty : CCApp -> Party -> Script MemberInfo
+getMemberInfoByParty app sv = do
+  [(_, rules)] <- query @SvcRules app.svc
+  case Map.lookup sv rules.members of
+    None -> fail $ "Not a member: " <> show sv
+    Some info -> pure info
+
 generateUnclaimedReward : CCApp -> CCUser -> Script ()
 generateUnclaimedReward app provider1 = do
   submitMulti [app.svc, provider1.primaryParty] [] $ createCmd AppRewardCoupon with

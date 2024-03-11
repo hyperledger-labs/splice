@@ -11,6 +11,7 @@ import CC.Types
 import CN.Cns
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
+import CN.SVC.MemberState
 import CN.SVC.SvStatus
 import CN.SvcRules
 
@@ -64,12 +65,19 @@ template SvcBootstrap with
           svName = founderName
           number = 0
           status = None
+        -- create initial reward state of the founder
+        _ <- create MemberRewardState with
+            svc
+            svName = founderName
+            state = RewardState with
+              lastRoundCollected = Round (- 1)
+              numRoundsMissed = 0
+              numRoundsCollected = 0
+              numCouponsIssued = 0
         -- create the SVC rules with the founding member as the sole member
         let founderInfo = MemberInfo with
               name = founderName
               joinedAsOfRound = Round 0
-              lastReceivedRewardFor = Round (- 1)
-              numRewardCouponsMissed = 0
               svRewardWeight = founderRewardWeight
               participantId = founderParticipantId
               domainNodes = founderDomainNodes

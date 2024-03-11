@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext}
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
+import com.daml.network.codegen.java.cn.svc.memberstate.MemberRewardState
 import com.daml.network.codegen.java.cn.svc.svstatus.SvStatusReport
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
@@ -1253,6 +1254,21 @@ class DbSvSvcStore(
   override def lookupSvStatusReport(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[AssignedContract[SvStatusReport.ContractId, SvStatusReport]]] =
+    lookupContractBySvParty(SvStatusReport.COMPANION, svPartyId)
+
+  override def lookupMemberRewardState(svName: String)(implicit
+      tc: TraceContext
+  ): Future[Option[AssignedContract[MemberRewardState.ContractId, MemberRewardState]]] =
+    lookupContractBySvName(MemberRewardState.COMPANION, svName)
+
+  private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
+      companion: C,
+      svPartyId: PartyId,
+  )(implicit
+      companionClass: ContractCompanion[C, TCId, T],
+      tc: TraceContext,
+  ): Future[Option[AssignedContract[TCId, T]]] = {
+    val templateId = companionClass.typeId(companion)
     waitUntilAcsIngested {
       for {
         row <- storage
@@ -1262,16 +1278,44 @@ class DbSvSvcStore(
               storeId,
               domainMigrationId,
               where = sql"""
-             template_id_qualified_name = ${QualifiedName(SvStatusReport.COMPANION.TEMPLATE_ID)}
-         and sv_status_report_sv = $svPartyId""",
+         template_id_qualified_name = ${QualifiedName(templateId)}
+     and sv_party = $svPartyId""",
               orderLimit = sql"""limit 1""",
             ).headOption,
-            "lookupSvStatusReport",
+            s"lookupContractBySvParty[$templateId]",
           )
           .value
-      } yield row.map(assignedContractFromRow(SvStatusReport.COMPANION)(_))
+      } yield row.map(assignedContractFromRow(companion)(_))
     }
+  }
 
+  private def lookupContractBySvName[C, TCId <: ContractId[_], T](
+      companion: C,
+      svName: String,
+  )(implicit
+      companionClass: ContractCompanion[C, TCId, T],
+      tc: TraceContext,
+  ): Future[Option[AssignedContract[TCId, T]]] = {
+    val templateId = companionClass.typeId(companion)
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            selectFromAcsTableWithState(
+              SvcTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""
+         template_id_qualified_name = ${QualifiedName(templateId)}
+     and sv_name = ${lengthLimited(svName)}""",
+              orderLimit = sql"""limit 1""",
+            ).headOption,
+            s"lookupContractBySvName[$templateId]",
+          )
+          .value
+      } yield row.map(assignedContractFromRow(companion)(_))
+    }
+  }
   override def close(): Unit = {
     svcStoreMetrics.close()
     super.close()

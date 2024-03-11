@@ -1,0 +1,46 @@
+-- | Templates to track per-member state.
+module CN.SVC.MemberState where
+
+import CC.Types
+
+import CN.Util
+
+
+-- Checked fetches for per-member state
+---------------------------------------
+
+data ForMember = ForMember with
+    svc : Party
+    svName : Text
+  deriving (Eq, Show)
+
+
+-- Reward collection
+--------------------
+
+-- | Reward collection state of an SVC member.
+--
+-- Note that we keep some extra aggregates in this state to make it easier to interpret it.
+-- In principle, these could be derived from the transaction history, but that
+-- would be much more onerous to implement.
+data RewardState = RewardState with
+    numRoundsMissed : Int -- ^ Number of rounds for which they missed collecting coupons.
+    numRoundsCollected : Int -- ^ Number of rounds for which they collected coupons.
+    lastRoundCollected : Round -- ^ Last round for which they collected reward coupons.
+    numCouponsIssued : Int -- ^ Number of SV reward coupons issued by them for their beneficiaries.
+  deriving (Eq, Show)
+
+-- | State of reward collection for a member identified by their member name.
+template MemberRewardState with
+    svc : Party
+    svName : Text
+    state : RewardState
+  where
+    signatory svc
+
+
+-- instances
+------------
+
+instance HasCheckedFetch MemberRewardState ForMember where
+  contractGroupId MemberRewardState {..} = ForMember with svc; svName

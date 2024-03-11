@@ -27,6 +27,7 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import MultiDomainAcsStore.QueryResult
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
+import com.daml.network.codegen.java.cn.svc.memberstate.MemberRewardState
 import com.daml.network.codegen.java.cn.svc.svstatus.SvStatusReport
 import com.daml.network.sv.store.{AppRewardCouponsSum, SvStore, SvSvcStore, TxLogEntry}
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
@@ -655,6 +656,15 @@ class InMemorySvSvcStore(
       .findContract(SvStatusReport.COMPANION)(
         (c: Contract[SvStatusReport.ContractId, SvStatusReport]) =>
           c.payload.sv == svPartyId.toProtoPrimitive
+      )
+      .map(_.flatMap(_.toAssignedContract))
+
+  override def lookupMemberRewardState(svName: String)(implicit
+      tc: TraceContext
+  ): Future[Option[AssignedContract[MemberRewardState.ContractId, MemberRewardState]]] =
+    multiDomainAcsStore
+      .findContract(MemberRewardState.COMPANION)(
+        (c: Contract[MemberRewardState.ContractId, MemberRewardState]) => c.payload.svName == svName
       )
       .map(_.flatMap(_.toAssignedContract))
 }

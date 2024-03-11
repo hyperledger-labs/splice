@@ -663,8 +663,19 @@ create table svc_acs_store
     -- the provider partyid of a FeaturedAppRight contract
     featured_app_right_provider   text,
 
-    -- the sv of an sv status report (not index-supported as there are not many)
-    sv_status_report_sv           text
+    -- TODO(#10711): use the index columns below for all templates where they make sense
+
+    -- generic by sv party field for templates with one instance per svParty
+    -- templates: SvStatusReport
+    --
+    -- Note: no index as the template_id_qualified_name index should be sufficient.
+    sv_party text,
+
+    -- generic by-sv-name field for templates with one instance per svName
+    -- templates: MemberRewardState
+    --
+    -- Note: no index as the template_id_qualified_name index should be sufficient.
+    sv_name text
 );
 
 -- ordered mining rounds

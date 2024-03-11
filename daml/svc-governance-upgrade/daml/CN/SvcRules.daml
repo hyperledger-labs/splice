@@ -25,6 +25,7 @@ import CN.Cns
 import CN.SvOnboarding
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
+import CN.SVC.MemberState
 import CN.SVC.SvStatus
 import CN.Util
 import CC.Schedule (getValueAsOf)
@@ -113,8 +114,6 @@ data CnsEntryContext_ActionRequiringConfirmation
 data MemberInfo = MemberInfo with
     name : Text -- ^ Human-readable name; must be unique.
     joinedAsOfRound : Round -- ^ Round in which the member joined the collective.
-    lastReceivedRewardFor : Round -- ^ Last round for which the member received a reward coupon.
-    numRewardCouponsMissed : Int -- ^ Number of reward coupons missed since they joined.
     svRewardWeight : Int -- ^ Weight of the SV in the SVC reward distribution.
     participantId : Text -- ^ Participant ID of the SV.
     domainNodes : DomainNodeConfigMap
@@ -128,7 +127,6 @@ data MemberInfo = MemberInfo with
 data OffboardedMemberInfo = OffboardedMemberInfo with
     name : Text -- ^ Human-readable name; must be unique.
     participantId : Text -- ^ Participant ID of the offboarded SV.
-    lastReceivedRewardFor : Round
   deriving (Eq, Show)
 
 data CollectiveSummary = CollectiveSummary with
@@ -329,7 +327,7 @@ template SvcRules with
               pure $ case find (\(_, info) -> info.name == newMemberName) (Map.toList members) of
                 None -> offboardedMembers
                 Some (prev, info) ->
-                  Map.insert prev (OffboardedMemberInfo { name = "SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty, participantId = info.participantId, lastReceivedRewardFor = info.lastReceivedRewardFor }) offboardedMembers
+                  Map.insert prev (OffboardedMemberInfo { name = "SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty, participantId = info.participantId}) offboardedMembers
             else do
               require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
               pure offboardedMembers
@@ -339,10 +337,6 @@ template SvcRules with
         let info = MemberInfo with
               name = newMemberName
               joinedAsOfRound
-              lastReceivedRewardFor = max (Round (joinedAsOfRound.number - 1)) (optional (Round (-1)) (.lastReceivedRewardFor) offboardedMemberInfoO)
-              -- For simplicity we only count missed coupons for the most recent joining, and not across reonboardings.
-              -- TODO(#9175): consider counting missed coupons across reonboardings
-              numRewardCouponsMissed = 0
               svRewardWeight = newMemberRewardWeight
               participantId = newMemberParticipantId
               domainNodes = noDomainNodes
@@ -355,7 +349,15 @@ template SvcRules with
           coinPrice = None
           lastUpdatedAt = now
         -- create SvStatusReport contract if the member has not previously been onboarded
-        unless (isSome offboardedMemberInfoO) $
+        unless (isSome offboardedMemberInfoO) $ do
+          void $ create MemberRewardState with
+            svc
+            svName = newMemberName
+            state = RewardState with
+              lastRoundCollected = Round (joinedAsOfRound.number - 1)
+              numRoundsMissed = 0
+              numRoundsCollected = 0
+              numCouponsIssued = 0
           void $ create SvStatusReport with
             svc
             sv = newMemberParty
@@ -395,7 +397,6 @@ template SvcRules with
             let offboardedMemberInfo = OffboardedMemberInfo with
                     name = info.name
                     participantId = info.participantId
-                    lastReceivedRewardFor = info.lastReceivedRewardFor
             -- create the new rules contract
             create SvcRules with
               svc
@@ -870,10 +871,6 @@ template SvcRules with
         let info = OffboardedMemberInfo with
               name = svOnboardingConfirmed.svName
               participantId = svOnboardingConfirmed.svParticipantId
-              lastReceivedRewardFor =
-                max
-                  (optional (Round (-1)) (.lastReceivedRewardFor) (Map.lookup party members))
-                  (optional (Round (-1)) (.lastReceivedRewardFor) (Map.lookup party offboardedMembers))
         create SvcRules with
           svc
           epoch
@@ -963,34 +960,42 @@ template SvcRules with
     -- Reward management driven directly by the leader
     --------------------------------------------------
 
-    -- Round durations are long enough that it's OK to have this bit of contention from all members drawing on their
-    -- coupons at about the same time.
-    choice SvcRules_ReceiveSvRewardCoupon
-      : (ContractId SvcRules, [ContractId SvRewardCoupon])
+    nonconsuming choice SvcRules_ReceiveSvRewardCoupon
+      : (ContractId MemberRewardState, [ContractId SvRewardCoupon])
       with
         sv : Party
         openRoundCid : ContractId OpenMiningRound
+        rewardStateCid : ContractId MemberRewardState
         beneficiaries : [(Party, Int)]
       controller sv
       do
         case Map.lookup sv members of
           None -> fail "SV is not a collective member"
           Some info -> do
+            -- check round
             now <- getTime
             openRound <- fetchReferenceData (ForSvc with svc) openRoundCid
             require "OpenRound is open" (openRound.opensAt <= now)
-            require ("Round " <> show openRound.round <> " is greater than the last round a reward has been received for " <> show info.lastReceivedRewardFor) (info.lastReceivedRewardFor < openRound.round)
 
-            let newInfo = info with
-                  lastReceivedRewardFor = openRound.round
-                  numRewardCouponsMissed =
-                    info.numRewardCouponsMissed + (openRound.round.number - info.lastReceivedRewardFor.number - 1)
+            -- check and update state
+            rewardState <- fetchAndArchive (ForMember with svc; svName = info.name) rewardStateCid
+            let state = rewardState.state
+            require
+              ("Round " <> show openRound.round <> " is greater than the last round a reward has been received for " <> show state.lastRoundCollected)
+              (state.lastRoundCollected < openRound.round)
 
-            rulesCid <- create this with
-              members = Map.insert sv newInfo members
+            newRewardStateCid <- create rewardState with
+              state = RewardState with
+                lastRoundCollected = openRound.round
+                numRoundsCollected = state.numRoundsCollected + 1
+                numRoundsMissed =
+                  state.numRoundsMissed + (openRound.round.number - state.lastRoundCollected.number - 1)
+                numCouponsIssued = state.numCouponsIssued + length beneficiaries
 
+            -- check weights and issue rewards
             let totalBenficiaryWeight = sum $ map snd beneficiaries
             require "Total beneficiary weight matches SV operator weight" (totalBenficiaryWeight == info.svRewardWeight)
+            require "At most one coupon per beneficiary" (unique $ map fst beneficiaries)
 
             couponCids <- forA beneficiaries $ \(beneficiary, weight) ->
               create SvRewardCoupon with
@@ -1000,10 +1005,13 @@ template SvcRules with
                 weight
                 round = openRound.round
 
-            return (rulesCid, couponCids)
+            return (newRewardStateCid, couponCids)
 
 
-    -- TODO(#9149): remove this choice once the apps switched to the new SV reward issuance
+    -- Reward management driven directly by the leader
+    --------------------------------------------------
+
+    -- TODO(#9149): remove this whole group of choices once the apps switched to the new SV reward issuance
     nonconsuming choice SvcRules_CollectSvcReward : ()
       with
         rewardCid : ContractId SvcReward

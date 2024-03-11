@@ -5,14 +5,15 @@ import DA.Action (void)
 import DA.List (sortOn)
 import DA.Foldable (forA_)
 import DA.Time
-import qualified DA.Map as Map
 
 import Daml.Script
 
 import CC.Coin
 import CC.Round
+import CC.Types
 import CC.Scripts.Util
 import CN.SvcRules
+import CN.SVC.MemberState
 import CN.Scripts.SvcTestUtils
 import CN.Util
 
@@ -38,23 +39,26 @@ test_SvRewards = do
           [(_, coin)] <- query @Coin sv
           require (show sv <> " balance: expected " <> show amount <> " == " <> show coin.amount.initialAmount)
             (coin.amount.initialAmount == amount)
-    let getSvRewardWeight sv = do
-          [(_, rules)] <- query @SvcRules svc
-          pure $ optional 0 (.svRewardWeight) $ Map.lookup sv rules.members
+    let getSvRewardWeightAndState sv = do
+          info <- getMemberInfoByParty app sv
+          [(rewardStateCid, _)] <- queryFilter @MemberRewardState svc (\s -> s.svName == info.name)
+          pure (info.svRewardWeight, rewardStateCid)
 
     let receiveSvRewardCouponFails sv round rulesCid = do
-          weight <- getSvRewardWeight sv
+          (weight, rewardStateCid) <- getSvRewardWeightAndState sv
           -- check that collecting the reward coupon fails
           void $ submitMultiMustFail [sv] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
             openRoundCid = round._1
+            rewardStateCid
             beneficiaries = [(sv, weight)]
             sv = sv
-    let receiveSvRewardCoupon : Party -> (ContractId OpenMiningRound, OpenMiningRound) -> ContractId SvcRules -> Script (ContractId SvcRules)
+    let receiveSvRewardCoupon : Party -> (ContractId OpenMiningRound, OpenMiningRound) -> ContractId SvcRules -> Script ()
         receiveSvRewardCoupon sv round rulesCid = do
-          weight <- getSvRewardWeight sv
+          (weight, rewardStateCid) <- getSvRewardWeightAndState sv
           -- collect reward coupon
-          (newRulesCid, _) <- submitMulti [sv] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
+          void $ submitMulti [sv] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
             openRoundCid = round._1
+            rewardStateCid
             beneficiaries = [(sv, weight - 1), (extraBeneficiary, 1)]
             sv = sv
           -- check that the coupon exists and has the right weight
@@ -67,8 +71,6 @@ test_SvRewards = do
                 weight
                 round = round._2.round
               | (beneficiary, weight) <- [(sv, weight - 1), (extraBeneficiary, 1)]]
-          -- return the new rules contract-id
-          pure newRulesCid
 
     [(rulesCid, _)] <- query @SvcRules svc
 
@@ -78,15 +80,15 @@ test_SvRewards = do
 
     -- round0 can be received by both SV1 and SV2
     passTime (hours 1)
-    rulesCid <- receiveSvRewardCoupon sv1 round0 rulesCid
-    rulesCid <- receiveSvRewardCoupon sv2 round0 rulesCid
+    receiveSvRewardCoupon sv1 round0 rulesCid
+    receiveSvRewardCoupon sv2 round0 rulesCid
 
     -- but not twice
     receiveSvRewardCouponFails sv1 round0 rulesCid
     receiveSvRewardCouponFails sv2 round0 rulesCid
 
     -- round1 can be received (intentionally skipping receiving it for SV2)
-    rulesCid <- receiveSvRewardCoupon sv1 round1 rulesCid
+    receiveSvRewardCoupon sv1 round1 rulesCid
 
     -- let's collect the rewards for Round 0: requires two issuing round advances
     -- (create the issuing round and advance time for it to become open)
@@ -130,14 +132,25 @@ test_SvRewards = do
     passTime (days 1)
 
     -- round3 can be received despite round 2 not yet being recieved, i.e., we can skip rounds
-    rulesCid <- receiveSvRewardCoupon sv1 round3 rulesCid
-    rulesCid <- receiveSvRewardCoupon sv2 round3 rulesCid
+    receiveSvRewardCoupon sv1 round3 rulesCid
+    receiveSvRewardCoupon sv2 round3 rulesCid
 
     checkSvRewardCouponsDoNotExist round2._2.round
+
     -- check that the coupons for round 2 and 3 are marked as not collected
-    [(_, rules)] <- query @SvcRules svc
-    optional (-1) (.numRewardCouponsMissed) (Map.lookup sv1 rules.members) === 2
-    optional (-1) (.numRewardCouponsMissed) (Map.lookup sv2 rules.members) === 3
+    [(_, sv1State)] <- queryFilter @MemberRewardState svc (\s -> s.svName == "sv1")
+    sv1State.state === RewardState with
+      numRoundsMissed = 2
+      numRoundsCollected = 3
+      lastRoundCollected = Round 4
+      numCouponsIssued = 6
+
+    [(_, sv2State)] <- queryFilter @MemberRewardState svc (\s -> s.svName == "sv2")
+    sv2State.state === RewardState with
+      numRoundsMissed = 3
+      numRoundsCollected = 2
+      lastRoundCollected = Round 4
+      numCouponsIssued = 4
 
     -- round2 can no longer be received
     receiveSvRewardCouponFails sv1 round2 rulesCid

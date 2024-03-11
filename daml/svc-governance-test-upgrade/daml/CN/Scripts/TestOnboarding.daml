@@ -335,7 +335,7 @@ testSvMemberOverwriteInDevNet = do
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" 19 "sv2-participant-id" (Round 3) domainId
 
   [(_, svcRules)] <- query @SvcRules app.svc
-  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id") (Round (-1)))]
+  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id"))]
 
   svX2 <- allocateParty "svX2"
 
@@ -345,7 +345,7 @@ testSvMemberOverwriteInDevNet = do
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX2 "sv2" 19 "sv2-participant-id" (Round 3) domainId
 
   [(_, svcRules)] <- query @SvcRules app.svc
-  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id") (Round (-1))), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'" ("sv2-participant-id") (Round 2))]
+  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id")), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'" ("sv2-participant-id"))]
 
   -- status reports are OK
   checkSvStatusReports app
@@ -358,15 +358,6 @@ testSvMemberReonboarding = do
   [(_, svcRules)] <- query @SvcRules svc
 
   Map.keys svcRules.members === [sv1, sv2, sv3, sv4]
-
-  [(earliestRoundCid, _), (middleRoundCid, _), _] <- getActiveOpenRoundsSorted app
-  -- Receive rewards for all open rounds
-  forA_ [earliestRoundCid, middleRoundCid] $ \roundCid -> do
-    [(rulesCid, _)] <- query @SvcRules svc
-    submitMulti [sv4] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
-      openRoundCid = roundCid
-      sv = sv4
-      beneficiaries = [(sv4, 3 * bpsMultiplier)]
 
   initiateAndAcceptVote app [sv1, sv2, sv3] $
     ARC_SvcRules with
@@ -414,17 +405,8 @@ testSvMemberReonboarding = do
   [(_, svcRules)] <- query @SvcRules svc
 
   Map.keys svcRules.members === [sv1, sv2, sv3, sv4]
-  fmap (.lastReceivedRewardFor) (Map.lookup sv4 svcRules.members) === Some (Round 1)
   -- sv4 is removed from offboarded members again.
   Map.keys svcRules.offboardedMembers === []
-
-  -- Check that we cannot receive rewards again
-  forA_ [earliestRoundCid, middleRoundCid] $ \roundCid -> do
-    [(rulesCid, _)] <- query @SvcRules svc
-    submitMultiMustFail [sv4] [svc] $ exerciseCmd rulesCid SvcRules_ReceiveSvRewardCoupon with
-      openRoundCid = roundCid
-      sv = sv4
-      beneficiaries = [(sv4, 3 * bpsMultiplier)]
 
   -- check status reports
   checkSvStatusReports app
