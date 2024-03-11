@@ -236,7 +236,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
               .getOrElse(fail(s"Failed parsing round number from: $asOfRound"))
           val totalCoinBalanceSv = find(id("total-coin-balance-cc")).value.text
           val totalCoinBalanceSv1 = sv1ScanClient.getTotalCoinBalance(round)
-          totalCoinBalanceSv shouldBe s"$totalCoinBalanceSv1 CC"
+          BigDecimal(totalCoinBalanceSv.stripSuffix("CC").trim) shouldBe totalCoinBalanceSv1
         }
       }
     } else {
