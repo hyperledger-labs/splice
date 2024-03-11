@@ -61,23 +61,15 @@ class SvcPartyHosting(
       participantId: ParticipantId,
   )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retryForClientCalls(
     "wait for SVC party to participant authorization to complete",
-    getSvcPartyToParticipantTransaction(domain, participantId).foldF(
-      Future.failed(
-        Status.NOT_FOUND
-          .withDescription(
-            show"Authorization to $participantId is still in progress"
-          )
-          .asRuntimeException()
-      )
-    ) { mapping =>
-      val validFrom = mapping.base.validFrom
-      logger.debug(show"the party to participant authorization $mapping has been observed")
-      participantAdminConnection
-        .waitForTopologyChangeToBeValid(
-          show"SVC party to participant mapping to $participantId",
-          validFrom,
+    getSvcPartyToParticipantTransaction(domain, participantId).fold(
+      throw Status.NOT_FOUND
+        .withDescription(
+          show"Authorization to $participantId is still in progress"
         )
-        .map(_ => validFrom)
+        .asRuntimeException()
+    ) { mapping =>
+      logger.debug(show"the party to participant authorization $mapping has been observed")
+      mapping.base.validFrom
     },
     logger,
   )

@@ -65,7 +65,6 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
-import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import org.apache.pekko.http.scaladsl.model.Uri
@@ -404,10 +403,6 @@ class GlobalDomainMigrationIntegrationTest
       new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds)),
       NoOpMetricsFactory,
     )
-    val wallClock = new WallClock(
-      ProcessingTimeout(),
-      loggerFactory,
-    )
 
     startAllSync(
       sv1ScanBackend, // Used by SV 1 & 3
@@ -532,7 +527,6 @@ class GlobalDomainMigrationIntegrationTest
           sv1Backend,
           sv1LocalBackend,
           retryProvider,
-          wallClock,
           env.environment.config.monitoring.logging.api,
         ),
         createUpgradeNode(
@@ -540,7 +534,6 @@ class GlobalDomainMigrationIntegrationTest
           sv2Backend,
           sv2LocalBackend,
           retryProvider,
-          wallClock,
           env.environment.config.monitoring.logging.api,
         ),
         createUpgradeNode(
@@ -548,7 +541,6 @@ class GlobalDomainMigrationIntegrationTest
           sv3Backend,
           sv3LocalBackend,
           retryProvider,
-          wallClock,
           env.environment.config.monitoring.logging.api,
         ),
         createUpgradeNode(
@@ -556,7 +548,6 @@ class GlobalDomainMigrationIntegrationTest
           sv4Backend,
           sv4LocalBackend,
           retryProvider,
-          wallClock,
           env.environment.config.monitoring.logging.api,
         ),
       ) { case (upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4) =>

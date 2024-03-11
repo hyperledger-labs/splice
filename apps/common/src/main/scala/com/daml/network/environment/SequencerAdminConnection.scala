@@ -16,7 +16,6 @@ import com.digitalasset.canton.domain.sequencing.sequencer.{
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
@@ -37,7 +36,6 @@ class SequencerAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
-    clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends TopologyAdminConnection(
       config,
@@ -45,7 +43,6 @@ class SequencerAdminConnection(
       loggerFactory,
       grpcClientMetrics,
       retryProvider,
-      clock,
     ) {
 
   override val serviceName = "Canton Sequencer Admin API"

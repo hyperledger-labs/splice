@@ -99,7 +99,6 @@ class SplitwellApp(
       loggerFactory,
       metrics.grpcClientMetrics,
       retryProvider,
-      clock,
     )
     participantId <- appInitStep("Get participant id") {
       participantAdminConnection.getParticipantId()

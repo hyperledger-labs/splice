@@ -1,7 +1,6 @@
 package com.daml.network.util
 
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
-import com.digitalasset.canton.time.WallClock
 import com.daml.network.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetrics}
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
@@ -115,7 +114,6 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
       oldBackend: SvAppBackendReference,
       newBackend: SvAppBackendReference,
       retryProvider: RetryProvider,
-      wallClock: WallClock,
       apiLoggingConfig: ApiLoggingConfig,
       portRange: Int = 27,
   )(implicit
@@ -131,7 +129,6 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
         loggerFactoryWithKey,
         grpcClientMetrics,
         retryProvider,
-        wallClock,
       ),
       oldBackend,
       newBackend,

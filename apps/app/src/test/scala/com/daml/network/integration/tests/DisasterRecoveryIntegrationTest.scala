@@ -22,7 +22,6 @@ import com.daml.network.util.{DomainMigrationUtil, ProcessTestUtil, StandaloneCa
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.time.WallClock
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.{NonNegativeDuration, ProcessingTimeout}
@@ -195,10 +194,6 @@ class DisasterRecoveryIntegrationTest
       new FutureSupervisor.Impl(NonNegativeDuration.tryFromDuration(10.seconds)),
       NoOpMetricsFactory,
     )
-    val wallClock = new WallClock(
-      ProcessingTimeout(),
-      loggerFactory,
-    )
 
     withCantonSvNodes(
       (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
@@ -272,7 +267,6 @@ class DisasterRecoveryIntegrationTest
             sv1Backend,
             sv1LocalBackend,
             retryProvider,
-            wallClock,
             env.environment.config.monitoring.logging.api,
             28,
           ),
@@ -281,7 +275,6 @@ class DisasterRecoveryIntegrationTest
             sv1Backend,
             sv2LocalBackend,
             retryProvider,
-            wallClock,
             env.environment.config.monitoring.logging.api,
             28,
           ),
@@ -290,7 +283,6 @@ class DisasterRecoveryIntegrationTest
             sv1Backend,
             sv3LocalBackend,
             retryProvider,
-            wallClock,
             env.environment.config.monitoring.logging.api,
             28,
           ),
@@ -299,7 +291,6 @@ class DisasterRecoveryIntegrationTest
             sv1Backend,
             sv4LocalBackend,
             retryProvider,
-            wallClock,
             env.environment.config.monitoring.logging.api,
             28,
           ),

@@ -12,7 +12,6 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
-import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -38,7 +37,6 @@ class ParticipantAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
-    clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends TopologyAdminConnection(
       config,
@@ -46,7 +44,6 @@ class ParticipantAdminConnection(
       loggerFactory,
       grpcClientMetrics,
       retryProvider,
-      clock,
     )
     with HasParticipantId {
   override val serviceName = "Canton Participant Admin API"

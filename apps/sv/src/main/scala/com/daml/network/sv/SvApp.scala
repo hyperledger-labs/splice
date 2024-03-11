@@ -125,7 +125,6 @@ class SvApp(
       loggerFactory,
       metrics.grpcClientMetrics,
       retryProvider,
-      clock,
     )
     (for {
       _ <- appInitStep("ensure beneficiary weights are <= 100.0") {
@@ -175,7 +174,6 @@ class SvApp(
       loggerFactory,
       metrics.grpcClientMetrics,
       retryProvider,
-      clock,
     )
 
     val localDomainNode = config.localDomainNode
@@ -188,7 +186,6 @@ class SvApp(
             loggerFactory,
             metrics.grpcClientMetrics,
             retryProvider,
-            clock,
           ),
           new MediatorAdminConnection(
             config.mediator.adminApi,
@@ -196,7 +193,6 @@ class SvApp(
             loggerFactory,
             metrics.grpcClientMetrics,
             retryProvider,
-            clock,
           ),
           config.parameters
             .toStaticDomainParameters(

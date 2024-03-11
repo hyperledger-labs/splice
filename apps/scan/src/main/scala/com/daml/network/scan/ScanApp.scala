@@ -109,7 +109,6 @@ class ScanApp(
         loggerFactory,
         nodeMetrics.grpcClientMetrics,
         retryProvider,
-        clock,
       )
       participantId <- appInitStep("Get participant id") {
         participantAdminConnection.getParticipantId()
@@ -133,7 +132,6 @@ class ScanApp(
         loggerFactory,
         nodeMetrics.grpcClientMetrics,
         retryProvider,
-        clock,
       )
       automation = new ScanAutomationService(
         config.automation,

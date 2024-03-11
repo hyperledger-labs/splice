@@ -376,7 +376,6 @@ class ValidatorApp(
       loggerFactory,
       metrics.grpcClientMetrics,
       retryProvider,
-      clock,
     )
     f(participantAdminConnection).andThen { _ => participantAdminConnection.close() }
   }
@@ -419,7 +418,6 @@ class ValidatorApp(
         loggerFactory,
         metrics.grpcClientMetrics,
         retryProvider,
-        clock,
       )
       _ <- appInitStep("Setup wallet dars") {
         setupWalletDars(participantAdminConnection)

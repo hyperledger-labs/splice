@@ -30,7 +30,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.protocol.DynamicDomainParameters
-import com.digitalasset.canton.time.{Clock, FetchTimeResponse, RemoteClock, WallClock}
+import com.digitalasset.canton.time.FetchTimeResponse
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
@@ -52,7 +52,6 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 import io.grpc.{Status, StatusRuntimeException}
 
-import java.time.{Duration, Instant}
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.reflect.ClassTag
@@ -65,7 +64,6 @@ abstract class TopologyAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     override protected[this] val retryProvider: RetryProvider,
-    clock: Clock,
 )(implicit ec: ExecutionContextExecutor)
     extends AppConnection(
       config,
@@ -1326,32 +1324,6 @@ abstract class TopologyAdminConnection(
       })
   }
 
-  def waitForTopologyChangeToBeValid(description: String, validFrom: Instant)(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = {
-    val validFromSkewed = CantonTimestamp
-      .assertFromInstant(validFrom)
-      .plus(TopologyAdminConnection.TOPOLOGY_CHANGE_SKEW)
-    logger.info(
-      s"Waiting for topology change $description to be valid at $validFrom (with skew $validFromSkewed)"
-    )
-    clock match {
-      case _: WallClock =>
-        clock
-          .scheduleAt(_ => (), validFromSkewed)
-          .failOnShutdownTo(
-            new RuntimeException(s"Aborting waiting for topology change due to node shutting down")
-          )
-          .map { _ =>
-            logger.debug("Topology change is now valid")
-          }
-      case _: RemoteClock =>
-        logger.debug("Running in simtime mode, topology change is valid immediately")
-        Future.unit
-      case c => sys.error(s"Unknown clock config: $c")
-    }
-  }
-
   def listVettedPackages(
       participantId: ParticipantId,
       domainId: DomainId,
@@ -1412,8 +1384,6 @@ abstract class TopologyAdminConnection(
 }
 
 object TopologyAdminConnection {
-  private val TOPOLOGY_CHANGE_SKEW: Duration = Duration.ofMillis(100)
-
   sealed trait TopologyTransactionType {
     def proposals: Boolean
     def signingKey: Option[String]
