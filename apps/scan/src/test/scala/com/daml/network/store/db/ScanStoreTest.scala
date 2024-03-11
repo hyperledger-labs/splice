@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.cn.cns.CnsEntry
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
 import com.daml.network.codegen.java.cn.svc.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.{DarResources, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.history.{CoinExpire, LockedCoinExpireCoin, Transfer}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.{
@@ -1021,8 +1021,7 @@ abstract class ScanStoreTest
   }
 
   protected def mkStore(
-      serviceUserPrimaryParty: PartyId = user1,
-      svcParty: PartyId = svcParty,
+      svcParty: PartyId = svcParty
   ): Future[ScanStore]
 
   private lazy val user1 = userParty(1)
@@ -1399,12 +1398,10 @@ trait CoinTransferUtil { self: StoreTest =>
 
 class InMemoryScanStoreTest extends ScanStoreTest {
   override protected def mkStore(
-      serviceUserPrimaryParty: PartyId,
-      svcParty: PartyId,
+      svcParty: PartyId
   ): Future[ScanStore] = {
     val store = new InMemoryScanStore(
-      serviceUserPrimaryParty = serviceUserPrimaryParty,
-      svcParty = svcParty,
+      key = ScanStore.Key(svcParty),
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       domainMigrationId,
@@ -1428,8 +1425,7 @@ class DbScanStoreTest
     with AcsTables {
 
   override protected def mkStore(
-      serviceUserPrimaryParty: PartyId,
-      svcParty: PartyId,
+      svcParty: PartyId
   ): Future[ScanStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
@@ -1441,8 +1437,7 @@ class DbScanStoreTest
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
     val store = new DbScanStore(
-      serviceUserPrimaryParty = serviceUserPrimaryParty,
-      svcParty = svcParty,
+      key = ScanStore.Key(svcParty),
       storage,
       // to allow aggregating from round zero without previous round aggregate
       ingestFromParticipantBegin = true,
@@ -1458,7 +1453,7 @@ class DbScanStoreTest
           def close(): Unit = ()
         },
       domainMigrationId,
-      participantIdSource = ParticipantAdminConnection.HasParticipantId.ForTesting,
+      participantId = mkParticipantId("ScanStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {

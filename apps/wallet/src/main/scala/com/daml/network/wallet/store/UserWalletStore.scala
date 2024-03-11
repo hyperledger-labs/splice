@@ -19,8 +19,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
-import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
+import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.store.{CNNodeAppStore, Limit, PageLimit, TxLogStore}
 import com.daml.network.util.*
@@ -33,7 +32,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -400,14 +399,12 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
   }
 
   final def listLaggingCoinRulesFollowers(
-      targetDomain: DomainId,
-      participantIdSource: HasParticipantId,
+      targetDomain: DomainId
   )(implicit
       tc: TraceContext
   ): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       targetDomain,
-      participantIdSource,
       templatesMovedByMyAutomation,
     )
 
@@ -505,7 +502,7 @@ object UserWalletStore {
       retryProvider: RetryProvider,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
-      participantIdSource: ParticipantAdminConnection.HasParticipantId,
+      participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -526,7 +523,7 @@ object UserWalletStore {
           loggerFactory,
           retryProvider,
           domainMigrationId,
-          participantIdSource,
+          participantId,
         )
     }
   }

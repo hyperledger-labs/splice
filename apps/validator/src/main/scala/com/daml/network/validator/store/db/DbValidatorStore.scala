@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
+import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.store.{Limit, LimitHelpers}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
@@ -22,9 +23,8 @@ import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -36,6 +36,7 @@ class DbValidatorStore(
     override protected val retryProvider: RetryProvider,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     override val domainMigrationId: Long,
+    participantId: ParticipantId,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -43,13 +44,20 @@ class DbValidatorStore(
 ) extends DbCNNodeAppStoreWithoutHistory(
       storage = storage,
       acsTableName = ValidatorTables.acsTableName,
-      storeDescriptor = Json.obj(
-        "version" -> Json.fromInt(1),
-        "store" -> Json.fromString("DbValidatorStore"),
-        "validatorParty" -> Json.fromString(key.validatorParty.toProtoPrimitive),
-        "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),
+      // Any change in the store descriptor will lead to previously deployed applications
+      // forgetting all persisted data once they upgrade to the new version.
+      storeDescriptor = StoreDescriptor(
+        version = 1,
+        name = "DbValidatorStore",
+        party = key.validatorParty,
+        participant = participantId,
+        key = Map(
+          "validatorParty" -> key.validatorParty.toProtoPrimitive,
+          "svcParty" -> key.svcParty.toProtoPrimitive,
+        ),
       ),
       domainMigrationId,
+      participantId,
     )
     with ValidatorStore
     with AcsTables

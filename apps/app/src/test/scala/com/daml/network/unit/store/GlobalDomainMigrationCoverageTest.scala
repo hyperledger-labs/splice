@@ -139,7 +139,7 @@ object GlobalDomainMigrationCoverageTest {
         ),
         UserWalletStore.templatesMovedByMyAutomation,
       ),
-      (ScanStore, ScanStore.contractFilter(dummyParty, domainMigrationId), Seq.empty),
+      (ScanStore, ScanStore.contractFilter(ScanStore.Key(dummyParty), domainMigrationId), Seq.empty),
     )
 
   // How do we ensure that new templates get migration added somewhere?  If

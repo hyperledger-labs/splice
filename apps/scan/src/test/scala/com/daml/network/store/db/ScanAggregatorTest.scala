@@ -2,7 +2,7 @@ package com.daml.network.store.db
 
 import scala.concurrent.Future
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
-import com.daml.network.environment.{DarResources, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.history.Transfer
 import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
 import com.daml.network.scan.store.db.ScanAggregator.*
@@ -22,6 +22,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
+import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.TxLogEntry.EntryType
 
 import scala.concurrent.ExecutionContext
@@ -52,7 +53,7 @@ class ScanAggregatorTest
   "ScanAggregator" should {
     "do nothing when there is no closed round" in {
       for {
-        (aggr, store) <- mkAggregator(user1, svcParty)
+        (aggr, store) <- mkAggregator(svcParty)
         _ <- addOpenRound(store, 0L)
         _ <- store.aggregate()
         lastClosedRound <- aggr.getLastCompletelyClosedRoundAfter(None)
@@ -108,7 +109,6 @@ class ScanAggregatorTest
       }
       for {
         (aggr, store) <- mkAggregator(
-          user1,
           svcParty,
           ingestFromParticipantBegin = false,
           createScanAggregateReader,
@@ -129,7 +129,7 @@ class ScanAggregatorTest
 
     "start from round zero when no previous round totals exist and founder, not read from SVC" in {
       for {
-        (aggr, store) <- mkAggregator(user1, svcParty, ingestFromParticipantBegin = true)
+        (aggr, store) <- mkAggregator(svcParty, ingestFromParticipantBegin = true)
         _ <- addOpenRound(store, 0L)
         last <- aggr.getLastAggregatedRoundTotals()
         firstOpen <- aggr.findFirstOpenMiningRound()
@@ -146,7 +146,7 @@ class ScanAggregatorTest
     "Not start from round zero when round zero closes, no first open mining round is found, not founder and no previous aggregates exist" in {
       val closedRound = closedMiningRound(svcParty, round = 0L)
       for {
-        (aggr, store) <- mkAggregator(user1, svcParty, ingestFromParticipantBegin = false)
+        (aggr, store) <- mkAggregator(svcParty, ingestFromParticipantBegin = false)
         _ <- dummyDomain.create(closedRound)(store.multiDomainAcsStore)
         last <- aggr.getLastAggregatedRoundTotals()
         firstOpen <- aggr.findFirstOpenMiningRound()
@@ -163,7 +163,7 @@ class ScanAggregatorTest
     }
 
     "do nothing when last closed round <= last round aggregated" in {
-      val (aggr, _) = mkAggregator(user1, svcParty).futureValue
+      val (aggr, _) = mkAggregator(svcParty).futureValue
 
       val lastClosedRound = 1L
       val previousRoundTotals = Some(RoundTotals(closedRound = 2L))
@@ -181,7 +181,7 @@ class ScanAggregatorTest
 
     "append round totals from round zero to last closed round (inclusive)" in {
       val (aggr, store) =
-        mkAggregator(user1, svcParty).futureValue
+        mkAggregator(svcParty).futureValue
       val range = (0 to 3)
 
       val party1 = mkPartyId("party1")
@@ -275,7 +275,7 @@ class ScanAggregatorTest
     }
 
     "append round totals for coin balance" in {
-      val (aggr, store) = mkAggregator(user1, svcParty).futureValue
+      val (aggr, store) = mkAggregator(svcParty).futureValue
       val lastRound = 10
       val holdingFee = 0.05
       val balanceChangeRoundZero = 10
@@ -374,7 +374,7 @@ class ScanAggregatorTest
     }
 
     "append round party totals from round zero to last closed round (inclusive)" in {
-      val (aggr, store) = mkAggregator(user1, svcParty).futureValue
+      val (aggr, store) = mkAggregator(svcParty).futureValue
       val lastRound = 10L
 
       for {
@@ -494,7 +494,7 @@ class ScanAggregatorTest
     }
 
     "Fail to backfill aggregates if it cannot read aggregates before round" in {
-      val (aggr, store) = mkAggregator(user1, svcParty).futureValue
+      val (aggr, store) = mkAggregator(svcParty).futureValue
       val now = CantonTimestamp.now()
       val lastRound = 10L
       (for {
@@ -519,7 +519,6 @@ class ScanAggregatorTest
 
       val (aggr, store) =
         mkAggregator(
-          user1,
           svcParty,
           ingestFromParticipantBegin = false,
           createSvcReader,
@@ -554,7 +553,6 @@ class ScanAggregatorTest
     "not backfill if no closed rounds can be found in round totals" in {
       val (_, store) =
         mkAggregator(
-          user1,
           svcParty,
           ingestFromParticipantBegin = false,
           createReader,
@@ -648,10 +646,7 @@ class ScanAggregatorTest
       _ <- resetAllCnAppTables(storage)
     } yield ()
 
-  private lazy val user1 = userParty(1)
-
   def mkAggregator(
-      serviceUserPrimaryParty: PartyId,
       svcParty: PartyId,
       ingestFromParticipantBegin: Boolean = false,
       createReader: DbScanStore => ScanAggregatesReader = createReader,
@@ -666,8 +661,7 @@ class ScanAggregatorTest
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
     val store = new DbScanStore(
-      serviceUserPrimaryParty = serviceUserPrimaryParty,
-      svcParty = svcParty,
+      key = ScanStore.Key(svcParty),
       storage = storage,
       ingestFromParticipantBegin = ingestFromParticipantBegin,
       loggerFactory,
@@ -679,7 +673,7 @@ class ScanAggregatorTest
       ),
       createReader,
       domainMigrationId = 0,
-      participantIdSource = ParticipantAdminConnection.HasParticipantId.ForTesting,
+      participantId = mkParticipantId("ScanAggregatorTest"),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

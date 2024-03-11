@@ -474,6 +474,9 @@ class ValidatorApp(
       svcParty <- appInitStep("Get SVC party id") {
         scanConnection.getSvcPartyIdWithRetries()
       }
+      participantId <- appInitStep("Get participant id") {
+        participantAdminConnection.getParticipantId()
+      }
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
         svcParty = svcParty,
@@ -485,11 +488,11 @@ class ValidatorApp(
         loggerFactory,
         retryProvider,
         config.domainMigrationId,
+        participantId,
       )
       walletManager =
         new UserWalletManager(
           ledgerClient,
-          participantAdminConnection,
           store,
           config.ledgerApiUser,
           config.automation,
@@ -500,6 +503,7 @@ class ValidatorApp(
           scanConnection,
           loggerFactory,
           config.domainMigrationId,
+          participantId,
           config.ingestFromParticipantBegin,
         )
       automation = new ValidatorAutomationService(

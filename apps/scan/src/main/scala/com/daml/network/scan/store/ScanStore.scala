@@ -3,7 +3,7 @@ package com.daml.network.scan.store
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
-import com.daml.network.environment.{PackageIdResolver, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
@@ -19,8 +19,9 @@ import com.daml.network.util.{CoinConfigSchedule, Contract, ContractWithState, T
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
@@ -52,15 +53,12 @@ trait ScanStore
       tc: TraceContext
   ): Future[Boolean]
 
-  /** Get the party-id of the SVC issuing CC accepted by this provider. */
-  def svcParty: PartyId
+  def key: ScanStore.Key
 
   def domainMigrationId: Long
 
-  def serviceUserPrimaryParty: PartyId
-
   override lazy val acsContractFilter: MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] =
-    ScanStore.contractFilter(svcParty, domainMigrationId)
+    ScanStore.contractFilter(key, domainMigrationId)
 
   override lazy val txLogConfig = new TxLogStore.Config[TxLogEntry] {
     override val parser = new ScanTxLogParser(loggerFactory)
@@ -218,9 +216,18 @@ trait ScanStore
 }
 
 object ScanStore {
+
+  case class Key(
+      /** The party-id of the SVC whose public data this scan is distributing. */
+      svcParty: PartyId
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[Key] = prettyOfClass(
+      param("svcParty", _.svcParty)
+    )
+  }
+
   def apply(
-      serviceUserPrimaryParty: PartyId,
-      svcParty: PartyId,
+      key: ScanStore.Key,
       storage: Storage,
       ingestFromParticipantBegin: Boolean,
       loggerFactory: NamedLoggerFactory,
@@ -228,7 +235,7 @@ object ScanStore {
       createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
-      participantIdSource: ParticipantAdminConnection.HasParticipantId,
+      participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -237,36 +244,34 @@ object ScanStore {
     storage match {
       case _: MemoryStorage =>
         new InMemoryScanStore(
-          serviceUserPrimaryParty = serviceUserPrimaryParty,
-          svcParty = svcParty,
+          key = key,
           loggerFactory,
           retryProvider,
           domainMigrationId,
         )
       case db: DbStorage =>
         new DbScanStore(
-          serviceUserPrimaryParty = serviceUserPrimaryParty,
-          svcParty = svcParty,
+          key = key,
           db,
           ingestFromParticipantBegin,
           loggerFactory,
           retryProvider,
           createScanAggregatesReader,
           domainMigrationId,
-          participantIdSource,
+          participantId,
         )
     }
   }
 
   def contractFilter(
-      svcParty: PartyId,
+      key: ScanStore.Key,
       domainMigrationId: Long,
   ): MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
-    val svc = svcParty.toProtoPrimitive
+    val svc = key.svcParty.toProtoPrimitive
 
     MultiDomainAcsStore.SimpleContractFilter(
-      svcParty,
+      key.svcParty,
       Map(
         mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc)(
           ScanAcsStoreRowData(_)

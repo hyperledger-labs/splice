@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.SplitwellStore
+import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.{LimitHelpers, MultiDomainAcsStore}
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
 import com.daml.network.util.{
@@ -19,9 +20,8 @@ import com.daml.network.util.{
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -34,6 +34,7 @@ class DbSplitwellStore(
     override protected val retryProvider: RetryProvider,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
+    participantId: ParticipantId,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -41,12 +42,19 @@ class DbSplitwellStore(
 ) extends DbCNNodeAppStoreWithoutHistory(
       storage = storage,
       acsTableName = SplitwellTables.acsTableName,
-      storeDescriptor = Json.obj(
-        "version" -> Json.fromInt(1),
-        "store" -> Json.fromString("DbSplitwellStore"),
-        "providerParty" -> Json.fromString(key.providerParty.toProtoPrimitive),
+      // Any change in the store descriptor will lead to previously deployed applications
+      // forgetting all persisted data once they upgrade to the new version.
+      storeDescriptor = StoreDescriptor(
+        version = 1,
+        name = "DbSplitwellStore",
+        party = key.providerParty,
+        participant = participantId,
+        key = Map(
+          "providerParty" -> key.providerParty.toProtoPrimitive
+        ),
       ),
       domainMigrationId,
+      participantId,
     )
     with AcsTables
     with AcsQueries

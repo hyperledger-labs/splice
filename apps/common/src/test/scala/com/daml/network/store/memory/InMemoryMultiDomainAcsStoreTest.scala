@@ -15,6 +15,7 @@ import com.digitalasset.canton.{HasActorSystem, HasExecutionContext}
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
+import com.digitalasset.canton.topology.ParticipantId
 
 class InMemoryMultiDomainAcsStoreTest
     extends MultiDomainAcsStoreTest[
@@ -28,6 +29,7 @@ class InMemoryMultiDomainAcsStoreTest
   override def mkStore(
       id: Int,
       migrationId: Long,
+      participantId: ParticipantId,
       filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData],
   ): InMemoryMultiDomainAcsStore[TestTxLogEntry] =
     new InMemoryMultiDomainAcsStore(

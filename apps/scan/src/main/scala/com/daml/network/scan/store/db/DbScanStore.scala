@@ -7,12 +7,13 @@ import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
 import com.daml.network.scan.store.TxLogEntry.EntryType
 import com.daml.network.scan.store.db.ScanTables.txLogTableName
 import com.daml.network.scan.store.{OpenMiningRoundTxLogEntry, ScanStore, SortOrder, TxLogEntry}
+import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
@@ -20,9 +21,8 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import java.time.Instant
@@ -34,8 +34,7 @@ import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.config.NonNegativeDuration
 
 class DbScanStore(
-    override val serviceUserPrimaryParty: PartyId,
-    override val svcParty: PartyId,
+    override val key: ScanStore.Key,
     storage: DbStorage,
     ingestFromParticipantBegin: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -43,7 +42,7 @@ class DbScanStore(
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     override val domainMigrationId: Long,
-    participantIdSource: ParticipantAdminConnection.HasParticipantId,
+    participantId: ParticipantId,
 )(implicit
     override protected val ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -52,14 +51,19 @@ class DbScanStore(
       storage,
       ScanTables.acsTableName,
       ScanTables.txLogTableName,
-      // TODO (#5544): change this to something better
-      storeDescriptor = Json.obj(
-        "version" -> Json.fromInt(1),
-        "service_user_primary_party" -> Json.fromString(serviceUserPrimaryParty.toProtoPrimitive),
-        "svc_party" -> Json.fromString(svcParty.toProtoPrimitive),
+      // Any change in the store descriptor will lead to previously deployed applications
+      // forgetting all persisted data once they upgrade to the new version.
+      storeDescriptor = StoreDescriptor(
+        version = 1,
+        name = "DbScanStore",
+        party = key.svcParty,
+        participant = participantId,
+        key = Map(
+          "svcParty" -> key.svcParty.toProtoPrimitive
+        ),
       ),
       domainMigrationId,
-      participantIdSource,
+      participantId,
       storeUpdateHistory = true,
     )
     with ScanStore

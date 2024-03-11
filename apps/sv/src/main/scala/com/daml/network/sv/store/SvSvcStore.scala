@@ -28,8 +28,7 @@ import com.daml.network.codegen.java.cn.svcrules.{
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
-import com.daml.network.environment.{PackageIdResolver, ParticipantAdminConnection, RetryProvider}
-import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
+import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
@@ -45,7 +44,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
+import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -788,36 +787,33 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   ]]]
 
   private[this] def listLaggingSvcRulesFollowers(
-      targetDomain: DomainId,
-      participantIdSource: HasParticipantId,
+      targetDomain: DomainId
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = for {
     coinRulesO <- lookupCoinRules()
     otherContracts <- multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       targetDomain,
-      participantIdSource,
       svcRulesFollowers,
     )
   } yield otherContracts ++ coinRulesO
     .filterNot(_.domain == targetDomain)
     .toList
 
-  final def listSvcRulesTransferFollowers(participantIdSource: HasParticipantId)(implicit
+  final def listSvcRulesTransferFollowers()(implicit
       tc: TraceContext
   ): Future[Seq[FollowTask[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules, _, _]]] = {
     lookupSvcRules().flatMap(_.map { svcRules =>
-      listLaggingSvcRulesFollowers(svcRules.domain, participantIdSource)
+      listLaggingSvcRulesFollowers(svcRules.domain)
         .map(_ map (FollowTask(svcRules, _)))
     }.getOrElse(Future successful Seq.empty))
   }
 
-  def listCoinRulesTransferFollowers(participantIdSource: HasParticipantId)(implicit
+  def listCoinRulesTransferFollowers()(implicit
       tc: TraceContext
   ): Future[Seq[FollowTask[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules, ?, ?]]] = {
     lookupCoinRules().flatMap(_.map { coinRules =>
       multiDomainAcsStore
         .listAssignedContractsNotOnDomainN(
           coinRules.domain,
-          participantIdSource,
           coinRulesFollowers,
         )
         .map(_.map(FollowTask(coinRules, _)).toSeq)
@@ -924,7 +920,7 @@ object SvSvcStore {
       retryProvider: RetryProvider,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
-      participantIdSource: ParticipantAdminConnection.HasParticipantId,
+      participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -945,7 +941,7 @@ object SvSvcStore {
           loggerFactory,
           retryProvider,
           domainMigrationId,
-          participantIdSource,
+          participantId,
         )
     }
   }

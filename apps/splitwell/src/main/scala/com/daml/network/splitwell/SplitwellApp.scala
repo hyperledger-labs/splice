@@ -93,6 +93,16 @@ class SplitwellApp(
         loggerFactory,
       )
     }
+    participantAdminConnection = new ParticipantAdminConnection(
+      config.participantClient.adminApi,
+      coinAppParameters.loggingConfig.api,
+      loggerFactory,
+      retryProvider,
+      clock,
+    )
+    participantId <- appInitStep("Get participant id") {
+      participantAdminConnection.getParticipantId()
+    }
     storeKey = SplitwellStore.Key(providerParty = partyId)
     store = SplitwellStore(
       storeKey,
@@ -101,13 +111,7 @@ class SplitwellApp(
       loggerFactory,
       retryProvider,
       config.domainMigrationId,
-    )
-    participantAdminConnection = new ParticipantAdminConnection(
-      config.participantClient.adminApi,
-      coinAppParameters.loggingConfig.api,
-      loggerFactory,
-      retryProvider,
-      clock,
+      participantId,
     )
     automation = new SplitwellAutomationService(
       config.automation,

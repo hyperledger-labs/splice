@@ -171,6 +171,7 @@ class DbSvSvStoreTest
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       domainMigrationId = 0,
+      participantId = mkParticipantId("SvSvStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

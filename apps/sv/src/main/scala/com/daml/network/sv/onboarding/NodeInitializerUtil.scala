@@ -11,6 +11,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.ParticipantId
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
@@ -31,6 +32,7 @@ trait NodeInitializerUtil extends NamedLogging {
       key: SvStore.Key,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
+      participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
@@ -41,6 +43,7 @@ trait NodeInitializerUtil extends NamedLogging {
     loggerFactory,
     retryProvider,
     domainMigrationId,
+    participantId,
   )
 
   protected def newSvSvAutomationService(
@@ -66,7 +69,7 @@ trait NodeInitializerUtil extends NamedLogging {
       key: SvStore.Key,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
-      participantIdSource: ParticipantAdminConnection.HasParticipantId,
+      participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
@@ -78,7 +81,7 @@ trait NodeInitializerUtil extends NamedLogging {
       loggerFactory,
       retryProvider,
       domainMigrationId,
-      participantIdSource,
+      participantId,
     )
   }
 

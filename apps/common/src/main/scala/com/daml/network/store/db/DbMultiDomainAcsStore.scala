@@ -8,7 +8,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -32,7 +32,7 @@ import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.showPretty
 
@@ -47,8 +47,10 @@ import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLAc
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableWithStateResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
+import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
+import io.circe.Json
 
 import scala.collection.mutable
 import scala.reflect.ClassTag
@@ -57,12 +59,13 @@ final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
     acsTableName: String,
     txLogTableName: String,
-    storeDescriptor: io.circe.Json,
+    storeDescriptor: StoreDescriptor,
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
     txLogConfig: TxLogStore.Config[TXE],
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
+    participantId: ParticipantId,
     retryProvider: RetryProvider,
     /** Allows processing the summary in a store-specific manner, e.g., to produce metrics
       * on ingestion of certain contracts.
@@ -289,7 +292,6 @@ final class DbMultiDomainAcsStore[TXE](
 
   override def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
-      participantIdSource: ParticipantAdminConnection.HasParticipantId,
       companions: Seq[ConstrainedTemplate],
       limit: notOnDomainsTotalLimit.type,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = waitUntilAcsIngested {
@@ -298,7 +300,6 @@ final class DbMultiDomainAcsStore[TXE](
       .toMap
     val templateIds = inClause(templateIdMap.keys)
     for {
-      participantId <- participantIdSource.getParticipantId()
       result <- storage.query(
         selectFromAcsTableWithState(
           acsTableName,
@@ -492,7 +493,7 @@ final class DbMultiDomainAcsStore[TXE](
       // - Postgres JSONB columns have a maximum size of 255MB
       // - We are using noSpacesSortKeys to insert a canonical serialization of the JSON object, even though this is not necessary for Postgres
       // - 'ON CONFLICT DO NOTHING RETURNING ...' does not return anything if the row already exists, that's why we are using two separate queries
-      val descriptorStr = String256M.tryCreate(storeDescriptor.noSpacesSortKeys)
+      val descriptorStr = String256M.tryCreate(storeDescriptor.toJson.noSpacesSortKeys)
       for {
         _ <- storage
           .update(
@@ -1423,5 +1424,38 @@ object DbMultiDomainAcsStore {
       mutable.ArrayBuffer.empty,
       mutable.ArrayBuffer.empty,
     )
+  }
+
+  /** Identifies an instance of a store.
+    *
+    *  @param version    The version of the store.
+    *                    Bumping this number will cause the store to forget all previously ingested data
+    *                    and start from a clean state.
+    *                    Bump this number whenever you make breaking changes in the ingestion filter or
+    *                    TxLog parser, or if you want to reset the store after fixing a bug that lead to
+    *                    data corruption.
+    * @param name        The name of the store, usually the simple name of the corresponding scala class.
+    * @param party       The party that owns the store (i.e., the party that subscribes
+    *                    to the update stream that feeds the store).
+    * @param participant The participant that serves the update stream that feeds this store.
+    * @param key         A set of named values that are used to filter the update stream or
+    *                    can otherwise be used to distinguish between different instances of the store.
+    */
+  case class StoreDescriptor(
+      version: Int,
+      name: String,
+      party: PartyId,
+      participant: ParticipantId,
+      key: Map[String, String],
+  ) {
+    def toJson: io.circe.Json = {
+      Json.obj(
+        "version" -> Json.fromInt(version),
+        "name" -> Json.fromString(name),
+        "party" -> Json.fromString(party.toProtoPrimitive),
+        "participant" -> Json.fromString(participant.toProtoPrimitive),
+        "key" -> Json.obj(key.map { case (k, v) => k -> Json.fromString(v) }.toSeq*),
+      )
+    }
   }
 }

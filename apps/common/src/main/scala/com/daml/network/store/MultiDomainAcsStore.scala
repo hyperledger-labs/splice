@@ -9,7 +9,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template}
 import com.daml.ledger.javaapi.data.codegen.{ContractId, ContractCompanion as JavaContractCompanion}
 import com.daml.metrics.api.MetricsContext
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.environment.{BaseLedgerConnection, ParticipantAdminConnection}
+import com.daml.network.environment.BaseLedgerConnection
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -167,7 +167,6 @@ trait MultiDomainAcsStore extends HasIngestionSink with AutoCloseable with Named
     */
   def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
-      participantIdSource: ParticipantAdminConnection.HasParticipantId,
       companions: Seq[ConstrainedTemplate],
       limit: notOnDomainsTotalLimit.type = notOnDomainsTotalLimit,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]]

@@ -6,9 +6,10 @@ import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
+import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
 import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
@@ -25,9 +26,9 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import io.circe.Json
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
+import com.digitalasset.canton.topology.ParticipantId
 import slick.jdbc.canton.SQLActionBuilder
 
 import scala.concurrent.*
@@ -40,7 +41,7 @@ class DbUserWalletStore(
     override protected val retryProvider: RetryProvider,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     override val domainMigrationId: Long,
-    participantIdSource: ParticipantAdminConnection.HasParticipantId,
+    participantId: ParticipantId,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -49,17 +50,23 @@ class DbUserWalletStore(
       storage = storage,
       acsTableName = WalletTables.acsTableName,
       txLogTableName = WalletTables.txLogTableName,
-      // TODO (#5544): change this to something better
-      storeDescriptor = Json.obj(
-        "version" -> Json.fromInt(1),
-        "store" -> Json.fromString("DbUserWalletStore"),
-        "endUserName" -> Json.fromString(key.endUserName),
-        "endUserParty" -> Json.fromString(key.endUserParty.toProtoPrimitive),
-        "validatorParty" -> Json.fromString(key.validatorParty.toProtoPrimitive),
-        "svcParty" -> Json.fromString(key.svcParty.toProtoPrimitive),
+      // Any change in the store descriptor will lead to previously deployed applications
+      // forgetting all persisted data once they upgrade to the new version.
+      storeDescriptor = StoreDescriptor(
+        version = 1,
+        name = "DbUserWalletStore",
+        party = key.endUserParty,
+        participant = participantId,
+        key = Map(
+          // TODO (#6385): this shouldn't be required anymore, but keep in mind data continuity
+          "endUserName" -> key.endUserName,
+          "endUserParty" -> key.endUserParty.toProtoPrimitive,
+          "validatorParty" -> key.validatorParty.toProtoPrimitive,
+          "svcParty" -> key.svcParty.toProtoPrimitive,
+        ),
       ),
       domainMigrationId,
-      participantIdSource,
+      participantId,
       // Note: this causes the app to persist the original update stream for each wallet end user.
       // The data in this stream overlaps with (but is not a subset of) the data in the validator operator
       // update stream, which is used in the DbValidatorWalletStore.

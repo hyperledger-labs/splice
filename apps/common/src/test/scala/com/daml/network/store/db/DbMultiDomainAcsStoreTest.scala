@@ -16,6 +16,7 @@ import com.digitalasset.canton.HasActorSystem
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.util.MonadUtil
 import slick.jdbc.JdbcProfile
 
@@ -74,9 +75,10 @@ class DbMultiDomainAcsStoreTest
     "not be SQL-injectable" in {
       import MultiDomainAcsStore.mkFilter
       val store = mkStoreWithAcsRowDataF(
-        1,
-        0,
-        MultiDomainAcsStore.SimpleContractFilter(
+        id = 1,
+        migrationId = 0,
+        participantId = mkParticipantId("DbMultiDomainAcsStoreTest"),
+        filter = MultiDomainAcsStore.SimpleContractFilter(
           svcParty,
           templateFilters = Map(
             mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)(BobbyTablesRowData(_))
@@ -122,19 +124,27 @@ class DbMultiDomainAcsStoreTest
     }
   }
 
-  private def storeDescriptor(id: Int) =
-    io.circe.parser
-      .parse(raw"""{"test": "DbMultiDomainAcsStoreTest", "id": $id}""")
-      .getOrElse(sys.error("Why is it so hard to define a JSON literal"))
+  private def storeDescriptor(id: Int, participantId: ParticipantId) =
+    DbMultiDomainAcsStore.StoreDescriptor(
+      version = 1,
+      name = "DbMultiDomainAcsStoreTest",
+      party = svcParty,
+      participant = participantId,
+      key = Map(
+        "id" -> id.toString
+      ),
+    )
 
   override def mkStore(
       id: Int,
       migrationId: Long,
+      participantId: ParticipantId,
       filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData],
   ) = {
     mkStoreWithAcsRowDataF(
       id,
       migrationId,
+      participantId,
       filter,
       "acs_store_template",
     )
@@ -143,6 +153,7 @@ class DbMultiDomainAcsStoreTest
   def mkStoreWithAcsRowDataF[R <: AcsRowData](
       id: Int,
       migrationId: Long,
+      participantId: ParticipantId,
       filter: MultiDomainAcsStore.ContractFilter[R],
       acsTableName: String,
   ) = {
@@ -155,11 +166,12 @@ class DbMultiDomainAcsStoreTest
       storage,
       acsTableName,
       "txlog_store_template",
-      storeDescriptor(id),
+      storeDescriptor(id, participantId),
       loggerFactory,
       filter,
       testTxLogConfig,
       migrationId,
+      participantId,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )
   }

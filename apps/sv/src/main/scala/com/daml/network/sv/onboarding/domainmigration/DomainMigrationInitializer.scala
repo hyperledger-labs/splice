@@ -55,6 +55,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class DomainMigrationInitializer(
     localDomainNode: LocalDomainNode,
     domainMigrationConfig: SvOnboardingConfig.DomainMigration,
+    participantId: ParticipantId,
     override protected val config: SvAppBackendConfig,
     override protected val cometBftNode: Option[CometBftNode],
     override protected val ledgerClient: CNLedgerClient,
@@ -117,8 +118,8 @@ class DomainMigrationInitializer(
         config.ledgerApiUser,
         storeKey.svParty,
       )
-      svStore = newSvStore(storeKey, config.domainMigrationId)
-      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantAdminConnection)
+      svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
+      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
         svcStore,

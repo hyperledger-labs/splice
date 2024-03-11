@@ -138,8 +138,8 @@ class FoundingNodeInitializer(
         ),
       ).tupled
       storeKey = SvStore.Key(svParty, svcParty)
-      svStore = newSvStore(storeKey, config.domainMigrationId)
-      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantAdminConnection)
+      svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
+      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
         svcStore,

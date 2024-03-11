@@ -127,11 +127,9 @@ To do so, you just need to increment the version of the `storeDescriptor` of the
 
 ```scala
 // DbXXXStore
-// TODO (#5544): change this to something better
-storeDescriptor = Json.obj(
-  "version" -> Json.fromInt(42), // assuming it was previously 41
-  "service_user_primary_party" -> Json.fromString(serviceUserPrimaryParty.toProtoPrimitive),
-  "svc_party" -> Json.fromString(svcParty.toProtoPrimitive),
+storeDescriptor = StoreDescriptor(
+  version = 42, // assuming it was previously 41
+  // Do not modify the values for the other fields
 )
 ```
 

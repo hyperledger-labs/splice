@@ -318,6 +318,7 @@ class SvApp(
                 sys.error("It must always specify a domain config for Domain Migration")
               ),
               domainMigrationConfig,
+              participantId,
               config,
               cometBftNode,
               ledgerClient,

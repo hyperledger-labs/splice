@@ -5,7 +5,7 @@ import org.apache.pekko.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Template, TransactionTree}
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.environment.ledger.api.*
 import com.daml.network.store.db.AcsRowData
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, Trees}
@@ -193,12 +193,11 @@ class InMemoryMultiDomainAcsStore[TXE](
 
   override def listAssignedContractsNotOnDomainN(
       excludedDomain: DomainId,
-      participantIdSource: ParticipantAdminConnection.HasParticipantId,
       companions: Seq[ConstrainedTemplate],
       limit: notOnDomainsTotalLimit.type,
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = {
     for {
-      participantId <- participantIdSource.getParticipantId()
+      participantId <- Future.successful(ParticipantId("foo"))
       grouped <- Future
         .traverse(companions)(listAssignedContractsNotOnDomain(excludedDomain, _))
     } yield reassignmentContractOrder(grouped.flatten, participantId)()

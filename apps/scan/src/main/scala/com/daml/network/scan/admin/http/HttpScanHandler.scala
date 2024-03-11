@@ -63,7 +63,7 @@ class HttpScanHandler(
   )()(extracted: TraceContext): Future[v0.ScanResource.GetSvcPartyIdResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getSvcPartyId") { _ => _ =>
-      Future.successful(definitions.GetSvcPartyIdResponse(store.svcParty.toProtoPrimitive))
+      Future.successful(definitions.GetSvcPartyIdResponse(store.key.svcParty.toProtoPrimitive))
     }
   }
 
@@ -718,7 +718,7 @@ class HttpScanHandler(
         // that users backup their own ACS.
         // As the SVC party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
         // BFT reads are usually not required since ACS commitments act as a check that the ACS was correct.
-        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(Set(store.svcParty))
+        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(Set(store.key.svcParty))
       } yield {
         val filteredAcsSnapshot =
           filterAcsSnapshot(acsSnapshot, partyId)

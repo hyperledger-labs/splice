@@ -1,7 +1,6 @@
 package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.environment.ledger.api.LedgerClient.GetTreeUpdatesResponse
 import com.daml.network.environment.ledger.api.{LedgerClient, TransactionTreeUpdate}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
@@ -291,12 +290,12 @@ class UpdateHistoryTest
   private def mkStore(
       updateStreamParty: PartyId = party1,
       domainMigrationId: Long = migration1,
-      participantIdSource: ParticipantAdminConnection.HasParticipantId = participant1,
+      participantId: ParticipantId = participant1,
   ): UpdateHistory = {
     new UpdateHistory(
       storage,
       domainMigrationId,
-      participantIdSource,
+      participantId,
       updateStreamParty,
       loggerFactory,
     )
@@ -322,10 +321,8 @@ class UpdateHistoryTest
   private val offset1 = validOffset(1)
   private val offset2 = validOffset(2)
 
-  private val participant1 =
-    ParticipantAdminConnection.HasParticipantId.Const(ParticipantId("participant1"))
-  private val participant2 =
-    ParticipantAdminConnection.HasParticipantId.Const(ParticipantId("participant2"))
+  private val participant1 = ParticipantId("participant1")
+  private val participant2 = ParticipantId("participant2")
 }
 
 object UpdateHistoryTest {

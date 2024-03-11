@@ -44,8 +44,7 @@ import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionRequest,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.environment.{DarResources, ParticipantAdminConnection, RetryProvider}
-import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
+import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
@@ -853,7 +852,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummy2Domain.create(followerContract1)(store.multiDomainAcsStore)
           _ <- dummy2Domain.create(followerContract2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(alreadyReassigned)(store.multiDomainAcsStore)
-          result <- store.listSvcRulesTransferFollowers(HasParticipantId.ForTesting)
+          result <- store.listSvcRulesTransferFollowers()
         } yield result.map(x =>
           x.leader.contractId -> x.follower.contractId
         ) should contain theSameElementsAs Seq(
@@ -876,7 +875,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummy2Domain.create(followerContract1)(store.multiDomainAcsStore)
           _ <- dummy2Domain.create(followerContract2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(alreadyReassigned)(store.multiDomainAcsStore)
-          result <- store.listCoinRulesTransferFollowers(HasParticipantId.ForTesting)
+          result <- store.listCoinRulesTransferFollowers()
         } yield result.map(x =>
           x.leader.contractId -> x.follower.contractId
         ) should contain theSameElementsAs Seq(
@@ -1315,7 +1314,7 @@ class DbSvSvcStoreTest
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       domainMigrationId,
-      participantIdSource = ParticipantAdminConnection.HasParticipantId.ForTesting,
+      participantId = mkParticipantId("SvSvcStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
       _ <- store.multiDomainAcsStore.ingestionSink.initialize()

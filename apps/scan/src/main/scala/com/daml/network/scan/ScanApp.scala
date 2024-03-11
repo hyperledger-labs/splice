@@ -20,12 +20,12 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.external.scan.ScanResource as ExternalScanResource
 import com.daml.network.http.v0.scan.ScanResource as InternalScanResource
-import com.daml.network.scan.admin.http.{HttpScanHandler, HttpExternalScanHandler}
+import com.daml.network.scan.admin.http.{HttpExternalScanHandler, HttpScanHandler}
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.scan.store.ScanStore
-import com.daml.network.scan.store.db.{ScanAggregatesReaderContext, ScanAggregatesReader}
+import com.daml.network.scan.store.db.{ScanAggregatesReader, ScanAggregatesReaderContext}
 import com.daml.network.store.PageLimit
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -80,10 +80,8 @@ class ScanApp(
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      // we don't care about the primary party in scan as that points to the SV party while we need the SVC party
+      // We don't care about the primary party in scan as that points to the SV party while we need the SVC party
       // which we read below.
-      // primary party of svc User
-      // or readAs party from sv User
       serviceUserPrimaryParty: PartyId,
   ): Future[ScanApp.State] = {
     for {
@@ -112,9 +110,11 @@ class ScanApp(
         retryProvider,
         clock,
       )
+      participantId <- appInitStep("Get participant id") {
+        participantAdminConnection.getParticipantId()
+      }
       store = ScanStore(
-        serviceUserPrimaryParty = serviceUserPrimaryParty,
-        svcParty = svcParty,
+        key = ScanStore.Key(svcParty = svcParty),
         storage,
         // Only the founder is configured to ingest from participant begin
         ingestFromParticipantBegin = config.ingestFromParticipantBegin,
@@ -124,7 +124,7 @@ class ScanApp(
           ScanAggregatesReader(store, scanAggregatesReaderContext)
         },
         config.domainMigrationId,
-        participantAdminConnection,
+        participantId,
       )
       sequencerAdminConnection = new SequencerAdminConnection(
         config.sequencerAdminClient,

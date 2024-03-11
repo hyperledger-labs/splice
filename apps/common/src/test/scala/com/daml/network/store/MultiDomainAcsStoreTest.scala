@@ -56,6 +56,7 @@ abstract class MultiDomainAcsStoreTest[
   protected def mkStore(
       id: Int = 0,
       domainMigrationId: Long = 0,
+      participantId: ParticipantId = ParticipantId("MultiDomainAcsStoreTest"),
       filter: MultiDomainAcsStore.ContractFilter[GenericAcsRowData] = defaultContractFilter,
   ): Store
 
@@ -672,7 +673,6 @@ abstract class MultiDomainAcsStoreTest[
     "read assignment-mismatched contracts in a stable order" in {
       import com.daml.lf.value.Value
       import com.daml.network.codegen.java.cc.coin.{FeaturedAppRight, SvcReward}
-      import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
       import MultiDomainAcsStore.ConstrainedTemplate
 
       // the specific templates don't matter, we just need 2 of them
@@ -699,14 +699,13 @@ abstract class MultiDomainAcsStoreTest[
           ),
         )
       }
-      implicit val store: Store = mkStore(0, 0L, contractFilter)
+      implicit val store: Store = mkStore(0, 0L, sampleParticipantId, contractFilter)
       for {
         _ <- acs(coids.zipWithIndex.map { case (coid, ix) =>
           (smallestContract(coid, ix), dummyDomain, 0L)
         })
         contracts <- store.listAssignedContractsNotOnDomainN(
           dummy2Domain,
-          HasParticipantId.Const(sampleParticipantId),
           Seq[ConstrainedTemplate](evenCompanion, oddCompanion),
         )
       } yield contracts.map(_.contractId.contractId) shouldBe expectedOrder.map(_.coid)

@@ -28,7 +28,6 @@ class UserWalletAutomationService(
     store: UserWalletStore,
     treasury: TreasuryService,
     ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
     globalDomain: GetTargetDomain,
     automationConfig: AutomationConfig,
     clock: Clock,
@@ -100,7 +99,7 @@ class UserWalletAutomationService(
         scanConnection.getCoinRulesWithState() flatMap { coinRules =>
           coinRules.toAssignedContract map { coinRules =>
             store
-              .listLaggingCoinRulesFollowers(coinRules.domain, participantAdminConnection)
+              .listLaggingCoinRulesFollowers(coinRules.domain)
               .map(_ map (FollowTask(coinRules, _)))
           } getOrElse Future.successful(Seq.empty)
         },

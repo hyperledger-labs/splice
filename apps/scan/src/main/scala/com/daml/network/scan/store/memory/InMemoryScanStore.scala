@@ -43,8 +43,7 @@ import com.daml.network.scan.store.SortOrder.Descending
 import com.daml.network.scan.store.TxLogEntry.RewardTxLogEntry
 
 class InMemoryScanStore(
-    override val serviceUserPrimaryParty: PartyId,
-    override val svcParty: PartyId,
+    override val key: ScanStore.Key,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     override val domainMigrationId: Long,

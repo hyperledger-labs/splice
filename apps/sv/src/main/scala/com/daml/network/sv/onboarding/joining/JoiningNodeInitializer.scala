@@ -141,8 +141,8 @@ class JoiningNodeInitializer(
         loggerFactory,
       )
       storeKey = SvStore.Key(svParty, svcPartyId)
-      svStore = newSvStore(storeKey, config.domainMigrationId)
-      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantAdminConnection)
+      svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
+      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
         svcStore,

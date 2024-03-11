@@ -1,11 +1,12 @@
 package com.daml.network.store.db
 
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.RetryProvider
 import com.daml.network.store.*
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.resource.DbStorage
+import com.digitalasset.canton.topology.ParticipantId
 
 import scala.concurrent.ExecutionContext
 
@@ -13,10 +14,10 @@ abstract class DbCNNodeAppStore[TXE](
     storage: DbStorage,
     acsTableName: String,
     txLogTableName: String,
-    storeDescriptor: io.circe.Json,
+    storeDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
-    participantIdSource: ParticipantAdminConnection.HasParticipantId,
+    participantId: ParticipantId,
     storeUpdateHistory: Boolean,
 )(implicit
     protected val ec: ExecutionContext,
@@ -39,6 +40,7 @@ abstract class DbCNNodeAppStore[TXE](
       acsContractFilter,
       txLogConfig,
       domainMigrationId,
+      participantId,
       retryProvider,
       handleIngestionSummary,
     )
@@ -59,7 +61,7 @@ abstract class DbCNNodeAppStore[TXE](
         new UpdateHistory(
           storage,
           domainMigrationId,
-          participantIdSource,
+          participantId,
           acsContractFilter.ingestionFilter.primaryParty,
           loggerFactory,
         )
@@ -72,9 +74,10 @@ abstract class DbCNNodeAppStore[TXE](
 abstract class DbCNNodeAppStoreWithoutHistory(
     storage: DbStorage,
     acsTableName: String,
-    storeDescriptor: io.circe.Json,
+    storeDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
+    participantId: ParticipantId,
 )(implicit
     ec: ExecutionContext,
     templateJsonDecoder: TemplateJsonDecoder,
@@ -96,6 +99,7 @@ abstract class DbCNNodeAppStoreWithoutHistory(
       acsContractFilter,
       TxLogStore.Config.empty,
       domainMigrationId,
+      participantId,
       retryProvider,
       handleIngestionSummary,
     )

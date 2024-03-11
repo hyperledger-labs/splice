@@ -6,7 +6,6 @@ import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
-import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.sv.store.db.DbSvSvStore
@@ -16,7 +15,7 @@ import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.DomainId
+import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -80,20 +79,17 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       .map(_.headOption map (_.contract))
 
   private[this] def listLaggingSvcRulesFollowers(
-      targetDomain: DomainId,
-      participantIdSource: HasParticipantId,
+      targetDomain: DomainId
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       targetDomain,
-      participantIdSource,
       templatesMovedByMyAutomation,
     )
 
   final def listSvcRulesTransferFollowers[SrCid, Sr](
-      svcRules: AssignedContract[SrCid, Sr],
-      participantIdSource: HasParticipantId,
+      svcRules: AssignedContract[SrCid, Sr]
   )(implicit tc: TraceContext): Future[Seq[FollowTask[SrCid, Sr, ?, ?]]] =
-    listLaggingSvcRulesFollowers(svcRules.domain, participantIdSource)
+    listLaggingSvcRulesFollowers(svcRules.domain)
       .map(_ map (FollowTask(svcRules, _)))
 
   def key: SvStore.Key
@@ -107,6 +103,7 @@ object SvSvStore {
       retryProvider: RetryProvider,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
+      participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -116,7 +113,7 @@ object SvSvStore {
       case _: MemoryStorage =>
         new InMemorySvSvStore(key, loggerFactory, retryProvider)
       case db: DbStorage =>
-        new DbSvSvStore(key, db, loggerFactory, retryProvider, domainMigrationId)
+        new DbSvSvStore(key, db, loggerFactory, retryProvider, domainMigrationId, participantId)
     }
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =

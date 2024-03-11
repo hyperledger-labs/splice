@@ -2,7 +2,6 @@ package com.daml.network.store
 
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Identifier, TransactionTree}
-import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
@@ -37,7 +36,7 @@ final class UpdateHistory(
     storage: DbStorage,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
-    participantIdSource: ParticipantAdminConnection.HasParticipantId,
+    participantId: ParticipantId,
     val updateStreamParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -57,11 +56,6 @@ final class UpdateHistory(
       .get()
       .historyId
       .getOrElse(throw new RuntimeException("Using historyId before it was assigned"))
-  private def participantId: ParticipantId =
-    state
-      .get()
-      .participantId
-      .getOrElse(throw new RuntimeException("Using participantId before it was assigned"))
 
   def ingestionSink: MultiDomainAcsStore.IngestionSink = new MultiDomainAcsStore.IngestionSink {
     override def ingestionFilter: IngestionFilter = IngestionFilter(
@@ -77,7 +71,6 @@ final class UpdateHistory(
       // Notes:
       // - 'ON CONFLICT DO NOTHING RETURNING ...' does not return anything if the row already exists, that's why we are using two separate queries
       for {
-        participantId <- participantIdSource.getParticipantId()
         _ <- storage
           .update(
             sql"""
@@ -128,8 +121,7 @@ final class UpdateHistory(
       } yield {
         state.updateAndGet(
           _.copy(
-            historyId = Some(newHistoryId),
-            participantId = Some(participantId),
+            historyId = Some(newHistoryId)
           )
         )
         lastIngestedOffset match {
@@ -604,8 +596,7 @@ final class UpdateHistory(
 
 object UpdateHistory {
   case class State(
-      historyId: Option[Long],
-      participantId: Option[ParticipantId] = None,
+      historyId: Option[Long]
   ) {}
   object State {
     def empty(): State = State(None)

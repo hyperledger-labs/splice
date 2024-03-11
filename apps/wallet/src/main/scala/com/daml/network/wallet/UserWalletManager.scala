@@ -4,7 +4,7 @@ import org.apache.pekko.stream.Materializer
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.Limit
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
@@ -14,7 +14,7 @@ import com.digitalasset.canton.lifecycle.{RunOnShutdown, *}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -26,7 +26,6 @@ import scala.concurrent.{ExecutionContext, Future, blocking}
 /** Manages all services comprising an end-user wallets. */
 class UserWalletManager(
     ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
     val store: WalletStore,
     val validatorUser: String,
     automationConfig: AutomationConfig,
@@ -38,6 +37,7 @@ class UserWalletManager(
     override val loggerFactory: NamedLoggerFactory,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
+    participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
@@ -70,7 +70,8 @@ class UserWalletManager(
   private[this] def addEndUserWallet(
       endUserName: String,
       endUserParty: PartyId,
-      createWallet: (String, PartyId) => (RetryProvider, UserWalletService),
+      participantId: ParticipantId,
+      createWallet: (String, PartyId, ParticipantId) => (RetryProvider, UserWalletService),
   ): Option[(RetryProvider, UserWalletService)] = blocking {
     this.synchronized {
       if (endUserWalletsMap.contains(endUserName)) {
@@ -82,7 +83,7 @@ class UserWalletManager(
         logger.debug(
           show"Creating wallet service and retry provider for user ${endUserName.singleQuoted}."
         )(TraceContext.empty)
-        val endUserWallet = createWallet(endUserName, endUserParty)
+        val endUserWallet = createWallet(endUserName, endUserParty, participantId)
         endUserWalletsMap.put(endUserName, endUserWallet): Unit
         Some(endUserWallet)
       }
@@ -137,7 +138,7 @@ class UserWalletManager(
       val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
 
       val userRetryProviderAndWalletService =
-        addEndUserWallet(endUserName, endUserParty, createEndUserWallet)
+        addEndUserWallet(endUserName, endUserParty, participantId, createEndUserWallet)
 
       // There might have been a concurrent call to .close() that missed the above addition of this user
       if (retryProvider.isClosing) {
@@ -158,6 +159,7 @@ class UserWalletManager(
   private def createEndUserWallet(
       endUserName: String,
       endUserParty: PartyId,
+      participantId: ParticipantId,
   ): (RetryProvider, UserWalletService) = {
     val key = UserWalletStore.Key(
       svcParty = store.walletKey.svcParty,
@@ -177,7 +179,6 @@ class UserWalletManager(
       )
     val walletService = new UserWalletService(
       ledgerClient,
-      participantAdminConnection,
       key,
       this,
       automationConfig,
@@ -188,6 +189,7 @@ class UserWalletManager(
       userLoggerFactory,
       scanConnection,
       domainMigrationId,
+      participantId,
       ingestFromParticipantBegin,
     )
     (userRetryProvider, walletService)

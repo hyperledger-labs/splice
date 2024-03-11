@@ -12,7 +12,6 @@ import com.daml.network.codegen.java.cn.wallet.{
   topupstate as topUpCodegen,
 }
 import com.daml.network.environment.RetryProvider
-import com.daml.network.environment.ParticipantAdminConnection.HasParticipantId
 import com.daml.network.http.v0.definitions
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore}
@@ -26,7 +25,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -192,12 +191,10 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       coinRules: AssignedContract[
         coinrulesCodegen.CoinRules.ContractId,
         coinrulesCodegen.CoinRules,
-      ],
-      participantIdSource: HasParticipantId,
+      ]
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       coinRules.domain,
-      participantIdSource,
       templatesMovedByMyAutomation(key.appManagerEnabled),
     )
 }
@@ -237,6 +234,7 @@ object ValidatorStore {
       retryProvider: RetryProvider,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
+      participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
       templateJsonDecoder: TemplateJsonDecoder,
@@ -246,7 +244,14 @@ object ValidatorStore {
       case _: MemoryStorage =>
         new InMemoryValidatorStore(key, loggerFactory, retryProvider, domainMigrationId)
       case storage: DbStorage =>
-        new DbValidatorStore(key, storage, loggerFactory, retryProvider, domainMigrationId)
+        new DbValidatorStore(
+          key,
+          storage,
+          loggerFactory,
+          retryProvider,
+          domainMigrationId,
+          participantId,
+        )
     }
 
   case class Key(

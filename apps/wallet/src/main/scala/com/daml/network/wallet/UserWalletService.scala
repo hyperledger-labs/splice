@@ -12,6 +12,7 @@ import com.digitalasset.canton.lifecycle.{CloseContext, FlagCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.ParticipantId
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
 
@@ -20,7 +21,6 @@ import scala.concurrent.ExecutionContext
 /** A service managing the treasury, automation, and store for an end-user's wallet. */
 class UserWalletService(
     ledgerClient: CNLedgerClient,
-    participantAdminConnection: ParticipantAdminConnection,
     key: UserWalletStore.Key,
     walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
@@ -32,6 +32,7 @@ class UserWalletService(
     scanConnection: BftScanConnection,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
     domainMigrationId: Long,
+    participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
 )(implicit
     ec: ExecutionContext,
@@ -51,7 +52,7 @@ class UserWalletService(
       loggerFactory,
       retryProvider,
       domainMigrationId,
-      participantAdminConnection,
+      participantId,
     )
 
   val treasury: TreasuryService = new TreasuryService(
@@ -74,7 +75,6 @@ class UserWalletService(
     store,
     treasury,
     ledgerClient,
-    participantAdminConnection,
     scanConnection.getCoinRulesDomain,
     automationConfig,
     clock,
