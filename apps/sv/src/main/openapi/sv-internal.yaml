@@ -1139,8 +1139,6 @@ components:
         migration_id:
           type: integer
           format: int64
-        for_testing:
-          type: boolean
 
     GetDomainMigrationDumpResponse:
       type: object

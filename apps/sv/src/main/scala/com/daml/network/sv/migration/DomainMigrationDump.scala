@@ -63,7 +63,6 @@ object DomainMigrationDump {
       svcStore: SvSvcStore,
       migrationId: Long,
       domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
-      forTesting: Boolean = false,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -76,12 +75,7 @@ object DomainMigrationDump {
         domainAlias,
         loggerFactory,
       )
-      snapshot <-
-        if (forTesting) {
-          domainDataSnapshotGenerator.getDomainMigrationSnapshotForTesting
-        } else {
-          domainDataSnapshotGenerator.getDomainMigrationSnapshot
-        }
+      snapshot <- domainDataSnapshotGenerator.getDomainMigrationSnapshot
     } yield DomainMigrationDump(
       migrationId,
       identities,

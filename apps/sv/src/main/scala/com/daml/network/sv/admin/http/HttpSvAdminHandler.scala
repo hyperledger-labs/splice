@@ -576,7 +576,6 @@ class HttpSvAdminHandler(
                     svcStore,
                     request.migrationId,
                     domainDataSnapshotGenerator,
-                    request.forTesting.getOrElse(false),
                   )
               } yield {
                 val path = BackupDump.writeToPath(

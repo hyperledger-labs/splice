@@ -438,7 +438,7 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class TriggerDomainMigrationDump(migrationId: Long, forTesting: Boolean = false)
+  case class TriggerDomainMigrationDump(migrationId: Long)
       extends BaseCommand[
         http.TriggerDomainMigrationDumpResponse,
         Unit,
@@ -453,7 +453,7 @@ object HttpSvAdminAppClient {
     ], TriggerDomainMigrationDumpResponse] =
       client.triggerDomainMigrationDump(
         headers = headers,
-        body = TriggerDomainMigrationDumpRequest(migrationId, Option.when(forTesting)(true)),
+        body = TriggerDomainMigrationDumpRequest(migrationId),
       )
 
     override def handleOk()(implicit

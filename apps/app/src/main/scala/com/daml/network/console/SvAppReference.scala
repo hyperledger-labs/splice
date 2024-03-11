@@ -112,12 +112,9 @@ abstract class SvAppReference(
     }
 
   @Help.Summary("Dump all the required data for domain migration to the configured location")
-  def triggerGlobalDomainMigrationDump(
-      migrationId: Long,
-      forTesting: Boolean = false,
-  ): Unit =
+  def triggerGlobalDomainMigrationDump(migrationId: Long): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.TriggerDomainMigrationDump(migrationId, forTesting))
+      httpCommand(HttpSvAdminAppClient.TriggerDomainMigrationDump(migrationId))
     }
 
   @Help.Summary("Get a snapshot of all the dynamic data from the domain")

@@ -35,28 +35,6 @@ class AcsExporter(
     )
   }
 
-  def exportParticipantPartiesAcsForTesting(domain: DomainId)(implicit
-      tc: TraceContext,
-      ec: ExecutionContext,
-  ): Future[ByteString] = {
-    for {
-      participantId <- participantAdminConnection.getId()
-      parties <- participantAdminConnection
-        .listPartyToParticipant(
-          filterStore = domain.filterString,
-          filterParticipant = participantId.toProtoPrimitive,
-        )
-        .map(_.map(_.mapping.partyId))
-      _ = logger.info(show"Exporting ACS from domain $domain for $parties")
-      snapshot <- participantAdminConnection.downloadAcsSnapshot(
-        parties = parties.toSet,
-        filterDomainId = Some(domain),
-      )
-    } yield {
-      snapshot
-    }
-  }
-
   def safeExportParticipantPartiesAcsFromPausedDomain(domain: DomainId)(implicit
       tc: TraceContext,
       ec: ExecutionContext,

@@ -61,20 +61,6 @@ class DomainDataSnapshotGenerator(
     dars,
   )
 
-  def getDomainMigrationSnapshotForTesting(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[DomainDataSnapshot] = for {
-    globalDomain <- svcStore.getSvcRules().map(_.domain)
-    acsSnapshot <- acsExporter.exportParticipantPartiesAcsForTesting(globalDomain)
-    topologySnapshot <- getTopologySnapshot(globalDomain, Instant.now())
-    dars <- darExporter.exportAllDars()
-  } yield DomainDataSnapshot(
-    topologySnapshot,
-    acsSnapshot,
-    dars,
-  )
-
   private def getTopologySnapshot(domainId: DomainId, timestamp: Instant)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
