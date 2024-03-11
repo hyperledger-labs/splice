@@ -1,11 +1,13 @@
 package com.daml.network.sv.onboarding.joining
 
+import cats.data.OptionT
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 import cats.implicits.{
   catsSyntaxTuple2Semigroupal,
   catsSyntaxTuple3Semigroupal,
   catsSyntaxTuple4Semigroupal,
+  toTraverseOps,
 }
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
@@ -76,6 +78,16 @@ class JoiningNodeInitializer(
     tracer: Tracer,
 ) extends NodeInitializerUtil {
 
+  private lazy val svConnection = OptionT(joiningConfig.traverse { conf =>
+    SvConnection(conf.svClient.adminApi, retryProvider, loggerFactory).map { connection =>
+      (conf, connection)
+    }
+  }).getOrElse(
+    sys.error(
+      "An onboarding config is required."
+    )
+  )
+
   def joinCollectiveAndOnboardNodes(): Future[
     (
         DomainId,
@@ -103,7 +115,7 @@ class JoiningNodeInitializer(
       manualConnect = true,
     )
     for {
-      (svcPartyId, _) <- (
+      (svcPartyId, darUploads) <- (
         // If we're not onboarded yet, this waits for the sponsoring SV
         getSvcPartyId(initConnection),
         for {
@@ -113,11 +125,11 @@ class JoiningNodeInitializer(
             domainConfig,
             RetryFor.WaitingOnInitDependency,
           )
-          _ <- participantAdminConnection.uploadDarFiles(
-            requiredDars,
-            RetryFor.WaitingOnInitDependency,
-          )
-        } yield (),
+          // Have the uploads run in the background while we setup the sv party to save time
+        } yield participantAdminConnection.uploadDarFiles(
+          requiredDars,
+          RetryFor.WaitingOnInitDependency,
+        ),
       ).tupled
       _ <- connectToDomainUnlessMigratingSvcParty(svcPartyId)
       svParty <- SetupUtil.setupSvParty(
@@ -128,6 +140,7 @@ class JoiningNodeInitializer(
         retryProvider,
         loggerFactory,
       )
+      _ <- darUploads
       storeKey = SvStore.Key(svParty, svcPartyId)
       svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
       svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantId)
@@ -180,11 +193,7 @@ class JoiningNodeInitializer(
               show"the SvcRules list the SV party ${svcStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
               isOnboarded(svcStore), {
                 for {
-                  (joiningConfig, svConnection) <- sponsorSvConnectionAndConfig.getOrElse(
-                    sys.error(
-                      "An onboarding config is required."
-                    )
-                  )
+                  (joiningConfig, svConnection) <- svConnection
                   _ <- withSvStore.startOnboardingWithSvcPartyHosted(
                     svcAutomation,
                     svConnection,
@@ -201,11 +210,7 @@ class JoiningNodeInitializer(
               "Starting onboarding with SVC party migration."
           )
           for {
-            (joiningConfig, svConnection) <- sponsorSvConnectionAndConfig.getOrElse(
-              sys.error(
-                "An onboarding config is required."
-              )
-            )
+            (joiningConfig, svConnection) <- svConnection
             svcAutomation <- withSvStore
               .startOnboardingWithSvcPartyMigration(
                 initConnection,
@@ -289,7 +294,7 @@ class JoiningNodeInitializer(
           )
           // Finally, fully onboard the sequencer and mediator
           _ <-
-            localDomainNode.onboardLocalSequencerIfRequired(joiningConfig.map(_.svClient.adminApi))
+            localDomainNode.onboardLocalSequencerIfRequired(svConnection.map(_._2))
           _ <- localDomainNode.initializeLocalMediatorIfRequired(
             globalDomain
           )
@@ -334,14 +339,6 @@ class JoiningNodeInitializer(
       logger,
     )
   }
-
-  private def sponsorSvConnectionAndConfig
-      : Option[Future[(SvOnboardingConfig.JoinWithKey, SvConnection)]] =
-    joiningConfig.map { conf =>
-      SvConnection(conf.svClient.adminApi, retryProvider, loggerFactory).map { connection =>
-        (conf, connection)
-      }
-    }
 
   private def newCometBftClient = {
     cometBftNode.map(node =>

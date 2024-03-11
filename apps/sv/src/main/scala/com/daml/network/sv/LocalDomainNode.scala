@@ -1,32 +1,31 @@
 package com.daml.network.sv
 
-import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
-import org.apache.pekko.stream.Materializer
-import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.config.SequencerPruningConfig
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
 import com.digitalasset.canton.networking.Endpoint
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
+import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.TopologyMappingX.Code.{
   NamespaceDelegationX,
   OwnerToKeyMappingX,
 }
-import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
-import com.digitalasset.canton.logging.pretty.PrettyInstances.prettyPrettyPrinting
-import com.digitalasset.canton.{DomainAlias, SequencerAlias}
-import com.digitalasset.canton.config.RequireTypes.PositiveLong
 import io.grpc.Status
+import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
+import org.apache.pekko.stream.Materializer
 
 import java.time.Duration
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -316,7 +315,7 @@ final class LocalDomainNode(
   /** Onboard the sequencer operated by this SV to the domain if it is not already.
     */
   def onboardLocalSequencerIfRequired(
-      svConnectionConfig: Option[NetworkAppClientConfig]
+      svConnection: => Future[SvConnection]
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider
       .getValueWithRetries(
@@ -328,20 +327,7 @@ final class LocalDomainNode(
       .flatMap {
         case Left(NodeStatus.NotInitialized(_)) =>
           logger.info("Onboarding sequencer")
-          svConnectionConfig match {
-            case None =>
-              Future.failed(
-                Status.FAILED_PRECONDITION
-                  .withDescription(
-                    "Can't onboard sequencer without sponsoring SV connection config"
-                  )
-                  .asRuntimeException()
-              )
-            case Some(svConnectionConfig) =>
-              withSvConnection(svConnectionConfig) { svConnection =>
-                onboardLocalSequencer(svConnection)
-              }
-          }
+          svConnection.flatMap(onboardLocalSequencer)
         case Right(NodeStatus.Success(_)) =>
           logger.info("Sequencer is already onboarded")
           Future.unit
@@ -389,14 +375,6 @@ final class LocalDomainNode(
         "Sequencer is initialized"
       )
     } yield ()
-  }
-
-  private def withSvConnection[T](
-      config: NetworkAppClientConfig
-  )(f: SvConnection => Future[T])(implicit traceContext: TraceContext): Future[T] = {
-    SvConnection(config, retryProvider, loggerFactory).flatMap(con =>
-      f(con).andThen(_ => con.close())
-    )
   }
 
   override protected def onClosed(): Unit = {

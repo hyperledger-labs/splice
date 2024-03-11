@@ -56,7 +56,7 @@ class SvOffboardingPartyToParticipantProposalTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = {
     logger.info(
-      s"Removing participant with participantId ${task} from the hosting of the SVC party"
+      s"Removing participant with participantId $task from the hosting of the SVC party"
     )
     for {
       svcRules <- svcStore.getSvcRules()
