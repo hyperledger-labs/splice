@@ -8,7 +8,7 @@ import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.console.ConsoleMacros
-import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.logging.{SuppressingLogger, SuppressionRule}
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import com.digitalasset.canton.topology.transaction.DecentralizedNamespaceDefinitionX
 import io.grpc
@@ -81,19 +81,21 @@ class ResetDecentralizedNamespace
                 def proposeDecentralizedNamespaceReset(
                     client: CNParticipantClientReference
                 ) = {
-                  loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
-                    client.topology.decentralized_namespaces
-                      .propose(
-                        Set(sv1ParticipantNamespace),
-                        PositiveInt.one,
-                        store,
-                        serial =
-                          Some(existingDecentralizedNamespace.context.serial + PositiveInt.one),
-                      )
-                      .discard,
-                    logs =>
-                      forAll(logs)(_.message should contain("FAILED_PRECONDITION/SERIAL_MISMATCH")),
-                  )
+                  env.environment.loggerFactory
+                    .asInstanceOf[SuppressingLogger]
+                    .assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
+                      client.topology.decentralized_namespaces
+                        .propose(
+                          Set(sv1ParticipantNamespace),
+                          PositiveInt.one,
+                          store,
+                          serial = Some(
+                            existingDecentralizedNamespace.context.serial + PositiveInt.one
+                          ),
+                        )
+                        .discard,
+                      forAll(_)(_.message should include("FAILED_PRECONDITION/SERIAL_MISMATCH")),
+                    )
                 }
 
                 try {
