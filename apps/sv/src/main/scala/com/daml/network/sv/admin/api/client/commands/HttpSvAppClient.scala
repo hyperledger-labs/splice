@@ -1,7 +1,5 @@
 package com.daml.network.sv.admin.api.client.commands
 
-import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, StatusCodes}
-import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
@@ -14,12 +12,14 @@ import com.daml.network.sv.http.SvHttpClient.BaseCommand
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.topology.admin.v30
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
-import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpResponse, StatusCodes}
+import org.apache.pekko.stream.Materializer
 
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
@@ -327,32 +327,6 @@ object HttpSvAppClient {
             .fromByteArrayUnsafe(Base64.getDecoder().decode(snapshot.sequencerSnapshot))
         } yield SequencerSnapshot(topologySnapshot, sequencerSnapshot)).left.map(_.message)
     }
-  }
-
-  case class OnboardSvMediator(
-      mediatorId: MediatorId
-  ) extends BaseCommand[
-        http.OnboardSvMediatorResponse,
-        Unit,
-      ] {
-
-    override def submitRequest(
-        client: Client,
-        headers: List[HttpHeader],
-    ): EitherT[Future, Either[
-      Throwable,
-      HttpResponse,
-    ], http.OnboardSvMediatorResponse] =
-      client.onboardSvMediator(
-        body = definitions.OnboardSvMediatorRequest(
-          Codec.encode(mediatorId)
-        ),
-        headers = headers,
-      )
-
-    override def handleOk()(implicit
-        decoder: TemplateJsonDecoder
-    ) = _ => Right(())
   }
 
   case class GetCometBftNodeStatus()

@@ -1,6 +1,5 @@
 package com.daml.network.config
 
-import org.apache.pekko.http.scaladsl.model.Uri
 import com.daml.network.auth.AuthUtil
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.splitwell.config.{
@@ -8,8 +7,10 @@ import com.daml.network.splitwell.config.{
   SplitwellAppClientConfig,
   SplitwellDomains,
 }
-import com.daml.network.sv.automation.singlesv.membership.offboarding.SvOffboardingSequencerTrigger
-import com.daml.network.sv.automation.singlesv.offboarding.SvOffboardingMediatorTrigger
+import com.daml.network.sv.automation.singlesv.membership.offboarding.{
+  SvOffboardingMediatorTrigger,
+  SvOffboardingSequencerTrigger,
+}
 import com.daml.network.sv.config.*
 import com.daml.network.validator.config.{
   AppManagerAppClientConfig,
@@ -23,6 +24,7 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import monocle.macros.syntax.lens.*
+import org.apache.pekko.http.scaladsl.model.Uri
 
 import scala.collection.mutable
 import scala.concurrent.duration.*

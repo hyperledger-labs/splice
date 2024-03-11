@@ -77,6 +77,6 @@ class SubmitSvStatusReportTrigger(
         .noDedup
         .yieldUnit()
       _ = logger.debug(s"Completed submitting on-ledger SvStatus report.")
-    } yield (false)
+    } yield false
   }
 }

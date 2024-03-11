@@ -5,7 +5,7 @@ import com.daml.network.environment.{HttpAppConnection, RetryProvider}
 import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.{MediatorId, ParticipantId, PartyId, SequencerId}
+import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
@@ -53,21 +53,6 @@ final class SvConnection private (
       HttpSvAppClient.OnboardSvPartyMigrationAuthorize(
         candidateParticipantId,
         candidateParty,
-      ),
-    )
-
-  def onboardSvMediator(
-      mediatorId: MediatorId
-  )(implicit
-      httpClient: HttpRequest => Future[HttpResponse],
-      templateDecoder: TemplateJsonDecoder,
-      ec: ExecutionContext,
-      mat: Materializer,
-  ): Future[Unit] =
-    runHttpCmd(
-      config.url,
-      HttpSvAppClient.OnboardSvMediator(
-        mediatorId
       ),
     )
 

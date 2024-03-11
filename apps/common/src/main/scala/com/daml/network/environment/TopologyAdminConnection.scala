@@ -20,7 +20,6 @@ import com.digitalasset.canton.admin.api.client.commands.{
 import com.digitalasset.canton.admin.api.client.data.topologyx.{
   BaseResult,
   ListOwnerToKeyMappingResult,
-  ListSequencerDomainStateResult,
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
@@ -35,12 +34,13 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionX,
   StoredTopologyTransactionsX,
+  StoredTopologyTransactionX,
   TimeQuery,
   TopologyStoreId,
 }
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
+import com.digitalasset.canton.topology.store.TimeQuery.HeadState
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
@@ -162,15 +162,19 @@ abstract class TopologyAdminConnection(
         .asRuntimeException
     }
 
-  def getSequencerDomainState(domainId: DomainId, proposals: Boolean = false)(implicit
+  def listSequencerDomainState(
+      domainId: DomainId,
+      timeQuery: TimeQuery,
+      proposals: Boolean = false,
+  )(implicit
       traceContext: TraceContext
-  ): Future[TopologyResult[SequencerDomainStateX]] =
+  ): Future[Seq[TopologyResult[SequencerDomainStateX]]] =
     runCmd(
       TopologyAdminCommandsX.Read.SequencerDomainState(
         BaseQueryX(
           filterStore = domainId.filterString,
           proposals = proposals,
-          timeQuery = TimeQuery.HeadState,
+          timeQuery = timeQuery,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
@@ -178,13 +182,19 @@ abstract class TopologyAdminConnection(
         filterDomain = "",
       )
     ).map { txs =>
-      val ListSequencerDomainStateResult(base, mapping) = txs.headOption
+      txs.map(res => TopologyResult(res.context, res.item))
+    }
+
+  def getSequencerDomainState(domainId: DomainId, proposals: Boolean = false)(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[SequencerDomainStateX]] =
+    listSequencerDomainState(domainId, HeadState, proposals).map { txs =>
+      txs.headOption
         .getOrElse(
           throw Status.NOT_FOUND
             .withDescription(s"No sequencer state for domain $domainId")
             .asRuntimeException()
         )
-      TopologyResult(base, mapping)
     }
 
   def getMediatorDomainStateProposals(domainId: DomainId)(implicit

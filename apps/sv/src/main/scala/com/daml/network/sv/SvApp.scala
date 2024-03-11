@@ -179,6 +179,7 @@ class SvApp(
     val localDomainNode = config.localDomainNode
       .map(config =>
         new LocalDomainNode(
+          participantAdminConnection,
           new SequencerAdminConnection(
             config.sequencer.adminApi,
             coinAppParameters.loggingConfig.api,
@@ -694,11 +695,6 @@ object SvApp {
           binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
           timeouts.shutdownNetwork,
         ),
-        SyncCloseable("sv automation", svAutomation.close()),
-        SyncCloseable("svc automation", svcAutomation.close()),
-        SyncCloseable("sv store", svStore.close()),
-        SyncCloseable("svc store", svcStore.close()),
-        SyncCloseable("storage", storage.close()),
         SyncCloseable(
           s"Domain connections",
           localDomainNode.foreach(_.close()),
@@ -707,6 +703,11 @@ object SvApp {
           s"Participant Admin connection",
           participantAdminConnection.close(),
         ),
+        SyncCloseable("sv automation", svAutomation.close()),
+        SyncCloseable("svc automation", svcAutomation.close()),
+        SyncCloseable("sv store", svStore.close()),
+        SyncCloseable("svc store", svcStore.close()),
+        SyncCloseable("storage", storage.close()),
       )
   }
 
