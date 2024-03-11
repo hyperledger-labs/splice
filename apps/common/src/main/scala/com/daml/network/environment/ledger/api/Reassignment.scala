@@ -4,10 +4,12 @@ import com.daml.ledger.javaapi.data.ParticipantOffset
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyInstances, PrettyPrinting}
 import com.daml.ledger.api.v2.reassignment as multidomain
+import com.digitalasset.canton.data.CantonTimestamp
 
 final case class Reassignment[+E](
     updateId: String,
     offset: ParticipantOffset.Absolute,
+    recordTime: CantonTimestamp,
     event: E & ReassignmentEvent,
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
@@ -31,9 +33,24 @@ object Reassignment {
       case multidomain.Reassignment.Event.Empty =>
         throw new IllegalArgumentException("uninitialized transfer event")
     }
+    val recordTime = CantonTimestamp
+      .fromProtoTimestamp(
+        proto.recordTime
+          .getOrElse(
+            throw new IllegalArgumentException(
+              s"transfer event ${proto.updateId} without record time"
+            )
+          )
+      )
+      .getOrElse(
+        throw new IllegalArgumentException(
+          s"transfer event ${proto.updateId} with invalid record time"
+        )
+      )
     Reassignment(
       proto.updateId,
       offset,
+      recordTime,
       event,
     )
   }

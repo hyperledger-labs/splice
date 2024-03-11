@@ -854,6 +854,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     Reassignment(
       updateId = "",
       offset = new ParticipantOffset.Absolute(offset),
+      recordTime = CantonTimestamp.Epoch,
       event = event,
     )
 

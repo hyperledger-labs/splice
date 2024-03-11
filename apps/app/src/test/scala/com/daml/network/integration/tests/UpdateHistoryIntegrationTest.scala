@@ -182,23 +182,28 @@ class UpdateHistoryIntegrationTest
 
     clue("Update history is consistent with update stream") {
       // History for the SVC, read from SV1 (only contains transactions on the global domain)
-      compareHistory(
-        sv1Backend.participantClient,
-        sv1ScanBackend.appState.store.updateHistory
-          .getOrElse(throw new RuntimeException("Scan should have history")),
-        ledgerBeginSv1,
-      )
+      // Using eventually(), as we don't know when UpdateHistory has caught up with the updates
+      eventually() {
+        compareHistory(
+          sv1Backend.participantClient,
+          sv1ScanBackend.appState.store.updateHistory
+            .getOrElse(throw new RuntimeException("Scan should have history")),
+          ledgerBeginSv1,
+        )
+      }
       // History for Alice, read from aliceValidator (should contain domain transfer because of splitwell)
-      compareHistory(
-        aliceValidatorBackend.participantClient,
-        aliceValidatorBackend.appState.walletManager
-          .lookupUserWallet(aliceWalletClient.config.ledgerApiUser)
-          .getOrElse(throw new RuntimeException("Alice wallet should exist"))
-          .store
-          .updateHistory
-          .getOrElse(throw new RuntimeException("User wallet should have history")),
-        ledgerBeginAlice,
-      )
+      eventually() {
+        compareHistory(
+          aliceValidatorBackend.participantClient,
+          aliceValidatorBackend.appState.walletManager
+            .lookupUserWallet(aliceWalletClient.config.ledgerApiUser)
+            .getOrElse(throw new RuntimeException("Alice wallet should exist"))
+            .store
+            .updateHistory
+            .getOrElse(throw new RuntimeException("User wallet should have history")),
+          ledgerBeginAlice,
+        )
+      }
 
     }
   }
@@ -272,7 +277,7 @@ class UpdateHistoryIntegrationTest
       /*rootEventIds = */ tree.getRootEventIds,
       /*domainId = */ tree.getDomainId,
       /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance, // Not preserved
-      /*recordTime = */ tree.getEffectiveAt, // TODO(#10656): this is wrong! retrieve the actual record_time from the store
+      /*recordTime = */ tree.getRecordTime,
     )
   }
 
@@ -291,7 +296,7 @@ class UpdateHistoryIntegrationTest
       /*witnessParties = */ java.util.Collections.emptyList(), // Not preserved
       /*eventId = */ created.getEventId,
       /*templateId = */ created.getTemplateId,
-      /* packageName = */ "dummyPackageName", // TODO(#10656): retrieve from store
+      /* packageName = */ created.getPackageName,
       /*contractId = */ created.getContractId,
       /*arguments = */ created.getArguments,
       /*createdEventBlob = */ ByteString.EMPTY, // Not preserved
@@ -324,18 +329,20 @@ class UpdateHistoryIntegrationTest
       transfer: Reassignment[ReassignmentEvent]
   ): Reassignment[ReassignmentEvent] = {
     transfer match {
-      case Reassignment(updateId, offset, assign: Assign) =>
+      case Reassignment(updateId, offset, recordTime, assign: Assign) =>
         Reassignment(
           updateId,
           offset,
+          recordTime,
           assign.copy(
             createdEvent = withoutLostData(assign.createdEvent)
           ),
         )
-      case Reassignment(updateId, offset, unassign: Unassign) =>
+      case Reassignment(updateId, offset, recordTime, unassign: Unassign) =>
         Reassignment(
           updateId,
           offset,
+          recordTime,
           unassign,
         )
       case _ => throw new RuntimeException("Invalid transfer type")

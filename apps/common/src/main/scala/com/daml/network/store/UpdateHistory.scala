@@ -243,9 +243,9 @@ final class UpdateHistory(
         reassignment: Reassignment[ReassignmentEvent]
     ): DBIOAction[?, NoStream, Effect.Write] = {
       reassignment match {
-        case Reassignment(_, _, event: ReassignmentEvent.Assign) =>
+        case Reassignment(_, _, _, event: ReassignmentEvent.Assign) =>
           ingestAssignment(reassignment, event)
-        case Reassignment(_, _, event: ReassignmentEvent.Unassign) =>
+        case Reassignment(_, _, _, event: ReassignmentEvent.Unassign) =>
           ingestUnassignment(reassignment, event)
       }
     }
@@ -255,7 +255,7 @@ final class UpdateHistory(
         event: ReassignmentEvent.Unassign,
     ): DBIOAction[?, NoStream, Effect.Write] = {
       val safeUpdateId = lengthLimited(reassignment.updateId)
-      val safeRecordTime = CantonTimestamp.now()
+      val safeRecordTime = reassignment.recordTime
       val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
       val safeUnassignId = lengthLimited(event.unassignId)
       val safeContractId = lengthLimited(event.contractId.contractId)
@@ -282,7 +282,7 @@ final class UpdateHistory(
         event: ReassignmentEvent.Assign,
     ): DBIOAction[?, NoStream, Effect.Write] = {
       val safeUpdateId = lengthLimited(reassignment.updateId)
-      val safeRecordTime = CantonTimestamp.now()
+      val safeRecordTime = reassignment.recordTime
       val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
       val safeUnassignId = lengthLimited(event.unassignId)
       val safeContractId = lengthLimited(event.createdEvent.getContractId)
@@ -291,6 +291,7 @@ final class UpdateHistory(
       val templateIdModuleName = lengthLimited(templateId.getModuleName)
       val templateIdEntityName = lengthLimited(templateId.getEntityName)
       val templateIdPackageId = lengthLimited(templateId.getPackageId)
+      val safePackageName = lengthLimited(event.createdEvent.getPackageName)
       val createArguments = serializeValue(event.createdEvent.getArguments)
       val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
 
@@ -303,7 +304,7 @@ final class UpdateHistory(
           reassignment_id,submitter,
           contract_id, event_id, created_at,
           template_id_package_id, template_id_module_name, template_id_entity_name,
-          create_arguments
+          package_name, create_arguments
         )
         values (
           $historyId, $safeUpdateId, $safeRecordTime,
@@ -312,7 +313,7 @@ final class UpdateHistory(
           $safeUnassignId, ${event.submitter},
           $safeContractId, $safeEventId, $safeCreatedAt,
           $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
-          $createArguments
+          $safePackageName, $createArguments
         )
       """
     }
@@ -340,11 +341,12 @@ final class UpdateHistory(
         tree: TransactionTree
     ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
       val safeUpdateId = lengthLimited(tree.getUpdateId)
-      val safeRecordTime = CantonTimestamp.now()
+      val safeRecordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
       val safeParticipantOffset = lengthLimited(tree.getOffset)
       val safeDomainId = lengthLimited(tree.getDomainId)
       val safeEffectiveAt = CantonTimestamp.assertFromInstant(tree.getEffectiveAt)
       val safeRootEventIds = tree.getRootEventIds.asScala.toSeq.map(lengthLimited)
+
       (sql"""
           insert into update_history_transactions(
             history_id, update_id, record_time,
@@ -370,6 +372,7 @@ final class UpdateHistory(
       val templateIdModuleName = lengthLimited(templateId.getModuleName)
       val templateIdEntityName = lengthLimited(templateId.getEntityName)
       val templateIdPackageId = lengthLimited(templateId.getPackageId)
+      val safePackageName = lengthLimited(event.getPackageName)
       val createArguments = serializeValue(event.getArguments)
       val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
 
@@ -379,13 +382,13 @@ final class UpdateHistory(
             history_id, event_id, update_row_id,
             contract_id, created_at,
             template_id_package_id, template_id_module_name, template_id_entity_name,
-            create_arguments
+            package_name, create_arguments
           )
           values (
             $historyId, $safeEventId, $updateRowId,
             $safeContractId, $safeCreatedAt,
             $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
-            $createArguments
+            $safePackageName, $createArguments
           )
         """
     }
@@ -474,6 +477,7 @@ final class UpdateHistory(
         template_id_package_id,
         template_id_module_name,
         template_id_entity_name,
+        package_name,
         create_arguments
       from update_history_creates
       where update_row_id = $transactionRowId
@@ -533,6 +537,7 @@ final class UpdateHistory(
         template_id_package_id,
         template_id_module_name,
         template_id_entity_name,
+        package_name,
         create_arguments
       from update_history_assignments
       where
@@ -651,7 +656,7 @@ final class UpdateHistory(
             row.templateModuleName,
             row.templateEntityName,
           ),
-          /* packageName = */ "dummyPackageName", // TODO(#10656): retrieve from store
+          /* packageName = */ row.packageName,
           /*contractId = */ row.contractId,
           /*arguments = */ deserializeValue(row.createArguments).asRecord().get(),
           /*createdEventBlob = */ ByteString.EMPTY,
@@ -700,7 +705,7 @@ final class UpdateHistory(
           /*rootEventIds = */ rootEventsIds.asJava,
           /*domainId = */ updateRow.domainId,
           /*traceContext = */ TraceContextOuterClass.TraceContext.getDefaultInstance,
-          /*recordTime = */ updateRow.effectiveAt.toInstant, // TODO(#10656): this is wrong! retrieve the actual record_time from the store
+          /*recordTime = */ updateRow.recordTime.toInstant,
         )
       ),
       domainId = DomainId.tryFromString(updateRow.domainId),
@@ -715,6 +720,7 @@ final class UpdateHistory(
         Reassignment[Assign](
           updateId = row.updateId,
           offset = new ParticipantOffset.Absolute(row.participantOffset),
+          recordTime = row.recordTime,
           event = Assign(
             submitter = row.submitter,
             source = row.sourceDomain,
@@ -728,7 +734,7 @@ final class UpdateHistory(
                 row.templateModuleName,
                 row.templateEntityName,
               ),
-              /*packageName = */ "dummyPackageName", // #10656: retrieve from store
+              /*packageName = */ row.packageName,
               /*contractId = */ row.contractId,
               /*arguments = */ deserializeValue(row.createArguments).asRecord().get(),
               /*createdEventBlob = */ ByteString.EMPTY,
@@ -755,6 +761,7 @@ final class UpdateHistory(
         Reassignment[Unassign](
           updateId = row.updateId,
           offset = new ParticipantOffset.Absolute(row.participantOffset),
+          recordTime = row.recordTime,
           event = Unassign(
             submitter = row.submitter,
             source = row.domainId,
@@ -810,6 +817,7 @@ final class UpdateHistory(
           <<[String],
           <<[String],
           <<[String],
+          <<[String],
           <<[Array[Byte]],
         )
       )
@@ -851,6 +859,7 @@ final class UpdateHistory(
           <<[String],
           <<[String],
           <<[CantonTimestamp],
+          <<[String],
           <<[String],
           <<[String],
           <<[String],
@@ -905,6 +914,7 @@ object UpdateHistory {
       templatePackageId: String,
       templateModuleName: String,
       templateEntityName: String,
+      packageName: String,
       createArguments: Array[Byte],
   )
 
@@ -937,6 +947,7 @@ object UpdateHistory {
       templatePackageId: String,
       templateModuleName: String,
       templateEntityName: String,
+      packageName: String,
       createArguments: Array[Byte],
   )
 
