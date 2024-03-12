@@ -91,7 +91,6 @@ object CantonDependencies {
 
   lazy val daml_grpc_utils = "com.daml" %% "grpc-utils" % daml_libraries_version
   lazy val daml_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
-  lazy val daml_metrics = "com.daml" %% "metrics" % daml_libraries_version
   lazy val daml_metrics_test_lib = "com.daml" %% "metrics-test-lib" % daml_libraries_version
   lazy val daml_contextualized_logging =
     "com.daml" %% "contextualized-logging" % daml_libraries_version
@@ -186,12 +185,6 @@ object CantonDependencies {
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
   )
 
-  lazy val dropwizard_metrics_core = "io.dropwizard.metrics" % "metrics-core" % "4.1.2"
-  lazy val dropwizard_metrics_jmx = "io.dropwizard.metrics" % "metrics-jmx" % "4.1.2"
-  lazy val dropwizard_metrics_jvm = "io.dropwizard.metrics" % "metrics-jvm" % "4.1.2"
-  lazy val dropwizard_metrics_graphite = "io.dropwizard.metrics" % "metrics-graphite" % "4.1.2"
-
-  lazy val prometheus_dropwizard = "io.prometheus" % "simpleclient_dropwizard" % "0.12.0"
   lazy val prometheus_httpserver = "io.prometheus" % "simpleclient_httpserver" % "0.12.0"
   lazy val prometheus_hotspot = "io.prometheus" % "simpleclient_hotspot" % "0.12.0"
 

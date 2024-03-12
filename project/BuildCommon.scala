@@ -352,7 +352,6 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           daml_grpc_utils exclude ("com.daml", "ledger-api-scalapb_2.13"),
           daml_lf_data,
-          daml_metrics,
           daml_telemetry,
           daml_nonempty_cats,
           daml_tracing,
@@ -409,9 +408,6 @@ object BuildCommon {
           cats,
           better_files,
           toxiproxy_java % Test,
-          dropwizard_metrics_jvm, // not used at compile time, but required at runtime to report jvm metrics
-          dropwizard_metrics_jmx,
-          dropwizard_metrics_graphite,
         ),
         // commented out from Canton OS repo as settings because they don't apply to us
         // core packaging commands
@@ -449,7 +445,6 @@ object BuildCommon {
         libraryDependencies ++= Seq(
           pekko_http,
           ammonite,
-          dropwizard_metrics_jmx,
           jul_to_slf4j,
           pureconfig_cats,
         ),
@@ -675,8 +670,6 @@ object BuildCommon {
           monocle_macro, // Include it here, even if unused, so that it can be used everywhere
           pprint,
           pureconfig, // Only dependencies may be needed, but it is simplest to include it like this
-          dropwizard_metrics_core,
-          prometheus_dropwizard, // Include it here to overwrite transitive dependencies by DAML libraries
           prometheus_httpserver, // Include it here to overwrite transitive dependencies by DAML libraries
           prometheus_hotspot, // Include it here to overwrite transitive dependencies by DAML libraries
           opentelemetry_api,
@@ -987,7 +980,6 @@ object BuildCommon {
           daml_ledger_resources,
           daml_timer_utils,
           daml_rs_grpc_pekko,
-          dropwizard_metrics_core,
           opentelemetry_api,
           pekko_stream,
           slf4j_api,
@@ -1008,7 +1000,6 @@ object BuildCommon {
           scalacheck % Test,
           opentelemetry_sdk_testing % Test,
           scalatestScalacheck % Test,
-          daml_metrics,
           daml_lf_data,
           daml_lf_transaction,
           daml_http_test_utils % Test,
@@ -1056,7 +1047,6 @@ object BuildCommon {
           netty_handler,
           hikaricp,
           guava,
-          dropwizard_metrics_core,
           bouncycastle_bcprov_jdk15on % Test,
           bouncycastle_bcpkix_jdk15on % Test,
           scalaz_scalacheck % Test,
