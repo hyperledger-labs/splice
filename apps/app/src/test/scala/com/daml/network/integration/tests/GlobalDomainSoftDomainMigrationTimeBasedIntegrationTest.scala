@@ -216,7 +216,6 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
                 SvUtil.DefaultFoundingNodeWeight,
                 "alice-participant-id",
                 dummyRound,
-                previousGlobalId.toProtoPrimitive,
               )
             )
           ),

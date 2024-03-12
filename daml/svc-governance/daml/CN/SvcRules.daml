@@ -28,7 +28,6 @@ import CN.SVC.GlobalDomain
 import CN.SVC.MemberState
 import CN.SVC.SvStatus
 import CN.Util
-import CC.Schedule (getValueAsOf)
 
 
 -- Types
@@ -291,8 +290,8 @@ template SvcRules with
         config.numUnclaimedRewardsThreshold > 0
 
     -- NOTE: the members are not direct signatories as that would not give us the right fault-tolerance wrt
-    -- validating choices on this contract. Instead, the members are indirect signatories by being backing
-    -- members of the 'svc' collective party.
+    -- validating choices on this contract. Instead, the members are indirect signatories by being
+    -- part of the confirmers for the 'svc' collective party.
     signatory svc
 
 
@@ -306,7 +305,6 @@ template SvcRules with
         newMemberRewardWeight : Int
         newMemberParticipantId : Text
         joinedAsOfRound : Round
-        domainId : Text
       controller svc
       do
         require "Member party is new" (not $ newMemberParty `Map.member` members)
@@ -420,8 +418,7 @@ template SvcRules with
 
     -- Called by SV candidates to add themselves to the SvcRules once they are confirmed and ready.
     -- We use the passed rounds for reliably determining the earliest open round, which will be
-    -- the first round in which the new SV will receive rewards. We make the SV receive rewards
-    -- early so they can start to pay domain fees early.
+    -- the first round in which the new SV will receive rewards.
     nonconsuming choice SvcRules_AddConfirmedMember : ContractId SvcRules
       with
         sv : Party
@@ -442,16 +439,12 @@ template SvcRules with
         require "middleRound is one after earliestRound" (middleRound.round.number == earliestRound.round.number + 1)
         require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
 
-        coinRules <- fetchReferenceData forSvc coinRulesCid
-        now <- getTime
-        let coinConfig = getValueAsOf now coinRules.configSchedule
         exercise self SvcRules_AddMember with
           newMemberParty = sv
           newMemberName = svOnboardingConfirmed.svName
           newMemberRewardWeight = svOnboardingConfirmed.svRewardWeight
           newMemberParticipantId = svOnboardingConfirmed.svParticipantId
           joinedAsOfRound = earliestRound.round
-          domainId = coinConfig.globalDomain.activeDomain
 
 
     -- Global domain config management
@@ -854,23 +847,15 @@ template SvcRules with
         cid: ContractId SvOnboardingConfirmed
       controller leader
       do
-        -- add the expired onboarding Sv into the offboardedMembers to be sure it is offboarded from all canton data structures
         svOnboardingConfirmed <- fetchButArchiveLater (ForSvc with svc) cid
         exercise cid SvOnboardingConfirmed_Expire
-
-        let party = svOnboardingConfirmed.svParty
+        -- register the member as offboarded so it's PartyToParticipant mapping for the svc party gets removed
+        let sv = svOnboardingConfirmed.svParty
         let info = OffboardedMemberInfo with
               name = svOnboardingConfirmed.svName
               participantId = svOnboardingConfirmed.svParticipantId
-        create SvcRules with
-          svc
-          epoch
-          leader
-          members
-          offboardedMembers = Map.insert party info offboardedMembers
-          config
-          initialTrafficState
-          isDevNet
+        create this with
+          offboardedMembers = Map.insert sv info offboardedMembers
 
 
     -- Coin management driven directly by the leader
@@ -1000,6 +985,7 @@ template SvcRules with
 
 
     -- Batch expiry of unclaimed rewards for a specific claimed round
+    -----------------------------------------------------------------
     nonconsuming choice SvcRules_ClaimExpiredRewards
       : Optional (ContractId UnclaimedReward)
       with
@@ -1186,6 +1172,7 @@ ensureNotExpired : Time -> Update ()
 ensureNotExpired expiresAt = do
   now <- getTime
   require "Contract has not yet expired" (now < expiresAt)
+
 
 -- Vote Request support functions
 ---------------------------------

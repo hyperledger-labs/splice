@@ -47,7 +47,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )
   )
 
-  private def actionRequiring4VotesForEarlyClosing(domainId: String) = new ARC_SvcRules(
+  private def actionRequiring4VotesForEarlyClosing() = new ARC_SvcRules(
     new SRARC_AddMember(
       new SvcRules_AddMember(
         "alice:1234",
@@ -55,7 +55,6 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         1234L,
         "alice-participant-id",
         new Round(42),
-        domainId,
       )
     )
   )
@@ -147,9 +146,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       "sv1 creates a vote request that expires directly",
       sv1Backend.createVoteRequest(
         sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
-        actionRequiring4VotesForEarlyClosing(
-          sv4Backend.config.domains.global.alias.toProtoPrimitive
-        ),
+        actionRequiring4VotesForEarlyClosing(),
         "url",
         "add new member",
         new RelTime(10_000_000L),

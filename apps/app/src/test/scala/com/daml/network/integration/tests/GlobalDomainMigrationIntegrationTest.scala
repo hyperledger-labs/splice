@@ -801,7 +801,6 @@ class GlobalDomainMigrationIntegrationTest
                     SvUtil.DefaultFoundingNodeWeight,
                     "bob-participant-id",
                     new Round(42),
-                    globalDomainId.toProtoPrimitive,
                   )
                 )
               ),

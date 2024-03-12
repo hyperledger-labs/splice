@@ -129,7 +129,6 @@ initCollective isDevNet = do
       newMemberRewardWeight = 3 * bpsMultiplier -- Simulate the new nodes being Tier 2 SV nodes
       newMemberParticipantId = svName <> "-participant-id"
       joinedAsOfRound = earliestOpenRound.round
-      domainId = coinConfig.globalDomain.activeDomain
 
   -- check that the SvStatusReports are present
   checkSvStatusReports app

@@ -976,7 +976,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         SvUtil.DefaultFoundingNodeWeight,
         "user666ParticipantId",
         new Round(1L),
-        dummyDomain.toProtoPrimitive,
       )
     )
   )
@@ -989,7 +988,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         SvUtil.DefaultFoundingNodeWeight,
         "user667ParticipantId",
         new Round(1L),
-        dummyDomain.toProtoPrimitive,
       )
     )
   )

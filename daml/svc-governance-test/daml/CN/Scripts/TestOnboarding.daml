@@ -238,9 +238,6 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
     SvcRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
-  coinConfig <- getCoinConfig app
-  let domainId = coinConfig.globalDomain.activeDomain
-
   -- create a SvOnboardingConfirmed contract
   submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember with
     newMemberParty = svX
@@ -248,7 +245,6 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
     newMemberRewardWeight = 19
     newMemberParticipantId = "svX-participant-id"
     joinedAsOfRound = (Round 3)
-    domainId
 
   -- leader can archive the onboarding as svX is added as member
   leaderSubmits app $ \cid -> exerciseCmd cid $
@@ -302,17 +298,14 @@ testSvOnboardingConfirmedExpiry = do
 testSvNameUniquenessNotInDevNet : Script ()
 testSvNameUniquenessNotInDevNet = do
   -- When it is not in devnet, new member cannot be added to SVC if its name is already used by any existing member.
-  (app, svc, (_, sv2, _, _)) <- initMainNetCollective
+  (_, svc, (_, sv2, _, _)) <- initMainNetCollective
 
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
   (fromSome (Map.lookup sv2 svcRules.members)).name === "sv2"
 
-  coinConfig <- getCoinConfig app
-  let domainId = coinConfig.globalDomain.activeDomain
-
   svX <- allocateParty "svX"
-  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" 19 "sv2-participant-id" (Round 3) domainId
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" 19 "sv2-participant-id" (Round 3)
 
 
 testSvMemberOverwriteInDevNet : Script ()
@@ -325,14 +318,11 @@ testSvMemberOverwriteInDevNet = do
   (fromSome (Map.lookup sv2 svcRules.members)).name === "sv2"
   svX <- allocateParty "svX"
 
-  coinConfig <- getCoinConfig app
-  let domainId = coinConfig.globalDomain.activeDomain
-
   -- Failing the template precondition check if the existing member being overwritten is the current leader.
-  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" 19 "sv1-participant-id" (Round 3) domainId
+  submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" 19 "sv1-participant-id" (Round 3)
 
   -- overwriting existing member successfuly
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" 19 "sv2-participant-id" (Round 3) domainId
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" 19 "sv2-participant-id" (Round 3)
 
   [(_, svcRules)] <- query @SvcRules app.svc
   svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id"))]
@@ -342,7 +332,7 @@ testSvMemberOverwriteInDevNet = do
   [(svcRulesCid, _)] <- query @SvcRules app.svc
 
   -- overwriting existing member again
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX2 "sv2" 19 "sv2-participant-id" (Round 3) domainId
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX2 "sv2" 19 "sv2-participant-id" (Round 3)
 
   [(_, svcRules)] <- query @SvcRules app.svc
   svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id")), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'" ("sv2-participant-id"))]
