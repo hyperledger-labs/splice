@@ -56,14 +56,12 @@ spec:
             - name: CANTON_SEQUENCER_AUTO_INIT
               value: "false"
         {{- end }}
-        {{- with .Values.nodeIdentifier }}
             - name: ADDITIONAL_CONFIG_NODE_IDENTIFIER
               value: |
                 canton.sequencers.sequencer.init.identity.node-identifier {
                   type = explicit
-                  name = "{{ . }}"
+                  name = "{{ .Values.nodeIdentifier }}"
                 }
-        {{- end }}
           imagePullPolicy: Always
           ports:
             - containerPort: 5008

@@ -162,6 +162,7 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "nodeIdentifier": "validator-runbook",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
             "key": "ledger-api-user",

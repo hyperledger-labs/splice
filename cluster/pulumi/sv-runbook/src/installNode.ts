@@ -228,6 +228,7 @@ async function installSvAndValidator(
           {
             MIGRATION_ID: migrationId.toString(),
             OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
+            YOUR_NODE_NAME: onboardingName,
           }
         ),
         disableAutoInit:

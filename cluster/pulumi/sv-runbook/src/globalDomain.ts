@@ -55,6 +55,7 @@ export function installGlobalDomainNode(
           `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
           {
             MIGRATION_ID: migrationId.toString(),
+            YOUR_SV_NAME: svName,
           }
         ),
         disableAutoInit: globalDomainMigrationConfig.isRunningMigration() || !isActive,

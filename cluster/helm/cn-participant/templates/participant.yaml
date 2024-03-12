@@ -47,14 +47,12 @@ spec:
         - name: CANTON_PARTICIPANT_AUTO_INIT
           value: "false"
         {{- end }}
-        {{- with .Values.nodeIdentifier }}
         - name: ADDITIONAL_CONFIG_NODE_IDENTIFIER
           value: |
             canton.participants.participant.init.identity.node-identifier {
               type = explicit
-              name = "{{ . }}"
+              name = "{{ .Values.nodeIdentifier }}"
             }
-        {{- end }}
         ports:
         - containerPort: 5002
           name: lg-adm-api

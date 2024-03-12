@@ -317,6 +317,7 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
+- Replace ``YOUR_NODE_NAME`` with the name you want your validator node to be represented as on the network.
 
 To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 

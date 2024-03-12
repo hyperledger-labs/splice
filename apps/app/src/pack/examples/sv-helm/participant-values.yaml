@@ -10,6 +10,9 @@ auth:
   # If you want to configure a custom audience for Ledger API, uncomment this line and replace OIDC_AUTHORITY_LEDGER_API_AUDIENCE with the audience of your choice.
   # targetAudience: "OIDC_AUTHORITY_LEDGER_API_AUDIENCE"
 enableHealthProbes: true
+# For SVs this should be your SV name, for validators use whatever name you
+# want your validator to be represented as.
+nodeIdentifier: YOUR_NODE_NAME
 # PARTICIPANT_BOOTSTRAP_START
 # Uncomment the line below if you are bootstrapping from an existing participant identities dump or from a migration dump.
 # disableAutoInit: true

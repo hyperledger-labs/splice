@@ -541,6 +541,7 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 - If you are running on a version of Kubernetes earlier than 1.24, set `enableHealthProbes` to `false` to disable the gRPC liveness and readiness probes.
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
+- Replace ``YOUR_NODE_NAME`` with the name you chose when creating the SV identity.
 
 If you are deploying a new instance of the participant as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``disableAutoInit`` to ``true`` in your ``participant-values.yaml``:
 
@@ -552,6 +553,7 @@ If you are deploying a new instance of the participant as part of a :ref:`synchr
 Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/global-domain-values.yaml`` as follows:
 
 - Replace all instances of ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace ``YOUR_SV_NAME`` with the name you chose when creating the SV identity.
 
 If you are deploying new instances of your global domain components as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``disableAutoInit`` to ``true`` in your ``global-domain-values.yaml``:
 

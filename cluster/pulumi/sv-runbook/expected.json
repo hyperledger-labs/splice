@@ -366,6 +366,7 @@
             "secretName": "mediator-pg-secret"
           }
         },
+        "nodeIdentifier": "DA-Helm-Test-Node",
         "sequencer": {
           "driver": {
             "host": "global-domain-0-cometbft-cometbft-rpc",
@@ -434,6 +435,7 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "nodeIdentifier": "DA-Helm-Test-Node",
         "persistence": {
           "databaseName": "participant_0",
           "host": "participant-pg",

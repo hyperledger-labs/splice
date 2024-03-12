@@ -39,14 +39,12 @@ spec:
         - name: CANTON_MEDIATOR_AUTO_INIT
           value: "false"
         {{- end }}
-        {{- with .Values.nodeIdentifier }}
         - name: ADDITIONAL_CONFIG_NODE_IDENTIFIER
           value: |
             canton.mediators.mediator.init.identity.node-identifier {
               type = explicit
-              name = "{{ . }}"
+              name = "{{ .Values.nodeIdentifier }}"
             }
-        {{- end }}
         imagePullPolicy: Always
         ports:
         - containerPort: 5007
