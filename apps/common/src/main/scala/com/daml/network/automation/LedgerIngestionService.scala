@@ -66,7 +66,10 @@ abstract class LedgerIngestionService(
           else {
             retryProvider
               .retry(
-                // We use the Automation retry policy here, so that we eventually give up retrying and log an error
+                // We use the LongRunningAutomation retry policy here to ensure that:
+                // 1. If we get a lot of errors in a short period of time, we log an error and backoff with the pollingInterval.
+                // 2. If we get very infrequent errors (e.g. stale stream authorization on user addition), no error is logged an we get fast retries
+                //    instead of sleeping for the polling interval just because a certain number of users got allocated.
                 RetryFor.Automation,
                 "ledger ingestion subscription", {
                   newLedgerSubscription().flatMap(subscription => {

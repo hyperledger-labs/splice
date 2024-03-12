@@ -37,10 +37,12 @@ object RetryFor {
   )
 
   /** A retry intended for automation that is expected to run forever, e.g.,
-    * ledger ingestion. Retries forever.
+    * ledger ingestion. Retries are bounded but reset after a period of
+    * no errors. This should usually be wrapped in an outer retry loop that
+    * retries forever but with a very slow retry interval.
     */
   val LongRunningAutomation: RetryFor = RetryFor(
-    maxRetries = Int.MaxValue,
+    maxRetries = 35,
     initialDelay = 200.millis,
     maxDelay = 5.seconds,
     resetRetriesAfter = Some(1.minute),
