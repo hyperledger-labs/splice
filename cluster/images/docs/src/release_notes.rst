@@ -11,6 +11,10 @@ Release Notes
   * ``participant-values.yaml`` and ``global-domain-values.yaml`` now require specifying your SV name as ``nodeIdentifier: YOUR_SV_NAME``.
     This is used to provide better names to Canton nodes.
 
+* Documentation
+
+  * :ref:`Synchronizer Upgrades <sv-upgrades>`: Added more detailed instructions on :ref:`testing <sv-upgrades-testing>`, as well as various clarifications.
+
 2024-03-11
 ----------
 
