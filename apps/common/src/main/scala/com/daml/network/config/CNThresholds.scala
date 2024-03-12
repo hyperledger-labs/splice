@@ -37,6 +37,9 @@ object CNThresholds {
       sequencersSize
     )
 
+  def sequencerSubmissionRequestAmplification(sequencersSize: Int): PositiveInt =
+    sequencerConnectionsSizeThreshold(sequencersSize)
+
   def decentralizedNamespaceThreshold(decentralizedNamespaceSize: Int): PositiveInt = {
     governanceThreshold(decentralizedNamespaceSize)
   }

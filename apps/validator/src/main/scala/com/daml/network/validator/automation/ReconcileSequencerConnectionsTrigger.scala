@@ -7,7 +7,6 @@ import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.validator.domain.DomainConnector
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.{
   GrpcSequencerConnection,
@@ -26,7 +25,6 @@ class ReconcileSequencerConnectionsTrigger(
     participantAdminConnection: ParticipantAdminConnection,
     scanConnection: BftScanConnection,
     globalDomainAlias: DomainAlias,
-    submissionRequestAmplification: PositiveInt,
     domainConnector: DomainConnector,
 )(implicit
     override val ec: ExecutionContext,
@@ -86,7 +84,8 @@ class ReconcileSequencerConnectionsTrigger(
                 sequencerConnections = SequencerConnections.tryMany(
                   nonEmptyConnections.forgetNE,
                   CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-                  submissionRequestAmplification = submissionRequestAmplification,
+                  submissionRequestAmplification =
+                    CNThresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
                 )
               )
             )

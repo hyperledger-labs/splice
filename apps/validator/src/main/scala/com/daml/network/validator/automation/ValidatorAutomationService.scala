@@ -20,7 +20,6 @@ import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -37,7 +36,6 @@ class ValidatorAutomationService(
     buyExtraTrafficConfig: BuyExtraTrafficConfig,
     appManagerConfig: Option[AppManagerConfig],
     sequencerConnectionFromScan: Boolean,
-    submissionRequestAmplification: PositiveInt,
     prevetDuration: NonNegativeFiniteDuration,
     globalDomainAlias: DomainAlias,
     isSvValidator: Boolean,
@@ -167,7 +165,6 @@ class ValidatorAutomationService(
         participantAdminConnection,
         scanConnection,
         globalDomainAlias,
-        submissionRequestAmplification,
         domainConnector,
       )
     )

@@ -371,8 +371,11 @@ abstract class ValidatorPreflightIntegrationTestBase
           domainConnectionConfig.sequencerConnections.connections.size
         )
         .value
-      // TODO: (#10618) update this expectation to be the same as sequencerTrustThreshold
-      domainConnectionConfig.sequencerConnections.submissionRequestAmplification shouldBe 2
+      domainConnectionConfig.sequencerConnections.submissionRequestAmplification shouldBe CNThresholds
+        .sequencerSubmissionRequestAmplification(
+          domainConnectionConfig.sequencerConnections.connections.size
+        )
+        .value
     }
   }
 

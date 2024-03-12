@@ -8,7 +8,6 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequ
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
@@ -41,7 +40,7 @@ class DomainConnector(
     // TODO (#8450) config.domains.global.alias and config.domains.global.url are wrong if global has migrated
     config.domains.global.url match {
       case None =>
-        sequencerConnectionsFromScan(config.domains.global.submissionRequestAmplification)
+        sequencerConnectionsFromScan()
       case Some(url) =>
         SequencerConnections.single(GrpcSequencerConnection.tryCreate(url)).pure[Future]
     }
@@ -71,7 +70,6 @@ class DomainConnector(
   }
 
   private def sequencerConnectionsFromScan(
-      submissionRequestAmplification: PositiveInt
   )(implicit tc: TraceContext) = for {
     _ <- waitForSequencerConnectionsFromScan(logger, retryProvider)
     sequencerConnections <- getSequencerConnectionsFromScan(clock.now)
@@ -82,7 +80,8 @@ class DomainConnector(
       SequencerConnections.tryMany(
         nonEmptyConnections.forgetNE,
         CNThresholds.sequencerConnectionsSizeThreshold(nonEmptyConnections.size),
-        submissionRequestAmplification = submissionRequestAmplification,
+        submissionRequestAmplification =
+          CNThresholds.sequencerSubmissionRequestAmplification(nonEmptyConnections.size),
       )
   }
 
