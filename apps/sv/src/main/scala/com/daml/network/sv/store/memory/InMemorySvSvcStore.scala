@@ -211,6 +211,13 @@ class InMemorySvSvcStore(
     )
   }
 
+  override def listSvRewardCouponsGroupedByCounterparty(
+      roundNumber: Long,
+      roundDomain: DomainId,
+      totalCouponsLimit: Limit,
+  )(implicit tc: TraceContext): Future[Seq[Seq[SvRewardCoupon.ContractId]]] =
+    throw new NotImplementedError("In-mem is going away.")
+
   override def listValidatorFaucetCouponsGroupedByCounterparty(
       roundNumber: Long,
       roundDomain: DomainId,

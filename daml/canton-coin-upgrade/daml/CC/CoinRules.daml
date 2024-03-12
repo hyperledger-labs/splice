@@ -373,6 +373,7 @@ template CoinRules
         closedRoundCid : ContractId ClosedMiningRound
         validatorRewardCouponCids : [ContractId ValidatorRewardCoupon]
         appCouponCids : [ContractId AppRewardCoupon]
+        svRewardCouponCids : [ContractId SvRewardCoupon]
         optValidatorFaucetCouponCids : Optional [ContractId ValidatorFaucetCoupon]
       controller svc
       do
@@ -398,12 +399,19 @@ template CoinRules
         let featuredAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, featured ]
         let unfeaturedAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, not featured ]
 
+        -- expire validator rewards and compute their unclaimed rewards
+        expiredSvRewards <- forA svRewardCouponCids $ \svRewardCouponCid -> do
+          exercise svRewardCouponCid SvRewardCoupon_SvcExpire with closedRoundCid
+
+        let svRewardsWeight = sum expiredSvRewards
+
         -- create unclaimed reward for the total
         let amount =
               validatorRewards * closedRound.issuancePerValidatorRewardCoupon +
               numValidatorFaucetCoupons * getClosedMiningRoundIssuancePerValidatorFaucetCoupon closedRound +
               featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
-              unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon
+              unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon +
+              intToDecimal svRewardsWeight * closedRound.issuancePerSvRewardCoupon
         if (amount <= 0.0)
           then pure None
           else Some <$> create UnclaimedReward with svc; amount

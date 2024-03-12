@@ -352,6 +352,14 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       domainId: DomainId,
   )(implicit tc: TraceContext): Future[Long]
 
+  def listSvRewardCouponsGroupedByCounterparty(
+      roundNumber: Long,
+      roundDomain: DomainId,
+      totalCouponsLimit: Limit,
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Seq[cc.coin.SvRewardCoupon.ContractId]]]
+
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
   ): Future[
@@ -387,30 +395,47 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
               closedRound.domain,
               totalCouponsLimit = totalCouponsLimit,
             )
+            svRewardCouponGroups <- listSvRewardCouponsGroupedByCounterparty(
+              closedRound.payload.round.number,
+              closedRound.domain,
+              totalCouponsLimit = totalCouponsLimit,
+            )
           } yield appRewardGroups.map(group =>
             ExpiredRewardCouponsBatch(
-              closedRound.contractId,
-              closedRound.contract.payload.round.number,
-              Seq.empty,
-              group,
-              Seq.empty,
+              closedRoundCid = closedRound.contractId,
+              closedRoundNumber = closedRound.contract.payload.round.number,
+              validatorCoupons = Seq.empty,
+              appCoupons = group,
+              svRewardCoupons = Seq.empty,
+              validatorFaucets = Seq.empty,
             )
           ) ++
             validatorRewardGroups.map(group =>
               ExpiredRewardCouponsBatch(
-                closedRound.contractId,
-                closedRound.contract.payload.round.number,
-                group,
-                Seq.empty,
-                Seq.empty,
+                closedRoundCid = closedRound.contractId,
+                closedRoundNumber = closedRound.contract.payload.round.number,
+                validatorCoupons = group,
+                appCoupons = Seq.empty,
+                svRewardCoupons = Seq.empty,
+                validatorFaucets = Seq.empty,
               )
             ) ++ validatorFaucetGroups.map(group =>
               ExpiredRewardCouponsBatch(
-                closedRound.contractId,
-                closedRound.contract.payload.round.number,
-                Seq.empty,
-                Seq.empty,
-                group,
+                closedRoundCid = closedRound.contractId,
+                closedRoundNumber = closedRound.contract.payload.round.number,
+                validatorCoupons = Seq.empty,
+                appCoupons = Seq.empty,
+                svRewardCoupons = Seq.empty,
+                validatorFaucets = group,
+              )
+            ) ++ svRewardCouponGroups.map(group =>
+              ExpiredRewardCouponsBatch(
+                closedRoundCid = closedRound.contractId,
+                closedRoundNumber = closedRound.contract.payload.round.number,
+                validatorCoupons = Seq.empty,
+                appCoupons = Seq.empty,
+                svRewardCoupons = group,
+                validatorFaucets = Seq.empty,
               )
             )
         case None => Future(Seq())
@@ -1314,6 +1339,7 @@ case class ExpiredRewardCouponsBatch(
     closedRoundNumber: Long,
     validatorCoupons: Seq[cc.coin.ValidatorRewardCoupon.ContractId],
     appCoupons: Seq[cc.coin.AppRewardCoupon.ContractId],
+    svRewardCoupons: Seq[cc.coin.SvRewardCoupon.ContractId],
     validatorFaucets: Seq[cc.validatorlicense.ValidatorFaucetCoupon.ContractId],
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =

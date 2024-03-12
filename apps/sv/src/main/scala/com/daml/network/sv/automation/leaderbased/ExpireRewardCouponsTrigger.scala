@@ -70,6 +70,7 @@ class ExpireRewardCouponsTrigger(
           expiredRewardsTask.closedRoundCid,
           expiredRewardsTask.validatorCoupons.asJava,
           Seq.empty.asJava,
+          Seq.empty.asJava,
           None.toJava,
         ),
       )
@@ -79,6 +80,7 @@ class ExpireRewardCouponsTrigger(
         coinRules.contractId,
         new CoinRules_ClaimExpiredRewards(
           expiredRewardsTask.closedRoundCid,
+          Seq.empty.asJava,
           Seq.empty.asJava,
           Seq.empty.asJava,
           Some(expiredRewardsTask.validatorFaucets.asJava).toJava,
@@ -92,11 +94,24 @@ class ExpireRewardCouponsTrigger(
           expiredRewardsTask.closedRoundCid,
           Seq.empty.asJava,
           expiredRewardsTask.appCoupons.asJava,
+          Seq.empty.asJava,
           None.toJava,
         ),
       )
     )
-    val cmds = Seq(validatorRewardCmd, validatorFaucetCmd, appRewardCmd)
+    val svRewardCmd = svcRules.exercise(
+      _.exerciseSvcRules_ClaimExpiredRewards(
+        coinRules.contractId,
+        new CoinRules_ClaimExpiredRewards(
+          expiredRewardsTask.closedRoundCid,
+          Seq.empty.asJava,
+          Seq.empty.asJava,
+          expiredRewardsTask.svRewardCoupons.asJava,
+          None.toJava,
+        ),
+      )
+    )
+    val cmds = Seq(validatorRewardCmd, validatorFaucetCmd, appRewardCmd, svRewardCmd)
     for {
       _ <- Future.sequence(
         cmds.map(cmd =>

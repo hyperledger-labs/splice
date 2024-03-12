@@ -383,6 +383,18 @@ class DbSvSvcStore(
       totalCouponsLimit,
     )
 
+  override def listSvRewardCouponsGroupedByCounterparty(
+      roundNumber: Long,
+      roundDomain: DomainId,
+      totalCouponsLimit: Limit,
+  )(implicit tc: TraceContext): Future[Seq[Seq[SvRewardCoupon.ContractId]]] =
+    listCouponsGroupedByCounterparty(
+      SvRewardCoupon.COMPANION,
+      roundNumber,
+      roundDomain,
+      totalCouponsLimit,
+    )
+
   private def listCouponsGroupedByCounterparty[C, TCId <: ContractId[_]: ClassTag, T](
       companion: C,
       roundNumber: Long,

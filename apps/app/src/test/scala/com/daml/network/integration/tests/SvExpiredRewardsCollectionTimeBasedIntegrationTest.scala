@@ -2,26 +2,13 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.coin.{AppRewardCoupon, ValidatorRewardCoupon}
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
-import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, SvTestUtil}
 
 import scala.concurrent.duration.*
 
 class SvExpiredRewardsCollectionTimeBasedIntegrationTest
-    extends SvTimeBasedIntegrationTestBaseWithSharedEnvironment {
-
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-    // The coupons received by this trigger are never collected due to `withoutAutomaticRewardsCollectionAndCoinMerging`
-    // in the parent definition. We disable it so that the round can be archived and the other rewards expired.
-    // TODO (#10424): this should no longer be necessary once the SvRewardCoupons are expired.
-    super.environmentDefinition.addConfigTransforms((_, conf) =>
-      updateAutomationConfig(ConfigurableApp.Sv)(
-        _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
-      )(conf)
-    )
-  }
+    extends SvTimeBasedIntegrationTestBaseWithSharedEnvironment
+    with SvTestUtil {
 
   "collect expired reward coupons" in { implicit env =>
     def getRewardCoupons(
@@ -72,7 +59,12 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
       timeUntilSuccess = 30.seconds
     )(
       "Advance 5 ticks, to close the round",
-      (1 to 5).foreach(_ => advanceRoundsByOneTick),
+      (1 to 5).foreach(_ => {
+        eventually() {
+          ensureSvRewardCouponClaimedForCurrentRound(sv1ScanBackend, sv1WalletClient)
+        }
+        advanceRoundsByOneTick
+      }),
     )(
       "Wait for all unclaimed coupons to be archived and the closed round to be archived",
       _ => {
@@ -80,6 +72,10 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
         sv1ScanBackend
           .getClosedRounds()
           .filter(r => r.payload.round.number == round.payload.round.number) should be(empty)
+        val (lastRound, _) = sv1ScanBackend.getRoundOfLatestData()
+        sv1WalletClient.listSvRewardCoupons().filter(_.payload.round.number <= lastRound) should be(
+          empty
+        )
       },
     )
   }

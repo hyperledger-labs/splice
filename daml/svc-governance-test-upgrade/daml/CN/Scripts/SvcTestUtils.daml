@@ -191,6 +191,7 @@ runNextIssuanceD app coinPrice = do
       -- collect all unclaimed rewards into the unclaimed rewards fund
       validatorRewards <- (queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round))
       appRewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
+      svRewards <- queryFilter @SvRewardCoupon app.svc (\r -> r.round == miningRound.round)
       validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.svc (\r -> r.round == miningRound.round)
       leaderSubmits app $ \cid -> exerciseCmd cid $
         SvcRules_ClaimExpiredRewards with
@@ -199,6 +200,7 @@ runNextIssuanceD app coinPrice = do
             closedRoundCid = miningRoundCid
             validatorRewardCouponCids = map fst validatorRewards
             appCouponCids = map fst appRewards
+            svRewardCouponCids = map fst svRewards
             optValidatorFaucetCouponCids = Some (map fst validatorFaucetCoupons)
 
       -- the closed round
