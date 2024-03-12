@@ -8,12 +8,11 @@ import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipT
   RemoveFromNamespace,
 }
 import com.daml.network.sv.store.SvSvcStore
-import com.digitalasset.canton.logging.pretty.Pretty
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
-import pprint.Tree
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
@@ -137,17 +136,15 @@ class SvNamespaceMembershipTrigger(
 
 object SvNamespaceMembershipTrigger {
 
-  sealed trait NamespaceDiff
+  sealed trait NamespaceDiff extends PrettyPrinting
 
-  case class AddToNamespace(domain: DomainId, partyId: PartyId) extends NamespaceDiff
-
-  case class RemoveFromNamespace(domain: DomainId, partyId: PartyId) extends NamespaceDiff
-
-  implicit val namespaceDiffPretty: Pretty[NamespaceDiff] = {
-    case addToNamespace: AddToNamespace =>
-      Tree.Apply("AddToNamespace", Iterator(Pretty.prettyOfObject.treeOf(addToNamespace)))
-    case removeFromNamespace: RemoveFromNamespace =>
-      Tree.Apply("RemoveFromNamespace", Iterator(Pretty.prettyOfObject.treeOf(removeFromNamespace)))
+  case class AddToNamespace(domain: DomainId, partyId: PartyId) extends NamespaceDiff {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(param("domain", _.domain), param("partyId", _.partyId))
   }
 
+  case class RemoveFromNamespace(domain: DomainId, partyId: PartyId) extends NamespaceDiff {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(param("domain", _.domain), param("partyId", _.partyId))
+  }
 }
