@@ -46,6 +46,9 @@ object HttpErrorHandler {
   // 401
   def unauthorized(message: String) = HttpErrorWithHttpCode(StatusCodes.Unauthorized, message);
 
+  // 409
+  def conflict(message: String) = HttpErrorWithHttpCode(StatusCodes.Conflict, message);
+
   // 404
   def notFound(message: String) = HttpErrorWithHttpCode(StatusCodes.NotFound, message);
 

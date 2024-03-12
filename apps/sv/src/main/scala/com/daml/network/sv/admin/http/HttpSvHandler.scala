@@ -131,8 +131,10 @@ class HttpSvHandler(
                   )
                 )
               } else if (!isCandidatePartyHostedOnParticipant)
+                // Conflict instead of not authorized because this can happen if our participant just has not yet caught up
+                // and the client can just retry on that.
                 Future.failed(
-                  HttpErrorHandler.unauthorized(
+                  HttpErrorHandler.conflict(
                     s"Candidate party ${token.candidateParty} is not authorized by participant ${token.candidateParticipantId}"
                   )
                 )
