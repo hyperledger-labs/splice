@@ -3,6 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_OffboardMember
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.config.CNNodeConfigTransforms.bumpUrl
 import com.daml.network.config.{CNNodeConfigTransforms, NetworkAppClientConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -13,6 +14,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.sv.config.SvOnboardingConfig.JoinWithKey
 import com.daml.network.util.{StandaloneCanton, SvTestUtil}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.scalatest.time.{Minute, Span}
 
@@ -38,7 +40,27 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
         (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(22_000)(conf),
         (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),
       )
-      .addConfigTransforms((_, config) =>
+      .addConfigTransforms((_, configuration) => {
+        val sv1ToSv2Bump = 100
+        val sv2OnboardingSvClientUrl =
+          configuration
+            .svApps(InstanceName.tryCreate("sv2"))
+            .onboarding
+            .getOrElse(
+              throw new IllegalStateException("Onboarding configuration not found.")
+            ) match {
+            case node: JoinWithKey => bumpUrl(sv1ToSv2Bump, node.svClient.adminApi.url.toString())
+            case _ => throw new IllegalStateException("JoinWithKey configuration not found.")
+          }
+        val sv2BootstrapSequencerUrl =
+          bumpUrl(
+            sv1ToSv2Bump,
+            configuration
+              .svApps(InstanceName.tryCreate("sv2"))
+              .domains
+              .global
+              .url,
+          )
         CNNodeConfigTransforms.updateAllSvAppConfigs { (name, config) =>
           if (name == "sv3") {
             config.copy(
@@ -50,21 +72,25 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
                   Some(
                     JoinWithKey(
                       node.name,
-                      SvAppClientConfig(NetworkAppClientConfig("http://127.0.0.1:5214")),
+                      SvAppClientConfig(NetworkAppClientConfig(sv2OnboardingSvClientUrl)),
                       node.publicKey,
                       node.privateKey,
                     )
                   )
                 case _ => throw new IllegalStateException("JoinWithKey configuration not found.")
-              }
+              },
+              domains = config.domains.copy(global =
+                config.domains.global
+                  .copy(url = sv2BootstrapSequencerUrl)
+              ),
             )
           } else config
-        }(config)
-      )
+        }(configuration)
+      })
       .withManualStart
 
-  "A new SV can onboard via a non-founding SV while founding SVs are offboarded from the SVC" in {
-    implicit env =>
+  "A new SV can: 1) onboard via a non-founding SV while founding SV is offboarded from the SVC and " +
+    "2) bootstrap using a sequencer that is not founding SV's sequencer" in { implicit env =>
       withCantonSvNodes(
         (
           Some(sv1Backend),
@@ -168,5 +194,5 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
           },
         )
       }
-  }
+    }
 }

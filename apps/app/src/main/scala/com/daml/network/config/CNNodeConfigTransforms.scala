@@ -427,7 +427,7 @@ object CNNodeConfigTransforms {
     })
   }
 
-  private def bumpUrl(bump: Int, s: String): String = {
+  def bumpUrl(bump: Int, s: String): String = {
     val uri = Uri(s)
     uri.withPort(uri.effectivePort + bump).toString
   }
