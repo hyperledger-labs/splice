@@ -5,6 +5,7 @@
     {
       "walletBaseUrl": "$K6_WALLET_BASE_URL",
       "auth": {
+        "kind": "oauth",
         "oauthDomain": "$K6_OAUTH_DOMAIN",
         "oauthClientId": "$K6_OAUTH_CLIENT_ID",
         "usersPassword": "$K6_USERS_PASSWORD",

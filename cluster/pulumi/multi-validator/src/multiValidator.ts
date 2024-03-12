@@ -1,14 +1,11 @@
 import * as pulumi from '@pulumi/pulumi';
+import { generatePortSequence } from 'cn-pulumi-common';
 
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
-import { basePort } from './utils';
 
 export class MultiValidator extends MultiNodeDeployment {
   constructor(name: string, args: BaseMultiNodeArgs, opts?: pulumi.ComponentResourceOptions) {
-    const ports = Array.from({ length: args.numNodes }, (_, i) => ({
-      name: `val-${i}`,
-      port: basePort(i) + 3,
-    }));
+    const ports = generatePortSequence(5000, args.numNodes, [{ name: 'val', id: 3 }]);
 
     super(
       name,

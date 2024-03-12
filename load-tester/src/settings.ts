@@ -1,20 +1,30 @@
 import { z } from 'zod';
 
+const oAuthSchema = z.object({
+  kind: z.literal('oauth'),
+  oauthDomain: z.string().min(1),
+  oauthClientId: z.string().min(1),
+  managementApi: z.object({
+    clientId: z.string().min(1),
+    clientSecret: z.string().min(1),
+  }),
+  admin: z.object({
+    email: z.string().email(),
+    password: z.string().min(1),
+  }),
+  usersPassword: z.string().min(1),
+});
+
+const selfSignedSchema = z.object({
+  kind: z.literal('self-signed'),
+  user: z.string().min(1),
+  audience: z.string().min(1),
+  secret: z.string().min(1),
+});
+
 const validatorSchema = z.object({
   walletBaseUrl: z.string().min(1),
-  auth: z.object({
-    oauthDomain: z.string().min(1),
-    oauthClientId: z.string().min(1),
-    managementApi: z.object({
-      clientId: z.string().min(1),
-      clientSecret: z.string().min(1),
-    }),
-    admin: z.object({
-      email: z.string().email(),
-      password: z.string().min(1),
-    }),
-    usersPassword: z.string().min(1),
-  }),
+  auth: z.discriminatedUnion('kind', [oAuthSchema, selfSignedSchema]),
 });
 
 export const configSchema = z.object({

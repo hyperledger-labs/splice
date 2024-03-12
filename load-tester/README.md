@@ -61,3 +61,15 @@ To temporarily stop a currently running load test, first suspend the `CronJob` v
 After that, delete the currently running `Job` via the k9s CLI or `kubectl delete job <job-name>`.
 
 To permanently disable the load tester for a cluster, set (or remove) its `K6_ENABLE_LOAD_GENERATOR=false` in its directory's `.envrc`.
+
+## Multi-Validators
+
+Running the load tester with _many_ validators:
+
+1. Set the cluster vars
+    - `K6_ENABLE_LOAD_GENERATOR_VALIDATORS=true`
+    - `K6_ENABLE_LOAD_GENERATOR=true`
+2. Deploy the base cluster
+3. Apply the `multi-validator` stack (`cncluster apply_multi`)
+
+Running this setup locally via `cncluster load_test` or against a non-devnet cluster is not supported.

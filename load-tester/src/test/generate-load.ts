@@ -1,25 +1,22 @@
 import BigNumber from 'bignumber.js';
-
-/* @ts-expect-error typings unavailable */
-import { randomItem } from 'https://jslib.k6.io/k6-utils/1.4.0/index.js';
 import { Gauge } from 'k6/metrics';
 
 import { Auth0Manager } from '../client/auth0/auth0';
 import { logInUser } from '../client/auth0/helpers';
+import { encodeJwtHmac256 } from '../client/jwt';
 import {
   doIfOnboarded,
   sendAndWaitForTransferOffer,
   waitForBalance,
 } from '../client/validator/helpers';
-import { ValidatorClient } from '../client/validator/validator';
 import settings from '../settings';
-import { pickTwoRandom, syncRetryUndefined } from '../utils';
+import { pickTwoRandomUsers, syncRetryUndefined } from '../utils';
 
 export const options = { ...settings.options };
 
 const validatorOperatorBalance = new Gauge('validator_operator_balance');
 
-type ValidatorConf = {
+export type ValidatorConf = {
   walletBaseUrl: string;
   adminToken: string;
   userTokens: string[];
@@ -31,44 +28,66 @@ export function setup(): ValidatorConf[] {
   settings.validators.forEach((validator, validatorIndex) => {
     let tokens: string[] = [];
 
-    const auth0 = new Auth0Manager(
-      validator.auth.oauthDomain,
-      validator.auth.oauthClientId,
-      validator.walletBaseUrl,
-      validator.auth.managementApi,
-    );
+    if (validator.auth.kind === 'oauth') {
+      const auth0 = new Auth0Manager(
+        validator.auth.oauthDomain,
+        validator.auth.oauthClientId,
+        validator.walletBaseUrl,
+        validator.auth.managementApi,
+      );
 
-    for (let i = 0; i < settings.usersPerValidator; i++) {
-      const t = logInUser(auth0, `user-${i}@cn-load-tester.com`, validator.auth.usersPassword);
-      tokens = [...tokens, t];
+      for (let i = 0; i < settings.usersPerValidator; i++) {
+        const t = logInUser(auth0, `user-${i}@cn-load-tester.com`, validator.auth.usersPassword);
+        tokens = [...tokens, t];
+      }
+
+      const adminToken = logInUser(
+        auth0,
+        validator.auth.admin.email,
+        validator.auth.admin.password,
+      );
+
+      validatorConfs[validatorIndex] = {
+        adminToken,
+        userTokens: tokens,
+        walletBaseUrl: validator.walletBaseUrl,
+      };
+    } else if (validator.auth.kind === 'self-signed') {
+      const secret = validator.auth.secret;
+      const aud = validator.auth.audience;
+      const adminToken = encodeJwtHmac256(
+        {
+          sub: validator.auth.user,
+          aud,
+        },
+        secret,
+      );
+
+      const userTokens = Array(settings.usersPerValidator)
+        .fill(0)
+        .map((_, i) =>
+          encodeJwtHmac256(
+            {
+              sub: `v-${validatorIndex}-user-${i}`,
+              aud,
+            },
+            secret,
+          ),
+        );
+
+      validatorConfs[validatorIndex] = {
+        adminToken,
+        userTokens,
+        walletBaseUrl: validator.walletBaseUrl,
+      };
     }
-
-    const adminToken = logInUser(auth0, validator.auth.admin.email, validator.auth.admin.password);
-
-    validatorConfs[validatorIndex] = {
-      adminToken,
-      userTokens: tokens,
-      walletBaseUrl: validator.walletBaseUrl,
-    };
   });
 
   return validatorConfs;
 }
 
 export default function (data: ValidatorConf[]): void {
-  // Pick a random available validator
-  const validatorConf: ValidatorConf = randomItem(data);
-  const { adminToken, walletBaseUrl, userTokens } = validatorConf;
-
-  // Pick two random users from that validator
-  const [senderIndex, recipientIndex] = pickTwoRandom(userTokens.length);
-
-  const senderToken = userTokens[senderIndex];
-  const recipientToken = userTokens[recipientIndex];
-
-  const adminClient = new ValidatorClient(walletBaseUrl, adminToken);
-  const senderClient = new ValidatorClient(walletBaseUrl, senderToken);
-  const receipientClient = new ValidatorClient(walletBaseUrl, recipientToken);
+  const { adminClient, senderClient, receipientClient } = pickTwoRandomUsers(data);
 
   // Track the admin's balance on non-devnet to send out top-up alerts
   if (!settings.isDevNet) {
