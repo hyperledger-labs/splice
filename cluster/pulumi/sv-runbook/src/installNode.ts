@@ -231,6 +231,9 @@ async function installSvAndValidator(
             YOUR_NODE_NAME: onboardingName,
           }
         ),
+        metrics: {
+          enable: true,
+        },
         disableAutoInit:
           !!participantBootstrapDumpSecret ||
           globalDomainMigrationConfig.isRunningMigration() ||
@@ -308,6 +311,9 @@ async function installSvAndValidator(
         : valuesFromYamlFile.migration.migrating,
       ...valuesFromYamlFile.migration,
     },
+    metrics: {
+      enable: true,
+    },
     extraBeneficiaries: [
       {
         partyId: validator1PartyId,
@@ -365,6 +371,9 @@ async function installSvAndValidator(
       TARGET_CLUSTER: TARGET_CLUSTER,
       MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
     }),
+    metrics: {
+      enable: true,
+    },
   };
 
   const scanValuesWithFixedTokens = {
@@ -396,6 +405,9 @@ async function installSvAndValidator(
         MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
       }
     ),
+    metrics: {
+      enable: true,
+    },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
   };
 

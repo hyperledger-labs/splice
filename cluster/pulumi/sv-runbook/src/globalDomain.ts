@@ -58,6 +58,9 @@ export function installGlobalDomainNode(
             YOUR_SV_NAME: svName,
           }
         ),
+        metrics: {
+          enable: true,
+        },
         disableAutoInit: globalDomainMigrationConfig.isRunningMigration() || !isActive,
       };
       return installCNRunbookHelmChart(

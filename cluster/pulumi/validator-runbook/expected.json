@@ -162,6 +162,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "metrics": {
+          "enable": true
+        },
         "nodeIdentifier": "validator-runbook",
         "participantAdminUserNameFrom": {
           "secretKeyRef": {
@@ -245,6 +248,9 @@
         },
         "clusterUrl": "validatorrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "metrics": {
+          "enable": true
+        },
         "migration": {
           "id": 0
         },

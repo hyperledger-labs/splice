@@ -366,6 +366,9 @@
             "secretName": "mediator-pg-secret"
           }
         },
+        "metrics": {
+          "enable": true
+        },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "sequencer": {
           "driver": {
@@ -435,6 +438,9 @@
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "metrics": {
+          "enable": true
+        },
         "nodeIdentifier": "DA-Helm-Test-Node",
         "persistence": {
           "databaseName": "participant_0",
@@ -483,6 +489,9 @@
       "values": {
         "clusterUrl": "svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "metrics": {
+          "enable": true
+        },
         "migration": {
           "id": "0"
         },
@@ -644,6 +653,9 @@
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
         },
+        "metrics": {
+          "enable": true
+        },
         "migration": {
           "id": "0"
         },
@@ -734,6 +746,9 @@
         "clusterUrl": "svrun.network.com.network.canton.global",
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "metrics": {
+          "enable": true
+        },
         "migration": {
           "id": "0"
         },

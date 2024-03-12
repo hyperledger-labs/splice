@@ -165,6 +165,9 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
       {}
     ),
+    metrics: {
+      enable: true,
+    },
     disableAutoInit: !!participantBootstrapDumpSecret,
   };
 
@@ -220,6 +223,9 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
         SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
       }
     ),
+    metrics: {
+      enable: true,
+    },
     migration: {
       id: globalDomainMigrationConfig.activeMigrationId,
     },
