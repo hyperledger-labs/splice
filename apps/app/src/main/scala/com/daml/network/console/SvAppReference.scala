@@ -111,6 +111,12 @@ abstract class SvAppReference(
       httpCommand(HttpSvAdminAppClient.PauseGlobalDomain())
     }
 
+  @Help.Summary("Unpause the global domain")
+  def unpauseGlobalDomain(): Unit =
+    consoleEnvironment.run {
+      httpCommand(HttpSvAdminAppClient.UnpauseGlobalDomain())
+    }
+
   @Help.Summary("Dump all the required data for domain migration to the configured location")
   def triggerGlobalDomainMigrationDump(migrationId: Long): Unit =
     consoleEnvironment.run {

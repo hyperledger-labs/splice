@@ -438,6 +438,24 @@ object HttpSvAdminAppClient {
     }
   }
 
+  case class UnpauseGlobalDomain() extends BaseCommand[http.UnpauseGlobalDomainResponse, Unit] {
+
+    override def submitRequest(
+        client: Client,
+        headers: List[HttpHeader],
+    ): EitherT[Future, Either[
+      Throwable,
+      HttpResponse,
+    ], http.UnpauseGlobalDomainResponse] =
+      client.unpauseGlobalDomain(headers = headers)
+
+    override def handleOk()(implicit
+        decoder: TemplateJsonDecoder
+    ) = { case http.UnpauseGlobalDomainResponse.OK =>
+      Right(())
+    }
+  }
+
   case class TriggerDomainMigrationDump(migrationId: Long)
       extends BaseCommand[
         http.TriggerDomainMigrationDumpResponse,

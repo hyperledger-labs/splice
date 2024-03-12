@@ -97,6 +97,21 @@ The operators representing an SV must be:
 - Capable (in terms of both skills and permissions) to interact with the SV’s node deployment via Helm and (for debugging with support from the CN team) Kubernetes (kubectl) commands.
 - Capable (in terms of both skills and permissions) to register new ingress rules for internal synchronizer components (sequencer, mediator and CometBFT) and SV participants. Resulting addresses will only be relevant to technical personnel and will follow a schema such as component-migrationId.hostname. Note that for fully supporting the migration flow for CometBFT nodes, it will also be necessary to allow communication over additional ports.
 
+
+Recovering from a failed upgrade
+--------------------------------
+
+In the event of a failed upgrade, Each SV must submit a topology transaction to resume the old synchronizer. This can be triggered using the following command:
+
+.. code-block:: bash
+
+    curl -X POST 'https://sv.sv.svc.YOUR_HOSTNAME/api/sv/v0/admin/domain/unpause' -H 'authorization: Bearer <token>'
+
+where `<token>` is an OAuth2 Bearer Token obtained from your OAuth provider. For context, see the Authentication section :ref:`here <app-auth>`.
+
+The command will complete successfully once a sufficient number of SVs have executed it. The old synchronizer will then be un-paused.
+
+
 Testing
 -------
 

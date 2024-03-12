@@ -76,7 +76,7 @@ import java.io.File
 import java.nio.file.Path
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
@@ -878,6 +878,39 @@ class GlobalDomainMigrationIntegrationTest
               sv1LocalBackend.stop()
               svb("sv1LocalOnboarded").startSync()
             }
+          }
+
+          withClueAndLog("old domain can be unpaused") {
+            clue("old domain is paused") {
+              sv1Backend.appState.participantAdminConnection
+                .getDomainParametersState(
+                  globalDomainId
+                )
+                .futureValue
+                .mapping
+                .parameters
+                .confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
+            }
+
+            actAndCheck(
+              "all sv propose to unpause the old domain",
+              Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { svBackend =>
+                Future {
+                  svBackend.unpauseGlobalDomain()
+                }
+              }.futureValue,
+            )(
+              "old domain is un-paused",
+              _ =>
+                sv1Backend.appState.participantAdminConnection
+                  .getDomainParametersState(
+                    globalDomainId
+                  )
+                  .futureValue
+                  .mapping
+                  .parameters
+                  .confirmationRequestsMaxRate should be > NonNegativeInt.zero,
+            )
           }
         }
       }

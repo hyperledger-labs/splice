@@ -29,6 +29,7 @@ import com.daml.network.util.{BackupDump, Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.protocol.DynamicDomainParameters
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -424,6 +425,21 @@ class HttpSvAdminHandler(
         globalDomain <- svcStore.getSvcRules().map(_.domain)
         _ <- changeDomainRatePerParticipant(globalDomain, NonNegativeInt.zero)
       } yield v0.SvAdminResource.PauseGlobalDomainResponseOK
+    }
+  }
+
+  override def unpauseGlobalDomain(respond: v0.SvAdminResource.UnpauseGlobalDomainResponse.type)()(
+      tuser: TracedUser
+  ): Future[v0.SvAdminResource.UnpauseGlobalDomainResponse] = {
+    implicit val TracedUser(_, traceContext) = tuser
+    withSpan(s"$workflowId.unpauseGlobalDomain") { _ => _ =>
+      for {
+        globalDomain <- svcStore.getSvcRules().map(_.domain)
+        _ <- changeDomainRatePerParticipant(
+          globalDomain,
+          DynamicDomainParameters.defaultConfirmationRequestsMaxRate,
+        )
+      } yield v0.SvAdminResource.UnpauseGlobalDomainResponseOK
     }
   }
 

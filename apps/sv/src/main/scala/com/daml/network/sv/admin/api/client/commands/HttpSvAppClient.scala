@@ -1,6 +1,7 @@
 package com.daml.network.sv.admin.api.client.commands
 
 import cats.data.EitherT
+import cats.syntax.either.*
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
@@ -189,8 +190,7 @@ object HttpSvAppClient {
           svcPartyId <- Codec.decode(Codec.Party)(svcPartyId)
           latestMiningRound <- Contract
             .fromHttp(OpenMiningRound.COMPANION)(latestMiningRound)
-            .left
-            .map(_.toString)
+            .leftMap(_.toString)
           coinRules <- Contract.fromHttp(CoinRules.COMPANION)(coinRules).left.map(_.toString)
           svcRules <- Contract.fromHttp(SvcRules.COMPANION)(svcRules).left.map(_.toString)
         } yield SvcInfo(

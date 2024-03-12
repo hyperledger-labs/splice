@@ -167,6 +167,16 @@ paths:
       responses:
         "200":
           description: ok
+
+  /v0/admin/domain/unpause:
+    post:
+      tags: [sv]
+      x-jvm-package: sv_admin
+      operationId: "unpauseGlobalDomain"
+      responses:
+        "200":
+          description: ok
+
   /v0/admin/domain/migration-dump:
     get:
       tags: [ sv ]
