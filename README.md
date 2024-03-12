@@ -67,7 +67,7 @@ Any group operating a Canton synchronizer may accept and implement new versions 
 ## Architecture
 The following diagram shows how the Splice applications interact with the Daml platform from Digital Asset.<br>
 
-![SV Node Architecture](./images/Splice-Canton-Global-Synchronizer.jpg)
+![SV Node Architecture](./images/Splice-Canton-Global-Synchronizer-2.jpg)
 
 
 ### Notes:
