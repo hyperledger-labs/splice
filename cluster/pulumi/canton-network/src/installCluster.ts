@@ -163,7 +163,6 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
 
   const svDependencies = allSvs.flatMap(sv => [sv.scan, sv.svApp, sv.validatorApp, sv.ingress]);
 
-  // TODO(#8761) install the non sv nodes once the upgrade supports it
   const nonSvComponentsDependencies = allSvs.flatMap(sv => [sv.scan, sv.ingress]);
 
   if (mustInstallValidator1) {

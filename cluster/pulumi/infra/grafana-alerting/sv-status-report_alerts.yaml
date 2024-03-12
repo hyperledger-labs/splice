@@ -3,120 +3,26 @@ groups:
   - orgId: 1
     name: sv status reports
     folder: canton-network
-    # TODO(#10584): revisit evaluation interval in case we lower the pending period for MainNet
     interval: 5m
     rules:
-      - uid: f15539f2-f6ea-4de4-8f7c-c56434d5bd52
-        title: SV Status -  Mediator falling behind
-        condition: progress_too_low
-        data:
-          - refId: progress
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: prometheus
-            model:
-              editorMode: code
-              expr: max by (namespace, report_publisher) (rate(cn_sv_status_report_mediator_domain_time_us{namespace=~"sv-1"}[5m])) / 1000000
-              instant: false
-              intervalMs: 1000
-              legendFormat: __auto
-              maxDataPoints: 43200
-              range: true
-              refId: progress
-          - refId: avg_progress
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0
-                      - 0
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params: []
-                  reducer:
-                    params: []
-                    type: avg
-                  type: query
-              datasource:
-                name: Expression
-                type: __expr__
-                uid: __expr__
-              expression: progress
-              intervalMs: 1000
-              maxDataPoints: 43200
-              reducer: mean
-              refId: avg_progress
-              settings:
-                mode: dropNN
-              type: reduce
-          - refId: progress_too_low
-            relativeTimeRange:
-              from: 600
-              to: 0
-            datasourceUid: __expr__
-            model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 0.75
-                      - 0
-                    type: lt
-                  operator:
-                    type: and
-                  query:
-                    params: []
-                  reducer:
-                    params: []
-                    type: avg
-                  type: query
-              datasource:
-                name: Expression
-                type: __expr__
-                uid: __expr__
-              expression: avg_progress
-              intervalMs: 1000
-              maxDataPoints: 43200
-              refId: progress_too_low
-              type: threshold
-        dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
-        panelId: 14
-        noDataState: NoData
-        execErrState: Error
-        # TODO(#10584): pending period set to allow for redeploys w/o alerts ==> revisit for MainNet
-        for: 30m
-        annotations:
-          __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
-          __panelId__: "14"
-          description: At least one of the SVs' status reports shows that their mediator is falling behind wrt processing messages from the domain, or they fail to submit status reports.
-          summary: Mediator Domain Time progressing too slowly
-        labels:
-          topology_level: svc
-        isPaused: false
       - uid: ea207f34-68d0-4fbb-9ae5-08020ff8b17d
-        title: SV Status -  Participant falling behind
+        title: SV Status -  Node falling behind
         condition: progress_too_low
         data:
-          - refId: progress
+          - refId: time_advance_per_second
             relativeTimeRange:
               from: 600
               to: 0
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by (namespace, report_publisher) (rate(cn_sv_status_report_participant_domain_time_us{namespace=~"sv-1"}[5m])) / 1000000
+              expr: min by (namespace, report_publisher, target_node) (rate(cn_sv_status_report_domain_time_us{}[5m])) / 1000000
               instant: false
               intervalMs: 1000
               legendFormat: __auto
               maxDataPoints: 43200
               range: true
-              refId: progress
+              refId: time_advance_per_second
           - refId: avg_progress
             relativeTimeRange:
               from: 600
@@ -141,7 +47,7 @@ groups:
                 name: Expression
                 type: __expr__
                 uid: __expr__
-              expression: progress
+              expression: time_advance_per_second
               intervalMs: 1000
               maxDataPoints: 43200
               reducer: mean
@@ -180,16 +86,17 @@ groups:
               type: threshold
         dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
         panelId: 9
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
-        # TODO(#10584): pending period set to allow for redeploys w/o alerts ==> revisit for MainNet
-        for: 30m
+        for: 15m
         annotations:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "9"
-          description: At least one of the SVs' status reports shows that their participant is falling behind wrt processing messages from the domain, or they fail to submit status reports.
-          summary: Participant Domain Time progressing too slowly
+          description: '{{ $labels.namespace }} reports that the SVs'' {{ $labels.report_publisher }} status reports for {{ $labels.target_node }}  shows that their node is falling behind wrt processing messages from the domain having an average catchup rate of {{ index $values "avg_progress" }} for the last 5 minutes, or they fail to submit status reports.'
+          runbook_url: ""
+          summary: Domain Time progressing too slowly
         labels:
+          "": ""
           topology_level: svc
         isPaused: false
       - uid: f60b1225-4458-483a-8168-240baac4f6fe
@@ -274,7 +181,6 @@ groups:
         panelId: 15
         noDataState: NoData
         execErrState: Error
-        # TODO(#10584): pending period set to allow for redeploys w/o alerts ==> revisit for MainNet
         for: 30m
         annotations:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
@@ -286,51 +192,46 @@ groups:
         isPaused: false
       - uid: d28ac95d-4724-4a82-a848-49198c5c6d80
         title: SV Status - Unexpected Mining Round Lag
-        condition: lag_check
+        condition: A
         data:
-          - refId: lag_series
+          - refId: open_round_per_publisher
             relativeTimeRange:
-              from: 600
+              from: 900
               to: 0
             datasourceUid: prometheus
             model:
+              disableTextWrap: false
               editorMode: code
-              expr: max by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_latest_open_round{namespace=~"sv-1"}) ) - min by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_latest_open_round{namespace=~"sv-1"}))
+              expr: max by(report_publisher) (cn_sv_status_report_latest_open_round)
+              fullMetaSearch: false
+              includeNullMetadata: true
               instant: false
               intervalMs: 1000
               legendFormat: __auto
               maxDataPoints: 43200
               range: true
-              refId: lag_series
-          - refId: lag_check
+              refId: open_round_per_publisher
+              useBackend: false
+          - refId: open_round
             relativeTimeRange:
               from: 600
               to: 0
-            datasourceUid: __expr__
+            datasourceUid: prometheus
             model:
-              conditions:
-                - evaluator:
-                    params:
-                      - 10
-                    type: gt
-                  operator:
-                    type: and
-                  query:
-                    params:
-                      - C
-                  reducer:
-                    params: []
-                    type: last
-                  type: query
-              datasource:
-                type: __expr__
-                uid: __expr__
-              expression: min_lag
+              disableTextWrap: false
+              editorMode: builder
+              expr: max(cn_sv_status_report_latest_open_round)
+              fullMetaSearch: false
+              hide: false
+              includeNullMetadata: true
+              instant: false
               intervalMs: 1000
+              legendFormat: __auto
               maxDataPoints: 43200
-              refId: lag_check
-              type: threshold
-          - refId: min_lag
+              range: true
+              refId: open_round
+              useBackend: false
+          - refId: publisher_lag
             relativeTimeRange:
               from: 600
               to: 0
@@ -354,25 +255,81 @@ groups:
                 name: Expression
                 type: __expr__
                 uid: __expr__
-              expression: lag_series
-              intervalMs: 1000
-              maxDataPoints: 43200
-              reducer: min
-              refId: min_lag
+              expression: $open_round - $open_round_per_publisher
+              hide: false
+              refId: publisher_lag
+              type: math
+          - refId: max_publisher_lag
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 0
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: publisher_lag
+              hide: false
+              reducer: max
+              refId: max_publisher_lag
               settings:
                 mode: dropNN
               type: reduce
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: __expr__
+            model:
+              conditions:
+                - evaluator:
+                    params:
+                      - 10
+                      - 0
+                    type: gt
+                  operator:
+                    type: and
+                  query:
+                    params: []
+                  reducer:
+                    params: []
+                    type: avg
+                  type: query
+              datasource:
+                name: Expression
+                type: __expr__
+                uid: __expr__
+              expression: max_publisher_lag
+              hide: false
+              refId: A
+              type: threshold
         dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
         panelId: 5
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
-        # TODO(#10584): pending period set to allow for redeploys w/o alerts ==> revisit for MainNet
-        for: 30m
+        for: 10m
         annotations:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "5"
-          description: The SV status reports observed by sv-1 exhibit an unexpectedly high lag in the latest open mining round number.
-          summary: Unexpected mining round lag in SV status reports
+          description: 'The SV status reports observed by one of the SVs exhibit an unexpectedly high lag in the latest open mining round number. Check the graphs for detailed metrics. '
+          runbook_url: ""
+          summary: 'Unexpected mining round lag {{ index $values "max_publisher_lag" }} in SV status reports for publisher {{ $labels.report_publisher }} '
         labels:
+          "": ""
           topology_level: svc
         isPaused: false
