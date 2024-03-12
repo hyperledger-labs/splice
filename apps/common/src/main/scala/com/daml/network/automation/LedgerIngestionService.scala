@@ -70,7 +70,7 @@ abstract class LedgerIngestionService(
                 // 1. If we get a lot of errors in a short period of time, we log an error and backoff with the pollingInterval.
                 // 2. If we get very infrequent errors (e.g. stale stream authorization on user addition), no error is logged an we get fast retries
                 //    instead of sleeping for the polling interval just because a certain number of users got allocated.
-                RetryFor.Automation,
+                RetryFor.LongRunningAutomation,
                 "ledger ingestion subscription", {
                   newLedgerSubscription().flatMap(subscription => {
                     // Smuggle the current subscription out of the body here, so that we can use
