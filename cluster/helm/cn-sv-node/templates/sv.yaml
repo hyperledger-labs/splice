@@ -207,9 +207,6 @@ spec:
               value: |
                 canton.sv-apps.sv.scan.public-url = {{ .Values.scan.publicUrl | quote }}
                 canton.sv-apps.sv.scan.internal-url = {{ .Values.scan.internalUrl | quote }}
-            - name: ADDITIONAL_CONFIG_REWARD_ISSUANCE
-              value: |
-                canton.sv-apps.sv.automation.use-new-sv-reward-issuance = true
             {{- if .Values.disableOnboardingParticipantPromotionDelay }}
             - name: ADDITIONAL_CONFIG_DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY
               value: |
