@@ -856,10 +856,12 @@ subcommand_whitelist[reset]='Reset the state of the cluster to a fully blank sta
 function _cluster_reset() {
     _info "Uninstalling Pulumi canton-network and runbook stacks"
 
-    _down_stack canton-network
-    _down_stack multi-validator
-    _down_stack sv-runbook
-    _down_stack validator-runbook
+    _down_stack canton-network &
+    _down_stack multi-validator &
+    _down_stack sv-runbook &
+    _down_stack validator-runbook &
+
+    wait
 
     _info "Cluster in reset/idle state."
 }
@@ -1393,6 +1395,16 @@ function subcmd_pulumi() {
 
         *)
             args+=(--stack "organization/${pulumi_project}/${pulumi_stack}")
+            ;;
+    esac
+
+    case "${pulumi_cmd}" in
+        up|down|destroy|refresh|preview)
+            _uses_pulumi_stack "${pulumi_project}"
+            # default 16
+            args+=(--parallel 128)
+            ;;
+        *)
             ;;
     esac
 
