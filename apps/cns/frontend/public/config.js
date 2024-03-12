@@ -20,7 +20,14 @@ window.canton_network_config = {
     },
     validator: {
       // URL of the validator app HTTP API
-      url: 'http://localhost:5003',
+      url: 'http://localhost:5003/api/validator',
     },
+    // BEGIN_CNS_CLUSTER_BACKEND_CONFIG
+    scan: {
+      // URL of scan backend.
+      // Edit this to the cluster you're trying to connect on.
+      url: 'https://scan.sv-1.svc.TARGET_CLUSTER.network.canton.global/api/scan',
+    },
+    // END_CNS_CLUSTER_BACKEND_CONFIG
   },
 };

@@ -7,7 +7,6 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.store.db.DbSvSvStore
-import com.daml.network.sv.store.memory.InMemorySvSvStore
 import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -127,24 +126,6 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
   lazy val svDomainConfig = SvDomainConfig(
     SvGlobalDomainConfig(DomainAlias.tryCreate(domain), "https://example.com")
   )
-}
-
-class InMemorySvSvStoreTest extends SvSvStoreTest {
-  override protected def mkStore(): Future[InMemorySvSvStore] = {
-    val store = new InMemorySvSvStore(
-      SvStore.Key(storeSvParty, svcParty),
-      loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-    )
-    for {
-      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
-      _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(acsOffset.toHexString, Seq.empty, Seq.empty, Seq.empty)
-      _ <- store.domains.ingestionSink.ingestConnectedDomains(
-        Map(DomainAlias.tryCreate(domain) -> dummyDomain)
-      )
-    } yield store
-  }
 }
 
 class DbSvSvStoreTest

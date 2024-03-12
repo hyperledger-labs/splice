@@ -40,6 +40,10 @@ class LocalRunbookIntegrationTest
   System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
   System.setProperty("GLOBAL_DOMAIN_URL", "http://localhost:5108")
 
+  // For flyway migrations
+  System.setProperty("CANTON_DB_USER", "postgres")
+  System.setProperty("CANTON_DB_PASSWORD", "postgres")
+
   override protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq(
     ("ParticipantLedgerApi", 7001),
     ("ParticipantAdminApi", 7002),

@@ -14,7 +14,6 @@ import com.daml.network.util.{AssignedContract, ResourceTemplateDecoder, Templat
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.store.db.DbValidatorStore
-import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.resource.DbStorage
@@ -588,26 +587,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       domainAlias
     )
   )
-}
-
-class InMemoryValidatorStoreTest extends ValidatorStoreTest {
-  override protected def mkStore(): Future[InMemoryValidatorStore] = {
-    val store = new InMemoryValidatorStore(
-      key = storeKey,
-      loggerFactory = loggerFactory,
-      retryProvider =
-        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
-    )
-    for {
-      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
-      _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
-      _ <- store.domains.ingestionSink.ingestConnectedDomains(
-        Map(domainAlias -> dummyDomain)
-      )
-    } yield store
-  }
 }
 
 class DbValidatorStoreTest

@@ -18,6 +18,7 @@ To locally start a validator node that connects against the DevNet domain, you w
 
 1) a Canton participant node, in order to host:
 2) the Daml validator app which also serves as the backend for the wallet
+3) a Postgres instance that the CN apps use to store their data
 
 Additionally, you'll also need to enable the GCP DA Canton DevNet VPN. If you can view
 this documentation, you already enabled the VPN successfully.
@@ -84,6 +85,38 @@ SV. This file should be saved under ``validator-onboarding.conf`` in the directo
   .. parsed-literal::
 
      curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
+
+Next, start a postgres docker container that will be used by the CN apps:
+
+.. code-block:: bash
+
+  docker run -d --rm \
+    --log-driver json-file \
+    --name "postgres_self_hosting_validator" \
+    -e POSTGRES_USER="postgres" \
+    -e POSTGRES_PASSWORD="postgres" \
+    -p 5432:5432 \
+    postgres:14 \
+    postgres \
+    -c max_connections=8000 \
+    -c log_statement=all \
+    -c logging_collector=on \
+    -c log_destination=csvlog \
+    -c log_filename='postgresql.log'
+
+Create a user and a database for the CN apps:
+
+.. code-block:: bash
+
+  docker exec -e PGPASSWORD="postgres" postgres_self_hosting_validator \
+    psql -U "postgres" \
+    -c "create user canton with encrypted password 'supersafe';"
+
+  docker exec -e PGPASSWORD="postgres" postgres_self_hosting_validator \
+    psql -U "postgres" \
+    -c "CREATE DATABASE cn_apps;" \
+    -c "GRANT ALL PRIVILEGES ON DATABASE cn_apps TO canton;"
+
 
 You can now start a console with the CN apps. Use the following command, making sure that the `validator-onboarding.conf` matches the file you created in the previous step.
 
@@ -174,14 +207,28 @@ Configuring the Wallet UI
 -------------------------
 
 The Wallet UI is distributed as static files that connect to the
-validator backend that we started in the previous section.
+validator backend that we started in the previous section. It also connects to the Scan service in the cluster.
 
-Before we can deploy the Wallet UI, we need to configure the URL of the CNS service so the wallet can resolve party IDs as well as the URL of CC Scan.
-For that, open ``web-uis/wallet/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal| for both CNS and scan:
+Before we can deploy the Wallet UI, we need to configure the URL of the Scan service so the wallet can resolve party IDs.
+Open ``web-uis/wallet/config.js`` and change all occurrences of ``TARGET_CLUSTER`` to |cn_cluster_literal|:
 
 .. literalinclude:: ../../../../../apps/wallet/frontend/public/config.js
     :start-after: BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
     :end-before: END_WALLET_CLUSTER_BACKEND_CONFIG
+
+Configuring the CNS UI
+----------------------
+
+The CNS UI is distributed as static files that connect to the validator backend that we started in the previous section.
+It also connects to the Scan service in the cluster.
+
+Before we can deploy the CNS UI, we need to configure the URL of the Scan service.
+Open ``web-uis/cns/config.js`` and change ``TARGET_CLUSTER`` in the Scan URL to |cn_cluster_literal|:
+
+.. literalinclude:: ../../../../../apps/cns/frontend/public/config.js
+    :start-after: BEGIN_CNS_CLUSTER_BACKEND_CONFIG
+    :end-before: END_CNS_CLUSTER_BACKEND_CONFIG
+
 
 .. _splitwell-user:
 
@@ -193,19 +240,12 @@ Configuring the Splitwell UI
    If you are interested in hosting your own instance as an application provider, take a
    look at the :ref:`instructions for deploying splitwell <splitwell-provider>`.
 
-To use splitwell, you first need to connect your participant to the
-splitwell domain and upload the DAR.  Go to the terminal in which you
+To use splitwell, you first need to upload the splitwell DAR.  Go to the terminal in which you
 are running the validator (the one using "validator.conf"), and type:
 
 .. parsed-literal::
 
-   @ validatorApp.participantClient.domains.connect("splitwell", "http://|cn_cluster|.network.canton.global:5108")
    @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-0.1.0.dar")
-
-.. note::
-   Note, that if you are not connecting to the splitwell instance
-   operated by Digital Asset, the Domain URL here will be different. Ask
-   the operator for the correct URL.
 
 As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal| like you did earlier for the CNS and wallet UIs:
 

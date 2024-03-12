@@ -6,10 +6,10 @@ import com.digitalasset.canton.config.*
 import com.digitalasset.canton.lifecycle.{CloseContext, UnlessShutdown}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.DbStorageMetrics
-import com.digitalasset.canton.resource.{DbStorageSingle, MemoryStorage, Storage, StorageFactory}
+import com.digitalasset.canton.resource.{DbStorageSingle, Storage, StorageFactory}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-import com.typesafe.config.{Config, ConfigFactory}
+import com.typesafe.config.Config
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.concurrent.ExecutionContext
@@ -28,14 +28,6 @@ object CNDbConfig {
     override protected val stableMigrationPath: String = postgresMigrationsPathStable
     override protected val devMigrationPath: String = postgresMigrationsPathDev
 
-  }
-
-  case class Memory(
-      override val config: Config = ConfigFactory.empty(),
-      override val parameters: DbParametersConfig = DbParametersConfig(),
-  ) extends CNDbConfig
-      with MemoryStorageConfig {
-    override type Self = Memory
   }
 
   private val stableDir = "stable"
@@ -75,8 +67,6 @@ class CNStorageFactory(val config: CNDbConfig) extends StorageFactory {
             loggerFactory,
           )
           .widen[Storage]
-      case _: CNDbConfig.Memory =>
-        EitherT.rightT(new MemoryStorage(loggerFactory, timeouts))
     }
   }
 }

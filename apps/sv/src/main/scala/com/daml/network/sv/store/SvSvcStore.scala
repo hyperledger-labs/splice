@@ -37,14 +37,13 @@ import com.daml.network.store.db.AcsJdbcTypes
 import com.daml.network.sv.store.SvSvcStore.noActiveSvcRules
 import com.daml.network.sv.store.db.{DbSvSvcStore, SvcTables}
 import com.daml.network.sv.store.db.SvcTables.SvcAcsStoreRowData
-import com.daml.network.sv.store.memory.InMemorySvSvcStore
 import com.daml.network.util.Contract.Companion.Template as TemplateCompanion
 import com.daml.network.util.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
@@ -957,13 +956,6 @@ object SvSvcStore {
       closeContext: CloseContext,
   ): SvSvcStore = {
     storage match {
-      case _: MemoryStorage =>
-        new InMemorySvSvcStore(
-          key,
-          loggerFactory,
-          retryProvider,
-          domainMigrationId,
-        )
       case db: DbStorage =>
         new DbSvSvcStore(
           key,
@@ -973,6 +965,7 @@ object SvSvcStore {
           domainMigrationId,
           participantId,
         )
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
   }
 

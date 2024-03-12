@@ -1013,6 +1013,24 @@ commands:
           cmd_name: "Stop canton"
           cmd: ./stop-canton.sh || true
 
+  start_cn_apps_postgres_in_background:
+    description: Start postgres in the background for self hosted preflight checks
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: "Start postgres for cn_apps"
+          cmd: |
+            ./scripts/postgres.sh docker start
+            ./scripts/postgres.sh docker createdb cn_apps
+          background: true
+
+  stop_cn_apps_postgres_in_background:
+    description: Stop postgres for self hosted preflight checks
+    steps:
+      - run_bash_command_in_nix:
+          cmd_name: "Stop postgres for cn_apps"
+          cmd: |
+            ./scripts/postgres.sh docker stop || true
+
   run_splitted_scala_tests:
     description: run splitted scala tests
     parameters:
@@ -2539,6 +2557,7 @@ jobs:
       - setup_vpn
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
+      - start_cn_apps_postgres_in_background
       - run_bash_command_in_nix:
           cmd_name: wait for deployment to finish
           cluster: << parameters.cluster >>
@@ -2593,6 +2612,7 @@ jobs:
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job
+      - stop_cn_apps_postgres_in_background
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>

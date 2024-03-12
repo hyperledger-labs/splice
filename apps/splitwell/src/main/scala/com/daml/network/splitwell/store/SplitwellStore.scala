@@ -7,13 +7,12 @@ import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.db.DbSplitwellStore
 import com.daml.network.splitwell.store.db.SplitwellTables.SplitwellAcsStoreRowData
-import com.daml.network.splitwell.store.memory.InMemorySplitwellStore
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
 import com.daml.network.util.{AssignedContract, Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -187,13 +186,6 @@ object SplitwellStore {
       close: CloseContext,
   ): SplitwellStore =
     storage match {
-      case _: MemoryStorage =>
-        new InMemorySplitwellStore(
-          key,
-          domainConfig,
-          loggerFactory,
-          retryProvider,
-        )
       case dbStorage: DbStorage =>
         new DbSplitwellStore(
           key,
@@ -204,6 +196,7 @@ object SplitwellStore {
           domainMigrationId,
           participantId,
         )
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
 
   case class Key(

@@ -65,6 +65,7 @@ jobs:
       - setup_vpn
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
+      - start_cn_apps_postgres_in_background
       - run_bash_command_in_nix:
           cmd_name: wait for deployment to finish
           cluster: << parameters.cluster >>
@@ -119,6 +120,7 @@ jobs:
       - print_gcloud_logs_commands:
           cluster: <<parameters.cluster>>
       - cleanup_sbt_test_job
+      - stop_cn_apps_postgres_in_background
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
           channel_notify: << parameters.channel_notify >>

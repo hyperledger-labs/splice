@@ -10,11 +10,10 @@ import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryRes
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.db.SvTables.SvAcsStoreRowData
-import com.daml.network.sv.store.memory.InMemorySvSvStore
 import com.daml.network.util.{AssignedContract, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -110,10 +109,9 @@ object SvSvStore {
       closeContext: CloseContext,
   ): SvSvStore =
     storage match {
-      case _: MemoryStorage =>
-        new InMemorySvSvStore(key, loggerFactory, retryProvider)
       case db: DbStorage =>
         new DbSvSvStore(key, db, loggerFactory, retryProvider, domainMigrationId, participantId)
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =

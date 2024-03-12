@@ -35,6 +35,9 @@ class SelfHostedSplitwellPreflightIntegrationTest
     ("ParticipantLedgerApi", 7701),
     ("ParticipantAdminApi", 7702),
   )
+  // For flyway migrations
+  System.setProperty("CANTON_DB_USER", "postgres")
+  System.setProperty("CANTON_DB_PASSWORD", "postgres")
 
   // Runs against a temporary Canton instance.
   override lazy val resetDecentralizedNamespace = false

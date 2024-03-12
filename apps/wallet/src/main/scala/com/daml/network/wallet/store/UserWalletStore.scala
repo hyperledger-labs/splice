@@ -26,12 +26,11 @@ import com.daml.network.util.*
 import com.daml.network.wallet.store.UserWalletStore.*
 import com.daml.network.wallet.store.db.{DbUserWalletStore, WalletTables}
 import com.daml.network.wallet.store.db.WalletTables.UserWalletAcsStoreRowData
-import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -509,13 +508,6 @@ object UserWalletStore {
       close: CloseContext,
   ): UserWalletStore = {
     storage match {
-      case _: MemoryStorage =>
-        new InMemoryUserWalletStore(
-          key,
-          loggerFactory,
-          retryProvider,
-          domainMigrationId,
-        )
       case dbStorage: DbStorage =>
         new DbUserWalletStore(
           key,
@@ -525,6 +517,7 @@ object UserWalletStore {
           domainMigrationId,
           participantId,
         )
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
   }
 

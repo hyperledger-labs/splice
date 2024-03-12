@@ -18,13 +18,12 @@ import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainA
 import com.daml.network.util.*
 import com.daml.network.validator.store.db.DbValidatorStore
 import com.daml.network.validator.store.db.ValidatorTables.ValidatorAcsStoreRowData
-import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.crypto.Hash
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -241,8 +240,6 @@ object ValidatorStore {
       closeContext: CloseContext,
   ): ValidatorStore =
     storage match {
-      case _: MemoryStorage =>
-        new InMemoryValidatorStore(key, loggerFactory, retryProvider, domainMigrationId)
       case storage: DbStorage =>
         new DbValidatorStore(
           key,
@@ -252,6 +249,7 @@ object ValidatorStore {
           domainMigrationId,
           participantId,
         )
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
 
   case class Key(

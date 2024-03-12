@@ -26,7 +26,6 @@ import com.daml.network.wallet.store.{
   UserWalletStore,
 }
 import com.daml.network.wallet.store.db.DbUserWalletStore
-import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.util.{
@@ -1405,28 +1404,6 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   lazy val initialOffset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val domainAlias = DomainAlias.tryCreate(domain)
-}
-
-class InMemoryUserWalletStoreTest extends UserWalletStoreTest {
-  override protected def mkStore(
-      endUserParty: PartyId
-  ): Future[InMemoryUserWalletStore] = {
-    val store = new InMemoryUserWalletStore(
-      key = storeKey(endUserParty),
-      loggerFactory = loggerFactory,
-      retryProvider =
-        RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
-    )
-    for {
-      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
-      _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(initialOffset.toHexString, Seq.empty, Seq.empty, Seq.empty)
-      _ <- store.domains.ingestionSink.ingestConnectedDomains(
-        Map(domainAlias -> dummyDomain)
-      )
-    } yield store
-  }
 }
 
 class DbUserWalletStoreTest

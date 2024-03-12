@@ -5,7 +5,6 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
-import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.scan.store.db.{
@@ -20,7 +19,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
+import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
@@ -242,13 +241,6 @@ object ScanStore {
       close: CloseContext,
   ): ScanStore = {
     storage match {
-      case _: MemoryStorage =>
-        new InMemoryScanStore(
-          key = key,
-          loggerFactory,
-          retryProvider,
-          domainMigrationId,
-        )
       case db: DbStorage =>
         new DbScanStore(
           key = key,
@@ -260,6 +252,7 @@ object ScanStore {
           domainMigrationId,
           participantId,
         )
+      case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
   }
 

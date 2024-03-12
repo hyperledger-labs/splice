@@ -126,6 +126,31 @@ abstract class MultiDomainAcsStoreTest[
       )
     )
   }
+  private val charsetMatchingDbBytes = java.nio.charset.Charset forName "UTF-8"
+
+  protected def reassignmentContractOrder[AC](
+      unordered: Seq[AC],
+      participantId: ParticipantId,
+  )(getContractId: AC => String = (_: Contract.Has[?, ?]).contractId.contractId): Seq[AC] =
+    if (unordered.sizeIs <= 1) unordered
+    else {
+      val pidBytes = participantId.toProtoPrimitive getBytes charsetMatchingDbBytes
+      val md = java.security.MessageDigest getInstance "MD5"
+      unordered
+        .map { ac =>
+          md.update(getContractId(ac) getBytes charsetMatchingDbBytes)
+          // in postgres bytea comparison, \x3132 < \xc3a9 (i.e. bytewise
+          // comparison is unsigned); Arrays.compare on byte[] incompatibly
+          // compares signed bytes, e.g. yielding \x3132 > \xc3a9.  Pretend we
+          // have unsigned bytes to match the DB memory store's sorting behavior
+          val digest = md.digest(pidBytes).map(b => if (b < 0) 256 + b else b.toInt)
+          md.reset()
+          (digest, ac)
+        }
+        .sortBy(_._1)(java.util.Arrays.compare(_, _))
+        .map(_._2)
+    }
+
   protected def cFeatured(i: Int): C =
     appRewardCoupon(i, svcParty, true, contractId = validContractId(i))
 
@@ -683,7 +708,7 @@ abstract class MultiDomainAcsStoreTest[
         if (ix % 2 == 0) featuredAppRight(svcParty, coid.coid)
         else appRewardCoupon(1, svcParty, contractId = coid.coid)
       val coids = MultiDomainAcsStoreTest.generatedCoids.value
-      val expectedOrder = InMemoryMultiDomainAcsStore.reassignmentContractOrder(
+      val expectedOrder = reassignmentContractOrder(
         coids,
         sampleParticipantId,
       )(_.coid)

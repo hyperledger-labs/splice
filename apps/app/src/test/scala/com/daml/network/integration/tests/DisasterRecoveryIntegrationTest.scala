@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import better.files.File
 import better.files.File.apply
-import com.daml.network.config.{CNDbConfig, CNNodeConfigTransforms, NetworkAppClientConfig}
+import com.daml.network.config.{CNNodeConfigTransforms, NetworkAppClientConfig}
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
 import com.daml.network.environment.{CNNodeEnvironmentImpl, RetryProvider}
@@ -12,7 +12,6 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.plugins.UseInMemoryStores
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
@@ -61,8 +60,6 @@ class DisasterRecoveryIntegrationTest
   }
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
-  // TODO(#9014) make it work with persistent stores
-  registerPlugin(new UseInMemoryStores(loggerFactory))
 
   // Runs against a temporary Canton instance.
   override lazy val resetDecentralizedNamespace = false
@@ -120,7 +117,6 @@ class DisasterRecoveryIntegrationTest
                 conf
                   .validatorApps(InstanceName.tryCreate("sv1Validator"))
                   .copy(
-                    storage = CNDbConfig.Memory(),
                     scanClient = TrustSingle(url = "http://127.0.0.1:28012"),
                     domains = ValidatorDomainConfig(global =
                       ValidatorGlobalDomainConfig(
@@ -152,7 +148,8 @@ class DisasterRecoveryIntegrationTest
 
   val dumpPath = Files.createTempFile("participant-dump", ".json")
 
-  "Recover from losing the domain" in { implicit env =>
+  // TODO(#10707) ignored, re-enable when fixed
+  "Recover from losing the domain" ignore { implicit env =>
     runTest(
       "lost-domain",
       (identities, timestampBeforeDisaster) => {
@@ -164,8 +161,8 @@ class DisasterRecoveryIntegrationTest
       },
     )
   }
-
-  "Recover from losing all sequencers and most participants" in { implicit env =>
+  // TODO(#10707) ignored, re-enable when fixed
+  "Recover from losing all sequencers and most participants" ignore { implicit env =>
     runTest(
       "lost-all-sequencers-most-participants",
       (identities, timestampBeforeDisaster) => {

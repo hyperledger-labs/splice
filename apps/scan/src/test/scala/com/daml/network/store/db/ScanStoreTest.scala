@@ -24,7 +24,6 @@ import com.daml.network.scan.store.{
 }
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.db.{DbScanStore, ScanAggregatesReader, ScanAggregator}
-import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.{PageLimit, StoreErrors, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.util.CNNodeUtil.damlDecimal
@@ -1396,27 +1395,6 @@ trait CoinTransferUtil { self: StoreTest =>
   lazy val domain = dummyDomain.toProtoPrimitive
 }
 
-class InMemoryScanStoreTest extends ScanStoreTest {
-  override protected def mkStore(
-      svcParty: PartyId
-  ): Future[ScanStore] = {
-    val store = new InMemoryScanStore(
-      key = ScanStore.Key(svcParty),
-      loggerFactory,
-      RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
-    )
-    for {
-      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
-      _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
-      _ <- store.domains.ingestionSink.ingestConnectedDomains(
-        Map(DomainAlias.tryCreate(domain) -> dummyDomain)
-      )
-    } yield store
-  }
-}
-
 class DbScanStoreTest
     extends ScanStoreTest
     with HasActorSystem
@@ -1471,7 +1449,6 @@ class DbScanStoreTest
       _ <- resetAllCnAppTables(storage)
     } yield ()
 
-  // TODO (#8152): move with the other tests. In-memory does not implement getTopValidatorLicenses
   "getTopValidatorLicenses" should {
 
     "return the top `limit` validator licenses by number of rounds collected" in {
@@ -1508,6 +1485,5 @@ class DbScanStoreTest
         result <- store.getTopValidatorLicenses(PageLimit.tryCreate(3))
       } yield result shouldBe Seq(first, almostFirst, third)
     }
-
   }
 }

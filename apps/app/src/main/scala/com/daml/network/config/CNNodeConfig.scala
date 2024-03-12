@@ -353,8 +353,6 @@ object CNNodeConfig {
 
     implicit val postgresCNDbConfigReader: ConfigReader[CNDbConfig.Postgres] =
       deriveReader[CNDbConfig.Postgres]
-    implicit val memoryCNDbConfigReader: ConfigReader[CNDbConfig.Memory] =
-      deriveReader[CNDbConfig.Memory]
     implicit val cnDbConfigReader: ConfigReader[CNDbConfig] = deriveReader[CNDbConfig]
 
     implicit val automationConfig: ConfigReader[AutomationConfig] =
@@ -601,8 +599,6 @@ object CNNodeConfig {
       confidentialWriter[CNDbConfig.Postgres](pg =>
         pg.copy(config = DbConfig.hideConfidential(pg.config))
       )
-    implicit val memoryCNDbConfigWriter: ConfigWriter[CNDbConfig.Memory] =
-      deriveWriter[CNDbConfig.Memory]
     implicit val cnDbConfigWriter: ConfigWriter[CNDbConfig] = deriveWriter[CNDbConfig]
 
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
