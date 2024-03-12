@@ -43,15 +43,16 @@ class SvStatusReportMetricsExportTrigger(
     TrieMap.empty
 
   private def getSvMetrics(svId: SvStatusReportMetricsExportTrigger.SvId): SvStatusMetrics =
-    perSvMetrics.get(svId).getOrElse {
+    perSvMetrics.getOrElse(
+      svId,
       // We must synchronize here to avoid allocating the metrics for the same sv multiple times, which would lead to
       // duplicate metric labels being reported by OpenTelemetry.
       blocking {
         synchronized {
           perSvMetrics.getOrElseUpdate(svId, SvStatusMetrics(svId, context.metricsFactory))
         }
-      }
-    }
+      },
+    )
 
   override protected def completeTask(
       task: AssignedContract[
@@ -109,7 +110,7 @@ object SvStatusReportMetricsExportTrigger {
         Map("report_publisher" -> svId.svName, "report_publisher_party" -> svId.svParty)
       )
     private val prefix: MetricName = CNMetrics.MetricsPrefix :+ "sv_status_report"
-    private def gauge(name: String, initial: Long): Gauge[Long] =
+    private def gauge(name: String, initial: Long)(implicit mc: MetricsContext): Gauge[Long] =
       metricsFactory.gauge(prefix :+ name, initial = initial)
 
     private val minTimestampValue = CantonTimestamp.MinValue.toMicros
@@ -118,9 +119,13 @@ object SvStatusReportMetricsExportTrigger {
     val creationTime: Gauge[Long] = gauge("creation_time_us", initial = minTimestampValue)
     val cometBftHeight: Gauge[Long] = gauge("cometbft_height", initial = -1L)
     val mediatorDomainTime: Gauge[Long] =
-      gauge("mediator_domain_time_us", initial = minTimestampValue)
+      gauge("domain_time_us", initial = minTimestampValue)(
+        mc.withExtraLabels("target_node" -> "mediator")
+      )
     val participantDomainTime: Gauge[Long] =
-      gauge("participant_domain_time_us", initial = minTimestampValue)
+      gauge("domain_time_us", initial = minTimestampValue)(
+        mc.withExtraLabels("target_node" -> "participant")
+      )
     val latestOpenRound: Gauge[Long] = gauge("latest_open_round", initial = -1L)
 
     override def close(): Unit = {
