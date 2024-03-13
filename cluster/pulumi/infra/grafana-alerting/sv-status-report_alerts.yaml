@@ -104,23 +104,40 @@ groups:
         isPaused: false
       - uid: f60b1225-4458-483a-8168-240baac4f6fe
         title: SV Status - Unexpected CometBFT Lag
-        condition: cometbft_lag
+        condition: alert
         data:
-          - refId: cometbft_height_lag
+          - refId: cometbft_height_per_publisher
             relativeTimeRange:
               from: 600
               to: 0
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: max by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_cometbft_height{namespace=~"sv-1"}) ) - min by (namespace) (max by (report_publisher, namespace) (cn_sv_status_report_cometbft_height{namespace=~"sv-1"}))
-              instant: false
+              exemplar: false
+              expr: max by (report_publisher) (cn_sv_status_report_cometbft_height)
+              instant: true
               intervalMs: 1000
               legendFormat: __auto
               maxDataPoints: 43200
-              range: true
-              refId: cometbft_height_lag
-          - refId: cometbft_lag
+              range: false
+              refId: cometbft_height_per_publisher
+          - refId: max_cometbft_height
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: prometheus
+            model:
+              editorMode: code
+              exemplar: false
+              expr: max(cn_sv_status_report_cometbft_height)
+              hide: false
+              instant: true
+              intervalMs: 1000
+              legendFormat: __auto
+              maxDataPoints: 43200
+              range: false
+              refId: max_cometbft_height
+          - refId: alert
             relativeTimeRange:
               from: 600
               to: 0
@@ -143,12 +160,12 @@ groups:
               datasource:
                 type: __expr__
                 uid: __expr__
-              expression: min_comet_bft_lag
+              expression: lag_per_publisher
               intervalMs: 1000
               maxDataPoints: 43200
-              refId: cometbft_lag
+              refId: alert
               type: threshold
-          - refId: min_comet_bft_lag
+          - refId: lag_per_publisher
             relativeTimeRange:
               from: 600
               to: 0
@@ -172,25 +189,25 @@ groups:
                 name: Expression
                 type: __expr__
                 uid: __expr__
-              expression: cometbft_height_lag
-              intervalMs: 1000
-              maxDataPoints: 43200
-              reducer: min
-              refId: min_comet_bft_lag
-              settings:
-                mode: dropNN
-              type: reduce
+              expression: '$max_cometbft_height - $cometbft_height_per_publisher '
+              hide: false
+              refId: lag_per_publisher
+              type: math
         dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
         panelId: 15
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         for: 30m
         annotations:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "15"
-          description: The SV status reports observed by sv-1 exhibit an unexpectedly high lag in CometBFT height.
-          summary: Unexpected CometBFT lag in SV status reports
+          description: |-
+            The SV status reports observed by the SVC report a lag of {{ index $values "alert" }}.
+            Reported maximum height {{ index $values "cometbft_height_per_publisher" }} for  {{ $labels.report_publisher }} and a global maximum of {{ index $values "max_cometbft_height" }}
+          runbook_url: ""
+          summary: '{{ index $values "alert" }} CometBFT lag in SV status reports for {{ $labels.report_publisher }}'
         labels:
+          "": ""
           topology_level: svc
         isPaused: false
       - uid: d28ac95d-4724-4a82-a848-49198c5c6d80
