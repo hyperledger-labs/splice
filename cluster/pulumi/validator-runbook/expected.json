@@ -174,7 +174,7 @@
           }
         },
         "persistence": {
-          "databaseName": "participant",
+          "databaseName": "participant_0",
           "host": "postgres",
           "schema": "participant",
           "secretName": "postgres-secrets"
@@ -252,7 +252,7 @@
           "enable": true
         },
         "migration": {
-          "id": 0
+          "id": "0"
         },
         "onboardingSecretFrom": {
           "secretKeyRef": {

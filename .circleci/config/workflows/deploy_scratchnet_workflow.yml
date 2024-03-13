@@ -99,6 +99,25 @@
            cluster: "user-selected-scratchnet"
            requires:
              - deploy_cluster_for_migration
+      - deploy_validator_runbook:
+          name: "deploy_validator_runbook_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_validator_check:
+          name: "preflight_validator_check_before_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "user-selected-scratchnet"
+          requires:
+            - deploy_cluster_for_migration
       - backup_cluster:
           name: "backup_cluster_before_migration"
           <<: *main-branch-never
@@ -110,6 +129,7 @@
           requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
+            - deploy_validator_runbook_for_migration
       - deploy_cluster:
           name: "prepare_cluster_for_migration"
           <<: *main-branch-never
@@ -152,6 +172,7 @@
           requires:
             - preflight_check_core
             - preflight_sv_check_before_migration
+            - preflight_validator_check_before_migration
             - backup_cluster_before_migration
       - deploy_cluster:
           name: "migrate_cluster"
@@ -208,18 +229,17 @@
           requires:
             - trigger_global_domain_migration
       - deploy_validator_runbook:
-          name: "deploy_validator_runbook_migrated"
-          global_domain_active_migration_id: 1
-          # TODO(#10441) uncomment once doing migration
-          # global_domain_migrate_from_id: 0
-          # global_domain_legacy_migration_id: 0
+          name: "migrate_validator_runbook"
           <<: *main-branch-never
           context:
             - artifactory
             - slack-context
           cluster: "user-selected-scratchnet"
+          global_domain_active_migration_id: 1
+          global_domain_migrate_from_id: 0
+          reset_cluster: false
           requires:
-            - migrate_cluster
+            - trigger_global_domain_migration
       - preflight_validator_check:
           name: "preflight_validator_check_migrated"
           migration_id: 1
@@ -255,8 +275,8 @@
             - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
-            - deploy_validator_runbook_migrated
             - migrate_sv_runbook
+            - migrate_validator_runbook
 
   # Simple deployment with no migration
   deploy_scratchnet_basic:

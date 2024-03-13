@@ -35,9 +35,17 @@ Requirements
 
 5) Please download the release artifacts containing the sample Helm value files, from here: |bundle_download_link|, and extract the bundle:
 
-.. parsed-literal::
+.. code-block:: bash
 
   tar xzvf |version|\_cn-node-0.1.0-SNAPSHOT.tar.gz
+
+6) Please inquire if the global synchronizer (domain) on your target network has previously undergone a :ref:`synchronizer migration <validator-upgrades>`.
+   If it has, please record the current migration ID of the synchronizer.
+   The migration ID is 0 for the initial synchronizer deployment and is incremented by 1 for each subsequent migration.
+
+.. code-block:: bash
+
+   export MIGRATION_ID=0
 
 .. _validator-identity-token:
 
@@ -319,6 +327,17 @@ Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/participant-val
 - Add `db.volumeSize` and `db.volumeStorageClass` to the values file adjust persistant storage size and storage class if necessary. (These values default to 20GiB and `standard-rwo`)
 - Replace ``YOUR_NODE_NAME`` with the name you want your validator node to be represented as on the network.
 
+Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-participant-values.yaml`` as follows:
+
+- Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+
+If you are deploying a new instance of the participant as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``disableAutoInit`` to ``true`` in your ``participant-values.yaml``:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
+    :language: yaml
+    :start-after: PARTICIPANT_BOOTSTRAP_START
+    :end-before: PARTICIPANT_BOOTSTRAP_END
+
 To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-values.yaml`` as follows:
 
 - Replace all instances of ``TARGET_CLUSTER`` with |cn_cluster|, per the cluster to which you are connecting.
@@ -329,7 +348,18 @@ To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the validator operator party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
 
-You also need to specify a URL for the an existing SV that will sponsor the onboarding of your validator. To do so, please update the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` by replacing ``SPONSOR_SV_URL`` with this URL, e.g. ``https://sv.sv-1.svc.dev.network.canton.global``
+Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` as follows:
+
+- Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
+- Replace ``SPONSOR_SV_URL`` with the URL of the SV that will sponsor the onboarding of your validator, e.g.,
+  ``https://sv.sv-1.svc.|cn_cluster|.network.canton.global``.
+
+If you are redeploying the validator app as part of a :ref:`synchronizer migration <validator-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``standalone-validator-values.yaml``:
+
+.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml
+    :language: yaml
+    :start-after: MIGRATION_START
+    :end-before: MIGRATION_END
 
 .. _validator-helm-charts-install:
 
@@ -488,7 +518,7 @@ Another reference Helm chart is provided for that, which can be installed using:
 
 .. code-block:: bash
 
-    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n sv --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-cluster-ingress-values.yaml
+    helm install cluster-ingress-validator canton-network-helm/cn-cluster-ingress-runbook -n validator --version ${CHART_VERSION} -f cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator-cluster-ingress-values.yaml
 
 
 .. _helm-validator-wallet-ui:
@@ -533,8 +563,7 @@ Canton Name Service.
   :width: 600
   :alt: After logged in into the CNS UI
 
-.. _validator-continuity:
-
+.. _validator-backups:
 
 Backup and Restore
 -------------------

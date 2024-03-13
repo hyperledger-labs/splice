@@ -1,7 +1,7 @@
 participantAddress: "participant"
 
 # URL of sponsoring SV for onboarding your validator, e.g. sv.sv-1.svc.dev.canton.network.global
-svSponsorAddress: SPONSOR_SV_URL
+svSponsorAddress: "SPONSOR_SV_URL"
 onboardingSecretFrom:
   secretKeyRef:
     name: cn-app-validator-onboarding-validator
@@ -9,7 +9,14 @@ onboardingSecretFrom:
     optional: false
 validatorPartyHint: validator_validator_service_user
 
+# MIGRATION_START
+# Replace MIGRATION_ID with the migration ID of the global synchronizer.
+migration:
+  id: "MIGRATION_ID"
+  # Uncomment this when redeploying as part of a migration, i.e., MIGRATION_ID was incremented and a migration dump was exported to the attached pvc.
+  # migrating: true
+#MIGRATION_END
+
 persistence:
   secretName: postgres-secrets
   host: postgres
-

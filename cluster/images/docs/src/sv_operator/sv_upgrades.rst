@@ -19,7 +19,7 @@ Overview
 7. All SVs upgrade theirs CN apps pods. See :ref:`sv-upgrades-deploying-apps`.
 8. Upon (re-)initialization, the SV node backend automatically consumes the migration dump and initializes all components based on the contents of this dump. The process is analogous for validators, where the validator app is tasked with importing the dump and initializing components. App databases are :ref:`preserved <sv-upgrades-state>`.
 9. Once a BFT majority (i.e., >⅔) of SVs have initialized their upgraded nodes, the new version of the synchronizer (with an incremented migration ID and, during a real upgrade, a new version of the core Canton components) becomes operational automatically. The end of the downtime window is therefore determined by the speed at which a sufficient number of SVs complete the necessary deployment and initialization steps.
-10. The remaining (Canton and CometBFT) components of the old synchronizer can be retired now. We recommend to only do so after (non-super) validators have had sufficient time to catch up to the latest state from before the pause.
+10. The remaining (Canton and CometBFT) components of the old synchronizer can be retired now. We recommend to only do so after (non-super) validators have had sufficient time to :ref:`catch up <validator-upgrades>` to the latest state from before the pause.
 
 Technical Details
 -----------------
@@ -31,12 +31,17 @@ The following section assumes that the SV node on the original synchronizer was 
 State and Migration IDs
 +++++++++++++++++++++++
 
-Synchronizer upgrades with downtime effectively clone the state of the existing synchronizer.
-This implies a number of finer points:
+Synchronizer upgrades with downtime effectively clone the state of the existing synchronizer, with some finer points:
 
 - All :ref:`identities <sv-identities-overview>` are reused, which includes all party IDs, all participant, sequencer and mediator (node) identities, as well as CometBFT node identities.
+  This is realized through exporting and importing a :ref:`migration dump <sv-upgrades-dumps>`.
 - Active ledger state is preserved.
+  This is also realized through exporting and importing a :ref:`migration dump <sv-upgrades-dumps>`.
 - Historical app state (such as transaction history) is preserved.
+  This is realized through persisting and reusing the (PostgreSQL) databases of the SV node apps (``sv``, ``scan``, ``validator``).
+- The CometBFT blockchain is **not** preserved.
+  The upgraded synchronizer starts with a fresh CometBFT chain.
+  CometBFT node state from the existing synchronizer is discarded.
 
 For avoiding conflicts across migrations, we use the concept of a migration ID:
 
@@ -46,7 +51,8 @@ For avoiding conflicts across migrations, we use the concept of a migration ID:
   To keep Canton components apart across migrations
   (new Canton components are needed to upgrade across non-backwards-compatible changes to the Canton software),
   we deploy them with migration ID-specific names and ingress rules (see :ref:`sv-upgrades-deploying-domain`).
-  As part of :ref:`sv-upgrades-deploying-apps`, the SV app will initialize these components based on its configured migration ID.
+  We furthermore configure Canton components to create and use migration ID-specific (PostgreSQL) database names.
+  As part of :ref:`sv-upgrades-deploying-apps`, the SV app will initialize Canton components based on its configured migration ID.
 - The SV node CometBFT component is aware of the migration ID - it is used for forming the CometBFT chain ID.
 
 .. _sv-upgrades-dumps:

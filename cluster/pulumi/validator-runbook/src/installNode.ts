@@ -163,12 +163,13 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
-      {}
+      { MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString() }
     ),
     metrics: {
       enable: true,
     },
-    disableAutoInit: !!participantBootstrapDumpSecret,
+    disableAutoInit:
+      !!participantBootstrapDumpSecret || globalDomainMigrationConfig.isRunningMigration(),
   };
 
   const participantValuesWithSpecifiedAud: ChartValues = {
@@ -210,7 +211,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     walletUiClientId
   );
 
-  const validatorValues = {
+  const validatorValuesFromYamlFiles = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/validator-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
       OPERATOR_WALLET_USER_ID: VALIDATOR_WALLET_USER_ID,
@@ -220,14 +221,21 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
+        MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
         SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
       }
     ),
+  };
+  const validatorValues: ChartValues = {
+    ...validatorValuesFromYamlFiles,
+    migration: {
+      ...validatorValuesFromYamlFiles.migration,
+      migrating: globalDomainMigrationConfig.isRunningMigration()
+        ? true
+        : validatorValuesFromYamlFiles.migration.migrating,
+    },
     metrics: {
       enable: true,
-    },
-    migration: {
-      id: globalDomainMigrationConfig.activeMigrationId,
     },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
   };

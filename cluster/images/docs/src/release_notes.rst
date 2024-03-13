@@ -10,12 +10,19 @@ Release Notes
 
   * ``participant-values.yaml`` and ``global-domain-values.yaml`` now require specifying your SV name as ``nodeIdentifier: YOUR_SV_NAME``.
     This is used to provide better names to Canton nodes.
+  * Multiple changes to the way (non-SV) validator nodes are deployed,
+    to prepare for supporting :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`.
+    Please revisit the section on :ref:`Helm-based validator deployment <k8s_validator>`,
+    paying attention to the new ``MIGRATION_ID`` variable (should be set to ``0`` until further notice).
 
 * Documentation
 
-  * :ref:`Synchronizer Upgrades <sv-upgrades>`: Added more detailed instructions on :ref:`testing <sv-upgrades-testing>`, as well as various clarifications.
+  * Added detailed instructions for (non-SV) validator node operators on participating in a synchronizer upgrade.
+    Please see the new validator operations section on :ref:`Synchronizer Upgrades with Downtime <validator-upgrades>`,
+    as well as the updates in :ref:`k8s_validator`.
+  * :ref:`SV Synchronizer Upgrades <sv-upgrades>`: Added more detailed instructions on :ref:`testing <sv-upgrades-testing>`, as well as various clarifications.
   * Removed now-obsolete documentation about "Transitioning Across Network Resets" and "Restoring from an existing Particiant Identities Backup".
-  * Added backup and restore documentation for a validator node
+  * Added :ref:`backup and restore documentation for (non-SV) validator nodes <validator-backups>`.
 
 2024-03-11
 ----------

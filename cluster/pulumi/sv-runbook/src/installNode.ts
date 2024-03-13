@@ -306,10 +306,10 @@ async function installSvAndValidator(
       sequencerPruningConfig,
     },
     migration: {
+      ...valuesFromYamlFile.migration,
       migrating: globalDomainMigrationConfig.isRunningMigration()
         ? true
         : valuesFromYamlFile.migration.migrating,
-      ...valuesFromYamlFile.migration,
     },
     metrics: {
       enable: true,

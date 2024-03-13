@@ -62,6 +62,25 @@ workflow:
            cluster: "cimain"
            requires:
              - deploy_cluster_for_migration
+      - deploy_validator_runbook:
+          name: "deploy_validator_runbook_for_migration"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_validator_check:
+          name: "preflight_validator_check_before_migration"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "cimain"
+          requires:
+            - deploy_cluster_for_migration
       - backup_cluster:
           name: "backup_cluster_before_migration"
           <<: *main-branch-only
@@ -73,6 +92,7 @@ workflow:
           requires:
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
+            - deploy_validator_runbook_for_migration
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-only
@@ -87,6 +107,7 @@ workflow:
           requires:
             - preflight_check
             - preflight_sv_check_before_migration
+            - preflight_validator_check_before_migration
             - backup_cluster_before_migration
       - deploy_cluster:
           name: "prepare_cluster_for_migration"
@@ -171,17 +192,17 @@ workflow:
           requires:
             - trigger_global_domain_migration
       - deploy_validator_runbook:
+          name: "migrate_validator_runbook"
           <<: *main-branch-only
           context:
             - artifactory
             - slack-context
           cluster: "cimain"
           global_domain_active_migration_id: 1
-          # TODO(#10441) uncomment once doing migration
-          # global_domain_migrate_from_id: 0
-          # global_domain_legacy_migration_id: 0
+          global_domain_migrate_from_id: 0
+          reset_cluster: false
           requires:
-            - migrate_cluster
+            - trigger_global_domain_migration
       - preflight_validator_check:
           <<: *main-branch-only
           name: "preflight_validator_check_migrated"
