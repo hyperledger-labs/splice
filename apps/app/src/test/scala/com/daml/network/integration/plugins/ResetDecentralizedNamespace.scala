@@ -107,15 +107,16 @@ class ResetDecentralizedNamespace
                       .filterNot(_.name.endsWith("Onboarded"))
                       .map(_.participantClientWithAdminToken)
                   val usableSvsByNamespace = usableSvs.map(p => p.id.uid.namespace -> p).toMap
-                  existingDecentralizedNamespace.item.owners.foreach { namespace =>
-                    val sv = usableSvsByNamespace.getOrElse(
-                      namespace,
-                      throw new IllegalStateException(
-                        s"Failed to remove $namespace as there is no SV with that namespace, svs found: ${usableSvsByNamespace.keySet}"
-                      ),
-                    )
-                    proposeDecentralizedNamespaceReset(sv)
-                  }
+                  (existingDecentralizedNamespace.item.owners + sv1.participantClientWithAdminToken.id.uid.namespace)
+                    .foreach { namespace =>
+                      val sv = usableSvsByNamespace.getOrElse(
+                        namespace,
+                        throw new IllegalStateException(
+                          s"Failed to remove $namespace as there is no SV with that namespace, svs found: ${usableSvsByNamespace.keySet}"
+                        ),
+                      )
+                      proposeDecentralizedNamespaceReset(sv)
+                    }
                   logger.info(
                     "All required proposals to reset SV namespace submitted, waiting for it to be effective"
                   )

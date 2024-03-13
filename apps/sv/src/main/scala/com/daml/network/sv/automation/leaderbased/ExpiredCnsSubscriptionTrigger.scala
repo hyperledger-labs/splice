@@ -21,7 +21,6 @@ class ExpiredCnsSubscriptionTrigger(
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[SvSvcStore.IdleCnsSubscription]
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[SvSvcStore.IdleCnsSubscription]] {
-  override protected def enableAutomaticLeaderElection: Boolean = false
   private val store = svTaskContext.svcStore
 
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit

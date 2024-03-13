@@ -57,7 +57,8 @@ class SvFrontendTimeBasedIntegrationTest
   }
 
   "SV UIs" should {
-    "see election results reflected in the UI" in { implicit env =>
+    // TODO(#7649): enable test back if automatic leader election is re-enabled in new flow
+    "see election results reflected in the UI" ignore { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "log in to sv1 UI", {
