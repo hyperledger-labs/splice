@@ -3,7 +3,7 @@ package com.daml.network.sv.onboarding.sponsor
 import cats.data.{EitherT, OptionT}
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
 import com.daml.network.environment.TopologyAdminConnection.{AuthorizedStateChanged, TopologyResult}
-import com.daml.network.environment.ParticipantAdminConnection
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.onboarding.SvcPartyHosting
 import com.daml.network.sv.onboarding.SvcPartyHosting.{
   RequiredProposalNotFound,
@@ -44,6 +44,7 @@ class SponsorSvcPartyHosting(
         svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
           domain,
           participantId,
+          RetryFor.ClientCalls,
         )
       )
     } yield {

@@ -146,6 +146,7 @@ class JoiningNodeSvcPartyHosting(
           _ <- svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
             domainId,
             participantId,
+            RetryFor.Automation,
           )
           _ = logger.info(
             s"SVC party is now hosted in the candidate SV participant $participantId"

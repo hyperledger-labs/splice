@@ -2,7 +2,7 @@ package com.daml.network.sv.onboarding
 
 import cats.data.OptionT
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
-import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
+import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.store.TimeQuery
@@ -59,7 +59,9 @@ class SvcPartyHosting(
   def waitForSvcPartyToParticipantAuthorization(
       domain: DomainId,
       participantId: ParticipantId,
-  )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retryForClientCalls(
+      retryFor: RetryFor,
+  )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retry(
+    retryFor,
     "wait for SVC party to participant authorization to complete",
     getSvcPartyToParticipantTransaction(domain, participantId).fold(
       throw Status.NOT_FOUND

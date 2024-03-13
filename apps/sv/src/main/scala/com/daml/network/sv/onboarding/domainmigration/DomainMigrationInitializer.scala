@@ -110,6 +110,7 @@ class DomainMigrationInitializer(
       _ <- svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
         globalDomainId,
         ParticipantId(migrationDump.nodeIdentities.participant.id.uid),
+        RetryFor.Automation,
       )
       _ = logger.info(
         s"SVC party hosting is replicated on the new global domain"
