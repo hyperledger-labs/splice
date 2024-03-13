@@ -267,7 +267,11 @@ async function installSvAndValidator(
   );
   const appsPg = installPostgres(xns, 'apps-pg', 'apps-pg-secret', appsPgValues);
 
-  const sv234NameSet = new Set<string>(['Digital-Asset-2', 'Digital-Asset-3', 'Digital-Asset-4']);
+  const sv234NameSet = new Set<string>([
+    'Digital-Asset-Eng-2',
+    'Digital-Asset-Eng-3',
+    'Digital-Asset-Eng-4',
+  ]);
 
   const allApprovedSvIdentities = (
     isDevNet

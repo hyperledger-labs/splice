@@ -82,9 +82,9 @@ trait SvTestUtil extends CNNodeTestCommon {
 
   def getSvName(sv: Integer): String =
     if (sv == 1) {
-      "Foundation-1"
+      "Digital-Asset-2"
     } else
-      s"Digital-Asset-${sv}"
+      s"Digital-Asset-Eng-${sv}"
 
   def scheduleDomainMigration(
       svToCreateVoteRequest: SvAppReference,

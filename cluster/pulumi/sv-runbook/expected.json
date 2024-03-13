@@ -579,17 +579,17 @@
             "rewardWeightBps": 100000
           },
           {
-            "name": "Digital-Asset-2",
+            "name": "Digital-Asset-Eng-2",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
             "rewardWeightBps": 140000
           },
           {
-            "name": "Digital-Asset-3",
+            "name": "Digital-Asset-Eng-3",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==",
             "rewardWeightBps": 0
           },
           {
-            "name": "Digital-Asset-4",
+            "name": "Digital-Asset-Eng-4",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==",
             "rewardWeightBps": 0
           },
@@ -609,7 +609,7 @@
             "rewardWeightBps": 10000
           },
           {
-            "name": "Digital-Asset",
+            "name": "Digital-Asset-1",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA==",
             "rewardWeightBps": 140000
           }

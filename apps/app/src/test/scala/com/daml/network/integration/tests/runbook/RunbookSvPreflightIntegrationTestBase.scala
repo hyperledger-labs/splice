@@ -73,7 +73,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
               }
             } else {
               forAll(Range(1, 2)) { _ =>
-                e.text should include(s"\"moniker\": \"Foundation\"")
+                e.text should include(s"\"moniker\": \"Digital-Asset\"")
               }
             }
           }

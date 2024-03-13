@@ -130,7 +130,7 @@ class CometBftClientIntegrationTest
 object CometBftClientIntegrationTest {
   private val InitialVotingPower = 10L
 
-  private val SvNode1 = "Foundation-1"
+  private val SvNode1 = "Digital-Asset-2"
   private val PubKey2 = "gpkwc1WCttL8ZATBIPWIBRCrb0eV4JwMCnjRa56REPw="
   private val SvNode2 = "svNode2"
   private val SvNode2CometId = "8A931AB5F957B8331BDEF3A0A081BD9F017A777F"

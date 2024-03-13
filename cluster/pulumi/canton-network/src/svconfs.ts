@@ -29,7 +29,7 @@ export interface StaticCometBftConfigWithNodeName extends StaticCometBftConfig {
 const svconfs: StaticSvConfig[] = [
   {
     nodeName: 'sv-1',
-    onboardingName: isDevNet ? 'Foundation-1' : 'Foundation',
+    onboardingName: 'Digital-Asset-2',
     auth0ValidatorAppName: 'sv1_validator',
     validatorWalletUser: isDevNet
       ? 'auth0|64afbc0956a97fe9577249d7'
@@ -50,7 +50,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-2',
-    onboardingName: 'Digital-Asset-2',
+    onboardingName: 'Digital-Asset-Eng-2',
     auth0ValidatorAppName: 'sv2_validator',
     validatorWalletUser: 'auth0|64afbc353bbc7ca776e27bf4',
     cometBft: {
@@ -69,7 +69,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-3',
-    onboardingName: 'Digital-Asset-3',
+    onboardingName: 'Digital-Asset-Eng-3',
     auth0ValidatorAppName: 'sv3_validator',
     validatorWalletUser: 'auth0|64afbc4431b562edb8995da6',
     cometBft: {
@@ -88,7 +88,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-4',
-    onboardingName: 'Digital-Asset-4',
+    onboardingName: 'Digital-Asset-Eng-4',
     auth0ValidatorAppName: 'sv4_validator',
     validatorWalletUser: 'auth0|64afbc720e20777e46fff490',
     cometBft: {
@@ -107,7 +107,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-5',
-    onboardingName: 'Digital-Asset-5',
+    onboardingName: 'Digital-Asset-Eng-5',
     auth0ValidatorAppName: 'sv5_validator',
     validatorWalletUser: 'auth0|65c15c482a18b1ef030ba290',
     cometBft: {
@@ -126,7 +126,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-6',
-    onboardingName: 'Digital-Asset-6',
+    onboardingName: 'Digital-Asset-Eng-6',
     auth0ValidatorAppName: 'sv6_validator',
     validatorWalletUser: 'auth0|65c26e959666d60d24fe523a',
     cometBft: {
@@ -145,7 +145,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-7',
-    onboardingName: 'Digital-Asset-7',
+    onboardingName: 'Digital-Asset-Eng-7',
     auth0ValidatorAppName: 'sv7_validator',
     validatorWalletUser: 'auth0|65c26e9d45eaef5c191a167e',
     cometBft: {
@@ -164,7 +164,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-8',
-    onboardingName: 'Digital-Asset-8',
+    onboardingName: 'Digital-Asset-Eng-8',
     auth0ValidatorAppName: 'sv8_validator',
     validatorWalletUser: 'auth0|65c26ea449ef8564a0ec9297',
     cometBft: {
@@ -183,7 +183,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-9',
-    onboardingName: 'Digital-Asset-9',
+    onboardingName: 'Digital-Asset-Eng-9',
     auth0ValidatorAppName: 'sv9_validator',
     validatorWalletUser: 'auth0|65c26eac58f141b4ca1dc5da',
     cometBft: {
@@ -202,7 +202,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-10',
-    onboardingName: 'Digital-Asset-10',
+    onboardingName: 'Digital-Asset-Eng-10',
     auth0ValidatorAppName: 'sv10_validator',
     validatorWalletUser: 'auth0|65e0a7854c76b74b28b8477f',
     cometBft: {
@@ -221,7 +221,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-11',
-    onboardingName: 'Digital-Asset-11',
+    onboardingName: 'Digital-Asset-Eng-11',
     auth0ValidatorAppName: 'sv11_validator',
     validatorWalletUser: 'auth0|65e0a78976d9757e3f14846b',
     cometBft: {
@@ -240,7 +240,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-12',
-    onboardingName: 'Digital-Asset-12',
+    onboardingName: 'Digital-Asset-Eng-12',
     auth0ValidatorAppName: 'sv12_validator',
     validatorWalletUser: 'auth0|65e0a78d68c39e5cc0351ed2',
     cometBft: {
@@ -259,7 +259,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-13',
-    onboardingName: 'Digital-Asset-13',
+    onboardingName: 'Digital-Asset-Eng-13',
     auth0ValidatorAppName: 'sv13_validator',
     validatorWalletUser: 'auth0|65e0a7914c76b74b28b84793',
     cometBft: {
@@ -278,7 +278,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-14',
-    onboardingName: 'Digital-Asset-14',
+    onboardingName: 'Digital-Asset-Eng-14',
     auth0ValidatorAppName: 'sv14_validator',
     validatorWalletUser: 'auth0|65e0a795aa7a40df0cc65ace',
     cometBft: {
@@ -297,7 +297,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-15',
-    onboardingName: 'Digital-Asset-15',
+    onboardingName: 'Digital-Asset-Eng-15',
     auth0ValidatorAppName: 'sv15_validator',
     validatorWalletUser: 'auth0|65e0a7994c76b74b28b8479c',
     cometBft: {
@@ -316,7 +316,7 @@ const svconfs: StaticSvConfig[] = [
   },
   {
     nodeName: 'sv-16',
-    onboardingName: 'Digital-Asset-16',
+    onboardingName: 'Digital-Asset-Eng-16',
     auth0ValidatorAppName: 'sv16_validator',
     validatorWalletUser: 'auth0|65e0a79de124e5c43dcb6a19',
     cometBft: {

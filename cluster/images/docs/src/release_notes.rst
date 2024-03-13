@@ -24,6 +24,15 @@ Release Notes
   * Removed now-obsolete documentation about "Transitioning Across Network Resets" and "Restoring from an existing Particiant Identities Backup".
   * Added :ref:`backup and restore documentation for (non-SV) validator nodes <validator-backups>`.
 
+* Configuration
+
+  * SV node renames:
+
+    * Digital-Asset is preparing to run two nodes, Digital-Asset-1 and Digital-Asset-2
+    * Digital Asset engineering team's extra nodes on DevNet were renamed to Digital-Asset-Eng-X
+
+  * SV weights: The SV weights on DevNet have been updated
+
 2024-03-11
 ----------
 

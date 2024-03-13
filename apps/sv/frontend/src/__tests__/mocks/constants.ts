@@ -11,7 +11,8 @@ import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 // You'll need to update this on template changes to SvcRules and CoinRules.
 export const svcInfo: GetSvcInfoResponse = {
   sv_user: 'OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn@clients',
-  sv_party_id: 'Foundation-1::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
+  sv_party_id:
+    'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
   svc_party_id: 'SVC::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
   voting_threshold: 3,
   latest_mining_round: {
@@ -300,14 +301,15 @@ export const svcInfo: GetSvcInfoResponse = {
         },
         maxTextLength: '1024',
       },
-      leader: 'Foundation-1::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
+      leader:
+        'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
       isDevNet: true,
       members: [
         [
-          'Foundation-1::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
+          'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
           {
             numRewardCouponsMissed: '0',
-            name: 'Foundation-1',
+            name: 'Digital-Asset-2',
             joinedAsOfRound: {
               number: '0',
             },
@@ -355,10 +357,10 @@ export const svcInfo: GetSvcInfoResponse = {
           },
         ],
         [
-          'Digital-Asset-2::12205ab9210b258422a251d6148b031d71147405948c92bf9c4bc78029c5479aed75',
+          'Digital-Asset-Eng-2::12205ab9210b258422a251d6148b031d71147405948c92bf9c4bc78029c5479aed75',
           {
             numRewardCouponsMissed: '0',
-            name: 'Digital-Asset-2',
+            name: 'Digital-Asset-Eng-2',
             joinedAsOfRound: {
               number: '0',
             },
@@ -406,10 +408,10 @@ export const svcInfo: GetSvcInfoResponse = {
           },
         ],
         [
-          'Digital-Asset-3::12203cb019c9986425861c91685d9b7c0068cf48abb8dff8e20f166501f7f677dce7',
+          'Digital-Asset-Eng-3::12203cb019c9986425861c91685d9b7c0068cf48abb8dff8e20f166501f7f677dce7',
           {
             numRewardCouponsMissed: '0',
-            name: 'Digital-Asset-3',
+            name: 'Digital-Asset-Eng-3',
             joinedAsOfRound: {
               number: '0',
             },
@@ -457,10 +459,10 @@ export const svcInfo: GetSvcInfoResponse = {
           },
         ],
         [
-          'Digital-Asset-4::122070fc4bb3519a4f39f5919b5a166e30794733e56ad9fba2157f7208ff458f7dc7',
+          'Digital-Asset-Eng-4::122070fc4bb3519a4f39f5919b5a166e30794733e56ad9fba2157f7208ff458f7dc7',
           {
             numRewardCouponsMissed: '0',
-            name: 'Digital-Asset-4',
+            name: 'Digital-Asset-Eng-4',
             joinedAsOfRound: {
               number: '0',
             },
