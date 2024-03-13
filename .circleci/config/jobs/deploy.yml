@@ -346,14 +346,14 @@ jobs:
           condition: << parameters.update_deployment_branch >>
           steps:
             - run_bash_command_in_nix:
-                cmd_name: Update deployment branch for cluster
+                cmd_name: Update deployment branch and tag for the cluster
                 cluster: << parameters.cluster >>
                 additional_nix_args: "--keep GITHUB_TOKEN"
                 cmd: |
                   # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
                   # This is a safeguard against people manually running e.g. deploy_devnet on a scratchnet.
                   if [[ << parameters.cluster >> != scratch* ]] && [[ << parameters.cluster >> != user-selected-scratchnet ]]; then
-                    scripts/update-deployment-branch.sh "<< parameters.cluster >>" HEAD
+                    scripts/update-deployment-branch-and-tag.sh "<< parameters.cluster >>" HEAD
                   else
                     echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
                   fi

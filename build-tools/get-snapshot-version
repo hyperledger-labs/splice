@@ -4,10 +4,10 @@ if [ $# -eq 1 ]; then
     OVERRIDE_VERSION=$1
 fi
 
-# Default to OVERRIDE_VERSION=latest_snapshot_tag for deployment branches
-branch=${CIRCLE_BRANCH:-""}
+# Default to OVERRIDE_VERSION=deployment_tag for deployment branches
+branch=${CIRCLE_BRANCH:-$(git rev-parse --abbrev-ref HEAD)}
 if [[ $branch == deployment/* && -z ${OVERRIDE_VERSION-} ]]; then
-    OVERRIDE_VERSION="latest_snapshot_tag"
+    OVERRIDE_VERSION="deployment_tag"
 fi
 
 sha=$(git rev-parse HEAD)
@@ -20,6 +20,7 @@ sha=$(git rev-parse HEAD)
 #     Can be used for preflights on CI but not for SV runbook re-deployments since that workflow does not connect to the VPN.
 # - an explicit snapshot version string eg. 0.1.1-snapshot.20240111.4526.0.v552e1828 (useful for testing)
 # - latest_main - use the latest snapshot tag on the main branch (useful for testing upgrades)
+# - deployment_tag - use the deployment tag for the deployment branch
 if [ -n "${OVERRIDE_VERSION-}" ]; then
     if [[ "${OVERRIDE_VERSION}" == "latest_snapshot_tag" ]]; then
         git describe --tags --match "*-snapshot.*" --abbrev=0 HEAD
@@ -36,6 +37,16 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
         exit 0
     elif [[ "${OVERRIDE_VERSION}" == "latest_main" ]]; then
         sha=$(get-latest-main-commit)
+        CNCLUSTER_STATIC_DIRTY_VERSION=""
+        CI=1
+        export ignore_dirty=1
+    elif [[ "${OVERRIDE_VERSION}" == "deployment_tag" ]]; then
+        # The deployment tag name is just the deployment branch name with slashes replaced with hyphens.
+        tag_name=$(echo "$branch" | tr '/' '-')
+        if ! sha=$(git rev-parse "$tag_name"); then
+            >&2 echo "Deployment tag $tag_name could not be found"
+            exit 1
+        fi
         CNCLUSTER_STATIC_DIRTY_VERSION=""
         CI=1
         export ignore_dirty=1

@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 
-# For each cluster, we maintain a branch called deployment/<cluster_name>
-# that tracks the latest commit deployed to that cluster.
-# This script updates the deployment branch for the provided cluster to the
-# provided git revision (commit hash/branch/tag).
+# For each cluster, we maintain a tag called deployment-<cluster_name>
+# that tracks the latest commit deployed to that cluster and a deployment branch
+# called deployment/<cluster_name> on which periodic CI workflows for that cluster
+# like preflights, runbook deployments etc. are run.
 
-#   USAGE: update-deployment-branch.sh <cluster-name> [git-revision]
+# This script updates both the deployment branch and the deployment tag for the
+# given cluster to the provided git revision (commit hash/branch/tag).
+
+#   USAGE: update-deployment-branch-and-tag.sh <cluster-name> [git-revision]
 
 # In case a specific revision is not provided as the second argument,
 # we query the cluster to determine the latest commit deployed there.
@@ -52,7 +55,11 @@ fi
 
 git fetch origin
 git_commit=$(git rev-parse --verify "${git_revision}")
-echo "Updating deployment branch for cluster ${cluster_name} to ${git_commit}"
+echo "updating deployment branch for cluster ${cluster_name} to ${git_commit}"
 remote_branch_name="deployment/${cluster_name}"
 git push --force origin "${git_commit}:refs/heads/${remote_branch_name}"
+echo "updating deployment tag for cluster ${cluster_name} to ${git_commit}"
+tag_name="deployment-${cluster_name}"
+git tag --force "${tag_name}"
+git push --force origin "${tag_name}"
 echo
