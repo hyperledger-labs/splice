@@ -15,7 +15,7 @@ import com.digitalasset.canton.sequencing.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status.Code
-import io.grpc.StatusRuntimeException
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -70,11 +70,13 @@ class ReconcileSequencerConnectionsTrigger(
       if (differentEndpointSet(sequencerConnections, conf.sequencerConnections.connections)) {
         NonEmpty.from(sequencerConnections) match {
           case None =>
-            // TODO: (#8015) remove the domain in this case
-            logger.warn(
-              "Svc Sequencer list from Scan is empty, not modifying sequencers connections."
-            )
-            None
+            // We warn on repeated failures of a polling trigger so
+            // it's safe to just treat it as a transient exception and retry without logging warnings.
+            throw Status.NOT_FOUND
+              .withDescription(
+                "Svc Sequencer list from Scan is empty, not modifying sequencers connections. This can happen during initialization when domain time is lagging behind."
+              )
+              .asRuntimeException()
           case Some(nonEmptyConnections) =>
             logger.info(
               s"modifying sequencers connections to $nonEmptyConnections"
