@@ -62,11 +62,9 @@ export class MultiValidator extends MultiNodeDeployment {
             containerPort: port.port,
             protocol: 'TCP',
           })),
-          // TODO(#10649): These probes only check the first validator, not all of them.
           livenessProbe: {
-            httpGet: {
-              path: '/api/validator/livez',
-              port: ports[0].port,
+            exec: {
+              command: ['/bin/bash', '/app/health-check.sh', 'api/validator/livez'],
             },
             initialDelaySeconds: 60,
             periodSeconds: 60,
@@ -74,9 +72,8 @@ export class MultiValidator extends MultiNodeDeployment {
             timeoutSeconds: 10,
           },
           readinessProbe: {
-            httpGet: {
-              path: '/api/validator/readyz',
-              port: ports[0].port,
+            exec: {
+              command: ['/bin/bash', '/app/health-check.sh', 'api/validator/readyz'],
             },
             initialDelaySeconds: 5,
             periodSeconds: 5,

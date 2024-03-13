@@ -535,11 +535,14 @@
                 "image": "us-central1-docker.pkg.dev/da-cn-shared/cn-images/multi-validator:0.0.1-deadbeef",
                 "imagePullPolicy": "Always",
                 "livenessProbe": {
-                  "failureThreshold": 5,
-                  "httpGet": {
-                    "path": "/api/validator/livez",
-                    "port": 5003
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/livez"
+                    ]
                   },
+                  "failureThreshold": 5,
                   "initialDelaySeconds": 60,
                   "periodSeconds": 60,
                   "timeoutSeconds": 10
@@ -598,11 +601,14 @@
                   }
                 ],
                 "readinessProbe": {
-                  "failureThreshold": 5,
-                  "httpGet": {
-                    "path": "/api/validator/readyz",
-                    "port": 5003
+                  "exec": {
+                    "command": [
+                      "/bin/bash",
+                      "/app/health-check.sh",
+                      "api/validator/readyz"
+                    ]
                   },
+                  "failureThreshold": 5,
                   "initialDelaySeconds": 5,
                   "periodSeconds": 5,
                   "timeoutSeconds": 3
