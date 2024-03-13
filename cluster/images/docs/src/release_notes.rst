@@ -15,6 +15,7 @@ Release Notes
 
   * :ref:`Synchronizer Upgrades <sv-upgrades>`: Added more detailed instructions on :ref:`testing <sv-upgrades-testing>`, as well as various clarifications.
   * Removed now-obsolete documentation about "Transitioning Across Network Resets" and "Restoring from an existing Particiant Identities Backup".
+  * Added backup and restore documentation for a validator node
 
 2024-03-11
 ----------
