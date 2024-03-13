@@ -111,7 +111,7 @@
             - deploy_cluster_for_migration
             - deploy_sv_runbook_for_migration
       - deploy_cluster:
-          name: "deploy_migration_canton_nodes"
+          name: "prepare_cluster_for_migration"
           <<: *main-branch-never
           context:
             - artifactory
@@ -125,6 +125,19 @@
           reset_cluster: false
           requires:
             - deploy_cluster_for_migration
+      - deploy_sv_runbook:
+          name: "prepare_sv_runbook_for_migration"
+          <<: *main-branch-never
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "user-selected-scratchnet"
+          requires:
+            - deploy_sv_runbook_for_migration
+          global_domain_active_migration_id: 0
+          global_domain_upgrade_migration_id: 1
+          reset_cluster: false
       - preflight_check:
           name: "trigger_global_domain_migration"
           <<: *main-branch-never
@@ -155,7 +168,7 @@
           global_domain_legacy_migration_id: 0
           requires:
             - trigger_global_domain_migration
-            - deploy_migration_canton_nodes
+            - prepare_cluster_for_migration
       - preflight_check:
           name: "preflight_check_migrated"
           <<: *main-branch-never
@@ -178,6 +191,7 @@
           cluster: "user-selected-scratchnet"
           requires:
             - trigger_global_domain_migration
+            - prepare_sv_runbook_for_migration
           global_domain_active_migration_id: 1
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0

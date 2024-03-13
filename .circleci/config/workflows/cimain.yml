@@ -89,7 +89,7 @@ workflow:
             - preflight_sv_check_before_migration
             - backup_cluster_before_migration
       - deploy_cluster:
-          name: "deploy_canton_migration_nodes"
+          name: "prepare_cluster_for_migration"
           <<: *main-branch-only
           context:
             - artifactory
@@ -103,6 +103,20 @@ workflow:
           global_domain_upgrade_migration_id: 1
           requires:
             - deploy_cluster_for_migration
+      - deploy_sv_runbook:
+          name: "prepare_sv_runbook_for_migration"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "cimain"
+          send_deployment_notification: false
+          requires:
+            - deploy_sv_runbook_for_migration
+          global_domain_active_migration_id: 0
+          global_domain_upgrade_migration_id: 1
+          reset_cluster: false
       - deploy_cluster:
           name: "migrate_cluster"
           <<: *main-branch-only
@@ -117,6 +131,7 @@ workflow:
           global_domain_legacy_migration_id: 0
           requires:
             - trigger_global_domain_migration
+            - prepare_cluster_for_migration
       - preflight_check:
           name: "preflight_check_migrated"
           <<: *main-branch-only
@@ -139,6 +154,7 @@ workflow:
           send_deployment_notification: false
           requires:
             - trigger_global_domain_migration
+            - prepare_sv_runbook_for_migration
           global_domain_active_migration_id: 1
           global_domain_migrate_from_id: 0
           global_domain_legacy_migration_id: 0
