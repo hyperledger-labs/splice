@@ -2332,7 +2332,7 @@
           "id": 0,
           "migrating": false
         },
-        "onboardingFoundingSvRewardWeightBps": 70000,
+        "onboardingFoundingSvRewardWeightBps": 140000,
         "onboardingName": "Digital-Asset-2",
         "onboardingType": "found-collective",
         "participantAddress": "participant-0",
