@@ -16,7 +16,8 @@ groups:
             datasourceUid: prometheus
             model:
               editorMode: code
-              expr: min by (namespace, report_publisher, target_node) (rate(cn_sv_status_report_domain_time_us{}[5m])) / 1000000
+              exemplar: false
+              expr: min by (report_publisher, target_node) (rate(cn_sv_status_report_domain_time_us{}[5m])) / 1000000
               instant: false
               intervalMs: 1000
               legendFormat: __auto
@@ -88,15 +89,14 @@ groups:
         panelId: 9
         noDataState: OK
         execErrState: Error
-        for: 15m
+        for: 30m
         annotations:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "9"
-          description: '{{ $labels.namespace }} reports that the SVs'' {{ $labels.report_publisher }} status reports for {{ $labels.target_node }}  shows that their node is falling behind wrt processing messages from the domain having an average catchup rate of {{ index $values "avg_progress" }} for the last 5 minutes, or they fail to submit status reports.'
+          description: The SVs' {{ $labels.report_publisher }} status reports for {{ $labels.target_node }}  shows that their node is falling behind wrt processing messages from the domain having an average catchup rate of {{ index $values "avg_progress" }} for the last 5 minutes, or they fail to submit status reports.
           runbook_url: ""
           summary: Domain Time progressing too slowly
         labels:
-          "": ""
           topology_level: svc
         isPaused: false
       - uid: f60b1225-4458-483a-8168-240baac4f6fe
@@ -257,6 +257,8 @@ groups:
                 uid: __expr__
               expression: $open_round - $open_round_per_publisher
               hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
               refId: publisher_lag
               type: math
           - refId: max_publisher_lag
@@ -285,6 +287,8 @@ groups:
                 uid: __expr__
               expression: publisher_lag
               hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
               reducer: max
               refId: max_publisher_lag
               settings:
@@ -316,6 +320,8 @@ groups:
                 uid: __expr__
               expression: max_publisher_lag
               hide: false
+              intervalMs: 1000
+              maxDataPoints: 43200
               refId: A
               type: threshold
         dashboardUid: caffa6f7-c421-4579-a839-b026d3b76826
