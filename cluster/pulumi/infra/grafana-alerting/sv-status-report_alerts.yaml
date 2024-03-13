@@ -15,9 +15,12 @@ groups:
               to: 0
             datasourceUid: prometheus
             model:
-              editorMode: code
+              disableTextWrap: false
+              editorMode: builder
               exemplar: false
-              expr: min by (report_publisher, target_node) (rate(cn_sv_status_report_domain_time_us{}[5m])) / 1000000
+              expr: max by(report_publisher, target_node) (rate(cn_sv_status_report_domain_time_us[5m])) / 1000000
+              fullMetaSearch: false
+              includeNullMetadata: true
               instant: false
               intervalMs: 1000
               legendFormat: __auto
