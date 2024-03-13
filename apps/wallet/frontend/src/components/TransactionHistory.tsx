@@ -238,7 +238,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // CoinExpired
       text = 'Coin Expired';
       break;
-    case 'SvcRules_CollectSvReward':
+    case 'SvRewardCoupon_ArchiveAsBeneficiary':
       // SvRewardCollected
       text = 'SV Reward Collected';
       break;

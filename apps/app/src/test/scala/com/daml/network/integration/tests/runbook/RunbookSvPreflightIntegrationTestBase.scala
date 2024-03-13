@@ -10,12 +10,9 @@ import com.daml.network.util.{
   SvTestUtil,
   WalletFrontendTestUtil,
 }
-import com.digitalasset.canton.config.NonNegativeFiniteDuration
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.DomainId
 
-import java.math.RoundingMode
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.{Random, Try}
@@ -38,6 +35,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
   protected def svUsername: String
   protected def isDevNet: Boolean
   protected val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
+  protected lazy val validatorUserPassword = sys.env(s"VALIDATOR_WEB_UI_PASSWORD")
   val scanUrl = s"https://scan.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
   val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
@@ -123,75 +121,69 @@ abstract class RunbookSvPreflightIntegrationTestBase
     )
     // Make sure that the SV would've received & claimed SvRewardCoupons
     if (earliestOpenRound >= joinedAsOfRound + 3) {
-      val coinsToIssueToSvc = computeCoinsToIssueToSvc(
-        sv1ScanClient.getCoinConfigAsOf(CantonTimestamp.now()).issuanceCurve.initialValue,
-        NonNegativeFiniteDuration.ofMillis(
-          svcInfo.coinRules.payload.configSchedule.initialValue.tickDuration.microseconds / 1000
-        ),
-      )
-      val svcWeight = svcInfo.svcRules.payload.members.asScala.map(_._2.svRewardWeight.toLong).sum
-      val svWeight = svcInfo.svcRules.payload.members.get(svParty).svRewardWeight
-      val svGetsInRound =
-        coinsToIssueToSvc
-          .multiply(BigDecimal(svWeight).bigDecimal)
-          .divide(BigDecimal(svcWeight).bigDecimal, RoundingMode.HALF_UP)
-          .setScale(10, RoundingMode.HALF_UP)
-      val maxValidatorFaucetCouponAmount = 2.85
+      def getTxLogEntries(): (
+          Seq[WalletFrontendTestUtil.FrontendTransaction],
+          Seq[WalletFrontendTestUtil.FrontendTransaction],
+      ) = {
+        withFrontEnd("sv") { implicit webDriver =>
+          val (_, svEntries) = actAndCheck(
+            s"Logging in to SV wallet at ${walletUrl}", {
+              completeAuth0LoginWithAuthorization(
+                walletUrl,
+                svUsername,
+                svPassword,
+                () => find(id("logout-button")) should not be empty,
+              )
+            },
+          )(
+            "There's SV Reward collected entries",
+            _ => {
+              val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
 
-      withFrontEnd("sv") { implicit webDriver =>
-        actAndCheck(
-          s"Logging in to SV wallet at ${walletUrl}", {
-            completeAuth0LoginWithAuthorization(
-              walletUrl,
-              svUsername,
-              svPassword,
-              () => find(id("logout-button")) should not be empty,
-            )
-          },
-        )(
-          "There's a transaction worth 66.67% of an SV reward",
-          _ => {
-            val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
+              val svRewardEntries = txs.filter(_.subtype == "SV Reward Collected")
+              svRewardEntries should not be empty
+              svRewardEntries
+            },
+          )
 
-            // 0.6667 = 1.0 - 0.3333. This is because we're using basis points.
-            val minExpected = BigDecimal(svGetsInRound) * BigDecimal("0.6667") - smallAmount
-            val maxExpected =
-              BigDecimal(svGetsInRound) * BigDecimal("0.6667") + maxValidatorFaucetCouponAmount
-            (txs.exists { tx =>
-              val gte = tx.ccAmount >= minExpected
-              val lte = tx.ccAmount <= maxExpected
-              gte && lte
+          val validator1WalletUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/"
+          val (_, validatorEntries) = actAndCheck(
+            s"Logging in to validator1 wallet at ${validator1WalletUrl}", {
+              completeAuth0LoginWithAuthorization(
+                validator1WalletUrl,
+                "admin@validator1.com",
+                validatorUserPassword,
+                () => find(id("logout-button")) should not be empty,
+              )
+            },
+          )(
+            "There's SV Reward collected entries",
+            _ => {
+              val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
+
+              val svRewardEntries = txs.filter(_.subtype == "SV Reward Collected")
+              svRewardEntries should not be empty
+              svRewardEntries
+            },
+          )
+          (svEntries, validatorEntries)
+        }
+      }
+
+      // The actual amount depends on every SV being available and claiming their rewards.
+      // We only care that validator1 gets part of the SV's coupons.
+      clue("The entries of the SV are proportional to the value of the validator entries") {
+        eventually() {
+          val (svEntries, validatorEntries) = getTxLogEntries()
+          forEvery(svEntries) { svEntry =>
+            (validatorEntries.exists { validatorEntry =>
+              val ratio = BigDecimal("0.6667") / BigDecimal("0.3333") // ~2
+              svEntry.ccAmount >= (validatorEntry.ccAmount - smallAmount) * ratio &&
+              svEntry.ccAmount <= (validatorEntry.ccAmount + smallAmount) * ratio
             } shouldBe true)
-              .withClue(s"Min Expected: $minExpected; Max Expected: $maxExpected; Txs: $txs")
-          },
-        )
-
-        val validator1WalletUrl = s"https://wallet.validator1.${sys.env("NETWORK_APPS_ADDRESS")}/"
-        actAndCheck(
-          s"Logging in to validator1 wallet at ${validator1WalletUrl}", {
-            completeAuth0LoginWithAuthorization(
-              validator1WalletUrl,
-              "admin@validator1.com",
-              "NobodyCares!",
-              () => find(id("logout-button")) should not be empty,
-            )
-          },
-        )(
-          "There's a transaction worth 33.33% of an SV reward",
-          _ => {
-            val txs = findAll(className("tx-row")).toSeq.map(readTransactionFromRow)
-
-            val minExpected = BigDecimal(svGetsInRound) * BigDecimal("0.3333") - smallAmount
-            val maxExpected =
-              BigDecimal(svGetsInRound) * BigDecimal("0.3333") + maxValidatorFaucetCouponAmount
-            (txs.exists { tx =>
-              val gte = tx.ccAmount >= minExpected
-              val lte = tx.ccAmount <= maxExpected
-              gte && lte
-            } shouldBe true)
-              .withClue(s"Min Expected: $minExpected; Max Expected: $maxExpected; Txs: $txs")
-          },
-        )
+              .withClue(s"SV Entries: $svEntries\nValidator Entries: $validatorEntries")
+          }
+        }
       }
     } else {
       logger.debug(
