@@ -1,4 +1,4 @@
-const defaultInterval = 500; // in ms
+const defaultInterval = 1000; // in ms
 
 export class PollingStrategy {
   /** disable polling outright */
