@@ -39,7 +39,7 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
         sha=$(get-latest-main-commit)
         CNCLUSTER_STATIC_DIRTY_VERSION=""
         CI=1
-        export ignore_dirty=1
+        export CI_IGNORE_DIRTY_REPO=1
     elif [[ "${OVERRIDE_VERSION}" == "deployment_tag" ]]; then
         # The deployment tag name is just the deployment branch name with slashes replaced with hyphens.
         tag_name=$(echo "$branch" | tr '/' '-')
@@ -75,7 +75,7 @@ if [ -z "${CI}" ]; then
     user_suffix="-${USER}"
 fi
 
-if ! (env-bool ignore_dirty) && [[  $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
+if ! (env-bool CI_IGNORE_DIRTY_REPO) && [[  $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
     if [ -z "${CI}" ]; then
         dirty_suffix="-dirty"
     else

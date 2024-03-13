@@ -82,6 +82,9 @@ jobs:
       skip_if_files_changed:
         type: string
         default: ""
+      with_shared_gcp:
+        type: boolean
+        default: false
     resource_class: << parameters.resource_class >>
     environment:
       <<: *env
@@ -132,6 +135,15 @@ jobs:
       # so we accept that.
       - start_canton_in_background:
           start_canton_options: << parameters.start_canton_options >>
+      - when:
+          condition:
+            equal: [ true, "<< parameters.with_shared_gcp >>" ]
+          steps:
+            run_bash_command_in_nix:
+              cmd_name: "Authenticate to shared GCP project"
+              additional_nix_args: "--keep GCP_DA_CN_SHARED_KEY"
+              cmd: |
+                echo $GCP_DA_CN_SHARED_KEY | gcloud auth activate-service-account --key-file=-
       - split_tests_for_parallel_run:
           test_names_file: << parameters.test_names_file >>
       - run_splitted_scala_tests:

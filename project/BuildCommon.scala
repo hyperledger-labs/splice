@@ -113,7 +113,15 @@ object BuildCommon {
         val Seq(srcFile) = (Compile / damlBuild).value
         val dstFile = (Compile / resourceDirectory).value / "dar" / srcFile.getName()
         IO.copyFile(srcFile, dstFile)
-        Seq(dstFile)
+        val currentFilename =
+          srcFile.getName().replaceAll("(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))*.dar", "current.dar")
+        if (!srcFile.getName().endsWith("0.2.0.dar")) {
+          val currentDstFile = (Compile / resourceDirectory).value / "dar" / currentFilename
+          IO.copyFile(srcFile, currentDstFile)
+          Seq(dstFile, currentDstFile)
+        } else {
+          Seq(dstFile)
+        }
       }.taskValue,
       cleanFiles += {
         (Compile / resourceDirectory).value / "dar"

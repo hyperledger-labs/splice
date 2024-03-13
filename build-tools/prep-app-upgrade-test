@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+
+set -eou pipefail
+
+# shellcheck disable=SC1091
+source "${TOOLS_LIB}/libcli.source"
+
+_info "Re-versioning local Daml models from 0.1.0 to 0.1.1"
+find "daml" -name "daml.yaml" -exec sed -i 's/0.1.0/0.1.1/g' {} \;
+find . -name "*0.1.0.dar" -exec rm {} \;
+
+base_version=$(get-snapshot-version latest_main)
+_info "Fetching and extracting release ${base_version} from GCP"
+tmp=$(mktemp -d)
+trap 'rm -rf "$tmp"' EXIT
+tarball="${base_version}_cn-node-0.1.0-SNAPSHOT.tar.gz"
+export CLOUDSDK_CORE_PROJECT=da-cn-shared
+set +e
+num_retries=0
+max_retries=10
+until gsutil cp "gs://cn-release-bundles/$tarball" "$tmp"; do
+  ((++num_retries))
+  if ((num_retries>max_retries)); then
+    _error "Failed to download release after $max_retries attempts"
+  fi
+  sleep 5
+done
+set -e
+
+BUNDLE_DIR="${REPO_ROOT}/apps/app/src/test/resources/bundles/${base_version}"
+mkdir -p "${BUNDLE_DIR}"
+tar zxf "$tmp/$tarball" -C "$BUNDLE_DIR"
+
+_info "Copying dar files into the respective daml directories"
+dars=$(find "${BUNDLE_DIR}"/cn-node-0.1.0-SNAPSHOT/dars -name "*-0.1.0.dar" -exec basename {} \;)
+for dar in $dars; do
+  module=${dar//-0.1.0.dar/}
+  mkdir -p "daml/${module}/src/main/resources/dar/"
+  cp "${BUNDLE_DIR}/cn-node-0.1.0-SNAPSHOT/dars/${dar}" "daml/${module}/src/main/resources/dar"
+  mkdir -p "daml/${module}/.daml/dist/"
+  cp "${BUNDLE_DIR}/cn-node-0.1.0-SNAPSHOT/dars/${dar}" "daml/${module}/.daml/dist"
+done
