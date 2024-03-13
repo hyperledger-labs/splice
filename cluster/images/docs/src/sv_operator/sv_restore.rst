@@ -33,7 +33,7 @@ Scale down all components in the SV node to 0 replicas
 .. code-block:: bash
 
     kubectl scale deployment --replicas=0 -n sv \
-      cometbft \
+      global-domain-0-cometbft \
       global-domain-0-mediator \
       global-domain-0-sequencer \
       participant-0 \
@@ -50,7 +50,7 @@ Once all storage has been restored, scale up all components in the SV node back 
 .. code-block:: bash
 
     kubectl scale deployment --replicas=1 -n sv \
-      cometbft \
+      global-domain-0-cometbft \
       global-domain-0-mediator \
       global-domain-0-sequencer \
       participant-0 \
