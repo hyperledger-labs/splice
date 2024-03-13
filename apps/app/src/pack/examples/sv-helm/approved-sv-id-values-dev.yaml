@@ -7,39 +7,31 @@ approvedSvIdentities:
     rewardWeightBps: 30000
   - name: Cumberland
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESLPPYUXcHS7yOEmDHHA4+/UueQM9KU26GvMXqYVJh/okOWFzdiXWtSDZfL1dYUJ9q9KrkNztVlANExBTjY70Vw==
-    rewardWeightBps: 240000
+    rewardWeightBps: 120000
   - name: Cumberland-2
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9/PUF/FFmdhbJNtxt+fR67LEW9vM/NluHSKTecvaqx7EYymDRsJf0GShphXwJAgrFzEOQ0Vsmbu6dmO6N1x8/g==
-    rewardWeightBps: 10000
+    rewardWeightBps: 120000
   - name: Orb-1-LP
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1LDIm4cEZ/fVP9Y3ReyP93osmeZ+9saRSHRDRb+gmLxtAEOL3GTYCRZClItc4gS8Y8FCNBBYkcSpfjvtBSTfGw==
-    rewardWeightBps: 10000
+    rewardWeightBps: 100000
   - name: Digital-Asset-2
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==
-    rewardWeightBps: 10000
+    rewardWeightBps: 140000
   - name: Digital-Asset-3
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE0fnbBQiM7UiSNaV6tjPq5lK2buIx5L5nzUuhYWxBk341nFChcbK9pDEO4O6gdxexb/OQP6RhQkDOTDdTCr77CA==
-    rewardWeightBps: 10000
+    rewardWeightBps: 0
   - name: Digital-Asset-4
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEa76d2OWmkpCQ2dTWsWyhofV3tOGdlkhoCnPpY7BbQhCb0s3laR1vp57JYu/d5Cf+332PF2XrgjC0yBWUqM4syQ==
-    rewardWeightBps: 10000
+    rewardWeightBps: 0
   - name: DA-Test-Node
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE7uz+zW1YcPJIl+TKqXv6/dfxcx+3ISVFgP6m2saeQ0l6r2lNW+WLfq+HUMcycxX9t6bUJ5kyEebYyfk9JW18KA==
     rewardWeightBps: 10000
   - name: DA-Helm-Test-Node
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE1eb+JkH2QFRCZedO/P5cq5d2+yfdwP+jE+9w3cT6BqfHxCd/PyA0mmWMePovShmf97HlUajFuN05kZgxvjcPQw==
     rewardWeightBps: 10000
-  # Jean Safar (CX)
-  - name: jeanSv
-    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAESxcNzqTXgL+ocVESayKc4nddN6taa/uFI9ca7GGIJs1Ns3yKFDDu6UCDKH+qlXA0+CcmyW6ytvZ9WPVeD7JsMw==
-    rewardWeightBps: 10000
-  # Ben Minton (DA support)
-  - name: dasc-test-sv-01
-    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEU/AYexo+CmqZxcNEnKgaNoJmdqhHP2nElBymaE4HREPQ0VgObBRNNMlgU/WfUUKElmn2u2D/b/wNtKKrtTA99A==
-    rewardWeightBps: 10000
   - name: Fiutur
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEejWbMSQyl+LUcpRxBIrh74z+/yOPrCzTIb7wGKPtNWHQ9JB0le62f0IyOvyVEytucIp4JmcR+I3RlX1jycLtpw==
-    rewardWeightBps: 30000
+    rewardWeightBps: 10000
   - name: Digital-Asset
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE5ZIIu7ciMWwgNmciMq8SfgY6eVi1o8feUEztydSg4cn8bF2mcd59XF7zbXRoxNKpLW2gNz6gnv8Ldfn5MkHPbA==
-    rewardWeightBps: 10000
+    rewardWeightBps: 140000
