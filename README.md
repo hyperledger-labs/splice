@@ -1066,7 +1066,7 @@ Upgrades of the CN apps are tested automatically in CI using AppUpgradeIntegrati
 - Every PR is tested for upgrade from the commit in `main` from which it branched
 - Every commit to `main` is tested for upgrade from the previous commit
 
-PRs/commits that include `[breaking]` in their commit message, or that make Daml changes or bump the Canton binary are excluded from this test.
+PRs/commits that include `[breaking]` in their commit message, or that bump the Canton binary are excluded from this test.
 
 The test spins up a full network in the source version, creates some activity, then gradually upgrades several of the components (SVs and validators)
 one-by-one to the current commit's version.
