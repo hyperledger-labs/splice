@@ -331,30 +331,6 @@ To configure the validator app, please modify the file ``cn-node-0.1.0-SNAPSHOT/
 
 You also need to specify a URL for the an existing SV that will sponsor the onboarding of your validator. To do so, please update the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/standalone-validator-values.yaml`` by replacing ``SPONSOR_SV_URL`` with this URL, e.g. ``https://sv.sv-1.svc.dev.network.canton.global``
 
-.. _validator-participant-identities-restore:
-
-Restoring from an existing Particiant Identities Backup
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-If you are restoring from an existing :ref:`participant identities backup <participant-identities-backup>`, you need to create another secret containing that dump. Here
-we are assuming you've stored the dump in a file called ``participant-identities-dump.json`` in the current directory.
-
-.. code-block:: bash
-
-    kubectl create --namespace validator secret generic participant-identities-dump \
-        "--from-file=content=participant-identities-dump.json"
-
-You also need to configure the participant to not initialize automatically by uncommenting the following section in your ``participant-values.yaml``.
-
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_START
-    :end-before: PARTICIPANT_BOOTSTRAP_END
-
-Note that restoring from a participant identities backup will only result in a functional participant if no participant with the same identity has ever been connected to the network (more specifically: to the global CN domain) since the network was last reset.
-This implies that you can only restore from the same participant identities backup once per network deployment.
-Also note that restoring from a participant identities backup is only possible if the participant is fresh and uninitialized, i.e., its database is completely empty.
-
 .. _validator-helm-charts-install:
 
 Installing the Helm Charts
@@ -558,14 +534,3 @@ Canton Name Service.
   :alt: After logged in into the CNS UI
 
 .. _validator-continuity:
-
-Transitioning Across Network Resets
------------------------------------
-
-To ensure that coin balances associated with your validator node are preserved across a `TestNet` reset.
-Please consult the :ref:`relevant section above <validator-participant-identities-restore>` on how to restore from an existing participant identities backup.
-
-Note that coin balances are currently not persisted across `DevNet` resets.
-Participant identities can still be restored across `DevNet` resets, using the steps referenced above,
-but doing so will yield no benefit in terms of recovered coin balances.
-It can still be useful for testing, of course.

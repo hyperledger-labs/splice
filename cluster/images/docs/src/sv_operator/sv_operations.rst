@@ -66,8 +66,8 @@ SV identity
 - An operator that has lost control over their SV identity will not be able to onboard SVs
   until a quorum of established SV operators have approved a new identity under the control of that operator.
 
-Participant identity
-++++++++++++++++++++
+Participant identities
+++++++++++++++++++++++
 
 - Used for securing Daml workflows and for determining an SV's ``svPartyId``,
   which is used for various SVC governance flows as well as for receiving SV rewards.
@@ -83,12 +83,8 @@ Participant identity
 - In general, participant identities *can't* be reused on the same global domain,
   i.e., without the network being reset/redeployed.
 
-- Participant identities can be migrated and reused across networks upgrades.
-  See :ref:`sv-participant-identities-restore`.
-  At the moment, you will need to do so for preserving coin balances across network upgrades.
-
-- Loss of control over a participant identity implies loss of control over the coin balances for all parties hosted under that identity.
-  On a network level, loss of a participant identity constitutes an SV failure and reduces the overall fault tolerance buffer,
+- Loss of control over a participant namespace implies loss of control over the coin balances for all parties hosted under that namespace.
+  On a network level, loss of a participant namespace constitutes an SV failure and reduces the overall fault tolerance buffer,
   until the respective SV is offboarded from the SVC.
 
 CometBFT node identities

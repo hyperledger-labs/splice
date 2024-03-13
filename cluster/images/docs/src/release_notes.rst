@@ -14,6 +14,7 @@ Release Notes
 * Documentation
 
   * :ref:`Synchronizer Upgrades <sv-upgrades>`: Added more detailed instructions on :ref:`testing <sv-upgrades-testing>`, as well as various clarifications.
+  * Removed now-obsolete documentation about "Transitioning Across Network Resets" and "Restoring from an existing Particiant Identities Backup".
 
 2024-03-11
 ----------
@@ -565,8 +566,8 @@ Release Notes
     * Ensured that both the `cn-cometbft` and `cn-postgres` charts support the `db.volumeSize` and `db.volumeStorageClass` values for configuring persistent storage.
     * The three secrets, `cn-app-scan-ledger-api-auth`, `cn-app-directory-ledger-api-auth`, `cn-app-svc-ledger-api-auth` that were required before with dummy values, are no longer required.
     * The `cn-postgres` and `cn-participant`charts now require a non-empty `postgresPassword` value to be set. The value templates includes a default value that you can modify to something more secure.
-    * The SV Helm runbook has been extended with a section that explains :ref:`how to restore from a participant identities backup <sv-participant-identities-restore>`.
-    * The instructions for self hosted validators have been extended with a section that explains :ref:`how to restore from a participant identities backup <old-validator-participant-identities-restore>`.
+    * The SV Helm runbook has been extended with a section that explains how to restore from a participant identities backup.
+    * The instructions for self hosted validators have been extended with a section that explains how to restore from a participant identities backup.
     * The secrets ``cn-app-sv1-validator-ledger-api-auth`` and ``cn-app-sv1-ledger-api-auth`` are no longer required.
     * The participant now requests 4 CPUs to improve behavior under load.
 
@@ -602,7 +603,7 @@ Release Notes
 * The SV node now supports domain fee top-ups in a network where domain fees are enabled.
   The ``validator-values.yaml`` file contains initial recommended values for those.
 * SV and validator operators are now asked to perform backups of participant identities data, to enable continuity across network resets.
-  This is covered in a :ref:`new section of the runbook <old-validator-continuity>`.
+  This is covered in a new section of the runbook.
 * The environment variable ``CANTON_PARTICIPANT_USERS`` defining the admin users to be allocated as part of participant
   bootstrapping is now a simple JSON array of strings, where each element is the name of another environment variable
   storing the name of the user to be allocated.

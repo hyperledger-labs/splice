@@ -625,37 +625,6 @@ Your SV node will also be configured with a set of SV identities for your node t
 
 Please identify the file out of the above corresponding to the network to which you are connecting, and after reviewing the file, set its path in an environment variable ``SV-IDENTITIES-FILE`` to be used below.
 
-.. _sv-participant-identities-restore:
-
-Restoring from an existing Particiant Identities Backup
-+++++++++++++++++++++++++++++++++++++++++++++++++++++++
-
-If you are restoring from an existing :ref:`participant identities backup <participant-identities-backup>`, you need to create another secret containing that dump. Here
-we are assuming you've stored the dump in a file called ``participant-identities-dump.json`` in the current directory.
-
-.. code-block:: bash
-
-    kubectl create --namespace sv secret generic participant-identities-dump \
-        "--from-file=content=participant-identities-dump.json"
-
-You also need to configure the participant to not initialize automatically by uncommenting the following section in your ``participant-values.yaml``.
-
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/participant-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_START
-    :end-before: PARTICIPANT_BOOTSTRAP_END
-
-Lastly, you need to configure the SV app to bootstrap the participant from the content of your secret by uncommenting the following section in your ``sv-values.yaml``.
-
-.. literalinclude:: ../../../../../apps/app/src/pack/examples/sv-helm/sv-values.yaml
-    :language: yaml
-    :start-after: PARTICIPANT_BOOTSTRAP_START
-    :end-before: PARTICIPANT_BOOTSTRAP_END
-
-Note that restoring from a participant identities backup will only result in a functional participant if no participant with the same identity has ever been connected to the network (more specifically: to the global CN domain) since the network was last reset.
-This implies that you can only restore from the same participant identities backup once per network deployment.
-Also note that restoring from a participant identities backup is only possible if the participant is fresh and uninitialized, i.e., its database is completely empty.
-
 .. _helm-install:
 
 Installing the Helm Charts
@@ -991,19 +960,3 @@ Backup of CometBFT
 In addition to the Postgres instances, the storage used by CometBFT should also be backed up every 4 hours.
 CometBFT does not use Postgres.
 We recommend backing up its storage by creating snapshots of the underlying Persistent Volume.
-
-
-.. _participant-identities-backup:
-
-Transitioning Across Network Resets
------------------------------------
-
-Please consult the :ref:`relevant section of the validator runbook <old-validator-continuity>` on how to backup the identity of your participant,
-to ensure that coin balances associated with your SV's validator node (which likely includes rewards earned by your SV nodes) are preserved across a `TestNet` reset.
-Please consult the :ref:`relevant section above <sv-participant-identities-restore>` on how to restore from an existing participant identities backup.
-
-Note that coin balances are currently not persisted across `DevNet` resets.
-Participant identities can still be restored across `DevNet` resets, using the steps referenced above,
-but doing so will yield no benefit in terms of recovered coin balances.
-It can still be useful for testing, of course.
-One way to verify that your participant identities were restored correctly is to observe that the ``svPartyId`` shown in your SV UI is identical to your ``svPartyId`` at the time of your identities backup.

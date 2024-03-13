@@ -14,6 +14,6 @@ enableHealthProbes: true
 # want your validator to be represented as.
 nodeIdentifier: YOUR_NODE_NAME
 # PARTICIPANT_BOOTSTRAP_START
-# Uncomment the line below if you are bootstrapping from an existing participant identities dump or from a migration dump.
+# Uncomment the line below if you are bootstrapping from a migration dump.
 # disableAutoInit: true
 # PARTICIPANT_BOOTSTRAP_END

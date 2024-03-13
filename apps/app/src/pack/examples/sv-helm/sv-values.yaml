@@ -13,12 +13,6 @@ auth:
 cometBFT:
   enabled: true
   connectionUri: "http://global-domain-MIGRATION_ID-cometbft-cometbft-rpc:26657"
-# PARTICIPANT_BOOTSTRAP_START
-# Uncomment the two lines below if you are bootstrapping from an existing participant
-# identities dump.
-# participantIdentitiesDumpImport:
-#  secretName: participant-identities-dump
-# PARTICIPANT_BOOTSTRAP_END
 
 # MIGRATION_START
 # Replace MIGRATION_ID with the migration ID of the global synchronizer.
