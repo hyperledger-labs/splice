@@ -26,7 +26,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
   override def dbsSuffix: String = "non_founding_svs"
 
   // Runs against a temporary Canton instance.
-  override lazy val resetDecentralizedNamespace = false
+  override lazy val resetRequiredTopologyState = false
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 

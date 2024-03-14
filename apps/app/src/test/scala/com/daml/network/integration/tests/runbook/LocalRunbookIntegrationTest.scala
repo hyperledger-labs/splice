@@ -48,6 +48,8 @@ class LocalRunbookIntegrationTest
     ("ParticipantLedgerApi", 7001),
     ("ParticipantAdminApi", 7002),
   )
+  // Runs against a temporary Canton instance.
+  override lazy val resetRequiredTopologyState: Boolean = false
 
   var cantonProcess: Option[Process] = None
 

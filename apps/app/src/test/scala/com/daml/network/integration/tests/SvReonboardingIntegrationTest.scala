@@ -50,7 +50,7 @@ class SvReonboardingIntegrationTest
     ) ++ super.usesDbs
 
   // Runs against a temporary Canton instance.
-  override lazy val resetDecentralizedNamespace = false
+  override lazy val resetRequiredTopologyState = false
 
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 

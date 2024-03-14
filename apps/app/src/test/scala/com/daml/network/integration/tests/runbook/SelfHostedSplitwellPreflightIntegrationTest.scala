@@ -40,7 +40,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
   System.setProperty("CANTON_DB_PASSWORD", "postgres")
 
   // Runs against a temporary Canton instance.
-  override lazy val resetDecentralizedNamespace = false
+  override lazy val resetRequiredTopologyState = false
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

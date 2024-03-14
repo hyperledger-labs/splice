@@ -11,7 +11,11 @@ import com.daml.network.config.AuthTokenSourceConfig
 import com.daml.network.console.*
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
-import com.daml.network.integration.plugins.{ResetDecentralizedNamespace, WaitForPorts}
+import com.daml.network.integration.plugins.{
+  ResetDecentralizedNamespace,
+  ResetSequencerDomainStateThreshold,
+  WaitForPorts,
+}
 import com.daml.network.metrics.CNNodeMetricsFactory
 import com.daml.network.sv.config.{SvOnboardingConfig, TrafficControlConfig}
 import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
@@ -75,11 +79,14 @@ object CNNodeTests {
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
-    protected lazy val resetDecentralizedNamespace: Boolean = true
+    protected lazy val resetRequiredTopologyState: Boolean = true
 
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
-    if (resetDecentralizedNamespace) {
+    if (resetRequiredTopologyState) {
       registerPlugin(new ResetDecentralizedNamespace())
+      // We MUST have the decentralized namespace reset before the reset of the sequencer domain state since
+      // the latter expects that submitting the topology tx from only sv1 will succeed.
+      registerPlugin(new ResetSequencerDomainStateThreshold())
     }
 
     override def environmentDefinition
@@ -97,11 +104,14 @@ object CNNodeTests {
 
     protected def extraPortsToWaitFor: Seq[(String, Int)] = Seq.empty
 
-    protected lazy val resetDecentralizedNamespace: Boolean = true
+    protected lazy val resetRequiredTopologyState: Boolean = true
 
     registerPlugin(new WaitForPorts(extraPortsToWaitFor))
-    if (resetDecentralizedNamespace) {
+    if (resetRequiredTopologyState) {
+      // We MUST have the decentralized namespace reset before the reset of the sequencer domain state since
+      // the latter expects that submitting the topology tx from only sv1 will succeed.
       registerPlugin(new ResetDecentralizedNamespace())
+      registerPlugin(new ResetSequencerDomainStateThreshold())
     }
 
     override def environmentDefinition

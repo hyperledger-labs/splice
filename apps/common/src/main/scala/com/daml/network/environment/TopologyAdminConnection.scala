@@ -985,22 +985,24 @@ abstract class TopologyAdminConnection(
       TopologyStoreId.DomainStore(domainId),
       description,
       EitherT(
-        getSequencerDomainState(domainId).map(result =>
+        getSequencerDomainState(domainId).map(result => {
+          val newSequencers = sequencerChange(result.mapping.active)
+          // we need to check the threshold as well because we reset it to 1 in tests (see ResetSequencerDomainStateThreshold)
+          val newThreshold = CNThresholds.sequencerConnectionsSizeThreshold(newSequencers.size)
           Either
             .cond(
-              result.mapping.active.forgetNE == sequencerChange(result.mapping.active),
+              result.mapping.active.forgetNE == newSequencers && result.mapping.threshold == newThreshold,
               result,
               result,
             )
-        )
+        })
       ),
       previous => {
         val newSequencers = sequencerChange(previous.active)
         logger.debug(
           s"Applying sequencer change: previous [${previous.active}], wanted [$newSequencers]"
         )
-        // The threshold in here does not matter for anything at this point.
-        // It is purely on the read side through the sequencer trust threshold.
+        // The threshold in here is used by Canton traffic control
         SequencerDomainStateX.create(
           previous.domain,
           CNThresholds

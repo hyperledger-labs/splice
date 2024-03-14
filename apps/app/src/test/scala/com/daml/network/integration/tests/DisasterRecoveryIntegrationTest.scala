@@ -62,7 +62,7 @@ class DisasterRecoveryIntegrationTest
   override implicit val patienceConfig: PatienceConfig = PatienceConfig(scaled(Span(1, Minute)))
 
   // Runs against a temporary Canton instance.
-  override lazy val resetDecentralizedNamespace = false
+  override lazy val resetRequiredTopologyState = false
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =

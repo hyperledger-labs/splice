@@ -7,6 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
+import com.daml.network.config.CNThresholds
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
@@ -59,14 +60,23 @@ class SvOnboardingSequencerProposalTrigger(
           )
       val sequencersToAdd =
         configuredSequencers.filterNot(sequencerDomainState.mapping.active.contains)
+      val thresholdToSet = CNThresholds.sequencerConnectionsSizeThreshold(configuredSequencers.size)
 
-      if (sequencersToAdd.nonEmpty)
+      if (sequencersToAdd.nonEmpty) {
         logger.info {
           import com.digitalasset.canton.util.ShowUtil.showPretty
           import com.daml.network.util.PrettyInstances.prettyCodegenContractId
           show"Planning to add sequencers $sequencersToAdd to match SvcRules ${svcRules.contractId} at $svcRulesOffset"
         }
-      sequencersToAdd
+        sequencersToAdd
+      } else if (thresholdToSet != sequencerDomainState.mapping.threshold) {
+        // This case can occur because we reset the threshold at the end of our tests (see ResetSequencerDomainState)
+        // We try to add an already onboarded sequencer once more to force a topology tx that would reset the threshold.
+        logger.info(
+          s"Planning to change sequencer threshold from ${sequencerDomainState.mapping.threshold} to ${thresholdToSet}"
+        )
+        sequencerDomainState.mapping.active.take(1)
+      } else Seq()
     }
   }
 

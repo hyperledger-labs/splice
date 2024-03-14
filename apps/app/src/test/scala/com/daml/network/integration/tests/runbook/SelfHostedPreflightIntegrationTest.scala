@@ -39,7 +39,7 @@ class SelfHostedPreflightIntegrationTest
   )
 
   // Runs against a temporary Canton instance.
-  override lazy val resetDecentralizedNamespace = false
+  override lazy val resetRequiredTopologyState = false
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
