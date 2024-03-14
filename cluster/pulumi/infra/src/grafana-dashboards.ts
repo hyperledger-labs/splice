@@ -11,11 +11,20 @@ export function createGrafanaDashboards(namespace: Input<string>, filtered: bool
   createConfigMapForFolder(namespace, `${dashboardsPath}/${prefix}platform`, 'platform');
   createConfigMapForFolder(namespace, `${dashboardsPath}/${prefix}participant`, 'participant');
   createConfigMapForFolder(namespace, `${dashboardsPath}/${prefix}canton`, 'canton');
-  createConfigMapForFolder(
+  createdNestedConfigMapForFolder(
     namespace,
-    `${REPO_ROOT}/cluster/pulumi/infra/grafana-dashboards`,
-    'canton-network'
+    `${REPO_ROOT}/cluster/pulumi/infra/grafana-dashboards/`
   );
+}
+
+function createdNestedConfigMapForFolder(namespace: Input<string>, folderPath: string) {
+  const dirFiles = fs.readdirSync(folderPath);
+  dirFiles.forEach(file => {
+    const filePath = path.join(folderPath, file);
+    if (fs.statSync(filePath).isDirectory()) {
+      createConfigMapForFolder(namespace, filePath, file);
+    }
+  });
 }
 
 function createConfigMapForFolder(
