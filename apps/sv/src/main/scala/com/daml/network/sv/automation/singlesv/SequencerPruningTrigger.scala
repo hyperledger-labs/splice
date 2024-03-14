@@ -114,7 +114,11 @@ class SequencerPruningTrigger(
               val lastAcknowledged =
                 statusAfterDisabling.members
                   .map(m => m.member.toProtoPrimitive -> m.safePruningTimestamp)
-              logger.warn(s"failed to prune with sequencer pruning status: $lastAcknowledged")
+              val message = s"failed to prune with sequencer pruning status: $lastAcknowledged"
+              if (context.retryProvider.isClosing)
+                logger.info(message)
+              else
+                logger.warn(message)
               err
             },
           )

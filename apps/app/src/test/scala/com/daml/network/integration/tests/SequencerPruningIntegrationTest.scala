@@ -1,0 +1,119 @@
+package com.daml.network.integration.tests
+
+import com.daml.network.config.{CNNodeConfigTransforms, CNParticipantClientConfig}
+import com.daml.network.console.ValidatorAppBackendReference
+import com.daml.network.sv.config.SequencerPruningConfig
+import com.daml.network.util.{ProcessTestUtil, WalletTestUtil}
+import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
+import com.digitalasset.canton.config.{ClientConfig, NonNegativeFiniteDuration}
+import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.util.ShowUtil.*
+import org.slf4j.event.Level
+
+import scala.concurrent.duration.*
+
+class SequencerPruningIntegrationTest
+    extends SvIntegrationTestBase
+    with WalletTestUtil
+    with ProcessTestUtil {
+
+  override def environmentDefinition =
+    super.environmentDefinition
+      .addConfigTransform((_, config) =>
+        CNNodeConfigTransforms.updateAllSvAppConfigs { (_, config) =>
+          config.copy(
+            localDomainNode = config.localDomainNode.map(domainNode =>
+              domainNode.copy(
+                sequencer = domainNode.sequencer.copy(
+                  pruning = Some(
+                    SequencerPruningConfig(
+                      pruningInterval = NonNegativeFiniteDuration(2.seconds),
+                      retentionPeriod = NonNegativeFiniteDuration(90.seconds),
+                    )
+                  )
+                )
+              )
+            )
+          )
+        }(config)
+      )
+      .addConfigTransform((_, config) =>
+        config.copy(
+          validatorApps = config.validatorApps + (
+            InstanceName.tryCreate("bobValidatorLocal") -> {
+              val bobValidatorConfig = config
+                .validatorApps(InstanceName.tryCreate("bobValidator"))
+              bobValidatorConfig
+                .copy(
+                  participantClient = CNParticipantClientConfig(
+                    ClientConfig(port = Port.tryCreate(5902)),
+                    bobValidatorConfig.participantClient.ledgerApi.copy(
+                      clientConfig =
+                        bobValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                          port = Port.tryCreate(5901)
+                        )
+                    ),
+                  )
+                )
+            }
+          )
+        )
+      )
+
+  "sequencer can be pruned even if a participant is down" in { implicit env =>
+    clue("Initialize SVC with 2 SVs") {
+      startAllSync(
+        sv1ScanBackend,
+        sv2ScanBackend,
+        sv1Backend,
+        sv2Backend,
+        sv1ValidatorBackend,
+        sv2ValidatorBackend,
+      )
+    }
+    sv1Backend.getSvcInfo().svcRules.payload.members should have size 2
+    val bobValidatorLocalBackend: ValidatorAppBackendReference = v("bobValidatorLocal")
+
+    val unavailableParticipantId = withCanton(
+      Seq(
+        testResourcesPath / "unavailable-validator-topology-canton.conf"
+      ),
+      Seq(),
+      "stop-validator-before-pruning-sequencer",
+      "VALIDATOR_ADMIN_USER" -> bobValidatorLocalBackend.config.ledgerApiUser,
+    ) {
+      startAllSync(bobValidatorLocalBackend)
+      val walletUserParty = onboardWalletUser(bobWalletClient, bobValidatorLocalBackend)
+      bobWalletClient.tap(walletCoinToUsd(50.0))
+      clue(s"${bobValidatorLocalBackend.name} has tapped a coin") {
+        checkWallet(walletUserParty, bobWalletClient, Seq((50, 50)))
+      }
+      bobValidatorLocalBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
+        true
+      )
+      val participantId = bobValidatorLocalBackend.participantClientWithAdminToken.id
+      bobValidatorLocalBackend.stop()
+      participantId
+    }
+
+    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+      {},
+      entries => {
+        forAtLeast(2, entries)(
+          // we will see that the sequencer is pruned
+          _.message should include regex (
+            "Completed pruning our sequencer with result: Removed [^0]"
+          )
+        )
+        forAtLeast(2, entries) { entry =>
+          // the unavailable validator is disabled
+          entry.message should include regex "disabling .+ member clients preventing pruning to"
+          entry.message should include regex show"LaggingMember\\(member = $unavailableParticipantId"
+        }
+      },
+      timeUntilSuccess = 3.minutes,
+    )
+  }
+
+}
