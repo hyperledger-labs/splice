@@ -92,8 +92,8 @@ abstract class ValidatorPreflightIntegrationTestBase
   protected def limitValidatorUsers() = {
     val users = validatorClient.listUsers()
 
-    val targetNumber = 80 // TODO(tech-debt): consider de-hardcoding this
-    val offboardThreshold = 100 // TODO(tech-debt): consider de-hardcoding this
+    val targetNumber = 40 // TODO(tech-debt): consider de-hardcoding this
+    val offboardThreshold = 50 // TODO(tech-debt): consider de-hardcoding this
     if (users.length > offboardThreshold) {
       logger.info(
         s"Validator has ${users.length} users, offboarding some to get below ${targetNumber}"
