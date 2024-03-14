@@ -37,6 +37,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
   protected val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
   protected lazy val validatorUserPassword = sys.env(s"VALIDATOR_WEB_UI_PASSWORD")
   val scanUrl = s"https://scan.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+
   val walletUrl = s"https://wallet.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
   "The SV UI of the node is working as expected" in { _ =>
@@ -176,12 +177,14 @@ abstract class RunbookSvPreflightIntegrationTestBase
         eventually() {
           val (svEntries, validatorEntries) = getTxLogEntries()
           forEvery(svEntries) { svEntry =>
-            (validatorEntries.exists { validatorEntry =>
+            // If more than one round has been claimed, there might be more than one entry with the same amount.
+            forAtLeast(1, validatorEntries) { validatorEntry =>
               val ratio = BigDecimal("0.6667") / BigDecimal("0.3333") // ~2
-              svEntry.ccAmount >= (validatorEntry.ccAmount - smallAmount) * ratio &&
-              svEntry.ccAmount <= (validatorEntry.ccAmount + smallAmount) * ratio
-            } shouldBe true)
-              .withClue(s"SV Entries: $svEntries\nValidator Entries: $validatorEntries")
+              svEntry.ccAmount should beWithin(
+                (validatorEntry.ccAmount - smallAmount) * ratio,
+                (validatorEntry.ccAmount + smallAmount) * ratio,
+              )
+            }
           }
         }
       }
