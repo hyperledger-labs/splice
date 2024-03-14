@@ -16,6 +16,7 @@ import com.daml.network.util.{DisclosedContracts, AssignedContract}
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -69,9 +70,11 @@ class AcceptedAppPaymentRequestsTrigger(
               .lookupTransferInProgress(payment.payload.reference)
               .map(
                 _.value.getOrElse(
-                  throw new IllegalStateException(
-                    show"Invariant violation: no transfer-in-progress contract found for payment request ${payment.payload.reference}"
-                  )
+                  throw Status.NOT_FOUND
+                    .withDescription(
+                      show"No transfer-in-progress contract found for payment request ${payment.payload.reference}, likely because a transfer is in progress"
+                    )
+                    .asRuntimeException()
                 )
               )
             cmd = transferInProgress.exercise(
