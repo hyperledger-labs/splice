@@ -62,7 +62,9 @@
   - [Participant Admin User Configuration](#participant-admin-user-configuration)
   - [Token configuration](#token-configuration)
   - [Testing the SV Helm Runbook](#testing-the-sv-helm-runbook)
-  - [Enabling additional SVs for Testing](#enabling-additional-svs-for-testing)
+  - [Scaling the Cluster Size for Testing](#scaling-the-cluster-size-for-testing)
+    - [SV Scaling](#sv-scaling)
+    - [Validator Scaling](#validator-scaling)
   - [SV Operations](#sv-operations)
     - [Approving new SVs](#approving-new-svs)
       - [Approving via SV API](#approving-via-sv-api)
@@ -1380,7 +1382,9 @@ To bring the deployment down, run:
 
 `cncluster pdown_sv`
 
-## Enabling additional SVs for Testing
+## Scaling the Cluster Size for Testing
+
+### SV Scaling
 
 When deploying a cluster, it is possible to enable additional SVs beyond the typical 1-4, for the purpose of
 creating and testing larger networks. Currently a max value of `9` is supported.
@@ -1388,6 +1392,16 @@ creating and testing larger networks. Currently a max value of `9` is supported.
 To enable these additional SVs, set `SVC_SIZE=<num>` for that cluster's env configuration, then `cncluster apply`.
 
 Note that the keys for the extra SVs need to be present in the Google Cloud project that the cluster is running in. Currently the keys are only uploaded to `da-cn-scratchnet`.
+
+### Validator Scaling
+
+Validators are scaled out via the `multi-validator` Pulumi stack. To add more test validators to the network, set the cluster env
+variable `MULTIVALIDATOR_SIZE=<num>`. As 1 multivalidator contains 10 validator nodes, this results in `10 * <num>` available validators.
+
+Because they are deployed from a separate stack, run `cncluster apply_multi` after `cncluster apply`.
+
+When `MULTIVALIDATOR_SIZE > 0`, the load-tester (if enabled) automatically begins using _all_ test validators for p2p transfers.
+A value of `0` tells the load-tester to not use any of the test validators and default back to using `validator1` only.
 
 ## SV Operations
 

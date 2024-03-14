@@ -67,8 +67,8 @@ To permanently disable the load tester for a cluster, set (or remove) its `K6_EN
 Running the load tester with _many_ validators:
 
 1. Set the cluster vars
-    - `K6_ENABLE_LOAD_GENERATOR_VALIDATORS=true`
     - `K6_ENABLE_LOAD_GENERATOR=true`
+    - `MULTIVALIDATOR_SIZE=<num>` (see cluster/README.md)
 2. Deploy the base cluster
 3. Apply the `multi-validator` stack (`cncluster apply_multi`)
 

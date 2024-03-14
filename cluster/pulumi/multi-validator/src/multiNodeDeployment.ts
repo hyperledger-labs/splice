@@ -1,14 +1,17 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
-import { requireEnv } from 'cn-pulumi-common';
+import { numNodesPerInstance, requireEnv } from 'cn-pulumi-common';
 import _ from 'lodash';
 
 export interface BaseMultiNodeArgs {
   namespace: k8s.core.v1.Namespace;
-  numNodes: number;
-  usernamePrefix: string;
-  secretRef: { name: string; key: string };
-  postgres: { host: string; schema: string; port: string; db: string };
+  postgres: {
+    host: string;
+    schema: string;
+    port: string;
+    db: string;
+    secret: { name: string; key: string };
+  };
 }
 
 interface MultiNodeDeploymentArgs extends BaseMultiNodeArgs {
@@ -66,11 +69,11 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                     ...(args.container.env || []),
                     {
                       name: 'NUM_NODES',
-                      value: `${args.numNodes}`,
+                      value: `${numNodesPerInstance}`,
                     },
                     {
                       name: 'VALIDATOR_USERNAME_PREFIX',
-                      value: args.usernamePrefix,
+                      value: 'validator_user',
                     },
                     {
                       name: 'AUTH_TARGET_AUDIENCE',
@@ -91,7 +94,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                     {
                       name: 'PGPASSWORD',
                       valueFrom: {
-                        secretKeyRef: args.secretRef,
+                        secretKeyRef: args.postgres.secret,
                       },
                     },
                   ],
@@ -116,7 +119,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                         }
 
                         ${Array.from(
-                          { length: args.numNodes },
+                          { length: numNodesPerInstance },
                           (_, i) => `createDb ${args.postgres.db}_${zeroPad(i, 2)}`
                         ).join('\n')}
                       `,
@@ -131,11 +134,11 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
     );
 
     this.service = new k8s.core.v1.Service(
-      `${name}-svc`,
+      name,
       {
         metadata: {
           namespace: args.namespace.metadata.name,
-          name: `${name}-svc`,
+          name: name,
           labels: {
             app: name,
           },

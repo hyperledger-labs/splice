@@ -8,6 +8,7 @@ export * from './infra';
 export * from './ingress';
 export * from './jmx';
 export * from './loopback';
+export * from './multiValidator';
 export * from './onboarding';
 export * from './persistence';
 export * from './runbook-backup';

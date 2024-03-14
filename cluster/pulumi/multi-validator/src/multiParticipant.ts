@@ -1,11 +1,11 @@
 import * as pulumi from '@pulumi/pulumi';
-import { generatePortSequence } from 'cn-pulumi-common';
+import { generatePortSequence, numNodesPerInstance } from 'cn-pulumi-common';
 
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 
 export class MultiParticipant extends MultiNodeDeployment {
   constructor(name: string, args: BaseMultiNodeArgs, opts?: pulumi.ComponentResourceOptions) {
-    const ports = generatePortSequence(5000, args.numNodes, [
+    const ports = generatePortSequence(5000, numNodesPerInstance, [
       { name: 'lg', id: 1 },
       { name: 'adm', id: 2 },
     ]);
@@ -32,7 +32,7 @@ export class MultiParticipant extends MultiNodeDeployment {
             {
               name: 'CANTON_PARTICIPANT_POSTGRES_PASSWORD',
               valueFrom: {
-                secretKeyRef: args.secretRef,
+                secretKeyRef: args.postgres.secret,
               },
             },
           ],

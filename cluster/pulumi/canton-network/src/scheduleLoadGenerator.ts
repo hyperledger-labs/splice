@@ -6,6 +6,8 @@ import {
   generatePortSequence,
   installCNHelmChart,
   isDevNet,
+  numInstances,
+  numNodesPerInstance,
   requireEnv,
 } from 'cn-pulumi-common';
 
@@ -59,21 +61,19 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client): void {
       },
     };
 
-    const multiValidatorConfigs = generatePortSequence(5000, 10, [{ name: '', id: 3 }]).map(
-      (p, i) => ({
-        walletBaseUrl: `http://multi-validator-svc.multi-validator.svc.cluster.local:${p.port}`,
+    const multiValidatorConfigs = new Array(numInstances).fill(0).flatMap((_, instance) =>
+      generatePortSequence(5000, numNodesPerInstance, [{ id: 3 }]).map((p, validator) => ({
+        walletBaseUrl: `http://multi-validator-${instance}.multi-validator.svc.cluster.local:${p.port}`,
         auth: {
           kind: 'self-signed',
-          user: `validator-user-${i}`,
+          user: `validator-user-${validator}`,
           audience: 'https://canton.network.global',
           secret: 'test',
         },
-      })
+      }))
     );
 
-    const validators = envFlag('K6_ENABLE_LOAD_GENERATOR_VALIDATORS', false)
-      ? [...multiValidatorConfigs, validator1]
-      : [validator1];
+    const validators = numInstances > 0 ? multiValidatorConfigs : [validator1];
 
     installCNHelmChart(
       xns,

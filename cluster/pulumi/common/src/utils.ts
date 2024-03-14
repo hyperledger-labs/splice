@@ -255,16 +255,6 @@ export function installCNHelmChart(
   );
 }
 
-export function generatePortSequence(
-  basePort: number,
-  numInstances: number,
-  ports: { name: string; id: number }[]
-): { name: string; port: number }[] {
-  return Array.from({ length: numInstances }, (_, i) =>
-    ports.map(p => ({ name: `${p.name}-${i}`, port: basePort + i * 100 + p.id }))
-  ).flat();
-}
-
 // Typically used for overriding chart values.
 // The pulumi documentation also doesn't suggest a better type than this. ¯\_(ツ)_/¯
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

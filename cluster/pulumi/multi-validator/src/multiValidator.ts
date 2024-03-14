@@ -1,11 +1,17 @@
 import * as pulumi from '@pulumi/pulumi';
-import { generatePortSequence } from 'cn-pulumi-common';
+import { generatePortSequence, numNodesPerInstance } from 'cn-pulumi-common';
 
 import { BaseMultiNodeArgs, MultiNodeDeployment } from './multiNodeDeployment';
 
+interface MultiValidatorArgs extends BaseMultiNodeArgs {
+  participant: {
+    address: pulumi.Output<string>;
+  };
+}
+
 export class MultiValidator extends MultiNodeDeployment {
-  constructor(name: string, args: BaseMultiNodeArgs, opts?: pulumi.ComponentResourceOptions) {
-    const ports = generatePortSequence(5000, args.numNodes, [{ name: 'val', id: 3 }]);
+  constructor(name: string, args: MultiValidatorArgs, opts?: pulumi.ComponentResourceOptions) {
+    const ports = generatePortSequence(5000, numNodesPerInstance, [{ name: 'val', id: 3 }]);
 
     super(
       name,
@@ -20,7 +26,7 @@ export class MultiValidator extends MultiNodeDeployment {
             },
             {
               name: 'CN_APP_VALIDATOR_PARTICIPANT_ADDRESS',
-              value: 'multi-participant-svc',
+              value: pulumi.interpolate`${args.participant.address}`,
             },
             {
               name: 'CN_APP_VALIDATOR_SCAN_URL',
@@ -53,7 +59,7 @@ export class MultiValidator extends MultiNodeDeployment {
             {
               name: 'CN_APP_POSTGRES_PASSWORD',
               valueFrom: {
-                secretKeyRef: args.secretRef,
+                secretKeyRef: args.postgres.secret,
               },
             },
           ],
