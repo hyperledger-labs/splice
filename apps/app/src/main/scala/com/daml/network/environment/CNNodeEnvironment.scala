@@ -1,6 +1,7 @@
 package com.daml.network.environment
 
 import cats.syntax.either.*
+import com.daml.metrics.JvmMetricSet
 import com.daml.network.config.CNNodeConfig
 import com.daml.network.metrics.CNNodeMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
@@ -38,6 +39,10 @@ trait CNNodeEnvironment extends Environment {
       configuredOpenTelemetry.openTelemetry.getMeterProvider,
       testingConfig.metricsFactoryType,
     )
+
+  if (config.monitoring.metrics.reportJvmMetrics) {
+    JvmMetricSet.registerObservers() // requires OpenTelemetry to have the global lib setup
+  }
 
   protected def createValidator(
       name: String,
