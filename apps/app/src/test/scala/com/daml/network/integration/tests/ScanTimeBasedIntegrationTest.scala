@@ -63,20 +63,23 @@ class ScanTimeBasedIntegrationTest
         sv1ScanBackend.getCoinConfigForRound(3)
       }
       cfg.coinCreateFee.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultCreateFee.fee.setScale(10)
+        CNNodeUtil.defaultCreateFee.fee divide walletCoinPrice setScale 10
       )
       cfg.holdingFee.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultHoldingFee.rate.setScale(10)
+        CNNodeUtil.defaultHoldingFee.rate divide walletCoinPrice setScale 10
       )
       cfg.lockHolderFee.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultLockHolderFee.fee.setScale(10)
+        CNNodeUtil.defaultLockHolderFee.fee divide walletCoinPrice setScale 10
       )
       cfg.transferFee.initial.bigDecimal.setScale(10) should be(
         CNNodeUtil.defaultTransferFee.initialRate.setScale(10)
       )
       cfg.transferFee.steps shouldBe (
         CNNodeUtil.defaultTransferFee.steps.asScala.toSeq.map(step =>
-          HttpScanAppClient.RateStep(step._1, step._2)
+          HttpScanAppClient.RateStep(
+            step._1 divide walletCoinPrice,
+            step._2,
+          )
         )
       )
     }
@@ -110,7 +113,9 @@ class ScanTimeBasedIntegrationTest
     }
     clue("Round 4 should now be open, and have the new configuration") {
       eventuallySucceeds() {
-        sv1ScanBackend.getCoinConfigForRound(4).holdingFee should be(newHoldingFee)
+        sv1ScanBackend.getCoinConfigForRound(4).holdingFee should be(
+          walletUsdToCoin(newHoldingFee)
+        )
       }
     }
   }
@@ -326,20 +331,18 @@ class ScanTimeBasedIntegrationTest
     )
 
     clue("Get total balances for round 0, 1 and 2") {
-      val holdingFee = BigDecimal(CNNodeUtil.defaultHoldingFee.rate)
-
       val total0 = sv1ScanBackend.getTotalCoinBalance(0)
       val total1 = sv1ScanBackend.getTotalCoinBalance(1)
       val total2 = sv1ScanBackend.getTotalCoinBalance(2)
 
-      val holdingFeeAfterOneRound = 1 * holdingFee
-      val holdingFeeAfterTwoRounds = 2 * holdingFee
+      val holdingFeeAfterOneRound = 1 * defaultHoldingFeeCC
+      val holdingFeeAfterTwoRounds = 2 * defaultHoldingFeeCC
 
       total0 shouldBe 0.0
-      total1 shouldBe (tapRound1Amount - holdingFeeAfterOneRound)
+      total1 shouldBe (walletUsdToCoin(tapRound1Amount) - holdingFeeAfterOneRound)
       total2 shouldBe (
-        tapRound1Amount - holdingFeeAfterTwoRounds +
-          tapRound2Amount - holdingFeeAfterOneRound
+        walletUsdToCoin(tapRound1Amount) - holdingFeeAfterTwoRounds +
+          walletUsdToCoin(tapRound2Amount) - holdingFeeAfterOneRound
       )
       sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(0, 2)
       sv1ScanBackend

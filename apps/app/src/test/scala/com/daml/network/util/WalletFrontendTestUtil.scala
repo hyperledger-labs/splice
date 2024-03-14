@@ -7,7 +7,7 @@ import org.scalatest.Assertion
 
 import scala.concurrent.duration.*
 
-trait WalletFrontendTestUtil { self: FrontendTestCommon =>
+trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =>
 
   protected def tapCoins(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
     val tapsBefore =
@@ -32,7 +32,7 @@ trait WalletFrontendTestUtil { self: FrontendTestCommon =>
         val tapsAfter = findAll(className("tx-row")).toSeq.flatMap(readTapCCAmountFromRow)
         val newTaps = tapsAfter.diff(tapsBefore)
         forExactly(1, newTaps) { tap =>
-          tap should be(tapQuantity)
+          tap shouldBe walletUsdToCoin(tapQuantity)
         }
       }
     }

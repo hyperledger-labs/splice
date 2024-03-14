@@ -35,12 +35,21 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   val exactly = (x: BigDecimal) => (x, x)
 
+  def walletCoinPrice = CNNodeUtil.damlDecimal(1)
+  def walletUsdToCoin(usd: BigDecimal) = usd
+  def walletCoinToUsd(cc: BigDecimal) = cc
+
+  lazy val defaultHoldingFeeCC = walletUsdToCoin(CNNodeUtil.defaultHoldingFee.rate)
+
   /** @param expectedAmountRanges : lower and upper bounds for coins sorted by their initial amount in ascending order. */
   def checkWallet(
       walletParty: PartyId,
       wallet: WalletAppClientReference,
       expectedAmountRanges: Seq[(BigDecimal, BigDecimal)],
   ): Unit = clue(s"checking wallet with $expectedAmountRanges") {
+    val expectedRatePerRound = new feesCodegen.RatePerRound(
+      defaultHoldingFeeCC.bigDecimal setScale 10
+    )
     eventually(10.seconds, 500.millis) {
       val coins =
         wallet.list().coins.sortBy(coin => coin.contract.payload.amount.initialAmount)
@@ -52,8 +61,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
           val coinAmount =
             coin.contract.payload.amount
           assertInRange(coinAmount.initialAmount, amountBounds)
-          coinAmount.ratePerRound shouldBe
-            CNNodeUtil.defaultHoldingFee
+          coinAmount.ratePerRound shouldBe expectedRatePerRound
         }
     }
   }

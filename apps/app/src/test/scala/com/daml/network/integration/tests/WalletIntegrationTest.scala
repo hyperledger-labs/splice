@@ -56,12 +56,12 @@ class WalletIntegrationTest
     "allow two wallet app users to connect to one wallet backend and tap" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-      aliceWalletClient.tap(50.0)
+      aliceWalletClient.tap(walletCoinToUsd(50.0))
       checkWallet(aliceUserParty, aliceWalletClient, Seq((50, 50)))
 
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
-      charlieWalletClient.tap(50.0)
+      charlieWalletClient.tap(walletCoinToUsd(50.0))
       checkWallet(charlieUserParty, charlieWalletClient, Seq((50, 50)))
     }
 
@@ -229,7 +229,10 @@ class WalletIntegrationTest
           checkBalance(
             aliceWalletClient,
             None,
-            (1 + successfulTaps * 10 - 1, 1 + successfulTaps * 10),
+            (
+              walletUsdToCoin(1 + successfulTaps * 10 - 1),
+              walletUsdToCoin(1 + successfulTaps * 10),
+            ),
             exactly(0),
             (0, smallAmount),
           )

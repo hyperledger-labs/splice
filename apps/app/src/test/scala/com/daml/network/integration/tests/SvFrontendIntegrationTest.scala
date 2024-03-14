@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, SvFrontendTestUtil, SvTestUtil}
+import com.daml.network.util.{FrontendLoginUtil, SvFrontendTestUtil, SvTestUtil, WalletTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -28,7 +28,8 @@ class SvFrontendIntegrationTest
     extends SvFrontendCommonIntegrationTest
     with SvTestUtil
     with SvFrontendTestUtil
-    with FrontendLoginUtil {
+    with FrontendLoginUtil
+    with WalletTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -207,50 +208,49 @@ class SvFrontendIntegrationTest
         )(
           "We see a median coin price, desired coin price of SV1 and other SVs, open mining rounds",
           _ => {
+            val shownCoinPrice = s"${walletCoinPrice.stripTrailingZeros.toPlainString} USD"
             inside(find(id("median-coin-price-usd"))) { case Some(e) =>
-              e.text shouldBe "1 USD"
+              e.text shouldBe shownCoinPrice
             }
             inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
-              e.text shouldBe "1 USD"
+              e.text shouldBe shownCoinPrice
             }
             val rows = findAll(className("coin-price-table-row")).toSeq
             rows should have size 3
-            svCoinPriceShouldMatch(rows, sv2Backend.getSvcInfo().svParty, "1 USD")
+            svCoinPriceShouldMatch(rows, sv2Backend.getSvcInfo().svParty, shownCoinPrice)
             svCoinPriceShouldMatch(rows, sv3Backend.getSvcInfo().svParty, "Not Set")
             svCoinPriceShouldMatch(rows, sv4Backend.getSvcInfo().svParty, "Not Set")
 
             val roundRows = findAll(className("open-mining-round-row")).toSeq
             roundRows should have size 3
             forEvery(roundRows) {
-              _.childElement(className("coin-price")).text shouldBe "1 USD"
+              _.childElement(className("coin-price")).text shouldBe shownCoinPrice
             }
           },
         )
 
+        def showBigDecimal(v: BigDecimal) = v.bigDecimal.stripTrailingZeros.toPlainString
+
         val testDesiredPriceChange = (desiredPrice: BigDecimal, otherValues: Seq[BigDecimal]) => {
           inside(find(id("median-coin-price-usd"))) { case Some(e) =>
-            e.text shouldBe s"${median(Seq(desiredPrice) ++ otherValues).getOrElse('0')} USD"
+            e.text shouldBe s"${median(Seq(desiredPrice) ++ otherValues).map(showBigDecimal).getOrElse('0')} USD"
           }
           inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
-            e.text shouldBe s"${desiredPrice.toString()} USD"
+            e.text shouldBe s"${showBigDecimal(desiredPrice)} USD"
           }
           val rows = findAll(className("coin-price-table-row")).toSeq
           rows should have size 3
-          svCoinPriceShouldMatch(
-            rows,
-            sv2Backend.getSvcInfo().svParty,
-            if (otherValues.isDefinedAt(0)) s"${otherValues(0)} USD" else "Not Set",
-          )
-          svCoinPriceShouldMatch(
-            rows,
-            sv3Backend.getSvcInfo().svParty,
-            if (otherValues.isDefinedAt(1)) s"${otherValues(1)} USD" else "Not Set",
-          )
-          svCoinPriceShouldMatch(
-            rows,
-            sv4Backend.getSvcInfo().svParty,
-            if (otherValues.isDefinedAt(2)) s"${otherValues(2)} USD" else "Not Set",
-          )
+          forEvery(
+            Table(("backend", "other value row"), (sv2Backend, 0), (sv3Backend, 1), (sv4Backend, 2))
+          ) { (backend, otherValueRow) =>
+            svCoinPriceShouldMatch(
+              rows,
+              backend.getSvcInfo().svParty,
+              otherValues
+                .lift(otherValueRow)
+                .fold("Not Set")(v => s"${showBigDecimal(v)} USD"),
+            )
+          }
         }
 
         actAndCheck(
@@ -265,7 +265,7 @@ class SvFrontendIntegrationTest
         )(
           "median fractional coin price changed and coin price updated on the row for sv2",
           _ => {
-            testDesiredPriceChange(10.55, Seq(1))
+            testDesiredPriceChange(10.55, Seq(walletCoinPrice))
           },
         )
 
@@ -281,7 +281,7 @@ class SvFrontendIntegrationTest
         )(
           "median coin price changed and coin price updated on the row for sv2",
           _ => {
-            testDesiredPriceChange(10, Seq(1))
+            testDesiredPriceChange(10, Seq(walletCoinPrice))
           },
         )
 

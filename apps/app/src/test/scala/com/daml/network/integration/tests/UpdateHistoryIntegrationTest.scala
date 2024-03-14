@@ -113,8 +113,9 @@ class UpdateHistoryIntegrationTest
     )(
       "Alice receives the transfer from bob and merges coins",
       _ => {
-        aliceWalletClient.balance().unlockedQty should be > (tapAmount + transferAmount / 2)
-        bobWalletClient.balance().unlockedQty should be < (tapAmount + transferAmount / 2)
+        val partitionAmount = walletUsdToCoin(tapAmount) + transferAmount / 2
+        aliceWalletClient.balance().unlockedQty should be > partitionAmount
+        bobWalletClient.balance().unlockedQty should be < partitionAmount
 
         aliceWalletClient.list().coins should have length 1
         bobWalletClient.list().coins should have length 1

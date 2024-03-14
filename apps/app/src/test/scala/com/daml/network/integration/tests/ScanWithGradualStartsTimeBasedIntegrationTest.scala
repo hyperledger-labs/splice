@@ -138,41 +138,43 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
             svcSize = 2,
           )
         )
-      val expectedTotalsRanges = Seq(
-        // Alice has 23 CC in Coin, Bob has 3 CC, all minus holding fees
-        (BigDecimal(25.9), BigDecimal(26.0)),
-        // note that SV2 doesn't have a wallet, so it doesn't claim the rewards
-        // validator faucets: SV1, Alice, Bob
-        (
-          26.0 + svRewardPerRound + validatorFaucetAmount * 3 - smallAmount,
-          26.0 + svRewardPerRound + validatorFaucetAmount * 3,
-        ),
-      )
-      (0 to 1).foreach { i =>
-        val round = 2L + i.toLong
+      forEvery(
+        Table(
+          ("round", "total floor", "total ceiling"),
+          // Alice has 23 USD in Coin, Bob has 3 USD, all minus holding fees
+          (2L, walletUsdToCoin(25.9), walletUsdToCoin(26.0)),
+          // note that SV2 doesn't have a wallet, so it doesn't claim the rewards
+          // validator faucets: SV1, Alice, Bob
+          (
+            3L,
+            walletUsdToCoin(26.0 + validatorFaucetAmount * 3 - smallAmount) + svRewardPerRound,
+            walletUsdToCoin(26.0 + validatorFaucetAmount * 3) + svRewardPerRound,
+          ),
+        )
+      ) { (round, floor, ceil) =>
         val total1 = sv1ScanBackend.getTotalCoinBalance(round)
         val total2 = sv2ScanBackend.getTotalCoinBalance(round)
         total1 shouldBe total2
-        total1 should be >= expectedTotalsRanges(i)._1
-        total1 should be <= expectedTotalsRanges(i)._2
+        total1 should beWithin(floor, ceil)
       }
     }
 
     clue("Aggregated rewards collected on both scan apps should match") {
-      val expectedTotalsRanges = Seq(
-        (
-          BigDecimal(0.0),
-          BigDecimal(0.0),
-        ),
-        (validatorFaucetAmount * 3 - smallAmount, BigDecimal(validatorFaucetAmount * 3)),
-      )
-      (0 to 1).foreach { i =>
-        val round = 2L + i.toLong
+      forEvery(
+        Table(
+          ("round", "total floor", "total ceiling"),
+          (2L, BigDecimal(0), BigDecimal(0)),
+          (
+            3L,
+            walletUsdToCoin(validatorFaucetAmount * 3 - smallAmount),
+            walletUsdToCoin(validatorFaucetAmount * 3),
+          ),
+        )
+      ) { (round, floor, ceil) =>
         val rewards1 = sv1ScanBackend.getRewardsCollectedInRound(round)
         val rewards2 = sv2ScanBackend.getRewardsCollectedInRound(round)
         rewards1 shouldBe rewards2
-        rewards1 should be >= expectedTotalsRanges(i)._1
-        rewards1 should be <= expectedTotalsRanges(i)._2
+        rewards1 should beWithin(floor, ceil)
       }
     }
   }

@@ -28,7 +28,7 @@ class WalletRewardsTimeBasedIntegrationTest
       waitForWalletUser(bobValidatorWalletClient)
 
       // Tap coin and do a transfer from alice to bob
-      aliceWalletClient.tap(50)
+      aliceWalletClient.tap(walletCoinToUsd(50))
 
       p2pTransfer(aliceWalletClient, bobWalletClient, bob, 40.0)
 
@@ -81,7 +81,7 @@ class WalletRewardsTimeBasedIntegrationTest
       // We just check that the balance has increased by roughly the right amount,
       // rather then repeating the calculation for the reward amount
       // 2.85 CC (at 1CC/USD) per faucet coupon
-      val faucetCouponAmount = 2.85 * openRounds.size
+      val faucetCouponAmount = walletUsdToCoin(2.85 * openRounds.size)
       assertInRange(
         newBalance - prevBalance,
         (0.1 + faucetCouponAmount, 0.5 + faucetCouponAmount),

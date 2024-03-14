@@ -24,6 +24,7 @@ import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.digitalasset.canton.tracing.TracingConfig.Tracer
 import io.opentelemetry.exporter.prometheus.PrometheusCollector
+import org.scalactic.source
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatest.{AppendedClues, BeforeAndAfterEach}
@@ -253,9 +254,10 @@ object CNNodeTests {
           fail("Failed to retrieve defaultTrafficControlConfig from sv1.")
       }
 
-    def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
-      value should (be >= range._1 and be <= range._2)
-    }
+    def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal))(implicit
+        pos: source.Position
+    ): Unit =
+      value should beWithin(range._1, range._2)
 
     // Upper bound for fees in any of the above transfers
     val smallAmount: BigDecimal = BigDecimal(1.0)
@@ -355,6 +357,7 @@ object CNNodeTests {
         try {
           loggerFactory.suppressErrors(testCode)
         } catch {
+          case e: TestFailedException => throw e
           case NonFatal(e) => fail(e)
         }
       }

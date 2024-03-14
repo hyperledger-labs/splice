@@ -77,7 +77,7 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
 
     // aliceWalletClient.list().coins contains one tap(3) and 0 or more tap(2) as it retries until connection fails.
     forExactly(1, aliceWalletClient.list().coins) { coin =>
-      coin.contract.payload.amount.initialAmount.longValue() shouldBe 3L
+      BigDecimal(coin.contract.payload.amount.initialAmount) shouldBe walletUsdToCoin(3)
     }
 
   }

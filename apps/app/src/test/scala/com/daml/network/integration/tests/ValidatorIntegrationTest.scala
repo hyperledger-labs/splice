@@ -327,7 +327,8 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       },
     )
 
-    aliceWalletClient.tap(100.0)
+    val tapAmount = 100.0
+    aliceWalletClient.tap(tapAmount)
     assertUserFullyOnboarded(aliceWalletClient, aliceValidatorBackend)
 
     actAndCheck(
@@ -356,7 +357,10 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       _ => {
         val balance = Try(loggerFactory.suppressErrors((aliceWalletClient.balance())))
           .getOrElse(fail(s"Could not get balance for alice"))
-        assertInRange(balance.unlockedQty, (99.9, 100.0))
+        assertInRange(
+          balance.unlockedQty,
+          (walletUsdToCoin(tapAmount - 0.1), walletUsdToCoin(tapAmount)),
+        )
       },
     )
 

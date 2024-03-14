@@ -59,7 +59,7 @@ class SplitwellFrontendIntegrationTest
       val charlieParty = charlieUserParty.toProtoPrimitive
       val groupName = "troika"
 
-      bobWalletClient.tap(550)
+      bobWalletClient.tap(walletCoinToUsd(550))
 
       val invite = withFrontEnd("aliceSplitwell") { implicit webDriver =>
         login(aliceSplitwellUIPort, aliceDamlUser)

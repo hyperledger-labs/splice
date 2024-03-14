@@ -3,10 +3,11 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.console.CNParticipantClientReference
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
+import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.topology.transaction.TopologyChangeOpX
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
 
-class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
+class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase with WalletTestUtil {
 
   "SV users can act as SV party and act or read as the SVC party" in { implicit env =>
     initSvc()
@@ -174,7 +175,8 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase {
           inside(coins) { case Seq(coin) =>
             coin.data.svc shouldBe svcPartyStr
             // the amount might diverge slightly due to (merged) SV rewards and fees
-            BigDecimal(coin.data.amount.initialAmount) should beAround(BigDecimal(100.0))
+            BigDecimal(coin.data.amount.initialAmount) should
+              beWithin(walletUsdToCoin(99), walletUsdToCoin(101))
             coin.data.owner shouldBe sv3Party.toProtoPrimitive
           }
         }

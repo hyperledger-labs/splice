@@ -59,6 +59,8 @@ class SvTimeBasedRewardCouponIntegrationTest
       )
       .withTrafficTopupsDisabled
 
+  private val feesUpperBoundCC = walletUsdToCoin(smallAmount)
+
   "SVs" should {
 
     "receive and claim SvRewardCoupons" in { implicit env =>
@@ -115,13 +117,13 @@ class SvTimeBasedRewardCouponIntegrationTest
         checkWallet(
           sv1Party,
           sv1WalletClient,
-          Seq(BigDecimal(eachSvGetInRound0) - smallAmount -> eachSvGetInRound0),
+          Seq(BigDecimal(eachSvGetInRound0) - feesUpperBoundCC -> eachSvGetInRound0),
         )
 
         checkWallet(
           aliceValidatorParty,
           aliceValidatorWalletClient,
-          Seq(BigDecimal(expectedAliceAmount) - smallAmount -> expectedAliceAmount),
+          Seq(BigDecimal(expectedAliceAmount) - feesUpperBoundCC -> expectedAliceAmount),
         )
       }
 

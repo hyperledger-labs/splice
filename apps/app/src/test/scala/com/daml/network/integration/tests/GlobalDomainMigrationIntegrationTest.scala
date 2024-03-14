@@ -420,8 +420,11 @@ class GlobalDomainMigrationIntegrationTest
       "Scan transaction history is recorded and wallet balance is updated",
       _ => {
         // buffer to account for domain fee payments
-        assertInRange(sv1WalletClient.balance().unlockedQty, (1000, 2000))
-        countTapsFromScan(sv1ScanBackend, 1337) shouldBe 1
+        assertInRange(
+          sv1WalletClient.balance().unlockedQty,
+          (walletUsdToCoin(1000), walletUsdToCoin(2000)),
+        )
+        countTapsFromScan(sv1ScanBackend, walletUsdToCoin(1337)) shouldBe 1
       },
     )
 
@@ -448,7 +451,11 @@ class GlobalDomainMigrationIntegrationTest
       val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
       walletClient.tap(tapAmount)
       withClueAndLog(s"${validatorBackend.name} has tapped a coin") {
-        checkWallet(walletUserParty, walletClient, Seq((expectedCoins.start, expectedCoins.end)))
+        checkWallet(
+          walletUserParty,
+          walletClient,
+          Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+        )
       }
       validatorBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
         true
@@ -938,9 +945,9 @@ class GlobalDomainMigrationIntegrationTest
       .discard
   }
 
-  private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: Double) = {
+  private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: BigDecimal) = {
     listTransactionsFromScan(scan).count(
-      _.tap.map(a => BigDecimal(a.coinAmount)).contains(BigDecimal(tapAmount))
+      _.tap.map(a => BigDecimal(a.coinAmount)).contains(tapAmount)
     )
   }
 

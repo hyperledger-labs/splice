@@ -94,13 +94,15 @@ class WalletTimeBasedIntegrationTest
         }
       }
       val startRound = aliceWalletClient.list().coins.head.round
+      val halfOriginalAmount =
+        (walletUsdToCoin(24), walletUsdToCoin(25))
 
       lockCoins(
         aliceValidatorBackend,
         aliceUserParty,
         aliceValidatorParty,
         aliceWalletClient.list().coins,
-        25,
+        walletUsdToCoin(25),
         sv1ScanBackend,
         Duration.ofDays(10),
       )
@@ -112,27 +114,29 @@ class WalletTimeBasedIntegrationTest
         aliceWalletClient.list().coins.head.round shouldBe startRound
         // we have 0 holding fees because the coins were created in the same round we are currently in
         aliceWalletClient.list().coins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, (24.0, 25.0))
+        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, halfOriginalAmount)
 
         aliceWalletClient.list().lockedCoins.head.round shouldBe startRound
         aliceWalletClient.list().lockedCoins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWalletClient.list().lockedCoins.head.effectiveAmount, (24.0, 25.0))
+        assertInRange(aliceWalletClient.list().lockedCoins.head.effectiveAmount, halfOriginalAmount)
       }
 
       // advance to next round.
       advanceRoundsByOneTick
 
       clue("Check wallet after advancing to next round") {
+        val expectedFee =
+          (walletUsdToCoin(0.000004), walletUsdToCoin(0.000005))
         eventually()(aliceWalletClient.list().coins.head.round shouldBe startRound + 1)
-        assertInRange(aliceWalletClient.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
-        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, (24.0, 25.0))
+        assertInRange(aliceWalletClient.list().coins.head.accruedHoldingFee, expectedFee)
+        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, halfOriginalAmount)
 
         aliceWalletClient.list().lockedCoins.head.round shouldBe startRound + 1
         assertInRange(
           aliceWalletClient.list().lockedCoins.head.accruedHoldingFee,
-          (0.000004, 0.000005),
+          expectedFee,
         )
-        assertInRange(aliceWalletClient.list().lockedCoins.head.effectiveAmount, (24.0, 25.0))
+        assertInRange(aliceWalletClient.list().lockedCoins.head.effectiveAmount, halfOriginalAmount)
       }
     }
 
@@ -142,10 +146,10 @@ class WalletTimeBasedIntegrationTest
       aliceWalletClient.tap(50)
       val startingBalance = eventually() {
         val startingBalance = aliceWalletClient.balance()
-        startingBalance.unlockedQty shouldBe 50.0
+        startingBalance.unlockedQty shouldBe walletUsdToCoin(50.0)
         startingBalance
       }
-      val lockedQty = 25
+      val lockedQty = walletUsdToCoin(25)
 
       advanceRoundsByOneTick
 
@@ -160,13 +164,14 @@ class WalletTimeBasedIntegrationTest
       )
 
       clue("Check balance after advancing round and locking coins") {
+        val feeCeiling = walletUsdToCoin(1)
         eventually() {
           val expectedUnlockedCoins = startingBalance.unlockedQty - lockedQty
           checkBalance(
             aliceWalletClient,
             Some(startingBalance.round + 1),
-            (expectedUnlockedCoins - 1, expectedUnlockedCoins),
-            (lockedQty - 1, lockedQty),
+            (expectedUnlockedCoins - feeCeiling, expectedUnlockedCoins),
+            (lockedQty - feeCeiling, lockedQty),
             (0, 1),
           )
         }
@@ -415,8 +420,9 @@ class WalletTimeBasedIntegrationTest
     "auto-expire coin" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-      clue("Alice taps 0.000005 coins") {
-        aliceWalletClient.tap(0.000005)
+      val tapAmountUsd = 0.000005
+      clue(s"Alice taps $tapAmountUsd USD") {
+        aliceWalletClient.tap(tapAmountUsd)
         eventually() {
           aliceWalletClient.list().coins should have length 1
           aliceWalletClient.list().lockedCoins should have length 0
@@ -439,7 +445,11 @@ class WalletTimeBasedIntegrationTest
         // The coin is expired but not yet archived.
         // They will be archived when no coins can be used as transfer input.
         // ie, in 2 round
-        aliceWalletClient.list().coins.head.accruedHoldingFee shouldBe 0.000005
+        aliceWalletClient
+          .list()
+          .coins
+          .head
+          .accruedHoldingFee shouldBe walletUsdToCoin(tapAmountUsd)
         aliceWalletClient.list().coins.head.effectiveAmount shouldBe 0
       }
 
@@ -487,7 +497,10 @@ class WalletTimeBasedIntegrationTest
         aliceWalletClient.list().coins.head.round shouldBe startRound
         // we have 0 holding fees because the coins were created in the same round we are currently in
         aliceWalletClient.list().coins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWalletClient.list().coins.head.effectiveAmount, (0, 1))
+        assertInRange(
+          aliceWalletClient.list().coins.head.effectiveAmount,
+          (0, walletUsdToCoin(1)),
+        )
 
         aliceWalletClient.list().lockedCoins.head.round shouldBe startRound
         aliceWalletClient.list().lockedCoins.head.accruedHoldingFee shouldBe 0

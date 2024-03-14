@@ -50,6 +50,7 @@ class TimeBasedTestNetPreviewIntegrationTest
 
     val sv1Balance = sv1WalletClient.balance().unlockedQty
     val amountToTransfer = 1
+    val feeCeiling = walletUsdToCoin(smallAmount)
 
     actAndCheck(
       "Transfer from SV1 wallet to Bob wallet",
@@ -61,7 +62,7 @@ class TimeBasedTestNetPreviewIntegrationTest
         checkWallet(
           sv1Party,
           sv1WalletClient,
-          Seq((sv1Balance - amountToTransfer - smallAmount, sv1Balance - amountToTransfer)),
+          Seq((sv1Balance - amountToTransfer - feeCeiling, sv1Balance - amountToTransfer)),
         )
       },
     )

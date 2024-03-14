@@ -66,7 +66,7 @@ class ModelUpgradeIntegrationTest
       aliceWalletClient.tap(10)
       val coin = aliceWalletClient.list().coins.loneElement.contract
       coin.identifier.getPackageId shouldBe DarResources.cantonCoin_0_1_0.packageId
-      BigDecimal(coin.payload.amount.initialAmount) shouldBe 10.0
+      BigDecimal(coin.payload.amount.initialAmount) shouldBe walletUsdToCoin(10)
 
       val svcRules = sv1Backend.getSvcInfo().svcRules
       svcRules.identifier.getPackageId shouldBe DarResources.svcGovernance_0_1_0.packageId
@@ -202,6 +202,9 @@ class ModelUpgradeIntegrationTest
         },
       )
 
+      val feeCeiling = walletUsdToCoin(smallAmount)
+      val mergedAmount = walletUsdToCoin(30)
+
       actAndCheck(
         "Alice taps after upgrade",
         eventuallySucceeds() {
@@ -212,7 +215,8 @@ class ModelUpgradeIntegrationTest
         _ => {
           val coin = aliceWalletClient.list().coins.loneElement.contract
           coin.identifier.getPackageId shouldBe DarResources.cantonCoin_0_2_0.packageId
-          BigDecimal(coin.payload.amount.initialAmount) should beWithin(30 - smallAmount, 30)
+          BigDecimal(coin.payload.amount.initialAmount) should
+            beWithin(mergedAmount - feeCeiling, mergedAmount)
         },
       )
 
@@ -236,21 +240,20 @@ class ModelUpgradeIntegrationTest
         _ => {
           val txs = sv1ScanBackend.listActivity(pageEndEventId = None, pageSize = 50)
           // old tap
-          forExactly(1, txs) { tx =>
-            val tf = tx.tap.value
-            tf.coinOwner shouldBe alice.toProtoPrimitive
-            tf.coinAmount shouldBe "10.0000000000"
-          }
-          // new taps
-          forExactly(1, txs) { tx =>
-            val tf = tx.tap.value
-            tf.coinOwner shouldBe alice.toProtoPrimitive
-            tf.coinAmount shouldBe "20.0000000000"
-          }
-          forExactly(1, txs) { tx =>
-            val tf = tx.tap.value
-            tf.coinOwner shouldBe bob.toProtoPrimitive
-            tf.coinAmount shouldBe "5.0000000000"
+          forEvery(
+            Table(
+              ("party", "coin amount"),
+              (alice, 10), // old tap
+              // new taps
+              (alice, 20),
+              (bob, 5),
+            )
+          ) { (party, coinAmount) =>
+            forExactly(1, txs) { tx =>
+              val tf = tx.tap.value
+              tf.coinOwner shouldBe party.toProtoPrimitive
+              BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(coinAmount)
+            }
           }
           // new transfer
           forExactly(1, txs) { tx =>

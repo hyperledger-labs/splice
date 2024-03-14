@@ -137,6 +137,9 @@ class WalletPaymentIntegrationTest
     "correctly select coins for payments" in { implicit env =>
       val (alice, bob) = onboardAliceAndBob()
 
+      val baseWalletFloor = walletUsdToCoin(69)
+      val baseWalletCeiling = walletUsdToCoin(70)
+
       clue("Alice gets some coins") {
         // Note: it would be great if we could add coins with different holding fees,
         // to test whether the wallet selects the most expensive ones for the transfer.
@@ -144,16 +147,26 @@ class WalletPaymentIntegrationTest
         aliceWalletClient.tap(40)
         aliceWalletClient.tap(20)
         // not using checkWallet as coins may already be merged by automation
-        checkBalance(aliceWalletClient, None, (69, 70), exactly(0), exactly(0))
+        checkBalance(
+          aliceWalletClient,
+          None,
+          (baseWalletFloor, baseWalletCeiling),
+          exactly(0),
+          exactly(0),
+        )
       }
 
       clue("Alice transfers 39") {
         p2pTransfer(aliceWalletClient, bobWalletClient, bob, 39)
-        checkWallet(alice, aliceWalletClient, Seq((30, 31)))
+        checkWallet(alice, aliceWalletClient, Seq((baseWalletFloor - 39, baseWalletCeiling - 39)))
       }
       clue("Alice transfers 19") {
         p2pTransfer(aliceWalletClient, bobWalletClient, bob, 19)
-        checkWallet(alice, aliceWalletClient, Seq((11, 12)))
+        checkWallet(
+          alice,
+          aliceWalletClient,
+          Seq((baseWalletFloor - 39 - 19, baseWalletCeiling - 39 - 19)),
+        )
       }
     }
 
@@ -201,8 +214,12 @@ class WalletPaymentIntegrationTest
           aliceWalletClient.listAcceptedTransferOffers() should have length 0
           bobWalletClient.listTransferOffers() should have length 2
           bobWalletClient.listAcceptedTransferOffers() should have length 0
-          checkWallet(aliceUserParty, aliceWalletClient, Seq((98.8, 99.0)))
-          checkWallet(bobUserParty, bobWalletClient, Seq((1.0, 1.0)))
+          checkWallet(
+            aliceUserParty,
+            aliceWalletClient,
+            Seq((walletUsdToCoin(99.8) - 1, walletUsdToCoin(100) - 1)),
+          )
+          checkWallet(bobUserParty, bobWalletClient, Seq((1, 1)))
         },
       )
 

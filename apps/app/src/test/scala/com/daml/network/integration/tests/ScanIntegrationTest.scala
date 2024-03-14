@@ -54,7 +54,7 @@ class ScanIntegrationTest
   "list transaction pages in ascending and descending order" in { implicit env =>
     onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val nrTaps = 10
-    val coinAmounts = (1 to nrTaps).toSeq.map(BigDecimal(_))
+    val coinAmounts = (1 to nrTaps).map(walletUsdToCoin(_))
     val pageSize = nrTaps / 2
 
     def toCoinAmounts(page: Seq[TransactionHistoryResponseItem]) =
@@ -185,7 +185,7 @@ class ScanIntegrationTest
       }
       taps should have size (2)
       taps.map(t => (PartyId.tryFromProtoPrimitive(t.coinOwner), BigDecimal(t.coinAmount))) shouldBe
-        Vector((aliceUserParty, BigDecimal(tap2)), (aliceUserParty, BigDecimal(tap1)))
+        Vector((aliceUserParty, walletUsdToCoin(tap2)), (aliceUserParty, walletUsdToCoin(tap1)))
 
       val merges =
         sv1ScanBackend.listActivity(None, 10).flatMap(_.transfer).filter { transfer =>
@@ -199,8 +199,8 @@ class ScanIntegrationTest
       PartyId.tryFromProtoPrimitive(mergeTransfer.sender.party) shouldBe aliceUserParty
       mergeTransfer.sender.inputCoinAmount
         .map(BigDecimal(_))
-        .getOrElse(BigDecimal(0)) shouldBe (BigDecimal(aliceCoin))
-      BigDecimal(mergeTransfer.sender.senderChangeAmount) shouldBe (BigDecimal(
+        .getOrElse(BigDecimal(0)) shouldBe walletUsdToCoin(aliceCoin)
+      BigDecimal(mergeTransfer.sender.senderChangeAmount) shouldBe (walletUsdToCoin(
         aliceCoin
       ) - BigDecimal(mergeTransfer.sender.senderChangeFee) - BigDecimal(
         mergeTransfer.sender.holdingFees
@@ -262,14 +262,17 @@ class ScanIntegrationTest
       clue("Alice receives the transfer from bob") {
         eventually() {
           val balance = aliceWalletClient.balance()
-          balance.unlockedQty shouldBe (aliceTapAmount + transferAmount)
+          balance.unlockedQty shouldBe (walletUsdToCoin(aliceTapAmount) + transferAmount)
         }
         eventually() {
-          val approxBobFees = 3 // this value depends on transferAmount
+          val approxBobFees = walletUsdToCoin(3) // this value depends on transferAmount
           val balance = bobWalletClient.balance()
           assertInRange(
             balance.unlockedQty,
-            (bobTapAmount - transferAmount - approxBobFees, bobTapAmount - transferAmount),
+            (
+              walletUsdToCoin(bobTapAmount) - transferAmount - approxBobFees,
+              walletUsdToCoin(bobTapAmount) - transferAmount,
+            ),
           )
         }
       }
@@ -343,7 +346,7 @@ class ScanIntegrationTest
           taps should have size (1)
           val tap = taps.head
           // bob tapped
-          BigDecimal(tap.coinAmount) shouldBe (BigDecimal(bobTapAmount))
+          BigDecimal(tap.coinAmount) shouldBe walletUsdToCoin(bobTapAmount)
         }
       }
       val selfTransferAmount = BigDecimal(1000)
@@ -381,7 +384,7 @@ class ScanIntegrationTest
           val senderFee = BigDecimal(transfer.sender.senderFee)
           val holdingFees = BigDecimal(transfer.sender.holdingFees)
           val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
-          senderFee shouldBe BigDecimal(CNNodeUtil.defaultCreateFee.fee)
+          senderFee shouldBe walletUsdToCoin(CNNodeUtil.defaultCreateFee.fee)
 
           val totalSenderFee = senderFee + holdingFees + senderChangeFee
           inputCoinAmount - senderChangeAmount shouldBe (selfTransferAmount + totalSenderFee)
@@ -581,21 +584,18 @@ class ScanIntegrationTest
   }
 
   def expectedSenderFee(amount: BigDecimal) = {
-    require(amount > 1000 && amount < 100000)
     val initialRate = CNNodeUtil.defaultTransferFee.initialRate
     val step1 = CNNodeUtil.defaultTransferFee.steps.get(0)
     val step2 = CNNodeUtil.defaultTransferFee.steps.get(1)
     val step3 = CNNodeUtil.defaultTransferFee.steps.get(2)
-    val (step1Amount, step1Mult) = (step1._1, step1._2)
-    val (step2Amount, step2Mult) = (step2._1, step2._2)
+    val (step1Amount, step1Mult) = (walletUsdToCoin(step1._1), step1._2)
+    val (step2Amount, step2Mult) = (walletUsdToCoin(step2._1), step2._2)
     // ensuring the right steps are hardcoded here.
-    BigDecimal(step3._1) should be > amount
-    val remainder = amount - step1Amount - step2Amount
-    // this is specific for the transferAmount > step3._1
+    walletUsdToCoin(step3._1) should be > amount
     val steppedRate =
-      initialRate * step1Amount + step1Mult * step2Amount +
-        step2Mult
-        * remainder
-    CNNodeUtil.defaultCreateFee.fee + steppedRate
+      initialRate * (amount min step1Amount) +
+        step1Mult * ((amount - step1Amount) max 0 min step2Amount) +
+        step2Mult * ((amount - step1Amount - step2Amount) max 0)
+    walletUsdToCoin(CNNodeUtil.defaultCreateFee.fee) + steppedRate
   }
 }

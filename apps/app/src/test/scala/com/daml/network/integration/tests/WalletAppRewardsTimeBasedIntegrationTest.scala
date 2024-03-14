@@ -97,6 +97,8 @@ class WalletAppRewardsTimeBasedIntegrationTest
           .pause()
           .futureValue
 
+        val feeCeiling = walletUsdToCoin(smallAmount)
+
         actAndCheck(
           "Advance rounds again to collect rewards",
           Seq(2, 3).foreach(_ => advanceRoundsByOneTick),
@@ -124,13 +126,15 @@ class WalletAppRewardsTimeBasedIntegrationTest
               .sum + aliceValidatorCoupons
               .map(_.payload.amount)
               .map(BigDecimal(_))
-              .sum + 2.85 * 3 // 2.85 CC (at 1CC/USD) per faucet coupon
+              .sum + walletUsdToCoin(2.85) * 3 // 2.85 USD per faucet coupon
             checkBalance(
               aliceValidatorWalletClient,
               Some(aliceValidatorStartBalance.round + 4),
               (
-                expectedBalance - smallAmount,
-                expectedBalance + 2.85, // the last validator faucet may or may not have been received/claimed
+                expectedBalance - feeCeiling,
+                expectedBalance + walletUsdToCoin(
+                  2.85
+                ), // the last validator faucet may or may not have been received/claimed
               ),
               (0, 0),
               (0, 1),
