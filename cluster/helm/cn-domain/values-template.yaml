@@ -2,7 +2,7 @@ cluster:
   imageTag: IMAGE_TAG
 imageRepo: "digitalasset-canton-network-docker.jfrog.io/digitalasset"
 
-defaultJvmOptions: -Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4
+defaultJvmOptions: -Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8
 resources:
   limits:
     memory: 8Gi

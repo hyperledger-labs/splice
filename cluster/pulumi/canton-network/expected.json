@@ -1115,7 +1115,7 @@
           "svNamespace": "splitwell"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
@@ -1159,7 +1159,7 @@
           "domains": 5,
           "nodes": 10
         },
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
@@ -1190,7 +1190,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1246,7 +1246,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -1446,7 +1446,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -1657,7 +1657,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1722,7 +1722,7 @@
           "svNamespace": "sv-1"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": false,
@@ -1764,7 +1764,7 @@
           "svNamespace": "sv-1"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
@@ -1808,7 +1808,7 @@
           "domains": 5,
           "nodes": 10
         },
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
@@ -1839,7 +1839,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2146,7 +2146,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": true,
         "metrics": {
@@ -2267,7 +2267,7 @@
           "connectionUri": "http://undefined:26657",
           "enabled": true
         },
-        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=8",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -2387,7 +2387,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
@@ -2588,7 +2588,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2653,7 +2653,7 @@
           "svNamespace": "sv-2"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": false,
@@ -2695,7 +2695,7 @@
           "svNamespace": "sv-2"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
@@ -2739,7 +2739,7 @@
           "domains": 5,
           "nodes": 10
         },
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
@@ -2770,7 +2770,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3077,7 +3077,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
@@ -3198,7 +3198,7 @@
           "connectionUri": "http://undefined:26657",
           "enabled": true
         },
-        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=8",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -3289,7 +3289,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
@@ -3490,7 +3490,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3555,7 +3555,7 @@
           "svNamespace": "sv-3"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": false,
@@ -3597,7 +3597,7 @@
           "svNamespace": "sv-3"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
@@ -3641,7 +3641,7 @@
           "domains": 5,
           "nodes": 10
         },
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
@@ -3672,7 +3672,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3979,7 +3979,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
@@ -4100,7 +4100,7 @@
           "connectionUri": "http://undefined:26657",
           "enabled": true
         },
-        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=8",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -4191,7 +4191,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
@@ -4392,7 +4392,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -4457,7 +4457,7 @@
           "svNamespace": "sv-4"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": false,
@@ -4499,7 +4499,7 @@
           "svNamespace": "sv-4"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
@@ -4543,7 +4543,7 @@
           "domains": 5,
           "nodes": 10
         },
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
@@ -4574,7 +4574,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -4881,7 +4881,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
@@ -5002,7 +5002,7 @@
           "connectionUri": "http://undefined:26657",
           "enabled": true
         },
-        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=8",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -5093,7 +5093,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
@@ -5190,7 +5190,7 @@
           "svNamespace": "validator1"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "cns": true,
@@ -5234,7 +5234,7 @@
           "domains": 5,
           "nodes": 10
         },
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images"
       }
     },
@@ -5265,7 +5265,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -5447,7 +5447,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "resources": {
           "limits": {
@@ -5485,7 +5485,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=4",
+        "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {

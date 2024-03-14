@@ -78,7 +78,7 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                     },
                     {
                       name: 'JAVA_TOOL_OPTIONS',
-                      value: '-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=4',
+                      value: '-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8',
                     },
                   ],
                 },
