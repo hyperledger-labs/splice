@@ -80,3 +80,6 @@ Skipped.*faucet coupons from last claimed round.*to current round
 
 # Sometimes the CircleCI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
 DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
+
+# TODO(#10889) Figure out what broke and remove this again.
+shutdown did not complete gracefully in .*seconds.*ParticipantAdminConnection

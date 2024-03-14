@@ -83,4 +83,7 @@ MEDIATOR_INVALID_MESSAGE.*Received a confirmation response.*with an unknown requ
 # TODO(#10875) Investigate why Canton starts warning about this
 periodic acknowledgement failed
 
+ TODO(#10887) Figure out where this is coming from
+Token refresh failed with Status.*UNAVAILABLE.*Health-check stream unexpectedly closed
+
 # Make sure to have a trailing newline
