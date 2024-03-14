@@ -1,4 +1,4 @@
-sdk-version: 3.0.0-snapshot.20240307.12859.0.v66d83e43
+sdk-version: 3.0.0-snapshot.20240312.12880.0.vde841b72
 build-options:
   - --ghc-option=-Wunused-binds
   - --ghc-option=-Wunused-matches

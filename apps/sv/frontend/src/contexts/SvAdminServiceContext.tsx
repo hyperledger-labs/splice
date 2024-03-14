@@ -27,7 +27,7 @@ import {
   UpdateCoinPriceVoteRequest,
 } from 'sv-openapi';
 
-import { RelTime } from '@daml.js/13f71afbf5d73853a854c2ad9269e47acf5a94c2f533141b5522542f66e86526/lib/DA/Time/Types';
+import { RelTime } from '@daml.js/b70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946/lib/DA/Time/Types';
 import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 const SvAdminContext = React.createContext<SvAdminClient | undefined>(undefined);

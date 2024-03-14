@@ -8,7 +8,7 @@ import React, { useEffect, useState } from 'react';
 import { FormControl, Stack, Typography } from '@mui/material';
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
-import { Tuple2 } from '@daml.js/26b14ad5a8a2ed45d75e3c774aeb1c41a918ef2f4a7d2bd40f9716f26c46bfdf/lib/DA/Types';
+import { Tuple2 } from '@daml.js/5aee9b21b8e9a4c4975b5f4c4198e6e6e8469df49e2010820e792f393db870f4/lib/DA/Types';
 import { CoinConfig, USD } from '@daml.js/canton-coin/lib/CC/CoinConfig';
 
 import { useSvcInfos } from '../../../contexts/SvContext';

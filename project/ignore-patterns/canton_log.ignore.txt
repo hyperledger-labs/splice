@@ -68,10 +68,6 @@ Failed to submit submission due to .*\(Overloaded\(Submission rate exceeds rate 
 # This is happenening during party migration and is expected. We can remove this in the future if/when canton detects and handles this warning
 .*Received a commitment where we have no shared contract.*ACS_MISMATCH_NO_SHARED_CONTRACTS.*
 
-# TODO(#9694) Remove this once Canton fixes their metrics
-has recorded multiple values for the same attributes
-Too many log messages detected..*AsynchronousMetricStorage
-
 # TODO(#9544): remove once the slowdown in Canton has been fixed
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 
@@ -83,5 +79,8 @@ SEQUENCER_MAX_SEQUENCING_TIME_TOO_FAR
 
 # TODO(#10847) Logged when a mediator joins between request and confirmation
 MEDIATOR_INVALID_MESSAGE.*Received a confirmation response.*with an unknown request id
+
+# TODO(#10875) Investigate why Canton starts warning about this
+periodic acknowledgement failed
 
 # Make sure to have a trailing newline

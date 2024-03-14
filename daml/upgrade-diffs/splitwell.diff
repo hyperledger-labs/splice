@@ -2,7 +2,7 @@ diff -ur -x '*~' -x target -x dar -x .daml daml/splitwell/daml.yaml daml/splitwe
 --- daml/splitwell/daml.yaml
 +++ daml/splitwell-upgrade/daml.yaml
 @@ -1,14 +1,15 @@
- sdk-version: 3.0.0-snapshot.20240307.12859.0.v66d83e43
+ sdk-version: 3.0.0-snapshot.20240312.12880.0.vde841b72
  name: splitwell
  source: daml
 -version: 0.1.0
