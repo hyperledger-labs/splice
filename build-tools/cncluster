@@ -843,7 +843,7 @@ function subcmd_create() {
     fi
 
     for stack in infra canton-network sv-runbook validator-runbook; do
-	_uses_pulumi_stack $stack
+      _uses_pulumi_stack $stack
     done
 
     _log "Cluster at IP ${IPADDR} ready"
