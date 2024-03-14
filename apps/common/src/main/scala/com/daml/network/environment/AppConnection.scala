@@ -91,7 +91,12 @@ abstract class AppConnection(
   )
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
-    SyncCloseable("channel", channel.close())
+    SyncCloseable(
+      "channel", {
+        channel.channel.shutdownNow()
+        channel.close()
+      },
+    )
   )
 
   // This adapted from GrpcCtlRunner but keeps the actual grpc exception
