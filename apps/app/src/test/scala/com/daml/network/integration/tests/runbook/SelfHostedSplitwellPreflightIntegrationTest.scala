@@ -11,6 +11,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.{CommonCNNodeAppInstanceReferences, ProcessTestUtil, SplitwellTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
+import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
 
 /** Preflight test that spins up a new validator following our runbook.
@@ -43,7 +44,12 @@ class SelfHostedSplitwellPreflightIntegrationTest
   override lazy val resetRequiredTopologyState = false
 
   override def environmentDefinition
-      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
+      : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] = {
+    // We have set the system properties of CANTON_DB_USER and CANTON_DB_PASSWORD in the initializer of the instance
+    // It is possible that `ConfigFactory.load()` was invoked before the above 2 system properties were set.
+    // If it is the case, the `ConfigFactory.load()` in `fromFiles()` will return a cached config object with old snapshot of system properties.
+    // We will have to call `invalidateCaches()` to make sure we will get the config object from `ConfigFactory.load()` with updated system properties.
+    ConfigFactory.invalidateCaches()
     CNNodeEnvironmentDefinition
       .fromFiles(
         this.getClass.getSimpleName,
@@ -70,7 +76,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       .addConfigTransforms((_, conf) => replaceDarFilePath(conf))
       .addConfigTransform((_, conf) => domainMigrationCNNodeConfigTransforms(conf))
       .withManualStart
-
+  }
   "run through runbook with self-hosted splitwell" in { implicit env =>
     // Start Canton as a separate process. We do that here rather than in the env setup
     // because it is only needed for this one test.
