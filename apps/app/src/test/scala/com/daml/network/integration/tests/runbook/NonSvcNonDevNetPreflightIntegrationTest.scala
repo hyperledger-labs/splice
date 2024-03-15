@@ -14,6 +14,8 @@ final class NonSvcNonDevNetPreflightIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with DataExportTestUtil {
 
+  override lazy val resetRequiredTopologyState: Boolean = false
+
   // For now treating this as a non-SV app since it is really run directly as the SVC
   // rather than as SV-1. It just happens to be in SV-1's namespace.
   def splitwellClient(implicit env: CNNodeTestConsoleEnvironment) = rsw("splitwell")

@@ -26,6 +26,8 @@ abstract class ValidatorPreflightIntegrationTestBase
     with WalletFrontendTestUtil
     with SplitwellFrontendTestUtil {
 
+  override lazy val resetRequiredTopologyState: Boolean = false
+
   protected val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
 
   protected val isDevNet: Boolean

@@ -14,6 +14,8 @@ abstract class ValidatorNonDevNetPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("validator-user", "sv1-user")
     with WalletFrontendTestUtil {
 
+  override lazy val resetRequiredTopologyState: Boolean = false
+
   protected val validatorName: String
 
   protected lazy val validatorUserName =

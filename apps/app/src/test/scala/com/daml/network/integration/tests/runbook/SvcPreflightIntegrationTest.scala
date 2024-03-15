@@ -14,6 +14,8 @@ class SvcPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv")
     with SvUiIntegrationTestUtil {
 
+  override lazy val resetRequiredTopologyState: Boolean = false
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition.preflightTopology(

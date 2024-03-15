@@ -26,6 +26,8 @@ abstract class RunbookSvPreflightIntegrationTestBase
     with CnsFrontendTestUtil
     with SvTestUtil {
 
+  override lazy val resetRequiredTopologyState: Boolean = false
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition.svPreflightTopology(
