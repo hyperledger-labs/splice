@@ -2,18 +2,35 @@
 # so we use env -i to unload everything except PATH and HOME,
 # and then we direnv exec to restore the repo's environment variables before running dump-config.
 # This doesn't translate well to CI, but that's okay because CI doesn't change variables anyway.
-.PHONY: $(dir)/test.json
-$(dir)/test.json: $(dir $(dir)).build
+.PHONY: $(dir)/test-devnet.json
+$(dir)/test-devnet.json: $(dir $(dir)).build
 	set -o pipefail \
 	&& cd $(@D); \
 	if [ -n "$$CI" ]; then \
-		npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+		IS_DEVNET=1 npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	else \
-		env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 direnv exec . npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+		env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 IS_DEVNET_OVERRIDE=1 direnv exec . npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
 	fi
 
+.PHONY: $(dir)/test-testnet.json
+$(dir)/test-testnet.json: $(dir $(dir)).build
+	set -o pipefail \
+	&& cd $(@D); \
+	if [ -n "$$CI" ]; then \
+    	IS_DEVNET=0 npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+    else \
+        env -i PATH="$$PATH" HOME="$$HOME" IGNORE_PRIVATE_ENVRC=1 IS_DEVNET_OVERRIDE=0 direnv exec . npm run --silent dump-config | jq --slurp --sort-keys $(JQ_FILTER) > $(@F); \
+    fi
+
 .PHONY: $(dir)/test
-$(dir)/test: $(dir)/test-config $(dir)/lint
+$(dir)/test: $(dir)/test-devnet $(dir)/test-testnet
+
+.PHONY: $(dir)/test-devnet
+$(dir)/test-devnet: $(dir)/test-config-devnet $(dir)/lint
+
+.PHONY: $(dir)/test-testnet
+$(dir)/test-testnet: $(dir)/test-config-testnet $(dir)/lint
+
 
 .PHONY: $(dir)/lint
 $(dir)/lint:
@@ -21,13 +38,28 @@ $(dir)/lint:
 	&& cd $(@D) \
 	&& npm run lint:check
 
-.PHONY: $(dir)/test-config
-$(dir)/test-config: $(dir)/test.json $(dir)/expected.json
-	diff -u $(@D)/expected.json $(@D)/test.json; \
+.PHONY: $(dir)/test-config-devnet
+$(dir)/test-config-devnet: $(dir)/test-devnet.json $(dir)/expected-devnet.json
+	diff -u $(@D)/expected-devnet.json $(@D)/test-devnet.json; \
 	EXIT=$$?; \
-	cp $(@D)/test.json $(@D)/expected.json; \
+	cp $(@D)/test-devnet.json $(@D)/expected-devnet.json; \
 	exit $$EXIT
 
+.PHONY: $(dir)/test-config-testnet
+$(dir)/test-config-testnet: $(dir)/test-testnet.json $(dir)/expected-testnet.json
+	diff -u $(@D)/expected-testnet.json $(@D)/test-testnet.json; \
+	EXIT=$$?; \
+	cp $(@D)/test-testnet.json $(@D)/expected-testnet.json; \
+	exit $$EXIT
+
+
 .PHONY: $(dir)/update-expected
-$(dir)/update-expected: $(dir)/test.json
-	@cp -v $^ $(@D)/expected.json
+$(dir)/update-expected: $(dir)/update-expected-devnet $(dir)/update-expected-testnet
+
+.PHONY: $(dir)/update-expected-devnet
+$(dir)/update-expected-devnet: $(dir)/test-devnet.json
+	@cp -v $^ $(@D)/expected-devnet.json
+
+.PHONY: $(dir)/update-expected-testnet
+$(dir)/update-expected-testnet: $(dir)/test-testnet.json
+	@cp -v $^ $(@D)/expected-testnet.json

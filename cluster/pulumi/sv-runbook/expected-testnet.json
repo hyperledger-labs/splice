@@ -1,0 +1,759 @@
+[
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "apps-pg",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "db": {
+          "volumeSize": "48Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "secretName": "apps-pg-secret"
+        }
+      }
+    },
+    "name": "apps-pg",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://ledger_api.example.com",
+          "client-id": "sv-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "sv-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-sv",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-validator-ledger-api-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "audience": "https://ledger_api.example.com",
+          "client-id": "validator-client-id",
+          "client-secret": "***",
+          "ledger-api-user": "validator-client-id@clients",
+          "url": "https://auth0Domain/.well-known/openid-configuration"
+        }
+      }
+    },
+    "name": "auth0-secret-sv-validator",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-cns-ui-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "cns-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-cns",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-ui-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "sv-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-sv",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-wallet-ui-auth",
+        "namespace": "sv"
+      },
+      "stringData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "client-id": "wallet-client-id",
+          "url": "https://auth0Domain"
+        }
+      }
+    },
+    "name": "auth0-ui-secret-sv-wallet",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "compat": "true",
+      "name": "cluster-ingress-sv",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "hostname": "svrun.network.canton.global",
+          "svNamespace": "sv"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingress": {
+          "globalDomain": {
+            "activeMigrationId": "0",
+            "migrationId": "0"
+          }
+        }
+      }
+    },
+    "name": "cluster-ingress-sv",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "apps-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-apps-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "json-credentials": "eyJidWNrZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LW5hbWUiLCJzZWNyZXROYW1lIjoiZGF0YS1leHBvcnQtYnVja2V0LXNhLWtleS1zZWNyZXQiLCJqc29uQ3JlZGVudGlhbHMiOiJkYXRhLWV4cG9ydC1idWNrZXQtc2Eta2V5LXNlY3JldC1jcmVkcyJ9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "private": "c3YtaWQtcHJpdmF0ZS1rZXk=",
+          "public": "c3YtaWQtcHVibGljLWtleQ=="
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cn-app-sv-key",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-key",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "mediator-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-mediator-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "participant-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-participant-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "postgresPassword": ""
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "sequencer-pg-secret",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cn-app-sv-sequencer-pg-secret",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "data": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": {
+          "node_key.json": "eyJwcml2X2tleSI6eyJ0eXBlIjoidGVuZGVybWludC9Qcml2S2V5RWQyNTUxOSIsInZhbHVlIjoicUdLRWRQL0V5T2d1dVBJc0JYQ0E5cURZeEN3OUp0UTljVEJzcm9RY0FiU0dEcXZ6NDJTY0lPOEw4ZzJXMEFPbndZdG9Lc1cweDhHSTQxeGdLcjRlbWc9PSJ9fQ==",
+          "priv_validator_key.json": "ewogICJhZGRyZXNzIjogIjA2NDdFNEZGMjc5MDhCOEI4NzRDMjY0NzUzNkFDOTg2QzlFQTBCQUIiLAogICJwdWJfa2V5IjogewogICAgInR5cGUiOiAidGVuZGVybWludC9QdWJLZXlFZDI1NTE5IiwKICAgICJ2YWx1ZSI6ICIzVEhIQnc0amVjQ0dPZWgxVWRiU0hmSDU0QlZqRmpxS2hySm5yWEFPZ2xNPSIKICB9LAogICJwcml2X2tleSI6IHsKICAgICJ0eXBlIjogInRlbmRlcm1pbnQvUHJpdktleUVkMjU1MTkiLAogICAgInZhbHVlIjogIjhmWkRzVkxyYTFWRTgvMjhrYUltaXdrV1BqVWdUZUF0SmN6VHh2cDVIQ25kTWNjSERpTjV3SVk1NkhWUjF0SWQ4Zm5nRldNV09vcUdzbWV0Y0E2Q1V3PT0iCiAgfQp9"
+        }
+      },
+      "kind": "Secret",
+      "metadata": {
+        "name": "cometbft-keys",
+        "namespace": "sv"
+      },
+      "type": "Opaque"
+    },
+    "name": "cometbft-keys",
+    "provider": "",
+    "type": "kubernetes:core/v1:Secret"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cometbft/",
+      "compat": "true",
+      "name": "global-domain-0-cometbft",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "founder": {
+          "externalAddress": "svrun.network.com.network.canton.global:26016"
+        },
+        "genesis": {
+          "chainId": "svrun.network.com-0"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "istioVirtualService": {
+          "enabled": true,
+          "gateway": "cluster-ingress/cn-apps-gateway",
+          "port": "26056"
+        },
+        "metrics": {
+          "enable": true,
+          "labels": [
+            {
+              "key": "active_migration",
+              "value": true
+            }
+          ]
+        },
+        "node": {
+          "externalAddress": "global-domain-0-cometbft.sv.svc.svrun.network.canton.global:26056",
+          "id": "9116f5faed79dcf98fa79a2a40865ad9b493f463",
+          "identifier": "global-domain-0-cometbft",
+          "keysSecret": "cometbft-keys",
+          "retainBlocks": 10000
+        },
+        "nodeName": "DA-Helm-Test-Node",
+        "stateSync": {
+          "rpcServers": "https://sv.sv-1.svc.svrun.network.com.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc,https://sv.sv-1.svc.svrun.network.com.network.canton.global:443/api/sv/v0/admin/domain/cometbft/json-rpc"
+        }
+      }
+    },
+    "name": "global-domain-0-cometbft",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-global-domain/",
+      "compat": "true",
+      "name": "global-domain-0",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "disableAutoInit": false,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "mediator": {
+          "persistence": {
+            "databaseName": "mediator_0",
+            "host": "mediator-pg",
+            "secretName": "mediator-pg-secret"
+          }
+        },
+        "metrics": {
+          "enable": true
+        },
+        "nodeIdentifier": "DA-Helm-Test-Node",
+        "sequencer": {
+          "driver": {
+            "host": "global-domain-0-cometbft-cometbft-rpc",
+            "port": 26657,
+            "type": "cometbft"
+          },
+          "persistence": {
+            "databaseName": "sequencer_0",
+            "host": "sequencer-pg",
+            "secretName": "sequencer-pg-secret"
+          }
+        }
+      }
+    },
+    "name": "global-domain-0",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "mediator-pg",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "db": {
+          "volumeSize": "48Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "secretName": "mediator-pg-secret"
+        }
+      }
+    },
+    "name": "mediator-pg",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": false,
+    "id": "organization/infra/infra.svrun",
+    "inputs": {
+      "name": "organization/infra/infra.svrun"
+    },
+    "name": "organization/infra/infra.svrun",
+    "provider": "",
+    "type": "pulumi:pulumi:StackReference"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-participant/",
+      "compat": "true",
+      "name": "participant-0",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "auth": {
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "targetAudience": "https://ledger_api.example.com"
+        },
+        "disableAutoInit": false,
+        "enableHealthProbes": true,
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "metrics": {
+          "enable": true
+        },
+        "nodeIdentifier": "DA-Helm-Test-Node",
+        "persistence": {
+          "databaseName": "participant_0",
+          "host": "participant-pg",
+          "schema": "participant",
+          "secretName": "participant-pg-secret"
+        }
+      }
+    },
+    "name": "participant-0",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "participant-pg",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "db": {
+          "volumeSize": "48Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "secretName": "participant-pg-secret"
+        }
+      }
+    },
+    "name": "participant-pg",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-scan/",
+      "compat": "true",
+      "name": "scan",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "clusterUrl": "svrun.network.com.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "metrics": {
+          "enable": true
+        },
+        "migration": {
+          "id": "0"
+        },
+        "participantAddress": "participant-0",
+        "persistence": {
+          "host": "apps-pg",
+          "secretName": "apps-pg-secret"
+        },
+        "sequencerAddress": "global-domain-0-sequencer"
+      }
+    },
+    "name": "scan",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-postgres/",
+      "compat": "true",
+      "name": "sequencer-pg",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "db": {
+          "volumeSize": "480Gi"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "persistence": {
+          "secretName": "sequencer-pg-secret"
+        }
+      }
+    },
+    "name": "sequencer-pg",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-apps-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-sv-node/",
+      "compat": "true",
+      "name": "sv-app",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "approvedSvIdentities": [
+          {
+            "name": "SBI-Holdings",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETM+CeyHvphl9RiPDKL3vVX7F+Qo4fIhJopmgU5B7IzkwSdFic20hFB6tnAuCTU+UBjqZgh8N/h9r+CTrXMPsRg==",
+            "rewardWeightBps": 100000
+          },
+          {
+            "name": "Liberty-City-Ventures",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEr/iPpyuFu2U914tHyNUDuECT4/AYz9J+nLQRTC8m+95yQ6Y4Oah+Y3u3o5MK4a9D+qkoNGoG6ng0HcjA6TGKmw==",
+            "rewardWeightBps": 30000
+          },
+          {
+            "name": "Digital-Asset-1",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEsRRntNkOLF2Wh7JxV0rBQPgT+SendIjFLXKUXCrLbVHqomkypHQiZP8OgFMSlByOnr81fqiUt3G36LUpg/fmgA==",
+            "rewardWeightBps": 140000
+          },
+          {
+            "name": "Cumberland",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUqL9Y0mFB8xQXGAAJk+7q5/E/SyrwM20pKWB4ZhwGGmyR7L7ss5hr56dwcCURLUGnIlKssuV89XFUwFfwhz3AA==",
+            "rewardWeightBps": 240000
+          }
+        ],
+        "auth": {
+          "audience": "https://sv.example.com/api",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json"
+        },
+        "cometBFT": {
+          "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
+          "enabled": true
+        },
+        "disableOnboardingParticipantPromotionDelay": false,
+        "domain": {
+          "mediatorAddress": "global-domain-0-mediator",
+          "sequencerAddress": "global-domain-0-sequencer",
+          "sequencerAvailabilityDelay": "60 seconds",
+          "sequencerPruningConfig": {
+            "enabled": false
+          },
+          "sequencerPublicUrl": "https://sequencer-0.sv.svc.svrun.network.canton.global"
+        },
+        "extraBeneficiaries": [
+          {
+            "partyId": "dummy::partyId",
+            "percentage": "33.33"
+          }
+        ],
+        "globalDomainUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "joinWithKeyOnboarding": {
+          "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
+        },
+        "metrics": {
+          "enable": true
+        },
+        "migration": {
+          "id": "0"
+        },
+        "onboardingName": "DA-Helm-Test-Node",
+        "participantAddress": "participant-0",
+        "persistence": {
+          "host": "apps-pg",
+          "secretName": "apps-pg-secret"
+        },
+        "scan": {
+          "internalUrl": "http://scan-app.sv:5012",
+          "publicUrl": "https://scan.sv.svc.svrun.network.canton.global"
+        }
+      }
+    },
+    "name": "sv-app",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-mediator-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-participant-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "length": 16,
+      "overrideSpecial": "_%@",
+      "special": true
+    },
+    "name": "sv-sequencer-pg-passwd",
+    "provider": "",
+    "type": "random:index/randomPassword:RandomPassword"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "apiVersion": "v1",
+      "kind": "Namespace",
+      "metadata": {
+        "labels": {
+          "istio-injection": "enabled"
+        },
+        "name": "sv"
+      }
+    },
+    "name": "sv",
+    "provider": "",
+    "type": "kubernetes:core/v1:Namespace"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-validator/",
+      "compat": "true",
+      "name": "validator",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "auth": {
+          "audience": "https://validator.example.com/api",
+          "jwksUrl": "https://auth0Domain/.well-known/jwks.json",
+          "ledgerApiAudience": "https://ledger_api.example.com"
+        },
+        "clusterUrl": "svrun.network.com.network.canton.global",
+        "globalDomainUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "metrics": {
+          "enable": true
+        },
+        "migration": {
+          "id": "0"
+        },
+        "participantAddress": "participant-0",
+        "participantIdentitiesDumpPeriodicBackup": {
+          "backupInterval": "10m",
+          "location": {
+            "bucket": {
+              "bucketName": "da-cn-data-dumps",
+              "jsonCredentials": "{\"bucketName\":\"data-export-bucket-name\",\"secretName\":\"data-export-bucket-sa-key-secret\",\"jsonCredentials\":\"data-export-bucket-sa-key-secret-creds\"}",
+              "projectId": "da-cn-devnet",
+              "secretName": "cn-gcp-bucket-da-cn-devnet-da-cn-data-dumps"
+            },
+            "prefix": "svrun/sv"
+          }
+        },
+        "persistence": {
+          "host": "apps-pg",
+          "secretName": "apps-pg-secret"
+        },
+        "scanAddress": "http://scan-app.sv:5012",
+        "svValidator": true,
+        "topup": {
+          "enabled": true,
+          "minTopupInterval": "1m",
+          "targetThroughput": 0
+        },
+        "useSequencerConnectionsFromScan": false,
+        "validatorWalletUser": "auth0|64553aa683015a9687d9cc2e"
+      }
+    },
+    "name": "validator",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  }
+]
