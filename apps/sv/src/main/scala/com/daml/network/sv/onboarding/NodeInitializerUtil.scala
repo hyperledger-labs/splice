@@ -5,20 +5,21 @@ import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvStore, SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.ParticipantId
+import com.digitalasset.canton.tracing.Spanning
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
-trait NodeInitializerUtil extends NamedLogging {
+trait NodeInitializerUtil extends NamedLogging with Spanning {
 
   protected val config: SvAppBackendConfig
   protected val storage: Storage

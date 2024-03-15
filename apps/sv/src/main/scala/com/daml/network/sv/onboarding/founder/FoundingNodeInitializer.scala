@@ -88,11 +88,12 @@ class FoundingNodeInitializer(
     templateDecoder: TemplateJsonDecoder,
     closeContext: CloseContext,
     mat: Materializer,
-    tc: TraceContext,
     tracer: Tracer,
 ) extends NodeInitializerUtil {
 
-  def bootstrapCollective(): Future[
+  def bootstrapCollective()(implicit
+      tc: TraceContext
+  ): Future[
     (
         DomainId,
         SvcPartyHosting,
@@ -212,6 +213,8 @@ class FoundingNodeInitializer(
       domain: DomainId,
       connection: BaseLedgerConnection,
       namespace: Namespace,
+  )(implicit
+      tc: TraceContext
   ): Future[PartyId] =
     for {
       svc <- connection.ensurePartyAllocated(
@@ -239,119 +242,123 @@ class FoundingNodeInitializer(
     )
   }
 
-  private def bootstrapDomain(domainNode: LocalDomainNode): Future[(Namespace, DomainId)] = {
-    logger.info("Bootstrapping the domain as the founding node")
+  private def bootstrapDomain(domainNode: LocalDomainNode)(implicit
+      tc: TraceContext
+  ): Future[(Namespace, DomainId)] = {
+    withSpan("bootstrapDomain") { implicit tc => _ =>
+      logger.info("Bootstrapping the domain as the founding node")
 
-    (
-      participantAdminConnection.getParticipantId(),
-      domainNode.mediatorAdminConnection.getMediatorId,
-      domainNode.sequencerAdminConnection.getSequencerId,
-    ).flatMapN { case (participantId, mediatorId, sequencerId) =>
-      val namespace =
-        DecentralizedNamespaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
-      val domainId = DomainId(
-        UniqueIdentifier(
-          Identifier.tryCreate("global-domain"),
-          namespace,
+      (
+        participantAdminConnection.getParticipantId(),
+        domainNode.mediatorAdminConnection.getMediatorId,
+        domainNode.sequencerAdminConnection.getSequencerId,
+      ).flatMapN { case (participantId, mediatorId, sequencerId) =>
+        val namespace =
+          DecentralizedNamespaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
+        val domainId = DomainId(
+          UniqueIdentifier(
+            Identifier.tryCreate("global-domain"),
+            namespace,
+          )
         )
-      )
-      val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v30)
-      val values = initialValues.copy(
-        // TODO(#6055) Consider increasing topology change delay again
-        topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
-        trafficControlParameters = Some(initialTrafficControlParameters),
-      )(initialValues.representativeProtocolVersion)
-      for {
-        _ <- retryProvider.ensureThatO(
-          RetryFor.WaitingOnInitDependency,
-          "sequencer is initialized",
-          domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),
-          for {
-            (
-              identityTransactions,
-              decentralizedNamespace,
-              domainParametersState,
-              sequencerState,
-              mediatorState,
-            ) <- (
-              List(
-                participantAdminConnection,
-                domainNode.mediatorAdminConnection,
-                domainNode.sequencerAdminConnection,
-              ).traverse { con =>
-                con.getId().flatMap(con.getIdentityTransactions(_, domainId = None))
-              }.map(_.flatten),
-              // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
-              // been proposed.
-              participantAdminConnection.proposeInitialDecentralizedNamespaceDefinition(
-                namespace,
-                NonEmpty.mk(Set, participantId.uid.namespace),
-                threshold = PositiveInt.one,
-                signedBy = participantId.uid.namespace.fingerprint,
-              ),
-              participantAdminConnection.proposeInitialDomainParameters(
-                domainId,
-                values,
-                signedBy = participantId.uid.namespace.fingerprint,
-              ),
-              TopologyAdminConnection.proposeCollectively(
-                NonEmpty.mk(List, participantAdminConnection, domainNode.sequencerAdminConnection)
-              ) { case (con, id) =>
-                con.proposeInitialSequencerDomainState(
-                  domainId,
-                  active = Seq(sequencerId),
-                  observers = Seq.empty,
-                  signedBy = id.namespace.fingerprint,
-                )
-              },
-              TopologyAdminConnection.proposeCollectively(
-                NonEmpty.mk(List, participantAdminConnection, domainNode.mediatorAdminConnection)
-              ) { case (con, id) =>
-                con.proposeInitialMediatorDomainState(
-                  domainId,
-                  group = NonNegativeInt.zero,
-                  active = Seq(mediatorId),
-                  observers = Seq.empty,
-                  signedBy = id.namespace.fingerprint,
-                )
-              },
-            ).tupled
-            bootstrapTransactions =
-              (Seq(
+        val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v30)
+        val values = initialValues.copy(
+          // TODO(#6055) Consider increasing topology change delay again
+          topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
+          trafficControlParameters = Some(initialTrafficControlParameters),
+        )(initialValues.representativeProtocolVersion)
+        for {
+          _ <- retryProvider.ensureThatO(
+            RetryFor.WaitingOnInitDependency,
+            "sequencer is initialized",
+            domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),
+            for {
+              (
+                identityTransactions,
                 decentralizedNamespace,
                 domainParametersState,
                 sequencerState,
                 mediatorState,
-              ) ++ identityTransactions).sorted
-                .mapFilter(_.selectOp[TopologyChangeOpX.Replace])
-                .map(signed =>
-                  StoredTopologyTransactionX(
-                    SequencedTime(CantonTimestamp.MinValue.immediateSuccessor),
-                    EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
-                    None,
-                    signed.copy(isProposal = false),
+              ) <- (
+                List(
+                  participantAdminConnection,
+                  domainNode.mediatorAdminConnection,
+                  domainNode.sequencerAdminConnection,
+                ).traverse { con =>
+                  con.getId().flatMap(con.getIdentityTransactions(_, domainId = None))
+                }.map(_.flatten),
+                // Proposing the same state is idempotent so we don't bother wrapping all of these in a check if the transaction has already
+                // been proposed.
+                participantAdminConnection.proposeInitialDecentralizedNamespaceDefinition(
+                  namespace,
+                  NonEmpty.mk(Set, participantId.uid.namespace),
+                  threshold = PositiveInt.one,
+                  signedBy = participantId.uid.namespace.fingerprint,
+                ),
+                participantAdminConnection.proposeInitialDomainParameters(
+                  domainId,
+                  values,
+                  signedBy = participantId.uid.namespace.fingerprint,
+                ),
+                TopologyAdminConnection.proposeCollectively(
+                  NonEmpty.mk(List, participantAdminConnection, domainNode.sequencerAdminConnection)
+                ) { case (con, id) =>
+                  con.proposeInitialSequencerDomainState(
+                    domainId,
+                    active = Seq(sequencerId),
+                    observers = Seq.empty,
+                    signedBy = id.namespace.fingerprint,
                   )
-                )
-            _ <- domainNode.sequencerAdminConnection.initialize(
-              StoredTopologyTransactionsX(bootstrapTransactions),
+                },
+                TopologyAdminConnection.proposeCollectively(
+                  NonEmpty.mk(List, participantAdminConnection, domainNode.mediatorAdminConnection)
+                ) { case (con, id) =>
+                  con.proposeInitialMediatorDomainState(
+                    domainId,
+                    group = NonNegativeInt.zero,
+                    active = Seq(mediatorId),
+                    observers = Seq.empty,
+                    signedBy = id.namespace.fingerprint,
+                  )
+                },
+              ).tupled
+              bootstrapTransactions =
+                (Seq(
+                  decentralizedNamespace,
+                  domainParametersState,
+                  sequencerState,
+                  mediatorState,
+                ) ++ identityTransactions).sorted
+                  .mapFilter(_.selectOp[TopologyChangeOpX.Replace])
+                  .map(signed =>
+                    StoredTopologyTransactionX(
+                      SequencedTime(CantonTimestamp.MinValue.immediateSuccessor),
+                      EffectiveTime(CantonTimestamp.MinValue.immediateSuccessor),
+                      None,
+                      signed.copy(isProposal = false),
+                    )
+                  )
+              _ <- domainNode.sequencerAdminConnection.initialize(
+                StoredTopologyTransactionsX(bootstrapTransactions),
+                domainNode.staticDomainParameters,
+                None,
+              )
+            } yield (),
+            logger,
+          )
+          _ <- retryProvider.ensureThatB(
+            RetryFor.WaitingOnInitDependency,
+            "mediator is initialized",
+            domainNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
+            domainNode.mediatorAdminConnection.initialize(
+              domainId,
               domainNode.staticDomainParameters,
-              None,
-            )
-          } yield (),
-          logger,
-        )
-        _ <- retryProvider.ensureThatB(
-          RetryFor.WaitingOnInitDependency,
-          "mediator is initialized",
-          domainNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
-          domainNode.mediatorAdminConnection.initialize(
-            domainId,
-            domainNode.staticDomainParameters,
-            domainNode.sequencerConnection,
-          ),
-          logger,
-        )
-      } yield (namespace, domainId)
+              domainNode.sequencerConnection,
+            ),
+            logger,
+          )
+        } yield (namespace, domainId)
+      }
     }
   }
 
@@ -375,7 +382,9 @@ class FoundingNodeInitializer(
     )
 
     /** The one and only entry-point: found a fresh collective, given a properly allocated SVC party */
-    def foundCollective(): Future[Unit] = retryProvider.retry(
+    def foundCollective()(implicit
+        tc: TraceContext
+    ): Future[Unit] = retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
       "bootstrapping SVC",
       bootstrapSvc(),
@@ -385,6 +394,8 @@ class FoundingNodeInitializer(
     def reconcileSequencerConfigIfRequired(
         localDomainNode: Option[LocalDomainNode],
         migrationId: Long,
+    )(implicit
+        tc: TraceContext
     ): Future[Unit] = {
       domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
         localDomainNode,
@@ -395,7 +406,9 @@ class FoundingNodeInitializer(
     }
 
     // Create SvcRules and CoinRules and open the first mining round
-    private def bootstrapSvc(): Future[Unit] = {
+    private def bootstrapSvc()(implicit
+        tc: TraceContext
+    ): Future[Unit] = {
       val svcRulesConfig = SvUtil.defaultSvcRulesConfig(domainId)
       for {
         (participantId, mediatorId, trafficStateForAllMembers, coinRules, svcRules) <- (

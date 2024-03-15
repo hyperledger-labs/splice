@@ -23,7 +23,7 @@ import com.digitalasset.canton.lifecycle.{
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.{HasUptime, WallClock}
 import com.digitalasset.canton.topology.UniqueIdentifier
-import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider, W3CTraceContext}
+import com.digitalasset.canton.tracing.{Spanning, TraceContext, TracerProvider, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 import org.apache.pekko.actor.ActorSystem
@@ -65,7 +65,10 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     with HasCloseContext
     with NamedLogging
     with HasUptime
-    with NoTracing {
+    with Spanning {
+
+  implicit val traceContext: TraceContext = TraceContext.empty
+
   val name: InstanceName
 
   protected val retryProvider: RetryProvider =
@@ -97,11 +100,11 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     W3CTraceContext
       .fromHeaders(headers.map(h => h.name() -> h.value()).toMap)
       .map(_.toTraceContext)
-      .getOrElse(traceContext)
+      .getOrElse(TraceContext.empty)
   }
   protected implicit val httpClient: HttpRequest => Future[HttpResponse] = (request: HttpRequest) =>
     {
-      val requestTraceCtx = traceContextFromHeaders(request.headers)
+      implicit val traceContext: TraceContext = traceContextFromHeaders(request.headers)
       import parameters.loggingConfig.api.*
       val logPayload = messagePayloads
       val pathLimited = request.uri.path.toString
@@ -115,17 +118,17 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
           case HttpEntity.Strict(ContentTypes.`application/json`, data) =>
             logger.debug(
               msg(s"Requesting with entity data: ${data.utf8String.limit(maxStringLength)}")
-            )(requestTraceCtx)
-          case _ => logger.debug(msg(s"omitting logging of request entity data."))(requestTraceCtx)
+            )
+          case _ => logger.debug(msg(s"omitting logging of request entity data."))
         }
       }
       logger
-        .trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))(requestTraceCtx)
+        .trace(msg(s"headers: ${request.headers.toString.limit(maxMetadataSize)}"))
       val host = request.uri.authority.host.address()
       val port = request.uri.effectivePort
       logger.trace(
         s"Connecting to host: ${host}, port: ${port} request.uri = ${request.uri}"
-      )(requestTraceCtx)
+      )
       val connectionContext = request.uri.scheme match {
         case "https" => ConnectionContext.httpsClient(SSLContext.getDefault)
         case _ => ConnectionContext.noEncryption()

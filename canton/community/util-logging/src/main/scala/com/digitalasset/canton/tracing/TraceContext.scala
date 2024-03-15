@@ -10,6 +10,7 @@ import com.daml.tracing as damlTelemetry
 import com.digitalasset.canton.logging.{ErrorLoggingContext, TracedLogger}
 import io.opentelemetry.api.trace.{Span, Tracer}
 import io.opentelemetry.context.Context as OpenTelemetryContext
+import io.opentelemetry.sdk.trace.ReadableSpan
 
 import scala.collection.mutable
 import scala.language.implicitConversions
@@ -24,9 +25,25 @@ class TraceContext private[tracing] (val context: OpenTelemetryContext)
   lazy val asW3CTraceContext: Option[W3CTraceContext] =
     W3CTraceContext.fromOpenTelemetryContext(context)
 
-  lazy val traceId: Option[String] = Option(Span.fromContextOrNull(context))
+  private val span: Option[Span] = Option(Span.fromContextOrNull(context))
     .filter(_.getSpanContext.isValid)
+
+  lazy val traceId: Option[String] = span
     .map(_.getSpanContext.getTraceId)
+
+  lazy val spanId: Option[String] = span
+    .map(_.getSpanContext.getSpanId)
+
+  lazy val spanParentId: Option[String] = span
+    .collect {
+      case span: ReadableSpan if span.getParentSpanContext.isValid =>
+        span.getParentSpanContext.getSpanId
+    }
+
+  lazy val spanName: Option[String] = span
+    .collect { case span: ReadableSpan =>
+      span.getName
+    }
 
   /** Convert to ledger-api server's telemetry context to facilitate integration
     */
