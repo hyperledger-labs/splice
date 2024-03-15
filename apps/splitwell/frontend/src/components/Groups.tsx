@@ -64,7 +64,7 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, r
 
   const initiateSettleDebts = useCallback(() => {
     if (balances.data) {
-      const amounts: ReceiverCCAmount[] = Array.from(balances.data)
+      const amounts: ReceiverCCAmount[] = Object.entries(balances.data)
         .filter(([_, v]) => new Decimal(v).isNegative())
         .map(([k, v]) => {
           return { receiver: k, ccAmount: Decimal.abs(new Decimal(v)).toString() };
@@ -94,7 +94,7 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, r
           }}
         >
           <TableBody>
-            {Array.from(balances.data).map(([party, balance]) => (
+            {Object.entries(balances.data).map(([party, balance]) => (
               <TableRow key={party} className="balances-table-row">
                 <TableCell>
                   <CnsEntryComponent className="balances-table-receiver" partyId={party} />

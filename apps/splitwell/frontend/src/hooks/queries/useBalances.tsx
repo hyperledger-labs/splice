@@ -6,7 +6,11 @@ import { Group } from '@daml.js/splitwell/lib/CN/Splitwell';
 
 import { useSplitwellClient } from '../../contexts/SplitwellServiceContext';
 
-export const useBalances = (group: Contract<Group>, party: string): UseQueryResult<string[]> => {
+export interface Balances {
+  [party: string]: string;
+}
+
+export const useBalances = (group: Contract<Group>, party: string): UseQueryResult<Balances> => {
   const splitwellClient = useSplitwellClient();
 
   return useQuery({
@@ -16,14 +20,14 @@ export const useBalances = (group: Contract<Group>, party: string): UseQueryResu
       const balanceMap = (
         await splitwellClient.listBalances(party, group.payload.id.unpack, group.payload.owner)
       ).balances;
-      let balances = new Map<string, string>();
+      let balances: Balances = {};
       [group.payload.owner].concat(group.payload.members).forEach(p => {
         if (p !== party) {
           const balance: string | undefined = balanceMap[p];
           if (balance) {
-            balances.set(p, balance);
+            balances[p] = balance;
           } else {
-            balances.set(p, '0.0');
+            balances[p] = '0.0';
           }
         }
       });
