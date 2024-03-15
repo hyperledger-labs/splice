@@ -22,4 +22,7 @@ INTERPRETATION_TIME_EXCEEDED.*: Interpretation time exceeds limit of Ledger Effe
 # TODO(#8955): investigate and remove once fixed
 INVALID_ACKNOWLEDGEMENT_TIMESTAMP.*Member.*has acknowledged the timestamp.*when only events with timestamps at most.*have been delivered
 
+# TODO(#10887) Figure out where this is coming from
+Request failed for sequencer.*GrpcServiceUnavailable: UNAVAILABLE/Authentication token refresh failed with grpc error
+
 # Make sure to have a trailing newline
