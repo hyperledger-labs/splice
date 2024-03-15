@@ -1,3 +1,5 @@
+import { envFlag } from 'cn-pulumi-common';
+
 import { configureAuth0 } from './auth0';
 import { clusterBasename } from './config';
 import { configureIstio } from './istio';
@@ -19,4 +21,6 @@ configureObservability(observabilityDependsOn);
 
 configureStorage();
 
-export const auth0 = configureAuth0(clusterBasename);
+if (envFlag('CLUSTER_CONFIGURE_AUTH0', true)) {
+  configureAuth0(clusterBasename);
+}

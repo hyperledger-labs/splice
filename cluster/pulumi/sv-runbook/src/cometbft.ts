@@ -5,7 +5,6 @@ import { Resource } from '@pulumi/pulumi';
 import {
   ExactNamespace,
   isDevNet,
-  cometbftRetainBlocks,
   installCNRunbookHelmChart,
   installMigrationIdSpecificComponent,
   loadYamlFromFile,
@@ -13,6 +12,7 @@ import {
   CnInput,
   GlobalDomainMigrationConfig,
 } from 'cn-pulumi-common';
+import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
 
 import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
 

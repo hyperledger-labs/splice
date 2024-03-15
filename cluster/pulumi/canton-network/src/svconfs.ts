@@ -1,5 +1,6 @@
 import { Output } from '@pulumi/pulumi';
-import { cometbftRetainBlocks, isDevNet } from 'cn-pulumi-common';
+import { isDevNet } from 'cn-pulumi-common';
+import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
 
 export interface StaticSvConfig {
   nodeName: string;
