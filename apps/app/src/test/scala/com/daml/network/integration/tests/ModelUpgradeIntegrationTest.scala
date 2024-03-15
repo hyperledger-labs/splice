@@ -328,7 +328,7 @@ class ModelUpgradeIntegrationTest
               )
             ),
           ),
-        )("Alice sees payment request", _ => aliceWalletClient.listAppPaymentRequests().loneElement)
+        )("Alice sees payment request", _ => getSingleRequestOnGlobalDomain(aliceWalletClient))
         actAndCheck(
           "Alice accepts payment request",
           aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
