@@ -86,7 +86,7 @@ export async function installNode(
 
   const xns = exactNamespace(svNamespaceStr, true);
 
-  console.error(`Using migration config: ${globalDomainMigrationConfig}`);
+  console.error(`Using migration config: ${JSON.stringify(globalDomainMigrationConfig)}`);
 
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
