@@ -129,7 +129,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       receiver: PartyId,
       amount: BigDecimal,
       key: HttpSplitwellAppClient.GroupKey,
-  ) = {
+  )(implicit env: CNNodeTestConsoleEnvironment) = {
     senderSplitwell.initiateTransfer(
       key,
       Seq(
@@ -139,11 +139,8 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
         )
       ),
     )
-    eventually()(senderWallet.listAppPaymentRequests() should not be empty)
-    inside(senderWallet.listAppPaymentRequests()) { case Seq(request) =>
-      senderWallet.acceptAppPaymentRequest(request.contractId)
-    }
-
+    val request = eventually()(getSingleRequestOnGlobalDomain(senderWallet))
+    senderWallet.acceptAppPaymentRequest(request.contractId)
   }
 
   protected def getSingleRequestOnGlobalDomain(
