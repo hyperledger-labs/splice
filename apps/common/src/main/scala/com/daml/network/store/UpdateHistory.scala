@@ -190,8 +190,11 @@ final class UpdateHistory(
             ingestUpdate_(update).andThen(updateOffset(offset))
           case Some(lastIngestedOffset) =>
             if (offset <= lastIngestedOffset) {
-              logger.info(
-                s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions"
+              logger.warn(
+                s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                  "This is expected if the SQL query was automatically retried after a transient database error. " +
+                  "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                  "ingesting into the same logical database."
               )
               DBIO.successful(())
             } else {

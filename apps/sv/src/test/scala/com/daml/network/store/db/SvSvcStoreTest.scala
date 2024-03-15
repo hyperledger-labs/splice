@@ -63,7 +63,6 @@ import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.*
@@ -107,7 +106,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           for {
             store <- mkStore()
             result <- fetch(store)
-          } yield result should be(QueryResult(acsOffset.toHexString, None))
+          } yield result should be(QueryResult(acsOffset, None))
         }
 
         offsetFreeLookupTest(create, noise)(fetch andThen (_ map (_.value)))
@@ -139,7 +138,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       ),
     )(
       _.lookupSvOnboardingRequestByCandidateParty(userParty(1)).map(
-        QueryResult(acsOffset.toHexString, _)
+        QueryResult(acsOffset, _)
       )
     )
     lookupTests("lookupSvOnboardingRequestByCandidateName")(
@@ -149,7 +148,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       ),
     )(
       _.lookupSvOnboardingRequestByCandidateName("good").map(
-        QueryResult(acsOffset.toHexString, _)
+        QueryResult(acsOffset, _)
       )
     )
     "lookupSvOnboardingConfirmedByParty" should {
@@ -1250,7 +1249,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
   protected def mkStore(): Future[SvSvcStore]
 
-  lazy val acsOffset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
+  lazy val acsOffset = nextOffset()
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val storeSvParty = providerParty(42)
   lazy val svDomainConfig = SvDomainConfig(
@@ -1284,9 +1283,9 @@ class DbSvSvcStoreTest
       participantId = mkParticipantId("SvSvcStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
-      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
-      _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(acsOffset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+      _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      _ <- store.multiDomainAcsStore.testIngestionSink
+        .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )

@@ -36,7 +36,6 @@ import com.daml.network.util.{
 }
 import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
@@ -166,7 +165,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           result <- store.getLatestTransferOfferEventByTrackingId("nope")
         } yield {
-          result.offset should be(initialOffset.toHexString)
+          result.offset should be(acsOffset)
           result.value should be(None)
         }
       }
@@ -252,7 +251,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store <- mkStore(user1)
           result <- store.getLatestBuyTrafficRequestEventByTrackingId("nope")
         } yield {
-          result.offset should be(initialOffset.toHexString)
+          result.offset should be(acsOffset)
           result.value should be(None)
         }
       }
@@ -1401,7 +1400,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       endUserParty: PartyId
   ): Future[UserWalletStore]
 
-  lazy val initialOffset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
+  lazy val acsOffset = nextOffset()
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val domainAlias = DomainAlias.tryCreate(domain)
 }
@@ -1435,9 +1434,9 @@ class DbUserWalletStoreTest
       participantId = mkParticipantId("UserWalletStoreTest"),
     )
     for {
-      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
-      _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(initialOffset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+      _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      _ <- store.multiDomainAcsStore.testIngestionSink
+        .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )

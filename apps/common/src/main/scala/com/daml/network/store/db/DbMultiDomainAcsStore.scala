@@ -615,14 +615,20 @@ final class DbMultiDomainAcsStore[TXE](
     ): DBIOAction[Unit, NoStream, Effect.Read & Effect.Write & Effect.Transactional] = {
       readOffset()
         .flatMap({
-          case Some(`offset`) =>
-            logger.info(s"Update at offset $offset already ingested, skipping database actions")
-            DBIO.successful(())
           case None =>
             action.andThen(updateOffset(offset))
-          case Some(_) =>
-            // TODO(#10122) Fail on readOffset > offset
-            action.andThen(updateOffset(offset))
+          case Some(lastIngestedOffset) =>
+            if (offset <= lastIngestedOffset) {
+              logger.warn(
+                s"Update offset $offset <= last ingested offset $lastIngestedOffset for DbMultiDomainAcsStore(storeId=$storeId), skipping database actions. " +
+                  "This is expected if the SQL query was automatically retried after a transient database error. " +
+                  "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                  "ingesting into the same logical database."
+              )
+              DBIO.successful(())
+            } else {
+              action.andThen(updateOffset(offset))
+            }
         })
         .transactionally
     }

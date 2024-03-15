@@ -1435,8 +1435,8 @@ class DbScanStoreTest
     )(parallelExecutionContext, implicitly, implicitly)
 
     for {
-      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
-      _ <- store.multiDomainAcsStore.ingestionSink
+      _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      _ <- store.multiDomainAcsStore.testIngestionSink
         .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)

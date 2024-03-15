@@ -108,24 +108,27 @@ class UpdateHistoryTest
           // Initialize all stores in parallel
           _ <- Future.traverse(stores)(s => initStore(s))
           // Process one update at a time
-          _ <- MonadUtil.sequentialTraverse(updateStreamElements) { case (i, update) =>
-            logger.info(s"Processing update $i")
-            // Ingest the same update on all stores in parallel
-            Future.traverse(stores)(s =>
-              // The first concurrent update is expected to fail on all but one store
-              // with a uniqueness violation error (assuming the updates are really concurrent).
-              // At the latest on the next retry, all stores should succeed ingesting the update
-              // by figuring out that the given offset was already ingested.
-              // In practice, the ingestion service would crash and restart after a "short delay".
-              retryOnceAfterAShortDelay(
-                s.ingestionSink
-                  .ingestUpdate(
-                    domain1,
-                    update,
-                  )
+          _ <- withoutRepeatedIngestionWarning(
+            MonadUtil.sequentialTraverse(updateStreamElements) { case (i, update) =>
+              logger.info(s"Processing update $i")
+              // Ingest the same update on all stores in parallel
+              Future.traverse(stores)(s =>
+                // The first concurrent update is expected to fail on all but one store
+                // with a uniqueness violation error (assuming the updates are really concurrent).
+                // At the latest on the next retry, all stores should succeed ingesting the update
+                // by figuring out that the given offset was already ingested.
+                // In practice, the ingestion service would crash and restart after a "short delay".
+                retryOnceAfterAShortDelay(
+                  s.ingestionSink
+                    .ingestUpdate(
+                      domain1,
+                      update,
+                    )
+                )
               )
-            )
-          }
+            },
+            maxCount = 199, // 10 stores x 10 updates x up to 2 retries per update
+          )
           // Query all stores in parallel
           updatesList <- Future.traverse(stores)(s => updates(s))
         } yield {
@@ -330,7 +333,7 @@ class UpdateHistoryTest
     .run()
 
   private def initStore(implicit store: UpdateHistory): Future[Unit] = {
-    store.ingestionSink.initialize().map(_ => ())
+    store.testIngestionSink.initialize().map(_ => ())
   }
 
   private def mkStore(

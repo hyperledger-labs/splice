@@ -10,7 +10,6 @@ import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
@@ -54,7 +53,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
         for {
           store <- mkStore()
           result <- store.lookupValidatorOnboardingBySecretWithOffset("whatever")
-        } yield result should be(QueryResult(acsOffset.toHexString, None))
+        } yield result should be(QueryResult(acsOffset, None))
       }
 
     }
@@ -120,7 +119,7 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
 
   protected def mkStore(): Future[SvSvStore]
 
-  lazy val acsOffset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
+  lazy val acsOffset = nextOffset()
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val storeSvParty = providerParty(42)
   lazy val svDomainConfig = SvDomainConfig(
@@ -155,9 +154,9 @@ class DbSvSvStoreTest
       participantId = mkParticipantId("SvSvStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)
     for {
-      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
-      _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(acsOffset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+      _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      _ <- store.multiDomainAcsStore.testIngestionSink
+        .ingestAcs(acsOffset, Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(DomainAlias.tryCreate(domain) -> dummyDomain)
       )

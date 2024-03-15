@@ -15,7 +15,6 @@ import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobal
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.store.db.DbValidatorStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.ledger.offset.Offset
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
@@ -579,7 +578,6 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
 
   protected def mkStore(): Future[ValidatorStore]
 
-  lazy val offset = Offset.fromByteArray(Array(1, 2, 3).map(_.toByte))
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val domainAlias = DomainAlias.tryCreate(domain)
   lazy val domainConfig = ValidatorDomainConfig(
@@ -616,9 +614,9 @@ class DbValidatorStoreTest
       participantId = mkParticipantId("ValidatorStoreTest"),
     )
     for {
-      _ <- store.multiDomainAcsStore.ingestionSink.initialize()
-      _ <- store.multiDomainAcsStore.ingestionSink
-        .ingestAcs(offset.toHexString, Seq.empty, Seq.empty, Seq.empty)
+      _ <- store.multiDomainAcsStore.testIngestionSink.initialize()
+      _ <- store.multiDomainAcsStore.testIngestionSink
+        .ingestAcs(nextOffset(), Seq.empty, Seq.empty, Seq.empty)
       _ <- store.domains.ingestionSink.ingestConnectedDomains(
         Map(domainAlias -> dummyDomain)
       )
