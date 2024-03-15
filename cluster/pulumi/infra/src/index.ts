@@ -21,6 +21,9 @@ configureObservability(observabilityDependsOn);
 
 configureStorage();
 
+let configuredAuth0;
 if (envFlag('CLUSTER_CONFIGURE_AUTH0', true)) {
-  configureAuth0(clusterBasename);
+  configuredAuth0 = configureAuth0(clusterBasename);
 }
+
+export const auth0 = configuredAuth0;
