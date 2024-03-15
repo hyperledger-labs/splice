@@ -142,35 +142,39 @@ class SplitwellFrontendIntegrationTest
             )(row2)
           }
         }
+        clue("Checking Bob’s balance updates") {
 
-        eventually() {
-          val rows = findAll(className("balance-updates-list-item")).toSeq
-          rows should have size 4
-          // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
-          forExactly(1, rows)(row =>
-            matchRow(
-              Seq("sender", "description", "receiver"),
-              Seq(bobParty, "sent 111.0 CC to", charlieParty),
-            )(row)
-          )
-          forExactly(1, rows)(row =>
-            matchRow(
-              Seq("sender", "description", "receiver"),
-              Seq(bobParty, "sent 400.0 CC to", aliceParty),
-            )(row)
-          )
-          forExactly(1, rows)(row =>
-            matchRow(
-              Seq("sender", "description"),
-              Seq(charlieParty, "paid 333.0 CC for Digestivs"),
-            )(row)
-          )
-          forExactly(1, rows)(row =>
-            matchRow(
-              Seq("sender", "description"),
-              Seq(aliceParty, "paid 1200.0 CC for Team lunch"),
-            )(row)
-          )
+          eventually() {
+            // TODO(#10755) Remove those noisy logs once the issue is fixed.
+            logger.debug("Querying Bob’s balance updates in frontend")
+            val rows = findAll(className("balance-updates-list-item")).toSeq
+            rows should have size 4
+            // We don't guarantee an order on ACS requests atm so we assert independent of the specific order.
+            forExactly(1, rows)(row =>
+              matchRow(
+                Seq("sender", "description", "receiver"),
+                Seq(bobParty, "sent 111.0 CC to", charlieParty),
+              )(row)
+            )
+            forExactly(1, rows)(row =>
+              matchRow(
+                Seq("sender", "description", "receiver"),
+                Seq(bobParty, "sent 400.0 CC to", aliceParty),
+              )(row)
+            )
+            forExactly(1, rows)(row =>
+              matchRow(
+                Seq("sender", "description"),
+                Seq(charlieParty, "paid 333.0 CC for Digestivs"),
+              )(row)
+            )
+            forExactly(1, rows)(row =>
+              matchRow(
+                Seq("sender", "description"),
+                Seq(aliceParty, "paid 1200.0 CC for Team lunch"),
+              )(row)
+            )
+          }
         }
       }
 

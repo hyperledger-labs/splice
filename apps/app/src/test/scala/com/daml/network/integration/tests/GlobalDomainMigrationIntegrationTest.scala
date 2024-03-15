@@ -866,10 +866,10 @@ class GlobalDomainMigrationIntegrationTest
                       )
                     }
                     inside(update1.payload.update) { case transfer: Transfer =>
-                      transfer.amount shouldBe BigDecimal("42.0000000000").bigDecimal
+                      transfer.amount shouldBe BigDecimal("43.0000000000").bigDecimal
                     }
                     inside(update2.payload.update) { case transfer: Transfer =>
-                      transfer.amount shouldBe BigDecimal("43.0000000000").bigDecimal
+                      transfer.amount shouldBe BigDecimal("42.0000000000").bigDecimal
                     }
                 },
             )

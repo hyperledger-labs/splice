@@ -23,7 +23,10 @@ export const useBalanceUpdates = (
           group.payload.owner
         )
       ).balance_updates;
-      return balanceUpdates.reverse().map(c => Contract.decodeOpenAPI(c, BalanceUpdate));
+      const updates = balanceUpdates.map(c => Contract.decodeOpenAPI(c, BalanceUpdate));
+      // TODO(#10755) Remove those noisy logs once the issue is fixed.
+      console.log(`balance updates: ${JSON.stringify(updates)}`);
+      return updates;
     },
   });
 };

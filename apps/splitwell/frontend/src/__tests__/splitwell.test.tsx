@@ -131,11 +131,11 @@ describe('alice can', () => {
                     tag: 'ExternalPayment',
                     value: {
                       payer: alicePartyId,
-                      description: 'dinner',
-                      amount: '15.0',
+                      description: 'expenses',
+                      amount: '30.0',
                     },
                   },
-                  'cid1'
+                  'cid3'
                 ),
                 makeBalanceUpdate(
                   splitwellProviderPartyId,
@@ -159,11 +159,11 @@ describe('alice can', () => {
                     tag: 'ExternalPayment',
                     value: {
                       payer: alicePartyId,
-                      description: 'expenses',
-                      amount: '30.0',
+                      description: 'dinner',
+                      amount: '15.0',
                     },
                   },
-                  'cid3'
+                  'cid1'
                 ),
               ],
             })

@@ -340,17 +340,24 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
       dataClassNames: Seq[String],
       expectedValues: Seq[String],
   )(row: Element): Unit = {
+    // TODO(#10755) Remove those noisy logs once the issue is fixed.
+    logger.debug(s"matchRow: checking row $row")
     if (dataClassNames.length !== expectedValues.length) {
       fail("className list must match length of expected value list")
     } else {
-      dataClassNames
-        .map(name => seleniumText(row.childElement(className(name))))
-        .zip(expectedValues)
-        .foreach({
-          case (dataText, expectedValue) => {
-            dataText should matchText(expectedValue)
-          }
-        })
+      val r = Try {
+        dataClassNames
+          .map(name => seleniumText(row.childElement(className(name))))
+          .zip(expectedValues)
+          .foreach({
+            case (dataText, expectedValue) => {
+              dataText should matchText(expectedValue)
+            }
+          })
+      }
+      // TODO(#10755) Remove those noisy logs once the issue is fixed.
+      logger.debug(s"matchRow: got result $r")
+      r.get
     }
   }
 

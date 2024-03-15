@@ -236,6 +236,7 @@ class DbSplitwellStore(
                 splitwellCodegen.BalanceUpdate.COMPANION.TEMPLATE_ID
               )} and group_id = ${lengthLimited(key.id.unpack)}
               """,
+            orderLimit = sql"""order by event_number desc""",
           ),
           "listBalanceUpdates",
         )
