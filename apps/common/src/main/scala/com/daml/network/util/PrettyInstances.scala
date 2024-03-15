@@ -5,6 +5,7 @@ import com.daml.ledger.javaapi
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
 import com.digitalasset.canton.util.ShowUtil.*
+import org.apache.pekko.NotUsed
 import pprint.Tree
 
 /** Extension of Canton's pretty instances with additional ones for:
@@ -29,6 +30,7 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
     }
   }
 
+  implicit val prettyNotUsed: Pretty[NotUsed] = _ => Tree.Literal("NotUsed")
   implicit def prettyCodegenContractId: Pretty[javaapi.data.codegen.ContractId[?]] =
     coid => prettyContractIdString.treeOf(coid.contractId)
 

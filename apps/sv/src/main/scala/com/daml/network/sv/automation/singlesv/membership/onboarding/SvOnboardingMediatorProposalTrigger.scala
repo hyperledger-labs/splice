@@ -8,10 +8,13 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
+import com.daml.network.sv.automation.singlesv.membership.onboarding.SvOnboardingMediatorProposalTrigger.MediatorToOnboard
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.sv.util.MemberIdUtil
-import com.digitalasset.canton.topology.MediatorId
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.topology.{DomainId, MediatorId, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -20,9 +23,12 @@ import scala.jdk.OptionConverters.RichOptional
 /** Onboards a new mediator to the current global domain topology state.
   * The onboarding only happens if the following conditions are met:
   * - the mediator is configured in the domain config found in the SvcRules
-  *  - the sequencer configured alongside the mediator is already part of the topology state.
+  * - the sequencer configured alongside the mediator is already part of the topology state.
   *      This is required for the mediator to be able to read from an existing sequencer counter.
   *      This also requires that the sequencer is bootstrapped at exactly the topology transaction that added it.
+  * - to speed up our onboarding, as we know the sequencer and mediator get added to the svc rules at the same time, but the sequencer will
+  *   be the first to be added to the topology state, we start the task without waiting for the sequencer to be added to the topology state,
+  *   and wait for the sequencer in the task run itself
   */
 class SvOnboardingMediatorProposalTrigger(
     override protected val context: TriggerContext,
@@ -31,19 +37,16 @@ class SvOnboardingMediatorProposalTrigger(
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[MediatorId] {
+) extends PollingParallelTaskExecutionTrigger[MediatorToOnboard] {
 
   private val svParty = svcStore.key.svParty
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
-  ): Future[Seq[MediatorId]] = {
+  ): Future[Seq[MediatorToOnboard]] = {
     for {
       svcRules <- svcStore.getSvcRules()
       currentMediatorState <- participantAdminConnection.getMediatorDomainState(
-        svcRules.domain
-      )
-      currentSequencerState <- participantAdminConnection.getSequencerDomainState(
         svcRules.domain
       )
     } yield {
@@ -62,11 +65,16 @@ class SvOnboardingMediatorProposalTrigger(
         }
       val mediatorsToAdd =
         domainNodeConfiguredNodes
-          .filter { case (mediatorId, sequencerId) =>
-            !currentMediatorState.mapping.active.contains(mediatorId) &&
-            currentSequencerState.mapping.active.contains(sequencerId)
+          .filterNot { case (mediatorId, _) =>
+            currentMediatorState.mapping.active.contains(mediatorId)
           }
-          .map(_._1)
+          .map { case (mediatorId, sequencerId) =>
+            MediatorToOnboard(
+              svcRules.domain,
+              mediatorId,
+              sequencerId,
+            )
+          }
 
       if (mediatorsToAdd.nonEmpty)
         logger.info {
@@ -78,25 +86,57 @@ class SvOnboardingMediatorProposalTrigger(
     }
   }
 
-  override protected def completeTask(task: MediatorId)(implicit
+  override protected def completeTask(task: MediatorToOnboard)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
+    logger.info(show"Adding mediator $task")
     for {
-      svcRules <- svcStore.getSvcRules()
-      _ = logger.info(show"Adding mediator $task to domain ${svcRules.domain}")
+      _ <- context.retryProvider.waitUntil(
+        RetryFor.Automation,
+        s"Sequencer is added to the topology state for $task",
+        participantAdminConnection
+          .getSequencerDomainState(task.domainId)
+          .map(state =>
+            // required so that the mediator doesn't have an assigned counter when the sequencer initializes from the snapshot
+            // if the mediator would have a counter, it will not be able to initialize from the sequencer
+            if (!state.mapping.active.contains(task.sequencerId))
+              throw Status.FAILED_PRECONDITION
+                .withDescription(s"Sequencer not yet observed for task $task")
+                .asRuntimeException()
+          ),
+        logger,
+      )
       _ <- participantAdminConnection.ensureMediatorDomainStateAdditionProposal(
-        svcRules.domain,
-        task,
+        task.domainId,
+        task.mediatorId,
         svParty.uid.namespace.fingerprint,
         RetryFor.Automation,
       )
     } yield {
-      TaskSuccess(show"Added mediator $task to domain ${svcRules.domain}")
+      TaskSuccess(show"Added mediator $task")
     }
   }
 
-  // proposing is safe and it checks when running the task so no need to duplicate the same check here
-  override protected def isStaleTask(task: MediatorId)(implicit
+  override protected def isStaleTask(task: MediatorToOnboard)(implicit
       tc: TraceContext
-  ): Future[Boolean] = Future.successful(false)
+  ): Future[Boolean] =
+    participantAdminConnection.getMediatorDomainState(task.domainId).map { state =>
+      state.mapping.active.contains(task.mediatorId)
+    }
+}
+
+object SvOnboardingMediatorProposalTrigger {
+
+  case class MediatorToOnboard(
+      domainId: DomainId,
+      mediatorId: MediatorId,
+      sequencerId: SequencerId,
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[MediatorToOnboard.this.type] = prettyOfClass(
+      param("domainId", _.domainId),
+      param("mediatorId", _.mediatorId),
+      param("sequencerId", _.sequencerId),
+    )
+  }
+
 }

@@ -1,8 +1,6 @@
 package com.daml.network.sv.automation.singlesv.membership
 
-import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger.{
@@ -16,7 +14,6 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.stream.Materializer
@@ -29,9 +26,10 @@ private class NamespaceMembership(
     svcParty: PartyId,
     participantAdminConnection: ParticipantAdminConnection,
     logger: TracedLogger,
-) {
+    val svSvcStore: SvSvcStore,
+) extends SvcRulesTopologyStateReconciler[NamespaceDiff] {
 
-  def diffSvcRulesWithTopology(
+  override def diffSvcRulesWithTopology(
       svcRules: AssignedContract[SvcRules.ContractId, SvcRules]
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[NamespaceDiff]] = {
     participantAdminConnection
@@ -71,7 +69,8 @@ private class NamespaceMembership(
           )
       }
   }
-  def reconcileDiff(
+
+  override def reconcileTask(
       task: NamespaceDiff
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[TaskOutcome] = task match {
     case AddToNamespace(domain, partyId) =>
@@ -120,51 +119,7 @@ private class NamespaceMembership(
   *
   * Adding the sv to the decentralized namespace only after it's already part of the svc guarantees that party migration has finished
   */
-class SvNamespaceMembershipParallelTrigger(
-    override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
-    participantAdminConnection: ParticipantAdminConnection,
-)(implicit
-    ec: ExecutionContext,
-    tracer: Tracer,
-) extends PollingParallelTaskExecutionTrigger[NamespaceDiff] {
-
-  private val svcParty = svcStore.key.svcParty
-  private val svParty = svcStore.key.svParty
-  private val namespaceMembership =
-    new NamespaceMembership(svParty, svcParty, participantAdminConnection, logger)
-
-  override protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[NamespaceDiff]] = {
-    svcStore.getSvcRules().flatMap { svcRules =>
-      namespaceMembership.diffSvcRulesWithTopology(svcRules)
-    }
-  }
-
-  override protected def completeTask(
-      task: NamespaceDiff
-  )(implicit tc: TraceContext): Future[TaskOutcome] = namespaceMembership.reconcileDiff(task)
-
-  override protected def isStaleTask(
-      task: NamespaceDiff
-  )(implicit tc: TraceContext): Future[Boolean] = {
-    for {
-      svcRules <- svcStore.getSvcRules()
-      decentralizedNamespace <- participantAdminConnection.getDecentralizedNamespaceDefinition(
-        svcRules.domain,
-        svcParty.uid.namespace,
-      )
-    } yield {
-      task match {
-        case AddToNamespace(_, partyId) =>
-          decentralizedNamespace.mapping.owners.contains(partyId.uid.namespace)
-        case RemoveFromNamespace(_, partyId) =>
-          !decentralizedNamespace.mapping.owners.contains(partyId.uid.namespace)
-      }
-    }
-  }
-}
-
-class SvNamespaceMembershipAssignedTrigger(
+class SvNamespaceMembershipTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     participantAdminConnection: ParticipantAdminConnection,
@@ -172,43 +127,26 @@ class SvNamespaceMembershipAssignedTrigger(
     override val ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends OnAssignedContractTrigger.Template[
-      cn.svcrules.SvcRules.ContractId,
-      cn.svcrules.SvcRules,
-    ](
+) extends SvTopologyStatePollingAndAssignedTrigger[NamespaceDiff](
+      context,
       store,
-      cn.svcrules.SvcRules.COMPANION,
     ) {
 
-  private val namespaceMembership = new NamespaceMembership(
+  override val reconciler = new NamespaceMembership(
     store.key.svParty,
     store.key.svcParty,
     participantAdminConnection,
     logger,
+    store,
   )
-
-  override protected def completeTask(task: AssignedContract[SvcRules.ContractId, SvcRules])(
-      implicit tc: TraceContext
-  ): Future[TaskOutcome] = {
-    namespaceMembership.diffSvcRulesWithTopology(task).flatMap { diff =>
-      if (diff.nonEmpty) {
-        logger.info(s"Applying namespace membership diff: $diff")
-      }
-      diff
-        .parTraverse(namespaceMembership.reconcileDiff)
-        .map(results =>
-          TaskSuccess(
-            s"Reconciled namespace membership: $results"
-          )
-        )
-    }
-  }
 
 }
 
 object SvNamespaceMembershipTrigger {
 
-  sealed trait NamespaceDiff extends PrettyPrinting
+  sealed trait NamespaceDiff extends PrettyPrinting {
+    def domain: DomainId
+  }
 
   case class AddToNamespace(domain: DomainId, partyId: PartyId) extends NamespaceDiff {
     override def pretty: Pretty[this.type] =

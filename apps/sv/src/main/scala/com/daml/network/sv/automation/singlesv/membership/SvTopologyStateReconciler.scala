@@ -1,0 +1,130 @@
+package com.daml.network.sv.automation.singlesv.membership
+
+import cats.implicits.catsSyntaxParallelTraverse1
+import com.daml.ledger.javaapi.data.codegen.ContractCompanion
+import com.daml.network.automation.{SourceBasedTrigger, TaskOutcome, TaskSuccess, TriggerContext}
+import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.sv.automation.singlesv.membership.SvTopologyStatePollingAndAssignedTrigger.{
+  StreamedAssignedContract,
+  TaskTrigger,
+  Tick,
+}
+import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.util.AssignedContract
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import io.opentelemetry.api.trace.Tracer
+import monocle.Monocle.toAppliedFocusOps
+import org.apache.pekko.stream.Materializer
+import org.apache.pekko.NotUsed
+import org.apache.pekko.stream.scaladsl.Source
+import pprint.Tree
+
+import scala.concurrent.{ExecutionContext, Future}
+
+trait SvcRulesTopologyStateReconciler[Task] {
+
+  protected def svSvcStore: SvSvcStore
+
+  def diffSvcRulesWithTopology(
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[Task]] = {
+    svSvcStore.getSvcRules().flatMap(diffSvcRulesWithTopology)
+  }
+
+  protected def diffSvcRulesWithTopology(
+      svcRules: AssignedContract[SvcRules.ContractId, SvcRules]
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Seq[Task]]
+
+  def reconcileTask(
+      task: Task
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[TaskOutcome]
+}
+
+/** Trigger that runs both on a regular interval and if the SvcRules contract is assigned.
+  * It reconciles the SvcRules contract with the topology state.
+  * This is done to ensure that we have minimum latency in applying any changes to the topology state (by using the assigned contract source)
+  * and to also ensure that the changes are eventually applied if currently not possible (by using the regular ticking interval)
+  */
+abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
+    originalContext: TriggerContext,
+    store: SvSvcStore,
+)(implicit
+    override val ec: ExecutionContext,
+    mat: Materializer,
+    tracer: Tracer,
+) extends SourceBasedTrigger[TaskTrigger] {
+
+  // set parallelism to 1 as a full reconciliation is run in a single call so we don't want to run multiple reconciliations in parallel
+  override protected val context: TriggerContext =
+    originalContext.focus(_.config.parallelism).replace(1)
+
+  val reconciler: SvcRulesTopologyStateReconciler[Task]
+  protected val contractsToRunOn
+      : Seq[ContractCompanion.WithoutKey[SvcRules.Contract, SvcRules.ContractId, SvcRules]] = Seq(
+    SvcRules.COMPANION
+  )
+
+  override protected def source(implicit traceContext: TraceContext): Source[TaskTrigger, NotUsed] =
+    Source
+      .tick(
+        context.config.pollingInterval.asFiniteApproximation,
+        context.config.pollingInterval.asFiniteApproximation,
+        Tick,
+      )
+      .mergeAll[TaskTrigger](
+        contractsToRunOn.map(
+          store.multiDomainAcsStore.streamAssignedContracts(_).map(StreamedAssignedContract)
+        ),
+        eagerComplete = false,
+      )
+      .conflate((source, _) => source)
+      .mapMaterializedValue(_ => NotUsed)
+
+  override protected def isStaleTask(task: TaskTrigger)(implicit
+      tc: TraceContext
+  ): Future[Boolean] =
+    store.lookupSvcRules().map(_.isEmpty)
+
+  override protected def completeTask(task: TaskTrigger)(implicit
+      tc: TraceContext
+  ): Future[TaskOutcome] = {
+    reconciler
+      .diffSvcRulesWithTopology()
+      .flatMap { tasks =>
+        if (tasks.nonEmpty) {
+          logger.info(s"Reconciling tasks: $tasks")
+        }
+        tasks
+          .parTraverse(task =>
+            withSpan("reconcile_task") { implicit tc => _ =>
+              reconciler.reconcileTask(task)
+            }
+          )
+          .map(outcomes => TaskSuccess(s"Tasks reconciled: $outcomes"))
+      }
+  }
+
+}
+
+object SvTopologyStatePollingAndAssignedTrigger {
+  sealed trait TaskTrigger extends PrettyPrinting
+  case object Tick extends TaskTrigger {
+    override def pretty: Pretty[Tick.this.type] = _ => Tree.Literal("Tick")
+  }
+  case class StreamedAssignedContract(contract: AssignedContract[?, ?]) extends TaskTrigger {
+    override def pretty: Pretty[StreamedAssignedContract.this.type] =
+      prettyOfClass(
+        param("contract", _.contract)
+      )
+  }
+}

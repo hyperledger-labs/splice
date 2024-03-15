@@ -15,10 +15,7 @@ import com.daml.network.sv.automation.SvSvcAutomationService.{
 }
 import com.daml.network.sv.automation.confirmation.*
 import com.daml.network.sv.automation.singlesv.*
-import com.daml.network.sv.automation.singlesv.membership.{
-  SvNamespaceMembershipAssignedTrigger,
-  SvNamespaceMembershipParallelTrigger,
-}
+import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger
 import com.daml.network.sv.automation.singlesv.membership.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingPartyToParticipantProposalTrigger,
@@ -223,14 +220,7 @@ class SvSvcAutomationService(
       )
     )
     registerTrigger(
-      new SvNamespaceMembershipParallelTrigger(
-        onboardingTriggerContext,
-        svcStore,
-        participantAdminConnection,
-      )
-    )
-    registerTrigger(
-      new SvNamespaceMembershipAssignedTrigger(
+      new SvNamespaceMembershipTrigger(
         onboardingTriggerContext,
         svcStore,
         participantAdminConnection,
@@ -252,7 +242,7 @@ class SvSvcAutomationService(
       )
     )
     registerTrigger(
-      new SvOnboardingSequencerProposalTrigger(
+      new SvOnboardingSequencerTrigger(
         onboardingTriggerContext,
         svcStore,
         participantAdminConnection,
@@ -416,11 +406,10 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
       aTrigger[SvOnboardingUnlimitedTrafficTrigger],
       aTrigger[SvOffboardingSequencerTrigger],
       aTrigger[ReconcileSequencerLimitWithMemberTrafficTrigger],
-      aTrigger[SvNamespaceMembershipParallelTrigger],
-      aTrigger[SvNamespaceMembershipAssignedTrigger],
+      aTrigger[SvNamespaceMembershipTrigger],
       aTrigger[SvOnboardingPromoteParticipantToSubmitterTrigger],
       aTrigger[SvOnboardingPartyToParticipantProposalTrigger],
-      aTrigger[SvOnboardingSequencerProposalTrigger],
+      aTrigger[SvOnboardingSequencerTrigger],
       aTrigger[SvOnboardingMediatorProposalTrigger],
       aTrigger[GlobalDomainMigrationTrigger],
       aTrigger[PublishLocalCometBftNodeConfigTrigger],
