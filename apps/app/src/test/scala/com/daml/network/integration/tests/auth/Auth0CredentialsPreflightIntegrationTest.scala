@@ -14,6 +14,8 @@ class Auth0CredentialsPreflightIntegrationTest
     with PreflightIntegrationTestUtil
     with PreflightAuthUtil {
 
+  override lazy val resetRequiredTopologyState: Boolean = false
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition.preflightTopology(
