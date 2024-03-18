@@ -27,6 +27,7 @@ class NodeInitializer(
     for {
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
+        "node_init",
         s"node is initialized with id $expectedId",
         connection.isNodeInitialized(),
         initializeFromDump(dump, Some(expectedId), domainId),

@@ -122,6 +122,7 @@ class ParticipantAdminConnection(
       _ <- retryProvider
         .ensureThat(
           retryFor,
+          "domain_registered_handshake",
           s"participant registered ${config.domain}",
           lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
           (_: Unit) => registerDomain(config, handshakeOnly = true),
@@ -142,6 +143,7 @@ class ParticipantAdminConnection(
       _ <- retryProvider
         .ensureThat(
           retryFor,
+          "domain_registered_no_handshake",
           s"participant registered ${config.domain}",
           lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
           (_: Unit) => registerDomain(config, handshakeOnly = false),
@@ -157,6 +159,7 @@ class ParticipantAdminConnection(
     _ <- retryProvider
       .ensureThat(
         retryFor,
+        "domain_registered",
         s"participant registered ${config.domain}",
         lookupDomainConnectionConfig(config.domain).map(_.toRight(())),
         (_: Unit) => registerDomain(config, handshakeOnly = false),
@@ -168,6 +171,7 @@ class ParticipantAdminConnection(
     // TODO(#5784): see whether we can improve Canton so that this kind of connectivity management is less brittle
     _ <- retryProvider.waitUntil(
       retryFor,
+      "domain_connected",
       s"participant is connected to ${config.domain}",
       // We're slightly abusing 'waitUntil' here, using a side-effecting condition. It's idempotent though, so all good.
       connectDomain(config.domain),
@@ -362,6 +366,7 @@ class ParticipantAdminConnection(
       _ <- retryProvider
         .ensureThatO(
           retryFor,
+          "upload_dar_locally",
           s"DAR file $path with hash $darHash has been uploaded.",
           lookupDar(darHash).map(_.map(_ => ())),
           runCmd(
@@ -391,6 +396,7 @@ class ParticipantAdminConnection(
       _ <- retryProvider
         .ensureThatO(
           retryFor,
+          "upload_dar",
           s"DAR file $path with hash $darHash has been uploaded.",
           // TODO(#5141) and TODO(#5755): consider if we still need a check here
           lookupDar(darHash).map(_.map(_ => ())),
@@ -418,6 +424,7 @@ class ParticipantAdminConnection(
     for {
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
+        "initial_party_to_participant",
         show"Party $partyId is allocated on $participantId",
         listPartyToParticipant(
           store.filterName,

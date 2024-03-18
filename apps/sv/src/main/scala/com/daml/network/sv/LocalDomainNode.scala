@@ -103,6 +103,7 @@ final class LocalDomainNode(
   )(implicit traceContext: TraceContext) =
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
+      "identity_transaction",
       show"the identity transactions for $uid are visible",
       participantAdminConnection.getIdentityTransactions(uid, Some(domainId)).map { txs =>
         if (!containsIdentityTransactions(uid, txs)) {
@@ -153,6 +154,7 @@ final class LocalDomainNode(
       .getValueWithRetries(
         RetryFor.WaitingOnInitDependency,
         "mediator status",
+        "mediator status",
         mediatorAdminConnection.getStatus.map(statusToEither),
         logger,
       )
@@ -190,6 +192,7 @@ final class LocalDomainNode(
       mediatorId <- mediatorAdminConnection.getMediatorId
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
+        "mediator_unlimited_traffic",
         "Mediator has been granted unlimited traffic",
         participantAdminConnection
           .lookupTrafficControlState(
@@ -213,6 +216,7 @@ final class LocalDomainNode(
       )
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
+        "sequencer_observes_mediator_onboarded",
         "local sequencer observes mediator as onboarded",
         // Otherwise we might fail with `PERMISSION_DENIED` during initialization
         sequencerAdminConnection
@@ -253,6 +257,7 @@ final class LocalDomainNode(
       )
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
+        "mediator_onboarded",
         "mediator observes itself as onboarded",
         mediatorAdminConnection.getMediatorDomainState(domainId).map { state =>
           if (!state.mapping.active.contains(mediatorId)) {
@@ -277,6 +282,7 @@ final class LocalDomainNode(
     retryProvider
       .getValueWithRetries(
         RetryFor.WaitingOnInitDependency,
+        "sequencer status",
         "sequencer status",
         sequencerAdminConnection.getStatus.map(statusToEither),
         logger,
@@ -320,6 +326,7 @@ final class LocalDomainNode(
     retryProvider
       .getValueWithRetries(
         RetryFor.WaitingOnInitDependency,
+        "sequencer status",
         "sequencer status",
         sequencerAdminConnection.getStatus.map(statusToEither),
         logger,

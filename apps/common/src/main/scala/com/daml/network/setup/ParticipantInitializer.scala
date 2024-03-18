@@ -64,6 +64,7 @@ class ParticipantInitializer(
         retryProvider
           .waitUntil(
             RetryFor.WaitingOnInitDependency,
+            "participant_init",
             "participant is initialized",
             participantAdminConnection
               .isNodeInitialized()

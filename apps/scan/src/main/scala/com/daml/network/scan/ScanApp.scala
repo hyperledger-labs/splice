@@ -145,6 +145,7 @@ class ScanApp(
       _ <- appInitStep("Wait until there is an OpenMiningRound contract") {
         retryProvider.waitUntil(
           RetryFor.WaitingOnInitDependency,
+          "wait_open_mining",
           "there is an OpenMiningRound contract",
           store.multiDomainAcsStore
             .listContracts(roundCodegen.OpenMiningRound.COMPANION, limit = PageLimit.tryCreate(1))

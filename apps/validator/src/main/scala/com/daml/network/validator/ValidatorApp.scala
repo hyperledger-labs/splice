@@ -307,6 +307,7 @@ class ValidatorApp(
   ): Future[Unit] = {
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
+      "validator_license",
       show"ValidatorLicense for ${store.key.validatorParty} is visible",
       for {
         validatorLicenseResult <- store.lookupValidatorLicenseWithOffset()
@@ -327,6 +328,7 @@ class ValidatorApp(
   private def ensureVersionMatch(scanClientConfig: BftScanClientConfig): Future[Unit] =
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
+      "version_check",
       "version checked via scan",
       // we checkVersionCompatibility on every CN app connection
       scanClientConfig match {

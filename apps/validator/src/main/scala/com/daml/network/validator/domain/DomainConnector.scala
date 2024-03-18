@@ -91,6 +91,7 @@ class DomainConnector(
   )(implicit tc: TraceContext) = {
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
+      "scan_sequencer_connections",
       "valid sequencer connections from scan is non empty",
       getSequencerConnectionsFromScan(clock.now)
         .map { connections =>

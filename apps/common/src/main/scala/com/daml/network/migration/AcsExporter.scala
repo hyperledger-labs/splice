@@ -103,6 +103,7 @@ class AcsExporter(
       _ <- retryProvider
         .waitUntil(
           RetryFor.WaitingOnInitDependency,
+          "wait_safe",
           "wait for mediator and participant response time after domain is paused",
           participantAdminConnection
             // This is an interactive call, and we'd rather not wait a full polling interval for it.

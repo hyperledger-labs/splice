@@ -18,7 +18,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, Traced
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import com.digitalasset.canton.sequencing.protocol.SequencerErrors
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.{Backoff, RetryUtil, Success}
 import com.digitalasset.canton.util.retry.RetryUtil.{
@@ -32,6 +32,7 @@ import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.time.Clock
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.Done
 import org.apache.pekko.http.scaladsl.model.{StatusCode, StatusCodes}
 import org.apache.pekko.stream.StreamTcpException
@@ -56,8 +57,10 @@ final class RetryProvider(
     override val timeouts: ProcessingTimeout,
     val futureSupervisor: FutureSupervisor,
     val metricsFactory: CantonLabeledMetricsFactory,
-) extends NamedLogging
-    with FlagCloseable {
+)(implicit tracer: Tracer)
+    extends NamedLogging
+    with FlagCloseable
+    with Spanning {
   import RetryProvider.Retryable
 
   // Keep track of promises directly to avoid the promise accumulating references to stale futures that it should complete.
@@ -179,93 +182,121 @@ final class RetryProvider(
     */
   def waitUntil(
       retryFor: RetryFor,
+      conditionIdentifier: String,
       conditionDescription: String,
       checkCondition: => Future[Unit],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit ec: ExecutionContext): Future[Unit] =
-    TraceContext.withNewTraceContext(tc0 => {
-      implicit val tc: TraceContext = tc0
-      logger.info(s"Waiting until $conditionDescription")
-      retry(
-        retryFor,
-        s"Check whether $conditionDescription",
-        checkCondition,
-        logger,
-        additionalCodes,
-      )
-        .transform(
-          result => {
-            logger.info(s"Success: $conditionDescription")
-            result
-          },
-          exception => {
-            if (isClosing)
-              logger.info(s"Gave up waiting until $conditionDescription, as we are shutting down")
-            else
-              logger.error(s"Gave up waiting until $conditionDescription", exception)
-            exception
-          },
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] =
+    withSpan(conditionIdentifier)(implicit tc =>
+      _ => {
+        logger.info(s"Waiting until $conditionDescription")
+        retry(
+          retryFor,
+          s"Check whether $conditionDescription",
+          checkCondition,
+          logger,
+          additionalCodes,
+          additionalMetricsLabels = Map(
+            "operation" -> conditionIdentifier
+          ),
         )
-    })
+          .transform(
+            result => {
+              logger.info(s"Success: $conditionDescription")
+              result
+            },
+            exception => {
+              if (isClosing)
+                logger.info(s"Gave up waiting until $conditionDescription, as we are shutting down")
+              else
+                logger.error(s"Gave up waiting until $conditionDescription", exception)
+              exception
+            },
+          )
+      }
+    )
 
   /** Retry getting a value and print it on success.
     *
     * Intended to be used for one-time value retrievals during app init or like processes.
+    *
+    * @param valueIdentifier - General identifier that is used to tag metrics and spans. Must not be a high cardinality value
     */
   def getValueWithRetriesNoPretty[T](
       retryFor: RetryFor,
       valueDescription: String,
+      valueIdentifier: String,
       getValue: => Future[T],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit ec: ExecutionContext): Future[T] = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
     implicit val adHocPretty: Pretty[T] = Pretty.prettyOfString(_.toString)
-    getValueWithRetries(retryFor, valueDescription, getValue, logger, additionalCodes)
+    getValueWithRetries(
+      retryFor,
+      valueIdentifier,
+      valueDescription,
+      getValue,
+      logger,
+      additionalCodes,
+    )
   }
 
   /** Retry getting a value and print it on success.
     *
     * Intended to be used for one-time value retrievals during app init or like processes.
+    *
+    * @param valueIdentifier - General identifier that is used to tag metrics and spans. Must not be a high cardinality value
     */
   def getValueWithRetries[T](
       retryFor: RetryFor,
+      valueIdentifier: String,
       valueDescription: String,
       getValue: => Future[T],
       logger: TracedLogger,
       additionalCodes: Seq[Status.Code] = Seq.empty,
-  )(implicit ec: ExecutionContext, pp: Pretty[T]): Future[T] =
-    TraceContext.withNewTraceContext(tc0 => {
-      implicit val tc: TraceContext = tc0
-      val valueDescQuoted = s"'$valueDescription'"
-      logger.info(s"Attempting to get $valueDescQuoted")
-      retry(retryFor, s"Get $valueDescription", getValue, logger, additionalCodes)
-        .transform(
-          value => {
-            logger.info(show"Got ${valueDescQuoted.unquoted}: $value")
-            value
-          },
-          exception => {
-            if (isClosing)
-              logger.info(s"Gave up waiting to get $valueDescQuoted, as we are shutting down")
-            else
-              logger.error(s"Gave up getting $valueDescQuoted", exception)
-            exception
-          },
+  )(implicit ec: ExecutionContext, tc: TraceContext, pp: Pretty[T]): Future[T] =
+    withSpan(valueIdentifier)(implicit tc =>
+      _ => {
+        val valueDescQuoted = s"'$valueDescription'"
+        logger.info(s"Attempting to get $valueDescQuoted")
+        retry(
+          retryFor,
+          s"Get $valueDescription",
+          getValue,
+          logger,
+          additionalCodes,
+          additionalMetricsLabels = Map("operation" -> valueIdentifier),
         )
-    })
+          .transform(
+            value => {
+              logger.info(show"Got ${valueDescQuoted.unquoted}: $value")
+              value
+            },
+            exception => {
+              if (isClosing)
+                logger.info(s"Gave up waiting to get $valueDescQuoted, as we are shutting down")
+              else
+                logger.error(s"Gave up getting $valueDescQuoted", exception)
+              exception
+            },
+          )
+      }
+    )
 
   /** Variant of ensureThat where the check returns only a Boolean. */
   def ensureThatB[R](
       retryFor: RetryFor,
+      conditionId: String,
       conditionDesc: String,
       check: => Future[Boolean],
       establish: => Future[Unit],
       logger: TracedLogger,
       retryable: R = Seq.empty,
-  )(implicit ec: ExecutionContext, mkRetryable: Retryable[R]): Future[Unit] =
+  )(implicit ec: ExecutionContext, tc: TraceContext, mkRetryable: Retryable[R]): Future[Unit] =
     ensureThatO(
       retryFor,
+      conditionId,
       conditionDesc,
       check.map(Option.when(_)(())),
       establish,
@@ -276,14 +307,21 @@ final class RetryProvider(
   /** Variant of ensureThat where the check returns only a result. */
   def ensureThatO[T, R](
       retryFor: RetryFor,
+      conditionId: String,
       conditionDesc: String,
       check: => Future[Option[T]],
       establish: => Future[Unit],
       logger: TracedLogger,
       retryable: R = Seq.empty,
-  )(implicit ec: ExecutionContext, pp: Pretty[T], mkRetryable: Retryable[R]): Future[T] =
+  )(implicit
+      ec: ExecutionContext,
+      tc: TraceContext,
+      pp: Pretty[T],
+      mkRetryable: Retryable[R],
+  ): Future[T] =
     ensureThat(
       retryFor,
+      conditionId,
       conditionDesc,
       check = check.map(_.toRight(())),
       establish = (_: Unit) => establish,
@@ -298,6 +336,7 @@ final class RetryProvider(
     */
   def ensureThat[A, B, R](
       retryFor: RetryFor,
+      conditionId: String,
       conditionDesc: String,
       check: => Future[Either[A, B]],
       establish: A => Future[Unit],
@@ -305,11 +344,12 @@ final class RetryProvider(
       retryable: R = Seq.empty,
   )(implicit
       ec: ExecutionContext,
+      tc: TraceContext,
       pa: Pretty[A],
       pb: Pretty[B],
       mkRetryable: Retryable[R],
   ): Future[B] =
-    ensureThatI(retryFor, conditionDesc, check, check, establish, logger, retryable)
+    ensureThatI(retryFor, conditionId, conditionDesc, check, check, establish, logger, retryable)
 
   /** Ensure that a particular condition holds as part of an init-like process.
     *
@@ -318,6 +358,7 @@ final class RetryProvider(
     */
   def ensureThatI[A, B, R](
       retryFor: RetryFor,
+      conditionId: String,
       conditionDesc: String,
       initialCheck: => Future[Either[A, B]],
       establishedCheck: => Future[Either[A, B]],
@@ -326,56 +367,59 @@ final class RetryProvider(
       additionalCodes: R = Seq.empty,
   )(implicit
       ec: ExecutionContext,
+      tc: TraceContext,
       pa: Pretty[A],
       pb: Pretty[B],
       mkRetryable: Retryable[R],
   ): Future[B] =
-    TraceContext.withNewTraceContext(tc0 => {
-      implicit val tc: TraceContext = tc0;
-      logger.info(s"Ensuring that $conditionDesc")
-      retry(
-        retryFor,
-        s"Check whether $conditionDesc and establish it if needed",
-        initialCheck.flatMap {
-          case Right(result) => Future.successful(Right(result))
-          case Left(error) =>
-            establish(error).map(Left(_))
-        },
-        logger,
-        additionalCodes,
-      ).flatMap {
-        case Right(result) => Future.successful(result)
-        case Left(_) =>
-          logger.debug(s"Established that $conditionDesc, waiting until it is observable")
-          retry(
-            retryFor,
-            s"Wait until observing $conditionDesc",
-            establishedCheck.map {
-              case Right(result) => result
-              case Left(error) =>
-                throw Status.FAILED_PRECONDITION
-                  .withDescription(
-                    show"Condition $conditionDesc is not (yet) observable; check failed with $error"
-                  )
-                  .asRuntimeException()
-            },
-            logger,
-            additionalCodes,
-          )
-      }.transform(
-        result => {
-          logger.info(show"Success: $conditionDesc, result is $result")
-          result
-        },
-        exception => {
-          if (isClosing)
-            logger.info(s"Gave up ensuring $conditionDesc, as we are shutting down")
-          else
-            logger.error(s"Gave up ensuring $conditionDesc", exception)
-          exception
-        },
-      )
-    })
+    withSpan(conditionId)(implicit tc =>
+      _ => {
+        logger.info(s"Ensuring that $conditionDesc")
+        retry(
+          retryFor,
+          s"Check whether $conditionDesc and establish it if needed",
+          initialCheck.flatMap {
+            case Right(result) => Future.successful(Right(result))
+            case Left(error) =>
+              establish(error).map(Left(_))
+          },
+          logger,
+          additionalCodes,
+          additionalMetricsLabels = Map("operation" -> conditionId),
+        ).flatMap {
+          case Right(result) => Future.successful(result)
+          case Left(_) =>
+            logger.debug(s"Established that $conditionDesc, waiting until it is observable")
+            retry(
+              retryFor,
+              s"Wait until observing $conditionDesc",
+              establishedCheck.map {
+                case Right(result) => result
+                case Left(error) =>
+                  throw Status.FAILED_PRECONDITION
+                    .withDescription(
+                      show"Condition $conditionDesc is not (yet) observable; check failed with $error"
+                    )
+                    .asRuntimeException()
+              },
+              logger,
+              additionalCodes,
+            )
+        }.transform(
+          result => {
+            logger.info(show"Success: $conditionDesc, result is $result")
+            result
+          },
+          exception => {
+            if (isClosing)
+              logger.info(s"Gave up ensuring $conditionDesc, as we are shutting down")
+            else
+              logger.error(s"Gave up ensuring $conditionDesc", exception)
+            exception
+          },
+        )
+      }
+    )
 
   /** A retry intended for client calls, thus timing out relatively quickly. */
   def retryForClientCalls[T, R: Retryable](
@@ -430,7 +474,7 @@ object RetryProvider {
       timeouts: ProcessingTimeout,
       futureSupervisor: FutureSupervisor,
       metricsFactory: CantonLabeledMetricsFactory,
-  ): RetryProvider = {
+  )(implicit tracer: Tracer): RetryProvider = {
     new RetryProvider(loggerFactory, timeouts, futureSupervisor, metricsFactory)
   }
 

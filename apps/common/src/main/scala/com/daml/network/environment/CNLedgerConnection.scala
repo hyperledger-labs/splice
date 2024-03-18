@@ -166,6 +166,7 @@ class BaseLedgerConnection(
   )(implicit traceContext: TraceContext): Future[PartyId] =
     retryProvider.ensureThatO(
       RetryFor.WaitingOnInitDependency,
+      "primary_party_allocated",
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
@@ -179,9 +180,10 @@ class BaseLedgerConnection(
   def ensureUserHasPrimaryParty(
       userId: String,
       partyId: PartyId,
-  ): Future[PartyId] =
+  )(implicit traceContext: TraceContext): Future[PartyId] =
     retryProvider.ensureThatO(
       RetryFor.WaitingOnInitDependency,
+      "primary_party_set",
       s"User $userId has primary party",
       check = getOptionalPrimaryParty(userId),
       establish = for {
@@ -213,31 +215,21 @@ class BaseLedgerConnection(
           participantId,
           participantId.uid.namespace.fingerprint,
         )
-      _ <- retryProvider.waitUntil(
-        RetryFor.WaitingOnInitDependency,
-        s"Ledger API observers party $partyId",
-        client.getParties(Seq(partyId)).map { parties =>
-          if (parties.isEmpty)
-            throw Status.NOT_FOUND
-              .withDescription(s"Party allocation of $partyId not observed on ledger API")
-              .asRuntimeException()
-        },
-        logger,
-      )
+      _ <- waitForPartyOnLedgerApi(partyId)
     } yield partyId
 
   def waitForPartyOnLedgerApi(
       party: PartyId
-  ): Future[Unit] =
+  )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
+      "ledger_api_wait_party",
       show"Party $party is observed on ledger API",
-      client.getParties(Seq(party)).map { result =>
-        if (result.isEmpty) {
+      client.getParties(Seq(party)).map { parties =>
+        if (parties.isEmpty)
           throw Status.NOT_FOUND
-            .withDescription(show"Party $party is not visible on ledger API")
+            .withDescription(s"Party allocation of $party not observed on ledger API")
             .asRuntimeException()
-        }
       },
       logger,
     )
@@ -291,7 +283,9 @@ class BaseLedgerConnection(
     client.setUserPrimaryParty(user, party, identityProviderId)
 
   def ensureUserMetadataAnnotation(userId: String, key: String, value: String, retryFor: RetryFor)(
-      implicit ec: ExecutionContext
+      implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
   ): Future[Unit] =
     ensureUserMetadataAnnotation(userId, Map(key -> value), retryFor)
 
@@ -301,10 +295,12 @@ class BaseLedgerConnection(
       retryFor: RetryFor,
       identityProviderId: Option[String] = None,
   )(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      traceContext: TraceContext,
   ): Future[Unit] =
     retryProvider.ensureThatB(
       retryFor,
+      "ensure_user_annotation",
       s"user $userId has metadata annotations $annotations",
       client.getUserProto(userId, identityProviderId).map { user =>
         if (!user.hasMetadata)
@@ -334,9 +330,10 @@ class BaseLedgerConnection(
       userId: String,
       key: String,
       identityProviderId: Option[String] = None,
-  ): Future[String] =
+  )(implicit traceContext: TraceContext): Future[String] =
     retryProvider.getValueWithRetriesNoPretty(
       RetryFor.WaitingOnInitDependency,
+      "wait_user_metadata",
       s"metadata field $key of user $userId",
       client.getUserProto(userId, identityProviderId).map { user =>
         if (user.hasMetadata) {
@@ -448,6 +445,7 @@ class BaseLedgerConnection(
     } else
       retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
+        "wait_packages",
         show"packages for $requiredPackageIds are uploaded",
         for {
           actual <- (listPackages(): Future[Set[String]])
@@ -464,7 +462,9 @@ class BaseLedgerConnection(
   }
 
   // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
-  def getSvcPartyFromUserMetadata(userId: String): Future[PartyId] =
+  def getSvcPartyFromUserMetadata(userId: String)(implicit
+      traceContext: TraceContext
+  ): Future[PartyId] =
     waitForUserMetadata(userId, SVC_PARTY_USER_METADATA_KEY).map(
       PartyId.tryFromProtoPrimitive(_)
     )

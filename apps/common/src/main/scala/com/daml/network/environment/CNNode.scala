@@ -11,6 +11,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -28,6 +29,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
+    tracer: Tracer,
 ) extends CNNodeBase[State](
       serviceUser,
       participantClient,
@@ -72,6 +74,7 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
     serviceParty <- appInitStep("Get primary party") {
       retryProvider.getValueWithRetries[PartyId](
         RetryFor.WaitingOnInitDependency,
+        "primary_party",
         s"primary party of service user $serviceUser",
         initConnection.getPrimaryParty(serviceUser),
         logger,

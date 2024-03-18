@@ -661,6 +661,7 @@ object BftScanConnection {
           // start with the latest scan list
           _ <- retryProvider.waitUntil(
             RetryFor.WaitingOnInitDependency,
+            "refresh_scan_list",
             "Scan list is refreshed.",
             bft
               .refresh(bftConnection)

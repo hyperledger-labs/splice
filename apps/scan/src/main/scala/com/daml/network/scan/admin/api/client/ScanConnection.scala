@@ -50,6 +50,7 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
   def getSvcPartyIdWithRetries()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
+      "scan_read_svc_party_id",
       "SVC party ID from scan",
       getSvcPartyId(),
       logger,

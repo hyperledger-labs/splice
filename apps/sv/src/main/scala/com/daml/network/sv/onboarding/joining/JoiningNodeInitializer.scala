@@ -190,6 +190,7 @@ class JoiningNodeInitializer(
             _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThatB(
               RetryFor.WaitingOnInitDependency,
+              "svc_onboard",
               show"the SvcRules list the SV party ${svcStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
               isOnboarded(svcStore), {
                 for {
@@ -255,6 +256,7 @@ class JoiningNodeInitializer(
     for {
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
+        "svc_rules_visible",
         show"the SvcRules and CoinRules are visible",
         svcStore.getSvcRules().map(_ => ()),
         logger,
@@ -317,6 +319,7 @@ class JoiningNodeInitializer(
       show"SV participant $participantId has Submission rights for party $svcParty"
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
+      "submission_rights",
       description,
       for {
         svcPartyHosting <- participantAdminConnection
@@ -357,6 +360,7 @@ class JoiningNodeInitializer(
       .map(cometBftClient =>
         retryProvider.waitUntil(
           RetryFor.WaitingOnInitDependency,
+          "cometbft_up_to_date",
           "CometBFT node has caught up",
           cometBftClient
             .nodeStatus()
@@ -558,6 +562,7 @@ class JoiningNodeInitializer(
       val description = show"SvOnboardingConfirmed contract for $svParty"
       retryProvider.getValueWithRetries(
         RetryFor.WaitingOnInitDependency,
+        "sv_onboarding_confirmed",
         description,
         for {
           svOnboardingConfirmedOpt <- lookupSvOnboardingConfirmed()
@@ -653,6 +658,7 @@ class JoiningNodeInitializer(
             .adminApi
           retryProvider.getValueWithRetries(
             RetryFor.WaitingOnInitDependency,
+            "svc_party_from_sponsor",
             "SVC party ID from sponsoring SV",
             getSvcPartyIdFromSponsor(sponsorConfig),
             logger,
@@ -698,6 +704,7 @@ class JoiningNodeInitializer(
     val svParty = svcStore.key.svParty
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
+      "svc_membership",
       show"SvcRules are visible and list $svParty as a member",
       for {
         svcRules <- svcStore.lookupSvcRules()

@@ -172,6 +172,7 @@ class DomainMigrationInitializer(
       )
       _ <- retryProvider.waitUntil(
         RetryFor.Automation,
+        "participant_up_to_date",
         "participant caught up with the domain state topology",
         participantAdminConnection
           .getDomainParametersState(
@@ -238,6 +239,7 @@ class DomainMigrationInitializer(
       )
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
+        "mediator_up_to_date",
         "mediator synced topology",
         for {
           sequencerTopology <- localDomainNode.sequencerAdminConnection.listAllTransactions(
@@ -290,6 +292,7 @@ class DomainMigrationInitializer(
               )
             _ <- retryProvider.waitUntil(
               RetryFor.ClientCalls,
+              "init_sequencer",
               "sequencer is initialized",
               localDomainNode.sequencerAdminConnection.isNodeInitialized().map { initialized =>
                 if (!initialized) {
@@ -306,6 +309,7 @@ class DomainMigrationInitializer(
       .flatMap { _ =>
         retryProvider.waitUntil(
           RetryFor.ClientCalls,
+          "sequencer_initialized",
           "sequencer is initialized with restored id",
           localDomainNode.sequencerAdminConnection.getSequencerId.map { id =>
             if (id != identity.id) {
@@ -344,6 +348,7 @@ class DomainMigrationInitializer(
             )
       _ <- retryProvider.waitUntil(
         RetryFor.ClientCalls,
+        "init_mediator",
         "mediator is initialized as expected",
         localDomainNode.mediatorAdminConnection.getMediatorId.map { id =>
           if (id != identity.id) {

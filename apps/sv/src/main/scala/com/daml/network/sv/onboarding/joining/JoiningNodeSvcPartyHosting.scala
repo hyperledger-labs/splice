@@ -52,8 +52,6 @@ class JoiningNodeSvcPartyHosting(
             ).flatMap { svConnection =>
               logger.info(s"Proposing party allocation to participant $participantId")
               (for {
-                svcInfo <- svConnection.getSvcInfo()
-                svcMembersSize = svcInfo.svcRules.payload.members.size()
                 partyToParticipantProposal <- participantAdminConnection
                   .ensurePartyToParticipantAdditionProposal(
                     domainId,
@@ -104,6 +102,7 @@ class JoiningNodeSvcPartyHosting(
                         _ <- participantAdminConnection.connectDomain(domainAlias)
                         _ <- retryProvider.waitUntil(
                           RetryFor.WaitingOnInitDependency,
+                          "party_hosting_serial_observed",
                           s"Serial ${proposalNotFound.partyToParticipantMappingSerial} expected by sponsor is observed",
                           participantAdminConnection
                             .getPartyToParticipant(

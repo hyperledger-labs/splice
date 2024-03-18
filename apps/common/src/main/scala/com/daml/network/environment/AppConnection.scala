@@ -184,6 +184,7 @@ abstract class HttpAppConnection(
         if (retryConnectionOnInitialFailure) {
           retryProvider.getValueWithRetries(
             RetryFor.WaitingOnInitDependency,
+            "app_version",
             s"app version of ${config.url}",
             getHttpAppVersionInfo(),
             logger,

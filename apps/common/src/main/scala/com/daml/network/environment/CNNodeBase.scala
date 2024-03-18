@@ -26,6 +26,7 @@ import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, TracerProvider, W3CTraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.actor.ActorSystem
 import org.apache.pekko.http.scaladsl.{ConnectionContext, Http}
 import org.apache.pekko.http.scaladsl.model.{
@@ -60,6 +61,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
+    tracer: Tracer,
 ) extends CantonNode
     with FlagCloseableAsync
     with HasCloseContext
@@ -246,6 +248,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     logger.info(s"Waiting for user $serviceUser")
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
+      "wait_user",
       s"user $serviceUser",
       connection.getUser(serviceUser).map(_ => ()),
       logger,

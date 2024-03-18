@@ -222,6 +222,7 @@ class HttpAppManagerAdminHandler(
   ): Future[Unit] =
     retryProvider.ensureThatO(
       RetryFor.ClientCalls,
+      "dar_upload",
       show"DAR $darHash is uploaded",
       participantAdminConnection.lookupDar(Hash.tryFromHexString(darHash)).map(_.map(_ => ())),
       for {

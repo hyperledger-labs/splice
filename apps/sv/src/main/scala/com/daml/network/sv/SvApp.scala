@@ -248,6 +248,7 @@ class SvApp(
         appInitStep("Get participant ID") {
           retryProvider.getValueWithRetries(
             RetryFor.WaitingOnInitDependency,
+            "get_participant_id",
             "Participant ID",
             participantAdminConnection.getParticipantId(),
             logger,
@@ -360,6 +361,7 @@ class SvApp(
         appInitStep("Get CoinRules to determine if we are in a DevNet") {
           retryProvider.getValueWithRetriesNoPretty(
             RetryFor.WaitingOnInitDependency,
+            "get_coin_rules",
             "get CoinRules to determine if we are in a DevNet",
             svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
             logger,
@@ -561,6 +563,7 @@ class SvApp(
   ): Future[Unit] = {
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
+      "onboarding_contracts",
       "Onboarding contracts have been created", {
         val expectedValidatorOnboardingSecrets = config.expectedValidatorOnboardings.map(_.secret)
         for {

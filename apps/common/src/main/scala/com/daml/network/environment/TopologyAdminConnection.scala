@@ -366,6 +366,7 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider.ensureThatB(
       retryFor,
+      "ensure_initial_owner_to_key_mapping",
       show"Initial key mapping for $member exists",
       listOwnerToKeyMapping(
         member
@@ -874,6 +875,7 @@ abstract class TopologyAdminConnection(
         GenericSignedTopologyTransactionX
       ], Seq[Status.Code]](
         RetryFor.ClientCalls,
+        "replay_topology",
         "Topology transaction are added",
         listAllTransactions(
           domainId.map(TopologyStoreId.DomainStore(_)),
@@ -1244,6 +1246,7 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[Unit] =
     retryProvider.ensureThat(
       RetryFor.WaitingOnInitDependency,
+      "ensure_traffic_control",
       s"Extra traffic limit for $member on domain $domainId set to $newTotalExtraTrafficLimit (or higher)",
       lookupTrafficControlState(domainId, member).map(result =>
         Either.cond(

@@ -124,6 +124,7 @@ class SequencerAdminConnection(
   ): Future[Unit] = {
     retryProvider.ensureThat(
       RetryFor.WaitingOnInitDependency,
+      "sequencer_traffic_control",
       s"Extra traffic limit for $member set to $newTotalExtraTrafficLimit",
       lookupSequencerTrafficControlState(member).map(result =>
         Either.cond(

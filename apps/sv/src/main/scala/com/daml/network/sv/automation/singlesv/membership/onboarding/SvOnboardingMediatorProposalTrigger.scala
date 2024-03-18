@@ -90,6 +90,7 @@ class SvOnboardingMediatorProposalTrigger(
     for {
       _ <- context.retryProvider.waitUntil(
         RetryFor.Automation,
+        "sequencer_added_to_topology_state",
         s"Sequencer is added to the topology state for $task",
         participantAdminConnection
           .getSequencerDomainState(task.domainId)

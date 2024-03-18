@@ -491,6 +491,7 @@ class HttpSvHandler(
       globalDomain <- svcStore.getSvcRules().map(_.domain)
       sequenced <- retryProvider.getValueWithRetries(
         RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
+        "sequencer_added_to_topology_state",
         "New sequencer is observed in SequencerDomainState through existing sequencer",
         sequencerAdminConnection
           .listSequencerDomainState(globalDomain, store.TimeQuery.Range(None, None))

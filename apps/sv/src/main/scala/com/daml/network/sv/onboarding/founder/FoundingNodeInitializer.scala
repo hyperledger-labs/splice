@@ -156,6 +156,7 @@ class FoundingNodeInitializer(
       // is allocated, as a stand-in for all of these actions.
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
+        "svc_party_allocation",
         show"SVC party $svcParty is allocated on participant $participantId and domain $globalDomain",
         for {
           svcPartyIsAuthorized <- svcPartyHosting.isSvcPartyAuthorizedOn(
@@ -183,6 +184,7 @@ class FoundingNodeInitializer(
       withSvcStore = new WithSvcStore(svcAutomation, globalDomain)
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
+        "bootstrap_svc_rules",
         show"the SvcRules and CoinRules are bootstrapped",
         svcStore.lookupSvcRules().map(_.isDefined), {
           withSvcStore.foundCollective()
@@ -270,6 +272,7 @@ class FoundingNodeInitializer(
         for {
           _ <- retryProvider.ensureThatO(
             RetryFor.WaitingOnInitDependency,
+            "init_sequencer",
             "sequencer is initialized",
             domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),
             for {
@@ -347,6 +350,7 @@ class FoundingNodeInitializer(
           )
           _ <- retryProvider.ensureThatB(
             RetryFor.WaitingOnInitDependency,
+            "init_mediator",
             "mediator is initialized",
             domainNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
             domainNode.mediatorAdminConnection.initialize(

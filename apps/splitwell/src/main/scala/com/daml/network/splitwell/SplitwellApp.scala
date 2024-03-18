@@ -199,6 +199,7 @@ class SplitwellApp(
   ): Future[Unit] = {
     retryProvider.waitUntil(
       RetryFor.ClientCalls,
+      "splitwell_rules_created",
       s"Wait for splitwell rules to be created for domain $domain",
       automation.store.lookupSplitwellRules(domain).flatMap {
         case QueryResult(offset, None) =>

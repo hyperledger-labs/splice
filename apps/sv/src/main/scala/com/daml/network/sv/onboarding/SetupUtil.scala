@@ -173,6 +173,7 @@ private[onboarding] object SetupUtil {
         // dars are uploaded async during the init phase
         _ <- retryProvider.waitUntil(
           RetryFor.WaitingOnInitDependency,
+          "dars_uploaded",
           "Required dars are uploaded",
           participantAdminConnection.listDars().map { dars =>
             val availablesHases = dars.map(_.hash)
@@ -225,12 +226,13 @@ private[onboarding] object SetupUtil {
       connection: CNLedgerConnection,
       config: SvAppBackendConfig,
       svcParty: PartyId,
-  )(implicit ec: ExecutionContext): Future[Unit] = connection.ensureUserMetadataAnnotation(
-    config.ledgerApiUser,
-    BaseLedgerConnection.SVC_PARTY_USER_METADATA_KEY,
-    svcParty.toProtoPrimitive,
-    RetryFor.WaitingOnInitDependency,
-  )
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
+    connection.ensureUserMetadataAnnotation(
+      config.ledgerApiUser,
+      BaseLedgerConnection.SVC_PARTY_USER_METADATA_KEY,
+      svcParty.toProtoPrimitive,
+      RetryFor.WaitingOnInitDependency,
+    )
 
   def grantSvUserRightReadAsSvc(
       connection: CNLedgerConnection,
