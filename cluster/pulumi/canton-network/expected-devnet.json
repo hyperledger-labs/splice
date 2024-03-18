@@ -1247,6 +1247,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -1447,6 +1448,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
@@ -2147,6 +2149,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
+        "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": true,
         "metrics": {
@@ -2309,6 +2312,7 @@
             }
           }
         ],
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "identitiesExport": {
@@ -2389,6 +2393,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3078,6 +3083,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
+        "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
@@ -3209,6 +3215,7 @@
           "sequencerPublicUrl": "https://sequencer-0.sv-2.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "identitiesExport": {
@@ -3291,6 +3298,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3980,6 +3988,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
+        "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
@@ -4111,6 +4120,7 @@
           "sequencerPublicUrl": "https://sequencer-0.sv-3.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "identitiesExport": {
@@ -4193,6 +4203,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -4882,6 +4893,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
+        "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingestFromParticipantBegin": false,
         "metrics": {
@@ -5013,6 +5025,7 @@
           "sequencerPublicUrl": "https://sequencer-0.sv-4.svc.mock.network.canton.global"
         },
         "expectedValidatorOnboardings": [],
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "identitiesExport": {
@@ -5095,6 +5108,7 @@
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -5486,6 +5500,7 @@
         },
         "clusterUrl": "mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
+        "failOnAppVersionMismatch": true,
         "fixedTokens": false,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {

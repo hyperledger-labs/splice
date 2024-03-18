@@ -26,6 +26,8 @@ persistence:
 migration:
   id: 0
 
+failOnAppVersionMismatch: true
+
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

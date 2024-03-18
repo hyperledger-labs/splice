@@ -12,6 +12,7 @@ import {
   installCNHelmChart,
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
+import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from './postgres';
 import { installMigrationSpecificValidatorParticipant } from './participant';
@@ -85,6 +86,7 @@ export async function installSplitwell(
         user: pulumi.Output.create('cnadmin'),
         port: pulumi.Output.create(5432),
       },
+      failOnAppVersionMismatch: failOnAppVersionMismatch(),
     },
     { dependsOn: dependsOn.concat([participant]) }
   );

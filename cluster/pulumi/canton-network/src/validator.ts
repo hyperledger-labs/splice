@@ -21,6 +21,7 @@ import {
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
+import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import { PersistenceConfig } from '../../common';
 
@@ -166,6 +167,7 @@ export async function installValidatorApp(
       },
       participantAddress: config.participantAddress,
       additionalJvmOptions: jmxOptions(),
+      failOnAppVersionMismatch: failOnAppVersionMismatch(),
     },
     { dependsOn }
   );

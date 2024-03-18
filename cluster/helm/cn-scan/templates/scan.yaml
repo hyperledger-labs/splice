@@ -65,6 +65,8 @@ spec:
           value: {{ .Values.participantAddress | default "participant" | quote }}
         - name: CN_APP_SCAN_SEQUENCER_ADDRESS
           value: {{ .Values.sequencerAddress | default "global-domain-sequencer" | quote }}
+        - name: FAIL_ON_APP_VERSION_MISMATCH
+          value: {{ .Values.failOnAppVersionMismatch }}
         imagePullPolicy: Always
         ports:
         - containerPort: 5012

@@ -25,6 +25,7 @@ import {
   ValidatorTopupConfig,
   nonSvValidatorTopupConfig,
 } from 'cn-pulumi-common';
+import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import {
   CLUSTER_BASENAME,
@@ -238,6 +239,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
       enable: true,
     },
     participantIdentitiesDumpPeriodicBackup: backupConfig,
+    failOnAppVersionMismatch: failOnAppVersionMismatch(),
   };
 
   const validatorValuesWithSpecifiedAud: ChartValues = {

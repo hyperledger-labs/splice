@@ -54,6 +54,8 @@ spec:
               name: {{ $.Values.persistence.secretName }}
               key: postgresPassword
         {{- end }}
+        - name: FAIL_ON_APP_VERSION_MISMATCH
+          value: {{ .Values.failOnAppVersionMismatch }}
         ports:
         - containerPort: 5213
           name: sw-api

@@ -31,6 +31,7 @@ import {
   ValidatorTopupConfig,
 } from 'cn-pulumi-common';
 import { jmxOptions } from 'cn-pulumi-common/src/jmx';
+import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from './postgres';
 import { GlobalDomainNode } from './globalDomainNode';
@@ -495,6 +496,7 @@ function installSvApp(
       enable: true,
     },
     additionalJvmOptions: jmxOptions(),
+    failOnAppVersionMismatch: failOnAppVersionMismatch(),
     participantAddress: participant.name,
     onboardingPollingInterval: config.onboardingPollingInterval,
   } as ChartValues;
@@ -532,6 +534,7 @@ function installScan(
     },
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
+    failOnAppVersionMismatch: failOnAppVersionMismatch(),
     ingestFromParticipantBegin: ingestFromParticipantBegin,
     sequencerAddress: globalDomainNode.namespaceInternalSequencerAddress,
     participantAddress: participant.name,

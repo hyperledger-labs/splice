@@ -28,6 +28,8 @@ migration:
 
 participantHost: "participant"
 
+failOnAppVersionMismatch: true
+
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

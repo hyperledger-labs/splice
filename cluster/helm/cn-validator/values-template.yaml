@@ -35,6 +35,8 @@ pvc:
 
 useSequencerConnectionsFromScan: true
 
+failOnAppVersionMismatch: true
+
 # k8s affinity for all deployed pods (optional)
 # affinity:
 

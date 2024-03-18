@@ -34,6 +34,7 @@ import {
   svOnboardingPollingInterval,
 } from 'cn-pulumi-common';
 import { retry } from 'cn-pulumi-common/src/retries';
+import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 import fetch from 'node-fetch';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
@@ -326,6 +327,7 @@ async function installSvAndValidator(
     ],
     onboardingPollingInterval: svOnboardingPollingInterval,
     disableOnboardingParticipantPromotionDelay,
+    failOnAppVersionMismatch: failOnAppVersionMismatch(),
   };
 
   const svValuesWithSpecifiedAud: ChartValues = {

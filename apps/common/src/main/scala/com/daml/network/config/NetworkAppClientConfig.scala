@@ -11,8 +11,13 @@ case class NetworkAppClientConfig(
     tls: Option[TlsClientConfig] = None,
     keepAliveClient: Option[KeepAliveClientConfig] = Some(KeepAliveClientConfig()),
     // whether to fail hard (on the client side) or just log when the app versions of the client and server do not match
-    failOnVersionMismatch: Boolean = true,
+    failOnVersionMismatch: Boolean = NetworkAppClientConfig.failOnVersionMismatchFromEnvVar,
 )
+
+object NetworkAppClientConfig {
+  private val failOnVersionMismatchFromEnvVar: Boolean =
+    Option(System.getenv("FAIL_ON_APP_VERSION_MISMATCH")).exists(_.toBoolean)
+}
 
 trait NetworkAppNodeConfig {
   def clientAdminApi: NetworkAppClientConfig
