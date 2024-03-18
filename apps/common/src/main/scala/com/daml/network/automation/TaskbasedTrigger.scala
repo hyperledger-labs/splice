@@ -94,21 +94,21 @@ abstract class TaskbasedTrigger[T: Pretty](
                 if (quiet)
                   logger.info(show"Completed processing $task with outcome: $description")
                 else
-                  logger.info(show"Completed processing with outcome: ${description}")
-                MetricsContext.withExtraMetricLabels(("stale", "false")) { m =>
+                  logger.info(show"Completed processing with outcome: $description")
+                MetricsContext.withExtraMetricLabels(("outcome", "success")) { m =>
                   metrics.completed.mark()(m)
                 }
                 Success(true)
               case TaskNoop =>
-                if (!quiet) logger.info(show"${TaskNoop}")
-                MetricsContext.withExtraMetricLabels(("noop", "false")) { m =>
+                if (!quiet) logger.info(show"$TaskNoop")
+                MetricsContext.withExtraMetricLabels(("outcome", "noop")) { m =>
                   metrics.completed.mark()(m)
                 }
                 // Signal to polling triggers that no work was done, and it's not worth retrying immediately.
                 Success(false)
               case TaskStale =>
-                if (!quiet) logger.info(show"${TaskStale}")
-                MetricsContext.withExtraMetricLabels(("stale", "true")) { m =>
+                if (!quiet) logger.info(show"$TaskStale")
+                MetricsContext.withExtraMetricLabels(("outcome", "stale")) { m =>
                   metrics.completed.mark()(m)
                 }
                 Success(true)
