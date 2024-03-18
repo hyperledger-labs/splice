@@ -158,6 +158,8 @@ before attempting an upgrade on MainNet.
 Mirroring the recommended process for an actual upgrade,
 we also recommend that SVs perform :ref:`preparation <sv-upgrades-testing-preparation>` steps in advance of every coordinated test.
 
+.. CN-team internal steps documented in: cluster/README.md#new-domain-readiness-checks
+
 .. _sv-upgrades-testing-preparation:
 
 Individual Preparation
@@ -210,12 +212,7 @@ Specifically, coordinated tests involve:
 
 .. TODO(#10782): Consider improving the "verify healthy" instructions for partners with specific metrics to check.
 
-.. CN-team internal checklist for checking synchronizer health on our end:
-
-   1. We have our expected coin balance.
-   2. Alls SVs are in sync based on the "SV Status Reports" Grafana dashboard.
-   3. We see successful ACS commitments for everyone in the logs. If we're in sync with all other SVs it's reasonable to assume they're also in sync with each other.
-   4. All other SVs confirm that they have their expected coin balance and that they aren't seeing anything weird.
+.. CN-team internal checklist in: cluster/README.md#participating-in-a-hard-domain-migration
 
 We recommend to perform at least one coordinated test on TestNet, with the exact same configuration and versions that will be used for the upgrade on MainNet,
 before scheduling a MainNet upgrade with downtime.

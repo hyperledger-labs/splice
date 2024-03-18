@@ -69,6 +69,10 @@
     - [Approving new SVs](#approving-new-svs)
       - [Approving via SV API](#approving-via-sv-api)
       - [Approving via SV config](#approving-via-sv-config)
+    - [Participating in a hard domain migration](#participating-in-a-hard-domain-migration)
+      - [Manual steps](#manual-steps)
+      - [Checking the readiness of partners](#checking-the-readiness-of-partners)
+      - [New domain readiness checks](#new-domain-readiness-checks)
   - [Interacting with Canton Network UIs](#interacting-with-canton-network-uis)
   - [Interacting with Canton Network APIs](#interacting-with-canton-network-apis)
     - [Canton Participant APIs](#canton-participant-apis)
@@ -1406,7 +1410,7 @@ A value of `0` tells the load-tester to not use any of the test validators and d
 ## SV Operations
 
 Supervalidator nodes (SVs) play a central role in the governance and operation of each CN deployment.
-Currently, each of our cluster deployments contains four SV nodes that are under our control (SV1 to SV4).
+Each of our cluster deployments contains up to 5 SV nodes that are under our direct control (SVs 1-4 + the runbook SV).
 This means that we occasionally have to perform operations that SV operators need to perform.
 The SV runbook is currently the main documentation for operating an SV node.
 This section covers aspects not (yet) covered by the SV runbook as well has hints for managing our SV nodes specifically,
@@ -1439,6 +1443,101 @@ approvedSvIdentities:
 
 As this process is quite subtle, ask in #team-canton-network-internal to pair with someone that has done this before. You can also deploy your changes to a scratchnet to ensure that you didn't break the config,
 which would prevent our SVs from initializing after the next redeploy.
+
+### Participating in a hard domain migration
+
+Our end of the "Synchronizer Upgrades with Downtime" flow.
+Note that this also includes some steps for our non-SV validators.
+The following steps assume that:
+
+- The cluster is already deployed and is at migration ID 0.
+- We already know that a migration will take place.
+
+#### Manual steps
+
+1. Start a Slack thread on which you document the steps you take.
+   Make sure there is at least one CN engineer around for a second pair of eyes, in case there are problems.
+1. Checkout the deployment branch of the cluster undergoing the migration:
+   `git branch -D deployment/<cluster>` (to avoid accidentally using an old state)
+   followed by `git fetch && git checkout deployment/<cluster>`.
+1. Change into the deployment directory of the cluster undergoing the migration.
+1. Run `git fetch --tags -f` to make sure that we'll be using the correct version.
+   To check, run `get-snapshot-version` and compare the result with
+   `curl "https://${GCP_CLUSTER_BASENAME}.network.canton.global/version"` - they should be the same.
+   You might need to set `CI_IGNORE_DIRTY_REPO` to `true` for `get-snapshot-version` (and the subsequent steps) to work,
+   in case you have made local changes to the repo (that you can confirm are harmless).
+1. Run `make -C $REPO_ROOT cluster/clean`, and `make -C $REPO_ROOT cluster/build` to rebuild your local helm charts to the target version.
+1. Set `export CI=true` to convince `cncluster` to let you work on non-scratch clusters manually.
+1. Run `cncluster hard_domain_migration_prepare` to deploy the new Canton and CometBFT nodes for all our SVs.
+   Note that this command contains multiple `pulumi up` steps (one for the main deployment, one for the runbook SV),
+   each with a preview that you should check and must confirm.
+   Once the pulumi steps have completed successfully and you can confirm that the cluster is (still) healthy
+   (no alerts, health check failures etc.), report to our partners that you have completed this step (setting a good example).
+1. Make sure that a sufficient number (ideally all) of our partners have also prepared their SVs for migration.
+   See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
+1. Coordinate with all other SVs to schedule a migration via governance vote.
+   For testing (or if our SVs have a governance majority) you can also run `cncluster hard_domain_migration_trigger`.
+1. Deactivate our periodic health checks for the target cluster by merging a PR to `main`.
+   If periodic SV runbook redeployments are scheduled for the target cluster, deactivate those as well.
+1. Wait until the scheduled time has arrived, the domain is paused and a migration dump has been exported.
+   If unsure, check the SV app logs for an entry such as "Wrote domain migration dump"
+   (e.g., via [GCE Log Explorer](#gce-log-explorer)).
+1. Wait until all our apps have fully caught up.
+   For a good margin of safety, the last "Ingested transaction" log entry for each app should be >10 minutes old.
+   It's probably easiest to check this via the [GCE Log Explorer](#gce-log-explorer).
+1. Backup our SVs and validators: `cncluster backup_nodes sv-1 sv-2 sv-3 sv-4 sv validator1 splitwell validator`.
+   This processes the nodes list sequentially and can be very slow.
+   Consider running multiple `cncluster backup_noces X Y Z` invocations in parallel.
+   Note that our tooling currently doesn't support backing up our runbook nodes.
+   If they break we need to redeploy them with empty state.
+1. Note (or take a screenshot of) the coin balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
+1. Run `cncluster hard_domain_migration_migrate` to set up our apps for migrating.
+   Note that this command contains multiple `pulumi up` steps
+   (one for the main deployment, one for the runbook SV, one for the runbook validator),
+   each with a preview that you should check and must confirm.
+   The deployments might fail or time out if too few SVs have completed the migration to unpause the new domain,
+   so be prepared to rerun this command until it succeeds.
+   (Check the logs of failing pods to be sure that there is no other problem.)
+   For more fine-grained control, you can append `core`, `sv` or `validator` to the command to tell it to change only one of these things,
+   followed by `pulumi up` parameters such as `--yes --skip-preview`.
+1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
+   Communicate the result of your check to the rest of the SVC to conclude the migration.
+1. [Patch](patching-healthchecks-against-a-deployed-cluster) our health checks
+   so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check` and `preflight_validator_check` jobs
+   is set to reflect the expected migration ID after completing the migration.
+   If periodic SV runbook redeployments are scheduled for the target cluster, you can fix them by adding the
+   `global_domain_active_migration_id: 1` parameter to the triggered `deploy_sv_runbook` job.
+   After merging your patches to the cluster deployment branch,
+   the periodic checks and deployments should be able to complete successfully again.
+   Open a PR (for `main`) to re-enable all previously disabled checks and (re-)deployments.
+
+#### Checking the readiness of partners
+
+In addition to inquiring about the status of partners on [Slack](https://daholdings.slack.com/archives/C05E70BCSDA),
+here is a hacky oneliner to see if our partners's new sequencers and CometBFT nodes are reachable (before the actual migration has taken place):
+
+```
+curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/svc | jq '.svc_rules.payload.members | .[] | .[1].domainNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0 && grpcurl --max-time 5 $0:443 grpc.health.v1.Health/Check'
+```
+
+This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and the same IP for the CometBFT node as is used for the sequencer...
+So use this with many grains of salt and clarify with partners for which the checks fail that our assumptions are correct in their case.
+
+Also note that pre-migration, the sequencer URLs of correctly set up sequencers will return the following (and this is fine):
+
+```
+Error invoking method "grpc.health.v1.Health/Check": rpc error: code = Unavailable desc = failed to query for service descriptor "grpc.health.v1.Health": upstream connect error or disconnect/reset before headers. reset reason: remote connection failure, transport failure reason: delayed connect error: 111
+```
+
+We expect to get an error here because the sequencer's public API should not be initialized yet, because the sequencer should have been deployed with `autoInit=false`.
+
+#### New domain readiness checks
+
+1. We have our expected coin balance.
+2. Alls SVs are in sync based on the "SV Status Reports" [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
+3. In the participant logs of one of our SVs, we see `Commitment correct` messages for all SV participants.
+   If we're in sync with all other SVs it's reasonable to assume they're also in sync with each other.
+4. All our partners confirm that they have their expected coin balance and that they aren't seeing anything weird.
 
 ## Interacting with Canton Network UIs
 
@@ -1659,7 +1758,7 @@ To create a new cluster, you need to follow these steps:
 1. Create a `deployment` directory for the cluster, e.g. `cluster/deployment/cinew`.
 2. Copy the `.envrc` and `.envrc.vars` files from an existing deployment directory,
    and update the environment specific configuration in `.envrc.vars`. Specifically:
-     * `GCP_CLUSTER_BASENAME` - the name of the cluster. E.g., in the example above, `cinew`. 
+     * `GCP_CLUSTER_BASENAME` - the name of the cluster. E.g., in the example above, `cinew`.
      * `CLOUDSDK_CORE_PROJECT` - the name of GCP project where the cluster belongs. E.g. `da-cn-ci-2`.
      * `GCP_MASTER_IPV4_CIDR` - a free IP range. You can find all the taken ones by searching for `GCP_MASTER_IPV4_CIDR` in the `.envrc.vars` of the other clusters.
      * Other variables might also need to be updated, depending on the specific requirements of the cluster.
@@ -1671,7 +1770,7 @@ If the cluster is a new scratchnet, in `.circleci/config/workflows/deploy_scratc
 * `deploy_scratchnet`
 * `deploy_scratchnet_basic`
 * `deploy_scratchnet_DR`
-to include the `hold_scratchnet` and `release_hold_set_scratchnet` jobs for the new cluster. 
+to include the `hold_scratchnet` and `release_hold_set_scratchnet` jobs for the new cluster.
 
 ## Cluster Data Dumps
 

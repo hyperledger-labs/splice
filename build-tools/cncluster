@@ -2214,25 +2214,88 @@ function subcmd_restore_node() {
     esac
 }
 
-subcommand_whitelist[hard_domain_migration]='Run a full hard domain migration'
+subcommand_whitelist[hard_domain_migration_prepare]='Prepare a hard domain migration'
 
-function subcmd_hard_domain_migration() {
+function subcmd_hard_domain_migration_prepare() {
+
   _prompt_to_confirm
   _cluster_must_exist
-  _cluster_reset
-  local version=""
-  version=$(get-snapshot-version)
-  # deploy original domain and prepare upgrade
+
+  if [ "$#" -gt 0 ]; then
+    if ! _contained "$1" "all" "core" "sv"; then
+      _error "Usage: $0 hard_domain_migration_prepare [all|core|sv] [pulumi-args...]"
+    fi
+    scope="$1"
+    shift
+  else
+    scope="all"
+  fi
+
+  local -x IMAGE_TAG
+  IMAGE_TAG=$(get-snapshot-version)
+
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
-  _cluster_apply "$version"
-  # trigger upgrade
+
+  # pulumi will show a preview and ask us to confirm each deployment step
+
+  if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
+    subcmd_pulumi canton-network up --show-sames "$@"
+  fi
+
+  export TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
+
+  if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
+    subcmd_pulumi sv-runbook up --show-sames "$@"
+  fi
+}
+
+subcommand_whitelist[hard_domain_migration_trigger]='Propose a (nearly immediate) hard domain migration start and vote with SVs 1-4'
+
+function subcmd_hard_domain_migration_trigger() {
+  _prompt_to_confirm
+  _cluster_must_exist
+
   subcmd_preflight_global_domain_upgrade
-  # switch to the new domain
-  unset GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID
+}
+
+subcommand_whitelist[hard_domain_migration_migrate]='Complete a hard domain migration'
+
+function subcmd_hard_domain_migration_migrate() {
+  _prompt_to_confirm
+  _cluster_must_exist
+
+  if [ "$#" -gt 0 ]; then
+    if ! _contained "$1" "all" "core" "sv" "validator"; then
+      _error "Usage: $0 hard_domain_migration_migrate [all|core|sv|validator] [pulumi-args...]"
+    fi
+    scope="$1"
+    shift
+  else
+    scope="all"
+  fi
+
+  local -x IMAGE_TAG
+  IMAGE_TAG=$(get-snapshot-version)
+
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=0
   export GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID=0
-  _cluster_apply "$version"
+
+  # pulumi will show a preview and ask us to confirm each deployment step
+
+  if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
+    subcmd_pulumi canton-network up --show-sames
+  fi
+
+  export TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
+
+  if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
+    subcmd_pulumi sv-runbook up --show-sames
+  fi
+
+  if [ "$scope" == "all" ] || [ "$scope" == "validator" ]; then
+    subcmd_pulumi validator-runbook up --show-sames
+  fi
 }
 
 # TODO(#9531): Currently, this is not tested regularly.
