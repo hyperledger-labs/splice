@@ -17,7 +17,13 @@ import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
-import com.daml.network.util.{DomainMigrationUtil, ProcessTestUtil, StandaloneCanton, SvTestUtil}
+import com.daml.network.util.{
+  DomainMigrationUtil,
+  ProcessTestUtil,
+  StandaloneCanton,
+  SvTestUtil,
+  WalletTestUtil,
+}
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -41,7 +47,8 @@ class DisasterRecoveryIntegrationTest
     with ProcessTestUtil
     with DomainMigrationUtil
     with StandaloneCanton
-    with SvTestUtil {
+    with SvTestUtil
+    with WalletTestUtil {
 
   override def dbsSuffix = "disaster_recovery"
 
@@ -220,7 +227,10 @@ class DisasterRecoveryIntegrationTest
           "Scan transaction history is recorded and wallet balance is updated",
           _ => {
             // buffer to account for domain fee payments
-            assertInRange(sv1WalletClient.balance().unlockedQty, (1000, 2000))
+            assertInRange(
+              sv1WalletClient.balance().unlockedQty,
+              (walletUsdToCoin(1000), walletUsdToCoin(2000)),
+            )
             countTapsFromScan(sv1ScanBackend, 1337) shouldBe 1
           },
         )
@@ -318,11 +328,17 @@ class DisasterRecoveryIntegrationTest
           checkMigrateDomainOnNodes(allNodes)
 
           withClueAndLog("Old balance has been transferred to new domain") {
-            assertInRange(sv1WalletLocalClient.balance().unlockedQty, (1000, 2000))
+            assertInRange(
+              sv1WalletLocalClient.balance().unlockedQty,
+              (walletUsdToCoin(1000), walletUsdToCoin(2000)),
+            )
           }
           withClueAndLog("New domain is functional") {
             sv1WalletLocalClient.tap(1337)
-            assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 3000))
+            assertInRange(
+              sv1WalletLocalClient.balance().unlockedQty,
+              (walletUsdToCoin(2000), walletUsdToCoin(3000)),
+            )
           }
         }
       }

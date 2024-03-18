@@ -217,11 +217,11 @@ class ScanTimeBasedIntegrationTest
         sv1ScanBackend.automation.trigger[ScanAggregationTrigger].runOnce().futureValue
         sv1ScanBackend.getRoundOfLatestData() should be((baseRoundWithLatestData + 5, ledgerTime))
 
-        // TODO(#2930): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
-        val appRewardsBobR3 = BigDecimal(0.6180000000)
-        val appRewardsAliceR3 = BigDecimal(0.2580000000)
-        val validatorRewardsBobR3 = BigDecimal(0.2060000000)
-        val validatorRewardsAliceR3 = BigDecimal(0.0860000000)
+        // TODO(#10941): consider de-hard-coding the expected values here somehow, e.g. by only checking them relative to each other
+        val appRewardsBobR3 = BigDecimal(4.2000000000)
+        val appRewardsAliceR3 = BigDecimal(3.8400000000)
+        val validatorRewardsBobR3 = BigDecimal(1.4000000000)
+        val validatorRewardsAliceR3 = BigDecimal(1.2800000000)
 
         (0 to baseRoundWithLatestData.toInt + 3).map { round =>
           sv1ScanBackend.getRewardsCollectedInRound(round.toLong)
@@ -279,8 +279,9 @@ class ScanTimeBasedIntegrationTest
           compareLeaderboard(
             sv1ScanBackend.getTopProvidersByAppRewards(baseRoundWithLatestData + 4, 10),
             Seq(
-              (aliceValidatorWalletClient, BigDecimal(144.2580000000)),
-              (bobValidatorWalletClient, BigDecimal(1.2366000000)),
+              // TODO(#10941): consider de-hard-coding the expected values here
+              (aliceValidatorWalletClient, BigDecimal(20644.8400000000)),
+              (bobValidatorWalletClient, BigDecimal(8.4060000000)),
             ),
           )
         }
@@ -288,8 +289,9 @@ class ScanTimeBasedIntegrationTest
           compareLeaderboard(
             sv1ScanBackend.getTopValidatorsByValidatorRewards(baseRoundWithLatestData + 4, 10),
             Seq(
-              (bobValidatorWalletClient, BigDecimal(0.4122000000)),
-              (aliceValidatorWalletClient, BigDecimal(0.1740000000)),
+              // TODO(#10941): consider de-hard-coding the expected values here
+              (bobValidatorWalletClient, BigDecimal(2.8020000000)),
+              (aliceValidatorWalletClient, BigDecimal(2.5620000000)),
             ),
           )
         }

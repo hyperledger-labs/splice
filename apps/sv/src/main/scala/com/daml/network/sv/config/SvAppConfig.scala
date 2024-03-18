@@ -75,7 +75,7 @@ object SvOnboardingConfig {
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
       initialMaxNumInputs: Int = 100,
-      initialCoinPrice: BigDecimal = 1.0,
+      initialCoinPrice: BigDecimal = 0.005,
       initialCnsConfig: InitialCnsConfig = InitialCnsConfig(),
       initialTrafficControlConfig: TrafficControlConfig = TrafficControlConfig(),
       isDevNet: Boolean = false,

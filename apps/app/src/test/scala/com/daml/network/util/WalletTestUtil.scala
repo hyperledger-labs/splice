@@ -36,9 +36,9 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   val exactly = (x: BigDecimal) => (x, x)
 
-  def walletCoinPrice = CNNodeUtil.damlDecimal(1)
-  def walletUsdToCoin(usd: BigDecimal) = usd
-  def walletCoinToUsd(cc: BigDecimal) = cc
+  def walletCoinPrice = CNNodeUtil.damlDecimal(0.005)
+  def walletUsdToCoin(usd: BigDecimal) = usd / walletCoinPrice
+  def walletCoinToUsd(cc: BigDecimal) = cc * walletCoinPrice
 
   lazy val defaultHoldingFeeCC = walletUsdToCoin(CNNodeUtil.defaultHoldingFee.rate)
 

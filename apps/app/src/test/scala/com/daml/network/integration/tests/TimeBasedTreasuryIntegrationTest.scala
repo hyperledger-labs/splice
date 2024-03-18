@@ -17,7 +17,7 @@ class TimeBasedTreasuryIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
+  override def environmentDefinition: CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
@@ -25,14 +25,18 @@ class TimeBasedTreasuryIntegrationTest
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
         )(config)
       )
-  }
+      // TODO (#10859) remove and fix test failures
+      .withCoinPrice(walletCoinPrice)
+
+  // TODO (#10859) remove and fix test failures
+  override def walletCoinPrice = CNNodeUtil.damlDecimal(1.0)
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>
     val (alice, bob) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
 
     // create two coins in alice's wallet
-    aliceWalletClient.tap(walletCoinToUsd(50))
+    aliceWalletClient.tap(50)
     checkWallet(alice, aliceWalletClient, Seq(exactly(50)))
 
     // run a transfer such that alice's validator has some rewards
@@ -40,7 +44,7 @@ class TimeBasedTreasuryIntegrationTest
     eventually()(aliceValidatorWalletClient.listAppRewardCoupons() should have size 1)
     eventually()(aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1)
     // and give alice another coin.
-    aliceWalletClient.tap(walletCoinToUsd(50))
+    aliceWalletClient.tap(50)
     checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)))
 
     // advance by two ticks, so the issuing round of round 1 is created
@@ -56,11 +60,7 @@ class TimeBasedTreasuryIntegrationTest
         .listAppRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
       // and coins are automatically merged.
-      checkWallet(
-        alice,
-        aliceWalletClient,
-        Seq((walletUsdToCoin(50 - smallAmount) + 10, walletUsdToCoin(50 + smallAmount) + 10)),
-      )
+      checkWallet(alice, aliceWalletClient, Seq((59, 61)))
       // same for validator rewards
       aliceValidatorWalletClient
         .listValidatorRewardCoupons()

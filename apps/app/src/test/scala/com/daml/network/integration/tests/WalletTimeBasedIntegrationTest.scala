@@ -611,7 +611,10 @@ class WalletTimeBasedIntegrationTest
           checkBalance(
             aliceValidatorWalletClient,
             Some(balanceBefore.round + 2),
-            (balanceBefore.unlockedQty + 102.5, balanceBefore.unlockedQty + 103.0),
+            (
+              balanceBefore.unlockedQty + walletUsdToCoin(102.5),
+              balanceBefore.unlockedQty + walletUsdToCoin(103.0),
+            ),
             (balanceBefore.lockedQty, balanceBefore.lockedQty),
             (0, 1),
           )

@@ -45,6 +45,7 @@ import io.grpc.protobuf.StatusProto
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
+import java.math.RoundingMode as JRM
 import scala.concurrent.{ExecutionContext, Future}
 import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
@@ -545,9 +546,11 @@ class HttpWalletHandler(
       retryProvider.retryForClientCalls(
         "Tap",
         for {
+          (openRounds, _) <- scanConnection.getOpenAndIssuingMiningRounds()
+          openRound = CNNodeUtil.selectLatestOpenMiningRound(walletManager.clock.now, openRounds)
           result <- exerciseWalletCoinAction(
             new coinoperation.CO_Tap(
-              amount
+              amount.divide(openRound.payload.coinPrice, JRM.CEILING)
             ),
             user,
             (outcome: coinoperationoutcome.COO_Tap) =>

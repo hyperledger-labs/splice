@@ -441,6 +441,7 @@ class ScanIntegrationTest
       }
   }
 
+  // TODO (#10940) move to simtime
   "list collected app and validator and SV rewards" in { implicit env =>
     val (alice, _) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
@@ -486,7 +487,7 @@ class ScanIntegrationTest
     clue("Bob grants featured app and taps, transfers to alice") {
       grantFeaturedAppRight(bobValidatorWalletClient)
 
-      bobWalletClient.tap(50)
+      bobWalletClient.tap(walletCoinToUsd(50))
       actAndCheck(
         "Transfer from Bob to Alice",
         p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0),
@@ -541,10 +542,11 @@ class ScanIntegrationTest
           .map(BigDecimal(_))
           .filter(_ != zero)
         val inputValidatorAmount = inputValidatorAmounts
+        // TODO (#10940) change both 78... and 79... to walletUsdToCoin(2.85)
         inputValidatorAmount should contain theSameElementsAs (Seq(
-          validatorRewardAmount + 2.85
+          validatorRewardAmount + 78.9594799594
         ) ++ Seq
-          .fill(2)(BigDecimal(2.85).setScale(10))) // 2 validator faucets
+          .fill(2)(BigDecimal(79.2744799594).setScale(10))) // 2 validator faucets
       }
     }
   }

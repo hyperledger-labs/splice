@@ -24,6 +24,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
 
+import java.math.RoundingMode
 import java.time.Duration
 import java.util.UUID
 
@@ -37,6 +38,9 @@ class WalletTxLogIntegrationTest
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
 
   private val coinPrice = BigDecimal(0.75).setScale(10)
+
+  private def usdAsTappedCoin(usd: Double) =
+    BigDecimal(BigDecimal(usd).bigDecimal.divide(coinPrice.bigDecimal, 10, RoundingMode.CEILING))
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
@@ -83,12 +87,12 @@ class WalletTxLogIntegrationTest
         Seq(
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 12.0
+            logEntry.amount shouldBe usdAsTappedCoin(12.0)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 11.0
+            logEntry.amount shouldBe usdAsTappedCoin(11.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),
@@ -198,17 +202,17 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 30.0
+            logEntry.amount shouldBe usdAsTappedCoin(30.0)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 20.0
+            logEntry.amount shouldBe usdAsTappedCoin(20.0)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 10.0
+            logEntry.amount shouldBe usdAsTappedCoin(10.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),
@@ -280,17 +284,17 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 30.0
+            logEntry.amount shouldBe usdAsTappedCoin(30.0)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 20.0
+            logEntry.amount shouldBe usdAsTappedCoin(20.0)
             logEntry.coinPrice shouldBe coinPrice
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 10.0
+            logEntry.amount shouldBe usdAsTappedCoin(10.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),
@@ -390,7 +394,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 100.0
+            logEntry.amount shouldBe usdAsTappedCoin(100.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),
@@ -445,7 +449,7 @@ class WalletTxLogIntegrationTest
           checkTransfer,
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 100.0
+            logEntry.amount shouldBe usdAsTappedCoin(100.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),
@@ -554,7 +558,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 100.0
+            logEntry.amount shouldBe usdAsTappedCoin(100.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),
@@ -720,7 +724,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 100.0
+            logEntry.amount shouldBe usdAsTappedCoin(100.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),
@@ -818,7 +822,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 100.0
+            logEntry.amount shouldBe usdAsTappedCoin(100.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),
@@ -985,7 +989,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 100.0
+            logEntry.amount shouldBe usdAsTappedCoin(100.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),
@@ -1114,7 +1118,7 @@ class WalletTxLogIntegrationTest
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
-            logEntry.amount shouldBe 100.0
+            logEntry.amount shouldBe usdAsTappedCoin(100.0)
             logEntry.coinPrice shouldBe coinPrice
           },
         ),

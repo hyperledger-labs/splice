@@ -5,6 +5,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{
+  CNNodeUtil,
   DomainFeesTestUtil,
   FrontendLoginUtil,
   WalletFrontendTestUtil,
@@ -28,6 +29,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
     with FrontendLoginUtil {
 
   private val coinPrice = 2
+  override def walletCoinPrice = CNNodeUtil.damlDecimal(coinPrice.toDouble)
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -76,6 +78,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               aliceCnsExternalClient,
               aliceEntryName,
               aliceWalletClient,
+              tapAmount = 5 * coinPrice,
             )
             // charlie -> alice
             charlieWalletClient.tap(50)

@@ -9,7 +9,7 @@ import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
-import com.daml.network.util.{ProcessTestUtil, SplitwellTestUtil, WalletTestUtil}
+import com.daml.network.util.{CNNodeUtil, ProcessTestUtil, SplitwellTestUtil, WalletTestUtil}
 
 import java.nio.file.{Path, Paths}
 import better.files.*
@@ -55,7 +55,11 @@ class AppUpgradeIntegrationTest
       val config = CNNodeConfig.parseAndLoadOrThrow(
         Seq(Paths.get(s"apps/app/src/test/resources/include/nodes/${configFile}.conf").toFile)
       )
-      val configOut = CNNodeConfigTransforms.defaults().foldLeft(config)((c, t) => t(c))
+      val configOut =
+        (CNNodeConfigTransforms.defaults()
+        // TODO (#10859) remove setCoinPrice and fix test failures
+          :+ CNNodeConfigTransforms.setCoinPrice(walletCoinPrice))
+          .foldLeft(config)((c, t) => t(c))
       val outFile = generatedConfigDir().resolve(s"${configFile}.conf")
       CNNodeConfig.writeToFile(configOut, outFile, confidential = false)
       configFile -> outFile
@@ -73,7 +77,13 @@ class AppUpgradeIntegrationTest
       configTransformsWithContext = (_: String) => Seq(),
     ).withManualStart
       .withAllocatedUsers()
+      // TODO (#10859) remove and fix test failures
+      .withCoinPrice(walletCoinPrice)
   }
+
+  // TODO (#10859) remove and fix test failures
+  override def walletCoinPrice = CNNodeUtil.damlDecimal(1.0)
+
   "A set of CN apps" should {
     "be upgradeable" in { implicit env =>
       Using.resource(AppUpgradeIntegrationTest.MultiCnProcessResource("forUpgrade", loggerFactory))(

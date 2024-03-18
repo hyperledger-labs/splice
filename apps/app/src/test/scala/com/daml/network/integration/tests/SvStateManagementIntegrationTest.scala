@@ -190,8 +190,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       // sv1 because it's the SVC founder and sv2 because we configured it to do so
       eventually() {
         getCoinPriceVoteMap() shouldBe Map(
-          svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
-          svParties("sv2") -> Seq(Some(BigDecimal(1.0))),
+          svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
+          svParties("sv2") -> Seq(Some(BigDecimal(0.005))),
           svParties("sv3") -> Seq(None),
           svParties("sv4") -> Seq(None),
         )
@@ -208,7 +208,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       "CoinPriceVote contract for sv2, sv3 anc sv4 are updated",
       _ => {
         getCoinPriceVoteMap() shouldBe Map(
-          svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
+          svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
           svParties("sv2") -> Seq(Some(BigDecimal(4.0))),
           svParties("sv3") -> Seq(Some(BigDecimal(3.0))),
           svParties("sv4") -> Seq(Some(BigDecimal(2.0))),
@@ -259,8 +259,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
     eventually() {
       getCoinPriceVoteMap() shouldBe Map(
-        svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
-        svParties("sv2") -> Seq(Some(BigDecimal(1.0))),
+        svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
+        svParties("sv2") -> Seq(Some(BigDecimal(0.005))),
         svParties("sv3") -> Seq(None),
         svParties("sv4") -> Seq(None),
       )
@@ -306,8 +306,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       "vote of sv3 is remove",
       _ =>
         getCoinPriceVoteMap() shouldBe Map(
-          svParties("sv1") -> Seq(Some(BigDecimal(1.0))),
-          svParties("sv2") -> Seq(Some(BigDecimal(1.0))),
+          svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
+          svParties("sv2") -> Seq(Some(BigDecimal(0.005))),
+          svParties("sv3") -> Seq(None),
           svParties("sv4") -> Seq(None),
         ),
     )

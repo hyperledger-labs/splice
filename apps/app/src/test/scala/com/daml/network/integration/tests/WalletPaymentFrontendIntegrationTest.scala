@@ -5,7 +5,13 @@ import com.daml.network.codegen.java.cn.wallet.payment.{AcceptedAppPayment, Curr
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{Contract, FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
+import com.daml.network.util.{
+  Contract,
+  CNNodeUtil,
+  FrontendLoginUtil,
+  WalletFrontendTestUtil,
+  WalletTestUtil,
+}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
@@ -17,6 +23,7 @@ class WalletPaymentFrontendIntegrationTest
 
   private val coinPrice = 2
   private val tolerance = 0.005
+  override def walletCoinPrice = CNNodeUtil.damlDecimal(coinPrice.toDouble)
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -39,6 +46,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -47,6 +55,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val description = "this will be accepted (in CC)"
@@ -118,6 +127,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -126,6 +136,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val description = "this will be accepted (in USD)"
@@ -201,6 +212,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -209,6 +221,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val description = "this will be accepted (in CC)"
@@ -283,6 +296,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -291,6 +305,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val description = "this will be accepted (in USD)"
@@ -365,6 +380,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -373,6 +389,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
+          tapAmount = 5 * coinPrice,
         )
 
         val description = "this will be accepted (in USD)"

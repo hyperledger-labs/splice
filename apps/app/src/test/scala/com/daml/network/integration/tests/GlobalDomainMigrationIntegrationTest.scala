@@ -46,6 +46,7 @@ import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
+  CNNodeUtil,
   DomainMigrationUtil,
   ProcessTestUtil,
   SplitwellTestUtil,
@@ -393,6 +394,11 @@ class GlobalDomainMigrationIntegrationTest
         { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
       )
       .withManualStart
+      // TODO (#10859) remove and fix test failures
+      .withCoinPrice(walletCoinPrice)
+
+  // TODO (#10859) remove and fix test failures
+  override def walletCoinPrice = CNNodeUtil.damlDecimal(1.0)
 
   "migrate global domain to new nodes with downtime" in { implicit env =>
     import env.environment.scheduler

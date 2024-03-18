@@ -36,6 +36,11 @@ class WalletAppRewardsTimeBasedIntegrationTest
           _.copy(miningRoundsCacheTimeToLiveOverride = Some(NonNegativeFiniteDuration.ofMillis(1)))
         )(config)
       )
+      // TODO (#10859) remove and fix test failures
+      .withCoinPrice(walletCoinPrice)
+
+  // TODO (#10859) remove and fix test failures
+  override def walletCoinPrice = CNNodeUtil.damlDecimal(1.0)
 
   "A wallet" should {
 

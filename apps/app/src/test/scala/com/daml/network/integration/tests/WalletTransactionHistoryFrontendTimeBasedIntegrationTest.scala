@@ -41,6 +41,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
+          tapAmount = 5.0 * coinPrice,
         )
         val (_, txsBefore) = actAndCheck(
           "Alice goes to wallet", {

@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
+import com.daml.network.util.{CNNodeUtil, FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
@@ -19,6 +19,7 @@ class WalletTransfersFrontendIntegrationTest
     with FrontendLoginUtil {
 
   private val coinPrice = 2
+  override def walletCoinPrice = CNNodeUtil.damlDecimal(coinPrice.toDouble)
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
@@ -242,9 +243,9 @@ class WalletTransfersFrontendIntegrationTest
         aliceCnsExternalClient,
         aliceCnsName,
         aliceWalletClient,
-        cc,
+        cc * coinPrice,
       )
-      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc)
+      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc * coinPrice)
 
       // transfer from bob to alice
       actAndCheck(
@@ -297,9 +298,9 @@ class WalletTransfersFrontendIntegrationTest
         aliceCnsExternalClient,
         aliceCnsName,
         aliceWalletClient,
-        cc,
+        cc * coinPrice,
       )
-      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc)
+      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc * coinPrice)
 
       // transfer from bob to alice
       actAndCheck(

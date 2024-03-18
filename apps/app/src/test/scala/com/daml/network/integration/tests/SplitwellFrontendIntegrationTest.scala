@@ -181,7 +181,7 @@ class SplitwellFrontendIntegrationTest
       eventually() {
         // Check final amounts in the wallets
         checkWallet(aliceUserParty, aliceWalletClient, Seq((399.75, 400)))
-        checkWallet(bobUserParty, bobWalletClient, Seq((36.3, 36.7)))
+        checkWallet(bobUserParty, bobWalletClient, Seq((6.7, 7.1)))
         checkWallet(charlieUserParty, charlieWalletClient, Seq((110.75, 111)))
       }
     }
@@ -209,7 +209,7 @@ class SplitwellFrontendIntegrationTest
       )
       val aliceCns = expectedCns(aliceUserParty, aliceEntryName)
       val bobCns = expectedCns(bobUserParty, bobEntryName)
-      bobWalletClient.tap(510)
+      bobWalletClient.tap(walletCoinToUsd(510))
 
       val invite = withFrontEnd("aliceSplitwell") { implicit webDriver =>
         login(aliceSplitwellUIPort, aliceDamlUser)
@@ -257,10 +257,21 @@ class SplitwellFrontendIntegrationTest
         }
       }
 
+      val expectedAliceAmount = walletUsdToCoin(5 /*cns tap*/ - 1 /*cns fee*/ ) + 500 /*from bob*/
+      val expectedBobAmount =
+        walletUsdToCoin(5 /*cns tap*/ - 1.105 /*cns fee*/ ) + 510 /*tap*/ - 500 /*to alice*/
       eventually() {
         // Check final amounts in the wallets
-        checkWallet(aliceUserParty, aliceWalletClient, Seq((503.75, 504)))
-        checkWallet(bobUserParty, bobWalletClient, Seq((12.3, 12.5)))
+        checkWallet(
+          aliceUserParty,
+          aliceWalletClient,
+          Seq((expectedAliceAmount - walletUsdToCoin(0.25), expectedAliceAmount)),
+        )
+        checkWallet(
+          bobUserParty,
+          bobWalletClient,
+          Seq((expectedBobAmount - walletUsdToCoin(2), expectedBobAmount)),
+        )
       }
 
       withFrontEnd("bobSplitwell") { implicit webDriver =>

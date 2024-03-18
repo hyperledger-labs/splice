@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
+import com.daml.network.util.{CNNodeUtil, FrontendLoginUtil, TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.{Duration, LocalDate}
@@ -15,11 +15,12 @@ class WalletSubscriptionsFrontendIntegrationTest
     with FrontendLoginUtil
     with TimeTestUtil {
 
+  override def walletCoinPrice = CNNodeUtil.damlDecimal(2.0)
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withCoinPrice(2)
+      .withCoinPrice(walletCoinPrice)
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
 
@@ -127,7 +128,12 @@ class WalletSubscriptionsFrontendIntegrationTest
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName1 = perTestCaseName("alice")
-      createCnsEntry(aliceCnsExternalClient, aliceEntryName1, aliceWalletClient)
+      createCnsEntry(
+        aliceCnsExternalClient,
+        aliceEntryName1,
+        aliceWalletClient,
+        walletCoinToUsd(5),
+      )
 
       val cnsParty = createCnsEntryForItself
       val cnsPaymentDue = LocalDate.now().plusDays(90)

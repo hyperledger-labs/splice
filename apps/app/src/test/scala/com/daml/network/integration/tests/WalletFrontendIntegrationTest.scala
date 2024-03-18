@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
+import com.daml.network.util.{CNNodeUtil, FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletFrontendIntegrationTest
@@ -13,6 +13,7 @@ class WalletFrontendIntegrationTest
     with FrontendLoginUtil {
 
   val coinPrice = 2
+  override def walletCoinPrice = CNNodeUtil.damlDecimal(coinPrice.toDouble)
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
@@ -51,7 +52,10 @@ class WalletFrontendIntegrationTest
             },
           )
 
-          val testTap = (amount: BigDecimal, feeUpperBound: BigDecimal) => {
+          val testTap = (amountUsd: BigDecimal, feeUpperBoundUsd: BigDecimal) => {
+
+            val amount = walletUsdToCoin(amountUsd)
+            val feeUpperBound = walletUsdToCoin(feeUpperBoundUsd)
 
             val (ccTextBefore, usdTextBefore) = eventually() {
               val ccTextBefore = find(id("wallet-balance-cc")).value.text.trim
@@ -64,8 +68,8 @@ class WalletFrontendIntegrationTest
             val usdBefore = BigDecimal(usdTextBefore.split(" ").head)
 
             actAndCheck(
-              s"User taps $amount in the wallet", {
-                tapCoins(amount)
+              s"User taps $amount CC in the wallet", {
+                tapCoins(amountUsd)
               },
             )(
               "User sees the updated balance",
