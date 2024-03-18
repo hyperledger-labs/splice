@@ -23,10 +23,14 @@ import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
 import com.daml.network.identities.NodeIdentitiesStore
 import com.daml.network.migration.DomainDataRestorer
 import com.daml.network.scan.admin.api.client
-import com.daml.network.scan.admin.api.client.{BftScanConnection, MinimalScanConnection}
+import com.daml.network.scan.admin.api.client.{
+  BftScanConnection,
+  MinimalScanConnection,
+  SingleScanConnection,
+}
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.setup.{NodeInitializer, ParticipantInitializer}
+import com.daml.network.setup.{NodeInitializer, ParticipantInitializer, ParticipantPartyMigrator}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{
@@ -44,6 +48,7 @@ import com.daml.network.validator.automation.{
 }
 import com.daml.network.validator.config.{
   AppInstance,
+  MigrateValidatorPartyConfig,
   ValidatorAppBackendConfig,
   ValidatorOnboardingConfig,
 }
@@ -185,16 +190,52 @@ class ValidatorApp(
                 domainConnector.ensureGlobalDomainRegistered()
             }
             _ <- domainConnector.ensureExtraDomainsRegistered()
-            // Note that for the validator of an SV app, the user will be created by the SV app with a
-            // primary party set to the SV app already so this is a noop.
-            _ <- connection.ensureUserPrimaryPartyIsAllocated(
-              config.ledgerApiUser,
-              config.validatorPartyHint
-                .getOrElse(
-                  BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
-                ),
-              participantAdminConnection,
-            ) whenA !config.svValidator
+            _ <- config.migrateValidatorParty match {
+              case Some(MigrateValidatorPartyConfig(scanConfig)) =>
+                val partyHint = config.validatorPartyHint
+                  .getOrElse(
+                    BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                  )
+                val participantPartyMigrator = new ParticipantPartyMigrator(
+                  connection,
+                  participantAdminConnection,
+                  config.domains.global.alias,
+                  retryProvider,
+                  loggerFactory,
+                )
+                for {
+                  (_, partyId) <- (
+                    setupDarsForAcsImport(participantAdminConnection),
+                    participantPartyMigrator
+                      .migrate(
+                        partyHint,
+                        config.ledgerApiUser,
+                        config.domains.global.alias,
+                        partyId =>
+                          SingleScanConnection.withSingleScanConnection(
+                            scanConfig,
+                            clock,
+                            retryProvider,
+                            loggerFactory,
+                          ) { scanConnection =>
+                            scanConnection.getAcsSnapshot(partyId)
+                          },
+                        Seq(DarResources.cantonCoin.bootstrap),
+                      ),
+                  ).tupled
+                } yield partyId
+              case None =>
+                // Note that for the validator of an SV app, the user will be created by the SV app with a
+                // primary party set to the SV app already so this is a noop.
+                connection.ensureUserPrimaryPartyIsAllocated(
+                  config.ledgerApiUser,
+                  config.validatorPartyHint
+                    .getOrElse(
+                      BaseLedgerConnection.sanitizeUserIdToPartyString(config.ledgerApiUser)
+                    ),
+                  participantAdminConnection,
+                ) whenA !config.svValidator
+            }
           } yield ()
         }
     } yield ()
@@ -214,6 +255,20 @@ class ValidatorApp(
         )
         .asRuntimeException()
     migrationDump
+  }
+
+  private def setupDarsForAcsImport(participantAdminConnection: ParticipantAdminConnection)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = {
+    logger.info(s"Uploading dars for ACS import.")
+    val darFiles = packages.map(UploadablePackage.fromResource)
+    for {
+      _ <- participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)
+    } yield {
+      logger.info(
+        s"Finished Uploading dars for ACS import."
+      )
+    }
   }
 
   private def setupWalletDars(

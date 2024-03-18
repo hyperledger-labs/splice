@@ -358,6 +358,31 @@ class SingleScanConnection private[client] (
     )
 }
 
+object SingleScanConnection {
+  def withSingleScanConnection[T](
+      scanConfig: ScanAppClientConfig,
+      clock: Clock,
+      retryProvider: RetryProvider,
+      loggerFactory: NamedLoggerFactory,
+  )(f: SingleScanConnection => Future[T])(implicit
+      ec: ExecutionContextExecutor,
+      traceContext: TraceContext,
+      mat: Materializer,
+      httpClient: HttpRequest => Future[HttpResponse],
+      templateDecoder: TemplateJsonDecoder,
+  ): Future[T] =
+    for {
+      scanConnection <- ScanConnection.singleUncached(
+        scanConfig,
+        clock,
+        retryProvider,
+        loggerFactory,
+        retryConnectionOnInitialFailure = true,
+      )
+      r <- f(scanConnection).andThen { _ => scanConnection.close() }
+    } yield r
+}
+
 class CachedScanConnection private[client] (
     protected val coinLedgerClient: CNLedgerClient,
     config: ScanAppClientConfig,
