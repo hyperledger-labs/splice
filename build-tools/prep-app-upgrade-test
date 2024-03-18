@@ -17,13 +17,15 @@ tarball="${base_version}_cn-node-0.1.0-SNAPSHOT.tar.gz"
 export CLOUDSDK_CORE_PROJECT=da-cn-shared
 set +e
 num_retries=0
-max_retries=10
+# Builds on main aren't serialized, so the previous release might not be available yet.
+# The bundle step takes about 13 minutes currently, so waiting for 20 minutes should be enough.
+max_retries=120
 until gsutil cp "gs://cn-release-bundles/$tarball" "$tmp"; do
   ((++num_retries))
   if ((num_retries>max_retries)); then
     _error "Failed to download release after $max_retries attempts"
   fi
-  sleep 5
+  sleep 10
 done
 set -e
 
