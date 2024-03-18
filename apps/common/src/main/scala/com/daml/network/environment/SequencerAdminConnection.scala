@@ -8,11 +8,8 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponseX
-import com.digitalasset.canton.domain.sequencing.sequencer.{
-  SequencerPruningStatus,
-  SequencerSnapshot,
-}
+import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponse
+import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
@@ -23,6 +20,7 @@ import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt
 import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerTrafficStatus
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
+import com.google.protobuf.ByteString
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -58,23 +56,31 @@ class SequencerAdminConnection(
   def getSequencerId(implicit traceContext: TraceContext): Future[SequencerId] =
     getId().map(SequencerId(_))
 
-  def getSequencerSnapshot(instant: CantonTimestamp)(implicit
+  def getOnboardingState(sequencerId: SequencerId)(implicit
       traceContext: TraceContext
-  ): Future[SequencerSnapshot] =
+  ): Future[ByteString] =
     runCmd(
-      EnterpriseSequencerAdminCommands.Snapshot(instant)
+      EnterpriseSequencerAdminCommands.OnboardingState(Left(sequencerId))
     )
 
-  def initialize(
+  def initializeFromGenesisState(
       topologySnapshot: GenericStoredTopologyTransactionsX,
       domainParameters: StaticDomainParameters,
-      sequencerSnapshot: Option[SequencerSnapshot],
-  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponseX] =
+  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
     runCmd(
-      EnterpriseSequencerAdminCommands.InitializeX(
-        topologySnapshot,
+      EnterpriseSequencerAdminCommands.InitializeFromGenesisState(
+        // TODO(#10953) Stop doing that.
+        topologySnapshot.toByteString(domainParameters.protocolVersion),
         domainParameters,
-        sequencerSnapshot,
+      )
+    )
+
+  def initializeFromOnboardingState(
+      onboardingState: ByteString
+  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
+    runCmd(
+      EnterpriseSequencerAdminCommands.InitializeFromOnboardingState(
+        onboardingState
       )
     )
 

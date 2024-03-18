@@ -32,6 +32,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.grpc.Status.Code
 import io.opentelemetry.api.trace.Tracer
 
+import com.google.protobuf.ByteString
 import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -429,12 +430,14 @@ class HttpSvHandler(
           .map(_.sequencerAdminConnection)
           .toRight("Onboarding sequencer configured to use X nodes but sponsoring SV is not")
       } yield {
-        getSequencerOnboardingSnapshots(sequencerConnection, sequencerId)
+        getSequencerOnboardingState(sequencerConnection, sequencerId)
       }).fold(
         errMsg => Future.failed(HttpErrorHandler.badRequest(errMsg)),
-        _.map(snapshot =>
+        _.map(onboardingState =>
           v0.SvResource.OnboardSvSequencerResponseOK(
-            definitions.OnboardSvSequencerResponse(snapshot)
+            definitions.OnboardSvSequencerResponse(
+              Base64.getEncoder.encodeToString(onboardingState.toByteArray)
+            )
           )
         ),
       )
@@ -517,25 +520,22 @@ class HttpSvHandler(
     } yield CantonTimestamp.tryFromInstant(sequenced)
   }
 
-  private def getSequencerOnboardingSnapshots(
+  private def getSequencerOnboardingState(
       sequencerAdminConnection: SequencerAdminConnection,
       sequencerId: SequencerId,
-  )(implicit traceContext: TraceContext): Future[definitions.SequencerSnapshot] = {
-    logger.info("Querying sequencer domain state")
+  )(implicit traceContext: TraceContext): Future[ByteString] = {
+    logger.info(
+      s"Waiting for sequencer $sequencerId to be onboarded before querying its onboarding state"
+    )
     for {
-      snapshotTime <- waitForNewSequencerObservedByExistingSequencer(
+      _ <- waitForNewSequencerObservedByExistingSequencer(
         sequencerAdminConnection,
         sequencerId,
       )
       globalDomain <- svcStore.getSvcRules().map(_.domain)
-      _ = logger.info(s"Downloading topology and sequencer snapshot at $snapshotTime")
-      sequencerSnapshot <- sequencerAdminConnection.getSequencerSnapshot(snapshotTime)
-      topologySnapshot <- sequencerAdminConnection
-        .getTopologySnapshot(globalDomain, sequencerSnapshot.lastTs)
-    } yield definitions.SequencerSnapshot(
-      topologySnapshot = Base64.getEncoder.encodeToString(topologySnapshot.toProtoV30.toByteArray),
-      sequencerSnapshot = Base64.getEncoder.encodeToString(sequencerSnapshot.toByteArray),
-    )
+      _ = logger.info(s"Downloading sequencer onboarding state for $sequencerId")
+      onboardingState <- sequencerAdminConnection.getOnboardingState(sequencerId)
+    } yield onboardingState
   }
 
   private def isCompleted(

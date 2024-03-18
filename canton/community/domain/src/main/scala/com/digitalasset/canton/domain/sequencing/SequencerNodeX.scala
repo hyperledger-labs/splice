@@ -13,8 +13,8 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.admin.v30.SequencerInitializationServiceGrpc
 import com.digitalasset.canton.domain.metrics.SequencerMetrics
 import com.digitalasset.canton.domain.sequencing.admin.grpc.{
-  InitializeSequencerRequestX,
-  InitializeSequencerResponseX,
+  InitializeSequencerRequest,
+  InitializeSequencerResponse,
 }
 import com.digitalasset.canton.domain.sequencing.authentication.MemberAuthenticationServiceFactory
 import com.digitalasset.canton.domain.sequencing.config.{
@@ -302,14 +302,14 @@ class SequencerNodeBootstrapX(
         .toMap
     }
 
-    override def initialize(request: InitializeSequencerRequestX)(implicit
+    override def initialize(request: InitializeSequencerRequest)(implicit
         traceContext: TraceContext
-    ): EitherT[FutureUnlessShutdown, String, InitializeSequencerResponseX] = {
+    ): EitherT[FutureUnlessShutdown, String, InitializeSequencerResponse] = {
       if (isInitialized) {
         logger.info(
           "Received a request to initialize an already initialized sequencer. Skipping initialization!"
         )
-        EitherT.pure(InitializeSequencerResponseX(replicated = config.sequencer.supportsReplicas))
+        EitherT.pure(InitializeSequencerResponse(replicated = config.sequencer.supportsReplicas))
       } else {
         completeWithExternalUS {
           logger.info(
@@ -383,7 +383,7 @@ class SequencerNodeBootstrapX(
               .mapK(FutureUnlessShutdown.outcomeK)
           } yield (request.domainParameters, sequencerFactory, topologyManager)
         }.map { _ =>
-          InitializeSequencerResponseX(replicated = config.sequencer.supportsReplicas)
+          InitializeSequencerResponse(replicated = config.sequencer.supportsReplicas)
         }
       }
     }
@@ -502,6 +502,7 @@ class SequencerNodeBootstrapX(
             domainId,
             sequencerId,
             Seq(sequencerId) ++ membersToRegister,
+            domainTopologyStore,
             topologyClient,
             topologyProcessor,
             Some(TopologyManagerStatus.combined(authorizedTopologyManager, domainTopologyManager)),

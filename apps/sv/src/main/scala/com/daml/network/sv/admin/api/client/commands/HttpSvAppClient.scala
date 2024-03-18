@@ -14,8 +14,6 @@ import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot as CantonSequencerSnapshot
 import com.digitalasset.canton.topology.{ParticipantId, PartyId, SequencerId}
-import com.digitalasset.canton.topology.admin.v30
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
@@ -297,7 +295,7 @@ object HttpSvAppClient {
       sequencerId: SequencerId
   ) extends BaseCommand[
         http.OnboardSvSequencerResponse,
-        SequencerSnapshot,
+        ByteString,
       ] {
 
     override def submitRequest(
@@ -315,17 +313,10 @@ object HttpSvAppClient {
       )
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.OnboardSvSequencerResponse.OK(definitions.OnboardSvSequencerResponse(snapshot)) =>
-        (for {
-          topologySnapshot <- StoredTopologyTransactionsX
-            .fromProtoV30(
-              v30.TopologyTransactions.parseFrom(
-                Base64.getDecoder().decode(snapshot.topologySnapshot)
-              )
-            )
-          sequencerSnapshot <- CantonSequencerSnapshot
-            .fromByteArrayUnsafe(Base64.getDecoder().decode(snapshot.sequencerSnapshot))
-        } yield SequencerSnapshot(topologySnapshot, sequencerSnapshot)).left.map(_.message)
+      case http.OnboardSvSequencerResponse.OK(
+            definitions.OnboardSvSequencerResponse(onboardingState)
+          ) =>
+        Right(ByteString.copyFrom(Base64.getDecoder().decode(onboardingState)))
     }
   }
 

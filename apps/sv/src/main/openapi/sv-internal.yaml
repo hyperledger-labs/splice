@@ -986,10 +986,10 @@ components:
     OnboardSvSequencerResponse:
       type: object
       required:
-        - sequencer_snapshot
+        - onboarding_state
       properties:
-        sequencer_snapshot:
-          "$ref": "#/components/schemas/SequencerSnapshot"
+        onboarding_state:
+          type: string
 
     OnboardSvMediatorRequest:
       type: object

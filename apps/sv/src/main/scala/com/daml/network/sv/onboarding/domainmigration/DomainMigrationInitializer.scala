@@ -282,12 +282,11 @@ class DomainMigrationInitializer(
               s"Restoring sequencer topology with sequencer transactions $sequencerInitTopologyTransactions"
             )
             _ <- localDomainNode.sequencerAdminConnection
-              .initialize(
+              .initializeFromGenesisState(
                 StoredTopologyTransactionsX(
                   sequencerInitTopologyTransactions
                 ),
                 localDomainNode.staticDomainParameters,
-                None,
               )
             _ <- retryProvider.waitUntil(
               RetryFor.ClientCalls,

@@ -10,6 +10,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
 import org.apache.pekko.stream.Materializer
 
+import com.google.protobuf.ByteString
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 
 final class SvConnection private (
@@ -63,7 +64,7 @@ final class SvConnection private (
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[HttpSvAppClient.SequencerSnapshot] =
+  ): Future[ByteString] =
     runHttpCmd(
       config.url,
       HttpSvAppClient.OnboardSvSequencer(

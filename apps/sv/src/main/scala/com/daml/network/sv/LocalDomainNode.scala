@@ -339,7 +339,7 @@ final class LocalDomainNode(
     for {
       sequencerId <- sequencerAdminConnection.getSequencerId
       _ = logger.info(s"Onboarding sequencer $sequencerId through sponsoring SV")
-      snapshot <- retryProvider.retry(
+      onboardingState <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "Onbarding sequencer through sponsoring SV",
         svConnection.onboardSvSequencer(sequencerId),
@@ -347,17 +347,15 @@ final class LocalDomainNode(
       )
       _ = logger.info(s"Onboarded sequencer $sequencerId")
       _ = logger.info(
-        s"Initializing sequencer $sequencerId with snapshot ${snapshot.sequencerSnapshot} and topology ${snapshot.topologySnapshot.show}."
+        s"Initializing sequencer $sequencerId"
       )
       _ <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
         "Initializing sequencer",
         sequencerAdminConnection.getStatus.flatMap {
           case NodeStatus.NotInitialized(_) =>
-            sequencerAdminConnection.initialize(
-              snapshot.topologySnapshot,
-              staticDomainParameters,
-              Some(snapshot.sequencerSnapshot),
+            sequencerAdminConnection.initializeFromOnboardingState(
+              onboardingState
             )
           case NodeStatus.Success(_) =>
             logger.info("Sequencer is already initialized")
