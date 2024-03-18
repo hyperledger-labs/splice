@@ -35,13 +35,18 @@ const NetworkInfo: React.FC = () => {
             <Stack spacing={4}>
               <Typography variant="h3">Current Canton Coin Configuration</Typography>
               <Typography variant="body1">
-                The coin configuration details below are voted on by the SVC, and may be updated
-                over time.
+                The coin configuration details below are voted on by the Super Validators, and may
+                be updated over time.
               </Typography>
               <Stack spacing={1}>
                 <Typography variant="h3">Fees</Typography>
                 <Typography variant="body1">
-                  Fees exist because of x and z. Here are important things you should know...
+                  Fees burn Canton Coin. Fees encourage active use of Canton Coin and maintain
+                  positive pressure on the value of Canton Coin by constraining the total supply
+                  over time. The Super Validators mint Canton Coin via smart contracts triggered by
+                  a consensus vote of 2/3 of the Super Validators. Super Validators and Validators
+                  burn Canton Coin to pay fees. Minting and burning takes place in fixed time cycles
+                  called rounds.
                 </Typography>
               </Stack>
               <FeesTable
@@ -91,7 +96,6 @@ const NextConfigUpdate: React.FC = () => {
 };
 
 const FeesTable: React.FC<{ coinConfig: CoinConfig<'USD'> }> = ({ coinConfig }) => {
-  const feesDescription = 'This fee is charged when x and y.';
   return (
     <TableContainer>
       <Table>
@@ -99,23 +103,28 @@ const FeesTable: React.FC<{ coinConfig: CoinConfig<'USD'> }> = ({ coinConfig }) 
           <FeeTableRow
             name="Coin Creation Fee"
             value={`${BigNumber(coinConfig.transferConfig.createFee.fee)} CC`}
-            description={feesDescription}
+            description="A fixed fee for the creation of new coin records."
           />
           <FeeTableRow
             name="Holding Fee"
             value={`${BigNumber(coinConfig.transferConfig.holdingFee.rate)} CC/Round`}
-            description={feesDescription}
+            description="A fixed fee for maintaining each active coin record, charged per round."
           />
           <FeeTableRow
             name="Lock Holder Fee"
             value={`${BigNumber(coinConfig.transferConfig.lockHolderFee.fee)} CC`}
-            description={feesDescription}
+            description="A fixed fee for extra lock holders on coin records."
           />
           <TransferFees transferFees={coinConfig.transferConfig.transferFee} />
           <FeeTableRow
             name="Round Tick Duration"
             value={`${microsecondsToMinutes(coinConfig.tickDuration.microseconds)} Minutes`}
-            description={feesDescription}
+            description="The interval at which new rounds are opened."
+          />
+          <FeeTableRow
+            name="Domain Fee"
+            value={`${BigNumber(coinConfig.globalDomain.fees.extraTrafficPrice)} $/MB`}
+            description="Cost of processing 1 MB of transactions through the global synchronizer"
           />
         </TableBody>
       </Table>
@@ -192,7 +201,10 @@ const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees })
         <Typography variant="body1" fontWeight="bold" textTransform="uppercase">
           Transfer Fee
         </Typography>
-        <Typography variant="caption">This fee is charged when x and y.</Typography>
+        <Typography variant="caption">
+          A proportional fee charged for the value created by locking and/or transferring a
+          particular amount of coin. The rates are specified in tranches.
+        </Typography>
       </TableCell>
       <TableCell align="right">
         <TableContainer>
