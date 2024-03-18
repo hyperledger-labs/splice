@@ -7,6 +7,7 @@ import com.daml.metrics.Timed
 import com.digitalasset.canton.console.{CommandFailure, ParticipantReference}
 import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.logging.LogEntry
+import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{
   BaseTest,
   ProtocolVersionChecksFixtureAnyWordSpec,
@@ -90,14 +91,14 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
       sender: ParticipantReference,
       receiver: ParticipantReference,
       timeoutMillis: Long = 20000,
-      workflowId: String = "",
+      domainId: Option[DomainId] = None,
       id: String = "",
   ): Assertion =
     withClue(s"${sender.name} was unable to ping ${receiver.name} within ${timeoutMillis}ms:") {
       sender.health.maybe_ping(
         receiver.id,
         config.NonNegativeDuration.ofMillis(timeoutMillis),
-        workflowId = workflowId,
+        domainId = domainId,
         id = id,
       ) shouldBe defined
     }

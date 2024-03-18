@@ -64,7 +64,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
             beginOffset = offsetBefore,
             endOffset = Some(
               new ParticipantOffset().withBoundary(
-                ParticipantOffset.ParticipantBoundary.PARTICIPANT_END
+                ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_END
               )
             ),
           )

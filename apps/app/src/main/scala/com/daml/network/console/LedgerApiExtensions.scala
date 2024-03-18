@@ -10,7 +10,7 @@ import com.daml.ledger.javaapi.data.TransactionTree as JavaTransactionTree
 import com.daml.ledger.javaapi.data.codegen.{ContractId, Exercised, Update}
 import com.daml.network.environment.{CNLedgerConnection, PackageIdResolver}
 import com.daml.network.util.{Contract, JavaDecodeUtil, PackageQualifiedName}
-import com.digitalasset.canton.admin.api.client.commands.{LedgerApiCommands, LedgerApiV2Commands}
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands
 import com.digitalasset.canton.admin.api.client.data.TemplateId
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.{
@@ -74,7 +74,7 @@ trait LedgerApiExtensions {
           )
           val tx = ledgerApi.consoleEnvironment.run {
             ledgerApi.ledgerApiCommand(
-              LedgerApiV2Commands.CommandService.SubmitAndWaitTransactionTree(
+              LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
                 actAs.map(_.toLf),
                 readAs.map(_.toLf),
                 cmds.map(c => Command.fromJavaProto(c.toProtoCommand)),
@@ -189,7 +189,7 @@ trait LedgerApiExtensions {
             partyIds: Set[PartyId],
             completeAfter: Int,
             beginOffset: ParticipantOffset = new ParticipantOffset().withBoundary(
-              ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN
+              ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
             ),
             endOffset: Option[ParticipantOffset] = None,
             verbose: Boolean = true,
@@ -197,7 +197,7 @@ trait LedgerApiExtensions {
         ): Seq[JavaTransactionTree] = {
           ledgerApi.ledger_api.updates
             .trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout)
-            .collect { case LedgerApiV2Commands.UpdateService.TransactionTreeWrapper(tree) =>
+            .collect { case LedgerApiCommands.UpdateService.TransactionTreeWrapper(tree) =>
               JavaTransactionTree.fromProto(TransactionTree.toJavaProto(tree))
             }
         }

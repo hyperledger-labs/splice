@@ -9,10 +9,9 @@ import "com/daml/ledger/api/v2/value.proto";
 import "google/protobuf/timestamp.proto";
 import "google/rpc/status.proto";
 
-
+option csharp_namespace = "Com.Daml.Ledger.Api.V2";
 option java_outer_classname = "EventOuterClass";
 option java_package = "com.daml.ledger.api.v2";
-option csharp_namespace = "Com.Daml.Ledger.Api.V2";
 
 // An event in the flat transaction stream can either be the creation
 // or the archiving of a contract.
@@ -32,7 +31,6 @@ message Event {
 
 // Records that a contract has been created, and choices may now be exercised on it.
 message CreatedEvent {
-
   // The ID of this particular event.
   // Must be a valid LedgerString (as described in ``value.proto``).
   // Required
@@ -111,7 +109,6 @@ message CreatedEvent {
 
 // View of a create event matched by an interface filter.
 message InterfaceView {
-
   // The interface implemented by the matched event.
   // Required
   Identifier interface_id = 1;
@@ -127,12 +124,10 @@ message InterfaceView {
   // sucessfully computed.
   // Optional
   Record view_value = 3;
-
 }
 
 // Records that a contract has been archived, and choices may no longer be exercised on it.
 message ArchivedEvent {
-
   // The ID of this particular event.
   // Must be a valid LedgerString (as described in ``value.proto``).
   // Required
@@ -156,11 +151,14 @@ message ArchivedEvent {
   // in ``value.proto``).
   // Required
   repeated string witness_parties = 4;
+
+  // The package name of the contract.
+  // Required
+  string package_name = 5;
 }
 
 // Records that a choice has been exercised on a target contract.
 message ExercisedEvent {
-
   // The ID of this particular event.
   // Must be a valid LedgerString (as described in ``value.proto``).
   // Required
@@ -221,5 +219,8 @@ message ExercisedEvent {
   // The result of exercising the choice.
   // Required
   Value exercise_result = 11;
-}
 
+  // The package name of the contract.
+  // Required
+  string package_name = 12;
+}

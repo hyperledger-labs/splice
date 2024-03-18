@@ -50,7 +50,7 @@ class UpdateIngestionService(
               if (ingestFromParticipantBegin) {
                 val participantBegin = ParticipantOffset(
                   ParticipantOffset.Value.Boundary(
-                    ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN
+                    ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
                   )
                 )
                 ingestionSink

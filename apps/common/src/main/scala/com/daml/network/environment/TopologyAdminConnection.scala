@@ -294,14 +294,16 @@ abstract class TopologyAdminConnection(
   ): Future[Seq[StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]] = {
     runCmd(
       TopologyAdminCommandsX.Read.ListAll(
-        BaseQueryX(
+        query = BaseQueryX(
           filterStore = store.map(_.filterName).getOrElse(""),
           proposals = proposals,
           timeQuery = timeQuery,
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
-        )
+        ),
+        filterNamespace = "",
+        excludeMappings = Seq.empty,
       )
     ).map(_.result)
   }
@@ -339,7 +341,9 @@ abstract class TopologyAdminConnection(
           ops = None,
           filterSigningKey = id.namespace.fingerprint.toProtoPrimitive,
           protocolVersion = None,
-        )
+        ),
+        filterNamespace = "",
+        excludeMappings = Seq.empty,
       )
     ).map { transactions =>
       transactions.result
@@ -427,7 +431,9 @@ abstract class TopologyAdminConnection(
           ops = None,
           filterSigningKey = "",
           protocolVersion = None,
-        )
+        ),
+        filterNamespace = "",
+        excludeMappings = Seq.empty,
       )
     ).map(txns =>
       StoredTopologyTransactionsX(

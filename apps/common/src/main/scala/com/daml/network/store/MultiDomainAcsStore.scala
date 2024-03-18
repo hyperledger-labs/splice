@@ -595,7 +595,7 @@ object MultiDomainAcsStore {
   def fromParticipantOffset(offset: ParticipantOffset): String =
     offset.value match {
       case ParticipantOffset.Value.Boundary(
-            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN
+            ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
           ) =>
         BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET
       case ParticipantOffset.Value.Absolute(offset) => offset
@@ -605,7 +605,9 @@ object MultiDomainAcsStore {
   def toParticipantOffset(offset: String): ParticipantOffset =
     if (offset == BaseLedgerConnection.PARTICIPANT_BEGIN_OFFSET)
       ParticipantOffset(
-        ParticipantOffset.Value.Boundary(ParticipantOffset.ParticipantBoundary.PARTICIPANT_BEGIN)
+        ParticipantOffset.Value.Boundary(
+          ParticipantOffset.ParticipantBoundary.PARTICIPANT_BOUNDARY_BEGIN
+        )
       )
     else ParticipantOffset(ParticipantOffset.Value.Absolute(offset))
 

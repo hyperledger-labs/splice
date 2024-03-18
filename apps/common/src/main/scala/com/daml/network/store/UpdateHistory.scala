@@ -682,6 +682,7 @@ final class UpdateHistory(
             row.templateModuleName,
             row.templateEntityName,
           ),
+          /*packageName = */ "dummyPackageName", // TODO(#10925): pipe this value through the update history
           /*interfaceId = */ java.util.Optional.empty(),
           /*contractId = */ row.contractId,
           /*choice = */ row.choice,

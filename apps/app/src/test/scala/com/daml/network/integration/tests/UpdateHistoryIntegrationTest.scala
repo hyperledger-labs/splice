@@ -28,7 +28,7 @@ import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.daml.network.store.UpdateHistory
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiV2Commands.UpdateService.{
+import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.UpdateService.{
   AssignedWrapper,
   TransactionTreeWrapper,
   UnassignedWrapper,
@@ -315,6 +315,7 @@ class UpdateHistoryIntegrationTest
       /*witnessParties = */ java.util.Collections.emptyList(), // Not preserved
       /*eventId = */ exercised.getEventId,
       /*templateId = */ exercised.getTemplateId,
+      /*packageName = */ "dummyPackageName", // TODO(#10925): preserve package name via store, if required
       /*interfaceId = */ java.util.Optional.empty(), // Not preserved
       /*contractId = */ exercised.getContractId,
       /*choice = */ exercised.getChoice,

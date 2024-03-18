@@ -65,6 +65,9 @@ import scala.jdk.OptionConverters.*
 
 abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
+  private val dummyPackageName =
+    "dummyPackageName" // TODO(#10925): remove all usages of this value and instead use an appropriate value derived from a contract's template
+
   protected def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
 
   protected def mkParticipantId(name: String) =
@@ -370,7 +373,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       Seq.empty[String].asJava,
       "dummyEventId",
       contract.identifier,
-      "dummyPackageName",
+      dummyPackageName,
       contract.contractId.contractId,
       contract.payload.toValue,
       contract.createdEventBlob,
@@ -390,6 +393,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       Seq.empty.asJava,
       "dummyEventId",
       contract.identifier,
+      dummyPackageName,
       None.toJava,
       contract.contractId.contractId,
       "DummyChoiceName",
@@ -425,6 +429,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       Seq.empty.asJava,
       "dummyEventId",
       templateId,
+      dummyPackageName,
       interfaceId.toJava,
       contractId,
       choice,
@@ -445,7 +450,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         created.getWitnessParties,
         eventId,
         created.getTemplateId,
-        "dummyPackageName",
+        dummyPackageName,
         created.getContractId,
         created.getArguments,
         created.getCreatedEventBlob,
@@ -461,6 +466,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         exercised.getWitnessParties,
         eventId,
         exercised.getTemplateId,
+        exercised.getPackageName,
         exercised.getInterfaceId,
         exercised.getContractId,
         exercised.getChoice,
@@ -478,6 +484,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       exercised.getWitnessParties,
       exercised.getEventId,
       exercised.getTemplateId,
+      exercised.getPackageName,
       exercised.getInterfaceId,
       exercised.getContractId,
       exercised.getChoice,
@@ -933,6 +940,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       Seq.empty.asJava,
       "dummyEventId",
       contract.identifier,
+      dummyPackageName,
       interfaceId.toJava,
       contract.contractId.contractId,
       choiceName,

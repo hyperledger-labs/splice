@@ -88,6 +88,7 @@ trait MessageDispatcherTest {
   private val domainId = DomainId.tryFromString("messageDispatcher::domain")
   private val participantId =
     ParticipantId.tryFromProtoPrimitive("PAR::messageDispatcher::participant")
+  private val otherParticipant = ParticipantId.tryFromProtoPrimitive("PAR::other::participant")
   private val mediatorGroup = MediatorsOfDomain(MediatorGroupIndex.zero)
   private val mediatorGroup2 = MediatorsOfDomain(MediatorGroupIndex.one)
 
@@ -333,7 +334,7 @@ trait MessageDispatcherTest {
         domainId,
         TestViewType,
         requestId,
-        Some(TestHash.dummyRootHash),
+        TestHash.dummyRootHash,
         Verdict.Approve(testedProtocolVersion),
         Set.empty,
         testedProtocolVersion,
@@ -347,7 +348,7 @@ trait MessageDispatcherTest {
         domainId,
         OtherTestViewType,
         requestId,
-        Some(TestHash.dummyRootHash),
+        TestHash.dummyRootHash,
         Verdict.Approve(testedProtocolVersion),
         Set.empty,
         testedProtocolVersion,
@@ -422,7 +423,7 @@ trait MessageDispatcherTest {
           domainId,
           TestViewType,
           RequestId(CantonTimestamp.MinValue),
-          Some(TestHash.dummyRootHash),
+          TestHash.dummyRootHash,
           reject,
           Set.empty,
           testedProtocolVersion,
@@ -837,7 +838,7 @@ trait MessageDispatcherTest {
             domainId,
             UnknownTestViewType,
             requestId,
-            Some(TestHash.dummyRootHash),
+            TestHash.dummyRootHash,
             Verdict.Approve(testedProtocolVersion),
             Set.empty,
             testedProtocolVersion,
@@ -918,7 +919,6 @@ trait MessageDispatcherTest {
             viewType,
             SerializedRootHashMessagePayload.empty,
           )
-        val otherParticipant = ParticipantId.tryFromProtoPrimitive("PAR::other::participant")
         // Batch -> expected alarms -> expected reaction
         val badBatches = List(
           Batch.of[ProtocolMessage](testedProtocolVersion, view -> Recipients.cc(participantId)) ->
@@ -931,14 +931,6 @@ trait MessageDispatcherTest {
             "Received root hash messages that were not sent to a mediator",
             "No valid root hash message in batch",
           ) -> DoNotExpectMediatorResult,
-          Batch.of[ProtocolMessage](
-            testedProtocolVersion,
-            view -> Recipients.cc(participantId),
-            rootHashMessage -> Recipients
-              .cc(MemberRecipient(participantId), MemberRecipient(otherParticipant), mediatorGroup2),
-          ) -> Seq(
-            "Received root hash message with invalid recipients"
-          ) -> ExpectMalformedMediatorConfirmationRequestResult,
           Batch.of[ProtocolMessage](
             testedProtocolVersion,
             view -> Recipients.cc(participantId),
@@ -1125,6 +1117,14 @@ trait MessageDispatcherTest {
           ) -> Seq(
             show"Received unexpected ${MalformedMediatorConfirmationRequestResult.message.viewType} for ${MalformedMediatorConfirmationRequestResult.message.requestId}"
           ),
+          Batch.of[ProtocolMessage](
+            testedProtocolVersion,
+            view -> Recipients.cc(participantId),
+            rootHashMessage -> Recipients
+              .cc(MemberRecipient(participantId), MemberRecipient(otherParticipant), mediatorGroup2),
+          ) -> Seq(
+            "The root hash message has an invalid recipient group."
+          ),
         )
 
         // sequentially process the test cases so that the log messages don't interfere
@@ -1144,10 +1144,7 @@ trait MessageDispatcherTest {
                   sut.requestCounterAllocator.peek shouldBe initRc + 1
                 },
                 alarms.map(alarm =>
-                  (entry: LogEntry) => {
-                    entry.shouldBeCantonErrorCode(SyncServiceAlarm)
-                    entry.warningMessage should include(alarm)
-                  }
+                  (_: LogEntry).shouldBeCantonError(SyncServiceAlarm, _ should include(alarm))
                 )*
               )
             }
