@@ -215,7 +215,7 @@ test = do
       transferConfig.extraFeaturedAppRewardAmount
     round = Round 50002
 
-  -- check that the 'arbiter' does not receive featured app rewards when he's the provider
+  -- the 'arbiter' also receives featured app rewards when he's the sender and provider of a transfer
   runNextIssuance app
   let reimbursementAmount = 0.5
   pay app arbiter alice.primaryParty reimbursementAmount
@@ -224,8 +224,11 @@ test = do
   appReward === AppRewardCoupon with
     svc = app.svc
     provider = arbiter.primaryParty
-    featured = False -- not featured despite presenting their app right as part of the 'pay' function
-    amount = transferConfig.createFee.fee + chargeSteppedRate transferConfig.transferFee reimbursementAmount
+    featured = True
+    amount =
+      transferConfig.createFee.fee
+      + chargeSteppedRate transferConfig.transferFee reimbursementAmount
+      + transferConfig.extraFeaturedAppRewardAmount
     round = Round 50003
 
   return ()
