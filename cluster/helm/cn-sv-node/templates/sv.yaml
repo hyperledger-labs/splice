@@ -225,7 +225,7 @@ spec:
                 canton.sv-apps.sv.onboarding-polling-interval = {{ . }}
             {{- end }}
             - name: FAIL_ON_APP_VERSION_MISMATCH
-              value: {{ .Values.failOnAppVersionMismatch }}
+              value: {{ .Values.failOnAppVersionMismatch | quote }}
           ports:
             - name: sv-api
               containerPort: 5014

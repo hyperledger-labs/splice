@@ -187,7 +187,7 @@ spec:
             canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
         {{- end }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
-          value: {{ .Values.failOnAppVersionMismatch }}
+          value: {{ .Values.failOnAppVersionMismatch | quote }}
         ports:
         - containerPort: 5003
           name: val-http
