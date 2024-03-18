@@ -119,6 +119,19 @@ trait ScanStore
   ): Future[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]] =
     getCoinRulesWithState().map(_.contract)
 
+  def getGlobalDomainId()(implicit
+      tc: TraceContext
+  ): Future[DomainId] =
+    getCoinRulesWithState()
+      .flatMap(
+        _.state.fold(
+          Future.successful,
+          Future failed Status.FAILED_PRECONDITION
+            .withDescription("CoinRules is in-flight, no current global domain")
+            .asRuntimeException(),
+        )
+      )
+
   def lookupCnsRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]]

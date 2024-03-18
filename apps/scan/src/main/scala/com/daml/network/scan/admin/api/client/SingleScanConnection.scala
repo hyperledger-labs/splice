@@ -44,7 +44,9 @@ class SingleScanConnection private[client] (
       retryProvider,
       outerLoggerFactory.append("scan-connection", config.adminApi.url.toString),
     )
-    with ScanConnection {
+    with ScanConnection
+    with HasUrl {
+  def url = config.adminApi.url
 
   // cached SVC reference. Never changes.
   private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)

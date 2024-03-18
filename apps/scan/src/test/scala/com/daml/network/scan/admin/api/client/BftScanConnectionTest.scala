@@ -279,4 +279,76 @@ class BftScanConnectionTest
     }
   }
 
+  "ScanAggregatesConnection" should {
+    import com.daml.network.scan.store.db.ScanAggregator.*
+    val round = 0L
+    val roundTotals = RoundTotals(round)
+    val roundPartyTotals = RoundPartyTotals(round, "party-id")
+    val roundAggregate = RoundAggregate(roundTotals, Vector(roundPartyTotals))
+
+    "get round aggregates from scans that report having the round aggregate" in {
+      val connections = getMockedConnections(n = 10)
+      connections.zipWithIndex.foreach { case (mock, index) =>
+        if (index < 2) {
+          when(mock.getAggregatedRounds())
+            .thenReturn(Future.successful(Some(RoundRange(round, round))))
+          when(mock.getRoundAggregate(round)).thenReturn(Future.successful(Some(roundAggregate)))
+        } else {
+          when(mock.getAggregatedRounds())
+            .thenReturn(Future.successful(None))
+          val failure = new RuntimeException(s"Mock #$n Failed getting round aggregate.")
+          when(mock.getRoundAggregate(round)).thenReturn(Future.failed(failure))
+        }
+      }
+      val bft = getBft(connections)
+      val con =
+        new ScanAggregatesConnection(bft, retryProvider, retryProvider.loggerFactory)
+      val result = con.getRoundAggregate(round).futureValue
+      result shouldBe Some(roundAggregate)
+    }
+
+    "Not get round aggregates from scans that report having the round aggregate if too many fail" in {
+      val connections = getMockedConnections(n = 10)
+      connections.zipWithIndex.foreach { case (mock, index) =>
+        when(mock.getAggregatedRounds())
+          .thenReturn(Future.successful(Some(RoundRange(round, round))))
+
+        if (index < 2) {
+          when(mock.getRoundAggregate(round)).thenReturn(Future.successful(Some(roundAggregate)))
+        } else {
+          val failure = new RuntimeException(s"Mock #$n Failed getting round aggregate.")
+          when(mock.getRoundAggregate(round)).thenReturn(Future.failed(failure))
+        }
+      }
+      val bft = getBft(connections)
+      val con =
+        new ScanAggregatesConnection(bft, retryProvider, retryProvider.loggerFactory)
+      con
+        .getRoundAggregate(round)
+        .failed
+        .futureValue shouldBe a[BftScanConnection.ConsensusNotReached]
+    }
+
+    "Not get round aggregates from scans if too many disagree, while reporting to have the aggregated round" in {
+      val connections = getMockedConnections(n = 4)
+
+      connections.zipWithIndex.foreach { case (mock, index) =>
+        when(mock.getAggregatedRounds())
+          .thenReturn(Future.successful(Some(RoundRange(round, round))))
+        val diffRoundPartyTotals =
+          RoundPartyTotals(round, "party-id", appRewards = BigDecimal(index))
+        val diffRoundAggregate = RoundAggregate(roundTotals, Vector(diffRoundPartyTotals))
+
+        when(mock.getRoundAggregate(round)).thenReturn(Future.successful(Some(diffRoundAggregate)))
+      }
+      val bft = getBft(connections)
+      val con =
+        new ScanAggregatesConnection(bft, retryProvider, retryProvider.loggerFactory)
+
+      con
+        .getRoundAggregate(round)
+        .failed
+        .futureValue shouldBe a[BftScanConnection.ConsensusNotReached]
+    }
+  }
 }

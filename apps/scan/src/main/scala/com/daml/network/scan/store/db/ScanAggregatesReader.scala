@@ -1,7 +1,7 @@
 package com.daml.network.scan.store.db
 
 import cats.data.NonEmptyList
-import com.daml.network.scan.admin.api.client.BftScanConnection
+import com.daml.network.scan.admin.api.client.{BftScanConnection, ScanAggregatesConnection}
 import com.daml.network.util.TemplateJsonDecoder
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -12,15 +12,14 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.lifecycle.SyncCloseable
+import java.util.concurrent.atomic.AtomicReference
 import org.apache.pekko.stream.Materializer
 import org.apache.pekko.http.scaladsl.model.HttpRequest
 import org.apache.pekko.http.scaladsl.model.HttpResponse
 import org.apache.pekko.http.scaladsl.model.Uri
-import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise}
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor}
-import scala.util.Success
-import scala.util.Failure
+import scala.util.{Failure, Success}
 import ScanAggregator.*
 
 trait ScanAggregatesReader extends AutoCloseable {
@@ -53,8 +52,8 @@ object ScanAggregatesReader {
 
     sealed trait ConState
     case object Uninitialized extends ConState
-    case class Initializing(promise: Promise[BftScanConnection]) extends ConState
-    case class Initialized(connection: BftScanConnection) extends ConState
+    case class Initializing(promise: Promise[ScanAggregatesConnection]) extends ConState
+    case class Initialized(connection: ScanAggregatesConnection) extends ConState
     case object Failed extends ConState
     private val conState = new AtomicReference[ConState](Uninitialized)
 
@@ -68,7 +67,9 @@ object ScanAggregatesReader {
               "get_bft_scan_connection",
               promise
                 .tryFailure(
-                  new RuntimeException("Cancelled getBftScanConnection attempt due to closeAsync")
+                  new RuntimeException(
+                    "Cancelled getScanAggregatesConnection attempt due to closeAsync"
+                  )
                 )
                 .discard,
             )
@@ -84,17 +85,19 @@ object ScanAggregatesReader {
         traceContext: TraceContext,
     ): Future[Option[RoundAggregate]] = {
       for {
-        con <- getBftScanConnection()
+        con <- getScanAggregatesConnection()
         roundAggregate <- con.getRoundAggregate(round)
       } yield roundAggregate
     }
 
-    def getBftScanConnection()(implicit traceContext: TraceContext): Future[BftScanConnection] = {
+    def getScanAggregatesConnection()(implicit
+        traceContext: TraceContext
+    ): Future[ScanAggregatesConnection] = {
       conState.get() match {
         case Uninitialized =>
-          val promise = Promise[BftScanConnection]()
+          val promise = Promise[ScanAggregatesConnection]()
           if (conState.compareAndSet(Uninitialized, Initializing(promise))) {
-            createBftScanConnection().onComplete {
+            createScanAggregatesConnection().onComplete {
               case Success(con) =>
                 promise.success(con)
                 conState.set(Initialized(con))
@@ -103,29 +106,34 @@ object ScanAggregatesReader {
                 conState.set(Failed)
             }
           }
-          getBftScanConnection()
+          getScanAggregatesConnection()
         case Initializing(promise) => promise.future
         case Initialized(connection) => Future.successful(connection)
         case Failed =>
-          if (conState.compareAndSet(Failed, Uninitialized)) getBftScanConnection()
+          if (conState.compareAndSet(Failed, Uninitialized)) getScanAggregatesConnection()
           else Future.failed(new RuntimeException("Failed to get a BFT scan connection."))
       }
     }
 
-    private def createBftScanConnection()(implicit
+    private def createScanAggregatesConnection()(implicit
         traceContext: TraceContext
-    ): Future[BftScanConnection] = {
+    ): Future[ScanAggregatesConnection] = {
       for {
-        svcScans <- store.listSvcScans()
-        scanUrls = svcScans.flatMap { case (_, scans) =>
-          scans.map(si => Uri.parseAbsolute(si.publicUrl))
-        }.toList
+        globalDomainId <- store.getGlobalDomainId().map(_.unwrap.toProtoPrimitive)
+        scans <- store.listSvcScans()
+        scanUrls = scans
+          .filter(_._1 == globalDomainId)
+          .flatMap { case (_, scans) =>
+            scans.map(si => Uri.parseAbsolute(si.publicUrl))
+          }
+          .toList
+          .distinct
         nonEmptyScanUrls = NonEmptyList.fromList(scanUrls) match {
           case Some(urls) => Future.successful(urls)
           case None => Future.failed(CannotAdvance("No scan urls found in Svc Rules."))
         }
         config <- nonEmptyScanUrls.map(BftScanConnection.BftScanClientConfig.Bft(_))
-        con <- BftScanConnection(
+        con <- ScanAggregatesConnection(
           context.ledgerClient,
           config,
           context.clock,

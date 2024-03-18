@@ -20,7 +20,6 @@ import com.daml.network.scan.admin.api.client.BftScanConnection.{
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcScan
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
@@ -151,131 +150,6 @@ class BftScanConnection(
     bftCall(_.lookupFeaturedAppRight(providerPartyId))
   }
 
-  // TODO(#9841) BFT
-  def getRoundAggregate(round: Long)(implicit
-      tc: TraceContext
-  ): Future[Option[ScanAggregator.RoundAggregate]] = {
-    logger.debug(s"Getting round aggregate for round $round")
-    // gets aggregated rounds from all scans, ignoring calls that fail
-    val scansWithRounds: Future[Map[SingleScanConnection, ScanAggregator.RoundRange]] = Future
-      .sequence(scanList.scanConnections.open.map { scan =>
-        scan
-          .getAggregatedRounds()
-          .map(_.map(scan -> _))
-          .recover { case e: Throwable =>
-            logger.info(
-              s"Failed to get aggregated rounds from scan ${scan.config.adminApi.url}, while getting round aggregate for round $round",
-              e,
-            )
-            None
-          }
-      })
-      .map(_.flatten.toMap)
-    // for calls that succeeded, get the round aggregates for the round from the scans that reported that they can serve it
-    scansWithRounds.flatMap { scansWithRounds =>
-      val roundsPerScan = scansWithRounds
-        .map { case (s, r) => s.config.adminApi.url -> r }
-      logger.debug(
-        s"Aggregate rounds per scan: ${roundsPerScan}, while getting round aggregate for round $round"
-      )
-      if (scansWithRounds.isEmpty) {
-        Future.failed(
-          ScanAggregator.CannotAdvance(
-            s"No scans have any aggregated rounds available, while getting round aggregate for round $round"
-          )
-        )
-      } else {
-        getRoundAggregatesWithinRound(scansWithRounds, round).flatMap { roundAggregates =>
-          val nrScans = scansWithRounds.size
-          if (roundAggregates.isEmpty) {
-            Future.failed(
-              ScanAggregator.CannotAdvance(
-                s"No RoundAggregates for round $round reported by ${nrScans} scans, while scans reported to have aggregate rounds per scan: ${roundsPerScan}"
-              )
-            )
-          } else if (roundAggregates.values.toList.distinct.size == 1) {
-            Future.successful(roundAggregates.values.headOption)
-          } else {
-            val roundAggregatesList = roundAggregates.values.toList
-            val roundTotalsList = roundAggregatesList.map(_.roundTotals)
-            val roundPartyTotalsList = roundAggregatesList.map(_.roundPartyTotals)
-            val scanUrls = roundAggregates.keys.toList
-              .sortBy(_.toString())
-            if (roundTotalsList.distinct.size == 1) {
-              val agreedUponRoundTotals = roundTotalsList.headOption
-              logger.warn(
-                s"RoundAggregates for round $round reported by ${nrScans} scans do not agree, but the RoundTotals do match: ${agreedUponRoundTotals}"
-              )
-            } else {
-              val details = scanUrls
-                .map { url =>
-                  s"Scan($url): ${roundAggregates(url).roundTotals}"
-                }
-                .mkString("\n")
-              logger.warn(
-                s"The RoundAggregates for round $round reported by ${nrScans} scans do not agree on RoundTotals:\n $details"
-              )
-            }
-            if (roundPartyTotalsList.distinct.size == 1) {
-              val agreedUponRoundPartyTotals = roundPartyTotalsList.headOption
-              logger.warn(
-                s"RoundAggregates for round $round reported by ${nrScans} scans do not agree, but the RoundPartyTotals do match: ${agreedUponRoundPartyTotals}"
-              )
-            } else {
-              val details = scanUrls
-                .map { url =>
-                  s"Scan($url): ${roundAggregates(url).roundPartyTotals}"
-                }
-                .mkString("\n")
-              logger.warn(
-                s"The RoundAggregates for round $round reported by ${nrScans} scans do not agree on RoundPartyTotals:\n $details"
-              )
-            }
-            Future.successful(roundAggregates.values.headOption)
-          }
-        }
-      }
-    }
-  }
-
-  private def getRoundAggregatesWithinRound(
-      scansWithRounds: Map[SingleScanConnection, ScanAggregator.RoundRange],
-      round: Long,
-  )(implicit
-      tc: TraceContext
-  ): Future[Map[Uri, ScanAggregator.RoundAggregate]] = {
-    val scansHavingRound = scansWithRounds
-      .filter(_._2.contains(round))
-      .keys
-      .toSeq
-    def getRoundAggregateFromScan(
-        scan: SingleScanConnection
-    ): Future[(Uri, ScanAggregator.RoundAggregate)] = {
-      logger
-        .debug(
-          s"Getting RoundAggregate for round $round from scan ${scan.config.adminApi.url}"
-        )
-      scan
-        .getRoundAggregate(round)
-        .map(_.map(scan.config.adminApi.url -> _))
-        .flatMap {
-          _.map(Future.successful).getOrElse(
-            Future
-              .failed(ScanAggregator.CannotAdvance(s"No RoundAggregate found for round $round"))
-          )
-        }
-        .recoverWith { case e: Throwable =>
-          // TODO(#9841) Revisit this log level when looking into proper BFT reads.
-          logger.info(
-            s"Failed to get RoundAggregate for round $round from scan ${scan.config.adminApi.url}",
-            e,
-          )
-          Future.failed(e)
-        }
-    }
-    Future.traverse(scansHavingRound)(getRoundAggregateFromScan).map(_.toMap)
-  }
-
   override def getMigrationSchedule()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
@@ -302,7 +176,7 @@ class BftScanConnection(
       retryProvider
         .retryForClientCalls(
           "bft_call",
-          executeCall(call, requestFrom, nTargetSuccess = f + 1),
+          BftScanConnection.executeCall(call, requestFrom, nTargetSuccess = f + 1, logger),
           logger,
           (_: String) => ConsensusNotReachedRetryable,
         )
@@ -317,11 +191,26 @@ class BftScanConnection(
     }
   }
 
-  private def executeCall[T](
-      call: SingleScanConnection => Future[T],
-      requestFrom: Seq[SingleScanConnection],
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    refreshAction.map(r => SyncCloseable("refresh_scan_list", r.close())).toList ++
+      Seq[AsyncOrSyncCloseable](
+        SyncCloseable("scan_list", scanList.close())
+      )
+  }
+}
+trait HasUrl {
+  def url: Uri
+}
+
+object BftScanConnection {
+  def executeCall[T, C <: HasUrl](
+      call: C => Future[T],
+      requestFrom: Seq[C],
       nTargetSuccess: Int,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[T] = {
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext, tc: TraceContext, mat: Materializer): Future[T] = {
+    require(requestFrom.nonEmpty, "At least one request must be made.")
+
     val responses =
       new ConcurrentHashMap[BftScanConnection.ScanResponse, List[Uri]]()
     val nResponsesDone = new AtomicInteger(0)
@@ -334,7 +223,7 @@ class BftScanConnection(
           val agreements =
             responses.compute(
               key,
-              (_, scans) => scan.config.adminApi.url :: Option(scans).getOrElse(List.empty),
+              (_, scans) => scan.url :: Option(scans).getOrElse(List.empty),
             )
 
           if (agreements.size == nTargetSuccess) { // consensus has been reached
@@ -347,12 +236,11 @@ class BftScanConnection(
                 val exception = new ConsensusNotReached(requestFrom.size, responses)
                 finalResponse.tryFailure(exception): Unit
               case Some(consensusResponse) =>
-                logDisagreements(consensusResponse, responses)
+                logDisagreements(logger, consensusResponse, responses)
             }
           }
         }
     }
-
     finalResponse.future
   }
 
@@ -361,7 +249,9 @@ class BftScanConnection(
     * - Status code + response body when the response is not successful (best effort).
     * - Never equal when there's other exceptions (unless those define equality, which they typically don't).
     */
-  private def keyToGroupResponses[T](r1: Try[T]): Future[BftScanConnection.ScanResponse] = {
+  private def keyToGroupResponses[T](
+      r1: Try[T]
+  )(implicit ec: ExecutionContext, mat: Materializer): Future[BftScanConnection.ScanResponse] = {
     r1 match {
       case Success(value) => Future.successful(BftScanConnection.SuccessfulResponse(value))
       case Failure(unexpected: BaseAppConnection.UnexpectedHttpResponse)
@@ -384,9 +274,10 @@ class BftScanConnection(
   }
 
   private def logDisagreements[T](
+      logger: TracedLogger,
       consensusResponse: Try[T],
       responses: ConcurrentHashMap[BftScanConnection.ScanResponse, List[Uri]],
-  )(implicit tc: TraceContext): Unit = {
+  )(implicit ec: ExecutionContext, mat: Materializer, tc: TraceContext): Unit = {
     keyToGroupResponses(consensusResponse).foreach { consensusResponseKey =>
       responses.remove(consensusResponseKey)
       responses.forEach { (disagreeingResponse, scanUrls) =>
@@ -396,17 +287,6 @@ class BftScanConnection(
       }
     }
   }
-
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
-    refreshAction.map(r => SyncCloseable("refresh_scan_list", r.close())).toList ++
-      Seq[AsyncOrSyncCloseable](
-        SyncCloseable("scan_list", scanList.close())
-      )
-  }
-
-}
-
-object BftScanConnection {
 
   case class ScanConnections(open: Seq[SingleScanConnection], failed: Int) {
     val totalNumber: Int = open.size + failed

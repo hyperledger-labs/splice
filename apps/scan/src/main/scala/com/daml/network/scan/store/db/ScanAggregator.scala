@@ -49,6 +49,7 @@ final class ScanAggregator(
 
   /** Aggregates RoundTotals and RoundPartyTotals in batches and reports the most recently aggregated RoundTotals. */
   def aggregate()(implicit traceContext: TraceContext): Future[Option[RoundTotals]] = {
+    logger.debug("Aggregation triggered.")
     (for {
       previousRoundTotals <- ensureConsecutiveAggregation()
       lastClosedRoundO <- getLastCompletelyClosedRoundAfter(previousRoundTotals.map(_.closedRound))
