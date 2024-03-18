@@ -1097,7 +1097,6 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       new Round(1L),
       789L,
       s"PAR::${name}::12345",
-      Collections.emptyMap(),
     )
   }
 
@@ -1233,8 +1232,8 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     val template = new SvOnboardingConfirmed(
       candidate.toProtoPrimitive,
       name,
-      participantId,
       SvUtil.DefaultFoundingNodeWeight,
+      participantId,
       "reason",
       svcParty.toProtoPrimitive,
       expiry,

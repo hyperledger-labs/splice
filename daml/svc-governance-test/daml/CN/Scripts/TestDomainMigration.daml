@@ -20,7 +20,7 @@ import CN.Scripts.SvcTestUtils
 
 testDomainMigration : Script ()
 testDomainMigration = do
-  (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
   let svs = [sv1, sv2, sv3, sv4]
 
   -- SVC decides off-ledger to setup a second domain
@@ -39,24 +39,20 @@ testDomainMigration = do
   now <- getTime
   -- SV's onboard their nodes and make them known
   forA_ svs $ \sv -> do
-    [(svcRulesCid, _)] <- query @SvcRules svc
-    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
-      sv
-      domainId = newDomainId
-      newNodeConfig = DomainNodeConfig with
-        cometBft = CometBftConfig with
-          nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
-          sequencingKeys = []
-          governanceKeys = []
-        sequencer = Some SequencerConfig with
-          migrationId = 0
-          sequencerId = "sequencer-id-" <> partyToText sv
-          url = "sequencer.address:1234"
-          availableAfter = Some now
-        mediator = Some MediatorConfig with
-          mediatorId = "mediator-id-" <> partyToText sv
-        scan = Some ScanConfig with
-          publicUrl = "https://" <> partyToText sv <> ".example.com"
+    setDomainNodeConfig app sv newDomainId $ DomainNodeConfig with
+      cometBft = CometBftConfig with
+        nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
+        sequencingKeys = []
+        governanceKeys = []
+      sequencer = Some SequencerConfig with
+        migrationId = 0
+        sequencerId = "sequencer-id-" <> partyToText sv
+        url = "sequencer.address:1234"
+        availableAfter = Some now
+      mediator = Some MediatorConfig with
+        mediatorId = "mediator-id-" <> partyToText sv
+      scan = Some ScanConfig with
+        publicUrl = "https://" <> partyToText sv <> ".example.com"
 
   -- The SVC marks the domain as operational
   executeSvcRulesConfigChange app $ \config ->

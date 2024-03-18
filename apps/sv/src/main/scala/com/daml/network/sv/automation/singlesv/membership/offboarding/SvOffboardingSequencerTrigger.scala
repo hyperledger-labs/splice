@@ -9,7 +9,6 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
-import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
 import com.digitalasset.canton.topology.SequencerId
 import com.digitalasset.canton.tracing.TraceContext
@@ -37,36 +36,43 @@ class SvOffboardingSequencerTrigger(
 
   private val svParty = svcStore.key.svParty
 
+  // TODO(tech-debt): this is an almost exact copy of SvOffboardingMediatorTrigger => share the code to avoid missed bugfixes
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[SequencerId]] = {
     for {
-      qSvcRules <- svcStore.getSvcRulesWithOffset()
-      QueryResult(svcRulesOffset, svcRules) = qSvcRules
+      rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
       currentSequencerState <- participantAdminConnection.getSequencerDomainState(
-        svcRules.domain
+        rulesAndStates.svcRules.domain
       )
     } yield {
       val svcRulesCurrentSequencers = getSequencerIds(
-        svcRules.contract.payload.members
-          .values()
-          .asScala
-          .flatMap(_.domainNodes.values().asScala)
+        rulesAndStates.svNodeStates.values.flatMap(_.payload.state.domainNodes.values().asScala)
       )
-      val sequencersToRemove = currentSequencerState.mapping.active
-        .filterNot(e => svcRulesCurrentSequencers.contains(e))
-      logger.info {
-        import com.digitalasset.canton.util.ShowUtil.showPretty
-        import com.daml.network.util.PrettyInstances.prettyCodegenContractId
-        show"Planning to remove sequencers $sequencersToRemove to match SvcRules ${svcRules.contractId} at $svcRulesOffset"
+      if (svcRulesCurrentSequencers.isEmpty) {
+        // Prudent engineering: always keep at least one sequencer active
+        logger.warn(
+          show"Not reconciling with target state that would leave no active sequencers: $rulesAndStates"
+        )
+        Seq.empty
+      } else {
+        val sequencersToRemove =
+          currentSequencerState.mapping.active
+            .filterNot(e => svcRulesCurrentSequencers.contains(e))
+        if (sequencersToRemove.nonEmpty)
+          logger.info {
+            import com.digitalasset.canton.util.ShowUtil.showPretty
+            show"Planning to remove sequencers $sequencersToRemove to match $rulesAndStates"
+          }
+        sequencersToRemove
       }
-      sequencersToRemove
     }
   }
 
   override protected def completeTask(task: SequencerId)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
+    // TODO(tech-debt): pass through the domain id from the task, and double-check task completion for races
     for {
       svcRules <- svcStore.getSvcRules()
       _ <- participantAdminConnection.ensureSequencerDomainStateRemoval(
@@ -84,6 +90,7 @@ class SvOffboardingSequencerTrigger(
       tc: TraceContext
   ): Future[Boolean] = {
     for {
+      // TODO(tech-debt): pass through the domain id from the task, and double-check staleness check for races
       svcRules <- svcStore.getSvcRules()
       sequencerDomainState <- participantAdminConnection.getSequencerDomainState(
         svcRules.domain

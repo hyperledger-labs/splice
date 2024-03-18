@@ -507,17 +507,16 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.listSvcSequencers") { _ => _ =>
       store
-        .listFromSvcRules { svcRules =>
+        .listFromSvNodeStates { nodeState =>
           for {
-            memberInfo <- svcRules.payload.members.asScala.values.toVector
-            (domainId, domainConfig) <- memberInfo.domainNodes.asScala
+            (domainId, domainConfig) <- nodeState.state.domainNodes.asScala.toVector
             sequencer <- domainConfig.sequencer.toScala
             availableAfter <- sequencer.availableAfter.toScala
           } yield domainId -> definitions.SvcSequencer(
             sequencer.migrationId,
             sequencer.sequencerId,
             sequencer.url,
-            memberInfo.name,
+            nodeState.svName,
             OffsetDateTime.ofInstant(availableAfter, ZoneOffset.UTC),
           )
         }

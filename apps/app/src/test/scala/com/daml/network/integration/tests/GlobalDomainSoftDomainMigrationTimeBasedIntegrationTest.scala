@@ -281,8 +281,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         new so.SvOnboardingConfirmed(
           sv1Party.toProtoPrimitive,
           "irrelevant name",
-          "PAR::sv::1220f3e2",
           SvUtil.DefaultFoundingNodeWeight,
+          "PAR::sv::1220f3e2",
           "observing domain migration",
           svcParty.toProtoPrimitive,
           mostDistantPossibleExpiry,

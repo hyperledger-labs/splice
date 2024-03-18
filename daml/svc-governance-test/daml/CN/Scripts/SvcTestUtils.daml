@@ -26,7 +26,7 @@ import CN.SvcRules
 import CN.SvcBootstrap
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
-import CN.SVC.SvStatus
+import CN.SVC.MemberState
 import CN.Scripts.CnsRulesParameters
 
 -- | Multiplier for the SV weights, which are recorded in basis-points, i.e., 1/10000ths
@@ -351,6 +351,20 @@ checkSvStatusReports app = do
   let reportingParties = Set.fromList $ [ report.sv | (_, report) <- reports ]
   reportingParties === expectedSvParties
 
+getSvNodeState : CCApp -> Party -> Script (ContractId SvNodeState, SvNodeState)
+getSvNodeState app sv = do
+  [result] <- queryFilter @SvNodeState app.svc (\state -> state.sv == sv)
+  pure result
+
+setDomainNodeConfig : CCApp -> Party -> Text -> DomainNodeConfig -> Script (ContractId SvNodeState)
+setDomainNodeConfig app sv domainId newNodeConfig = do
+  (nodeStateCid, _) <- getSvNodeState app sv
+  [(svcRulesCid, _)] <- query @SvcRules app.svc
+  submitMulti [sv] [app.svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
+    sv
+    domainId
+    nodeStateCid
+    newNodeConfig
 
 -- Pure utility functions
 -------------------------

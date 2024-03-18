@@ -8,7 +8,7 @@ import Daml.Script
 import CC.Types
 import CN.Scripts.SvcTestUtils
 import CN.SvcRules
-import CN.SVC.SvStatus
+import CN.SVC.MemberState
 
 
 -- test status report submission, as status report invariants are tested

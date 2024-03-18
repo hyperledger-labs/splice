@@ -175,7 +175,7 @@ class SvOnboardingAddlIntegrationTest
 
     // we need to wait for a minute due to non sv validator only connect to sequencers after initialization + sequencerAvailabilityDelay which is is 60s
     eventually(timeUntilSuccess = 1.minutes, maxPollInterval = 1.second) {
-      val membersInfoFromSvcRules = sv1Backend.getSvcInfo().svcRules.payload.members
+      val sv1NodeStates = sv1Backend.getSvcInfo().svNodeStates
 
       forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { svBackend =>
         val svParty = svBackend.getSvcInfo().svParty
@@ -199,8 +199,8 @@ class SvOnboardingAddlIntegrationTest
             localSequencerEndpoint.forgetNE.map(_.toURI(false)).headOption.value
         }
 
-        val memberInfo = membersInfoFromSvcRules.get(svParty.toProtoPrimitive)
-        forAll(memberInfo.domainNodes.values()) { domainNode =>
+        val nodeState = sv1NodeStates.get(svParty).value.payload
+        forAll(nodeState.state.domainNodes.values()) { domainNode =>
           domainNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
           domainNode.mediator.toScala.value.mediatorId should not be empty
         }
@@ -209,7 +209,7 @@ class SvOnboardingAddlIntegrationTest
           inside(sv1ScanBackend.listSvcSequencers()) { case Seq(domainSequencers) =>
             domainSequencers.sequencers should have size 4
             domainSequencers.sequencers.find(s =>
-              s.svName == memberInfo.name && s.url == localSequencerUrl.toString
+              s.svName == nodeState.svName && s.url == localSequencerUrl.toString
             ) should not be empty
           }
         }

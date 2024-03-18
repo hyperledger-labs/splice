@@ -178,12 +178,9 @@ class SvOffboardingIntegrationTest
               mediators.size shouldBe 3
               mediators shouldBe sv3Backend
                 .getSvcInfo()
-                .svcRules
-                .payload
-                .members
-                .values()
-                .asScala
-                .flatMap(_.domainNodes.values().asScala)
+                .svNodeStates
+                .values
+                .flatMap(_.payload.state.domainNodes.values().asScala)
                 .flatMap(_.mediator.toScala)
                 .map(_.mediatorId)
                 .flatMap(mediatorId =>
@@ -213,12 +210,9 @@ class SvOffboardingIntegrationTest
               sequencers.size shouldBe 3
               sequencers shouldBe sv3Backend
                 .getSvcInfo()
-                .svcRules
-                .payload
-                .members
-                .values()
-                .asScala
-                .flatMap(_.domainNodes.values().asScala)
+                .svNodeStates
+                .values
+                .flatMap(_.payload.state.domainNodes.values().asScala)
                 .flatMap(_.sequencer.toScala)
                 .map(_.sequencerId)
                 .flatMap(sequencerId =>

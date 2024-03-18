@@ -9,10 +9,7 @@ import CC.Schedule
 import CC.Types
 
 import CN.Cns
-import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
-import CN.SVC.MemberState
-import CN.SVC.SvStatus
 import CN.SvcRules
 
 -- | A template for bootstrapping the collective and CoinRules.
@@ -51,43 +48,28 @@ template SvcBootstrap with
         exercise coinRulesCid CoinRules_Bootstrap_Rounds with
           round0Duration
           coinPrice
-        -- create initial coin price vote of the founder
-        now <- getTime
-        _ <- create CoinPriceVote with
-          svc
-          sv = founderParty
-          coinPrice = Some coinPrice
-          lastUpdatedAt = now
-        -- create initial status report of the founder
-        _ <- create SvStatusReport with
-          svc
-          sv = founderParty
-          svName = founderName
-          number = 0
-          status = None
-        -- create initial reward state of the founder
-        _ <- create MemberRewardState with
-            svc
-            svName = founderName
-            state = RewardState with
-              lastRoundCollected = Round (- 1)
-              numRoundsMissed = 0
-              numRoundsCollected = 0
-              numCouponsIssued = 0
         -- create the SVC rules with the founding member as the sole member
-        let founderInfo = MemberInfo with
+        let founderMemberInfo = MemberInfo with
               name = founderName
               joinedAsOfRound = Round 0
               svRewardWeight = founderRewardWeight
               participantId = founderParticipantId
-              domainNodes = founderDomainNodes
-        _ <- create SvcRules with
-          svc
-          epoch = 0
-          members = Map.fromList [(founderParty, founderInfo)]
-          offboardedMembers = Map.empty
-          leader = founderParty
-          config
-          initialTrafficState
-          isDevNet
-        pure ()
+        let svcRules = SvcRules with
+              svc
+              epoch = 0
+              members = Map.fromList [(founderParty, founderMemberInfo)]
+              offboardedMembers = Map.empty
+              leader = founderParty
+              config
+              initialTrafficState
+              isDevNet
+        create svcRules
+        -- create initial per-member and per-operator contracts for founder
+        let addMemberChoiceArgs = SvcRules_AddMember with
+              newMemberParty = founderParty
+              newMemberName = founderName
+              newMemberParticipantId = founderParticipantId
+              joinedAsOfRound = Round 0
+              newMemberRewardWeight = founderRewardWeight
+        createPerMemberContracts svcRules addMemberChoiceArgs
+        createPerSvPartyContracts svc founderParty founderName founderDomainNodes (Some coinPrice)

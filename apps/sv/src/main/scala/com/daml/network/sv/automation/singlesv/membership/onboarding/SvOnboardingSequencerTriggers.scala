@@ -2,16 +2,15 @@ package com.daml.network.sv.automation.singlesv.membership.onboarding
 
 import cats.implicits.showInterpolator
 import com.daml.network.automation.{TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
-import com.daml.network.sv.automation.singlesv.membership.{
-  SvcRulesTopologyStateReconciler,
-  SvTopologyStatePollingAndAssignedTrigger,
-}
 import com.daml.network.sv.automation.singlesv.membership.onboarding.SequencerOnboarding.SequencerToOnboard
+import com.daml.network.sv.automation.singlesv.membership.{
+  SvTopologyStatePollingAndAssignedTrigger,
+  SvcRulesTopologyStateReconciler,
+}
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.AssignedContract
+import com.daml.network.sv.store.SvSvcStore.SvcRulesWithMemberNodeStates
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId, SequencerId}
@@ -29,12 +28,12 @@ class SequencerOnboarding(
     logger: TracedLogger,
 ) extends SvcRulesTopologyStateReconciler[SequencerToOnboard] {
   override def diffSvcRulesWithTopology(
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules]
+      svcRulesAndState: SvcRulesWithMemberNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[SequencerToOnboard]] = {
+    val svcRules = svcRulesAndState.svcRules
     participantAdminConnection.getSequencerDomainState(svcRules.domain).map {
       sequencerDomainState =>
-        val currentDomainConfigs =
-          OnboardingDomainNodeUtil.currentDomainConfig(svcRules.domain, svcRules)
+        val currentDomainConfigs = svcRulesAndState.currentDomainNodeConfigs()
         val configuredSequencers =
           currentDomainConfigs
             .flatMap(_.sequencer.toScala)
@@ -59,9 +58,7 @@ class SequencerOnboarding(
 
         if (sequencersToAdd.nonEmpty) {
           logger.info {
-            import com.daml.network.util.PrettyInstances.prettyCodegenContractId
-            import com.digitalasset.canton.util.ShowUtil.showPretty
-            show"Planning to add sequencers $sequencersToAdd to match SvcRules ${svcRules.contractId}"
+            show"Planning to add sequencers $sequencersToAdd to match $svcRulesAndState"
           }
           sequencersToAdd
         } else if (thresholdToSet != sequencerDomainState.mapping.threshold) {

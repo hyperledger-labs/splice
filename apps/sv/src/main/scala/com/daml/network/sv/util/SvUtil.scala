@@ -15,18 +15,17 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
   SequencerConfig,
   SvcGlobalDomainConfig,
 }
-import com.daml.network.codegen.java.cn.svcrules.{SvcRules, SvcRulesConfig}
+import com.daml.network.codegen.java.cn.svcrules.SvcRulesConfig
 import com.daml.network.codegen.java.cn.{cometbft, svc}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvScanConfig
-import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.time.EnrichedDurations.*
-import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 
 import java.security.interfaces.{ECPrivateKey, ECPublicKey}
@@ -276,34 +275,4 @@ object SvUtil {
   def toRelTime(duration: NonNegativeFiniteDuration): RelTime = new RelTime(
     duration.toInternal.toScala.toMicros
   )
-
-  def listActiveSvParticipantsAndMediators(
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules]
-  ): Seq[Member] = {
-    val svParticipants = svcRules.contract.payload.members
-      .values()
-      .asScala
-      .map(_.participantId)
-      .toSeq
-      .map(ParticipantId.tryFromProtoPrimitive)
-    val offboardedSvParticipants = svcRules.contract.payload.offboardedMembers
-      .values()
-      .asScala
-      .map(_.participantId)
-      .toSeq
-      .map(ParticipantId.tryFromProtoPrimitive)
-    val svMediators = svcRules.contract.payload.members
-      .values()
-      .asScala
-      .toSeq
-      .flatMap(_.domainNodes.values().asScala)
-      .flatMap(_.mediator.toScala)
-      .map(m =>
-        MediatorId
-          .fromProtoPrimitive(m.mediatorId, "mediator")
-          .fold(err => throw new IllegalArgumentException(err.message), identity)
-      )
-    svParticipants.filterNot(offboardedSvParticipants.contains) ++ svMediators
-  }
-
 }

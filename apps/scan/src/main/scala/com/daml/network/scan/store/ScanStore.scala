@@ -14,7 +14,13 @@ import com.daml.network.scan.store.db.{
   ScanTables,
 }
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
-import com.daml.network.util.{CoinConfigSchedule, Contract, ContractWithState, TemplateJsonDecoder}
+import com.daml.network.util.{
+  AssignedContract,
+  CoinConfigSchedule,
+  Contract,
+  ContractWithState,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -22,6 +28,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, Storage}
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -84,29 +91,27 @@ trait ScanStore
   /** Returns all items extracted by `f` from the SvcRules ensuring that they're sorted by domainId,
     * so that the order is deterministic.
     */
-  def listFromSvcRules[T](
-      f: ContractWithState[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules] => Vector[
-        (String, T)
-      ]
+  def listFromSvNodeStates[T](
+      f: cn.svc.memberstate.SvNodeState => Vector[(String, T)]
   )(implicit tc: TraceContext): Future[Vector[(String, Vector[T])]] = {
     for {
-      svcRulesO <- lookupSvcRules()
-    } yield {
-      val svcRules = svcRulesO getOrElse {
-        throw new NoSuchElementException("found no svcRules instance")
+      svcRules <- getSvcRules()
+      nodeStates <- Future.traverse(svcRules.payload.members.asScala.keys) { svPartyId =>
+        getSvNodeState(PartyId.tryFromProtoPrimitive(svPartyId))
       }
-      val items = f(svcRules)
+    } yield {
+      val items = nodeStates.toVector.flatMap(nodeState => f(nodeState.contract.payload))
       val itemsByDomain = items.groupBy(_._1).view.mapValues(_.map(_._2))
       itemsByDomain.toVector.sortBy(_._1)
     }
   }
+
   def listSvcScans()(implicit tc: TraceContext): Future[Vector[(String, Vector[ScanInfo])]] = {
-    listFromSvcRules { svcRules =>
+    listFromSvNodeStates { nodeState =>
       for {
-        memberInfo <- svcRules.payload.members.asScala.values.toVector
-        (domainId, domainConfig) <- memberInfo.domainNodes.asScala
+        (domainId, domainConfig) <- nodeState.state.domainNodes.asScala.toVector
         scan <- domainConfig.scan.toScala
-      } yield domainId -> ScanInfo(scan.publicUrl, memberInfo.name)
+      } yield domainId -> ScanInfo(scan.publicUrl, nodeState.svName)
     }
   }
   def getCoinRules()(implicit
@@ -121,6 +126,17 @@ trait ScanStore
   def lookupSvcRules()(implicit
       tc: TraceContext
   ): Future[Option[ContractWithState[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]]
+
+  private def getSvcRules()(implicit
+      tc: TraceContext
+  ): Future[ContractWithState[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
+    lookupSvcRules().map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription("No active SvcRules contract")
+          .asRuntimeException()
+      )
+    )
 
   def getTotalCoinBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
 
@@ -212,6 +228,25 @@ trait ScanStore
   def getRoundPartyTotals(startRound: Long, endRound: Long)(implicit
       tc: TraceContext
   ): Future[Seq[ScanAggregator.RoundPartyTotals]]
+
+  def lookupSvNodeState(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[
+    AssignedContract[cn.svc.memberstate.SvNodeState.ContractId, cn.svc.memberstate.SvNodeState]
+  ]]
+
+  def getSvNodeState(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[
+    AssignedContract[cn.svc.memberstate.SvNodeState.ContractId, cn.svc.memberstate.SvNodeState]
+  ] =
+    lookupSvNodeState(svPartyId).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(show"No SvNodeState found for $svPartyId")
+          .asRuntimeException()
+      )
+    )
 }
 
 object ScanStore {
@@ -351,6 +386,13 @@ object ScanStore {
             ScanAcsStoreRowData(
               contract = contract,
               validatorLicenseRoundsCollected = Some(roundsCollected.orElse(0L)),
+            )
+        },
+        mkFilter(cn.svc.memberstate.SvNodeState.COMPANION)(co => co.payload.svc == svc) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract,
+              svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
             )
         },
       ),

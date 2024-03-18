@@ -9,7 +9,6 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.topology.{DomainId, Member}
@@ -54,9 +53,9 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger2(
         },
         memberId => {
           store
-            .getSvcRules()
-            .flatMap(svcRules => {
-              if (SvUtil.listActiveSvParticipantsAndMediators(svcRules).contains(memberId)) {
+            .getSvcRulesWithMemberNodeStates()
+            .flatMap(rulesAndStates => {
+              if (rulesAndStates.activeSvParticipantAndMediatorIds().contains(memberId)) {
                 // SVs are granted unlimited traffic and do not need to purchase it via MemberTraffic contracts.
                 // While the top-up trigger for SV validators is disabled by default, we also explicitly ignore
                 // SV related MemberTraffic contracts here as a safeguard for the case of 3rd party top-ups
@@ -65,7 +64,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger2(
                   .successful(TaskSuccess(s"Skipping MemberTraffic contract for SV node $memberId"))
               } else {
                 val domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
-                val trafficLimitOffset = svcRules.payload.initialTrafficState.asScala
+                val trafficLimitOffset = rulesAndStates.svcRules.payload.initialTrafficState.asScala
                   .get(memberId.toProtoPrimitive)
                   .fold(0L)(_.consumedTraffic)
                 reconcileExtraTrafficLimitForMember(memberId, domainId, trafficLimitOffset)

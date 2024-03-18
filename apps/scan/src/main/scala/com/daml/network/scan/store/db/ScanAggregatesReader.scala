@@ -116,8 +116,7 @@ object ScanAggregatesReader {
         traceContext: TraceContext
     ): Future[BftScanConnection] = {
       for {
-        svcScans <- store
-          .listSvcScans()
+        svcScans <- store.listSvcScans()
         scanUrls = svcScans.flatMap { case (_, scans) =>
           scans.map(si => Uri.parseAbsolute(si.publicUrl))
         }.toList

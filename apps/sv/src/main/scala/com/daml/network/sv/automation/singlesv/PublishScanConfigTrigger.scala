@@ -14,11 +14,11 @@ import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
-import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvScanConfig
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvSvcStore.SvcRulesWithSvNodeState
 import com.daml.network.sv.util.SvUtil
-import com.daml.network.util.{AssignedContract, TemplateJsonDecoder}
+import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.DomainId
@@ -53,12 +53,10 @@ class PublishScanConfigTrigger(
       tc: TraceContext
   ): Future[Seq[PublishScanConfigTrigger.PublishLocalConfigTask]] =
     (for {
-      svcRules <- OptionT(store.lookupSvcRules())
-      svNodeMemberInfo <- OptionT.fromOption[Future](
-        CometBftNode.extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
-      )
-      domainId = svcRules.domain
-      domainNodeConfig = svNodeMemberInfo.domainNodes.asScala.get(domainId.toProtoPrimitive)
+      rulesAndState <- OptionT.liftF(store.getSvcRulesWithSvNodeState(store.key.svParty))
+      domainId = rulesAndState.svcRules.domain
+      nodeState = rulesAndState.svNodeState.payload
+      domainNodeConfig = nodeState.state.domainNodes.asScala.get(domainId.toProtoPrimitive)
       damlScanConfig = new daml.svc.globaldomain.ScanConfig(scanConfig.publicUrl.toString)
       // Check if config is already up2date first so we can avoid even querying scan if it is.
       if Some(damlScanConfig) != domainNodeConfig.flatMap(_.scan.toScala)
@@ -97,12 +95,13 @@ class PublishScanConfigTrigger(
         }
       }
     } yield PublishScanConfigTrigger.PublishLocalConfigTask(
-      svNodeMemberInfo.name,
-      svcRules,
+      nodeState.svName,
+      rulesAndState,
       domainNodeConfig.fold(SvUtil.emptyCometBftConfig)(_.cometBft),
       domainNodeConfig.flatMap(_.sequencer.toScala).toJava,
       domainNodeConfig.flatMap(_.mediator.toScala).toJava,
       damlScanConfig,
+      // TODO(#4906): this domain-id is likely the wrong one to use in a soft-domain migration context
       domainId,
     )).value
       .map(_.toList)
@@ -112,11 +111,12 @@ class PublishScanConfigTrigger(
   )(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    val cmd = task.svcRules.exercise(
+    val cmd = task.svcRulesAndState.svcRules.exercise(
       _.exerciseSvcRules_SetDomainNodeConfig(
         store.key.svParty.toProtoPrimitive,
         task.domainId.toProtoPrimitive,
         task.damlSvNodeConfig,
+        task.svcRulesAndState.svNodeState.contractId,
       )
     )
     for {
@@ -129,20 +129,14 @@ class PublishScanConfigTrigger(
 
   override protected def isStaleTask(
       task: PublishScanConfigTrigger.PublishLocalConfigTask
-  )(implicit tc: TraceContext): Future[Boolean] = {
-    for {
-      contract <- store.multiDomainAcsStore
-        .lookupContractById(daml.svcrules.SvcRules.COMPANION)(task.svcRules.contractId)
-    } yield {
-      contract.isEmpty
-    }
-  }
+  )(implicit tc: TraceContext): Future[Boolean] =
+    task.svcRulesAndState.isStale(store.multiDomainAcsStore)
 }
 
 object PublishScanConfigTrigger {
   case class PublishLocalConfigTask(
       svNodeId: String,
-      svcRules: AssignedContract[daml.svcrules.SvcRules.ContractId, daml.svcrules.SvcRules],
+      svcRulesAndState: SvcRulesWithSvNodeState,
       cometBftConfig: CometBftConfig,
       sequencerConfig: Optional[SequencerConfig],
       mediatorConfig: Optional[MediatorConfig],
@@ -153,7 +147,7 @@ object PublishScanConfigTrigger {
     import com.daml.network.util.PrettyInstances.*
 
     override def pretty: Pretty[this.type] = prettyOfClass(
-      param("svcRules", _.svcRules),
+      param("svcRulesAndState", _.svcRulesAndState),
       param("publicScanUrl", _.scanConfig.publicUrl.unquoted),
     )
 

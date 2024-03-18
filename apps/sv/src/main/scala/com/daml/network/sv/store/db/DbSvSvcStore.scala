@@ -13,8 +13,8 @@ import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext}
 import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
-import com.daml.network.codegen.java.cn.svc.memberstate.MemberRewardState
-import com.daml.network.codegen.java.cn.svc.svstatus.SvStatusReport
+import com.daml.network.codegen.java.cn.svc.memberstate.{MemberRewardState, SvNodeState}
+import com.daml.network.codegen.java.cn.svc.memberstate.SvStatusReport
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
@@ -1263,6 +1263,11 @@ class DbSvSvcStore(
       } yield row.map(contractWithStateFromRow(CnsEntryContext.COMPANION)(_))
     }
 
+  def lookupSvNodeState(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[AssignedContract[SvNodeState.ContractId, SvNodeState]]] =
+    lookupContractBySvParty(SvNodeState.COMPANION, svPartyId)
+
   override def lookupSvStatusReport(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[AssignedContract[SvStatusReport.ContractId, SvStatusReport]]] =
@@ -1328,6 +1333,7 @@ class DbSvSvcStore(
       } yield row.map(assignedContractFromRow(companion)(_))
     }
   }
+
   override def close(): Unit = {
     svcStoreMetrics.close()
     super.close()

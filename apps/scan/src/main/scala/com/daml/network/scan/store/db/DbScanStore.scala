@@ -1,11 +1,14 @@
 package com.daml.network.scan.store.db
 
 import cats.implicits.*
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
+import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -16,7 +19,13 @@ import com.daml.network.scan.store.{OpenMiningRoundTxLogEntry, ScanStore, SortOr
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStore, TxLogQueries}
 import com.daml.network.store.{Limit, LimitHelpers, PageLimit}
-import com.daml.network.util.{Contract, ContractWithState, QualifiedName, TemplateJsonDecoder}
+import com.daml.network.util.{
+  AssignedContract,
+  Contract,
+  ContractWithState,
+  QualifiedName,
+  TemplateJsonDecoder,
+}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
@@ -697,6 +706,39 @@ class DbScanStore(
             "getRoundPartyTotals",
           )
       } yield roundPartyTotals
+    }
+  }
+
+  def lookupSvNodeState(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[AssignedContract[SvNodeState.ContractId, SvNodeState]]] =
+    lookupContractBySvParty(SvNodeState.COMPANION, svPartyId)
+
+  private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
+      companion: C,
+      svPartyId: PartyId,
+  )(implicit
+      companionClass: ContractCompanion[C, TCId, T],
+      tc: TraceContext,
+  ): Future[Option[AssignedContract[TCId, T]]] = {
+    val templateId = companionClass.typeId(companion)
+    waitUntilAcsIngested {
+      for {
+        row <- storage
+          .querySingle(
+            selectFromAcsTableWithState(
+              ScanTables.acsTableName,
+              storeId,
+              domainMigrationId,
+              where = sql"""
+         template_id_qualified_name = ${QualifiedName(templateId)}
+     and sv_party = $svPartyId""",
+              orderLimit = sql"""limit 1""",
+            ).headOption,
+            s"lookupContractBySvParty[$templateId]",
+          )
+          .value
+      } yield row.map(assignedContractFromRow(companion)(_))
     }
   }
 }

@@ -45,13 +45,11 @@ class SvOnboardingMediatorProposalTrigger(
       tc: TraceContext
   ): Future[Seq[MediatorToOnboard]] = {
     for {
-      svcRules <- svcStore.getSvcRules()
-      currentMediatorState <- participantAdminConnection.getMediatorDomainState(
-        svcRules.domain
-      )
+      rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
+      domainId = rulesAndStates.svcRules.domain
+      currentMediatorState <- participantAdminConnection.getMediatorDomainState(domainId)
     } yield {
-      val currentDomainConfigs =
-        OnboardingDomainNodeUtil.currentDomainConfig(svcRules.domain, svcRules)
+      val currentDomainConfigs = rulesAndStates.currentDomainNodeConfigs()
       val domainNodeConfiguredNodes = currentDomainConfigs
         .flatMap(domainConfigs =>
           (domainConfigs.mediator.toScala -> domainConfigs.sequencer.toScala).tupled
@@ -70,7 +68,7 @@ class SvOnboardingMediatorProposalTrigger(
           }
           .map { case (mediatorId, sequencerId) =>
             MediatorToOnboard(
-              svcRules.domain,
+              domainId,
               mediatorId,
               sequencerId,
             )
@@ -79,8 +77,7 @@ class SvOnboardingMediatorProposalTrigger(
       if (mediatorsToAdd.nonEmpty)
         logger.info {
           import com.digitalasset.canton.util.ShowUtil.showPretty
-          import com.daml.network.util.PrettyInstances.prettyCodegenContractId
-          show"Planning to add mediators $mediatorsToAdd to match SvcRules ${svcRules.contractId}"
+          show"Planning to add mediators $mediatorsToAdd to match $rulesAndStates"
         }
       mediatorsToAdd
     }

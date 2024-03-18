@@ -10,6 +10,7 @@ import com.daml.network.sv.automation.singlesv.membership.SvTopologyStatePolling
   Tick,
 }
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvSvcStore.SvcRulesWithMemberNodeStates
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
@@ -32,11 +33,11 @@ trait SvcRulesTopologyStateReconciler[Task] {
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[Seq[Task]] = {
-    svSvcStore.getSvcRules().flatMap(diffSvcRulesWithTopology)
+    svSvcStore.getSvcRulesWithMemberNodeStates().flatMap(diffSvcRulesWithTopology)
   }
 
   protected def diffSvcRulesWithTopology(
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules]
+      svcRulesAndState: SvcRulesWithMemberNodeStates
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,

@@ -37,23 +37,36 @@ class SvOffboardingMediatorTrigger(
 
   private val svParty = svcStore.key.svParty
 
+  // TODO(tech-debt): this is an almost exact copy of SvOffboardingSequencerTrigger => share the code to avoid missed bugfixes
+
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[MediatorId]] = {
     for {
-      svcRules <- svcStore.getSvcRules()
+      rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
       currentMediatorState <- participantAdminConnection.getMediatorDomainState(
-        svcRules.domain
+        rulesAndStates.svcRules.domain
       )
     } yield {
       val svcRulesCurrentMediators = getMediatorIds(
-        svcRules.contract.payload.members
-          .values()
-          .asScala
-          .flatMap(_.domainNodes.values().asScala)
+        rulesAndStates.svNodeStates.values.flatMap(_.payload.state.domainNodes.values().asScala)
       )
-      currentMediatorState.mapping.active
-        .filterNot(e => svcRulesCurrentMediators.contains(e))
+      if (svcRulesCurrentMediators.isEmpty) {
+        // Prudent engineering: always keep at least one mediator active
+        logger.warn(
+          show"Not reconciling with target state that would leave no active mediators: $rulesAndStates"
+        )
+        Seq.empty
+      } else {
+        val mediatorsToRemove = currentMediatorState.mapping.active
+          .filterNot(e => svcRulesCurrentMediators.contains(e))
+        if (mediatorsToRemove.nonEmpty)
+          logger.info {
+            import com.digitalasset.canton.util.ShowUtil.showPretty
+            show"Planning to remove sequencers $mediatorsToRemove to match $rulesAndStates"
+          }
+        mediatorsToRemove
+      }
     }
   }
 

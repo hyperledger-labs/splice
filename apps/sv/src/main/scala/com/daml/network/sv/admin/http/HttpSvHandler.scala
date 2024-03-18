@@ -287,7 +287,8 @@ class HttpSvHandler(
       for {
         latestOpenMiningRound <- svcStore.getLatestActiveOpenMiningRound()
         coinRules <- svcStore.getCoinRules()
-        svcRules <- svcStore.getSvcRules()
+        rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
+        svcRules = rulesAndStates.svcRules
       } yield definitions.GetSvcInfoResponse(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
@@ -296,6 +297,7 @@ class HttpSvHandler(
         latestMiningRound = latestOpenMiningRound.contract.toHttp,
         coinRules = coinRules.toHttp,
         svcRules = svcRules.contract.toHttp,
+        svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
       )
     }
   }

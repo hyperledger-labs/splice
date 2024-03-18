@@ -2,9 +2,11 @@ package com.daml.network.sv.admin.api.client.commands
 
 import cats.data.EitherT
 import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
+import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
@@ -32,6 +34,7 @@ object HttpSvAppClient {
       latestMiningRound: Contract[OpenMiningRound.ContractId, OpenMiningRound],
       coinRules: Contract[CoinRules.ContractId, CoinRules],
       svcRules: Contract[SvcRules.ContractId, SvcRules],
+      svNodeStates: Map[PartyId, Contract[SvNodeState.ContractId, SvNodeState]],
   )
 
   sealed trait SvOnboardingStatus
@@ -181,6 +184,7 @@ object HttpSvAppClient {
               latestMiningRound,
               coinRules,
               svcRules,
+              svNodeStates,
             )
           ) =>
         for {
@@ -191,6 +195,12 @@ object HttpSvAppClient {
             .leftMap(_.toString)
           coinRules <- Contract.fromHttp(CoinRules.COMPANION)(coinRules).left.map(_.toString)
           svcRules <- Contract.fromHttp(SvcRules.COMPANION)(svcRules).left.map(_.toString)
+          svNodeStates <- svNodeStates.traverse { co =>
+            for {
+              nodeState <- Contract.fromHttp(SvNodeState.COMPANION)(co).left.map(_.toString)
+              partyId <- Codec.decode(Codec.Party)(nodeState.payload.sv)
+            } yield partyId -> nodeState
+          }
         } yield SvcInfo(
           svUser,
           svPartyId,
@@ -199,6 +209,7 @@ object HttpSvAppClient {
           latestMiningRound,
           coinRules,
           svcRules,
+          svNodeStates.toMap,
         )
     }
   }

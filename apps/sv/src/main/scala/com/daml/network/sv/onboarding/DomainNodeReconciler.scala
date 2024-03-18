@@ -5,14 +5,13 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
   MediatorConfig,
   SequencerConfig,
 }
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.{CNLedgerConnection, RetryFor, RetryProvider}
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvSvcStore.SvcRulesWithSvNodeState
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.{LocalMediatorConfig, LocalSequencerConfig}
-import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.time.Clock
@@ -37,15 +36,16 @@ class DomainNodeReconciler(
 
   private def setConfig(
       domainId: DomainId,
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      rulesAndState: SvcRulesWithSvNodeState,
       nodeConfig: DomainNodeConfig,
   )(implicit tc: TraceContext) = {
     logger.info(show"Setting domain node config to $nodeConfig")
-    val cmd = svcRules.exercise(
+    val cmd = rulesAndState.svcRules.exercise(
       _.exerciseSvcRules_SetDomainNodeConfig(
         svParty.toProtoPrimitive,
         domainId.toProtoPrimitive,
         nodeConfig,
+        rulesAndState.svNodeState.contractId,
       )
     )
     connection
@@ -66,12 +66,10 @@ class DomainNodeReconciler(
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode, migrationId)
       localMediatorConfig <- SvUtil.getMediatorConfig(localDomainNode)
-      svcRules <- svcStore.getSvcRules()
+      rulesAndState <- svcStore.getSvcRulesWithSvNodeState(svParty)
+      nodeState = rulesAndState.svNodeState.payload
       // TODO(#4901): do not use default, but reconcile all configured domains
-      memberInfo = Option(svcRules.payload.members.get(svParty.toProtoPrimitive))
-        .getOrElse(throw new IllegalArgumentException(s"SV $svParty is not party of the SVC"))
-      domainNodes = memberInfo.domainNodes.asScala
-      domainNodeConfig = domainNodes.get(domainId.toProtoPrimitive)
+      domainNodeConfig = nodeState.state.domainNodes.asScala.get(domainId.toProtoPrimitive)
       sequencerConfig = domainNodeConfig.flatMap(_.sequencer.toScala)
       mediatorConfig = domainNodeConfig.flatMap(_.mediator.toScala)
       existingScanConfig = domainNodeConfig.flatMap(_.scan.toScala).toJava
@@ -95,10 +93,7 @@ class DomainNodeReconciler(
           shouldMarkSequencerAsOnboarded
         ) {
           val nodeConfig = new DomainNodeConfig(
-            domainNodes
-              .get(domainId.toProtoPrimitive)
-              .map(_.cometBft)
-              .getOrElse(SvUtil.emptyCometBftConfig),
+            domainNodeConfig.map(_.cometBft).getOrElse(SvUtil.emptyCometBftConfig),
             localSequencerConfig.map { c =>
               val sequencerAvailabilityDelay =
                 localDomainNode
@@ -129,7 +124,7 @@ class DomainNodeReconciler(
               .toJava,
             existingScanConfig,
           )
-          setConfig(domainId, svcRules, nodeConfig)
+          setConfig(domainId, rulesAndState, nodeConfig)
         } else {
           logger.info(s"Not setting domain node config because it is the same as the existing one.")
           Future.unit

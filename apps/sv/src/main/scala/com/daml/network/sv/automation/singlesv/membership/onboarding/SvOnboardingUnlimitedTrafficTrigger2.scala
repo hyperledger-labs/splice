@@ -9,7 +9,6 @@ import com.daml.network.automation.{
 }
 import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.util.SvUtil
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.Member
@@ -36,8 +35,8 @@ class SvOnboardingUnlimitedTrafficTrigger2(
       tc: TraceContext
   ): Future[Seq[Task]] = {
     for {
-      svcRules <- svcStore.getSvcRules()
-      svMembersWithTrafficState <- SvUtil.listActiveSvParticipantsAndMediators(svcRules).traverse {
+      rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
+      svMembersWithTrafficState <- rulesAndStates.activeSvParticipantAndMediatorIds().traverse {
         memberId =>
           for {
             state <- sequencerAdminConnection.lookupSequencerTrafficControlState(memberId)
@@ -70,10 +69,10 @@ class SvOnboardingUnlimitedTrafficTrigger2(
   override protected def isStaleTask(task: Task)(implicit
       tc: TraceContext
   ): Future[Boolean] = for {
-    svcRules <- svcStore.getSvcRules()
+    rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
     trafficState <- sequencerAdminConnection.lookupSequencerTrafficControlState(task.memberId)
   } yield {
-    !SvUtil.listActiveSvParticipantsAndMediators(svcRules).contains(task.memberId)
+    !rulesAndStates.activeSvParticipantAndMediatorIds().contains(task.memberId)
     || trafficState
       .flatMap(_.trafficState.extraTrafficLimit)
       .fold(NonNegativeLong.zero)(_.toNonNegative) == NonNegativeLong.maxValue

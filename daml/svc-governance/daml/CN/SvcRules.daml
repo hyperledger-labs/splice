@@ -5,7 +5,7 @@ import DA.Either (partitionEithers)
 import DA.Exception
 import DA.Foldable (forA_)
 import DA.List as List
-import DA.Optional (fromSome, fromOptional, isSome)
+import DA.Optional (isNone, fromSome, fromOptional, isSome)
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
@@ -26,7 +26,6 @@ import CN.SvOnboarding
 import CN.SVC.CoinPrice
 import CN.SVC.GlobalDomain
 import CN.SVC.MemberState
-import CN.SVC.SvStatus
 import CN.Util
 
 
@@ -114,12 +113,7 @@ data MemberInfo = MemberInfo with
     name : Text -- ^ Human-readable name; must be unique.
     joinedAsOfRound : Round -- ^ Round in which the member joined the collective.
     svRewardWeight : Int -- ^ Weight of the SV in the SVC reward distribution.
-    participantId : Text -- ^ Participant ID of the SV.
-    domainNodes : DomainNodeConfigMap
-    -- ^ This is the config for the CometBFT nodes under control of this member.
-    -- We expect the SvApp to run a reconciliation loop that applies all changes to this
-    -- config to the actual CometBFT network config using the service defined here:
-    -- https://github.com/DACH-NY/canton-network-node/pull/3896/files.
+    participantId : Text -- ^ Participant ID of the SV, stored here as PartyToParticipant mappings are tracked via state on the SvcRules + SvOnboardingConfirmed contracts.
   deriving (Eq, Show)
 
 -- | Information about offboarded members
@@ -306,64 +300,7 @@ template SvcRules with
         newMemberParticipantId : Text
         joinedAsOfRound : Round
       controller svc
-      do
-        require "Member party is new" (not $ newMemberParty `Map.member` members)
-        -- Add members with same name as offboarded on devnet
-        newOffboardedMembers <-
-          if isDevNet
-            then
-              -- Check if there is an existing member with the same name
-              pure $ case find (\(_, info) -> info.name == newMemberName) (Map.toList members) of
-                None -> offboardedMembers
-                Some (prev, info) ->
-                  Map.insert prev (OffboardedMemberInfo { name = "SV " <> show newMemberName <> " reonboarded as " <> show newMemberParty, participantId = info.participantId}) offboardedMembers
-            else do
-              require "Member name is new" (newMemberName `notElem` (map (.name) (Map.values members)))
-              pure offboardedMembers
-        -- Remove from offboarded members if the same party id is reonboarded
-        let offboardedMemberInfoO = Map.lookup newMemberParty newOffboardedMembers
-        newOffboardedMembers <- pure $ Map.delete newMemberParty newOffboardedMembers
-        let info = MemberInfo with
-              name = newMemberName
-              joinedAsOfRound
-              svRewardWeight = newMemberRewardWeight
-              participantId = newMemberParticipantId
-              domainNodes = noDomainNodes
-        let membersNotMatchingNewMemberName = Map.filter (\m -> m.name /= newMemberName) members
-        now <- getTime
-        -- TOOD(#10063): only create CoinPriceVote if the SV is a member that has not previously been onboarded
-        create CoinPriceVote with
-          svc
-          sv = newMemberParty
-          coinPrice = None
-          lastUpdatedAt = now
-        -- create SvStatusReport contract if the member has not previously been onboarded
-        unless (isSome offboardedMemberInfoO) $ do
-          void $ create MemberRewardState with
-            svc
-            svName = newMemberName
-            state = RewardState with
-              lastRoundCollected = Round (joinedAsOfRound.number - 1)
-              numRoundsMissed = 0
-              numRoundsCollected = 0
-              numCouponsIssued = 0
-          void $ create SvStatusReport with
-            svc
-            sv = newMemberParty
-            svName = newMemberName
-            number = 0
-            status = None
-        create SvcRules with
-          svc
-          epoch
-          leader
-          -- existing entry of member with same name as the new member will be overwritten by the new member info
-          -- this should only happen if it is in devnet
-          members = Map.insert newMemberParty info membersNotMatchingNewMemberName
-          offboardedMembers = newOffboardedMembers
-          config
-          initialTrafficState
-          isDevNet
+      do svcRules_addMember this arg
 
     choice SvcRules_OffboardMember : ContractId SvcRules
       with
@@ -408,7 +345,7 @@ template SvcRules with
         case Map.lookup sv members of
           None -> fail "SV is not a collective member"
           Some info -> do
-            previousReport <- fetchAndArchive (ForOwner with svc; owner = sv) previousReportCid
+            previousReport <- fetchAndArchive (ForSvNode with svc; sv; svName = info.name) previousReportCid
             create SvStatusReport with
               svc
               sv
@@ -451,24 +388,29 @@ template SvcRules with
     -----------------------------------
 
     -- Every SV can change their own domain node's config within the configured limits.
-    choice SvcRules_SetDomainNodeConfig : ContractId SvcRules
+    nonconsuming choice SvcRules_SetDomainNodeConfig : ContractId SvNodeState
       with
         sv : Party
         domainId : Text
         newNodeConfig : DomainNodeConfig
+        nodeStateCid : ContractId SvNodeState
       controller sv
       do
+        -- check that the domain is known
         require "Domain with this id is configured" (domainId `Map.member` config.globalDomain.domains)
-        case Map.lookup sv members of
-          None -> error "SV is not a collective member"
-          Some info -> do
-            -- check validity of config and constraint on voting power
-            require "Valid configuration" (validDomainNodeConfig config.domainNodeConfigLimits newNodeConfig)
-            unless isDevNet $
-              require "CometBft voting power <= 1" (CometBft.totalVotingPower newNodeConfig.cometBft <= 1)
-            -- update member info
-            let newInfo = info with domainNodes = Map.insert domainId newNodeConfig info.domainNodes
-            create this with members = Map.insert sv newInfo this.members
+        -- check validity of config and constraint on voting power
+        require "Valid configuration" (validDomainNodeConfig config.domainNodeConfigLimits newNodeConfig)
+        unless isDevNet $
+          require "CometBft voting power <= 1" (CometBft.totalVotingPower newNodeConfig.cometBft <= 1)
+        -- update the SV operator node's state
+        info <- getMemberInfo sv this
+        let svName = info.name
+        nodeState <- fetchAndArchive (ForSvNode with svc; sv; svName) nodeStateCid
+        let state = nodeState.state
+        create nodeState with
+          state = state with
+            domainNodes = Map.insert domainId newNodeConfig state.domainNodes
+
 
     -- Automation leader election
     ------------------------------
@@ -826,7 +768,7 @@ template SvcRules with
         reason : Text
       controller svc
       do
-        require "Member party is new" (not $ newMemberParty `Map.member` members)
+        ensureNeverOperatedNode newMemberParty this
         if (not isDevNet)
           then
             require "Member name is expected to be new unless in devnet" (newMemberName `notElem` (map (.name) (Map.values members)))
@@ -836,8 +778,8 @@ template SvcRules with
         create SvOnboardingConfirmed with
           svParty = newMemberParty
           svName = newMemberName
-          svParticipantId = newParticipantId
           svRewardWeight = newMemberRewardWeight
+          svParticipantId = newParticipantId
           reason
           svc
           expiresAt
@@ -851,11 +793,11 @@ template SvcRules with
         exercise cid SvOnboardingConfirmed_Expire
         -- register the member as offboarded so it's PartyToParticipant mapping for the svc party gets removed
         let sv = svOnboardingConfirmed.svParty
-        let info = OffboardedMemberInfo with
+        let offboardingInfo = OffboardedMemberInfo with
               name = svOnboardingConfirmed.svName
               participantId = svOnboardingConfirmed.svParticipantId
         create this with
-          offboardedMembers = Map.insert sv info offboardedMembers
+          offboardedMembers = Map.insert sv offboardingInfo offboardedMembers
 
 
     -- Coin management driven directly by the leader
@@ -1192,6 +1134,94 @@ actionRequiringConfirmationEffectiveAt action =
     ARC_CnsEntryContext with .. -> None
     ExtActionRequiringConformation _dummyUnitField ->
       error "Encountered unexpected ExtActionRequiringConformation at runtime"
+
+
+-- On- and offboarding
+----------------------
+
+getMemberInfo : Party -> SvcRules -> Update MemberInfo
+getMemberInfo operator this =
+  optional (fail "Not a member") pure $ Map.lookup operator this.members
+
+lookupMemberInfoByName : Text -> SvcRules -> Optional (Party, MemberInfo)
+lookupMemberInfoByName svName SvcRules{..} =
+  find (\info -> info._2.name == svName) $ Map.toList members
+
+ensureNeverOperatedNode : Party -> SvcRules -> Update ()
+ensureNeverOperatedNode newMemberParty this = do
+  require "SV party has not yet operated a node" $
+    not (newMemberParty `Map.member` this.members || newMemberParty `Map.member` this.offboardedMembers)
+
+-- factored out from the choice to avoid mistakes from having the fields of SvcRules{..} in scope
+svcRules_addMember : SvcRules -> SvcRules_AddMember -> Update (ContractId SvcRules)
+svcRules_addMember this0 arg@SvcRules_AddMember{..} = do
+  ensureNeverOperatedNode newMemberParty this0
+  -- in DevNet we allow changing the operator of an existing member, which we implement as a removal and re-addition
+  this@SvcRules{..} <-
+    if this0.isDevNet
+      then
+        let SvcRules{..} = this0 in -- bring all SvcRules fields into scope
+        case lookupMemberInfoByName newMemberName this0 of
+          None -> pure this0
+          Some (sv, info) -> do
+            let offboardingInfo = OffboardedMemberInfo with
+                  name = info.name
+                  participantId = info.participantId
+            pure $ this0 with
+              members = Map.delete sv members
+              offboardedMembers = Map.insert sv offboardingInfo offboardedMembers
+      else do
+        require "Member is not currently onboarded" (isNone $ lookupMemberInfoByName newMemberName this0)
+        pure this0
+
+  -- create per-member contracts if they have never been onboarded
+  unless (newMemberParty `Map.member` this.offboardedMembers) $
+    createPerMemberContracts this arg
+  -- create per SV party contracts
+  let initialCoinPriceVote = None
+  createPerSvPartyContracts svc newMemberParty newMemberName noDomainNodes initialCoinPriceVote
+  -- register the new operator in the SvcRules
+  let memberInfo = MemberInfo with
+        name = newMemberName
+        joinedAsOfRound
+        svRewardWeight = newMemberRewardWeight
+        participantId = newMemberParticipantId
+  create this with
+    members = Map.insert newMemberParty memberInfo members
+
+createPerMemberContracts : SvcRules -> SvcRules_AddMember -> Update ()
+createPerMemberContracts SvcRules{..} SvcRules_AddMember{..} = do
+  void $ create MemberRewardState with
+    svc
+    svName = newMemberName
+    state = RewardState with
+      lastRoundCollected = Round (joinedAsOfRound.number - 1)
+      numRoundsMissed = 0
+      numRoundsCollected = 0
+      numCouponsIssued = 0
+
+createPerSvPartyContracts : Party -> Party -> Text -> DomainNodeConfigMap -> Optional Decimal -> Update ()
+createPerSvPartyContracts svc newMemberParty newMemberName domainNodes coinPrice = do
+  now <- getTime
+  -- Note: we currently track the coin-price vote on a per operator basis.
+  -- This implies it will be reset when an operator is offboarded and re-onboarded.
+  void $ create CoinPriceVote with
+    svc
+    sv = newMemberParty
+    coinPrice
+    lastUpdatedAt = now
+  void $ create SvStatusReport with
+    svc
+    sv = newMemberParty
+    svName = newMemberName
+    number = 0
+    status = None
+  void $ create SvNodeState with
+    svc
+    sv = newMemberParty
+    svName = newMemberName
+    state = NodeState with
+      domainNodes
 
 
 -- instances

@@ -27,12 +27,14 @@ template SvOnboardingRequest with
         require "Onboarding has expired" (now >= expiresAt)
         pure ()
 
--- | A confirmation for approval of a candidate SV
+-- | A confirmation for approval of a candidate SV.
+--
+-- Once this contract is created, the workflows to onboard that SVs node starts.
 template SvOnboardingConfirmed with
     svParty : Party
     svName : Text
-    svParticipantId: Text
     svRewardWeight : Int
+    svParticipantId: Text
     reason : Text
     svc : Party
     expiresAt : Time            -- ^ When this contract can be archived.

@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests.runbook
 
+import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -28,9 +29,8 @@ class RunbookSvSequencerInfoPreflightIntegrationTest
   "The SV sequencer public url has been published to SvcRules" in { implicit env =>
     val sv = svcl("sv")
     val svcInfo = sv.getSvcInfo()
-    val svcRules = svcInfo.svcRules
-    val memberInfo = svcRules.payload.members.asScala.get(svcInfo.svParty.toProtoPrimitive).value
-    val domainConfig = memberInfo.domainNodes.asScala.values.headOption.value
+    val nodeState: SvNodeState = svcInfo.svNodeStates.get(svcInfo.svParty).value.payload
+    val domainConfig = nodeState.state.domainNodes.asScala.values.headOption.value
     val sequencer = domainConfig.sequencer.toScala.value
     sequencer.migrationId shouldBe migrationId
     sequencer.url shouldBe s"https://sequencer-${migrationId}.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"

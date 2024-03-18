@@ -1,9 +1,6 @@
 package com.daml.network.sv.cometbft
 
-import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.drivers as proto
 import com.daml.network.codegen.java.cn as daml
-import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.cometbft.{
   CometBftConfig,
   CometBftNodeConfig,
@@ -11,6 +8,8 @@ import com.daml.network.codegen.java.cn.cometbft.{
   SequencingKeyConfig,
 }
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
+import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
+import com.digitalasset.canton.{BaseTest, drivers as proto}
 import com.digitalasset.canton.topology.DomainId
 import monocle.Monocle.toAppliedFocusOps
 import org.scalatest.wordspec.AnyWordSpec
@@ -87,40 +86,36 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
     )
   }
 
-  private def mkMemberInfos(
+  private def mkMemberNodeStates(
       members: Seq[(Int, String)]
-  ) =
-    members
-      .map { case (svNodeNr, validatorKey) =>
-        (
-          "svNodeParty" + svNodeNr.toString,
-          new daml.svcrules.MemberInfo(
-            mkSvNodeId(svNodeNr),
-            new Round(0L),
-            10_000L, // SV reward weight
-            s"PAR::sv${svNodeNr}::12345",
-            Map(
-              dummySvcDomainId.toProtoPrimitive -> new DomainNodeConfig(
-                new CometBftConfig(
-                  Map(
-                    mkCometBftNodeName(svNodeNr) -> new CometBftNodeConfig(
-                      validatorKey,
-                      1L,
-                    )
-                  ).asJava,
-                  Seq[GovernanceKeyConfig]().asJava,
-                  Seq[SequencingKeyConfig]().asJava,
-                ),
-                Optional.empty(),
-                Optional.empty(),
-                Optional.empty(),
-              )
-            ).asJava,
-          ),
-        )
-      }
-      .toMap
-      .asJava
+  ): Seq[SvNodeState] =
+    members.map { case (svNodeNr, validatorKey) =>
+      val svParty = "svNodeParty" + svNodeNr.toString
+      new SvNodeState(
+        "svc",
+        svParty,
+        mkSvNodeId(svNodeNr),
+        new daml.svc.memberstate.NodeState(
+          Map(
+            dummySvcDomainId.toProtoPrimitive -> new DomainNodeConfig(
+              new CometBftConfig(
+                Map(
+                  mkCometBftNodeName(svNodeNr) -> new CometBftNodeConfig(
+                    validatorKey,
+                    1L,
+                  )
+                ).asJava,
+                Seq[GovernanceKeyConfig]().asJava,
+                Seq[SequencingKeyConfig]().asJava,
+              ),
+              Optional.empty(),
+              Optional.empty(),
+              Optional.empty(),
+            )
+          ).asJava
+        ),
+      )
+    }
 
   private def testCase(
       targetConfig: Option[String],
@@ -152,7 +147,9 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
       .diffNetworkConfig(
         owningSvNodeId,
         CometBftRequestSigner.GenesisFingerprint,
-        mkMemberInfos(targetConfig.map((nodeNr, _)).toList ++ Seq(10 -> "key-10", 11 -> "key-11")),
+        mkMemberNodeStates(
+          targetConfig.map((nodeNr, _)).toList ++ Seq(10 -> "key-10", 11 -> "key-11")
+        ),
         networkConfig,
         dummySvcDomainId,
         logger,

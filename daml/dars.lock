@@ -12,10 +12,10 @@ daml/splitwell-test-upgrade/.daml/dist/splitwell-test-0.2.0.dar f0b37cc671544e68
 daml/splitwell-test/.daml/dist/splitwell-test-0.1.0.dar 819f5b7a285d4537d3c7f8ed8aa3077beb5ed870e701865969c54fe33d1a9042
 daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar 13f5d823c603f3023cacd5b80130ffbec6daf3f8fdf0e28a240c507a567221f8
 daml/splitwell/.daml/dist/splitwell-0.1.0.dar de9d1baa6bb38ac26cb1349cd80a32641a7138f252a24f4e843614a4e15b9fa4
-daml/svc-governance-test-upgrade/.daml/dist/svc-governance-test-0.2.0.dar 73ced29583a96db82905bcc1fb8200723a7fab76558575bc5a03ef5046ad0146
-daml/svc-governance-test/.daml/dist/svc-governance-test-0.1.0.dar 6712bfbee85e4d93397f0ae6a8b4e398e29a4454ff9e3658c964e8d73ebf38d7
-daml/svc-governance-upgrade/.daml/dist/svc-governance-0.2.0.dar b338317540bbc18c05ca53dde6eb4ec753885d6d254c4403dbb74b7e397c5e31
-daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar d4ed89dd6910e5837f5cda48a62c37d918503615bcfdd0c5f67f0583d77ae1c0
+daml/svc-governance-test-upgrade/.daml/dist/svc-governance-test-0.2.0.dar a10e1755792b65bcd7a11c98fd4e25db170c10753f4384a055f742d590865919
+daml/svc-governance-test/.daml/dist/svc-governance-test-0.1.0.dar 9e6980425afd2db602054b93f6c6f29f9ba706c8cd23c55ac67afe426519aa2f
+daml/svc-governance-upgrade/.daml/dist/svc-governance-0.2.0.dar 7e297577698a6624264d6dfb171b0f2ec624ce164a080eb0cbb272cb28261b76
+daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 3d0e7d41b78e38e631c1c8e1fc92cc3863ee6378e1445a2b2d0f21fbb95bfef4
 daml/validator-lifecycle-test/.daml/dist/validator-lifecycle-test-0.1.0.dar f9a7307b154c17180ec357473a0fe05ed49dbfc4b40bc6d6b3b4c0400108a270
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar 73a84923e152c39e53c92e52b4f4d7dfe1388f8dba8b7fadbe42a9d1409340a7
 daml/wallet-payments-upgrade/.daml/dist/wallet-payments-0.2.0.dar 274292f097d5992147ebd183bccc25db70cd2288e5ede4931ab6446b1c19437d

@@ -42,16 +42,13 @@ class SequencerPruningTrigger(
     context.metricsFactory
   )
 
-  private val svParty = store.key.svParty
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
-      svcRules <- store.getSvcRules()
-      globalDomainId <- store.getCoinRulesDomain()(traceContext)
-      svcRulesActiveSequencerConfig = getAvailableSequencerConfigFromSvcRules(
-        svParty,
-        svcRules,
+      rulesAndState <- store.getSvcRulesWithSvNodeState(store.key.svParty)
+      // TODO(#4906): check whether are passing the right domain-id to make this work with soft-domain migration
+      svcRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
+        rulesAndState.svcRules.domain,
         clock.now.toInstant,
-        globalDomainId,
         migrationId,
       )
       _ <- svcRulesActiveSequencerConfig.fold {

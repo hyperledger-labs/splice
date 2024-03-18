@@ -340,7 +340,13 @@ create table scan_acs_store
     total_traffic_purchased       bigint,
 
     -- the rounds collected in a ValidatorLicense's faucetState. Used to sort for top validators by faucets collected.
-    validator_license_rounds_collected bigint
+    validator_license_rounds_collected bigint,
+
+    -- generic by sv party field for templates with one instance per svParty
+    -- mostly used to keep track of SVC state
+    --
+    -- Note: no index as the template_id_qualified_name index should be sufficient.
+    sv_party text
 );
 
 -- lookup validator traffic

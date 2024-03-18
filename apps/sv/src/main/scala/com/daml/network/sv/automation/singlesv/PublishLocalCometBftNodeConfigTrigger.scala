@@ -10,14 +10,14 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.codegen.java.cn.cometbft.SequencingKeyConfig
 import com.daml.network.codegen.java.cn.svc.globaldomain.{
-  ScanConfig,
   MediatorConfig,
+  ScanConfig,
   SequencerConfig,
 }
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.AssignedContract
+import com.daml.network.sv.store.SvSvcStore.SvcRulesWithSvNodeState
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.topology.DomainId
@@ -49,14 +49,13 @@ class PublishLocalCometBftNodeConfigTrigger(
       tc: TraceContext
   ): Future[Seq[PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask]] =
     (for {
-      svcRules <- OptionT(store.lookupSvcRules())
-      svNodeMemberInfo <- OptionT.fromOption[Future](
-        CometBftNode.extractSvNodeMemberInfo(svcRules.payload, store.key.svParty)
-      )
+      rulesAndState <- OptionT.liftF(store.getSvcRulesWithSvNodeState(store.key.svParty))
+      domainId = rulesAndState.svcRules.domain
+      nodeState = rulesAndState.svNodeState.payload
+      domainNodeConfig = nodeState.state.domainNodes.asScala.get(domainId.toProtoPrimitive)
       localSvNodeConfig <- OptionT.liftF(cometBftNode.getLocalNodeConfig())
       // TODO (#4901) reconcile cometBft networks for multiple domains instead using one default domain id here.
-      domainId = svcRules.domain
-      domainNodeConfig = svNodeMemberInfo.domainNodes.asScala.get(domainId.toProtoPrimitive)
+      domainId = rulesAndState.svcRules.domain
       // create a task if the local config is different than the one we have published to the SVC
       // or if no domain bft is configured
       if
@@ -65,8 +64,8 @@ class PublishLocalCometBftNodeConfigTrigger(
         .map(domainNodeConfig => CometBftNode.svNodeConfigToProto(domainNodeConfig.cometBft))
         .contains(localSvNodeConfig)
     } yield PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask(
-      svNodeMemberInfo.name,
-      svcRules,
+      nodeState.svName,
+      rulesAndState,
       domainNodeConfig.flatMap(_.sequencer.toScala).toJava,
       domainNodeConfig.flatMap(_.mediator.toScala).toJava,
       domainNodeConfig.flatMap(_.scan.toScala).toJava,
@@ -80,11 +79,12 @@ class PublishLocalCometBftNodeConfigTrigger(
   )(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    val cmd = task.svcRules.exercise(
+    val cmd = task.svcRulesAndState.svcRules.exercise(
       _.exerciseSvcRules_SetDomainNodeConfig(
         store.key.svParty.toProtoPrimitive,
         task.domainId.toProtoPrimitive,
         task.damlSvNodeConfig,
+        task.svcRulesAndState.svNodeState.contractId,
       )
     )
     for {
@@ -97,21 +97,19 @@ class PublishLocalCometBftNodeConfigTrigger(
 
   override protected def isStaleTask(
       task: PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask
-  )(implicit tc: TraceContext): Future[Boolean] = {
+  )(implicit tc: TraceContext): Future[Boolean] =
     for {
-      contract <- store.multiDomainAcsStore
-        .lookupContractById(daml.svcrules.SvcRules.COMPANION)(task.svcRules.contractId)
+      staleContracts <- task.svcRulesAndState.isStale(store.multiDomainAcsStore)
       currentNodeConfig <- cometBftNode.getLocalNodeConfig()
     } yield {
-      contract.isEmpty || task.localSvNodeConfig != currentNodeConfig
+      staleContracts || task.localSvNodeConfig != currentNodeConfig
     }
-  }
 }
 
 object PublishLocalCometBftNodeConfigTrigger {
   case class PublishLocalConfigTask(
       svNodeId: String,
-      svcRules: AssignedContract[daml.svcrules.SvcRules.ContractId, daml.svcrules.SvcRules],
+      svcRulesAndState: SvcRulesWithSvNodeState,
       sequencerConfig: Optional[SequencerConfig],
       mediatorConfig: Optional[MediatorConfig],
       scanConfig: Optional[ScanConfig],
@@ -125,7 +123,7 @@ object PublishLocalCometBftNodeConfigTrigger {
       PrettyUtil.adHocPrettyInstance
 
     override def pretty: Pretty[this.type] = prettyOfClass(
-      param("svcRules", _.svcRules),
+      param("svcRulesAndState", _.svcRulesAndState),
       param("localSvNodeConfig", _.localSvNodeConfig),
     )
 

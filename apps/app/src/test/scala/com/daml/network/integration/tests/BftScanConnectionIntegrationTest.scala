@@ -40,8 +40,8 @@ class BftScanConnectionIntegrationTest
     eventually() {
       val svcInfo = sv1Backend.getSvcInfo()
       val scans = for {
-        (_, member) <- svcInfo.svcRules.payload.members.asScala
-        (_, domainNode) <- member.domainNodes.asScala
+        (_, nodeState) <- svcInfo.svNodeStates
+        (_, domainNode) <- nodeState.payload.state.domainNodes.asScala
         scan <- domainNode.scan.toScala
       } yield scan
       scans should have size 2 // sv1&2's scans

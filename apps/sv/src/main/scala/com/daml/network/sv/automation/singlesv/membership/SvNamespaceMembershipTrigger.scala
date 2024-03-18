@@ -1,7 +1,6 @@
 package com.daml.network.sv.automation.singlesv.membership
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipTrigger.{
   AddToNamespace,
@@ -9,7 +8,7 @@ import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipT
   RemoveFromNamespace,
 }
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.AssignedContract
+import com.daml.network.sv.store.SvSvcStore.SvcRulesWithMemberNodeStates
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -30,8 +29,9 @@ private class NamespaceMembership(
 ) extends SvcRulesTopologyStateReconciler[NamespaceDiff] {
 
   override def diffSvcRulesWithTopology(
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules]
+      svcRulesAndState: SvcRulesWithMemberNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[NamespaceDiff]] = {
+    val svcRules = svcRulesAndState.svcRules
     participantAdminConnection
       .getDecentralizedNamespaceDefinition(
         svcRules.domain,

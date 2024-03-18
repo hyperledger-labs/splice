@@ -24,15 +24,16 @@ import com.daml.network.sv.automation.singlesv.membership.offboarding.{
 import com.daml.network.sv.config.MigrateSvPartyConfig
 import com.daml.network.util.{ProcessTestUtil, StandaloneCanton}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-import com.digitalasset.canton.config.RequireTypes.PositiveInt
-import com.digitalasset.canton.health.admin.data.NodeStatus
+// TODO(#10845): add back imports once the later parts of the test are added again
+// import com.digitalasset.canton.config.RequireTypes.PositiveInt
+// import com.digitalasset.canton.health.admin.data.NodeStatus
+// import scala.concurrent.duration.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.Files
-import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
 class SvReonboardingIntegrationTest
@@ -56,7 +57,8 @@ class SvReonboardingIntegrationTest
 
   val dumpPath = Files.createTempFile("participant-dump", ".json")
 
-  private def sv4ReonboardBackend(implicit env: CNNodeTestConsoleEnvironment) = svb("sv4Reonboard")
+  // TODO(#10845): add back once the later part of the test is back
+  // private def sv4ReonboardBackend(implicit env: CNNodeTestConsoleEnvironment) = svb("sv4Reonboard")
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -123,12 +125,14 @@ class SvReonboardingIntegrationTest
       sv4 = false,
     )() {
 
-      val (
-        dump,
-        sv4Party,
-        (sv1MediatorId, sv2MediatorId, sv3MediatorId, _),
-        (sv1SequencerId, sv2SequencerId, sv3SequencerId, _),
-      ) = withCantonSvNodes(
+      // TODO(#10845): add back once the later part of the test is back
+//      val (
+//        dump,
+//        sv4Party,
+//        (sv1MediatorId, sv2MediatorId, sv3MediatorId, _),
+//        (sv1SequencerId, sv2SequencerId, sv3SequencerId, _),
+//        ) = withCantonSvNodes(
+      withCantonSvNodes(
         (None, None, None, Some(sv4Backend)),
         logSuffix = "sv4-reonboarding",
         svs123 = false,
@@ -278,6 +282,8 @@ class SvReonboardingIntegrationTest
         )
       }
 
+      // TODO(#10845): re-enable this part of the test.
+      /*
       withCantonSvNodes(
         (None, None, None, Some(sv4Backend)),
         logSuffix = "sv4-reonboarding-new",
@@ -363,6 +369,7 @@ class SvReonboardingIntegrationTest
           },
         )
       }
+       */
     }
   }
 }

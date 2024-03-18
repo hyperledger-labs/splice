@@ -36,6 +36,7 @@ object ScanTables extends AcsTables {
       memberTrafficMember: Option[Member] = None,
       totalTrafficPurchased: Option[Long] = None,
       validatorLicenseRoundsCollected: Option[Long] = None,
+      svParty: Option[PartyId] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
       "round" -> round,
@@ -48,6 +49,7 @@ object ScanTables extends AcsTables {
       "member_traffic_member" -> memberTrafficMember,
       "total_traffic_purchased" -> totalTrafficPurchased,
       "validator_license_rounds_collected" -> validatorLicenseRoundsCollected,
+      "sv_party" -> svParty,
     )
   }
 

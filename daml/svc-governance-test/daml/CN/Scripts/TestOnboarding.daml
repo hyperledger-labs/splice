@@ -131,7 +131,7 @@ testSvOnboarding = do
 
   checkSvStatusReports app
 
-  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+  [(_, svcRules)] <- query @SvcRules svc
   case Map.lookup svX svcRules.members of
     None -> fail "svX is not a member of the SVC"
     Some info ->
@@ -174,17 +174,12 @@ testSvOnboarding = do
         mediator = mediatorConfig
         scan = scanConfig
 
-  submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_SetDomainNodeConfig with
-    sv = svX
-    domainId = svcRules.config.globalDomain.lastDomainId
-    newNodeConfig
+  setDomainNodeConfig app svX svcRules.config.globalDomain.lastDomainId newNodeConfig
 
   -- check that the config was actually set
-  [(_, svcRules)] <- query @SvcRules svc
-  let actualConfig = do
-        info <- Map.lookup svX svcRules.members
-        config <- Map.lookup svcRules.config.globalDomain.lastDomainId info.domainNodes
-        pure config
+  (_, nodeState) <- getSvNodeState app svX
+  let actualConfig =
+        Map.lookup svcRules.config.globalDomain.lastDomainId nodeState.state.domainNodes
   actualConfig === Some newNodeConfig
 
   pure ()
@@ -321,27 +316,31 @@ testSvMemberOverwriteInDevNet = do
   -- Failing the template precondition check if the existing member being overwritten is the current leader.
   submitMustFail svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv1" 19 "sv1-participant-id" (Round 3)
 
-  -- overwriting existing member successfuly
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" 19 "sv2-participant-id" (Round 3)
+  -- overwriting existing member successfully (using a new participant node)
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX "sv2" 19 "svX-participant-id" (Round 3)
 
   [(_, svcRules)] <- query @SvcRules app.svc
-  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id"))]
+  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "sv2" "sv2-participant-id")]
 
   svX2 <- allocateParty "svX2"
 
   [(svcRulesCid, _)] <- query @SvcRules app.svc
 
   -- overwriting existing member again
-  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX2 "sv2" 19 "sv2-participant-id" (Round 3)
+  submit svc $ exerciseCmd svcRulesCid $ SvcRules_AddMember svX2 "sv2" 19 "svX2-participant-id" (Round 3)
 
   [(_, svcRules)] <- query @SvcRules app.svc
-  svcRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX'" ("sv2-participant-id")), (svX, OffboardedMemberInfo "SV \"sv2\" reonboarded as 'svX2'" ("sv2-participant-id"))]
+  svcRules.offboardedMembers === Map.fromList
+    [ (sv2, OffboardedMemberInfo "sv2" "sv2-participant-id")
+    , (svX, OffboardedMemberInfo "sv2" "svX-participant-id")
+    ]
 
   -- status reports are OK
   checkSvStatusReports app
 
   pure ()
 
+testSvMemberReonboarding : Script ()
 testSvMemberReonboarding = do
   (app, svc, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
 
@@ -363,18 +362,19 @@ testSvMemberReonboarding = do
 
   -- reonboard sv4
   let token = "mock-token"
+  sv4New <- allocateParty "sv4New"
 
   svSubmits app sv1 $ \cid -> exerciseCmd cid $
-    SvcRules_StartSvOnboarding "sv4" sv4 "sv4-participant-id" token sv1
+    SvcRules_StartSvOnboarding "sv4New" sv4New "sv4New-participant-id" token sv1
   forA_ [sv1,sv2,sv3] $ \sv ->
     svSubmits app sv $ \cid -> exerciseCmd cid $ SvcRules_ConfirmAction with
       confirmer = sv
       action = ARC_SvcRules with
         svcAction = SRARC_ConfirmSvOnboarding $ SvcRules_ConfirmSvOnboarding with
-          newMemberParty = sv4
-          newMemberName = "sv4"
-          newParticipantId = "sv4-participant-id"
-          reason = "because"
+          newMemberParty = sv4New
+          newMemberName = "sv4New"
+          newParticipantId = "sv4New-participant-id"
+          reason = "because the sv4 owner still has the right to operate a node"
           newMemberRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
   executeAllConfirmedActions app
   [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed svc
@@ -384,8 +384,8 @@ testSvMemberReonboarding = do
   [(coinRulesCid, _)] <- query @CoinRules svc
   [(svcRulesCid, _)] <- query @SvcRules svc
 
-  submitMulti [sv4] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
-    sv = sv4
+  submitMulti [sv4New] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
+    sv = sv4New
     svOnboardingConfirmedCid
     earliestRoundCid
     middleRoundCid
@@ -394,9 +394,9 @@ testSvMemberReonboarding = do
 
   [(_, svcRules)] <- query @SvcRules svc
 
-  Map.keys svcRules.members === [sv1, sv2, sv3, sv4]
-  -- sv4 is removed from offboarded members again.
-  Map.keys svcRules.offboardedMembers === []
+  Map.keys svcRules.members === [sv1, sv2, sv3, sv4New]
+  -- sv4 remaines offboarded
+  Map.keys svcRules.offboardedMembers === [sv4]
 
   -- check status reports
   checkSvStatusReports app

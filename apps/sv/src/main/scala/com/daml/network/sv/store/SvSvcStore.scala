@@ -44,7 +44,7 @@ import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, Storage}
-import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
+import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
@@ -52,6 +52,7 @@ import io.grpc.Status
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
+import scala.jdk.CollectionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
 trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCoinRules {
@@ -110,16 +111,66 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   ): Future[AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
     lookupSvcRules().map(_.getOrElse(throw noActiveSvcRules))
 
+  def getSvcRulesWithMemberNodeStates()(implicit
+      tc: TraceContext
+  ): Future[SvSvcStore.SvcRulesWithMemberNodeStates] = {
+    for {
+      // Note: at a certain size of the SVC, we'll be better off doing this join in the DB. We'll find out from our logs and performance tests.
+      svcRules <- getSvcRules()
+      memberSvParties = svcRules.payload.members.keySet().asScala.toSeq
+      svNodeStates <- Future
+        .traverse(memberSvParties) { svPartyStr =>
+          val svParty = PartyId.tryFromProtoPrimitive(svPartyStr)
+          getSvNodeState(svParty).map(co => svParty -> co.contract)
+        }
+        .map(_.toMap)
+    } yield SvSvcStore.SvcRulesWithMemberNodeStates(svcRules, svNodeStates)
+  }
+
+  def getSvcRulesWithSvNodeState(svParty: PartyId)(implicit
+      tc: TraceContext
+  ): Future[SvSvcStore.SvcRulesWithSvNodeState] = {
+    for {
+      svcRules <- getSvcRules()
+      svNodeState <- getSvNodeState(svParty)
+    } yield SvSvcStore.SvcRulesWithSvNodeState(svcRules, svParty, svNodeState.contract)
+  }
+
+  def lookupSvNodeState(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Option[
+    AssignedContract[cn.svc.memberstate.SvNodeState.ContractId, cn.svc.memberstate.SvNodeState]
+  ]]
+
+  def getSvNodeState(svPartyId: PartyId)(implicit
+      tc: TraceContext
+  ): Future[
+    AssignedContract[cn.svc.memberstate.SvNodeState.ContractId, cn.svc.memberstate.SvNodeState]
+  ] =
+    lookupSvNodeState(svPartyId).map(
+      _.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(show"No SvNodeState found for $svPartyId")
+          .asRuntimeException()
+      )
+    )
+
   def lookupSvStatusReport(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[
-    AssignedContract[cn.svc.svstatus.SvStatusReport.ContractId, cn.svc.svstatus.SvStatusReport]
+    AssignedContract[
+      cn.svc.memberstate.SvStatusReport.ContractId,
+      cn.svc.memberstate.SvStatusReport,
+    ]
   ]]
 
   def getSvStatusReport(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[
-    AssignedContract[cn.svc.svstatus.SvStatusReport.ContractId, cn.svc.svstatus.SvStatusReport]
+    AssignedContract[
+      cn.svc.memberstate.SvStatusReport.ContractId,
+      cn.svc.memberstate.SvStatusReport,
+    ]
   ] =
     lookupSvStatusReport(svPartyId).map(
       _.getOrElse(
@@ -979,7 +1030,8 @@ object SvSvcStore {
       svcr.ElectionRequest.COMPANION,
       so.SvOnboardingRequest.COMPANION,
       so.SvOnboardingConfirmed.COMPANION,
-      cn.svc.svstatus.SvStatusReport.COMPANION,
+      cn.svc.memberstate.SvStatusReport.COMPANION,
+      cn.svc.memberstate.SvNodeState.COMPANION,
       cn.svc.memberstate.MemberRewardState.COMPANION,
     )
   }
@@ -1079,7 +1131,14 @@ object SvSvcStore {
       mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc)(
         SvcAcsStoreRowData(_)
       ),
-      mkFilter(cn.svc.svstatus.SvStatusReport.COMPANION)(co => co.payload.svc == svc) { contract =>
+      mkFilter(cn.svc.memberstate.SvStatusReport.COMPANION)(co => co.payload.svc == svc) {
+        contract =>
+          SvcAcsStoreRowData(
+            contract,
+            svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
+          )
+      },
+      mkFilter(cn.svc.memberstate.SvNodeState.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
           svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
@@ -1325,6 +1384,107 @@ object SvSvcStore {
 
   private def noActiveSvcRules =
     Status.NOT_FOUND.withDescription("No active SvcRules contract").asRuntimeException()
+
+  case class SvcRulesWithMemberNodeStates(
+      svcRules: AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      svNodeStates: Map[
+        PartyId,
+        Contract[cn.svc.memberstate.SvNodeState.ContractId, cn.svc.memberstate.SvNodeState],
+      ],
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(
+        param("domainId", _.svcRules.domain),
+        param("svcRulesCid", _.svcRules.contractId),
+        param("svNodeStates", _.svNodeStates),
+      )
+
+    def currentDomainNodeConfigs(): Seq[cn.svc.globaldomain.DomainNodeConfig] = {
+      // TODO(#4906): make its callers work with soft-domain migration
+      svNodeStates.values
+        .flatMap(_.payload.state.domainNodes.asScala.get(svcRules.domain.toProtoPrimitive))
+        .toSeq
+    }
+
+    def activeSvParticipantAndMediatorIds(): Seq[Member] = {
+      val svParticipants = svcRules.contract.payload.members
+        .values()
+        .asScala
+        .map(_.participantId)
+        .toSeq
+        .map(ParticipantId.tryFromProtoPrimitive)
+      val offboardedSvParticipants = svcRules.contract.payload.offboardedMembers
+        .values()
+        .asScala
+        .map(_.participantId)
+        .toSeq
+        .map(ParticipantId.tryFromProtoPrimitive)
+      val svMediators = svNodeStates.values
+        .flatMap(_.payload.state.domainNodes.values().asScala)
+        .flatMap(_.mediator.toScala)
+        .map(m =>
+          MediatorId
+            .fromProtoPrimitive(m.mediatorId, "mediator")
+            .fold(err => throw new IllegalArgumentException(err.message), identity)
+        )
+      svParticipants.filterNot(offboardedSvParticipants.contains) ++ svMediators
+    }
+
+    def getSvMemberName(svParty: PartyId): Future[String] =
+      svcRules.contract.payload.members.asScala
+        .get(svParty.toProtoPrimitive)
+        .fold(
+          Future.failed[String](
+            Status.NOT_FOUND
+              .withDescription(show"$svParty is not an active SVC member")
+              .asRuntimeException()
+          )
+        )(info => Future.successful(info.name))
+
+  }
+
+  case class SvcRulesWithSvNodeState(
+      svcRules: AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      svParty: PartyId,
+      svNodeState: Contract[
+        cn.svc.memberstate.SvNodeState.ContractId,
+        cn.svc.memberstate.SvNodeState,
+      ],
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(
+        param("domainId", _.svcRules.domain),
+        param("svcRulesCid", _.svcRules.contractId),
+        param("svParty", _.svParty),
+        param("svNodeState", _.svNodeState),
+      )
+
+    def isStale(
+        store: MultiDomainAcsStore
+    )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] =
+      for {
+        // TODO(#4906): check whether we also need to compare the domain-id to detect staleness
+        checkSvcRules <- store.lookupContractById(cn.svcrules.SvcRules.COMPANION)(
+          svcRules.contractId
+        )
+        checkSvNodeState <- store
+          .lookupContractById(cn.svc.memberstate.SvNodeState.COMPANION)(svNodeState.contractId)
+      } yield checkSvcRules.isEmpty || checkSvNodeState.isEmpty
+
+    def lookupSequencerConfigFor(
+        globalDomainId: DomainId,
+        domainTimeLowerBound: Instant,
+        migrationId: Long,
+    ): Option[cn.svc.globaldomain.SequencerConfig] = {
+      for {
+        domainNodeConfig <- svNodeState.payload.state.domainNodes.asScala
+          .get(globalDomainId.toProtoPrimitive)
+        sequencerConfig <- domainNodeConfig.sequencer.toScala
+        if sequencerConfig.migrationId == migrationId && sequencerConfig.url.nonEmpty && sequencerConfig.availableAfter.toScala
+          .exists(availableAfter => domainTimeLowerBound.isAfter(availableAfter))
+      } yield sequencerConfig
+    }
+  }
 }
 
 case class ExpiredRewardCouponsBatch(

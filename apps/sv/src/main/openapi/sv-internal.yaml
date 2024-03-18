@@ -1020,6 +1020,7 @@ components:
         - latest_mining_round
         - coin_rules
         - svc_rules
+        - sv_node_states
       properties:
         # User representing the SV
         sv_user:
@@ -1042,6 +1043,11 @@ components:
         # Contract IDs of the SvcRules contract associated with the SVC
         svc_rules:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+        # States the SVC members' nodes
+        sv_node_states:
+          type: array
+          items:
+            $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     TriggerAcsDumpResponse:
       type: object

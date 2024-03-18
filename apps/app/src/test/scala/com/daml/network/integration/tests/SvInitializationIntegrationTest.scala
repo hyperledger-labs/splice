@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.network.codegen.java.cn.svc.svstatus.SvStatusReport
+import com.daml.network.codegen.java.cn.svc.memberstate.SvStatusReport
 import com.daml.network.config.CNNodeConfigTransforms.updateAllSvAppConfigs_
 import com.daml.network.console.{
   ScanAppBackendReference,
@@ -133,9 +133,10 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
 
       clue("All SVs have reported their Scan URLs in SVC rules") {
         eventually() {
-          val svcRules = sv1Backend.appState.svcStore.getSvcRules().futureValue.contract.payload
-          svcRules.members.asScala
-            .flatMap(_._2.domainNodes.get(globalDomainId.toProtoPrimitive).scan.toScala)
+          val rulesAndState =
+            sv1Backend.appState.svcStore.getSvcRulesWithMemberNodeStates().futureValue
+          rulesAndState.svNodeStates.values
+            .flatMap(_.payload.state.domainNodes.get(globalDomainId.toProtoPrimitive).scan.toScala)
             // onle sv1 and sv2 have scan apps
             .map(_.publicUrl) should contain theSameElementsAs Seq(
             "http://localhost:5012",

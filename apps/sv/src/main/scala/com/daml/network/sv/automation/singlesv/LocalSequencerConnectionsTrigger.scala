@@ -33,18 +33,17 @@ class LocalSequencerConnectionsTrigger(
   private val svParty = store.key.svParty
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      svcRules <- store.getSvcRules()
+      rulesAndState <- store.getSvcRulesWithSvNodeState(svParty)
+      // TODO(#4906): double-check that the right domain-ids are used in the right place to make this work with soft-domain migration
       domainId <- participantAdminConnection.getDomainId(globalDomainAlias)
       domainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
         domainId,
         maxDomainTimeLag = context.config.pollingInterval,
       )
       globalDomainId <- store.getCoinRulesDomain()(traceContext)
-      svcRulesActiveSequencerConfig = getAvailableSequencerConfigFromSvcRules(
-        svParty,
-        svcRules,
-        domainTimeLb.timestamp.toInstant,
+      svcRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
         globalDomainId,
+        domainTimeLb.timestamp.toInstant,
         migrationId,
       )
       _ <- svcRulesActiveSequencerConfig.fold {
