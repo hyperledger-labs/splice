@@ -7,9 +7,11 @@ import { scheduleLoadGenerator } from './scheduleLoadGenerator';
 async function auth0CacheAndInstallCluster(auth0Fetch: Auth0Fetch) {
   await auth0Fetch.loadAuth0Cache();
 
-  await installCluster(auth0Fetch);
+  const svc = await installCluster(auth0Fetch);
 
   await auth0Fetch.saveAuth0Cache();
+
+  return svc;
 }
 
 async function main() {
@@ -19,11 +21,11 @@ async function main() {
     return new Auth0Fetch(cfg);
   });
 
-  auth0FetchOutput.apply(auth0Fetch => {
+  auth0FetchOutput.apply(async auth0Fetch => {
     // eslint-disable-next-line @typescript-eslint/no-floating-promises
-    auth0CacheAndInstallCluster(auth0Fetch);
+    const cluster = await auth0CacheAndInstallCluster(auth0Fetch);
 
-    scheduleLoadGenerator(auth0Fetch);
+    scheduleLoadGenerator(auth0Fetch, cluster.validator1 ? [cluster.validator1] : []);
   });
 }
 

@@ -1,3 +1,4 @@
+import { Resource } from '@pulumi/pulumi';
 import {
   Auth0Client,
   BackupConfig,
@@ -115,7 +116,9 @@ function getSvcSize(): number {
   return svcSize;
 }
 
-export async function installCluster(auth0Client: Auth0Client): Promise<void> {
+export async function installCluster(
+  auth0Client: Auth0Client
+): Promise<{ svc: Svc; validator1?: Resource }> {
   const bootstrapBucketSpec = await bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
 
   if (!isDevNet) {
@@ -164,9 +167,10 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   const svDependencies = allSvs.flatMap(sv => [sv.scan, sv.svApp, sv.validatorApp, sv.ingress]);
 
   const nonSvComponentsDependencies = allSvs.flatMap(sv => [sv.scan, sv.ingress]);
+  let validator1;
 
   if (mustInstallValidator1) {
-    await installValidator1(
+    validator1 = await installValidator1(
       auth0Client,
       'validator1',
       validator1Onboarding.secret,
@@ -205,4 +209,9 @@ export async function installCluster(auth0Client: Auth0Client): Promise<void> {
   if (enableChaosMesh) {
     installChaosMesh({ dependsOn: svDependencies });
   }
+
+  return {
+    svc,
+    validator1,
+  };
 }

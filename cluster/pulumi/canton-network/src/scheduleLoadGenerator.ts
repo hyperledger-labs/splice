@@ -1,3 +1,4 @@
+import { Resource } from '@pulumi/pulumi';
 import {
   Auth0Client,
   CLUSTER_BASENAME,
@@ -11,7 +12,7 @@ import {
   requireEnv,
 } from 'cn-pulumi-common';
 
-export function scheduleLoadGenerator(auth0Client: Auth0Client): void {
+export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Resource[]): void {
   if (envFlag('K6_ENABLE_LOAD_GENERATOR')) {
     const xns = exactNamespace('load-tester', true);
 
@@ -92,7 +93,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client): void {
           },
         }),
       },
-      { dependsOn: [loopback] }
+      { dependsOn: dependencies.concat([loopback]) }
     );
   } else {
     console.log('K6 load test is disabled for this cluster. Skipping...');
