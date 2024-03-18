@@ -7,6 +7,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.cn.wallet.payment.{AcceptedAppPayment, ReceiverCCAmount}
 import com.daml.network.console.{
   CNParticipantClientReference,
   SplitwellAppClientReference,
@@ -129,8 +130,10 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       receiver: PartyId,
       amount: BigDecimal,
       key: HttpSplitwellAppClient.GroupKey,
-  )(implicit env: CNNodeTestConsoleEnvironment) = {
-    senderSplitwell.initiateTransfer(
+  )(implicit env: CNNodeTestConsoleEnvironment): AcceptedAppPayment.ContractId =
+    splitwellTransfer(
+      senderSplitwell,
+      senderWallet,
       key,
       Seq(
         new walletCodegen.ReceiverCCAmount(
@@ -139,6 +142,14 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
         )
       ),
     )
+
+  def splitwellTransfer(
+      senderSplitwell: SplitwellAppClientReference,
+      senderWallet: WalletAppClientReference,
+      key: HttpSplitwellAppClient.GroupKey,
+      receiverAmounts: Seq[ReceiverCCAmount],
+  )(implicit env: CNNodeTestConsoleEnvironment): AcceptedAppPayment.ContractId = {
+    senderSplitwell.initiateTransfer(key, receiverAmounts)
     val request = eventually()(getSingleRequestOnGlobalDomain(senderWallet))
     senderWallet.acceptAppPaymentRequest(request.contractId)
   }

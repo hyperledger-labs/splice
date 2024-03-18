@@ -492,9 +492,11 @@ class WalletTxLogIntegrationTest
         _ => aliceWalletClient.balance().unlockedQty should be > BigDecimal(0),
       )
 
-      val (_, paymentRequest) = actAndCheck(
-        "Alice initiates a transfer of CC to all other group members",
-        aliceSplitwellClient.initiateTransfer(
+      actAndCheck(
+        "Alice settles her CC debts with all other group members",
+        splitwellTransfer(
+          aliceSplitwellClient,
+          aliceWalletClient,
           key,
           Seq(
             new walletCodegen.ReceiverCCAmount(
@@ -508,15 +510,7 @@ class WalletTxLogIntegrationTest
           ),
         ),
       )(
-        "Alice sees the app payment request on the global domain",
-        _ => aliceWalletClient.listAppPaymentRequests().headOption.value,
-      )
-
-      actAndCheck(
-        "Alice confirms the payment request",
-        aliceWalletClient.acceptAppPaymentRequest(paymentRequest.contractId),
-      )(
-        "All parties see new balances",
+        "All parties see the new balances",
         _ => {
           aliceWalletClient.listAcceptedAppPayments() shouldBe empty
           bobWalletClient.balance().unlockedQty should be > BigDecimal(0.0)
