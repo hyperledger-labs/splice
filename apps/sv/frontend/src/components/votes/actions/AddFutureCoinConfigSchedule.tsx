@@ -61,10 +61,13 @@ const AddFutureCoinConfigSchedule: React.FC<{
   }
 
   if (configuration == null) {
-    const originalConfig = CoinConfig(USD).encode(
-      svcInfosQuery.data?.coinRules.payload.configSchedule.initialValue!
+    const now = dayjs();
+    const configSchedule = svcInfosQuery.data?.coinRules.payload.configSchedule;
+    const currentConfig = CoinConfig(USD).encode(
+      configSchedule.futureValues.reverse().find(schedule => dayjs(schedule._1).isBefore(now))
+        ?._2 || configSchedule.initialValue
     ) as Record<string, JSONValue>;
-    setConfiguration(originalConfig);
+    setConfiguration(currentConfig);
   }
 
   function addFutureCoinConfigScheduleAction(config: Record<string, JSONValue>) {

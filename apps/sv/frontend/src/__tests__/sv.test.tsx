@@ -55,4 +55,22 @@ describe('SV user can', () => {
     expect(screen.queryByText('nextScheduledDomainUpgrade')).toBeNull();
     expect(await screen.findByText('nextScheduledDomainUpgrade.time')).toBeDefined();
   });
+
+  test('AddFutureCoinConfigSchedule defaults to the current coin configuration', async () => {
+    const user = userEvent.setup();
+    render(<App />);
+
+    expect(await screen.findByText('Governance')).toBeDefined();
+    await user.click(screen.getByText('Governance'));
+
+    expect(await screen.findByText('Vote Requests')).toBeDefined();
+    expect(await screen.findByText('Governance')).toBeDefined();
+
+    const dropdown = screen.getByTestId('display-actions');
+    expect(dropdown).toBeDefined();
+    fireEvent.change(dropdown!, { target: { value: 'CRARC_AddFutureCoinConfigSchedule' } });
+
+    expect(await screen.findByText('transferConfig.createFee.fee')).toBeDefined();
+    expect(await screen.findByDisplayValue('4815162342')).toBeDefined();
+  });
 });

@@ -87,144 +87,21 @@ export const svcInfo: GetSvcInfoResponse = {
     payload: {
       svc: 'SVC::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
       configSchedule: {
-        initialValue: {
-          packageConfig: {
-            cantonCoin: '0.1.0',
-            walletPayments: '0.1.0',
-            svcGovernance: '0.1.0',
-            validatorLifecycle: '0.1.0',
-            cantonNameService: '0.1.0',
-            wallet: '0.1.0',
+        initialValue: getCoinConfig('0.03'),
+        futureValues: [
+          {
+            _1: '2023-03-15T08:35:00Z',
+            _2: getCoinConfig('0.003'),
           },
-          tickDuration: {
-            microseconds: '150000000',
+          {
+            _1: '2024-03-15T08:35:00Z',
+            _2: getCoinConfig('4815162342'),
           },
-          transferConfig: {
-            holdingFee: {
-              rate: '0.0000048225',
-            },
-            maxNumInputs: '100',
-            lockHolderFee: {
-              fee: '0.005',
-            },
-            createFee: {
-              fee: '0.03',
-            },
-            extraFeaturedAppRewardAmount: '1.0',
-            maxNumLockHolders: '50',
-            transferFee: {
-              initialRate: '0.01',
-              steps: [
-                {
-                  _1: '100.0',
-                  _2: '0.001',
-                },
-                {
-                  _1: '1000.0',
-                  _2: '0.0001',
-                },
-                {
-                  _1: '1000000.0',
-                  _2: '0.00001',
-                },
-              ],
-            },
-            maxNumOutputs: '100',
+          {
+            _1: '2524-03-19T08:35:00Z',
+            _2: getCoinConfig('0.03'),
           },
-          globalDomain: {
-            requiredDomains: {
-              map: [
-                [
-                  'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
-                  {},
-                ],
-              ],
-            },
-            activeDomain:
-              'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
-            fees: {
-              baseRateTrafficLimits: {
-                burstAmount: '2000000',
-                burstWindow: {
-                  microseconds: '600000000',
-                },
-              },
-              extraTrafficPrice: '1.0',
-              readVsWriteScalingFactor: '200',
-              minTopupAmount: '1000',
-            },
-          },
-          issuanceCurve: {
-            initialValue: {
-              validatorRewardPercentage: '0.5',
-              coinToIssuePerYear: '40000000000.0',
-              unfeaturedAppRewardCap: '0.6',
-              appRewardPercentage: '0.15',
-              validatorFaucetCap: '2.85',
-              featuredAppRewardCap: '100.0',
-              validatorRewardCap: '0.2',
-            },
-            futureValues: [
-              {
-                _1: {
-                  microseconds: '15768000000000',
-                },
-                _2: {
-                  validatorRewardPercentage: '0.12',
-                  coinToIssuePerYear: '20000000000.0',
-                  unfeaturedAppRewardCap: '0.6',
-                  appRewardPercentage: '0.4',
-                  validatorFaucetCap: '2.85',
-                  featuredAppRewardCap: '100.0',
-                  validatorRewardCap: '0.2',
-                },
-              },
-              {
-                _1: {
-                  microseconds: '47304000000000',
-                },
-                _2: {
-                  validatorRewardPercentage: '0.18',
-                  coinToIssuePerYear: '10000000000.0',
-                  unfeaturedAppRewardCap: '0.6',
-                  appRewardPercentage: '0.62',
-                  validatorFaucetCap: '2.85',
-                  featuredAppRewardCap: '100.0',
-                  validatorRewardCap: '0.2',
-                },
-              },
-              {
-                _1: {
-                  microseconds: '157680000000000',
-                },
-                _2: {
-                  validatorRewardPercentage: '0.21',
-                  coinToIssuePerYear: '5000000000.0',
-                  unfeaturedAppRewardCap: '0.6',
-                  appRewardPercentage: '0.69',
-                  validatorFaucetCap: '2.85',
-                  featuredAppRewardCap: '100.0',
-                  validatorRewardCap: '0.2',
-                },
-              },
-              {
-                _1: {
-                  microseconds: '315360000000000',
-                },
-                _2: {
-                  validatorRewardPercentage: '0.2',
-                  coinToIssuePerYear: '2500000000.0',
-                  unfeaturedAppRewardCap: '0.6',
-                  appRewardPercentage: '0.75',
-                  validatorFaucetCap: '2.85',
-                  featuredAppRewardCap: '100.0',
-                  validatorRewardCap: '0.2',
-                },
-              },
-            ],
-          },
-        },
-        futureValues: [],
+        ],
       },
       isDevNet: true,
       upgrade: null,
@@ -517,6 +394,119 @@ export const svcInfo: GetSvcInfoResponse = {
     created_at: '2024-01-09T19:18:14.379987Z',
   },
 };
+
+function getCoinConfig(createFee: string) {
+  return {
+    packageConfig: {
+      cantonCoin: '0.1.0',
+      walletPayments: '0.1.0',
+      svcGovernance: '0.1.0',
+      validatorLifecycle: '0.1.0',
+      cantonNameService: '0.1.0',
+      wallet: '0.1.0',
+    },
+    tickDuration: { microseconds: '150000000' },
+    transferConfig: {
+      holdingFee: { rate: '0.0000048225' },
+      extraFeaturedAppRewardAmount: '1.0',
+      maxNumInputs: '100',
+      lockHolderFee: { fee: '0.005' },
+      createFee: { fee: createFee },
+      maxNumLockHolders: '50',
+      transferFee: {
+        initialRate: '0.01',
+        steps: [
+          { _1: '100.0', _2: '0.001' },
+          { _1: '1000.0', _2: '0.0001' },
+          { _1: '1000000.0', _2: '0.00001' },
+        ],
+      },
+      maxNumOutputs: '100',
+    },
+    globalDomain: {
+      requiredDomains: {
+        map: [
+          [
+            'global-domain::1220d12352e0839d9aac0a1c0c05b0eaaeb44f0aa19958cca2db37ae22c7817949a7',
+            {},
+          ],
+        ],
+      },
+      activeDomain:
+        'global-domain::1220d12352e0839d9aac0a1c0c05b0eaaeb44f0aa19958cca2db37ae22c7817949a7',
+      fees: {
+        baseRateTrafficLimits: {
+          burstAmount: '2000000',
+          burstWindow: { microseconds: '600000000' },
+        },
+        extraTrafficPrice: '1.0',
+        readVsWriteScalingFactor: '200',
+        minTopupAmount: '10000000',
+      },
+    },
+    issuanceCurve: {
+      initialValue: {
+        validatorRewardPercentage: '0.5',
+        coinToIssuePerYear: '40000000000.0',
+        unfeaturedAppRewardCap: '0.6',
+        appRewardPercentage: '0.15',
+        featuredAppRewardCap: '100.0',
+        validatorRewardCap: '0.2',
+        optValidatorFaucetCap: null,
+      },
+      futureValues: [
+        {
+          _1: { microseconds: '15768000000000' },
+          _2: {
+            validatorRewardPercentage: '0.12',
+            coinToIssuePerYear: '20000000000.0',
+            unfeaturedAppRewardCap: '0.6',
+            appRewardPercentage: '0.4',
+            featuredAppRewardCap: '100.0',
+            validatorRewardCap: '0.2',
+            optValidatorFaucetCap: null,
+          },
+        },
+        {
+          _1: { microseconds: '47304000000000' },
+          _2: {
+            validatorRewardPercentage: '0.18',
+            coinToIssuePerYear: '10000000000.0',
+            unfeaturedAppRewardCap: '0.6',
+            appRewardPercentage: '0.62',
+            featuredAppRewardCap: '100.0',
+            validatorRewardCap: '0.2',
+            optValidatorFaucetCap: null,
+          },
+        },
+        {
+          _1: { microseconds: '157680000000000' },
+          _2: {
+            validatorRewardPercentage: '0.21',
+            coinToIssuePerYear: '5000000000.0',
+            unfeaturedAppRewardCap: '0.6',
+            appRewardPercentage: '0.69',
+            featuredAppRewardCap: '100.0',
+            validatorRewardCap: '0.2',
+            optValidatorFaucetCap: null,
+          },
+        },
+        {
+          _1: { microseconds: '315360000000000' },
+          _2: {
+            validatorRewardPercentage: '0.2',
+            coinToIssuePerYear: '2500000000.0',
+            unfeaturedAppRewardCap: '0.6',
+            appRewardPercentage: '0.75',
+            featuredAppRewardCap: '100.0',
+            validatorRewardCap: '0.2',
+            optValidatorFaucetCap: null,
+          },
+        },
+      ],
+    },
+  };
+}
 
 // Sanity check / guard against template changes
 
