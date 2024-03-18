@@ -109,12 +109,22 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     initSvcWithSv1Only()
     aliceValidatorBackend.startSync()
 
-    val partyIdFromTokenUser = aliceValidatorBackend.register()
+    val aliceUser = aliceWalletClient.config.ledgerApiUser
+    val aliceToken = Some(
+      AuthUtil.testToken(
+        audience = AuthUtil.testAudience,
+        user = aliceUser,
+        secret = AuthUtil.testSecret,
+      )
+    )
+    val aliceValidatorClientWithToken = aliceValidatorClient.copy(token = aliceToken)
+    // register() is the same as onboardUser(), but it reads the user name from the token
+    val partyIdFromTokenUser = aliceValidatorClientWithToken.register()
 
     partyIdFromTokenUser.toString
       .split("::")
       .head should be(
-      BaseLedgerConnection.sanitizeUserIdToPartyString(aliceValidatorBackend.config.ledgerApiUser)
+      BaseLedgerConnection.sanitizeUserIdToPartyString(aliceUser)
     )
   }
 
@@ -292,8 +302,19 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     initSvcWithSv1Only()
     aliceValidatorBackend.startSync()
 
-    val party1 = aliceValidatorBackend.register()
-    val party2 = aliceValidatorBackend.register()
+    val aliceUser = aliceWalletClient.config.ledgerApiUser
+    val aliceToken = Some(
+      AuthUtil.testToken(
+        audience = AuthUtil.testAudience,
+        user = aliceUser,
+        secret = AuthUtil.testSecret,
+      )
+    )
+    val aliceValidatorClientWithToken = aliceValidatorClient.copy(token = aliceToken)
+
+    // register() is the same as onboardUser(), but it reads the user name from the token
+    val party1 = aliceValidatorClientWithToken.register()
+    val party2 = aliceValidatorClientWithToken.register()
     party1 shouldBe party2
   }
 
