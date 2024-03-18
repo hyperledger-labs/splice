@@ -61,7 +61,7 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
       "Advance 5 ticks, to close the round",
       (1 to 5).foreach(_ => {
         eventually() {
-          ensureSvRewardCouponClaimedForCurrentRound(sv1ScanBackend, sv1WalletClient)
+          ensureSvRewardCouponReceivedForCurrentRound(sv1ScanBackend, sv1WalletClient)
         }
         advanceRoundsByOneTick
       }),

@@ -45,7 +45,7 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
         "Advance enough rounds for SV1 to claim rewards", {
           (0 to 3).foreach { _ =>
             eventually() {
-              ensureSvRewardCouponClaimedForCurrentRound(sv1ScanBackend, sv1WalletClient)
+              ensureSvRewardCouponReceivedForCurrentRound(sv1ScanBackend, sv1WalletClient)
             }
             advanceRoundsByOneTick
           }

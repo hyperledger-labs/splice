@@ -3,6 +3,7 @@ package com.daml.network.store
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
+import com.digitalasset.canton.config.CantonRequireTypes.String3
 import com.digitalasset.canton.logging.pretty.Pretty
 
 final case class IngestionSummary(
@@ -21,7 +22,7 @@ final case class IngestionSummary(
     numFilteredUnassignEvents: Int,
     removedUnassignEvents: Vector[(ContractId[?], ReassignmentId)],
     prunedContracts: Vector[ContractId[_]],
-    ingestedTxLogEntries: Seq[String],
+    ingestedTxLogEntries: Seq[(String3, String)],
 )
 
 private[store] object IngestionSummary {
@@ -72,7 +73,9 @@ private[store] object IngestionSummary {
       paramIfNonEmpty("prunedContracts", _.prunedContracts),
       paramIfNonEmpty(
         "ingestedTxLogEntries",
-        _.ingestedTxLogEntries.map(_.unquoted),
+        _.ingestedTxLogEntries.map { case (typee, json) =>
+          typee.str.unquoted -> json.unquoted
+        },
       ),
     )
   }

@@ -29,6 +29,7 @@ import com.daml.network.util.SvTestUtil.ConfirmingSv
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.parallelFuture
+import org.scalatest.Assertion
 
 import java.math.RoundingMode
 import scala.concurrent.duration.*
@@ -235,15 +236,27 @@ trait SvTestUtil extends CNNodeTestCommon {
       .setScale(10, RoundingMode.HALF_UP)
   }
 
-  def ensureSvRewardCouponClaimedForCurrentRound(
+  def ensureSvRewardCouponReceivedForCurrentRound(
       scan: ScanAppBackendReference,
       wallet: WalletAppClientReference,
-  ) = {
+  ): Assertion = {
     val currentRound =
       scan.getOpenAndIssuingMiningRounds()._1.head.contract.payload.round.number
     wallet
       .listSvRewardCoupons()
       .map(_.payload.round.number) should contain(currentRound)
+  }
+
+  def ensureNoSvRewardCouponExistsForRound(
+      round: Long,
+      wallet: WalletAppClientReference,
+  ): Assertion = {
+    inside(
+      wallet
+        .listSvRewardCoupons()
+    ) { case coupons =>
+      coupons.map(_.payload.round.number) should not(contain(round))
+    }
   }
 }
 

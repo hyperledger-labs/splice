@@ -22,6 +22,7 @@ import com.daml.network.wallet.store.TxLogEntry
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
+import org.scalatest.Assertion
 
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
@@ -1060,6 +1061,39 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       s" Wait for the payment to be accepted or rejected.",
       _ => refs.wallet.listSubscriptionInitialPayments() shouldBe empty,
     )
+  }
+
+  def ensureValidatorFaucetCouponReceivedForCurrentRound(
+      scanBackend: ScanAppBackendReference,
+      walletClient: WalletAppClientReference,
+  ): Assertion = {
+    val currentRound =
+      scanBackend
+        .getOpenAndIssuingMiningRounds()
+        ._1
+        .head
+        .contract
+        .payload
+        .round
+        .number
+    (walletClient
+      .listValidatorFaucetCoupons()
+      .map(_.payload.round.number) should contain(currentRound))
+      .withClue(
+        s"Wallet: ${walletClient.name} did not receive a ValidatorFaucetCoupon for round $currentRound."
+      )
+  }
+
+  def ensureNoValidatorFaucetCouponExistsForRound(
+      round: Long,
+      walletClient: WalletAppClientReference,
+  ): Assertion = {
+    inside(
+      walletClient
+        .listValidatorFaucetCoupons()
+    ) { case coupons =>
+      coupons.map(_.payload.round.number) should not(contain(round))
+    }
   }
 }
 

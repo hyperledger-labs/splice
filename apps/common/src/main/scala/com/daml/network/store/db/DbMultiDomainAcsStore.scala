@@ -27,7 +27,7 @@ import com.daml.network.util.{
   TemplateJsonDecoder,
   Trees,
 }
-import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M}
+import com.digitalasset.canton.config.CantonRequireTypes.{String255, String256M, String3}
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -1117,7 +1117,7 @@ final class DbMultiDomainAcsStore[TXE](
       val indexColumnNames = getIndexColumnNames(rowData.indexColumns)
       val indexColumnNameValues = getIndexColumnValues(rowData.indexColumns)
 
-      summary.ingestedTxLogEntries.addOne(entryData)
+      summary.ingestedTxLogEntries.addOne((entryType, entryData))
       (sql"""
       insert into #$txLogTableName(store_id, migration_id, transaction_offset, domain_id, acs_contract_id,
       entry_type, entry_data #$indexColumnNames)
@@ -1386,7 +1386,7 @@ object DbMultiDomainAcsStore {
       var numFilteredUnassignEvents: Int,
       removedUnassignEvents: mutable.ArrayBuffer[(ContractId[?], ReassignmentId)],
       prunedContracts: mutable.ArrayBuffer[ContractId[?]],
-      ingestedTxLogEntries: mutable.ArrayBuffer[String],
+      ingestedTxLogEntries: mutable.ArrayBuffer[(String3, String)],
   ) {
     def acsSizeDiff: Int = ingestedCreatedEvents.size - ingestedArchivedEvents.size
 

@@ -37,7 +37,7 @@ class TimeBasedTestNetPreviewIntegrationTest
         (1 to 3).foreach { _ =>
           advanceRoundsByOneTick
           eventually() {
-            ensureSvRewardCouponClaimedForCurrentRound(sv1ScanBackend, sv1WalletClient)
+            ensureSvRewardCouponReceivedForCurrentRound(sv1ScanBackend, sv1WalletClient)
           }
         }
       },

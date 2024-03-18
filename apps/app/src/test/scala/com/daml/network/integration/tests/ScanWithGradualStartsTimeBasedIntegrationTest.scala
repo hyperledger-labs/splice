@@ -40,91 +40,86 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       bobWalletClient.tap(3)
     }
 
-    clue("Start sv2 app and scan") {
+    val firstOpenRound = clue("Start sv2 app and scan") {
       sv2Backend.startSync()
       sv2ScanBackend.startSync()
-      val maxOpenRoundFromACS = sv2ScanBackend
-        .getOpenAndIssuingMiningRounds()
-        ._1
-        .map(_.contract.payload.round.number)
-        .max
-      // sv2 scan sees round 3 as first round opening after ACS, will get round 2 aggregates from sv1 scan
-      maxOpenRoundFromACS shouldBe 2
+      eventually() {
+        val sv2OpenRounds = sv2ScanBackend
+          .getOpenAndIssuingMiningRounds()
+          ._1
+        val sv1OpenRounds = sv1ScanBackend
+          .getOpenAndIssuingMiningRounds()
+          ._1
+
+        sv2OpenRounds should be(sv1OpenRounds)
+
+        val maxOpenRoundFromACS = sv2OpenRounds
+          .map(_.contract.payload.round.number)
+          .max
+        // sv2 scan sees round 3 as first round opening after ACS, will get round 2 aggregates from sv1 scan
+        maxOpenRoundFromACS shouldBe 2
+        sv2OpenRounds.head
+      }
     }
 
     clue("Tap some more coin now that sv2 scan is up") {
       aliceWalletClient.tap(3)
     }
 
-    actAndCheck(
-      "Advancing time to close rounds",
-      // TODO(#2930): Since we are reporting in getRoundOfLatestData() only the latest round that is aggregated (fully closed),
-      // we must advance rounds until round 3 closes, which is the first round that sv2's scan is guaranteed to have seen.
-      (1 to 7).foreach(_ => {
+    // TODO(#2930): Since we are reporting in getRoundOfLatestData() only the latest round that is aggregated (fully closed),
+    // we must advance rounds until round 3 closes, which is the first round that sv2's scan is guaranteed to have seen.
+    (firstOpenRound.payload.round.number.toInt to (firstOpenRound.payload.round.number.toInt + 6))
+      .foreach { n =>
         clue("Ensure SvRewardCoupons are received") {
           eventually() {
-            ensureSvRewardCouponClaimedForCurrentRound(sv1ScanBackend, sv1WalletClient)
-            // sv2 doesn't have a wallet, so it won't claim them anyway
+            ensureSvRewardCouponReceivedForCurrentRound(sv1ScanBackend, sv1WalletClient)
+            // sv2 did not start up it's validator app (thus wallet), so it won't claim any coupons.
           }
         }
         clue("Ensure ValidatorFaucetCoupons are received") {
           eventually() {
             Seq(sv1WalletClient, aliceValidatorWalletClient, bobValidatorWalletClient).foreach {
               walletClient =>
-                val currentRound =
-                  sv1ScanBackend
-                    .getOpenAndIssuingMiningRounds()
-                    ._1
-                    .head
-                    .contract
-                    .payload
-                    .round
-                    .number
-                (walletClient
-                  .listValidatorFaucetCoupons()
-                  .map(_.payload.round.number) should contain(currentRound))
-                  .withClue(
-                    s"Wallet: ${walletClient.name} did not receive a ValidatorFaucetCoupon."
-                  )
+                ensureValidatorFaucetCouponReceivedForCurrentRound(sv1ScanBackend, walletClient)
             }
           }
         }
+
         advanceRoundsByOneTick
-      }),
-    )(
-      "Waiting for scan apps to report rounds as closed",
-      _ => {
+
+        val roundForWhichCouponsAreNowRedeemed = n.toLong - 2
+        if (roundForWhichCouponsAreNowRedeemed >= 0) {
+          // you're not guaranteed that a coupon will be claimed in the first round possible if the rounds advance too quickly,
+          // so we make sure that it happens so the balances at the end make sense. See flake in issue #10923.
+          clue("Ensure SvRewardCoupons are redeemed") {
+            eventually() {
+              Seq(sv1WalletClient, aliceValidatorWalletClient, bobValidatorWalletClient).foreach {
+                walletClient =>
+                  ensureNoSvRewardCouponExistsForRound(
+                    roundForWhichCouponsAreNowRedeemed,
+                    walletClient,
+                  )
+              }
+            }
+          }
+          clue("Ensure ValidatorFaucetCoupons are redeemed") {
+            eventually() {
+              Seq(sv1WalletClient, aliceValidatorWalletClient, bobValidatorWalletClient).foreach {
+                walletClient =>
+                  ensureNoValidatorFaucetCouponExistsForRound(
+                    roundForWhichCouponsAreNowRedeemed,
+                    walletClient,
+                  )
+              }
+            }
+          }
+        }
+      }
+
+    clue("Waiting for scan apps to report rounds as closed") {
+      eventually() {
         Try(sv2ScanBackend.getRoundOfLatestData()._1).success.value shouldBe 3
         Try(sv1ScanBackend.getRoundOfLatestData()._1).success.value shouldBe 3
-      },
-    )
-
-    clue("Ensure SvRewardCoupons are claimed") {
-      eventually() {
-        val coupons = sv1WalletClient
-          .listSvRewardCoupons()
-          .map(_.payload.round.number)
-        coupons should have size 3
-        // rounds 0 to 6 (total: 7) have advanced, and their coupons are claimed
-        coupons.min should be(6)
-      }
-    }
-
-    clue("Ensure ValidatorFaucetCoupons are claimed") {
-      eventually() {
-        Seq(sv1WalletClient, aliceValidatorWalletClient, bobValidatorWalletClient).foreach {
-          walletClient =>
-            {
-              val coupons = walletClient
-                .listValidatorFaucetCoupons()
-                .map(_.payload.round.number)
-              coupons should have size 3
-              // rounds 0 to 6 (total: 7) have advanced, and their coupons are claimed
-              coupons.min should be(6)
-            }.withClue(
-              s"Wallet: ${walletClient.name} did not claim all the expected ValidatorFaucetCoupons."
-            )
-        }
       }
     }
 
@@ -143,10 +138,10 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
           ("round", "total floor", "total ceiling"),
           // Alice has 23 USD in Coin, Bob has 3 USD, all minus holding fees
           (2L, walletUsdToCoin(25.9), walletUsdToCoin(26.0)),
-          // note that SV2 doesn't have a wallet, so it doesn't claim the rewards
-          // validator faucets: SV1, Alice, Bob
+          // sv2 did not start up it's validator app (thus wallet), so it won't claim any coupons.
           (
             3L,
+            // validator faucets: SV1, Alice, Bob
             walletUsdToCoin(26.0 + validatorFaucetAmount * 3 - smallAmount) + svRewardPerRound,
             walletUsdToCoin(26.0 + validatorFaucetAmount * 3) + svRewardPerRound,
           ),
