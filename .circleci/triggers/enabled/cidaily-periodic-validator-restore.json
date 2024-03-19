@@ -1,0 +1,17 @@
+{
+    "name": "CIDaily Validator Restore",
+    "description": "Periodic restore of validator on CIDaily",
+    "attribution-actor": "system",
+    "parameters": {
+      "branch": "deployment/cidaily",
+      "run-job": "restore-validator-cidaily"
+    },
+    "timetable": {
+      "per-hour": 1,
+      "hours-of-day": [3, 7, 11, 15, 19, 23],
+      "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}
+

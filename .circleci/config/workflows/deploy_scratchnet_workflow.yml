@@ -379,6 +379,20 @@
             - preflight_sv_check
             - preflight_validator_check
             - backup_cluster
+      - restore_node:
+          name: "restore_validator_node"
+          <<: *main-branch-never
+          cluster: "user-selected-scratchnet"
+          namespace_name: "validator1"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - preflight_check
+            - preflight_sv_check
+            - preflight_validator_check
+            - backup_cluster
       - deploy_sv_runbook:
           <<: *main-branch-never
           context:

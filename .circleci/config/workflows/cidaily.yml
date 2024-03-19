@@ -381,6 +381,34 @@ workflow:
           requires:
             - wait_for_previous_pipeline
 
+  restore_validator_cidaily:
+    when:
+      equal: [ restore-validator-cidaily, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_cidaily_and_cidaily_testnet cidaily_health_check"
+      - restore_node:
+          filters:
+            branches:
+              only:
+                - deployment/cidaily
+          cluster: "cidaily"
+          namespace_name: "validator1"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          requires:
+            - wait_for_previous_pipeline
+
   backup_cidaily_testnet:
     when:
       equal: [ backup-cidaily-testnet, << pipeline.parameters.run-job >> ]
