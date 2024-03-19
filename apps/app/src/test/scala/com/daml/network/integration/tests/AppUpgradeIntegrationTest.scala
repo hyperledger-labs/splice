@@ -38,6 +38,9 @@ class AppUpgradeIntegrationTest
   override def environmentDefinition = CNNodeEnvironmentDefinition
     .simpleTopology4Svs(this.getClass.getSimpleName)
     .withManualStart
+    // We don't currently register the upgrade of splitwell in app manager, just want to test
+    // that we can actually upgrade splitwell and use the new payment APIs in it.
+    .withoutInitialManagerApps
 
   "A set of CN apps" should {
     "be upgradeable" in { implicit env =>
@@ -48,8 +51,8 @@ class AppUpgradeIntegrationTest
         Using.resource(
           AppUpgradeIntegrationTest.MultiCnProcessResource("forUpgrade", loggerFactory)
         )(cnProcs => {
-          // Do not start the old sv4 backend nor bob's and splitwell validators, they will join only after upgrade
-          Seq("sv1-node", "sv2-node", "sv3-node", "aliceValidator").foreach(conf => {
+          // Do not start the old sv4 backend nor alice's validators, they will join only after upgrade
+          Seq("sv1-node", "sv2-node", "sv3-node", "bobSplitwellValidators").foreach(conf => {
             val version = getBaseVersion()
             val bundledConfig = getConfigFileFromBundle(version, conf)
             val inputConfig = generateConfig(bundledConfig, version, testId)
@@ -65,34 +68,36 @@ class AppUpgradeIntegrationTest
                 true
               ) withClue s"${sv} wallet initialized"
             })
-            Seq("alice").foreach(validator =>
+            Seq("bob", "splitwell").foreach(validator =>
               vc(s"${validator}ValidatorClient").httpHealth.successOption
                 .exists(_.active) should be(true)
             )
           }
 
-          aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPathV1)
+          bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPathV1)
 
           val sv2Wallet = wc("sv2Wallet")
           val sv1Client = svcl("sv1Client")
 
-          val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+          val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
           clue("Tapping some coin in the network before any upgrades") {
-            aliceWalletClient.tap(10)
-            aliceValidatorWalletClient.tap(1_000_001)
-            aliceValidatorWalletClient.balance().unlockedQty should be > BigDecimal(1_000_000)
+            bobWalletClient.tap(10)
+            bobValidatorWalletClient.tap(1_000_001)
+            bobValidatorWalletClient.balance().unlockedQty should be > BigDecimal(1_000_000)
             sv2Wallet.tap(1_000_002)
             sv2Wallet.balance().unlockedQty should be > BigDecimal(1_000_000)
           }
 
-          clue("Upgrading alice's validator") {
-            cnProcs.stopBundledCN("aliceValidator")
-            aliceValidatorBackend.startSync()
+          clue("Upgrading bob's and splitwell validator") {
+            cnProcs.stopBundledCN("bobSplitwellValidators")
+            bobValidatorBackend.startSync()
+            splitwellValidatorBackend.startSync()
+            splitwellBackend.startSync()
           }
 
           clue("Validating that the balance is visible in the upgraded validator") {
-            aliceValidatorWalletClient.balance().unlockedQty should be > BigDecimal(1_000_000)
+            bobValidatorWalletClient.balance().unlockedQty should be > BigDecimal(1_000_000)
           }
 
           clue("Upgrading sv-2 & sv-3") {
@@ -108,7 +113,7 @@ class AppUpgradeIntegrationTest
             sv2Wallet.balance().unlockedQty should be > BigDecimal(2_000_000)
             // p2p transfer between an upgraded validator (alice's) and a non-upgraded (sv-1's)
             p2pTransfer(
-              aliceValidatorWalletClient,
+              bobValidatorWalletClient,
               sv1WalletClient,
               sv1Client.getSvcInfo().svParty,
               500_001,
@@ -252,14 +257,14 @@ class AppUpgradeIntegrationTest
           )
 
           actAndCheck(
-            "Alice taps after upgrade",
+            "Bob taps after upgrade",
             eventuallySucceeds() {
-              aliceWalletClient.tap(20)
+              bobWalletClient.tap(20)
             },
           )(
             "Old and new coin get merged together into a new coin",
             _ => {
-              val coin = aliceWalletClient.list().coins.loneElement.contract
+              val coin = bobWalletClient.list().coins.loneElement.contract
               coin.identifier.getPackageId shouldBe DarResources.cantonCoin_current.packageId
               BigDecimal(coin.payload.amount.initialAmount) should beWithin(
                 walletUsdToCoin(30 - smallAmount),
@@ -268,21 +273,21 @@ class AppUpgradeIntegrationTest
             },
           )
 
-          // Bob can join after the upgrade
-          bobValidatorBackend.startSync()
-          val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-          // This is just to invalidate the coin rules cache on Bob’s side. In a real upgrade, the upgrade will be announced days or weeks in advance
+          // Alice can join after the upgrade
+          aliceValidatorBackend.startSync()
+          val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+          // This is just to invalidate the coin rules cache on Alice’s side. In a real upgrade, the upgrade will be announced days or weeks in advance
           // while cache expiration is a few minutes so this is a non-issue.
-          clue("Bob taps after upgrade") {
+          clue("Alice taps after upgrade") {
             eventuallySucceeds() {
-              bobWalletClient.tap(5)
+              aliceWalletClient.tap(5)
             }
           }
 
           actAndCheck(
-            "Alice makes p2p transfer after upgrade",
+            "Bob makes p2p transfer after upgrade",
             eventuallySucceeds() {
-              p2pTransfer(aliceWalletClient, bobWalletClient, bob, 4.0)
+              p2pTransfer(bobWalletClient, aliceWalletClient, alice, 4.0)
             },
           )(
             "old and new taps and transfers appear in scan tx log",
@@ -291,25 +296,25 @@ class AppUpgradeIntegrationTest
               // old tap
               forExactly(1, txs) { tx =>
                 val tf = tx.tap.value
-                tf.coinOwner shouldBe alice.toProtoPrimitive
+                tf.coinOwner shouldBe bob.toProtoPrimitive
                 BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(10)
               }
               // new taps
               forExactly(1, txs) { tx =>
                 val tf = tx.tap.value
-                tf.coinOwner shouldBe alice.toProtoPrimitive
+                tf.coinOwner shouldBe bob.toProtoPrimitive
                 BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(20)
               }
               forExactly(1, txs) { tx =>
                 val tf = tx.tap.value
-                tf.coinOwner shouldBe bob.toProtoPrimitive
+                tf.coinOwner shouldBe alice.toProtoPrimitive
                 BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(5)
               }
               // new transfer
               forExactly(1, txs) { tx =>
                 val tf = tx.transfer.value
-                tf.sender.party shouldBe alice.toProtoPrimitive
-                tf.receivers.loneElement.party shouldBe bob.toProtoPrimitive
+                tf.sender.party shouldBe bob.toProtoPrimitive
+                tf.receivers.loneElement.party shouldBe alice.toProtoPrimitive
                 BigDecimal(tf.receivers.loneElement.amount) shouldBe 4.0
               }
             },
@@ -322,15 +327,14 @@ class AppUpgradeIntegrationTest
 
           clue("Splitwell works") {
 
-            splitwellValidatorBackend.startSync()
-            splitwellBackend.startSync()
-
             // There is no auto-vetting for splitwell yet so we upload the DARs manually.
+            bobValidatorBackend.participantClient.upload_dar_unless_exists(
+              splitwellDarPathCurrent
+            )
+            aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPathV1)
             aliceValidatorBackend.participantClient.upload_dar_unless_exists(
               splitwellDarPathCurrent
             )
-            bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPathV1)
-            bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPathCurrent)
             splitwellValidatorBackend.participantClient.upload_dar_unless_exists(
               splitwellDarPathCurrent
             )
