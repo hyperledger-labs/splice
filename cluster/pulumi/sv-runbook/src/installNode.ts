@@ -144,13 +144,37 @@ export async function installNode(
       ingress: {
         globalDomain: {
           activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
-          migrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
         },
       },
     },
     defaultVersion,
     ingressImagePullDeps.concat([sv, validator])
   );
+  installMigrationIdSpecificComponent(globalDomainMigrationConfig, migrationId => {
+    installCNRunbookHelmChartByNamespaceName(
+      xns.logicalName,
+      `cluster-ingress-sv-domain-${migrationId}`,
+      'cn-cluster-ingress-runbook',
+      {
+        cluster: {
+          hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+          svNamespace: svNamespaceStr,
+        },
+        ingress: {
+          wallet: false,
+          cns: false,
+          scan: false,
+          sequencer: true,
+          sv: false,
+          globalDomain: {
+            migrationId: migrationId.toString(),
+          },
+        },
+      },
+      defaultVersion,
+      ingressImagePullDeps.concat([sv])
+    );
+  });
 }
 
 type SvConfig = {

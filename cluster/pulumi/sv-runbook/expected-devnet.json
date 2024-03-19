@@ -144,6 +144,37 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
+      "name": "cluster-ingress-sv-domain-0",
+      "namespace": "sv",
+      "timeout": 480,
+      "values": {
+        "cluster": {
+          "hostname": "svrun.network.canton.global",
+          "svNamespace": "sv"
+        },
+        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "ingress": {
+          "cns": false,
+          "globalDomain": {
+            "migrationId": "0"
+          },
+          "scan": false,
+          "sequencer": true,
+          "sv": false,
+          "wallet": false
+        }
+      }
+    },
+    "name": "cluster-ingress-sv-domain-0",
+    "provider": "",
+    "type": "kubernetes:helm.sh/v3:Release"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
+      "compat": "true",
       "name": "cluster-ingress-sv",
       "namespace": "sv",
       "timeout": 480,
@@ -155,8 +186,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "globalDomain": {
-            "activeMigrationId": "0",
-            "migrationId": "0"
+            "activeMigrationId": "0"
           }
         }
       }
