@@ -43,6 +43,7 @@ import java.time
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import javax.net.ssl.SSLContext
+import scala.annotation.nowarn
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
@@ -68,8 +69,6 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     with NamedLogging
     with HasUptime
     with Spanning {
-
-  implicit val traceContext: TraceContext = TraceContext.empty
 
   val name: InstanceName
 
@@ -203,7 +202,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     Future.successful(status)
   }
 
-  private def createLedgerClient(): Future[CNLedgerClient] = for {
+  private def createLedgerClient()(implicit tc: TraceContext): Future[CNLedgerClient] = for {
     _ <- Future.successful(())
     _ = logger.info("Creating ledger API auth token source")
     authTokenSource = AuthTokenSource.fromConfig(
@@ -226,6 +225,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
           () =>
             retryProvider.retry(
               RetryFor.WaitingOnInitDependency,
+              "acquire_auth_token",
               "Acquiring auth token",
               authTokenManager.getToken,
               logger,
@@ -244,7 +244,9 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     )
   }
 
-  private def waitForUser(connection: BaseLedgerConnection): Future[Unit] = {
+  private def waitForUser(
+      connection: BaseLedgerConnection
+  )(implicit tc: TraceContext): Future[Unit] = {
     logger.info(s"Waiting for user $serviceUser")
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
@@ -258,42 +260,47 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
 
   // Code that is run before a ledger connection becomes available.
   // This can be used for helping the participant initialize.
-  protected def preInitializeBeforeLedgerConnection(): Future[Unit] = Future.unit
+  protected def preInitializeBeforeLedgerConnection()(implicit
+      @nowarn("cat=unused") tc: TraceContext
+  ): Future[Unit] =
+    Future.unit
 
   protected def initializeNode(
       ledgerClient: CNLedgerClient
-  ): Future[State]
+  )(implicit tc: TraceContext): Future[State]
 
   private lazy val appInitMessage = s"$name app initialization"
 
   protected def appInitStep[T](
       description: String
-  )(f: => Future[T]): Future[T] =
-    TraceContext.withNewTraceContext(implicit tc => {
-      val startTime = Instant.now()
-      logger.debug(s"$appInitMessage: $description started")(tc)
-      // TODO(#5419): here we could pass on the trace context to inner function to make sure all log lines
-      // produced by this initialization step are tagged with the same trace id.
-      // However, some of our helper methods hold onto the trace context and use it for all future
-      // operations. This would mean that the trace context would be used for operations that are
-      // not part of the initialization step.
-      Try(f) match {
-        case Success(asyncValue) =>
-          asyncValue.transform {
-            case result @ Success(_) =>
-              logger.info(s"$appInitMessage: $description finished after ${time.Duration
-                  .between(startTime, Instant.now())
-                  .toString}")(tc)
-              result
-            case Failure(ex) =>
-              logger.info(s"$appInitMessage: $description failed", ex)(tc)
-              Failure(new RuntimeException(s"$appInitMessage: $description failed", ex))
-          }
-        case Failure(ex) =>
-          logger.info(s"$appInitMessage: $description failed", ex)(tc)
-          throw new RuntimeException(s"$appInitMessage: $description failed", ex)
+  )(f: => Future[T])(implicit tc: TraceContext): Future[T] =
+    withSpan("init_step")(implicit tc =>
+      _ => {
+        val startTime = Instant.now()
+        logger.debug(s"$appInitMessage: $description started")(tc)
+        // TODO(#5419): here we could pass on the trace context to inner function to make sure all log lines
+        // produced by this initialization step are tagged with the same trace id.
+        // However, some of our helper methods hold onto the trace context and use it for all future
+        // operations. This would mean that the trace context would be used for operations that are
+        // not part of the initialization step.
+        Try(f) match {
+          case Success(asyncValue) =>
+            asyncValue.transform {
+              case result @ Success(_) =>
+                logger.info(s"$appInitMessage: $description finished after ${time.Duration
+                    .between(startTime, Instant.now())
+                    .toString}")(tc)
+                result
+              case Failure(ex) =>
+                logger.info(s"$appInitMessage: $description failed", ex)(tc)
+                Failure(new RuntimeException(s"$appInitMessage: $description failed", ex))
+            }
+          case Failure(ex) =>
+            logger.info(s"$appInitMessage: $description failed", ex)(tc)
+            throw new RuntimeException(s"$appInitMessage: $description failed", ex)
+        }
       }
-    })
+    )
 
   protected def appInitStepSync[T](
       description: String
@@ -310,21 +317,48 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     }
   })
 
-  logger.info(s"$appInitMessage: Starting initialization")
-  private val preInitialize1F = preInitializeBeforeLedgerConnection()
-  private val ledgerClientF = preInitialize1F.flatMap { _ =>
-    appInitStep("Create ledger client") { createLedgerClient() }
-  }
-  private val initializeF = appInitStep("Initialize app") {
-    ledgerClientF.flatMap { client =>
-      val initConnection = client.readOnlyConnection(
-        this.getClass.getSimpleName,
-        loggerFactory,
-      )
-      appInitStep("Wait for user") { waitForUser(initConnection) }.flatMap(_ =>
-        appInitStep("Initialize node") { initializeNode(client) }
-      )
+  private lazy val ledgerClientF = appInitStep("create ledger client") {
+    createLedgerClient()(TraceContext.empty)
+  }(TraceContext.empty)
+
+  private val initializeF = withNewTrace("app_init") { implicit tc => _ =>
+    logger.info(s"$appInitMessage: Starting initialization")
+    val preInitialize1F = preInitializeBeforeLedgerConnection()
+    val ledgerClient = preInitialize1F.flatMap { _ =>
+      ledgerClientF
     }
+    appInitStep("Initialize app") {
+      ledgerClient.flatMap { client =>
+        val initConnection = client.readOnlyConnection(
+          this.getClass.getSimpleName,
+          loggerFactory,
+        )
+        appInitStep("Wait for user") { waitForUser(initConnection) }.flatMap(_ =>
+          appInitStep("Initialize node") { initializeNode(client) }
+        )
+      }
+    }.andThen { _ =>
+      logger.info(
+        s"$appInitMessage: Initialization complete, running on version ${BuildInfo.compiledVersion}"
+      )
+      isInitializedVar.set(true)
+    }
+      // TODO(tech-debt): Handle cleanup in case some initialization failed mid-way.
+      // For example, if we fail to get the service party we won't close the ledger client.
+      // Note that we have a similar issue in app-initialization, so this should be handled
+      // in a generic way
+      .andThen {
+        case Failure(err) if this.isClosing =>
+          logger.info(
+            s"$appInitMessage: Ignoring initialization failure, we are actually shutting down. Message was: ${err.getMessage()}"
+          )
+        case Failure(err) =>
+          val msg = s"$appInitMessage: Initialization failed"
+          logger.error(msg, err)
+          System.err.println(s"$msg, so exiting; check the application logs for details")
+          err.printStackTrace()
+          sys.exit(1)
+      }
   }
 
   private[network] def getState = initializeF.value match {
@@ -332,68 +366,46 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
     case _ => None
   }
 
-  initializeF.foreach { _ =>
-    logger.info(
-      s"$appInitMessage: Initialization complete, running on version ${BuildInfo.compiledVersion}"
-    )
-    isInitializedVar.set(true)
-  }
-
   for {
     state <- initializeF
     automation = automationServices(state)
-  } AutomationService.checkPausedTriggersSpelling(automation)
-
-  // TODO(tech-debt): Handle cleanup in case some initialization failed mid-way.
-  // For example, if we fail to get the service party we won't close the ledger client.
-  // Note that we have a similar issue in app-initialization, so this should be handled
-  // in a generic way
-  val initUnlessClosing = initializeF.andThen {
-    case Failure(err) if this.isClosing =>
-      logger.info(
-        s"$appInitMessage: Ignoring initialization failure, we are actually shutting down. Message was: ${err.getMessage()}"
-      )
-    case Failure(err) =>
-      val msg = s"$appInitMessage: Initialization failed"
-      logger.error(msg, err)
-      System.err.println(s"$msg, so exiting; check the application logs for details")
-      err.printStackTrace()
-      sys.exit(1)
-  }
+  } AutomationService.checkPausedTriggersSpelling(automation)(TraceContext.empty)
 
   protected[this] def automationServices(st: State): Seq[AutomationService.OrCompanion]
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
-    logger.info(s"Stopping $name node")
-    val nonNegativeDuration = NonNegativeDuration.tryFromDuration(closingTimeout)
-    Seq(
-      // Close first to trigger the node-wide shutdown signal before shutting down actual services
-      SyncCloseable(
-        s"$name retry provider",
-        retryProvider.close(),
-      ),
-      // By shutting down gRPC (ledger) and HTTP connections before the app state, any in-flight connections will be cancelled.
-      // This prevents requests that take longer than the shutdown wait from blocking the shutdown process.
-      // See #9851 and #10167.
-      AsyncCloseable(
-        s"$name Ledger API connection",
-        ledgerClientF.map(_.close()),
-        nonNegativeDuration,
-      ),
-      AsyncCloseable(
-        "http pool",
-        httpExt.shutdownAllConnectionPools(),
-        nonNegativeDuration,
-      ),
-      AsyncCloseable(
-        s"$name App state",
-        initUnlessClosing.transform {
-          case Failure(_) if this.isClosing => Success(())
-          case Failure(e) => Failure(e)
-          case Success(node) => Success(node.close())
-        },
-        nonNegativeDuration,
-      ),
-    )
+    withNewTrace("closing") { implicit tc => _ =>
+      logger.info(s"Stopping $name node")
+      val nonNegativeDuration = NonNegativeDuration.tryFromDuration(closingTimeout)
+      Seq(
+        // Close first to trigger the node-wide shutdown signal before shutting down actual services
+        SyncCloseable(
+          s"$name retry provider",
+          retryProvider.close(),
+        ),
+        // By shutting down gRPC (ledger) and HTTP connections before the app state, any in-flight connections will be cancelled.
+        // This prevents requests that take longer than the shutdown wait from blocking the shutdown process.
+        // See #9851 and #10167.
+        AsyncCloseable(
+          s"$name Ledger API connection",
+          ledgerClientF.map(_.close()),
+          nonNegativeDuration,
+        ),
+        AsyncCloseable(
+          "http pool",
+          httpExt.shutdownAllConnectionPools(),
+          nonNegativeDuration,
+        ),
+        AsyncCloseable(
+          s"$name App state",
+          initializeF.transform {
+            case Failure(_) if this.isClosing => Success(())
+            case Failure(e) => Failure(e)
+            case Success(node) => Success(node.close())
+          },
+          nonNegativeDuration,
+        ),
+      )
+    }
   }
 }

@@ -192,6 +192,7 @@ class ParticipantAdminConnection(
   ): Future[Unit] = for {
     _ <- disconnectDomain(alias)
     _ <- retryProvider.retryForClientCalls(
+      "reconnect_domain",
       s"participant is connected to $alias",
       connectDomain(alias),
       logger,

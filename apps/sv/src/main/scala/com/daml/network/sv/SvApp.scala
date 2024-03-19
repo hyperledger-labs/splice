@@ -118,7 +118,7 @@ class SvApp(
   override def packages: Seq[DarResource] =
     super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.cantonNameService.all
 
-  override def preInitializeBeforeLedgerConnection(): Future[Unit] = {
+  override def preInitializeBeforeLedgerConnection()(implicit tc: TraceContext): Future[Unit] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
       coinAppParameters.loggingConfig.api,
@@ -167,7 +167,7 @@ class SvApp(
 
   override def initializeNode(
       ledgerClient: CNLedgerClient
-  ): Future[SvApp.State] = {
+  )(implicit tc: TraceContext): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
       coinAppParameters.loggingConfig.api,
@@ -227,7 +227,7 @@ class SvApp(
       participantAdminConnection: ParticipantAdminConnection,
       ledgerClient: CNLedgerClient,
       localDomainNode: Option[LocalDomainNode],
-  ): Future[SvApp.State] = {
+  )(implicit tc: TraceContext): Future[SvApp.State] = {
     val cometBftClient = newCometBftClient
     val cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
       new CometBftNode(client, config, loggerFactory)
@@ -240,6 +240,7 @@ class SvApp(
         appInitStep("Reconnect all domains") {
           retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
+            "reconect_domains",
             "Reconnect all domains",
             participantAdminConnection.reconnectAllDomains(),
             logger,
@@ -484,7 +485,7 @@ class SvApp(
                     svAutomation.connection,
                     loggerFactory,
                     "canton network sv admin realm",
-                  ),
+                  )(traceContext),
                 ),
                 pathPrefix("api" / "sv")(
                   CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext))
@@ -560,7 +561,7 @@ class SvApp(
 
   private def waitUntilConfiguredOnboardingContractsHaveBeenCreated(
       store: SvSvStore
-  ): Future[Unit] = {
+  )(implicit tc: TraceContext): Future[Unit] = {
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
       "onboarding_contracts",
@@ -599,7 +600,7 @@ class SvApp(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
       clock: Clock,
-  ): Future[List[Unit]] = {
+  )(implicit tc: TraceContext): Future[List[Unit]] = {
     if (
       config.expectedValidatorOnboardings
         .map(_.secret)
@@ -625,9 +626,10 @@ class SvApp(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
       globalDomain: DomainId,
       clock: Clock,
-  ): Future[Unit] =
+  )(implicit tc: TraceContext): Future[Unit] =
     retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
+      "created_validator_onboarding_contract",
       "Create ValidatorOnboarding contract for preconfigured secret",
       SvApp
         .prepareValidatorOnboarding(
@@ -649,7 +651,7 @@ class SvApp(
       defaultCoinPriceVote: BigDecimal,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       logger: TracedLogger,
-  ): Future[Either[String, Unit]] =
+  )(implicit tc: TraceContext): Future[Either[String, Unit]] =
     svcStoreWithIngestion.store.lookupCoinPriceVoteByThisSv().flatMap {
       case Some(vote) if vote.payload.coinPrice.toScala.isDefined =>
         logger.info(s"A coin price vote with a defined coin price already exists")
@@ -657,6 +659,7 @@ class SvApp(
       case _ =>
         retryProvider.retry(
           RetryFor.WaitingOnInitDependency,
+          "update_coin_price",
           "Update coin price vote to configured initial coin price vote",
           SvApp
             .updateCoinPriceVote(
@@ -956,6 +959,7 @@ object SvApp {
           svcRules <- svcStoreWithIngestion.store.getSvcRules()
           res <- retryProvider.retryForClientCalls(
             "castVote",
+            "castVote",
             for {
               resolvedVoteRequest <- svcStoreWithIngestion.store.getVoteRequest(trackingCid)
               resolvedCid = resolvedVoteRequest.contractId
@@ -1114,6 +1118,7 @@ object SvApp {
     for {
       _ <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
+        "create_validator_license",
         "Create validator license for SV party",
         for {
           svcRules <- store.getSvcRules()

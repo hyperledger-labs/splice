@@ -193,13 +193,11 @@ final class RetryProvider(
         logger.info(s"Waiting until $conditionDescription")
         retry(
           retryFor,
+          conditionIdentifier,
           s"Check whether $conditionDescription",
           checkCondition,
           logger,
           additionalCodes,
-          additionalMetricsLabels = Map(
-            "operation" -> conditionIdentifier
-          ),
         )
           .transform(
             result => {
@@ -262,11 +260,11 @@ final class RetryProvider(
         logger.info(s"Attempting to get $valueDescQuoted")
         retry(
           retryFor,
+          valueIdentifier,
           s"Get $valueDescription",
           getValue,
           logger,
           additionalCodes,
-          additionalMetricsLabels = Map("operation" -> valueIdentifier),
         )
           .transform(
             value => {
@@ -377,6 +375,7 @@ final class RetryProvider(
         logger.info(s"Ensuring that $conditionDesc")
         retry(
           retryFor,
+          conditionId,
           s"Check whether $conditionDesc and establish it if needed",
           initialCheck.flatMap {
             case Right(result) => Future.successful(Right(result))
@@ -385,13 +384,13 @@ final class RetryProvider(
           },
           logger,
           additionalCodes,
-          additionalMetricsLabels = Map("operation" -> conditionId),
         ).flatMap {
           case Right(result) => Future.successful(result)
           case Left(_) =>
             logger.debug(s"Established that $conditionDesc, waiting until it is observable")
             retry(
               retryFor,
+              conditionId,
               s"Wait until observing $conditionDesc",
               establishedCheck.map {
                 case Right(result) => result
@@ -423,6 +422,7 @@ final class RetryProvider(
 
   /** A retry intended for client calls, thus timing out relatively quickly. */
   def retryForClientCalls[T, R: Retryable](
+      operationId: String,
       operationName: String,
       task: => Future[T],
       logger: TracedLogger,
@@ -433,6 +433,7 @@ final class RetryProvider(
   ): Future[T] =
     retry(
       RetryFor.ClientCalls,
+      operationId,
       operationName,
       task,
       logger,
@@ -441,7 +442,8 @@ final class RetryProvider(
 
   def retry[T, R](
       retryConfig: RetryFor,
-      operationName: String,
+      operationId: String,
+      operationDescription: String,
       task: => Future[T],
       logger: TracedLogger,
       retryable: R = Seq.empty,
@@ -452,19 +454,28 @@ final class RetryProvider(
       mkRetryable: Retryable[R],
   ): Future[T] = {
     implicit val success: Success[T] = Success.always
-
-    Backoff(
-      logger,
-      this,
-      retryConfig.maxRetries,
-      retryConfig.initialDelay,
-      retryConfig.maxDelay,
-      operationName,
-      resetRetriesAfter = retryConfig.resetRetriesAfter,
-    ).apply(
-      task,
-      mkRetryable(operationName, retryable, metricsFactory, additionalMetricsLabels, this),
-    )
+    withSpan(operationId) { implicit traceContext => _ =>
+      Backoff(
+        logger,
+        this,
+        retryConfig.maxRetries,
+        retryConfig.initialDelay,
+        retryConfig.maxDelay,
+        operationDescription,
+        resetRetriesAfter = retryConfig.resetRetriesAfter,
+      ).apply(
+        task,
+        mkRetryable(
+          operationDescription,
+          retryable,
+          metricsFactory,
+          additionalMetricsLabels ++ Map(
+            "operation" -> operationId
+          ),
+          this,
+        ),
+      )
+    }
   }
 }
 

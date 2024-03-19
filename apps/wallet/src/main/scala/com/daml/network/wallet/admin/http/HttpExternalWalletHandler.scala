@@ -65,6 +65,7 @@ class HttpExternalWalletHandler(
             // TODO(#8300) revisit if we want to retry here.
             retryProvider.retryForClientCalls(
               "createTransferOffer",
+              "createTransferOffer",
               exerciseWalletAction((installCid, _) => {
                 val receiver = Codec.tryDecode(Codec.Party)(request.receiverPartyId)
                 val amount = Codec.tryDecode(Codec.JavaBigDecimal)(request.amount)
@@ -210,6 +211,7 @@ class HttpExternalWalletHandler(
               // TODO(#8300) revisit if we want to retry here.
               retryProvider
                 .retryForClientCalls(
+                  "createBuyTrafficRequest",
                   "createBuyTrafficRequest",
                   exerciseWalletAction((installCid, _) => {
                     val expiresAt = Codec.tryDecode(Codec.Timestamp)(request.expiresAt)

@@ -82,6 +82,7 @@ abstract class TaskbasedTrigger[T: Pretty](
         .retry(
           RetryFor.Automation,
           "processTaskWithRetry",
+          "processTaskWithRetry",
           processTaskWithStalenessCheck(),
           logger,
           additionalRetryableConditions,

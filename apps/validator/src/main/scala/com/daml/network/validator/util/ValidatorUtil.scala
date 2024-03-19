@@ -44,6 +44,7 @@ private[validator] object ValidatorUtil {
     for {
       _ <- retryProvider.retryForClientCalls(
         "installWalletForUser",
+        "installWalletForUser",
         store.lookupWalletInstallByNameWithOffset(endUserName).flatMap {
           case QueryResult(offset, None) =>
             storeWithIngestion.connection
@@ -163,6 +164,7 @@ private[validator] object ValidatorUtil {
           Future.unit
         }
       _ <- retryProvider.retryForClientCalls(
+        "offboard_validator",
         "Remove install contract and validator right",
         Future
           .traverse(

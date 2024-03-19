@@ -115,6 +115,7 @@ object CNNodeUtil {
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
     retryProvider.retryForClientCalls(
       "createValidatorRight",
+      "createValidatorRight",
       lookupValidatorRightByParty(user).flatMap {
         case QueryResult(offset, None) =>
           connection

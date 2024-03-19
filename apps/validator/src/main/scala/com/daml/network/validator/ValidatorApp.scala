@@ -114,7 +114,9 @@ class ValidatorApp(
   override def packages =
     super.packages ++ DarResources.wallet.all ++ DarResources.cantonNameService.all ++ DarResources.appManager.all
 
-  override def preInitializeBeforeLedgerConnection(): Future[Unit] = for {
+  override def preInitializeBeforeLedgerConnection()(implicit
+      traceContext: TraceContext
+  ): Future[Unit] = for {
     // TODO(tech-debt) consider removing early version check once we switch to a non-dev Canton protocol version
     _ <- ensureVersionMatch(config.scanClient)
     _ <- withParticipantAdminConnection { participantAdminConnection =>
@@ -139,7 +141,7 @@ class ValidatorApp(
   override def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
       ledgerClient: CNLedgerClient,
-  ) =
+  )(implicit traceContext: TraceContext) =
     for {
       _ <- config.appManager.traverse_ { appManagerConfig =>
         connection.ensureIdentityProviderConfig(
@@ -295,7 +297,7 @@ class ValidatorApp(
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       participantAdminConnection: ParticipantAdminConnection,
       domainId: DomainId,
-  ): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(s"Attempting to setup app $name...")
     for {
       _ <- instance.dars.traverse_(dar =>
@@ -359,7 +361,7 @@ class ValidatorApp(
 
   private def waitForValidatorLicense(
       store: ValidatorStore
-  ): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
       "validator_license",
@@ -380,7 +382,9 @@ class ValidatorApp(
     )
   }
 
-  private def ensureVersionMatch(scanClientConfig: BftScanClientConfig): Future[Unit] =
+  private def ensureVersionMatch(scanClientConfig: BftScanClientConfig)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
       "version_check",
@@ -407,7 +411,7 @@ class ValidatorApp(
 
   private def withSvConnection[T](
       svConfig: NetworkAppClientConfig
-  )(f: ValidatorSvConnection => Future[T]): Future[T] =
+  )(f: ValidatorSvConnection => Future[T])(implicit traceContext: TraceContext): Future[T] =
     ValidatorSvConnection(svConfig, retryProvider, loggerFactory).flatMap(con =>
       f(con).andThen(_ => con.close())
     )
@@ -416,10 +420,11 @@ class ValidatorApp(
       svConfig: NetworkAppClientConfig,
       validatorParty: PartyId,
       secret: String,
-  ): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(s"Requesting to be onboarded by SV at: ${svConfig.url}")
     retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
+      "request_onboarding",
       "request onboarding",
       withSvConnection(svConfig)(_.onboardValidator(validatorParty, secret)),
       logger,
@@ -440,7 +445,7 @@ class ValidatorApp(
   private def newTrafficBalanceService(
       participantAdminConnection: ParticipantAdminConnection,
       scanConnection: BftScanConnection,
-  ) = {
+  )(implicit traceContext: TraceContext) = {
     def lookupReservedTraffic(domainId: DomainId): Future[Option[NonNegativeLong]] = {
       config.domains.global.trafficReservedForTopupsO
         .fold(Future.successful(Option.empty[NonNegativeLong]))(trafficReservedForTopups => {
@@ -466,7 +471,7 @@ class ValidatorApp(
   override def initialize(
       ledgerClient: CNLedgerClient,
       validatorParty: PartyId,
-  ): Future[ValidatorApp.State] =
+  )(implicit traceContext: TraceContext): Future[ValidatorApp.State] =
     for {
       _ <- Future.successful(())
       participantAdminConnection = new ParticipantAdminConnection(

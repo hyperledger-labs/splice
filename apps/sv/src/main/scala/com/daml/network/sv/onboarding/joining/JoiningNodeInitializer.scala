@@ -445,6 +445,7 @@ class JoiningNodeInitializer(
           _ <- waitForSvOnboardingConfirmedInSvcStore()
           _ <- retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
+            "add_svc_member",
             "add member to Svc",
             for {
               (svcRules, coinRules, openMiningRounds, svOnboardingConfirmedOpt) <- (
@@ -617,6 +618,7 @@ class JoiningNodeInitializer(
             _ = logger.info(s"Requesting to be onboarded via the sponsor SV")
             _ <- retryProvider.retry(
               RetryFor.WaitingOnInitDependency,
+              "request_onboarding",
               "request onboarding",
               svConnection.startSvOnboarding(token),
               logger,

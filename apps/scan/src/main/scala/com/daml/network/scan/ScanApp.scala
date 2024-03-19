@@ -37,7 +37,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TracerProvider
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
@@ -83,7 +83,7 @@ class ScanApp(
       // We don't care about the primary party in scan as that points to the SV party while we need the SVC party
       // which we read below.
       serviceUserPrimaryParty: PartyId,
-  ): Future[ScanApp.State] = {
+  )(implicit tc: TraceContext): Future[ScanApp.State] = {
     for {
       svcParty <- appInitStep("Get SVC party from user metadata") {
         ledgerClient

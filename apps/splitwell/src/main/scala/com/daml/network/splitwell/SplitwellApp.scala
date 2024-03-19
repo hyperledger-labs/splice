@@ -40,7 +40,7 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, PartyId}
-import com.digitalasset.canton.tracing.TracerProvider
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.cors.scaladsl.CorsDirectives.cors
 import org.apache.pekko.http.cors.scaladsl.settings.CorsSettings
@@ -83,7 +83,7 @@ class SplitwellApp(
   override def initialize(
       ledgerClient: CNLedgerClient,
       partyId: PartyId,
-  ): Future[SplitwellApp.State] = for {
+  )(implicit traceContext: TraceContext): Future[SplitwellApp.State] = for {
     scanConnection <- appInitStep(s"Get scan connection") {
       ScanConnection.singleCached(
         ledgerClient,
@@ -190,13 +190,13 @@ class SplitwellApp(
   private def createSplitwellRules(
       domains: SplitwellDomains,
       automation: SplitwellAutomationService,
-  ): Future[Unit] =
+  )(implicit traceContext: TraceContext): Future[Unit] =
     (domains.preferred +: domains.others).toList.traverse_(createSplitwellRules(_, automation))
 
   private def createSplitwellRules(
       domain: DomainId,
       automation: SplitwellAutomationService,
-  ): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[Unit] = {
     retryProvider.waitUntil(
       RetryFor.ClientCalls,
       "splitwell_rules_created",

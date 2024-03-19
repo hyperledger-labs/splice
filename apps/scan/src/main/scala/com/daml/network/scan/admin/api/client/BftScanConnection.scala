@@ -73,6 +73,7 @@ class BftScanConnection(
           retryProvider.retry(
             RetryFor.LongRunningAutomation,
             "refresh_scan_list",
+            "refresh_scan_list",
             bft.refresh(this)(tc).flatMap { connections =>
               if (connections.failed > 0)
                 Future.failed(
@@ -176,6 +177,7 @@ class BftScanConnection(
       retryProvider
         .retryForClientCalls(
           "bft_call",
+          s"Bft call with f $f",
           BftScanConnection.executeCall(call, requestFrom, nTargetSuccess = f + 1, logger),
           logger,
           (_: String) => ConsensusNotReachedRetryable,

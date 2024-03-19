@@ -389,6 +389,7 @@ class FoundingNodeInitializer(
         tc: TraceContext
     ): Future[Unit] = retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
+      "bootstrap_svc",
       "bootstrapping SVC",
       bootstrapSvc(),
       logger,

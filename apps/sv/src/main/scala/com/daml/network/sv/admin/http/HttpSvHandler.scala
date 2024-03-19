@@ -90,6 +90,7 @@ class HttpSvHandler(
                 // We retry here because this mutates the CoinRules and rounds contracts,
                 // which can lead to races.
                 _ <- retryProvider.retryForClientCalls(
+                  "onboard_validator",
                   "onboard validator via SvcRules",
                   onboardValidator(partyId, body.secret, vo),
                   logger,
@@ -159,6 +160,7 @@ class HttpSvHandler(
                     // We retry here because the SvcRules can change while attempting this.
                     retryProvider
                       .retryForClientCalls(
+                        "start_sv_onboarding",
                         s"start SV ${token.candidateName} onboarding via SvcRules",
                         startSvOnboarding(
                           token.candidateName,
@@ -460,7 +462,8 @@ class HttpSvHandler(
     // wait for a bit as it is possible the store ingression is not complete
     retryProvider
       .retryForClientCalls(
-        "wait for ",
+        "wait_onboarding_contract",
+        s"wait for onboarding contract for party $party",
         for {
           maybeConfirmed <- svcStore
             .lookupSvOnboardingConfirmedByParty(party)

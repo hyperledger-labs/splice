@@ -9,7 +9,7 @@ import com.digitalasset.canton.concurrent.FutureSupervisor
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TracerProvider
+import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 
@@ -52,17 +52,17 @@ abstract class CNNode[State <: AutoCloseable & HasHealth](
   protected def preInitializeAfterLedgerConnection(
       connection: BaseLedgerConnection,
       ledgerClient: CNLedgerClient,
-  ): Future[Unit] =
+  )(implicit tc: TraceContext): Future[Unit] =
     Future.unit
 
   def initialize(
       ledgerClient: CNLedgerClient,
       party: PartyId,
-  ): Future[State]
+  )(implicit tc: TraceContext): Future[State]
 
   override protected def initializeNode(
       ledgerClient: CNLedgerClient
-  ): Future[State] = for {
+  )(implicit tc: TraceContext): Future[State] = for {
     _ <- preInitializeBeforeLedgerConnection()
     initConnection = appInitStepSync("Acquire ledger connection") {
       ledgerClient.readOnlyConnection(

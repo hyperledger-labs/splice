@@ -91,6 +91,7 @@ class SvcPartyMigration(
       snapshot <- {
         retryProvider.retry(
           RetryFor.ClientCalls,
+          "download_acs_snapshot",
           show"Download ACS snapshot for SVC at $authorizedAt",
           participantAdminConnection
             .downloadAcsSnapshot(

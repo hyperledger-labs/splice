@@ -155,12 +155,14 @@ final class AppManagerStore(
   )(implicit tc: TraceContext): Future[Unit] =
     retryProvider
       .retryForClientCalls(
+        "fetch_coin_rules_domain",
         "Fetching global domain from CoinRules",
         getCoinRulesDomain()(tc),
         logger,
       )
       .flatMap { domain =>
         retryProvider.retryForClientCalls(
+          "create",
           show"Creating $name if it does not already exist",
           lookup.flatMap {
             case QueryResult(offset, None) =>

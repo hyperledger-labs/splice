@@ -290,6 +290,7 @@ class HttpWalletHandler(
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.acceptTransferOffer") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
+        "accept_transfer",
         "accept transfer offer",
         exerciseWalletAction((installCid, _) => {
           val requestCid =
@@ -319,6 +320,7 @@ class HttpWalletHandler(
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.rejectTransferOffer") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
+        "reject_transfer",
         "reject transfer offer",
         exerciseWalletAction[r0.RejectTransferOfferResponse]((installCid, _) => {
           val requestCid =
@@ -346,6 +348,7 @@ class HttpWalletHandler(
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.withdrawTransferOffer") { implicit traceContext => _ =>
       retryProvider.retryForClientCalls(
+        "withdraw_transfer",
         "withdraw transfer offer",
         exerciseWalletAction[r0.WithdrawTransferOfferResponse]((installCid, _) => {
           val requestCid =
@@ -379,6 +382,7 @@ class HttpWalletHandler(
         contractId
       )
       retryProvider.retryForClientCalls(
+        "accept_app_payment",
         "Accept app payment request",
         exerciseWalletCoinAction(
           new coinoperation.CO_AppPayment(requestCid),
@@ -404,6 +408,7 @@ class HttpWalletHandler(
         contractId
       )
       retryProvider.retryForClientCalls(
+        "reject_app_payment",
         "Reject app payment request",
         exerciseWalletAction((installCid, _) => {
           Future.successful(
@@ -443,6 +448,7 @@ class HttpWalletHandler(
           contractId
         )
       retryProvider.retryForClientCalls(
+        "accept_subscription",
         "Accept subscription and make initial payment",
         exerciseWalletCoinAction(
           new coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
@@ -544,6 +550,7 @@ class HttpWalletHandler(
       // Note that we're passing a custom retryable here because blindly retrying
       // on failed taps would be incorrect (tap is not idempotent).
       retryProvider.retryForClientCalls(
+        "tap",
         "Tap",
         for {
           (openRounds, _) <- scanConnection.getOpenAndIssuingMiningRounds()

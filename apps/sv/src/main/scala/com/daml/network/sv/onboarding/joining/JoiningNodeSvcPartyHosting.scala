@@ -44,6 +44,7 @@ class JoiningNodeSvcPartyHosting(
         for {
           response <- retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
+            "onboard_svc_party",
             "Onboard to SVC party hosting and decentralized namespace membership",
             SvConnection(
               sponsorSvConfig.adminApi,
@@ -65,6 +66,7 @@ class JoiningNodeSvcPartyHosting(
                 response <- retryProvider
                   .retry(
                     RetryFor.WaitingOnInitDependency,
+                    "authorize_svc_party",
                     "authorize SVC party hosting on sponsor",
                     svConnection
                       .authorizeSvcPartyHosting(

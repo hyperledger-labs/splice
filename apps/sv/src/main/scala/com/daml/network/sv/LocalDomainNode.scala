@@ -235,6 +235,7 @@ final class LocalDomainNode(
       _ = logger.info(s"Initializing mediator $mediatorId")
       _ <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
+        "initialize_mediator",
         "Initializing mediator",
         mediatorAdminConnection.getStatus.flatMap {
           case NodeStatus.NotInitialized(_) =>
@@ -348,6 +349,7 @@ final class LocalDomainNode(
       _ = logger.info(s"Onboarding sequencer $sequencerId through sponsoring SV")
       onboardingState <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
+        "onboarding_sequencer",
         "Onbarding sequencer through sponsoring SV",
         svConnection.onboardSvSequencer(sequencerId),
         logger,
@@ -358,6 +360,7 @@ final class LocalDomainNode(
       )
       _ <- retryProvider.retry(
         RetryFor.WaitingOnInitDependency,
+        "initializer_sequencer",
         "Initializing sequencer",
         sequencerAdminConnection.getStatus.flatMap {
           case NodeStatus.NotInitialized(_) =>

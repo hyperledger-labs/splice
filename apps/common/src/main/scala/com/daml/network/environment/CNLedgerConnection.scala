@@ -480,6 +480,7 @@ class BaseLedgerConnection(
   ): Future[Unit] =
     retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
+      "ensure_identity_provider_config",
       show"Create identity provider $id",
       client.createIdentityProviderConfig(id, issuer, jwksUrl, audience).recover {
         case ex: StatusRuntimeException if ex.getStatus.getCode == Status.Code.ALREADY_EXISTS =>

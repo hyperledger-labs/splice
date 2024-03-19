@@ -62,6 +62,7 @@ class SvcPartyHosting(
       retryFor: RetryFor,
   )(implicit traceContext: TraceContext): Future[Instant] = retryProvider.retry(
     retryFor,
+    "wait_svc_party_authorization",
     "wait for SVC party to participant authorization to complete",
     getSvcPartyToParticipantTransaction(domain, participantId).fold(
       throw Status.NOT_FOUND

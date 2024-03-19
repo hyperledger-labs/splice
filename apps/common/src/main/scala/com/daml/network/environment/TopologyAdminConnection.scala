@@ -568,6 +568,7 @@ abstract class TopologyAdminConnection(
   )(implicit traceContext: TraceContext): Future[TopologyResult[M]] =
     retryProvider.retry(
       retryFor,
+      "establish_topology_mapping",
       description,
       check.foldF(
         { case TopologyResult(beforeEstablishedBaseResult, mapping) =>
@@ -590,6 +591,7 @@ abstract class TopologyAdminConnection(
             .flatMap { _ =>
               retryProvider.retry(
                 retryFor,
+                "check_establish_topology_mapping",
                 s"check established $description",
                 check.leftMap { currentAuthorizedState =>
                   if (currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial) {

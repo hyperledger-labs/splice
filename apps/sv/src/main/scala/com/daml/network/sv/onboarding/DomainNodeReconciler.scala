@@ -134,6 +134,7 @@ class DomainNodeReconciler(
     retryProvider
       .retry(
         RetryFor.WaitingOnInitDependency,
+        "set_domain_config",
         s"setting domain config for $svParty",
         setConfigIfRequired(),
         logger,
