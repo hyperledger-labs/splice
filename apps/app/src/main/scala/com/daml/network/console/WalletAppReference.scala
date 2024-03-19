@@ -45,14 +45,16 @@ abstract class WalletAppReference(
     }
   }
 
-  @Help.Summary("Credits the requested amount of Canton coin to the wallet's user")
+  @Help.Summary(
+    "Credits an amount of Canton coin corresponding to the requested USD amount to the wallet's user"
+  )
   @Help.Description(
     "This function will only be available in the devnet. It allows creating coins for testing purposes." +
       "Returns the contract ID of the created contract. "
   )
-  def tap(amount: BigDecimal): coinCodegen.Coin.ContractId = {
+  def tap(usdAmount: BigDecimal): coinCodegen.Coin.ContractId = {
     consoleEnvironment.run {
-      httpCommand(HttpWalletAppClient.Tap(amount))
+      httpCommand(HttpWalletAppClient.Tap(usdAmount))
     }
   }
 

@@ -5,16 +5,16 @@ import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigS
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
 import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
-import com.daml.network.config.{CNNodeConfig, CNNodeConfigTransforms}
+import com.daml.network.integration.tests.AppUpgradeIntegrationTest.*
+
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTest
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
-import com.daml.network.util.{CNNodeUtil, ProcessTestUtil, SplitwellTestUtil, WalletTestUtil}
+import com.daml.network.util.{ProcessTestUtil, SplitwellTestUtil, WalletTestUtil}
 
 import java.nio.file.{Path, Paths}
 import better.files.*
 import com.daml.network.environment.{BuildInfo, DarResources}
-import com.daml.network.integration.tests.AppUpgradeIntegrationTest.generatedConfigDir
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 
@@ -35,65 +35,26 @@ class AppUpgradeIntegrationTest
   private val splitwellDarPathCurrent =
     "daml/splitwell/src/main/resources/dar/splitwell-current.dar"
 
-  // TODO(#10595): consider reading these from config files:
-  System.setProperty("SV1_URL", "http://127.0.0.1:5114")
-  System.setProperty("SV1_SCAN_URL", "http://127.0.0.1:5012")
-  System.setProperty("SV2_SCAN_URL", "http://127.0.0.1:5112")
-
-  private val confs = transformAndSaveConfigs()
-
-  private def transformAndSaveConfigs() = {
-
-    Seq(
-      "sv1-node",
-      "sv2-node",
-      "sv3-node",
-      "sv4-node",
-      "aliceValidator",
-      "bobSplitwellValidators",
-    ).map(configFile => {
-      val config = CNNodeConfig.parseAndLoadOrThrow(
-        Seq(Paths.get(s"apps/app/src/test/resources/include/nodes/${configFile}.conf").toFile)
-      )
-      val configOut =
-        (CNNodeConfigTransforms.defaults()
-        // TODO (#10859) remove setCoinPrice and fix test failures
-          :+ CNNodeConfigTransforms.setCoinPrice(walletCoinPrice))
-          .foldLeft(config)((c, t) => t(c))
-      val outFile = generatedConfigDir().resolve(s"${configFile}.conf")
-      CNNodeConfig.writeToFile(configOut, outFile, confidential = false)
-      configFile -> outFile
-    })
-  }
-
-  override def environmentDefinition: CNNodeEnvironmentDefinition = {
-
-    val files = confs.map(c => File(c._2))
-    val config = CNNodeConfig.parseAndLoadOrThrow(files.map(_.toJava))
-    CNNodeEnvironmentDefinition(
-      baseConfig = config,
-      context = this.getClass.getSimpleName,
-      // skip the default transforms, as we already applied them in the saved config files
-      configTransformsWithContext = (_: String) => Seq(),
-    ).withManualStart
-      .withAllocatedUsers()
-      // TODO (#10859) remove and fix test failures
-      .withCoinPrice(walletCoinPrice)
-  }
-
-  // TODO (#10859) remove and fix test failures
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(1.0)
+  override def environmentDefinition = CNNodeEnvironmentDefinition
+    .simpleTopology4Svs(this.getClass.getSimpleName)
+    .withManualStart
 
   "A set of CN apps" should {
     "be upgradeable" in { implicit env =>
-      Using.resource(AppUpgradeIntegrationTest.MultiCnProcessResource("forUpgrade", loggerFactory))(
-        cnProcs => {
-          confs
-            .filter({ case (name, _) =>
-              // Do not start the old sv4 backend nor bob's and splitwell validators, they will join only after upgrade
-              name != "sv4-node" && name != "bobSplitwellValidators"
-            })
-            .foreach(conf => cnProcs.startBundledCN(conf._1, conf._2))
+      {
+
+        val testId = env.environment.config.name.value
+
+        Using.resource(
+          AppUpgradeIntegrationTest.MultiCnProcessResource("forUpgrade", loggerFactory)
+        )(cnProcs => {
+          // Do not start the old sv4 backend nor bob's and splitwell validators, they will join only after upgrade
+          Seq("sv1-node", "sv2-node", "sv3-node", "aliceValidator").foreach(conf => {
+            val version = getBaseVersion()
+            val bundledConfig = getConfigFileFromBundle(version, conf)
+            val inputConfig = generateConfig(bundledConfig, version, testId)
+            cnProcs.startBundledCN(conf, inputConfig)
+          })
 
           eventually(5.minute) {
             Seq("sv1", "sv2", "sv3").foreach(sv => {
@@ -300,7 +261,10 @@ class AppUpgradeIntegrationTest
             _ => {
               val coin = aliceWalletClient.list().coins.loneElement.contract
               coin.identifier.getPackageId shouldBe DarResources.cantonCoin_current.packageId
-              BigDecimal(coin.payload.amount.initialAmount) should beWithin(30 - smallAmount, 30)
+              BigDecimal(coin.payload.amount.initialAmount) should beWithin(
+                walletUsdToCoin(30 - smallAmount),
+                walletUsdToCoin(30),
+              )
             },
           )
 
@@ -328,18 +292,18 @@ class AppUpgradeIntegrationTest
               forExactly(1, txs) { tx =>
                 val tf = tx.tap.value
                 tf.coinOwner shouldBe alice.toProtoPrimitive
-                tf.coinAmount shouldBe "10.0000000000"
+                BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(10)
               }
               // new taps
               forExactly(1, txs) { tx =>
                 val tf = tx.tap.value
                 tf.coinOwner shouldBe alice.toProtoPrimitive
-                tf.coinAmount shouldBe "20.0000000000"
+                BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(20)
               }
               forExactly(1, txs) { tx =>
                 val tf = tx.tap.value
                 tf.coinOwner shouldBe bob.toProtoPrimitive
-                tf.coinAmount shouldBe "5.0000000000"
+                BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(5)
               }
               // new transfer
               forExactly(1, txs) { tx =>
@@ -439,10 +403,9 @@ class AppUpgradeIntegrationTest
               _ => aliceSplitwellClient.listBalanceUpdates(key) should have size 1,
             )
           }
-        }
-      )
+        })
+      }
     }
-
   }
 }
 
@@ -454,8 +417,7 @@ object AppUpgradeIntegrationTest {
     val processes = scala.collection.mutable.Map[String, Process]()
 
     def startBundledCN(name: String, config: Path): Unit = {
-      // For now, we get the base version from BuildInfo, which is auto-generated by build.sbt
-      val version = BuildInfo.compatibleVersion
+      val version = getBaseVersion()
       val process = ProcessTestUtil.startProcess(
         Seq(
           getBundledCn(version).toString,
@@ -490,8 +452,8 @@ object AppUpgradeIntegrationTest {
     }
 
     def getBundledCn(version: String) = {
-      val dir = getDir(bundleDir().resolve(version))
-      val bundledCn = dir.resolve("cn-node-0.1.0-SNAPSHOT/bin/cn-node")
+      val dir = getDir(bundleDir(version))
+      val bundledCn = dir.resolve("bin/cn-node")
       if (!bundledCn.toFile.exists()) {
         throw new RuntimeException(
           s"Bundled CN artifacts for version ${version} not found, did you run build-tools/prep-app-upgrade-test ?"
@@ -513,11 +475,59 @@ object AppUpgradeIntegrationTest {
     dir
   }
 
-  def generatedConfigDir(): Path = {
-    getDir(Paths.get("apps/app/src/test/resources/generated"))
+  def generatedConfigDir(version: String): Path = {
+    getDir(Paths.get(s"apps/app/src/test/resources/generated/${version}"))
   }
 
-  def bundleDir(): Path = {
-    getDir(Paths.get("apps/app/src/test/resources/bundles"))
+  def bundleDir(version: String): Path = {
+    getDir(
+      Paths
+        .get("apps/app/src/test/resources/bundles")
+        .resolve(version)
+        .resolve("cn-node-0.1.0-SNAPSHOT")
+    )
+  }
+
+  def getConfigFileFromBundle(version: String, node: String): Path = {
+    val dir = getDir(
+      bundleDir(version).resolve("testResources/include/nodes")
+    )
+    val conf = dir.resolve(s"${node}.conf")
+    if (!conf.toFile.exists()) {
+      throw new RuntimeException(
+        s"Bundled config file for node ${node} in version ${version} not found, did you run build-tools/prep-app-upgrade-test ?"
+      )
+    }
+    conf
+  }
+
+  def getBaseVersion() = {
+    // For now, we get the base version from BuildInfo, which is auto-generated by build.sbt
+    BuildInfo.compatibleVersion
+  }
+
+  def generateConfig(sourceConfig: Path, version: String, testId: String): Path = {
+    val bundle = bundleDir(version)
+    val classpath = bundle.resolve("lib/cn-node-0.1.0-SNAPSHOT.jar")
+    val transformConfig = bundle.resolve("testResources/transform-config.sc")
+    val generatedPath = generatedConfigDir(version).resolve(sourceConfig.getFileName)
+    val generated = File(generatedPath)
+
+    val cmd =
+      s"scala -classpath $classpath $transformConfig integrationTestDefaults $sourceConfig $generated $testId"
+
+    import sys.process.*
+    val result = Process(
+      Seq("bash", "-c", cmd),
+      None,
+      // TODO(#10595): consider reading these from config files:
+      "SV1_URL" -> "http://127.0.0.1:5114",
+      "SV1_SCAN_URL" -> "http://127.0.0.1:5012",
+      "SV2_SCAN_URL" -> "http://127.0.0.1:5112",
+    ).!
+    if (result != 0) {
+      throw new RuntimeException(s"Command $cmd returned: $result")
+    }
+    generatedPath
   }
 }
