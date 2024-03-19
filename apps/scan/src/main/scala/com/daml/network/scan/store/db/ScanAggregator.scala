@@ -79,29 +79,29 @@ final class ScanAggregator(
 
   def backFillAggregates()(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[Option[Long]] = {
     (for {
       earliestClosedRound <- getEarliestAggregatedRound()
       res <-
         earliestClosedRound match {
           case None =>
             logger.debug("No closed round found in round_totals, not backfilling aggregates.")
-            Future.successful(false)
+            Future.successful(None)
           case Some(0L) =>
             logger.debug(
               s"Round zero exists. No need to backfill aggregates."
             )
-            Future.successful(false)
+            Future.successful(Some(0L))
           case Some(closedRound) =>
             val backFillRound = closedRound - 1L
             logger.debug(
               s"Backfilling round $backFillRound. (Earliest closed round = $closedRound)"
             )
-            backFill(backFillRound).map(_ => true)
+            backFill(backFillRound).map(_ => Some(backFillRound))
         }
     } yield res).recover { case CannotAdvance(msg) =>
       logger.debug(msg)
-      false
+      None
     }
   }
 

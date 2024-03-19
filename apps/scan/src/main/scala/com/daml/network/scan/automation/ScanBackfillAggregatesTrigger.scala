@@ -14,6 +14,6 @@ class ScanBackfillAggregatesTrigger(
 )(implicit val ec: ExecutionContext, val tracer: Tracer)
     extends PollingTrigger {
   def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
-    store.backFillAggregates()
+    store.backFillAggregates().map(_.exists(_ > 0))
   }
 }

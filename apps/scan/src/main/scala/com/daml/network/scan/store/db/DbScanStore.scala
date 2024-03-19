@@ -41,6 +41,7 @@ import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.lifecycle.AsyncCloseable
 import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.lifecycle.SyncCloseable
 
 class DbScanStore(
     override val key: ScanStore.Key,
@@ -85,6 +86,7 @@ class DbScanStore(
     with RetryProvider.Has {
 
   import multiDomainAcsStore.waitUntilAcsIngested
+  private val storeMetrics = new DbScanStoreMetrics(retryProvider.metricsFactory)
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
     implicit def traceContext: TraceContext = TraceContext.empty
@@ -93,7 +95,8 @@ class DbScanStore(
         "db_scan_store",
         aggregator.map(_.close()),
         NonNegativeDuration.tryFromDuration(timeouts.shutdownNetwork.duration),
-      )
+      ),
+      SyncCloseable("db_scan_store_metrics", storeMetrics.close()),
     )
   }
 
@@ -115,17 +118,21 @@ class DbScanStore(
   ): Future[Option[ScanAggregator.RoundTotals]] = {
     for {
       a <- aggregator
-      r <- a.aggregate()
-    } yield r
+      lastAggregateRoundTotals <- a.aggregate()
+      _ = lastAggregateRoundTotals.foreach(rt =>
+        storeMetrics.latestAggregatedRound.updateValue(rt.closedRound)
+      )
+    } yield lastAggregateRoundTotals
   }
 
   def backFillAggregates()(implicit
       tc: TraceContext
-  ): Future[Boolean] = {
+  ): Future[Option[Long]] = {
     for {
       a <- aggregator
-      r <- a.backFillAggregates()
-    } yield r
+      backFilledRound <- a.backFillAggregates()
+      _ = backFilledRound.foreach(r => storeMetrics.earliestAggregatedRound.updateValue(r))
+    } yield backFilledRound
   }
 
   def storeId: Int = multiDomainAcsStore.storeId

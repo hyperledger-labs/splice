@@ -57,7 +57,7 @@ trait ScanStore
 
   def backFillAggregates()(implicit
       tc: TraceContext
-  ): Future[Boolean]
+  ): Future[Option[Long]]
 
   def key: ScanStore.Key
 

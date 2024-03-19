@@ -503,7 +503,7 @@ class ScanAggregatorTest
         res <- store.backFillAggregates()
       } yield {
         res
-      }).futureValue shouldBe false
+      }).futureValue shouldBe None
     }
 
     "backfill aggregates before existing rounds total, up to round zero" in {
@@ -532,7 +532,7 @@ class ScanAggregatorTest
           .sequentialTraverse(0 to lastRound.toInt - 1) { _ =>
             store.backFillAggregates()
           }
-          .map(_.forall(identity))
+          .map(_.forall(_.exists(_ >= 0)))
         backFilledRoundTotals <- store.getRoundTotals(0L, lastRound - 1)
         backFilledRoundPartyTotals <- store.getRoundPartyTotals(0L, lastRound - 1)
       } yield {
@@ -561,7 +561,7 @@ class ScanAggregatorTest
       for {
         res <- store.backFillAggregates()
       } yield {
-        res shouldBe false
+        res shouldBe None
       }
     }
   }
