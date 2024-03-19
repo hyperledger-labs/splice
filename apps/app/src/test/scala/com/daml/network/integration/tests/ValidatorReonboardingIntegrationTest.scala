@@ -33,7 +33,7 @@ class ValidatorReonboardingIntegrationTest
     with StandaloneCanton
     with WalletTestUtil {
 
-  override def dbsSuffix = "reonboard"
+  override def dbsSuffix = "validator_reonboard"
   override def usesDbs =
     Seq(
       "participant_alice_validator_reonboard_new",
