@@ -5,6 +5,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   clusterLargeDisk,
   CNCustomResourceOptions,
+  defaultVersion,
   envFlag,
   ExactNamespace,
   installCNHelmChart,
@@ -161,6 +162,7 @@ class CNPostgres extends pulumi.ComponentResource implements Postgres {
           secretName: this.secretName,
         },
       },
+      defaultVersion,
       { dependsOn: [passwordSecret] }
     );
     this.pg = pg;
@@ -191,6 +193,7 @@ export function installPostgresMetrics(
         secretName: postgres.secretName,
       },
     },
+    defaultVersion,
     { ...{ dependsOn: dependsOn }, ...opts }
   );
 }

@@ -16,9 +16,6 @@ export const DISABLE_ONBOARDING_PARTICIPANT_PROMOTION_DELAY = envFlag(
   false
 );
 
-export const version = process.env.CHARTS_VERSION;
-export const localCharts = version == '' || version == undefined; // Whether to use helm charts generated locally or taken from the artifactory (the latter being for externally released versions)
-
 // Default to admin@sv-dev.com (devnet) or admin@sv.com (non devnet) at the sv-test tenant by default
 export const validatorWalletUserName = isDevNet
   ? 'auth0|64b16b9ff7a0dfd00ea3704e'

@@ -5,6 +5,7 @@ import {
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_BASENAME,
+  defaultVersion,
   exactNamespace,
   ExactNamespace,
   GlobalDomainMigrationConfig,
@@ -46,6 +47,7 @@ export async function installSplitwell(
         basename: CLUSTER_BASENAME,
       },
     },
+    defaultVersion,
     { dependsOn: [xns.ns] }
   );
 
@@ -88,6 +90,7 @@ export async function installSplitwell(
       },
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
     },
+    defaultVersion,
     { dependsOn: dependsOn.concat([participant]) }
   );
 
@@ -145,18 +148,12 @@ export async function installSplitwell(
 }
 
 function installIngress(xns: ExactNamespace) {
-  installCNHelmChart(
-    xns,
-    'cluster-ingress-splitwell-uis',
-    'cn-cluster-ingress-runbook',
-    {
-      cluster: {
-        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-        hostPrefix: '',
-        svNamespace: xns.logicalName,
-      },
-      withSvIngress: false,
+  installCNHelmChart(xns, 'cluster-ingress-splitwell-uis', 'cn-cluster-ingress-runbook', {
+    cluster: {
+      hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+      hostPrefix: '',
+      svNamespace: xns.logicalName,
     },
-    {}
-  );
+    withSvIngress: false,
+  });
 }

@@ -32,6 +32,7 @@ import {
   ValidatorTopupConfig,
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
+  defaultVersion,
 } from 'cn-pulumi-common';
 import { retry } from 'cn-pulumi-common/src/retries';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -40,7 +41,7 @@ import fetch from 'node-fetch';
 import { SvAppConfig, ValidatorAppConfig } from './config';
 import { installGlobalDomainNode } from './globalDomain';
 import { installPostgres } from './postgres';
-import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
+import { CLUSTER_BASENAME, TARGET_CLUSTER } from './utils';
 
 if (!isDevNet) {
   console.error('Launching in non-devnet mode');
@@ -78,9 +79,9 @@ export async function installNode(
   resolveValidator1PartyId: () => Promise<string> = getValidator1PartyId
 ): Promise<void> {
   console.error(
-    localCharts
+    defaultVersion.type === 'local'
       ? 'Using locally built charts'
-      : `Using charts from the artifactory, version ${version}`
+      : `Using charts from the artifactory, version ${defaultVersion.version}`
   );
   console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
   console.error(`Installing SV node in namespace: ${svNamespaceStr}`);
@@ -100,10 +101,11 @@ export async function installNode(
 
   const loopback =
     TARGET_CLUSTER === CLUSTER_BASENAME
-      ? installLoopback(xns, CLUSTER_BASENAME, localCharts, version)
+      ? installLoopback(xns, CLUSTER_BASENAME, defaultVersion)
       : null;
 
-  const imagePullDeps = localCharts ? [] : imagePullSecret(xns);
+  // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
+  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const svKey = svKeyFromSecret('sv');
 
@@ -127,7 +129,9 @@ export async function installNode(
     resolveValidator1PartyId
   );
 
-  const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
+  // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
+  const ingressImagePullDeps =
+    defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installCNRunbookHelmChartByNamespaceName(
     xns.logicalName,
     'cluster-ingress-sv',
@@ -144,8 +148,7 @@ export async function installNode(
         },
       },
     },
-    localCharts,
-    version,
+    defaultVersion,
     ingressImagePullDeps.concat([sv, validator])
   );
 }
@@ -254,8 +257,7 @@ async function installSvAndValidator(
         `participant-${migrationId}`,
         'cn-participant',
         participantValuesWithSpecifiedAud,
-        localCharts,
-        version,
+        defaultVersion,
         imagePullDeps
           .concat([participantPg, svAppSecret, svKeySecret_])
           .concat(loopback !== null ? loopback : [])
@@ -364,8 +366,7 @@ async function installSvAndValidator(
     'sv-app',
     'cn-sv-node',
     fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
-    localCharts,
-    version,
+    defaultVersion,
     imagePullDeps
       .concat([participant, globalDomain])
       .concat([svAppSecret, svAppUISecret, appsPg])
@@ -392,8 +393,7 @@ async function installSvAndValidator(
     `scan`,
     'cn-scan',
     fixedTokens() ? scanValuesWithFixedTokens : scanValues,
-    localCharts,
-    version,
+    defaultVersion,
     imagePullDeps.concat([sv, participant, svAppSecret, appsPg])
   );
 
@@ -446,8 +446,7 @@ async function installSvAndValidator(
     'validator',
     'cn-validator',
     validatorValuesWithMaybeTopups,
-    localCharts,
-    version,
+    defaultVersion,
     imagePullDeps
       .concat([sv, participant])
       .concat([svValidatorAppSecret, svValidatorUISecret])

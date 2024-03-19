@@ -8,6 +8,7 @@ import {
   BootstrappingDumpConfig,
   CLUSTER_BASENAME,
   CnInput,
+  defaultVersion,
   DomainMigrationIndex,
   ExactNamespace,
   fetchAndInstallParticipantBootstrapDump,
@@ -169,6 +170,7 @@ export async function installValidatorApp(
       additionalJvmOptions: jmxOptions(),
       failOnAppVersionMismatch: failOnAppVersionMismatch(),
     },
+    defaultVersion,
     { dependsOn }
   );
 }

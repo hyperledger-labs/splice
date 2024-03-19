@@ -1,9 +1,6 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
-import * as _ from 'lodash';
-import { Release } from '@pulumi/kubernetes/helm/v3';
-import { CustomResourceOptions } from '@pulumi/pulumi';
 import { PathLike } from 'fs';
 import { load } from 'js-yaml';
 
@@ -16,6 +13,7 @@ export const CLUSTER_BASENAME = requireEnv('GCP_CLUSTER_BASENAME');
 export const GCP_PROJECT = requireEnv('CLOUDSDK_CORE_PROJECT');
 export const CLUSTER_NAME = `cn-${CLUSTER_BASENAME}net`;
 export const CLUSTER_DNS_NAME = `${CLUSTER_BASENAME}.network.canton.global`;
+export const CHARTS_VERSION = process.env.CHARTS_VERSION;
 
 /// Environment variables
 
@@ -170,84 +168,6 @@ export function loadIPRanges(): string[] {
       extractIpRanges(internalIPRangesJson.testnet)
     );
   }
-}
-
-export function cnChartValues(chartPath: string, overrideValues: ChartValues = {}): ChartValues {
-  const chartDefaultValues = loadYamlFromFile(
-    process.env.REPO_ROOT + '/cluster/helm/' + chartPath + '/values.yaml'
-  );
-
-  const imageTagOverride = process.env['IMAGE_TAG'];
-
-  const values = _.mergeWith(
-    {},
-    chartDefaultValues,
-    {
-      imageRepo: 'us-central1-docker.pkg.dev/da-cn-shared/cn-images',
-      cluster: {
-        basename: CLUSTER_BASENAME,
-        name: CLUSTER_NAME,
-        fixedTokens: fixedTokens(),
-        dnsName: CLUSTER_DNS_NAME,
-      },
-      clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
-    },
-    overrideValues,
-    imageTagOverride
-      ? {
-          cluster: {
-            imageTag: imageTagOverride,
-          },
-        }
-      : {},
-    (a, b) => (_.isArray(b) ? b : undefined)
-  );
-
-  return values;
-}
-
-// The default type of dependsOn is an unworkable abonimation.
-export type CNCustomResourceOptions = Omit<CustomResourceOptions, 'dependsOn'> & {
-  dependsOn?: pulumi.Input<pulumi.Resource>[];
-};
-
-export function installCNHelmChartByNamespaceName(
-  prefix: string,
-  nsName: pulumi.Output<string>,
-  name: string,
-  chartName: string,
-  values: ChartValues = {},
-  opts?: CNCustomResourceOptions
-): Release {
-  const release = new k8s.helm.v3.Release(
-    `${prefix}-${name}`,
-    {
-      name,
-      namespace: nsName,
-      chart: process.env.REPO_ROOT + '/cluster/helm/' + chartName + '/',
-      values: cnChartValues(chartName, values),
-      timeout: HELM_CHART_TIMEOUT_SEC,
-    },
-    opts
-  );
-  return release;
-}
-
-export function installCNHelmChart(
-  xns: ExactNamespace,
-  name: string,
-  chartName: string,
-  values: ChartValues = {},
-  opts?: CNCustomResourceOptions
-): Release {
-  return installCNHelmChartByNamespaceName(
-    xns.logicalName,
-    xns.ns.metadata.name,
-    name,
-    chartName,
-    values,
-    opts
-  );
 }
 
 // Typically used for overriding chart values.

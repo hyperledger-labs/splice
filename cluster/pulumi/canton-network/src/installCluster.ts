@@ -12,6 +12,7 @@ import {
   svValidatorTopupConfig,
   nonSvValidatorTopupConfig,
   svOnboardingPollingInterval,
+  defaultVersion,
 } from 'cn-pulumi-common';
 
 import { installChaosMesh } from './chaosMesh';
@@ -119,6 +120,12 @@ function getSvcSize(): number {
 export async function installCluster(
   auth0Client: Auth0Client
 ): Promise<{ svc: Svc; validator1?: Resource }> {
+  console.error(
+    defaultVersion.type === 'local'
+      ? 'Using locally built charts'
+      : `Using charts from the artifactory, version ${defaultVersion.version}`
+  );
+
   const bootstrapBucketSpec = await bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');
 
   if (!isDevNet) {

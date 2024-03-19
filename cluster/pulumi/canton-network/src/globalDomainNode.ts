@@ -7,6 +7,7 @@ import {
   installCNHelmChart,
   DomainMigrationIndex,
   jmxOptions,
+  defaultVersion,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
@@ -97,6 +98,7 @@ export class GlobalDomainNode extends ComponentResource {
         disableAutoInit: disableAutoInit,
         nodeIdentifier,
       },
+      defaultVersion,
       { dependsOn: [cometBftService], parent: this }
     );
 

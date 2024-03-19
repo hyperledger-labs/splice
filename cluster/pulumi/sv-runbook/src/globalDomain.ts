@@ -9,11 +9,11 @@ import {
   installCNRunbookHelmChart,
   installMigrationIdSpecificComponent,
   loadYamlFromFile,
+  defaultVersion,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
 import { installPostgres } from './postgres';
-import { localCharts, version } from './utils';
 
 export function installGlobalDomainNode(
   svNamespace: ExactNamespace,
@@ -68,8 +68,7 @@ export function installGlobalDomainNode(
         `global-domain-${migrationId}`,
         'cn-global-domain',
         globalDomainValues,
-        localCharts,
-        version,
+        defaultVersion,
         dependencies.concat([cometbft, sequencerPg, mediatorPg])
       );
     }

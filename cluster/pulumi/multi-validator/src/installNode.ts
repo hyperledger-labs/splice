@@ -1,4 +1,10 @@
-import { exactNamespace, CLUSTER_BASENAME, installLoopback, numInstances } from 'cn-pulumi-common';
+import {
+  exactNamespace,
+  CLUSTER_BASENAME,
+  installLoopback,
+  numInstances,
+  defaultVersion,
+} from 'cn-pulumi-common';
 
 import { MultiParticipant } from './multiParticipant';
 import { MultiValidator } from './multiValidator';
@@ -6,7 +12,7 @@ import { installPostgres } from './postgres';
 
 export async function installNode(): Promise<void> {
   const namespace = exactNamespace('multi-validator', true);
-  installLoopback(namespace, CLUSTER_BASENAME, true, undefined);
+  installLoopback(namespace, CLUSTER_BASENAME, defaultVersion);
 
   for (let i = 0; i < numInstances; i++) {
     const postgres = installPostgres(namespace, `postgres-${i}`);

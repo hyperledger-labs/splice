@@ -12,6 +12,7 @@ import {
   ChartValues,
   CLUSTER_BASENAME,
   CnInput,
+  defaultVersion,
   ExactNamespace,
   exactNamespace,
   ExpectedValidatorOnboarding,
@@ -143,6 +144,7 @@ export async function installSvNode(
         basename: CLUSTER_BASENAME,
       },
     },
+    defaultVersion,
     { dependsOn: [xns.ns] }
   );
 
@@ -279,6 +281,7 @@ export async function installSvNode(
         svNamespace: xns.logicalName,
       },
     },
+    defaultVersion,
     { dependsOn: [xns.ns] }
   );
 
@@ -420,6 +423,7 @@ function installMigrationIdSpecificComponents(
             svNamespace: xns.logicalName,
           },
         },
+        defaultVersion,
         { dependsOn: [xns.ns] }
       );
       return {
@@ -511,7 +515,7 @@ function installSvApp(
     };
   }
 
-  const svApp = installCNHelmChart(xns, `sv-app`, 'cn-sv-node', svValues, {
+  const svApp = installCNHelmChart(xns, `sv-app`, 'cn-sv-node', svValues, defaultVersion, {
     dependsOn: dependsOn.concat([participant, postgres, globalDomain]),
   });
   installPostgresMetrics(postgres, svDbName, [svApp]);
@@ -546,7 +550,7 @@ function installScan(
       id: globalDomainMigrationConfig.activeMigrationId,
     },
   };
-  const scan = installCNHelmChart(xns, `scan`, 'cn-scan', scanValues, {
+  const scan = installCNHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {
     dependsOn: [svApp, globalDomainNode],
   });
   installPostgresMetrics(postgres, scanDbName, [scan]);

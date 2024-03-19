@@ -2231,21 +2231,23 @@ function subcmd_hard_domain_migration_prepare() {
     scope="all"
   fi
 
-  local -x IMAGE_TAG
-  IMAGE_TAG=$(get-snapshot-version)
+  local version
+  version=$(get-snapshot-version)
+  export IMAGE_TAG=$version
+  export CHARTS_VERSION=$version
 
   export GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID=1
 
   # pulumi will show a preview and ask us to confirm each deployment step
 
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
-    subcmd_pulumi canton-network up --show-sames "$@"
+    subcmd_pulumi canton-network up "$@"
   fi
 
   export TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
 
   if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
-    subcmd_pulumi sv-runbook up --show-sames "$@"
+    subcmd_pulumi sv-runbook up "$@"
   fi
 }
 
@@ -2274,8 +2276,10 @@ function subcmd_hard_domain_migration_migrate() {
     scope="all"
   fi
 
-  local -x IMAGE_TAG
-  IMAGE_TAG=$(get-snapshot-version)
+  local version
+  version=$(get-snapshot-version)
+  export IMAGE_TAG=$version
+  export CHARTS_VERSION=$version
 
   export GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID=1
   export GLOBAL_DOMAIN_LEGACY_MIGRATION_ID=0
@@ -2284,17 +2288,17 @@ function subcmd_hard_domain_migration_migrate() {
   # pulumi will show a preview and ask us to confirm each deployment step
 
   if [ "$scope" == "all" ] || [ "$scope" == "core" ]; then
-    subcmd_pulumi canton-network up --show-sames
+    subcmd_pulumi canton-network up "$@"
   fi
 
   export TARGET_CLUSTER="${GCP_CLUSTER_BASENAME}"
 
   if [ "$scope" == "all" ] || [ "$scope" == "sv" ]; then
-    subcmd_pulumi sv-runbook up --show-sames
+    subcmd_pulumi sv-runbook up "$@"
   fi
 
   if [ "$scope" == "all" ] || [ "$scope" == "validator" ]; then
-    subcmd_pulumi validator-runbook up --show-sames
+    subcmd_pulumi validator-runbook up "$@"
   fi
 }
 

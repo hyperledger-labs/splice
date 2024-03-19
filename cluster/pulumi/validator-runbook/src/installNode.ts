@@ -24,15 +24,14 @@ import {
   validatorSecrets,
   ValidatorTopupConfig,
   nonSvValidatorTopupConfig,
+  defaultVersion,
 } from 'cn-pulumi-common';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import {
   CLUSTER_BASENAME,
-  localCharts,
   TARGET_CLUSTER,
   VALIDATOR_NAMESPACE as RUNBOOK_NAMESPACE,
-  version,
 } from './utils';
 
 type BootstrapCliConfig = {
@@ -54,9 +53,9 @@ const globalDomainMigrationConfig = GlobalDomainMigrationConfig.fromEnv();
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
-    localCharts
+    defaultVersion.type === 'local'
       ? 'Using locally built charts'
-      : `Using charts from the artifactory, version ${version}`
+      : `Using charts from the artifactory, version ${defaultVersion.version}`
   );
   console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
   console.error(`Installing validator node in namespace: ${RUNBOOK_NAMESPACE}`);
@@ -76,10 +75,11 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
 
   const loopback =
     TARGET_CLUSTER === CLUSTER_BASENAME
-      ? installLoopback(xns, CLUSTER_BASENAME, localCharts, version)
+      ? installLoopback(xns, CLUSTER_BASENAME, defaultVersion)
       : null;
 
-  const imagePullDeps = localCharts ? [] : imagePullSecret(xns);
+  // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
+  const imagePullDeps = defaultVersion.type === 'local' ? [] : imagePullSecret(xns);
 
   const password = new random.RandomPassword(`${xns.logicalName}-postgres-passwd`, {
     length: 16,
@@ -101,7 +101,9 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
     otherDeps: [passwordSecret],
   });
 
-  const ingressImagePullDeps = localCharts ? [] : imagePullSecretByNamespaceName('cluster-ingress');
+  // For the runbooks, we pull images from artifactory when using remote charts, and need creds for that
+  const ingressImagePullDeps =
+    defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installCNRunbookHelmChartByNamespaceName(
     xns.logicalName,
     'cluster-ingress-validator',
@@ -114,8 +116,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
       },
       withSvIngress: false,
     },
-    localCharts,
-    version,
+    defaultVersion,
     ingressImagePullDeps.concat([validator])
   );
 }
@@ -152,8 +153,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     'postgres',
     'cn-postgres',
     {},
-    localCharts,
-    version,
+    defaultVersion,
     otherDeps
   );
 
@@ -186,8 +186,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     'participant',
     'cn-participant',
     participantValuesWithSpecifiedAud,
-    localCharts,
-    version,
+    defaultVersion,
     imagePullDeps.concat([postgres]).concat(loopback !== null ? loopback : [])
   );
 
@@ -280,8 +279,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     'validator',
     'cn-validator',
     validatorValuesWithMaybeTopups,
-    localCharts,
-    version,
+    defaultVersion,
     dependsOn
   );
 }

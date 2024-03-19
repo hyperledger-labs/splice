@@ -4,6 +4,7 @@ import {
   BackupConfig,
   BootstrappingDumpConfig,
   CLUSTER_BASENAME,
+  defaultVersion,
   ExactNamespace,
   exactNamespace,
   GlobalDomainMigrationConfig,
@@ -41,6 +42,7 @@ export async function installValidator1(
         basename: CLUSTER_BASENAME,
       },
     },
+    defaultVersion,
     { dependsOn: [xns.ns] }
   );
 
@@ -104,15 +106,9 @@ export async function installValidator1(
   installIngress(xns, installSplitwell, globalDomainMigrationConfig);
 
   if (installSplitwell) {
-    installCNHelmChart(
-      xns,
-      'splitwell-web-ui',
-      'cn-splitwell-web-ui',
-      {},
-      {
-        dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
-      }
-    );
+    installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, defaultVersion, {
+      dependsOn: [await installAuth0UISecret(auth0Client, xns, 'splitwell', 'splitwell')],
+    });
   }
 
   return validator;
@@ -123,24 +119,18 @@ function installIngress(
   splitwell: boolean,
   globalDomainMigrationConfig: GlobalDomainMigrationConfig
 ) {
-  installCNHelmChart(
-    xns,
-    `cluster-ingress-${xns.logicalName}`,
-    'cn-cluster-ingress-runbook',
-    {
-      cluster: {
-        hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-        hostPrefix: '',
-        svNamespace: xns.logicalName,
-      },
-      withSvIngress: false,
-      ingress: {
-        splitwell: splitwell,
-        globalDomain: {
-          activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
-        },
+  installCNHelmChart(xns, `cluster-ingress-${xns.logicalName}`, 'cn-cluster-ingress-runbook', {
+    cluster: {
+      hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+      hostPrefix: '',
+      svNamespace: xns.logicalName,
+    },
+    withSvIngress: false,
+    ingress: {
+      splitwell: splitwell,
+      globalDomain: {
+        activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
       },
     },
-    {}
-  );
+  });
 }

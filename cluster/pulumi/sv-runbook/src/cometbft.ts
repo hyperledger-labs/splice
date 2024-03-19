@@ -11,10 +11,11 @@ import {
   REPO_ROOT,
   CnInput,
   GlobalDomainMigrationConfig,
+  defaultVersion,
 } from 'cn-pulumi-common';
 import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
 
-import { CLUSTER_BASENAME, localCharts, TARGET_CLUSTER, version } from './utils';
+import { CLUSTER_BASENAME, TARGET_CLUSTER } from './utils';
 
 const nodeKeyContent = fs.readFileSync(
   `${REPO_ROOT}/cluster/pulumi/sv-runbook/cometbft/node_key.json`,
@@ -91,8 +92,7 @@ export function installCometBftNode(
             labels: [{ key: 'active_migration', value: isActive }],
           },
         }),
-        localCharts,
-        version,
+        defaultVersion,
         dependencies
       );
     }

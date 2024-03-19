@@ -1,13 +1,12 @@
 import * as k8s from '@pulumi/kubernetes';
 
-import { installCNRunbookHelmChart } from './helm';
+import { CnChartVersion, installCNRunbookHelmChart } from './helm';
 import { ExactNamespace } from './utils';
 
 export function installLoopback(
   namespace: ExactNamespace,
   clusterBasename: string,
-  localCharts: boolean,
-  version: string | undefined
+  version: CnChartVersion
 ): k8s.helm.v3.Release {
   return installCNRunbookHelmChart(
     namespace,
@@ -18,7 +17,6 @@ export function installLoopback(
         basename: clusterBasename,
       },
     },
-    localCharts,
     version,
     [namespace.ns]
   );

@@ -4,6 +4,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   auth0UserNameEnvVarSource,
   BootstrappingDumpConfig,
+  defaultVersion,
   ExactNamespace,
   GlobalDomainMigrationConfig,
   installCNHelmChart,
@@ -73,6 +74,7 @@ export function installParticipant(
       nodeIdentifier,
       additionalJvmOptions: jmxOptions(),
     },
+    defaultVersion,
     {
       dependsOn,
     }
