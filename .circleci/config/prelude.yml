@@ -48,6 +48,7 @@ parameters:
         auth0-user-cleanup,
         cluster-lock-reaper,
         mark-for-testnet,
+        apply-infra
       ]
     default: build
   # Tag the current commit for the next DevNet release, overwriting the existing tag if it exists.
@@ -68,6 +69,10 @@ parameters:
   reset-before-deploy:
     type: boolean
     default: true
+  # Cluster used for the apply-infra job
+  cluster:
+    type: string
+    default: "none"
 
 notify-fail: &notify-fail
   context: slack-context
