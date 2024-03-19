@@ -10,6 +10,17 @@ Release Notes
   early joiners and allows for more time to validate that the
   configuration upon joining is the one an SV expected.
 
+* Initial coin price is now $0.005/CC.
+
+* Subsequent round duration is now 10min.
+
+* The initial holding fee is now 0.0038580247 CC/round to preserve an
+  approximate fee of $1/360 days given the coin price and round duration
+  changes.
+
+* New ``initial-holding-fee`` setting for ``"found-collective"`` sv
+  onboarding.
+
 2024-03-18
 ----------
 

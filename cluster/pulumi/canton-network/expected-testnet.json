@@ -1785,6 +1785,8 @@
           "prefix": "mock/sv-1"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
+        "initialHoldingFee": 0.0038580247,
+        "initialTickDuration": "600 seconds",
         "isDevNet": false,
         "metrics": {
           "enable": true,

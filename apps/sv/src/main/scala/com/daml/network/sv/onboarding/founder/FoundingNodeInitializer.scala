@@ -452,6 +452,7 @@ class FoundingNodeInitializer(
                   foundingConfig.initialTrafficControlConfig.baseRateBurstAmount.value,
                   foundingConfig.initialTrafficControlConfig.baseRateBurstWindow,
                   foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor.value,
+                  foundingConfig.initialHoldingFee,
                 )
                 for {
                   founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(

@@ -13,6 +13,7 @@ import com.daml.network.config.{
 }
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.SvAppClientConfig
+import com.daml.network.util.CNNodeUtil
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.config.RequireTypes.{
@@ -76,6 +77,7 @@ object SvOnboardingConfig {
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
       initialMaxNumInputs: Int = 100,
       initialCoinPrice: BigDecimal = 0.005,
+      initialHoldingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
       initialCnsConfig: InitialCnsConfig = InitialCnsConfig(),
       initialTrafficControlConfig: TrafficControlConfig = TrafficControlConfig(),
       isDevNet: Boolean = false,
