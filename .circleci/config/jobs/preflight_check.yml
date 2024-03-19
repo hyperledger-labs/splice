@@ -24,6 +24,9 @@ jobs:
       migration_id:
         type: integer
         default: 0
+      get_snapshot_version_override:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -71,7 +74,7 @@ jobs:
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
-            VERSION=$(get-snapshot-version)
+            VERSION=$(get-snapshot-version << parameters.get_snapshot_version_override >>)
             cncluster wait_version $VERSION
             validator_app="validator-app"
             # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
@@ -141,6 +144,9 @@ jobs:
       migration_id:
         type: integer
         default: 0
+      get_snapshot_version_override:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -180,7 +186,7 @@ jobs:
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
-            VERSION=$(get-snapshot-version)
+            VERSION=$(get-snapshot-version << parameters.get_snapshot_version_override >>)
             cncluster wait_version $VERSION
             # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
             cncluster wait sv validator-app << parameters.migration_id >>
@@ -236,6 +242,9 @@ jobs:
       migration_id:
         type: integer
         default: 0
+      get_snapshot_version_override:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -275,7 +284,7 @@ jobs:
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
-            VERSION=$(get-snapshot-version)
+            VERSION=$(get-snapshot-version << parameters.get_snapshot_version_override >>)
             cncluster wait_version $VERSION
             # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
             cncluster wait validator validator-app << parameters.migration_id >>

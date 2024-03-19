@@ -38,12 +38,20 @@ jobs:
         default: -1
     steps:
       - checkout_with_retry
+      - run:
+          name: Find latest base version
+          command: |
+            LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
+            echo "Latest base version is $LATEST_BASE_VERSION"
+            echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
       - when:
           condition: << parameters.deploy_version >>
           steps:
             - run:
                 name: Checkout commit << parameters.deploy_version >>
-                command: git checkout << parameters.deploy_version >>
+                command: |
+                  echo "Checking out commit << parameters.deploy_version >>"
+                  git checkout << parameters.deploy_version >>
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
@@ -142,12 +150,20 @@ jobs:
         default: -1
     steps:
       - checkout_with_retry
+      - run:
+          name: Find latest base version
+          command: |
+            LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
+            echo "Latest base version is $LATEST_BASE_VERSION"
+            echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
       - when:
           condition: << parameters.deploy_version >>
           steps:
             - run:
                 name: Checkout commit << parameters.deploy_version >>
-                command: git checkout << parameters.deploy_version >>
+                command: |
+                  echo "Checking out commit << parameters.deploy_version >>"
+                  git checkout << parameters.deploy_version >>
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
@@ -249,12 +265,20 @@ jobs:
 
     steps:
       - checkout_with_retry
+      - run:
+          name: Find latest base version
+          command: |
+            LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
+            echo "Latest base version is $LATEST_BASE_VERSION"
+            echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
       - when:
           condition: << parameters.deploy_version >>
           steps:
             - run:
                 name: Checkout commit << parameters.deploy_version >>
-                command: git checkout << parameters.deploy_version >>
+                command: |
+                  echo "Checking out commit << parameters.deploy_version >>"
+                  git checkout << parameters.deploy_version >>
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts

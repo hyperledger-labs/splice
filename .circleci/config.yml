@@ -33,6 +33,7 @@ parameters:
         build,
         deploy-cidaily,
         deploy-cilr,
+        deploy-ciupgrade,
         deploy-devnet,
         deploy-testnet,
         healthcheck-cidaily,
@@ -108,6 +109,7 @@ cluster-parameter: &cluster-parameter
         "cidaily",
         "cidaily-testnet",
         "cilr",
+        "ciupgrade",
         "devnet",
         "testnet",
         "testnet-preview",
@@ -1393,12 +1395,20 @@ jobs:
         default: -1
     steps:
       - checkout_with_retry
+      - run:
+          name: Find latest base version
+          command: |
+            LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
+            echo "Latest base version is $LATEST_BASE_VERSION"
+            echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
       - when:
           condition: << parameters.deploy_version >>
           steps:
             - run:
                 name: Checkout commit << parameters.deploy_version >>
-                command: git checkout << parameters.deploy_version >>
+                command: |
+                  echo "Checking out commit << parameters.deploy_version >>"
+                  git checkout << parameters.deploy_version >>
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
@@ -1497,12 +1507,20 @@ jobs:
         default: -1
     steps:
       - checkout_with_retry
+      - run:
+          name: Find latest base version
+          command: |
+            LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
+            echo "Latest base version is $LATEST_BASE_VERSION"
+            echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
       - when:
           condition: << parameters.deploy_version >>
           steps:
             - run:
                 name: Checkout commit << parameters.deploy_version >>
-                command: git checkout << parameters.deploy_version >>
+                command: |
+                  echo "Checking out commit << parameters.deploy_version >>"
+                  git checkout << parameters.deploy_version >>
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
@@ -1604,12 +1622,20 @@ jobs:
 
     steps:
       - checkout_with_retry
+      - run:
+          name: Find latest base version
+          command: |
+            LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
+            echo "Latest base version is $LATEST_BASE_VERSION"
+            echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
       - when:
           condition: << parameters.deploy_version >>
           steps:
             - run:
                 name: Checkout commit << parameters.deploy_version >>
-                command: git checkout << parameters.deploy_version >>
+                command: |
+                  echo "Checking out commit << parameters.deploy_version >>"
+                  git checkout << parameters.deploy_version >>
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: Build Helm & Pulumi artifacts
@@ -2579,6 +2605,9 @@ jobs:
       migration_id:
         type: integer
         default: 0
+      get_snapshot_version_override:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2626,7 +2655,7 @@ jobs:
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
-            VERSION=$(get-snapshot-version)
+            VERSION=$(get-snapshot-version << parameters.get_snapshot_version_override >>)
             cncluster wait_version $VERSION
             validator_app="validator-app"
             # We use readiness of validator-app in all namespaces as an approximation to the cluster's readiness
@@ -2696,6 +2725,9 @@ jobs:
       migration_id:
         type: integer
         default: 0
+      get_snapshot_version_override:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2735,7 +2767,7 @@ jobs:
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
-            VERSION=$(get-snapshot-version)
+            VERSION=$(get-snapshot-version << parameters.get_snapshot_version_override >>)
             cncluster wait_version $VERSION
             # We use readiness of validator-app in the sv namespace as an approximation to the sv's readiness
             cncluster wait sv validator-app << parameters.migration_id >>
@@ -2791,6 +2823,9 @@ jobs:
       migration_id:
         type: integer
         default: 0
+      get_snapshot_version_override:
+        type: string
+        default: ""
     machine:
       image: ubuntu-2204:2024.01.1
     environment:
@@ -2830,7 +2865,7 @@ jobs:
           cluster: << parameters.cluster >>
           additional_nix_args: "--keep VPN_HOST_NAME --keep VPN_USER --keep VPN_PASSWORD --keep VPN_HOST_IP"
           cmd: |
-            VERSION=$(get-snapshot-version)
+            VERSION=$(get-snapshot-version << parameters.get_snapshot_version_override >>)
             cncluster wait_version $VERSION
             # We use readiness of validator-app in the validator namespace as an approximation to the validator's readiness
             cncluster wait validator validator-app << parameters.migration_id >>
@@ -3920,6 +3955,234 @@ workflows:
             - preflight_sv_check_migrated
             - preflight_validator_check_migrated
             - preflight_check_migrated
+
+  deploy_ciupgrade:
+    when:
+      equal: [ build, << pipeline.parameters.run-job >> ]
+    jobs:
+      - wait_for_previous_pipeline:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          workflow_names: "deploy_ciupgrade"
+      - deploy_cluster:
+          name: "deploy_cluster_for_migration"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciupgrade"
+          send_deployment_notification: false
+          update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
+          cancel_workflow_on_failure: true
+          deploy_version: "$LATEST_BASE_VERSION"
+          requires:
+            - wait_for_previous_pipeline
+      - preflight_check:
+          <<: *main-branch-only
+          get_snapshot_version_override: "latest_base"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          wait_for_sv: false
+          parallelism: 1
+          requires:
+            - wait_for_previous_pipeline
+      - deploy_sv_runbook:
+          name: "deploy_sv_runbook_for_migration"
+          deploy_version: "$LATEST_BASE_VERSION"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+            - canton-network-vpn
+          cluster: "ciupgrade"
+          send_deployment_notification: false
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_sv_check:
+           name: "preflight_sv_check_before_migration"
+           <<: *main-branch-only
+           get_snapshot_version_override: "latest_base"
+           context:
+             - artifactory
+             - canton-network-vpn
+             - slack-context
+           cluster: "ciupgrade"
+           requires:
+             - deploy_cluster_for_migration
+      - deploy_validator_runbook:
+          name: "deploy_validator_runbook_for_migration"
+          deploy_version: "$LATEST_BASE_VERSION"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_cluster_for_migration
+      - preflight_validator_check:
+          name: "preflight_validator_check_before_migration"
+          <<: *main-branch-only
+          get_snapshot_version_override: "latest_base"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_cluster_for_migration
+# TODO (#9917): these steps (roughly) are needed for a domain migration test.
+#      - backup_cluster:
+#          name: "backup_cluster_before_migration"
+#          <<: *main-branch-only
+#          cluster: "ciupgrade"
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          requires:
+#            - deploy_cluster_for_migration
+#            - deploy_sv_runbook_for_migration
+#            - deploy_validator_runbook_for_migration
+#      - preflight_check:
+#          name: "trigger_global_domain_migration"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          cluster: "ciupgrade"
+#          test_names_file: "test-full-class-names-global-domain-upgrade-preflight.log"
+#          parallelism: 1
+#          wait_for_sv: false
+#          requires:
+#            - preflight_check
+#            - preflight_sv_check_before_migration
+#            - preflight_validator_check_before_migration
+#            - backup_cluster_before_migration
+#      - deploy_cluster:
+#          name: "prepare_cluster_for_migration"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - slack-context
+#          cluster: "ciupgrade"
+#          send_deployment_notification: false
+#          update_deployment_branch: false  # No need to create a deployment branch for ciupgrade
+#          cancel_workflow_on_failure: true
+#          reset_cluster: false
+#          global_domain_active_migration_id: 0
+#          global_domain_upgrade_migration_id: 1
+#          requires:
+#            - deploy_cluster_for_migration
+#      - deploy_sv_runbook:
+#          name: "prepare_sv_runbook_for_migration"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - slack-context
+#            - canton-network-vpn
+#          cluster: "ciupgrade"
+#          send_deployment_notification: false
+#          requires:
+#            - deploy_sv_runbook_for_migration
+#          global_domain_active_migration_id: 0
+#          global_domain_upgrade_migration_id: 1
+#          reset_cluster: false
+#      - deploy_cluster:
+#          name: "migrate_cluster"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - slack-context
+#          cluster: "ciupgrade"
+#          send_deployment_notification: false
+#          update_deployment_branch: false
+#          global_domain_active_migration_id: 1
+#          global_domain_migrate_from_id: 0
+#          global_domain_legacy_migration_id: 0
+#          requires:
+#            - trigger_global_domain_migration
+#            - prepare_cluster_for_migration
+#      - preflight_check:
+#          name: "preflight_check_migrated"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          cluster: "ciupgrade"
+#          migration_id: 1
+#          requires:
+#            - trigger_global_domain_migration
+#      - deploy_sv_runbook:
+#          name: "migrate_sv_runbook"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - slack-context
+#            - canton-network-vpn
+#          cluster: "ciupgrade"
+#          send_deployment_notification: false
+#          requires:
+#            - trigger_global_domain_migration
+#            - prepare_sv_runbook_for_migration
+#          global_domain_active_migration_id: 1
+#          global_domain_migrate_from_id: 0
+#          global_domain_legacy_migration_id: 0
+#          reset_cluster: false
+#      - preflight_sv_check:
+#          name: "preflight_sv_check_migrated"
+#          migration_id: 1
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          cluster: "ciupgrade"
+#          requires:
+#            - trigger_global_domain_migration
+#      - deploy_validator_runbook:
+#          name: "migrate_validator_runbook"
+#          <<: *main-branch-only
+#          context:
+#            - artifactory
+#            - slack-context
+#          cluster: "ciupgrade"
+#          global_domain_active_migration_id: 1
+#          global_domain_migrate_from_id: 0
+#          reset_cluster: false
+#          requires:
+#            - trigger_global_domain_migration
+#      - preflight_validator_check:
+#          <<: *main-branch-only
+#          name: "preflight_validator_check_migrated"
+#          migration_id: 1
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          cluster: "ciupgrade"
+#          requires:
+#            - trigger_global_domain_migration
+#      - restore_node:
+#          <<: *main-branch-only
+#          cluster: "ciupgrade"
+#          namespace_name: "sv-3"
+#          expected_migration_id: 1
+#          context:
+#            - artifactory
+#            - canton-network-vpn
+#            - slack-context
+#          requires:
+#            - preflight_sv_check_migrated
+#            - preflight_validator_check_migrated
+#            - preflight_check_migrated
 
 
   auth0_user_cleanup:
