@@ -47,7 +47,7 @@ class SvReonboardingIntegrationTest
       "participant_sv4_reonboard_new",
       "sequencer_sv4_reonboard_new",
       "mediator_sv4_reonboard_new",
-      "cn_apps_reonboard",
+      "sv_app_sv4_reonboard_new",
     ) ++ super.usesDbs
 
   // Runs against a temporary Canton instance.
@@ -84,7 +84,7 @@ class SvReonboardingIntegrationTest
                           config = c.config
                             .withValue(
                               "properties.databaseName",
-                              ConfigValueFactory.fromAnyRef("cn_apps_reonboard"),
+                              ConfigValueFactory.fromAnyRef("sv_app_sv4_reonboard_new"),
                             )
                         )
                       case _ => throw new IllegalArgumentException("Only Postgres is supported")
