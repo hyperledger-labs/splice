@@ -12,6 +12,7 @@ import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.health.admin.data.{NodeStatus, ParticipantStatus}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
+import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.{DomainId, NodeIdentity, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -92,7 +93,14 @@ class ParticipantAdminConnection(
   def registerDomain(config: DomainConnectionConfig, handshakeOnly: Boolean)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
-    runCmd(ParticipantAdminCommands.DomainConnectivity.RegisterDomain(config, handshakeOnly))
+    runCmd(
+      ParticipantAdminCommands.DomainConnectivity.RegisterDomain(
+        config,
+        handshakeOnly,
+        // TODO(#10985) Consider enabling this
+        SequencerConnectionValidation.Disabled,
+      )
+    )
 
   def connectDomain(alias: DomainAlias)(implicit
       traceContext: TraceContext
@@ -265,7 +273,11 @@ class ParticipantAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] =
     runCmd(
-      ParticipantAdminCommands.DomainConnectivity.ModifyDomainConnection(config)
+      ParticipantAdminCommands.DomainConnectivity.ModifyDomainConnection(
+        config,
+        // TODO(#10985) Consider enabling this
+        SequencerConnectionValidation.Disabled,
+      )
     )
 
   def modifyDomainConnectionConfig(

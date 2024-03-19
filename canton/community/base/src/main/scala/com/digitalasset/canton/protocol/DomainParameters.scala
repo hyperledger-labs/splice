@@ -99,6 +99,9 @@ final case class StaticDomainParameters private (
 object StaticDomainParameters
     extends HasProtocolVersionedCompanion[StaticDomainParameters]
     with ProtocolVersionedCompanionDbHelpers[StaticDomainParameters] {
+
+  // Note: if you need static domain parameters for testing, look at BaseTest.defaultStaticDomainParametersWith
+
   val supportedProtoVersions: protocol.StaticDomainParameters.SupportedProtoVersions =
     SupportedProtoVersions(
       ProtoVersion(30) -> VersionedProtoConverter(ProtocolVersion.v30)(

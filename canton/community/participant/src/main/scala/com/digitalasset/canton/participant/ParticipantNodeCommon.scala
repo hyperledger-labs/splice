@@ -27,7 +27,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.Metrics as LedgerApiServerMetrics
 import com.digitalasset.canton.participant.admin.grpc.*
 import com.digitalasset.canton.participant.admin.{
-  DomainConnectivityService,
   MutablePackageNameMapResolver,
   PackageDependencyResolver,
   PackageOps,
@@ -495,14 +494,6 @@ trait ParticipantNodeBootstrapCommon {
         ledgerApiDependentServices,
       )
 
-      val stateService = new DomainConnectivityService(
-        sync,
-        domainAliasManager,
-        parameterConfig.processingTimeouts,
-        sequencerInfoLoader,
-        loggerFactory,
-      )
-
       adminServerRegistry
         .addServiceU(
           TrafficControlServiceGrpc.bindService(
@@ -520,7 +511,16 @@ trait ParticipantNodeBootstrapCommon {
       adminServerRegistry
         .addServiceU(
           DomainConnectivityServiceGrpc
-            .bindService(new GrpcDomainConnectivityService(stateService), executionContext)
+            .bindService(
+              new GrpcDomainConnectivityService(
+                sync,
+                domainAliasManager,
+                parameterConfig.processingTimeouts,
+                sequencerInfoLoader,
+                loggerFactory,
+              ),
+              executionContext,
+            )
         )
       adminServerRegistry
         .addServiceU(

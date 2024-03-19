@@ -122,7 +122,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
     // Not starting validator so we need to connect the participant manually.
     val config =
       sv1Backend.participantClient.domains.config(sv1Backend.config.domains.global.alias).value
-    bobValidatorBackend.participantClient.domains.connect(config)
+    bobValidatorBackend.participantClient.domains.connect_by_config(config)
     val candidate = clue("create a dummy party") {
       val name = "dummy" + env.environment.config.name.getOrElse("")
       bobValidatorBackend.participantClientWithAdminToken.ledger_api.parties

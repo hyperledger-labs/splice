@@ -9,7 +9,11 @@ import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{MediatorNodeStatus, NodeStatus}
 import com.digitalasset.canton.protocol.StaticDomainParameters
-import com.digitalasset.canton.sequencing.{SequencerConnection, SequencerConnections}
+import com.digitalasset.canton.sequencing.{
+  SequencerConnection,
+  SequencerConnectionValidation,
+  SequencerConnections,
+}
 import com.digitalasset.canton.topology.{DomainId, MediatorId, NodeIdentity}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -56,6 +60,8 @@ class MediatorAdminConnection(
         domainId,
         domainParameters,
         SequencerConnections.single(sequencerConnection),
+        // TODO(#10985) Consider enabling this.
+        SequencerConnectionValidation.Disabled,
       )
     )
 
