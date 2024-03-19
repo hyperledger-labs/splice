@@ -806,7 +806,7 @@ summarizeTransfer sender openRound transferConfigCC inp preprocessedOutputs = do
         changeToInitialAmountAsOfRoundZero = negate inp.amountArchivedAsOfRoundZero
         changeToHoldingFeesRate = inp.changeToHoldingFeesRate
 
-    balanceChanges = Map.fromListWith (+) ((sender, senderBalanceChange) :: map outputBalanceChange preprocessedOutputs)
+    balanceChanges = Map.fromListWithR (+) ((sender, senderBalanceChange) :: map outputBalanceChange preprocessedOutputs)
 
     summary = TransferSummary with
       inputCoinAmount = inp.totalCoinAmount

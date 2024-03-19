@@ -6,7 +6,7 @@ object CantonDependencies {
   val version: String = "3.0.0-snapshot.20240312.12880.0.vde841b72"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
-  val daml_compiler_version = version
+  val daml_compiler_version = "3.0.0-snapshot.20240318.12913.0.v1c415c97"
   val daml_java_codegen_version = version
   val use_custom_daml_version = false
 
@@ -83,7 +83,7 @@ object CantonDependencies {
   lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive-reader" % daml_libraries_version
   lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
-  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
+  lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_compiler_version
   lazy val daml_lf_transaction_test_lib =
     "com.daml" %% "daml-lf-transaction-test-lib" % daml_libraries_version
   lazy val daml_lf_api_type_signature =

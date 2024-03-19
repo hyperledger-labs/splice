@@ -582,7 +582,7 @@ getBalanceChangesFromAcs DefaultAppWithUsers{..} = do
         changeToHoldingFeesRate = coin.amount.ratePerRound.rate
 
   let normalizedBalanceChanges = map(\c -> (c.owner, balanceChangeFromCoin c)) allCoins
-  return $ Map.fromListWith (+) normalizedBalanceChanges
+  return $ Map.fromListWithR (+) normalizedBalanceChanges
 
 checkBalanceChanges: DefaultAppWithUsers -> Script TransferResult -> Script TransferResult
 checkBalanceChanges d script = do
