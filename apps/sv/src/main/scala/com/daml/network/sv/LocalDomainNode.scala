@@ -7,7 +7,7 @@ import com.daml.network.util.TemplateJsonDecoder
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
 import com.digitalasset.canton.config.ClientConfig
-import com.digitalasset.canton.config.RequireTypes.PositiveLong
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -194,24 +194,20 @@ final class LocalDomainNode(
         RetryFor.WaitingOnInitDependency,
         "mediator_unlimited_traffic",
         "Mediator has been granted unlimited traffic",
-        participantAdminConnection
-          .lookupTrafficControlState(
-            domainId,
-            mediatorId,
+        sequencerAdminConnection
+          .getSequencerTrafficControlState(
+            mediatorId
           )
-          .map {
-            case None =>
-              throw Status.NOT_FOUND
-                .withDescription(show"No traffic state for mediator $mediatorId")
-                .asRuntimeException
-            case Some(traffic) if traffic.mapping.totalExtraTrafficLimit != PositiveLong.MaxValue =>
+          .map(traffic =>
+            if (traffic.extraTrafficLimit != NonNegativeLong.maxValue)
               throw Status.FAILED_PRECONDITION
                 .withDescription(
-                  show"Mediator $mediatorId does not have unlimited traffic limit, current limit: ${traffic.mapping.totalExtraTrafficLimit}"
+                  show"Mediator $mediatorId does not have unlimited traffic limit, current limit: ${traffic.extraTrafficLimit}"
                 )
                 .asRuntimeException()
-            case _ => ()
-          },
+            else
+              ()
+          ),
         logger,
       )
       _ <- retryProvider.waitUntil(

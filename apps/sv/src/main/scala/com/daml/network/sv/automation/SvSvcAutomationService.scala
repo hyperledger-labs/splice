@@ -202,7 +202,7 @@ class SvSvcAutomationService(
       new SvOnboardingUnlimitedTrafficTrigger(
         onboardingTriggerContext,
         svcStore,
-        participantAdminConnection,
+        localDomainNode.map(_.sequencerAdminConnection),
       )
     )
     registerTrigger(
@@ -216,7 +216,7 @@ class SvSvcAutomationService(
       new ReconcileSequencerLimitWithMemberTrafficTrigger(
         triggerContext,
         svcStore,
-        participantAdminConnection,
+        localDomainNode.map(_.sequencerAdminConnection),
       )
     )
     registerTrigger(

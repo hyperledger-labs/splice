@@ -1,6 +1,5 @@
 package com.daml.network.sv.automation.singlesv
 
-import org.apache.pekko.stream.Materializer
 import com.daml.network.automation.{
   OnAssignedContractTrigger,
   TaskOutcome,
@@ -8,20 +7,27 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.ParticipantAdminConnection
+import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.AssignedContract
+import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
+import org.apache.pekko.stream.Materializer
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
+/** This trigger currently relies on enough SVs working on the same set traffic balance request around the same time.
+  * It also depends on the sorting of tasks done in OnAssignedContractTrigger to make this more likely to succeed.
+  * TODO(#10597): Remove this constraint by retrying the reconciliation task every setBalanceRequestSubmissionWindowSize if not successful.
+  */
 class ReconcileSequencerLimitWithMemberTrafficTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
-    participantAdminConnection: ParticipantAdminConnection,
+    sequencerAdminConnectionO: Option[SequencerAdminConnection],
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -75,34 +81,32 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
       domainId: DomainId,
       trafficLimitOffset: Long,
   )(implicit tc: TraceContext): Future[TaskSuccess] = {
+    val sequencerAdminConnection = sequencerAdminConnectionO.getOrElse(
+      throw Status.FAILED_PRECONDITION
+        .withDescription("No sequencer admin connection configured for SV App")
+        .asRuntimeException()
+    )
     for {
       // Compute new extra traffic limit
       totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, domainId)
-      newExtraTrafficLimit = trafficLimitOffset + totalPurchasedTraffic
+      newExtraTrafficLimit = NonNegativeLong.tryCreate(trafficLimitOffset + totalPurchasedTraffic)
 
       // Fetch current extra traffic limit
-      currentExtraTrafficLimit <- participantAdminConnection
-        .lookupTrafficControlState(domainId, memberId)
-        .map(_.fold(0L)(_.mapping.totalExtraTrafficLimit.value))
+      trafficState <- sequencerAdminConnection.getSequencerTrafficControlState(memberId)
+      currentExtraTrafficLimit = trafficState.extraTrafficLimit
 
       // Compare and reconcile old and new limits
       taskOutcome <-
         if (currentExtraTrafficLimit < newExtraTrafficLimit) {
-          participantAdminConnection
-            .getParticipantId()
-            .flatMap(svParticipantId =>
-              participantAdminConnection
-                .ensureTrafficControlState(
-                  domainId,
-                  memberId,
-                  newExtraTrafficLimit,
-                  svParticipantId.uid.namespace.fingerprint,
-                )
-                .map(_ =>
-                  TaskSuccess(
-                    s"Updated extra traffic limit for member ${memberId} from ${currentExtraTrafficLimit} to ${newExtraTrafficLimit}"
-                  )
-                )
+          sequencerAdminConnection
+            .ensureSequencerTrafficControlState(
+              memberId,
+              newExtraTrafficLimit,
+            )
+            .map(_ =>
+              TaskSuccess(
+                s"Updated extra traffic limit for member ${memberId} from ${currentExtraTrafficLimit} to ${newExtraTrafficLimit}"
+              )
             )
         } else {
           Future(

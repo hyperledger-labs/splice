@@ -17,7 +17,7 @@ import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
-import com.digitalasset.canton.domain.sequencing.sequencer.traffic.SequencerTrafficStatus
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
 import com.google.protobuf.ByteString
@@ -84,26 +84,29 @@ class SequencerAdminConnection(
       )
     )
 
-  def getSequencerTrafficStatus(filterMembers: Seq[Member] = Seq.empty)(implicit
+  def listSequencerTrafficControlState(filterMembers: Seq[Member] = Seq.empty)(implicit
       traceContext: TraceContext
-  ): Future[SequencerTrafficStatus] =
+  ): Future[Seq[TrafficStatus]] =
     runCmd(
       SequencerAdminCommands.GetTrafficControlState(filterMembers)
-    )
+    ).map(_.members.map(TrafficStatus))
 
-  def lookupSequencerTrafficControlState(
+  def getSequencerTrafficControlState(
       member: Member
-  )(implicit traceContext: TraceContext): Future[Option[MemberTrafficStatus]] = {
-    getSequencerTrafficStatus(Seq(member)).map(_.members match {
-      case Seq() => None
-      case Seq(m) => Some(m)
+  )(implicit traceContext: TraceContext): Future[TrafficStatus] = {
+    listSequencerTrafficControlState(Seq(member)).map {
+      case Seq() =>
+        throw Status.NOT_FOUND
+          .withDescription(s"No traffic state found for member ${member}")
+          .asRuntimeException()
+      case Seq(m) => m
       case memberList =>
         throw Status.INTERNAL
           .withDescription(
             s"Received more than one traffic status response for member ${member}: ${memberList}"
           )
           .asRuntimeException()
-    })
+    }
   }
 
   private def setTrafficControlState(
@@ -126,21 +129,18 @@ class SequencerAdminConnection(
       RetryFor.WaitingOnInitDependency,
       "sequencer_traffic_control",
       s"Extra traffic limit for $member set to $newTotalExtraTrafficLimit",
-      lookupSequencerTrafficControlState(member).map(result =>
+      getSequencerTrafficControlState(member).map(result =>
         Either.cond(
-          result
-            .flatMap(_.trafficState.extraTrafficLimit)
-            .fold(NonNegativeLong.zero)(_.toNonNegative) == newTotalExtraTrafficLimit,
+          result.extraTrafficLimit == newTotalExtraTrafficLimit,
           (),
           result,
         )
       ),
-      (previousOrNone: Option[MemberTrafficStatus]) =>
+      (previous: TrafficStatus) =>
         setTrafficControlState(
           member,
           newTotalExtraTrafficLimit,
-          serial =
-            previousOrNone.flatMap(_.balanceSerial).fold(PositiveInt.one)(_ + PositiveInt.one),
+          serial = previous.nextSerial,
         ).map(_ => ()),
       logger,
     )
@@ -175,5 +175,21 @@ class SequencerAdminConnection(
       case NodeStatus.NotInitialized(_) => false
       case NodeStatus.Success(_) => true
     }
+  }
+
+  case class TrafficStatus(status: MemberTrafficStatus) extends PrettyPrinting {
+    def member: Member = status.member
+    def extraTrafficConsumed: NonNegativeLong = status.trafficState.extraTrafficConsumed
+    def extraTrafficLimit: NonNegativeLong =
+      status.trafficState.extraTrafficLimit.fold(NonNegativeLong.zero)(_.toNonNegative)
+    def nextSerial: PositiveInt = status.balanceSerial.fold(PositiveInt.one)(_.increment)
+
+    override def pretty: Pretty[TrafficStatus] = prettyOfClass(
+      param("member", _.member),
+      param("extraTrafficConsumed", _.extraTrafficConsumed),
+      param("extraTrafficLimit", _.extraTrafficLimit),
+      param("nextSerial", _.nextSerial),
+      param("status", _.status),
+    )
   }
 }

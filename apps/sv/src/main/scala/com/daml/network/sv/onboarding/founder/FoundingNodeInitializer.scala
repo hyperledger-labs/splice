@@ -418,9 +418,7 @@ class FoundingNodeInitializer(
         (participantId, mediatorId, trafficStateForAllMembers, coinRules, svcRules) <- (
           participantAdminConnection.getParticipantId(),
           localDomainNode.mediatorAdminConnection.getMediatorId,
-          localDomainNode.sequencerAdminConnection
-            .getSequencerTrafficStatus()
-            .map(_.members),
+          localDomainNode.sequencerAdminConnection.listSequencerTrafficControlState(),
           svcStore.lookupCoinRules(),
           svcStore.lookupSvcRulesWithOffset(),
         ).tupled
@@ -498,7 +496,7 @@ class FoundingNodeInitializer(
                         trafficStateForAllMembers
                           .map(m =>
                             m.member.toProtoPrimitive -> new cn.svcrules.TrafficState(
-                              m.trafficState.extraTrafficConsumed.value
+                              m.extraTrafficConsumed.value
                             )
                           )
                           .toMap

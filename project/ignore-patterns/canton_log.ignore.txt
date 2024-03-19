@@ -86,4 +86,8 @@ periodic acknowledgement failed
 # TODO(#10887) Figure out where this is coming from
 Token refresh failed with Status.*UNAVAILABLE.*Health-check stream unexpectedly closed
 
+# Sequencers can issue this warning if the SequencerDomainState threshold increases between when a topup request is made and when it is validated
+# TODO(#11018): Remove once Canton does not issue a warning for this expected condition
+INVALID_TRAFFIC_CONTROL_BALANCE_MESSAGE.* signature threshold not reached
+
 # Make sure to have a trailing newline
