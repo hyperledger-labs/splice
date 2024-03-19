@@ -76,6 +76,14 @@ spec:
             - name: CN_APP_SV_FOUNDER_REWARD_WEIGHT
               value: {{ .Values.onboardingFoundingSvRewardWeightBps | quote }}
             {{- end }}
+            {{- if .Values.onboardingFoundingSvRewardWeightBps }}
+            - name: CN_APP_SV_FOUNDER_REWARD_WEIGHT
+              value: {{ .Values.onboardingFoundingSvRewardWeightBps | quote }}
+            {{- end }}
+            {{- if .Values.onboardingRoundZeroDuration }}
+            - name: CN_APP_SV_ROUND_ZERO_DURATION
+              value: {{ .Values.onboardingRoundZeroDuration | quote }}
+            {{- end }}
             {{ if ((.Values.auth).audience) }}
             - name: CN_APP_SV_AUTH_AUDIENCE
               value: {{ .Values.auth.audience | quote }}

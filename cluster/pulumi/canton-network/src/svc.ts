@@ -146,7 +146,11 @@ export class Svc extends pulumi.ComponentResource {
       founderConf,
       runningMigration
         ? { type: 'domain-migration' }
-        : { type: 'found-collective', foundingSvRewardWeightBps },
+        : {
+            type: 'found-collective',
+            foundingSvRewardWeightBps,
+            roundZeroDuration: process.env.ROUND_ZERO_DURATION,
+          },
       {
         founder: founderCometBftConf,
         peers: peerCometBftConfs,

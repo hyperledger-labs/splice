@@ -71,7 +71,7 @@ export function installSvKeySecret(
 
 export type SvOnboarding =
   | { type: 'domain-migration' }
-  | { type: 'found-collective'; foundingSvRewardWeightBps: number }
+  | { type: 'found-collective'; foundingSvRewardWeightBps: number; roundZeroDuration?: string }
   | {
       type: 'join-with-key';
       keys: CnInput<SvIdKey>;
@@ -453,6 +453,10 @@ function installSvApp(
     onboardingFoundingSvRewardWeightBps:
       config.onboarding.type == 'found-collective'
         ? config.onboarding.foundingSvRewardWeightBps
+        : undefined,
+    onboardingRoundZeroDuration:
+      config.onboarding.type == 'found-collective'
+        ? config.onboarding.roundZeroDuration
         : undefined,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     cometBFT: {

@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+2024-03-25
+----------
+
+* Round 0 now has a duration of 24h. This removes the advantage of
+  early joiners and allows for more time to validate that the
+  configuration upon joining is the one an SV expected.
+
 2024-03-18
 ----------
 

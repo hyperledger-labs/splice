@@ -1,14 +1,13 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{CoinConfigSchedule, DataExportTestUtil}
+import com.daml.network.util.DataExportTestUtil
 import com.digitalasset.canton.data.CantonTimestamp
 
-import java.time.{Duration, Instant}
+import java.time.Duration
 import com.daml.network.util.FrontendLoginUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.util.Try
@@ -113,15 +112,23 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
     }
   }
 
-  "Check latest open mining round from SV scan-app has been open for < 1.3 ticks" in {
-    implicit env =>
-      val round = svScanClient.getLatestOpenMiningRound(env.environment.clock.now).contract.payload
-      checkRoundWithinTickDuration(round.opensAt, 1.3)
-  }
-
-  "Check latest open mining round from SV sv-app has been open for < 1.3 ticks" in { implicit env =>
-    val round = svClient.getSvcInfo().latestMiningRound.payload
-    checkRoundWithinTickDuration(round.opensAt, 1.3)
+  "Check that open mining round 0 is open for 24h" in { implicit env =>
+    val (openRounds, _) = svScanClient.getOpenAndIssuingMiningRounds()
+    inside(openRounds.find(_.contract.payload.round.number == 0)) {
+      case None =>
+        val openRoundNumbers = openRounds.map(_.contract.payload.round.number)
+        logger.info(
+          s"OpenMiningRound 0 is no longer open, currently open rounds: $openRoundNumbers"
+        )
+      case Some(round) =>
+        val diff = CantonTimestamp.assertFromInstant(
+          round.contract.payload.targetClosesAt
+        ) - CantonTimestamp.assertFromInstant(round.contract.payload.opensAt)
+        // In theory this should be exact but I don't entirely trust that leap seconds or whatever don't break this
+        // and we don't actually care about it being exact.
+        diff should be < Duration.ofHours(24).plus(Duration.ofSeconds(1))
+        diff should be > Duration.ofHours(24).minus(Duration.ofSeconds(1))
+    }
   }
 
   "Check health status of sv cometBft node" in { implicit env =>
@@ -131,20 +138,6 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   "Check that there is a recent participant identities backup on GCP" in { _ =>
     testRecentParticipantIdentitiesDump(svNamespace)
   }
-
-  private def checkRoundWithinTickDuration(round: Instant, factor: Double)(implicit
-      env: CNNodeTestConsoleEnvironment
-  ): Unit = {
-    val tickDuration: RelTime = CoinConfigSchedule(
-      svScanClient
-        .getCoinRules()
-        .toAssignedContract
-        .getOrElse(fail("coinRules is currently in-flight"))
-    ).getConfigAsOf(env.environment.clock.now).tickDuration
-    (env.environment.clock.now - CantonTimestamp.assertFromInstant(
-      round
-    )) should be < Duration.ofNanos(tickDuration.microseconds * (1000 * factor).longValue())
-  }
 }
 
 final class Sv1NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightIntegrationTestBase {
@@ -152,18 +145,26 @@ final class Sv1NonDevNetPreflightIntegrationTest extends SvNonDevNetPreflightInt
   override protected def svNumber = 1
 
   "Check that sv-1 responds with a recent aggregated round" in { implicit env =>
-    val latestOpenMiningRound =
-      Try(
-        svScanClient
-          .getLatestOpenMiningRound(env.environment.clock.now)
-          .contract
-          .payload
-          .round
-          .number
-      ).getOrElse(fail("Could not get latest open mining round from sv-1"))
-    val latestAggregatedRound = Try(svScanClient.getRoundOfLatestData()._1)
-      .getOrElse(fail("Could not get round of latest data from sv-1"))
-
-    latestOpenMiningRound - latestAggregatedRound should be <= 7L
+    eventually() {
+      val (openRounds, issuingRounds) = svScanClient.getOpenAndIssuingMiningRounds()
+      if (openRounds.exists(_.contract.payload.round.number == 0)) {
+        logger.info("Round 0 is still open, not expecting an aggregate")
+      } else if (issuingRounds.exists(_.contract.payload.round.number == 0)) {
+        logger.info("Round 0 is still issuing, not expecting an aggregate")
+      } else {
+        val latestOpenMiningRound =
+          Try(
+            svScanClient
+              .getLatestOpenMiningRound(env.environment.clock.now)
+              .contract
+              .payload
+              .round
+              .number
+          ).getOrElse(fail("Could not get latest open mining round from sv-1"))
+        val latestAggregatedRound = Try(svScanClient.getRoundOfLatestData()._1)
+          .getOrElse(fail("Could not get round of latest data from sv-1"))
+        latestOpenMiningRound - latestAggregatedRound should be <= 7L
+      }
+    }
   }
 }
