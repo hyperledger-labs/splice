@@ -33,10 +33,12 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
       { dependsOn: [xns.ns] }
     );
 
-    // give pulumi + cluster time to stabilize before the first load test run starts.
-    const minute = (new Date().getMinutes() + 10) % 60;
-    // trigger the job once every hour, starting 10 mins from now
-    const schedule = `${minute} * * * *`;
+    // trigger the job every 24h
+    const date = new Date();
+    date.setMinutes(date.getMinutes() + 5);
+    const minute = date.getMinutes();
+    const hour = date.getHours();
+    const schedule = `${minute} ${hour} * * *`;
 
     const oauthDomain = `https://${auth0Client.getCfg().auth0Domain}`;
     const oauthClientId = auth0Client.getCfg().namespaceToUiToClientId?.validator1?.wallet;
@@ -90,7 +92,7 @@ export function scheduleLoadGenerator(auth0Client: Auth0Client, dependencies: Re
           usersPerValidator: 10,
           validators,
           test: {
-            duration: '58m',
+            duration: `${24 * 60 - 5}m`,
             iterationsPerMinute: 60,
           },
         }),
