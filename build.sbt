@@ -1219,6 +1219,9 @@ lazy val bundleTask = {
     val log = streams.value.log
     val assemblyJar = assembly.value
     val examples = Seq("-c", "apps/app/src/pack")
+    val testResources = Seq("-r", "apps/app/src/test/resources", "testResources")
+    val transformConfig =
+      Seq("-r", "scripts/transform-config.sc", "testResources/transform-config.sc")
     val webUis =
       Seq(
         ((`apps-wallet-frontend` / bundle).value, "wallet"),
@@ -1240,11 +1243,13 @@ lazy val bundleTask = {
         (`validator-lifecycle-daml` / Compile / damlBuild).value,
         (`cn-util-daml` / Compile / damlBuild).value,
       )
-    val args: Seq[String] = license ++ examples ++ webUis.flatMap({ case ((source, _), name) =>
-      Seq[String]("-r", source.toString, s"web-uis/$name")
-    }) ++ dars.flatten.flatMap({ case dar =>
-      Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
-    })
+    val args: Seq[String] =
+      license ++ examples ++ testResources ++ transformConfig ++ webUis.flatMap({
+        case ((source, _), name) =>
+          Seq[String]("-r", source.toString, s"web-uis/$name")
+      }) ++ dars.flatten.flatMap({ case dar =>
+        Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
+      })
     val cacheDir = streams.value.cacheDirectory
     val main = (assembly / mainClass).value.get
     val cache = FileFunction.cached(cacheDir) { _ =>

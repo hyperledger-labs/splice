@@ -67,9 +67,7 @@ object CNNodeConfigTransforms {
     * // validatorUserName will have the name with the suffix applied
     * val validatorParty = validatorParticipant.ledger_api.parties.allocate(validatorUserName, validatorUserName).party
     */
-  def addDamlNameSuffix(context: String): CNNodeConfigTransform = { config =>
-    val suffix = context.toLowerCase
-
+  def addDamlNameSuffix(suffix: String): CNNodeConfigTransform = { config =>
     val transforms = Seq(
       updateAllSvAppConfigs_(c =>
         c.copy(
@@ -166,9 +164,9 @@ object CNNodeConfigTransforms {
     * // validatorUserName will have the name with the suffix applied
     * val validatorParty = validatorParticipant.ledger_api.parties.allocate(validatorUserName, validatorUserName).party
     */
-  def ensureNovelDamlNames(): CNNodeConfigTransform = { config =>
-    val id = (new scala.util.Random).nextInt().toHexString
-    addConfigName(id)(addDamlNameSuffix(id)(config))
+  def ensureNovelDamlNames(id: Option[String] = None): CNNodeConfigTransform = { config =>
+    val _id = id.getOrElse((new scala.util.Random).nextInt().toHexString.toLowerCase)
+    addConfigName(_id)(addDamlNameSuffix(_id)(config))
   }
 
   /** Default transforms to apply to tests using a [[CNNodeEnvironmentDefinition]].
@@ -176,10 +174,10 @@ object CNNodeConfigTransforms {
     * collide, and adds a suffix to Daml user names that is specific to a given test
     * context.
     */
-  def defaults(): Seq[CNNodeConfigTransform] = {
+  def defaults(testId: Option[String] = None): Seq[CNNodeConfigTransform] = {
     Seq(
       makeAllTimeoutsBounded,
-      ensureNovelDamlNames(),
+      ensureNovelDamlNames(testId),
       useSelfSignedTokensForLedgerApiAuth("test"),
       reducePollingInterval,
       withPauseSvDomainComponentsOffboardingTriggers(),
