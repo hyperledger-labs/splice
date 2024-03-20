@@ -49,7 +49,8 @@
         "20.250.60.187/32",
         "20.250.127.247/32"
       ],
-      "Canton Network Registry App": ["34.65.140.146/32"]
+      "Canton Network Registry App": ["34.65.140.146/32"],
+      "Daml Hub DevNet Validator": ["35.193.111.3/32"]
     }
   },
   "testnet": {
