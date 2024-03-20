@@ -1779,7 +1779,8 @@ jobs:
                 cmd: |
                   # deployment/scratch* branches break our deployment, so we guard against accidentally creating those here
                   # This is a safeguard against people manually running e.g. deploy_devnet on a scratchnet.
-                  if [[ << parameters.cluster >> != scratch* ]] && [[ << parameters.cluster >> != user-selected-scratchnet ]]; then
+                  # TODO(#11090) Stop filtering out testnet here
+                  if [[ << parameters.cluster >> != scratch* ]] && [[ << parameters.cluster >> != user-selected-scratchnet ]] && [[ << parameters.cluster >> != testnet ]]; then
                     scripts/update-deployment-branch-and-tag.sh "<< parameters.cluster >>" HEAD
                   else
                     echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
