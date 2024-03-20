@@ -143,9 +143,8 @@ export class Svc extends pulumi.ComponentResource {
     const initialTickDurationS = 600;
     // chosen for $1/360 days at above tick duration
     const initialHoldingFee =
-      Math.round(
-        (100000_00000 * 1.0) / 360.0 / ((24.0 * 60.0 * 60.0) / initialTickDurationS) / 0.005 // assumed coin price
-      ) / 100000_00000;
+      Math.round((100000_00000 * 1.0) / 360.0 / ((24.0 * 60.0 * 60.0) / initialTickDurationS)) /
+      100000_00000;
 
     const runningMigration = this.args.globalDomainUpgradeConfig.isRunningMigration();
     const founder = await this.installSvNode(

@@ -14,9 +14,9 @@ Release Notes
 
 * Subsequent round duration is now 10min.
 
-* The initial holding fee is now 0.0038580247 CC/round to preserve an
-  approximate fee of $1/360 days given the coin price and round duration
-  changes.
+* The initial holding fee is now $0.0000192901/round (about 4× its prior
+  value) to preserve an approximate fee of $1/360 days given the round
+  duration change.
 
 * New ``initial-holding-fee`` setting for ``"found-collective"`` sv
   onboarding.
