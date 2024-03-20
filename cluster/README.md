@@ -1410,7 +1410,7 @@ A value of `0` tells the load-tester to not use any of the test validators and d
 ## SV Operations
 
 Supervalidator nodes (SVs) play a central role in the governance and operation of each CN deployment.
-Each of our cluster deployments contains up to 5 SV nodes that are under our direct control (SVs 1-4 + the runbook SV).
+Each of our cluster deployments contains multiple SV nodes that are under our direct control (e.g., SVs 1-4, the runbook SV).
 This means that we occasionally have to perform operations that SV operators need to perform.
 The SV runbook is currently the main documentation for operating an SV node.
 This section covers aspects not (yet) covered by the SV runbook as well has hints for managing our SV nodes specifically,
@@ -1466,7 +1466,9 @@ The following steps assume that:
    `curl "https://${GCP_CLUSTER_BASENAME}.network.canton.global/version"` - they should be the same.
    You might need to set `CI_IGNORE_DIRTY_REPO` to `true` for `get-snapshot-version` (and the subsequent steps) to work,
    in case you have made local changes to the repo (that you can confirm are harmless).
-1. Run `make -C $REPO_ROOT cluster/clean`, and `make -C $REPO_ROOT cluster/build` to rebuild your local helm charts to the target version.
+1. The `cncluster` commands below are wired up to use charts published to artifactory.
+   If you want to use local charts instead you (currently) need to edit `cncluster` to remove the `CHART_VERSION` exports.
+   In this case you'll also want to run `make -C $REPO_ROOT cluster/clean` and `make -C $REPO_ROOT cluster/build` to rebuild your local helm charts to the target version.
 1. Set `export CI=true` to convince `cncluster` to let you work on non-scratch clusters manually.
 1. Run `cncluster hard_domain_migration_prepare` to deploy the new Canton and CometBFT nodes for all our SVs.
    Note that this command contains multiple `pulumi up` steps (one for the main deployment, one for the runbook SV),
@@ -1477,7 +1479,8 @@ The following steps assume that:
    See [below](#checking-the-readiness-of-partners) for ideas on how to determine this.
 1. Coordinate with all other SVs to schedule a migration via governance vote.
    For testing (or if our SVs have a governance majority) you can also run `cncluster hard_domain_migration_trigger`.
-1. Deactivate our periodic health checks for the target cluster by merging a PR to `main`.
+1. Deactivate our periodic health checks for the target cluster by merging a PR to `main`
+   (close to the scheduled synchronizer pausing date).
    If periodic SV runbook redeployments are scheduled for the target cluster, deactivate those as well.
 1. Wait until the scheduled time has arrived, the domain is paused and a migration dump has been exported.
    If unsure, check the SV app logs for an entry such as "Wrote domain migration dump"
@@ -1517,11 +1520,14 @@ In addition to inquiring about the status of partners on [Slack](https://daholdi
 here is a hacky oneliner to see if our partners's new sequencers and CometBFT nodes are reachable (before the actual migration has taken place):
 
 ```
-curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/svc | jq '.svc_rules.payload.members | .[] | .[1].domainNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0 && grpcurl --max-time 5 $0:443 grpc.health.v1.Health/Check'
+curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/svc | jq '.svc_rules.payload.members | .[] | .[1].domainNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
 ```
 
-This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and the same IP for the CometBFT node as is used for the sequencer...
+This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and that the hostname for the CometBFT node either doesn't matter (because it's all the same IP) or they are Daml Hub...
 So use this with many grains of salt and clarify with partners for which the checks fail that our assumptions are correct in their case.
+
+For CometBFT, you can also check the CometBFT [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
+If you pick the chain ID after the migration (with the higher ID), the "Connected Peers" display tells you how many SVs have already set up their new CometBFT nodes (add +1 to also count the node you are viewing).
 
 Also note that pre-migration, the sequencer URLs of correctly set up sequencers will return the following (and this is fine):
 
