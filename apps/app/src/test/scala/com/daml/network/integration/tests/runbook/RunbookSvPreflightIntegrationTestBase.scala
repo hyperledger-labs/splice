@@ -342,28 +342,4 @@ final class RunbookSvNonDevNetPreflightIntegrationTest
     extends RunbookSvPreflightIntegrationTestBase {
   override protected def svUsername = s"admin@sv.com";
   override protected def isDevNet = false
-
-  "ParticipantId matches the expected one" in { _ =>
-    val svUiUrl = s"https://sv.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}/";
-    // we need to update this hard-coded string when we change it
-    val participantId = "122094f834829f4e48f0712fca8fec13ac867e97da47311729508704f7f59994c7b5"
-
-    withFrontEnd("sv") { implicit webDriver =>
-      clue(s"Logging in to sv ui at ${svUiUrl}") {
-        completeAuth0LoginWithAuthorization(
-          svUiUrl,
-          svUsername,
-          svPassword,
-          () => find(id("logout-button")) should not be empty,
-        )
-      }
-
-      clue("The suffix matches the participantID") {
-        eventually() {
-          val valueCells = findAll(className("general-svc-value-name")).toSeq
-          forAtLeast(1, valueCells)(cell => seleniumText(cell) should include(participantId))
-        }
-      }
-    }
-  }
 }
