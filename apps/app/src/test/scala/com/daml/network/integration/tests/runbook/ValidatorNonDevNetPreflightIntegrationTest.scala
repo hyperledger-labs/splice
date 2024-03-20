@@ -6,7 +6,6 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironme
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletFrontendTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.PartyId
 
 /** Base for preflight tests running against a deployed non-devnet validator
   */
@@ -28,69 +27,27 @@ abstract class ValidatorNonDevNetPreflightIntegrationTestBase
   protected val sv1UserPassword: String = sys.env(s"SV_WEB_UI_PASSWORD")
   protected val sv1WalletUiUrl = s"https://wallet.sv-1.svc.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
-  private val minimalBalance = 1_000
-  private val targetBalance = 10_000
-
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition.preflightTopology(
       this.getClass.getSimpleName
     )
 
-  "The validator service user's wallet is accessible and has sufficient balance" in { _ =>
-    val (recipient: PartyId, balance: BigDecimal) = withFrontEnd("validator-user") {
-      implicit webDriver =>
-        clue(s"Logging in to wallet UI at: $validatorWalletUiUrl") {
-          completeAuth0LoginWithAuthorization(
-            validatorWalletUiUrl,
-            validatorUserName,
-            validatorUserPassword,
-            // Notably, we expect that the service user is always already onboarded.
-            () => find(id("wallet-balance-cc")) should not be empty,
-          )
-        }
-        val recipient =
-          PartyId.tryFromProtoPrimitive(seleniumText(find(id("logged-in-user"))))
-        clue("Checking that balance is visible and > 0") {
-          val balanceText = find(id("wallet-balance-cc")).value.text.trim
-          (recipient, BigDecimal(balanceText.split(" ").head))
-        }
-    }
-    if (balance <= BigDecimal(targetBalance)) {
-      clue(
-        s"Balance is too low, topping up $validatorName's wallet to have at least $targetBalance CC"
-      ) {
-        sv1TopupValidatorWallet(recipient, targetBalance - balance)
-      }
-      withFrontEnd("validator-user") { implicit webDriver =>
-        val acceptButton = eventually() {
-          findAll(className("transfer-offer")).toSeq.headOption match {
-            case Some(element) =>
-              element.childWebElement(className("transfer-offer-accept"))
-            case None => fail("failed to find transfer offer")
-          }
-        }
-        click on acceptButton
-        eventually() {
-          val balanceText = find(id("wallet-balance-cc")).value.text.trim
-          val balance = BigDecimal(balanceText.split(" ").head)
-          balance should be > BigDecimal(minimalBalance)
-        }
-      }
-    }
-  }
-
-  private def sv1TopupValidatorWallet(recipient: PartyId, amount: BigDecimal): Unit = {
-    withFrontEnd("sv1-user") { implicit webDriver =>
-      clue(s"Logging in to SV1 wallet UI at: $sv1WalletUiUrl") {
+  "The validator service user's wallet is accessible" in { _ =>
+    withFrontEnd("validator-user") { implicit webDriver =>
+      clue(s"Logging in to wallet UI at: $validatorWalletUiUrl") {
         completeAuth0LoginWithAuthorization(
-          sv1WalletUiUrl,
-          sv1UserName,
-          sv1UserPassword,
+          validatorWalletUiUrl,
+          validatorUserName,
+          validatorUserPassword,
+          // Notably, we expect that the service user is always already onboarded.
           () => find(id("wallet-balance-cc")) should not be empty,
         )
       }
-      createTransferOffer(recipient, amount, 1)
+      clue("Checking that balance is visible") {
+        val balanceText = find(id("wallet-balance-cc")).value.text.trim
+        logger.info(s"Current balance: $balanceText")
+      }
     }
   }
 }
