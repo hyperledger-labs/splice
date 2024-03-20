@@ -93,8 +93,9 @@ Next, start a postgres docker container that will be used by the CN apps:
   docker run -d --rm \
     --log-driver json-file \
     --name "postgres_self_hosting_validator" \
-    -e POSTGRES_USER="postgres" \
-    -e POSTGRES_PASSWORD="postgres" \
+    -e POSTGRES_USER="canton" \
+    -e POSTGRES_PASSWORD="supersafe" \
+    -e POSTGRES_DB="cn_apps" \
     -p 5432:5432 \
     postgres:14 \
     postgres \
@@ -103,19 +104,6 @@ Next, start a postgres docker container that will be used by the CN apps:
     -c logging_collector=on \
     -c log_destination=csvlog \
     -c log_filename='postgresql.log'
-
-Create a user and a database for the CN apps:
-
-.. code-block:: bash
-
-  docker exec -e PGPASSWORD="postgres" postgres_self_hosting_validator \
-    psql -U "postgres" \
-    -c "create user canton with encrypted password 'supersafe';"
-
-  docker exec -e PGPASSWORD="postgres" postgres_self_hosting_validator \
-    psql -U "postgres" \
-    -c "CREATE DATABASE cn_apps;" \
-    -c "GRANT ALL PRIVILEGES ON DATABASE cn_apps TO canton;"
 
 
 You can now start a console with the CN apps. Use the following command, making sure that the `validator-onboarding.conf` matches the file you created in the previous step.
