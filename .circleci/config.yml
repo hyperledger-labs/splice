@@ -1577,6 +1577,51 @@ jobs:
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
 
+  deploy_multivalidator:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2024.01
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      reset_cluster:
+        type: boolean
+        default: true
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+          cmd_retry_count: 2
+      - when:
+          condition:
+            and:
+              - equal: [ true, <<pipeline.parameters.reset-before-deploy>> ]
+              - equal: [ true, <<parameters.reset_cluster>> ]
+          steps:
+            - run_bash_command_in_nix:
+                cmd_name: Reset multi-validator pulumi stack
+                cluster: << parameters.cluster >>
+                gce_authenticate: true
+                cmd: |
+                  cncluster activate
+                  cncluster ci_pdown_multi
+      - run_bash_command_in_nix:
+          cmd_name: Apply multi-validator pulumi stack
+          cluster: << parameters.cluster >>
+          additional_nix_args: "--keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET --keep ARTIFACTORY_USER --keep ARTIFACTORY_PASSWORD --keep CIRCLECI_TOKEN --keep CIRCLE_WORKFLOW_ID"
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster ci_apply_multi
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+
   deploy_cluster:
     circleci_ip_ranges: true
     docker:
@@ -3580,6 +3625,14 @@ workflows:
           requires:
             - deploy_cluster
       - deploy_validator_runbook:
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "cilr"
+          requires:
+            - deploy_cluster
+      - deploy_multivalidator:
           <<: *main-branch-only
           context:
             - artifactory

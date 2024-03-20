@@ -1724,6 +1724,23 @@ function subcmd_apply_multi() {
     subcmd_pulumi multi-validator up --yes --skip-preview --show-sames "${args[@]}"
 }
 
+subcommand_whitelist[ci_apply_multi]='Run only by CircleCI'
+
+function subcmd_ci_apply_multi() {
+    _assert_lock
+
+    if ! (env-bool CI); then
+        _error "This subcommand is available to CI jobs only."
+    fi
+
+    local -x IMAGE_TAG
+    IMAGE_TAG=$(get-snapshot-version)
+
+    _uses_pulumi_stack multi-validator
+
+    subcmd_pulumi multi-validator up --yes --skip-preview "${args[@]}"
+}
+
 ###
 
 subcommand_whitelist[pdown_multi]="Take the current multi-validator Pulumi configuration down"
@@ -1732,6 +1749,17 @@ function subcmd_pdown_multi(){
     _production_gate
     _prompt_to_confirm
     _cluster_must_exist
+
+    subcmd_pulumi multi-validator down --yes --skip-preview
+}
+
+subcommand_whitelist[ci_pdown_multi]="Run only by CircleCI"
+
+function subcmd_ci_pdown_multi(){
+
+    if ! (env-bool CI); then
+        _error "This subcommand is available to CI jobs only."
+    fi
 
     subcmd_pulumi multi-validator down --yes --skip-preview
 }
