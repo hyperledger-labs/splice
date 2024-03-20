@@ -510,7 +510,7 @@ class GlobalDomainMigrationIntegrationTest
       ),
       logSuffix = "global-domain-migration",
       autoInit = false,
-      extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+      extraParticipantsConfigFileName = Some("standalone-participant-extra-splitwell.conf"),
       extraParticipantsEnvMap = Map(
         "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorBackend.config.ledgerApiUser,
         "EXTRA_PARTICIPANT_DB" -> s"participant_extra_${dbsSuffix}",

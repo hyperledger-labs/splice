@@ -63,10 +63,7 @@ trait StandaloneCanton extends PostgresAroundEach with NamedLogging with Process
         ) ++
         conditionalConf(sv4 && participants, "standalone-participant-sv4.conf") ++
         conditionalConf(sv4 && sequencersMediators, "standalone-sequencer-mediator-sv4.conf") ++
-        conditionalConf(
-          extraParticipantsConfigFileName.isDefined,
-          "standalone-participant-extra.conf",
-        )
+        extraParticipantsConfigFileName.toList.map(testResourcesPath / _)
 
     def adminUserEnv(index: Integer) = {
       adminUsersFromSvBackends

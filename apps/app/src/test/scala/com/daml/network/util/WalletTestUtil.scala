@@ -61,6 +61,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
           coin.contract.payload.owner shouldBe walletParty.toProtoPrimitive
           val coinAmount =
             coin.contract.payload.amount
+
           assertInRange(coinAmount.initialAmount, amountBounds)
           coinAmount.ratePerRound shouldBe expectedRatePerRound
         }

@@ -6,10 +6,15 @@ import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirm
 import com.daml.network.config.{
   CNDbConfig,
   CNNodeConfigTransforms,
+  CNParticipantClientConfig,
   NetworkAppClientConfig,
   ParticipantBootstrapDumpConfig,
 }
-import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
+import com.daml.network.config.CNNodeConfigTransforms.{
+  ConfigurableApp,
+  bumpUrl,
+  updateAutomationConfig,
+}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTest,
@@ -21,25 +26,31 @@ import com.daml.network.sv.automation.singlesv.membership.offboarding.{
   SvOffboardingMediatorTrigger,
   SvOffboardingSequencerTrigger,
 }
-import com.daml.network.sv.config.MigrateSvPartyConfig
-import com.daml.network.util.{ProcessTestUtil, StandaloneCanton}
+import com.daml.network.util.{ProcessTestUtil, StandaloneCanton, WalletTestUtil}
+import com.daml.network.validator.config.MigrateValidatorPartyConfig
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
-// TODO(#10845): add back imports once the later parts of the test are added again
-// import com.digitalasset.canton.config.RequireTypes.PositiveInt
-// import com.digitalasset.canton.health.admin.data.NodeStatus
-// import scala.concurrent.duration.*
+import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.health.admin.data.NodeStatus
+
+import scala.jdk.CollectionConverters.*
+import scala.concurrent.duration.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.typesafe.config.ConfigValueFactory
 import org.apache.pekko.http.scaladsl.model.Uri
 import org.scalatest.time.{Minute, Span}
 
 import java.nio.file.Files
-import scala.jdk.CollectionConverters.*
+import java.util.UUID
+import java.time.Duration as JDUration
 
 class SvReonboardingIntegrationTest
     extends CNNodeIntegrationTest
     with ProcessTestUtil
-    with StandaloneCanton {
+    with StandaloneCanton
+    with WalletTestUtil {
 
   override def dbsSuffix = "reonboard"
   override def usesDbs =
@@ -48,6 +59,9 @@ class SvReonboardingIntegrationTest
       "sequencer_sv4_reonboard_new",
       "mediator_sv4_reonboard_new",
       "sv_app_sv4_reonboard_new",
+      "validator_sv4_reonboard_new",
+      "participant_reonboard_new",
+      "validator_app_reonboard_new",
     ) ++ super.usesDbs
 
   // Runs against a temporary Canton instance.
@@ -57,8 +71,15 @@ class SvReonboardingIntegrationTest
 
   val dumpPath = Files.createTempFile("participant-dump", ".json")
 
-  // TODO(#10845): add back once the later part of the test is back
-  // private def sv4ReonboardBackend(implicit env: CNNodeTestConsoleEnvironment) = svb("sv4Reonboard")
+  private def sv4ReonboardBackend(implicit env: CNNodeTestConsoleEnvironment) = svb("sv4Reonboard")
+  private def sv4WalletClient(implicit
+      env: CNNodeTestConsoleEnvironment
+  ) = wc("sv4Wallet")
+  private def validatorLocalBackend(implicit env: CNNodeTestConsoleEnvironment) = v(
+    "validatorLocal"
+  )
+  private def validatorLocalWalletClient(implicit env: CNNodeTestConsoleEnvironment) =
+    wc("validatorWalletLocal")
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -74,11 +95,12 @@ class SvReonboardingIntegrationTest
         (_, config) =>
           config.copy(
             svApps = config.svApps +
-              (InstanceName.tryCreate("sv4Reonboard") ->
-                config
+              (InstanceName.tryCreate("sv4Reonboard") -> {
+                val sv4Config = config
                   .svApps(InstanceName.tryCreate("sv4"))
+                sv4Config
                   .copy(
-                    storage = config.svApps(InstanceName.tryCreate("sv4")).storage match {
+                    storage = sv4Config.storage match {
                       case c: CNDbConfig.Postgres =>
                         c.copy(
                           config = c.config
@@ -89,10 +111,43 @@ class SvReonboardingIntegrationTest
                         )
                       case _ => throw new IllegalArgumentException("Only Postgres is supported")
                     },
-                    participantBootstrappingDump =
-                      Some(ParticipantBootstrapDumpConfig.File(dumpPath, Some("sv4ReonboardNew"))),
-                    migrateSvParty = Some(
-                      MigrateSvPartyConfig(
+                    svPartyHint = Some("digital-asset-eng-4-reonboard"),
+                  )
+              }),
+            validatorApps = config.validatorApps +
+              (InstanceName.tryCreate("validatorLocal") -> {
+                val referenceValidatorConfig =
+                  config.validatorApps(InstanceName.tryCreate("aliceValidator"))
+                referenceValidatorConfig
+                  .copy(
+                    adminApi = referenceValidatorConfig.adminApi
+                      .copy(internalPort = Some(Port.tryCreate(27503))),
+                    participantClient = CNParticipantClientConfig(
+                      ClientConfig(port = Port.tryCreate(27502)),
+                      referenceValidatorConfig.participantClient.ledgerApi.copy(
+                        clientConfig =
+                          referenceValidatorConfig.participantClient.ledgerApi.clientConfig.copy(
+                            port = Port.tryCreate(27501)
+                          )
+                      ),
+                    ),
+                    storage = referenceValidatorConfig.storage match {
+                      case c: CNDbConfig.Postgres =>
+                        c.copy(
+                          config = c.config
+                            .withValue(
+                              "properties.databaseName",
+                              ConfigValueFactory.fromAnyRef("validator_app_reonboard_new"),
+                            )
+                        )
+                      case _ => throw new IllegalArgumentException("Only Postgres is supported")
+                    },
+                    participantBootstrappingDump = Some(
+                      ParticipantBootstrapDumpConfig
+                        .File(dumpPath, Some("validatorLocalNew"))
+                    ),
+                    migrateValidatorParty = Some(
+                      MigrateValidatorPartyConfig(
                         ScanAppClientConfig(
                           adminApi = NetworkAppClientConfig(
                             Uri(s"http://localhost:5012")
@@ -100,7 +155,24 @@ class SvReonboardingIntegrationTest
                         )
                       )
                     ),
-                  ))
+                    validatorPartyHint = config.svApps(InstanceName.tryCreate("sv4")).svPartyHint,
+                    domains = referenceValidatorConfig.domains.copy(extra = Seq.empty),
+                  )
+              }),
+            walletAppClients = config.walletAppClients + (
+              InstanceName.tryCreate("validatorWalletLocal") -> {
+                val referenceValidatorWalletConfig =
+                  config.walletAppClients(InstanceName.tryCreate("aliceValidatorWallet"))
+
+                referenceValidatorWalletConfig
+                  .copy(
+                    adminApi = referenceValidatorWalletConfig.adminApi
+                      .copy(url =
+                        bumpUrl(22_000, referenceValidatorWalletConfig.adminApi.url.toString())
+                      )
+                  )
+              }
+            ),
           ),
         (_, config) =>
           updateAutomationConfig(ConfigurableApp.Sv)(
@@ -108,9 +180,10 @@ class SvReonboardingIntegrationTest
               .withResumedTrigger[SvOffboardingSequencerTrigger]
           )(config),
       )
+      .withTrafficTopupsDisabled
       .withManualStart
 
-  "restore SV from namespace only" in { implicit env =>
+  "reonboard SV with new party id and recover coin via new regular validator" in { implicit env =>
     // Mediators/sequencers that have been offboarded stay in a broken state which is fine in prod
     // (you can onboard a fresh mediator/sequencer)
     // but annoying in tests so we use a dedicated Canton instance for this test.
@@ -125,14 +198,13 @@ class SvReonboardingIntegrationTest
       sv4 = false,
     )() {
 
-      // TODO(#10845): add back once the later part of the test is back
-//      val (
-//        dump,
-//        sv4Party,
-//        (sv1MediatorId, sv2MediatorId, sv3MediatorId, _),
-//        (sv1SequencerId, sv2SequencerId, sv3SequencerId, _),
-//        ) = withCantonSvNodes(
-      withCantonSvNodes(
+      val (
+        sv4ParticipantDump,
+        sv4Name,
+        (sv1Party, sv2Party, sv3Party, sv4Party),
+        (sv1MediatorId, sv2MediatorId, sv3MediatorId, _),
+        (sv1SequencerId, sv2SequencerId, sv3SequencerId, _),
+      ) = withCantonSvNodes(
         (None, None, None, Some(sv4Backend)),
         logSuffix = "sv4-reonboarding",
         svs123 = false,
@@ -154,6 +226,17 @@ class SvReonboardingIntegrationTest
         val sv2Party = sv2Backend.getSvcInfo().svParty
         val sv3Party = sv3Backend.getSvcInfo().svParty
         val sv4Party = sv4Backend.getSvcInfo().svParty
+
+        val sv4Name =
+          sv1Backend
+            .getSvcInfo()
+            .svcRules
+            .payload
+            .members
+            .asScala
+            .get(sv4Party.toProtoPrimitive)
+            .value
+            .name
 
         val (sv1MediatorId, sv2MediatorId, sv3MediatorId, sv4MediatorId) =
           inside(
@@ -201,6 +284,9 @@ class SvReonboardingIntegrationTest
           sv3SequencerId,
           sv4SequencerId,
         )
+
+        sv4WalletClient.tap(100)
+        val sv4ParticipantDump = sv4ValidatorBackend.dumpParticipantIdentities()
 
         clue("Offboard SV4") {
           val (_, voteRequestCid) = actAndCheck(
@@ -267,44 +353,74 @@ class SvReonboardingIntegrationTest
           }
         }
 
-        val dump = sv4ValidatorBackend.dumpParticipantIdentities()
-
         // Stop SV4
         clue("Stop SV4") {
           sv4Backend.stop()
           sv4ValidatorBackend.stop()
         }
         (
-          dump,
-          sv4Party,
+          sv4ParticipantDump,
+          sv4Name,
+          (sv1Party, sv2Party, sv3Party, sv4Party),
           (sv1MediatorId, sv2MediatorId, sv3MediatorId, sv4MediatorId),
           (sv1SequencerId, sv2SequencerId, sv3SequencerId, sv4SequencerId),
         )
       }
 
-      // TODO(#10845): re-enable this part of the test.
-      /*
       withCantonSvNodes(
         (None, None, None, Some(sv4Backend)),
         logSuffix = "sv4-reonboarding-new",
         svs123 = false,
         overrideSvDbsSuffix = Some("reonboard_new"),
-      )(
-        "SV4_PARTICIPANT_AUTO_INIT" -> "false"
-      ) {
+        extraParticipantsConfigFileName = Some("standalone-participant-extra.conf"),
+        extraParticipantsEnvMap = Map(
+          "EXTRA_PARTICIPANT_ADMIN_USER" -> validatorLocalBackend.config.ledgerApiUser,
+          "EXTRA_PARTICIPANT_DB" -> s"participant_reonboard_new",
+          "EXTRA_PARTICIPANT_AUTO_INIT" -> "false",
+        ),
+      )() {
         // Canton is slooooooooooooooooooooooooooow
         eventuallySucceeds(timeUntilSuccess = 60.seconds) {
-          sv4ReonboardBackend.participantClientWithAdminToken.health.status shouldBe NodeStatus
-            .NotInitialized(
-              true
-            )
+          sv4ReonboardBackend.participantClientWithAdminToken.health.status should (be(
+            NodeStatus.NotInitialized(true)
+          ) or be(a[NodeStatus.Success[?]]))
         }
         better.files
           .File(dumpPath)
           .overwrite(
-            dump.toJson.noSpaces
+            sv4ParticipantDump.toJson.noSpaces
           )
-        sv4ReonboardBackend.startSync()
+
+        startAllSync(
+          sv4ReonboardBackend,
+          sv4ValidatorBackend,
+          validatorLocalBackend,
+        )
+
+        val sv4PartyNew = sv4ReonboardBackend.getSvcInfo().svParty
+        clue("partyId of re-onboarded sv4 is different") {
+          sv4PartyNew should not be sv4Party
+          sv4PartyNew.uid.id.unwrap should startWith("digital-asset-eng-4-reonboard")
+          sv4PartyNew.uid.namespace should not be sv4Party.uid.namespace
+        }
+
+        sv1Backend.getSvcInfo().svcRules.payload.members.keySet.asScala shouldBe Set(
+          sv1Party,
+          sv2Party,
+          sv3Party,
+          sv4PartyNew,
+        ).map(_.toProtoPrimitive)
+
+        sv1Backend
+          .getSvcInfo()
+          .svcRules
+          .payload
+          .members
+          .asScala
+          .get(sv4PartyNew.toProtoPrimitive)
+          .value
+          .name shouldBe sv4Name
+
         val mapping = sv1Backend.appState.participantAdminConnection
           .getPartyToParticipant(globalDomainId, sv1Backend.getSvcInfo().svcParty)
           .futureValue
@@ -346,13 +462,13 @@ class SvReonboardingIntegrationTest
         val action: ActionRequiringConfirmation =
           new ARC_SvcRules(
             new SRARC_GrantFeaturedAppRight(
-              new SvcRules_GrantFeaturedAppRight(sv4Party.toProtoPrimitive)
+              new SvcRules_GrantFeaturedAppRight(sv4PartyNew.toProtoPrimitive)
             )
           )
         actAndCheck(
           "SV4 can create vote requests",
           sv4ReonboardBackend.createVoteRequest(
-            sv4Party.toProtoPrimitive,
+            sv4PartyNew.toProtoPrimitive,
             action,
             "url",
             "description",
@@ -368,8 +484,88 @@ class SvReonboardingIntegrationTest
             }
           },
         )
+
+        clue("sv4 party is now the primary party of the new validator") {
+          PartyId.tryFromProtoPrimitive(
+            validatorLocalWalletClient.userStatus().party
+          ) shouldBe sv4Party
+        }
+
+        val sv4PartyToParticipantMapping =
+          validatorLocalBackend.appState.participantAdminConnection
+            .getPartyToParticipant(
+              globalDomainId,
+              sv4Party,
+            )
+            .futureValue
+            .mapping
+
+        sv4PartyToParticipantMapping.participants.map(
+          _.participantId
+        ) should contain theSameElementsAs Seq(
+          validatorLocalBackend.participantClient.id
+        )
+
+        validatorLocalBackend.participantClient.id.code shouldBe ParticipantId.Code
+        validatorLocalBackend.participantClient.id.uid.id.unwrap shouldBe "validatorLocalNew"
+
+        sv4WalletClient.userStatus().party shouldBe sv4PartyNew.toProtoPrimitive
+
+        clue("coin balance is preserved from off-boarded sv4") {
+          val expectedCoins: Range = 99 to 100
+          checkWallet(
+            sv4Party,
+            validatorLocalWalletClient,
+            Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+          )
+        }
+
+        actAndCheck(
+          "sv4Party tap again on re-onboarded validator",
+          validatorLocalWalletClient.tap(50.0),
+        )(
+          "balance updated",
+          _ => {
+            val expectedCoins: Range = 149 to 150
+            checkWallet(
+              sv4Party,
+              validatorLocalWalletClient,
+              Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+            )
+          },
+        )
+
+        val (offerCid, _) =
+          actAndCheck(
+            "sv4Party creates transfer offer via the validator",
+            validatorLocalWalletClient.createTransferOffer(
+              sv4PartyNew,
+              walletUsdToCoin(148.0),
+              "transfer recovered coin back to SV",
+              CantonTimestamp.now().plus(JDUration.ofMinutes(1)),
+              UUID.randomUUID.toString,
+            ),
+          )(
+            "sv4PartyNew sees transfer offer",
+            _ => sv4WalletClient.listTransferOffers() should have length 1,
+          )
+
+        actAndCheck(
+          "sv4PartyNew accepts transfer offer",
+          sv4WalletClient.acceptTransferOffer(offerCid),
+        )(
+          "sv4PartyNew sees updated balance",
+          _ => {
+            sv4WalletClient.listTransferOffers() should have length 0
+            val expectedCoins: Range = 147 to 148
+            checkWallet(
+              sv4PartyNew,
+              sv4WalletClient,
+              Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+            )
+          },
+        )
       }
-       */
     }
   }
 }

@@ -129,12 +129,12 @@ class ValidatorReonboardingIntegrationTest
     }
     withCanton(
       Seq(
-        testResourcesPath / "standalone-alice-participant-reonboard.conf"
+        testResourcesPath / "standalone-participant-extra.conf"
       ),
       Seq(),
       "alice-reonboard-participant",
-      "PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
-      "PARTICIPANT_DB" -> s"participant_alice_validator_reonboard_new",
+      "EXTRA_PARTICIPANT_ADMIN_USER" -> aliceValidatorLocalBackend.config.ledgerApiUser,
+      "EXTRA_PARTICIPANT_DB" -> s"participant_alice_validator_reonboard_new",
       "AUTO_INIT_ALL" -> "false",
     ) {
       better.files
