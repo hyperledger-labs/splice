@@ -34,12 +34,7 @@
   ],
   "app_hash": "",
   "app_state": {
-    "sv_node_id":
-    {{- if eq (include "isTestNet" .) "true" }}
-      "Foundation",
-    {{- else }}
-      "Foundation-1",
-    {{ end }}
+    "sv_node_id": "Foundation",
     "governance_keys": [
       {
         "pub_key": "m16haLzv/d/Ok04Sm39ABk0f0HsSWYNZxrIUiyQ+cK8=",
