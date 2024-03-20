@@ -17,7 +17,6 @@ workflow:
             - slack-context
           cluster: "testnet"
           deploy_version: "testnet-next"
-          restore_cluster: true
           use_published_artifacts: true
           requires:
             - wait_for_previous_pipeline

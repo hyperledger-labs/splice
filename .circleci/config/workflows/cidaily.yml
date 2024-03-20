@@ -33,7 +33,6 @@ workflow:
             - artifactory
             - slack-context
           cluster: "cidaily-testnet"
-          restore_cluster: true
           requires:
             - docker_images_push
             - wait_for_previous_pipeline
@@ -91,7 +90,6 @@ workflow:
             - slack-context
             - canton-network-vpn
           cluster: "cidaily-testnet"
-          restore_cluster: true
           requires:
             - deploy_cluster_cidaily_testnet
       - deploy_validator_runbook:
