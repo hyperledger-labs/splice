@@ -21,6 +21,9 @@ Release Notes
 * New ``initial-holding-fee`` setting for ``"found-collective"`` sv
   onboarding.
 
+* Sequencer pruning is now enabled by default. This requires configuring a pruning interval and retention period in the SV app's configuration.
+
+
 2024-03-18
 ----------
 
