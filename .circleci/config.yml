@@ -47,6 +47,7 @@ parameters:
         backup-cidaily,
         restore-sv-cidaily,
         backup-cidaily-testnet,
+        restore-validator-cidaily,
         restore-validator-cidaily-testnet,
         backup-devnet,
         backup-testnet,
@@ -3282,10 +3283,10 @@ workflows:
           context:
             - artifactory
             - slack-context
-          # Skip healthchecks for 45 minutes after starting an sv node restore from backup.
+          # Skip healthchecks for 45 minutes after starting an sv/validator node restore from backup.
           # ATM, some tests are expected to fail while an SV is catching up, others are prone to failure.
           max_pipeline_age_secs: 2700
-          workflow_names: "restore_sv_cidaily"
+          workflow_names: "restore_sv_cidaily restore_validator_cidaily"
           only_if_running: false
       - preflight_check:
           filters:
