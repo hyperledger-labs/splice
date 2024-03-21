@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.{SvTestUtil, WalletTestUtil}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.DomainAlias
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.Port
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -26,7 +27,7 @@ class DistributedDomainIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
-      .withZeroSequencerAvailabilityDelay
+      .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .withManualStart
 
   private val globalDomain = DomainAlias.tryCreate("global")

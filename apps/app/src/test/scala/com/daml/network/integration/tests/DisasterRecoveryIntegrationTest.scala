@@ -29,7 +29,11 @@ import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobal
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{NonNegativeDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.{
+  NonNegativeDuration,
+  NonNegativeFiniteDuration,
+  ProcessingTimeout,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
@@ -77,7 +81,7 @@ class DisasterRecoveryIntegrationTest
       .simpleTopology4Svs(this.getClass.getSimpleName)
       // Disable user allocation
       .withPreSetup(_ => ())
-      .withZeroSequencerAvailabilityDelay
+      .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .addConfigTransformsToFront(
         (_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(22_000)(conf),
         (_, conf) => CNNodeConfigTransforms.bumpCantonDomainPortsBy(22_000)(conf),

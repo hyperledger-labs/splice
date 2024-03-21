@@ -226,7 +226,10 @@ final case class SvSequencerConfig(
     adminApi: ClientConfig,
     internalApi: ClientConfig,
     externalPublicApiUrl: String,
-    // The default value of 60 seconds is based on https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
+    // This needs to be participantResponseTimeout + mediatorResponseTimeout to make sure that the sequencer
+    // does not have to serve requests that have been in flight before the sequencer's signing keys became valid.
+    // See also https://github.com/DACH-NY/canton-network-node/issues/5938#issuecomment-1677165109
+    // The default value of 60 seconds is based on Canton defaulting to 30s for each of those.
     // TODO (#8282): consider reading config value from participant instead of configuring here
     sequencerAvailabilityDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
     pruning: Option[SequencerPruningConfig] = None,

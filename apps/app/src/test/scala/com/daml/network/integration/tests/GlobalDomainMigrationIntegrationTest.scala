@@ -59,7 +59,12 @@ import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobal
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.{ClientConfig, NonNegativeDuration, ProcessingTimeout}
+import com.digitalasset.canton.config.{
+  ClientConfig,
+  NonNegativeDuration,
+  NonNegativeFiniteDuration,
+  ProcessingTimeout,
+}
 import com.digitalasset.canton.config.CantonRequireTypes.InstanceName
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -100,7 +105,7 @@ class GlobalDomainMigrationIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
-      .withZeroSequencerAvailabilityDelay
+      .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .addConfigTransform((_, config) => CNNodeConfigTransforms.useGlobalDomainSplitwell()(config))
       .addConfigTransforms((_, config) => {
         config.copy(

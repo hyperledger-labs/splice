@@ -202,14 +202,21 @@ case class CNNodeEnvironmentDefinition(
   def withCoinPrice(price: BigDecimal): CNNodeEnvironmentDefinition =
     addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
 
-  def withZeroSequencerAvailabilityDelay: CNNodeEnvironmentDefinition =
+  /** For an SV’s sequencer to be safely usable, we need to wait for participantResponseTimeout + mediatorResponseTimeout.
+    * However, in some tests, we do care that an SV can connect to their own sequencer reasonably quickly.
+    * To make that work, we lower the delay to a number that is not fully safe but empirically
+    * long enough that all in-flight transactions succeed or fail before.
+    */
+  def unsafeWithSequencerAvailabilityDelay(
+      duration: NonNegativeFiniteDuration
+  ): CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       CNNodeConfigTransforms.updateAllSvAppConfigs_(
         _.focus(_.localDomainNode)
           .modify(
             _.map(d =>
               d.focus(_.sequencer.sequencerAvailabilityDelay)
-                .replace(NonNegativeFiniteDuration.Zero)
+                .replace(duration)
             )
           )
       )(config)
