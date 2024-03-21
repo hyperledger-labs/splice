@@ -1,6 +1,6 @@
 package com.daml.network.sv.automation.singlesv.membership.onboarding
 
-import cats.syntax.traverse.*
+import cats.syntax.traverseFilter.*
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
   TaskOutcome,
@@ -37,12 +37,19 @@ class SvOnboardingUnlimitedTrafficTrigger(
   ): Future[Seq[Task]] = {
     for {
       svcRulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
-      svMembersWithTrafficState <- svcRulesAndStates.activeSvParticipantAndMediatorIds().traverse {
-        memberId =>
+      svMembersWithTrafficState <- svcRulesAndStates
+        .activeSvParticipantAndMediatorIds()
+        .traverseFilter { memberId =>
           for {
-            state <- sequencerAdminConnection.getSequencerTrafficControlState(memberId)
-          } yield memberId -> state
-      }
+            stateO <- sequencerAdminConnection.lookupSequencerTrafficControlState(memberId)
+          } yield {
+            if (stateO.isEmpty) {
+              // This can happen for mediators which are registered in SvcRules before they connect.
+              logger.info(s"Member $memberId does not yet have a traffic state, skipping")
+            }
+            stateO.map(memberId -> _)
+          }
+        }
     } yield {
       svMembersWithTrafficState.sortBy(_._1).collect {
         case (memberId, trafficState)

@@ -94,12 +94,21 @@ class SequencerAdminConnection(
   def getSequencerTrafficControlState(
       member: Member
   )(implicit traceContext: TraceContext): Future[TrafficStatus] = {
-    listSequencerTrafficControlState(Seq(member)).map {
-      case Seq() =>
+    lookupSequencerTrafficControlState(member).map(
+      _.getOrElse(
         throw Status.NOT_FOUND
           .withDescription(s"No traffic state found for member ${member}")
           .asRuntimeException()
-      case Seq(m) => m
+      )
+    )
+  }
+
+  def lookupSequencerTrafficControlState(
+      member: Member
+  )(implicit traceContext: TraceContext): Future[Option[TrafficStatus]] = {
+    listSequencerTrafficControlState(Seq(member)).map {
+      case Seq() => None
+      case Seq(m) => Some(m)
       case memberList =>
         throw Status.INTERNAL
           .withDescription(
