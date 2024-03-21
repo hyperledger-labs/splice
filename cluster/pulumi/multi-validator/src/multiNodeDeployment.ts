@@ -45,6 +45,10 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
           },
         },
         spec: {
+          replicas: 1,
+          strategy: {
+            type: 'Recreate',
+          },
           selector: {
             matchLabels: {
               app: name,
