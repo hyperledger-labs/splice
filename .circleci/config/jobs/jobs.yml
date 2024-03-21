@@ -469,7 +469,7 @@ jobs:
         type: string
       branch_filter:
         type: string
-        default: "^main|deployment/.*$"
+        default: "^main|deployment/.*$|release-line.*"
       branch_filter_is_regex:
         type: boolean
         default: true
@@ -499,7 +499,7 @@ jobs:
         type: string
       branch_filter:
         type: string
-        default: "^main|deployment/.*$"
+        default: "^main|deployment/.*$|release-line.*"
       branch_filter_is_regex:
         type: boolean
         default: true

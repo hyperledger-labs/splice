@@ -61,7 +61,14 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
     fi
 fi
 
-prefix=$(<"${REPO_ROOT}"/HELM_CHART_VERSION)
+prefix=$(<"${REPO_ROOT}"/VERSION)
+
+git_commit_message=$(git log -1 --pretty=format:%B)
+if [[ $git_commit_message == *"[release]"* ]]; then
+    # release commit - no suffixes
+    echo "$prefix"
+    exit 0
+fi
 
 commit_date=$(git log -n1 --format=%cd --date=format:%Y%m%d "$sha")
 number_of_commits=$(git rev-list --count "$sha")

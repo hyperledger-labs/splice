@@ -94,7 +94,7 @@ notify-fail: &notify-fail
     # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
     # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
     - slack/notify:
-        branch_pattern: (deployment\/.*|main)
+        branch_pattern: (deployment\/.*|main|release-line.*)
         # #team-canton-network-internal-ci
         channel: C05DT77QF5M
         event: fail
@@ -1259,7 +1259,7 @@ commands:
       # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
       - slack/notify:
           channel: << parameters.channel_notify >>
-          branch_pattern: (deployment\/.*|main)
+          branch_pattern: (deployment\/.*|main|release-line.*)
           event: fail
           custom: |
             { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${FAILED_PARALLEL_RUN_URL}|$(git log -1 --oneline --no-color | sed s/\"//g)> ($(git log -1 --pretty='%an'), <${FAILED_PARALLEL_RUN_URL}|CI Build in Run #${CIRCLE_NODE_INDEX}>)" }
@@ -1273,7 +1273,7 @@ commands:
     steps:
       - slack/notify:
           channel: << parameters.channel_notify >>
-          branch_pattern: (deployment\/.*|main)
+          branch_pattern: (deployment\/.*|main|release-line.*)
           event: pass
           custom: |
             { "text": "*✅Job '${CIRCLE_JOB}' deployed on cluster '<< parameters.cluster >>'*\n<${CIRCLE_BUILD_URL}| Commit $(git log -1 --oneline --no-color | sed s/\"//g)>" }
@@ -2348,7 +2348,7 @@ jobs:
         type: string
       branch_filter:
         type: string
-        default: "^main|deployment/.*$"
+        default: "^main|deployment/.*$|release-line.*"
       branch_filter_is_regex:
         type: boolean
         default: true
@@ -2378,7 +2378,7 @@ jobs:
         type: string
       branch_filter:
         type: string
-        default: "^main|deployment/.*$"
+        default: "^main|deployment/.*$|release-line.*"
       branch_filter_is_regex:
         type: boolean
         default: true
@@ -2983,7 +2983,7 @@ workflows:
           branch_filter: "$CIRCLE_BRANCH"
           # cannot use a simple CCI branch filter for the job since this job is a dependency for all the other jobs in this workflow
           # and cannot be skipped
-          branch_ignores: "^(main|deployment/.*)$"
+          branch_ignores: "^(main|deployment/.*|release-line.*)$"
           max_pipeline_age_secs: 7776000  # 90 days which is the max that the CCI API allows for pipeline cancellation
       # Linting and formatting
       - static_tests:
