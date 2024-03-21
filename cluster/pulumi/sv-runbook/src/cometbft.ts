@@ -12,6 +12,7 @@ import {
   CnInput,
   GlobalDomainMigrationConfig,
   defaultVersion,
+  disableCometBftStateSync,
 } from 'cn-pulumi-common';
 import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
 
@@ -83,9 +84,11 @@ export function installCometBftNode(
           stateSync: {
             ...cometBftValues.stateSync,
             enable:
-              globalDomainMigrationConfig.isRunningMigration() || !isActive
-                ? false
-                : cometBftValues.stateSync.enable,
+              !disableCometBftStateSync &&
+              !globalDomainMigrationConfig.isRunningMigration() &&
+              isActive
+                ? cometBftValues.stateSync.enable
+                : false,
           },
           metrics: {
             enable: true,

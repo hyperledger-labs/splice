@@ -5,6 +5,7 @@ import {
   auth0UserNameEnvVarSource,
   BootstrappingDumpConfig,
   defaultVersion,
+  disableCantonAutoInit,
   ExactNamespace,
   GlobalDomainMigrationConfig,
   installCNHelmChart,
@@ -36,7 +37,10 @@ export function installMigrationSpecificValidatorParticipant(
         participantPostgres,
         auth0UserNameEnvVarSource('validator'),
         // We disable auto-init if we have a dump to bootstrap from.
-        !!participantBootstrapDump || !isActive || globalDomainMigrationConfig.isRunningMigration(),
+        disableCantonAutoInit ||
+          !!participantBootstrapDump ||
+          !isActive ||
+          globalDomainMigrationConfig.isRunningMigration(),
         nodeIdentifier,
         dependsOn
       );

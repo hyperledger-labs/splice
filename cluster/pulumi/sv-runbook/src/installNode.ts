@@ -33,6 +33,7 @@ import {
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
   defaultVersion,
+  disableCantonAutoInit,
 } from 'cn-pulumi-common';
 import { retry } from 'cn-pulumi-common/src/retries';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
@@ -263,6 +264,7 @@ async function installSvAndValidator(
           enable: true,
         },
         disableAutoInit:
+          disableCantonAutoInit ||
           !!participantBootstrapDumpSecret ||
           globalDomainMigrationConfig.isRunningMigration() ||
           !isActive,

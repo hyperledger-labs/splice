@@ -13,6 +13,8 @@ import {
   CLUSTER_BASENAME,
   CnInput,
   defaultVersion,
+  disableCantonAutoInit,
+  disableCometBftStateSync,
   ExactNamespace,
   exactNamespace,
   ExpectedValidatorOnboarding,
@@ -384,13 +386,14 @@ function installMigrationIdSpecificComponents(
         defaultPostgres || postgres.installPostgres(xns, `participant-${migrationId}-pg`, true);
 
       const mustBeManuallyInitialized =
-        !isActive || globalDomainMigrationConfig.isRunningMigration();
+        disableCantonAutoInit || !isActive || globalDomainMigrationConfig.isRunningMigration();
       // legacy domains don't need cometbft state sync because no new nodes will join
       // upgrade domains don't need cometbft state sync because until they are active cometbft will not really progress its height a lot
       // also for upgrade domains we first deploy the domain and then redeploy the sv app, and as we proxy the calls for state sync through the
       // sv-app we cannot configure state sync until the sv app has migrated
       // if a migration is running we must not configure state sync because that will also add a pulumi dependency and our migrate flow will break (sv2-4 depending on sv1)
-      const canSyncFromCometBft = isActive && !globalDomainMigrationConfig.isRunningMigration();
+      const canSyncFromCometBft =
+        !disableCometBftStateSync && isActive && !globalDomainMigrationConfig.isRunningMigration();
       // If we have a dump, we disable auto init.
       const isParticipantRestoringFromDump = !!svConfig.bootstrappingDumpConfig;
       const participant = installParticipant(

@@ -74,6 +74,9 @@ export const svOnboardingPollingInterval = process.env['SV_ONBOARDING_POLLING_IN
 // Refrence to upstream infrastructure stack.
 export const infraStack = new pulumi.StackReference(`organization/infra/infra.${CLUSTER_BASENAME}`);
 
+export const disableCometBftStateSync = envFlag('DISABLE_COMETBFT_STATE_SYNC', false);
+export const disableCantonAutoInit = envFlag('DISABLE_CANTON_AUTO_INIT', false);
+
 /// Kubernetes Namespace
 
 // There is no way to read the logical name off a Namespace.  Exactly
