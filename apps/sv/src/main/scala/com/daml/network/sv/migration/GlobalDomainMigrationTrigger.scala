@@ -2,7 +2,7 @@ package com.daml.network.sv.migration
 
 import cats.data.OptionT
 import com.daml.network.automation.TriggerContext
-import com.daml.network.environment.ParticipantAdminConnection
+import com.daml.network.environment.{ParticipantAdminConnection, SequencerAdminConnection}
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.migration.{AcsExporter, DomainMigrationTrigger}
 import com.daml.network.sv.LocalDomainNode
@@ -26,14 +26,18 @@ final class GlobalDomainMigrationTrigger(
     localDomainNode: LocalDomainNode,
     svcStore: SvSvcStore,
     protected val participantAdminConnection: ParticipantAdminConnection,
+    sequencerAdminConnection0: SequencerAdminConnection,
     protected val dumpPath: Path,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends DomainMigrationTrigger[DomainMigrationDump] {
 
+  override val sequencerAdminConnection = Some(sequencerAdminConnection0)
+
   val domainDataSnapshotGenerator = new DomainDataSnapshotGenerator(
     participantAdminConnection,
+    sequencerAdminConnection,
     svcStore,
     new AcsExporter(participantAdminConnection, context.retryProvider, loggerFactory),
   )

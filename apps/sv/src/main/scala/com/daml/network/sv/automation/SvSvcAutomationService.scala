@@ -266,6 +266,7 @@ class SvSvcAutomationService(
             domainNode,
             svcStore,
             participantAdminConnection,
+            domainNode.sequencerAdminConnection,
             dumpPath: Path,
           )
         )

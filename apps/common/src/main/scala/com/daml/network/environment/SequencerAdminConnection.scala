@@ -56,6 +56,13 @@ class SequencerAdminConnection(
   def getSequencerId(implicit traceContext: TraceContext): Future[SequencerId] =
     getId().map(SequencerId(_))
 
+  def getGenesisState(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Future[ByteString] =
+    runCmd(
+      EnterpriseSequencerAdminCommands.GenesisState(timestamp = Some(timestamp))
+    )
+
   def getOnboardingState(sequencerId: SequencerId)(implicit
       traceContext: TraceContext
   ): Future[ByteString] =
@@ -63,7 +70,9 @@ class SequencerAdminConnection(
       EnterpriseSequencerAdminCommands.OnboardingState(Left(sequencerId))
     )
 
-  def initializeFromGenesisState(
+  /** This is used for initializing the sequencer when the domain is first bootstrapped.
+    */
+  def initializeFromBeginning(
       topologySnapshot: GenericStoredTopologyTransactionsX,
       domainParameters: StaticDomainParameters,
   )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
@@ -71,6 +80,19 @@ class SequencerAdminConnection(
       EnterpriseSequencerAdminCommands.InitializeFromGenesisState(
         // TODO(#10953) Stop doing that.
         topologySnapshot.toByteString(domainParameters.protocolVersion),
+        domainParameters,
+      )
+    )
+
+  /** This is used for initializing the sequencer after hard domain migrations.
+    */
+  def initializeFromGenesisState(
+      genesisState: ByteString,
+      domainParameters: StaticDomainParameters,
+  )(implicit traceContext: TraceContext): Future[InitializeSequencerResponse] =
+    runCmd(
+      EnterpriseSequencerAdminCommands.InitializeFromGenesisState(
+        genesisState,
         domainParameters,
       )
     )

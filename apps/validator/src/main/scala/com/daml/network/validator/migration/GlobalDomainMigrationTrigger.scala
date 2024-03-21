@@ -25,6 +25,8 @@ final class GlobalDomainMigrationTrigger(
     tracer: Tracer,
 ) extends DomainMigrationTrigger[DomainMigrationDump] {
 
+  override protected val sequencerAdminConnection = None
+
   private val dumpGenerator = new DomainMigrationDumpGenerator(
     participantAdminConnection,
     context.retryProvider,

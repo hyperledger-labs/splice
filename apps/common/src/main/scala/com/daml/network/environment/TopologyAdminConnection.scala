@@ -420,6 +420,7 @@ abstract class TopologyAdminConnection(
       domainId: DomainId,
       timestamp: CantonTimestamp,
       proposals: Boolean,
+      excludeMappings: Seq[TopologyMappingX.Code] = Seq.empty,
   )(implicit
       traceContext: TraceContext
   ): Future[GenericStoredTopologyTransactionsX] = {
@@ -434,7 +435,7 @@ abstract class TopologyAdminConnection(
           protocolVersion = None,
         ),
         filterNamespace = "",
-        excludeMappings = Seq.empty,
+        excludeMappings = excludeMappings.map(_.code),
       )
     ).map(txns =>
       StoredTopologyTransactionsX(
@@ -461,6 +462,16 @@ abstract class TopologyAdminConnection(
       )
     }
   }
+
+  def getVettedPackagesSnapshot(domainId: DomainId, timestamp: CantonTimestamp)(implicit
+      tc: TraceContext
+  ): Future[GenericStoredTopologyTransactionsX] =
+    getSnapshot(
+      domainId,
+      timestamp,
+      excludeMappings = TopologyMappingX.Code.all.diff(Seq(TopologyMappingX.Code.VettedPackagesX)),
+      proposals = false,
+    )
 
   def lookupTrafficControlState(
       domainId: DomainId,
@@ -863,42 +874,33 @@ abstract class TopologyAdminConnection(
     )
   }
 
-  def addTopologyTransactionsAndEnsurePersisted(
-      domainId: Option[DomainId],
-      txs: Seq[GenericSignedTopologyTransactionX],
+  def addVettedPackageTransactionAndEnsurePersisted(
+      domainId: DomainId,
+      tx: GenericSignedTopologyTransactionX,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     logger.info(
-      s"Adding topology transactions $txs"
+      s"Adding vetted package topology transactions $tx"
     )
-    retryProvider
-      .ensureThat[Seq[GenericSignedTopologyTransactionX], Seq[
-        GenericSignedTopologyTransactionX
-      ], Seq[Status.Code]](
-        RetryFor.ClientCalls,
-        "replay_topology",
-        "Topology transaction are added",
-        listAllTransactions(
-          domainId.map(TopologyStoreId.DomainStore(_)),
-          TimeQuery.Range(None, None),
-        ).map { stored =>
-          val signedStoredTransactions = stored.map(_.transaction.transaction)
-          // filter just based on the transaction, ignoring signature differences
-          val missingTxs =
-            txs.filterNot(transaction => signedStoredTransactions.contains(transaction.transaction))
-          if (missingTxs.nonEmpty) {
-            logger.debug(s"Found missing transactions $missingTxs")
-          }
-          Either.cond(missingTxs.isEmpty, txs, missingTxs)
-        },
-        missingTx => {
-          logger.debug(s"Submitting missing transactions $missingTx")
-          addTopologyTransactions(domainId, missingTx)
-        },
-        logger,
+    val vettedPkgs = tx
+      .selectMapping[VettedPackagesX]
+      .getOrElse(
+        sys.error(s"Domain dump did contain topology transaction that was not VettedPackagesX: $tx")
       )
-      .map(_.discard)
+    val participant = vettedPkgs.transaction.mapping.participantId
+    retryProvider.ensureThatB(
+      RetryFor.ClientCalls,
+      "replay_vetted_packages",
+      s"Vetted packages for $participant with serial ${vettedPkgs.serial} has been added",
+      listVettedPackages(participant, domainId).map { txs =>
+        txs.exists(_.base.serial >= vettedPkgs.serial)
+      }, {
+        logger.debug(s"Submitting missing vetted packages: $vettedPkgs")
+        addTopologyTransactions(Some(domainId), Seq(vettedPkgs))
+      },
+      logger,
+    )
   }
 
   def addTopologyTransactions(

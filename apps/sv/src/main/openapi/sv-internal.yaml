@@ -1117,13 +1117,16 @@ components:
     DomainDataSnapshot:
       type: object
       required:
-        - topology_snapshot
         - acs_snapshot
         - dars
       properties:
-        topology_snapshot:
+        genesis_state:
           description: |
-            base64 encoded string of topology snapshot
+            base64 encoded string of domain genesis state
+          type: string
+        vetted_packages:
+          description: |
+            base64 encoded string of vetted packages
           type: string
         acs_snapshot:
           description: |

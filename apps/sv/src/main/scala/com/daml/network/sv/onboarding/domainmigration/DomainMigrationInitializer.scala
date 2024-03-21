@@ -20,12 +20,10 @@ import com.daml.network.sv.onboarding.{NodeInitializerUtil, SetupUtil, SvcPartyH
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
   loadDomainMigrationDump,
   DomainNodeInitializer,
-  DomainTopologyTransactions,
 }
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.DynamicDomainParameters
@@ -33,15 +31,11 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
-import com.digitalasset.canton.topology.processing.SequencedTime
-import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionsX,
-  StoredTopologyTransactionX,
-  TopologyStoreId,
-}
-import com.digitalasset.canton.topology.transaction.{TopologyChangeOpX, TopologyMappingX}
+import com.digitalasset.canton.topology.store.TopologyStoreId
+import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
+import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse}
@@ -152,14 +146,16 @@ class DomainMigrationInitializer(
   private def migrateToNewDomainNode(
       domainMigrationDump: DomainMigrationDump
   ): Future[Unit] = {
-    val domainTopologyTransactions = DomainTopologyTransactions(
-      domainMigrationDump.domainDataSnapshot.topologySnapshot.result
-    )
     val domainAlias = domainMigrationDump.nodeIdentities.domainAlias
     for {
       _ <- initializeDomainNode(
         domainMigrationDump.nodeIdentities,
-        domainTopologyTransactions,
+        domainMigrationDump.domainDataSnapshot.genesisState.getOrElse(
+          sys.error("Domain nodes cannot be initialized without a genesis dump")
+        ),
+        domainMigrationDump.domainDataSnapshot.vettedPackages.getOrElse(
+          sys.error("Domain nodes cannot be initialized without vetted packages snapshot")
+        ),
       )
       _ <- domainDataRestorer.connectDomainAndRestoreData(
         readOnlyConnection,
@@ -169,27 +165,6 @@ class DomainMigrationInitializer(
         SequencerConnections.single(localDomainNode.sequencerConnection),
         domainMigrationDump.domainDataSnapshot.dars,
         domainMigrationDump.domainDataSnapshot.acsSnapshot,
-      )
-      _ <- retryProvider.waitUntil(
-        RetryFor.Automation,
-        "participant_up_to_date",
-        "participant caught up with the domain state topology",
-        participantAdminConnection
-          .getDomainParametersState(
-            domainMigrationDump.nodeIdentities.domainId
-          )
-          .map { domainParameters =>
-            if (
-              domainParameters.base.serial < domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction.serial
-            ) {
-              throw Status.FAILED_PRECONDITION
-                .withDescription(
-                  s"Domain state topology is not yet up to date with the dump. Dump state is ${domainTopologyTransactions.lastDomainStateParametersState.transaction.transaction} and current state is $domainParameters"
-                )
-                .asRuntimeException()
-            }
-          },
-        loggerFactory.getTracedLogger(getClass),
       )
       _ <- participantAdminConnection
         .ensureDomainParameters(
@@ -206,7 +181,8 @@ class DomainMigrationInitializer(
 
   private def initializeDomainNode(
       nodeIdentities: DomainNodeIdentities,
-      domainTopologyTransactions: DomainTopologyTransactions,
+      genesisState: ByteString,
+      vettedPackages: GenericStoredTopologyTransactionsX,
   ): Future[Unit] = {
     val domainNodeInitiaizer = DomainNodeInitializer(
       localDomainNode,
@@ -214,24 +190,24 @@ class DomainMigrationInitializer(
       loggerFactory,
       retryProvider,
     )
-    logger.info(s"Init new domain nodes from snapshot $domainTopologyTransactions")
+    logger.info("Init new domain nodes from snapshot")
     for {
       _ <- initializeSequencer(
         domainNodeInitiaizer,
         nodeIdentities.sequencer,
-        domainTopologyTransactions.sequencerInitTopologyTransactions,
+        genesisState,
       )
       _ = logger.info(
-        s"Adding topology transactions after sequencer initialization ${domainTopologyTransactions.topologyTransactionsToSubmit}"
+        s"Adding ${vettedPackages.result.size} vetted packages topology transactions after sequencer initialization"
       )
-      _ <- MonadUtil.sequentialTraverse_(domainTopologyTransactions.topologyTransactionsToSubmit)(
-        transactions =>
-          localDomainNode.sequencerAdminConnection
-            .addTopologyTransactionsAndEnsurePersisted(
-              Some(nodeIdentities.domainId),
-              Seq(transactions.transaction),
-            )
-      )
+      _ <- MonadUtil.sequentialTraverse_(vettedPackages.result.zipWithIndex) { case (tx, index) =>
+        logger.info(s"Replaying vetted packages $index / ${vettedPackages.result.size}")
+        localDomainNode.sequencerAdminConnection
+          .addVettedPackageTransactionAndEnsurePersisted(
+            nodeIdentities.domainId,
+            tx.transaction,
+          )
+      }
       _ <- initializeMediator(
         nodeIdentities.domainId,
         domainNodeInitiaizer,
@@ -266,9 +242,7 @@ class DomainMigrationInitializer(
   private def initializeSequencer(
       domainNodeInitializer: DomainNodeInitializer,
       identity: NodeIdentitiesDump,
-      sequencerInitTopologyTransactions: Seq[
-        StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]
-      ],
+      genesisState: ByteString,
   ) = {
     domainNodeInitializer.domainNode.sequencerAdminConnection
       .isNodeInitialized()
@@ -281,13 +255,11 @@ class DomainMigrationInitializer(
           for {
             _ <- domainNodeInitializer.sequencerInitializer.initializeFromDump(identity)
             _ = logger.info(
-              s"Restoring sequencer topology with sequencer transactions $sequencerInitTopologyTransactions"
+              s"Restoring sequencer topology from genesis state"
             )
             _ <- localDomainNode.sequencerAdminConnection
               .initializeFromGenesisState(
-                StoredTopologyTransactionsX(
-                  sequencerInitTopologyTransactions
-                ),
+                genesisState,
                 localDomainNode.staticDomainParameters,
               )
             _ <- retryProvider.waitUntil(
@@ -406,61 +378,4 @@ object DomainMigrationInitializer {
     )
 
   }
-
-  case class DomainTopologyTransactions(
-      transactions: Seq[StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]]
-  ) {
-
-    private val sequencerInitTransactions = Seq(
-      TopologyMappingX.Code.NamespaceDelegationX,
-      TopologyMappingX.Code.OwnerToKeyMappingX,
-      TopologyMappingX.Code.IdentifierDelegationX,
-      // start with all the sequencers authorized
-      TopologyMappingX.Code.SequencerDomainStateX,
-      // TODO(#8761) fix issue where replaying this fails with not authorized
-      TopologyMappingX.Code.TrafficControlStateX,
-    )
-
-    val (sequencerInitTopologyTransactions, topologyTransactionsToSubmit) =
-      transactions
-        .map { transaction =>
-          if (sequencerInitTransactions.contains(transaction.mapping.code)) {
-            // reset sequenced time to ensure it's included in all the init calls
-            // use same value as for the founding bootstrap
-            // We don't overwrite the validFrom because if there will be multiple overlapping transactions with the same valid from, canton will consider them all valid
-            transaction.copy(
-              sequenced = SequencedTime(CantonTimestamp.MinValue.immediateSuccessor)
-            )
-          } else {
-            if (isFoundingTopologyTransaction(transaction)) {
-              // ensure transaction is valid to be able to replay
-              transaction.copy(validUntil = None)
-            } else {
-              transaction
-            }
-          }
-        }
-        .partition(transaction => isFoundingTopologyTransaction(transaction))
-
-    private def isFoundingTopologyTransaction(
-        transaction: StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX]
-    ) = {
-      transaction.sequenced.value == CantonTimestamp.MinValue || transaction.sequenced.value == CantonTimestamp.MinValue.immediateSuccessor
-    }
-
-    val lastDomainStateParametersState
-        : StoredTopologyTransactionX[TopologyChangeOpX, TopologyMappingX] =
-      transactions.reverse
-        .collectFirst {
-          case transaction
-              if transaction.mapping.code == TopologyMappingX.Code.DomainParametersStateX =>
-            transaction
-        }
-        .getOrElse(
-          throw new IllegalArgumentException(
-            s"Failed to find last topology transaction in $transactions"
-          )
-        )
-  }
-
 }

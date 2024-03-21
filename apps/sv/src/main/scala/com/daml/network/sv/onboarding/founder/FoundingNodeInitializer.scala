@@ -341,7 +341,7 @@ class FoundingNodeInitializer(
                       signed.copy(isProposal = false),
                     )
                   )
-              _ <- domainNode.sequencerAdminConnection.initializeFromGenesisState(
+              _ <- domainNode.sequencerAdminConnection.initializeFromBeginning(
                 StoredTopologyTransactionsX(bootstrapTransactions),
                 domainNode.staticDomainParameters,
               )

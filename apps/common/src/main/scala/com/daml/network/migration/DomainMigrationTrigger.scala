@@ -2,7 +2,7 @@ package com.daml.network.migration
 
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess}
-import com.daml.network.environment.ParticipantAdminConnection
+import com.daml.network.environment.{ParticipantAdminConnection, SequencerAdminConnection}
 import com.daml.network.migration
 import com.daml.network.util.BackupDump
 import com.digitalasset.canton.data.CantonTimestamp
@@ -23,6 +23,7 @@ abstract class DomainMigrationTrigger[T: Codec](implicit
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[DomainMigrationTrigger.Task] {
   protected val participantAdminConnection: ParticipantAdminConnection
+  protected val sequencerAdminConnection: Option[SequencerAdminConnection]
   protected val dumpPath: Path
   protected val currentMigrationId: Long
 

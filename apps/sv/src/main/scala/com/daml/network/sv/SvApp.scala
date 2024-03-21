@@ -440,6 +440,13 @@ class SvApp(
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
           participantAdminConnection,
+          Some(
+            localDomainNode
+              .getOrElse(
+                sys.error("SV app should always have a sequencer connection for domain migrations")
+              )
+              .sequencerAdminConnection
+          ),
           svcStore,
           new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
         ),
