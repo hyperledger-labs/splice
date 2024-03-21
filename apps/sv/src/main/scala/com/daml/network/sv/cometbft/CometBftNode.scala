@@ -196,7 +196,8 @@ object CometBftNode {
       deletes: Seq[proto.cometbft.NetworkConfigChangeRequest],
       updates: Seq[proto.cometbft.NetworkConfigChangeRequest],
   ) {
-    lazy val requests: Seq[proto.cometbft.NetworkConfigChangeRequest] = deletes ++ updates
+    // updates must be sent before deletes to ensure that we don't end up in a state where we try to delete all the validators
+    lazy val requests: Seq[proto.cometbft.NetworkConfigChangeRequest] = updates ++ deletes
   }
 
   /** Compute the set of change requests that, when applied, make the current network config

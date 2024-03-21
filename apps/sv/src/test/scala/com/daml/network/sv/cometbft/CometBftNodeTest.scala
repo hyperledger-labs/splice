@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.cn.cometbft.{
 import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
 import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
 import com.digitalasset.canton.{BaseTest, drivers as proto}
+import com.digitalasset.canton.drivers.cometbft.SvNodeConfigChange
 import com.digitalasset.canton.topology.DomainId
 import monocle.Monocle.toAppliedFocusOps
 import org.scalatest.wordspec.AnyWordSpec
@@ -304,6 +305,37 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
       pendingConfig = Some(Some("b")),
       expectChange = true,
     )
+
+    "updates should be issues before deletes" in {
+      val networkConfig = mkNetworkConfig(
+        Seq(
+          (
+            11,
+            "dummy-key-10",
+            Seq.empty,
+          )
+        )
+      )
+      val configDiff = CometBftNode
+        .diffNetworkConfig(
+          owningSvNodeId,
+          CometBftRequestSigner.GenesisFingerprint,
+          mkMemberNodeStates(
+            Seq(10 -> "key-10")
+          ),
+          networkConfig,
+          dummySvcDomainId,
+          logger,
+        )
+        .requests
+      configDiff.size shouldBe 2
+      configDiff.map(
+        _.getNodeConfigChangeRequest.getChange.kind.getClass
+      ) should contain theSameElementsInOrderAs Seq(
+        classOf[SvNodeConfigChange.Kind.SetConfig],
+        classOf[SvNodeConfigChange.Kind.DeleteConfig],
+      )
+    }
 
   }
 
