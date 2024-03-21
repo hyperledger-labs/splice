@@ -99,6 +99,7 @@ export type SequencerPruningConfig = {
 };
 
 export interface SvConfig extends StaticSvConfig {
+  isFounder: boolean;
   auth0Client: Auth0Client;
   nodeConfigs: {
     founder: StaticCometBftConfigWithNodeName;
@@ -251,6 +252,7 @@ export async function installSvNode(
 
   const scan = installScan(
     xns,
+    config.isFounder,
     globalDomainUpgradeConfig,
     config.nodeName,
     config.onboarding.type,
@@ -538,6 +540,7 @@ function installSvApp(
 
 function installScan(
   xns: ExactNamespace,
+  isFounder: boolean,
   globalDomainMigrationConfig: GlobalDomainMigrationConfig,
   nodename: string,
   svConfigOnboardingType: string,
@@ -548,16 +551,15 @@ function installScan(
 ) {
   const scanDbName = `scan_${sanitizedForPostgres(nodename)}`;
   // const scanDb = scanAppPostgres.createDatabase(scanDbName);
-  const ingestFromParticipantBegin = svConfigOnboardingType == 'found-collective';
   const scanValues = {
     clusterUrl,
     metrics: {
       enable: true,
     },
+    isFounder: isFounder,
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
-    ingestFromParticipantBegin: ingestFromParticipantBegin,
     sequencerAddress: globalDomainNode.namespaceInternalSequencerAddress,
     participantAddress: participant.name,
     migration: {

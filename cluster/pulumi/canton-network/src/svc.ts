@@ -66,6 +66,7 @@ export class Svc extends pulumi.ComponentResource {
     },
     extraApprovedSvIdentities: ApprovedSvIdentity[],
     expectedValidatorOnboardings: ExpectedValidatorOnboarding[],
+    isFounder = false,
     cometBftSyncSource?: k8s.helm.v3.Release
   ) {
     const defaultApprovedSvIdentities = (
@@ -89,6 +90,7 @@ export class Svc extends pulumi.ComponentResource {
 
     return installSvNode(
       {
+        isFounder,
         nodeName: svConf.nodeName,
         onboardingName: svConf.onboardingName,
         nodeConfigs,
@@ -163,7 +165,8 @@ export class Svc extends pulumi.ComponentResource {
         peers: peerCometBftConfs,
       },
       additionalSvIdentities,
-      this.args.expectedValidatorOnboardings
+      this.args.expectedValidatorOnboardings,
+      true
     );
 
     const restSvs = await Promise.all(
@@ -182,6 +185,7 @@ export class Svc extends pulumi.ComponentResource {
           cometBft,
           additionalSvIdentities,
           [],
+          false,
           founder.svApp
         );
       })

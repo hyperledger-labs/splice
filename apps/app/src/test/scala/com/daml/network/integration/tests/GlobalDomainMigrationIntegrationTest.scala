@@ -395,9 +395,6 @@ class GlobalDomainMigrationIntegrationTest
             _.withPausedTrigger[ReceiveSvRewardCouponTrigger]
           )(conf),
       )
-      .addConfigTransforms(
-        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
-      )
       .withManualStart
       // TODO (#10859) remove and fix test failures
       .withCoinPrice(walletCoinPrice)

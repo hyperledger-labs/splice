@@ -116,8 +116,7 @@ class ScanApp(
       store = ScanStore(
         key = ScanStore.Key(svcParty = svcParty),
         storage,
-        // Only the founder is configured to ingest from participant begin
-        ingestFromParticipantBegin = config.ingestFromParticipantBegin,
+        isFounder = config.isFounder,
         loggerFactory,
         retryProvider,
         { store =>

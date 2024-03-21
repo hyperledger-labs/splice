@@ -33,9 +33,6 @@ class ScanIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransformsToFront(
-        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
-      )
       .addConfigTransforms((_, config) =>
         (updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[CollectRewardsAndMergeCoinsTrigger]

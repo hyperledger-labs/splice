@@ -28,9 +28,6 @@ class AutomationControlIntegrationTest
     CNNodeEnvironmentDefinition
       // start only sv1 but not sv2-4, to speed up the test
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .addConfigTransformsToFront(
-        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
-      )
       // Very short round ticks
       .addConfigTransforms((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppFoundCollectiveConfigs_(

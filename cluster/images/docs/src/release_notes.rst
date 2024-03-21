@@ -23,6 +23,10 @@ Release Notes
 
 * Sequencer pruning is now enabled by default. This requires configuring a pruning interval and retention period in the SV app's configuration.
 
+* Fix performance bottleneck while initializing new synchronizer after a hard synchronizer migration.
+
+* Fix scan so that it functions as expected after a hard synchronizer migration.
+
 
 2024-03-18
 ----------

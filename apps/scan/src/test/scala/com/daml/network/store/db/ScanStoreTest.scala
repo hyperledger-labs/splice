@@ -1414,7 +1414,7 @@ class DbScanStoreTest
       key = ScanStore.Key(svcParty),
       storage,
       // to allow aggregating from round zero without previous round aggregate
-      ingestFromParticipantBegin = true,
+      isFounder = true,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
       // required to instantiate a DbScanStore, returns none not to affect this test.

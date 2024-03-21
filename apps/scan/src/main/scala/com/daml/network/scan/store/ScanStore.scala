@@ -276,7 +276,7 @@ object ScanStore {
   def apply(
       key: ScanStore.Key,
       storage: Storage,
-      ingestFromParticipantBegin: Boolean,
+      isFounder: Boolean,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
       createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
@@ -293,7 +293,7 @@ object ScanStore {
         new DbScanStore(
           key = key,
           db,
-          ingestFromParticipantBegin,
+          isFounder,
           loggerFactory,
           retryProvider,
           createScanAggregatesReader,

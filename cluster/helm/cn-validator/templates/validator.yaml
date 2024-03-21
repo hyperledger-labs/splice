@@ -174,7 +174,6 @@ spec:
           value: |
             canton.validator-apps.validator_backend {
               domain-migration-id = {{ .Values.migration.id }}
-              ingest-from-participant-begin = true
             }
         {{- if and .Values.migration.migrating (not .Values.svValidator) }}
         - name: ADDITIONAL_CONFIG_VALIDATOR_MIGRATION_RESTORE

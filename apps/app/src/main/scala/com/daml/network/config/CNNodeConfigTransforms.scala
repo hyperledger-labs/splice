@@ -658,13 +658,6 @@ object CNNodeConfigTransforms {
       )
     })
 
-  def ingestFromParticipantBeginInScan: CNNodeConfigTransform =
-    updateAllScanAppConfigs_(c =>
-      c.copy(
-        ingestFromParticipantBegin = true
-      )
-    )
-
   // Disable default domain connections to splitwell to test that the one established by the app manager works
   def disableSplitwellUserDomainConnections: CNNodeConfigTransform =
     updateAllValidatorConfigs(

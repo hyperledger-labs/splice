@@ -29,7 +29,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 final class ScanAggregator(
     storage: DbStorage,
     val storeId: Int,
-    ingestFromParticipantBegin: Boolean,
+    isFounder: Boolean,
     reader: ScanAggregatesReader,
     val loggerFactory: NamedLoggerFactory,
     domainMigrationId: Long,
@@ -160,7 +160,7 @@ final class ScanAggregator(
           )
           Future.successful(lastRoundTotals)
         case None =>
-          if (ingestFromParticipantBegin) {
+          if (isFounder) {
             logger.debug(s"Aggregation starts from round 0, store_id = $storeId")
             Future.successful(None)
           } else {
@@ -427,7 +427,7 @@ final class ScanAggregator(
         None
       } else {
         if (lastAggregatedRound == -1) {
-          if (ingestFromParticipantBegin) {
+          if (isFounder) {
             // only allowed to start from round zero with no previous total rounds if the scan is reading from participant begin (the founder)
             Some(lastRound)
           } else {

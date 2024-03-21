@@ -50,11 +50,11 @@ spec:
               name: {{ $.Values.persistence.secretName }}
               key: postgresPassword
         {{- end }}
-        {{- if .Values.ingestFromParticipantBegin }}
-        - name: ADDITIONAL_CONFIG_SCAN_APP
+        {{- if .Values.isFounder }}
+        - name: ADDITIONAL_CONFIG_IS_FOUNDER
           value: |
             canton.scan-apps.scan-app {
-              ingest-from-participant-begin = {{ .Values.ingestFromParticipantBegin }}
+              is-founder = true
             }
         {{- end }}
         - name: ADDITIONAL_CONFIG_MIGRATION_ID

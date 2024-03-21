@@ -123,7 +123,6 @@ spec:
               value: |
                 canton.sv-apps.sv {
                   domain-migration-id = {{ .Values.migration.id }}
-                  ingest-from-participant-begin = true
                 }
             - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
               value: |

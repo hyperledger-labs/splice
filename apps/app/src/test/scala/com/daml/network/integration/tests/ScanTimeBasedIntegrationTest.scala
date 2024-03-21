@@ -28,9 +28,6 @@ class ScanTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      .addConfigTransformsToFront(
-        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
-      )
       // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
       .withoutAutomaticRewardsCollectionAndCoinMerging

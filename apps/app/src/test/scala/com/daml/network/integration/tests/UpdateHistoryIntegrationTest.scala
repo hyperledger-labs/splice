@@ -63,9 +63,6 @@ class UpdateHistoryIntegrationTest
         aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
       })
-      .addConfigTransformsToFront(
-        { case (_, c) => CNNodeConfigTransforms.ingestFromParticipantBeginInScan(c) }
-      )
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Sv)(
           _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]

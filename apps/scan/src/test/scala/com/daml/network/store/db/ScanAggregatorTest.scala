@@ -663,7 +663,7 @@ class ScanAggregatorTest
     val store = new DbScanStore(
       key = ScanStore.Key(svcParty),
       storage = storage,
-      ingestFromParticipantBegin = ingestFromParticipantBegin,
+      isFounder = ingestFromParticipantBegin,
       loggerFactory,
       RetryProvider(
         loggerFactory,

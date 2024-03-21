@@ -46,7 +46,7 @@ import com.digitalasset.canton.lifecycle.SyncCloseable
 class DbScanStore(
     override val key: ScanStore.Key,
     storage: DbStorage,
-    ingestFromParticipantBegin: Boolean,
+    isFounder: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
@@ -105,7 +105,7 @@ class DbScanStore(
       new ScanAggregator(
         storage,
         storeId,
-        ingestFromParticipantBegin,
+        isFounder,
         createScanAggregatesReader(this),
         loggerFactory,
         domainMigrationId,

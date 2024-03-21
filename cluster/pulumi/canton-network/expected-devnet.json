@@ -2151,7 +2151,7 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "ingestFromParticipantBegin": true,
+        "isFounder": true,
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3087,7 +3087,7 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "ingestFromParticipantBegin": false,
+        "isFounder": false,
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -3992,7 +3992,7 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "ingestFromParticipantBegin": false,
+        "isFounder": false,
         "metrics": {
           "enable": true,
           "interval": "30s",
@@ -4897,7 +4897,7 @@
         "defaultJvmOptions": "-Xms1152M -Xmx1152M -Dscala.concurrent.context.minThreads=8",
         "failOnAppVersionMismatch": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "ingestFromParticipantBegin": false,
+        "isFounder": false,
         "metrics": {
           "enable": true,
           "interval": "30s",
