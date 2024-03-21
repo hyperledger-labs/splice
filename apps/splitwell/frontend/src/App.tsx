@@ -19,7 +19,7 @@ import {
 
 import { CssBaseline, ThemeProvider } from '@mui/material';
 
-import * as splitwellOld from '@daml.js/splitwell-old/lib/CN/Splitwell';
+import * as splitwell from '@daml.js/splitwell/lib/CN/Splitwell';
 
 import { SplitwellLedgerApiClientProvider } from './contexts/SplitwellLedgerApiContext';
 import { SplitwellClientProvider } from './contexts/SplitwellServiceContext';
@@ -34,7 +34,7 @@ class SplitwellPackageIdResolver extends PackageIdResolver {
   async resolveTemplateId(templateId: string): Promise<string> {
     switch (this.getQualifiedName(templateId)) {
       case 'CN.Splitwell:SplitwellRules': {
-        return splitwellOld.SplitwellRules.templateId;
+        return splitwell.SplitwellRules.templateId;
       }
       default: {
         throw new Error(`Unknown temmplate id: ${templateId}`);

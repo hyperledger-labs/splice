@@ -1064,7 +1064,6 @@ trait CoinTransferUtil { self: StoreTest =>
       receiver.toProtoPrimitive,
       java.util.List.of(mkInputCoin()),
       java.util.List.of(mkTransferOutput(receiver, amount)),
-      Optional.empty(),
     )
 
   def mkTransferContext() = new cc.coinrules.TransferContext(
@@ -1085,7 +1084,6 @@ trait CoinTransferUtil { self: StoreTest =>
       provider.toProtoPrimitive,
       transferInputs.asJava,
       transferOutputs.asJava,
-      Optional.empty(),
     )
 
   def mkCoinRules_Transfer(transfer: cc.coinrules.Transfer) =
@@ -1145,7 +1143,6 @@ trait CoinTransferUtil { self: StoreTest =>
         coinPrice,
       ),
       java.util.List.of(),
-      Optional.empty(),
       Optional.empty(),
     ).toValue
 
@@ -1304,7 +1301,6 @@ trait CoinTransferUtil { self: StoreTest =>
       svcParty.toProtoPrimitive,
       owner.toProtoPrimitive,
       expiringAmount(amount),
-      Optional.empty(),
     )
   }
 

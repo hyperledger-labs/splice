@@ -25,7 +25,6 @@ import org.mockito.exceptions.base.MockitoAssertionError
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.{Duration, Instant}
-import java.util.Optional
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.network.codegen.java.cc.coinrules as coinrulesCodegen
 import com.digitalasset.canton.logging.SuppressionRule
@@ -72,7 +71,6 @@ class BftScanConnectionTest
                     domainId,
                   ),
                   false,
-                  Optional.empty(),
                 ),
                 ByteString.EMPTY,
                 Instant.EPOCH,

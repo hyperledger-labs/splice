@@ -10,50 +10,44 @@ import scala.util.Using
 object DarResources {
   val cantonCoin_0_1_0 = DarResource("canton-coin-0.1.0.dar")
   val cantonCoin_current = DarResource("canton-coin-current.dar")
-  val cantonCoin_0_2_0 = DarResource("canton-coin-0.2.0.dar")
   val cantonCoin = PackageResource(
     cantonCoin_0_1_0,
-    Seq(cantonCoin_current, cantonCoin_0_2_0),
+    Seq(cantonCoin_current),
   )
 
   val svcGovernance_0_1_0 = DarResource("svc-governance-0.1.0.dar")
   val svcGovernance_current = DarResource("svc-governance-current.dar")
-  val svcGovernance_0_2_0 = DarResource("svc-governance-0.2.0.dar")
   val svcGovernance = PackageResource(
     svcGovernance_0_1_0,
-    Seq(svcGovernance_current, svcGovernance_0_2_0),
+    Seq(svcGovernance_current),
   )
 
   val cantonNameService_0_1_0 = DarResource("canton-name-service-0.1.0.dar")
   val cantonNameService_current = DarResource("canton-name-service-current.dar")
-  val cantonNameService_0_2_0 = DarResource("canton-name-service-0.2.0.dar")
   val cantonNameService = PackageResource(
     cantonNameService_0_1_0,
-    Seq(cantonNameService_current, cantonNameService_0_2_0),
+    Seq(cantonNameService_current),
   )
 
   val splitwell_0_1_0 = DarResource("splitwell-0.1.0.dar")
   val splitwell_current = DarResource("splitwell-current.dar")
-  val splitwell_0_2_0 = DarResource("splitwell-0.2.0.dar")
   val splitwell = PackageResource(
     splitwell_0_1_0,
-    Seq(splitwell_current, splitwell_0_2_0),
+    Seq(splitwell_current),
   )
 
   val wallet_0_1_0 = DarResource("wallet-0.1.0.dar")
   val wallet_current = DarResource("wallet-current.dar")
-  val wallet_0_2_0 = DarResource("wallet-0.2.0.dar")
   val wallet = PackageResource(
     wallet_0_1_0,
-    Seq(wallet_current, wallet_0_2_0),
+    Seq(wallet_current),
   )
 
   val walletPayments_0_1_0 = DarResource("wallet-payments-0.1.0.dar")
   val walletPayments_current = DarResource("wallet-payments-current.dar")
-  val walletPayments_0_2_0 = DarResource("wallet-payments-0.2.0.dar")
   val walletPayments = PackageResource(
     walletPayments_0_1_0,
-    Seq(walletPayments_current, walletPayments_0_2_0),
+    Seq(walletPayments_current),
   )
 
   val validatorLifecycle_0_1_0 = DarResource("validator-lifecycle-0.1.0.dar")

@@ -422,7 +422,6 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
                 dummyRound,
                 new cc.fees.RatePerRound(dummyDecimal),
               ),
-              java.util.Optional.empty,
             ),
             new cc.expiry.TimeLock(
               java.util.List.of(),

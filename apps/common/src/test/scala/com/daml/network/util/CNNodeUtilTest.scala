@@ -5,7 +5,6 @@ import com.daml.network.codegen.java.cc.fees.{ExpiringAmount, RatePerRound}
 import com.daml.network.codegen.java.cc.types.Round
 import com.digitalasset.canton.BaseTest
 import java.math.BigDecimal
-import java.util.Optional
 import org.scalatest.wordspec.AnyWordSpec
 
 class CNNodeUtilTest extends AnyWordSpec with BaseTest {
@@ -17,7 +16,6 @@ class CNNodeUtilTest extends AnyWordSpec with BaseTest {
       new Round(0L),
       new RatePerRound(new BigDecimal(0.5).setScale(10)),
     ),
-    Optional.empty(),
   )
   "compute holding fees" in {
     CNNodeUtil.holdingFee(coin, 0L) shouldBe new BigDecimal(0.0).setScale(10)

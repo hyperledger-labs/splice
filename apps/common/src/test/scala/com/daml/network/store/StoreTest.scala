@@ -57,7 +57,6 @@ import org.slf4j.event.Level
 
 import java.time.{Duration, Instant}
 import java.time.temporal.ChronoUnit
-import java.util.Optional
 import scala.concurrent.blocking
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -106,7 +105,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       svcParty.toProtoPrimitive,
       schedule,
       false,
-      Optional.empty(),
     )
     contract(
       identifier = templateId,
@@ -183,7 +181,6 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new Round(createdAtRound),
         new feesCodegen.RatePerRound(numeric(ratePerRound)),
       ),
-      Optional.empty(),
     )
     contract(
       identifier = templateId,

@@ -59,12 +59,6 @@ repos:
         language: system
         entry: ".circleci/build-config.sh --check"
         files: '^.circleci/config/.*[.]yml$'
-      - id: check-upgrade-model-diffs
-        name: Check that the diffs for daml models are up2date
-        language: system
-        entry: "./scripts/check-upgrade-model-diff.sh"
-        pass_filenames: false
-        always_run: true
       - id: check-trailing-whitespace
         name: Check for trailing whitespace
         language: system

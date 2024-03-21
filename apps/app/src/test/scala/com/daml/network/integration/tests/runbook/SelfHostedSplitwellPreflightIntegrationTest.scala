@@ -96,8 +96,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       runScript(validatorPath / "validator.sc")(env.environment)
 
       Seq(
-        "./daml/splitwell/.daml/dist/splitwell-0.1.0.dar",
-        "./daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar",
+        "./daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
       ).foreach { dar =>
         v("validatorApp").participantClient.dars
           .upload(dar)
@@ -146,10 +145,6 @@ class SelfHostedSplitwellPreflightIntegrationTest
                     .replace(
                       "dars/splitwell-0.1.0.dar",
                       "./daml/splitwell/.daml/dist/splitwell-0.1.0.dar",
-                    )
-                    .replace(
-                      "dars/splitwell-0.2.0.dar",
-                      "./daml/splitwell-upgrade/.daml/dist/splitwell-0.2.0.dar",
                     )
                     .toFile
                     .path

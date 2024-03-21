@@ -115,13 +115,9 @@ object BuildCommon {
         IO.copyFile(srcFile, dstFile)
         val currentFilename =
           srcFile.getName().replaceAll("(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))*.dar", "current.dar")
-        if (!srcFile.getName().endsWith("0.2.0.dar")) {
-          val currentDstFile = (Compile / resourceDirectory).value / "dar" / currentFilename
-          IO.copyFile(srcFile, currentDstFile)
-          Seq(dstFile, currentDstFile)
-        } else {
-          Seq(dstFile)
-        }
+        val currentDstFile = (Compile / resourceDirectory).value / "dar" / currentFilename
+        IO.copyFile(srcFile, currentDstFile)
+        Seq(dstFile, currentDstFile)
       }.taskValue,
       cleanFiles += {
         (Compile / resourceDirectory).value / "dar"
@@ -189,13 +185,13 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "lint",
-          "; damlDarsLockFileCheck ; cantonDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck ; runCheckUpgradeModelDiffs",
+          "; damlDarsLockFileCheck ; cantonDarsLockFileCheck ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint ; pulumi/npmLint ; load-tester/npmLint ; runShellcheck ; syncpackCheck",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all CN DARs here, just in case
         addCommandAlias(
           "clean-cn",
-          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; cn-util-daml/clean; canton-coin-daml/clean; canton-coin-upgrade-daml/clean; svc-governance-daml/clean; svc-governance-upgrade-daml/clean; wallet-daml/clean; wallet-upgrade-daml/clean; wallet-payments-daml/clean; wallet-payments-upgrade-daml/clean; canton-name-service-daml/clean; canton-name-service-upgrade-daml/clean; splitwell-daml/clean; splitwell-upgrade-daml/clean; validator-lifecycle-daml/clean; app-manager-daml/clean; apps-frontends/clean; cleanCnDars",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwell/clean; apps-sv/clean; apps-wallet/clean; apps-app/clean; cn-util-daml/clean; canton-coin-daml/clean; svc-governance-daml/clean; wallet-daml/clean; wallet-payments-daml/clean; canton-name-service-daml/clean; splitwell-daml/clean; validator-lifecycle-daml/clean; app-manager-daml/clean; apps-frontends/clean; cleanCnDars",
         ) ++
         addCommandAlias("cn-clean", "; clean-cn")
     val buildSettings = inThisBuild(

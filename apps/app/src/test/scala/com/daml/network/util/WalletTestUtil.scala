@@ -26,7 +26,7 @@ import org.scalatest.Assertion
 
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
-import java.util.{Optional, UUID}
+import java.util.UUID
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
@@ -911,7 +911,6 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
           new Round(round),
           new feesCodegen.RatePerRound(holdingFee.bigDecimal),
         ),
-        Optional.empty(),
       ).create
     val created = participantClient.ledger_api_extensions.commands
       .submitWithResult(

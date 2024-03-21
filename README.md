@@ -24,7 +24,6 @@
     - [Daml Numerics](#daml-numerics)
     - [Editing Daml](#editing-daml)
     - [Preparing for upgrades that add variant constructors](#preparing-for-upgrades-that-add-variant-constructors)
-    - [Editing Daml Upgrade Models](#editing-daml-upgrade-models)
     - [Bumping External Dependencies](#bumping-external-dependencies)
       - [Bumping CometBFT](#bumping-cometbft)
       - [Bumping Canton](#bumping-canton)
@@ -594,25 +593,6 @@ data Bar
 ```
 This matches the guidance given for protobuf enums: https://protobuf.dev/programming-guides/dos-donts/#unspecified-enum
 
-
-### Editing Daml Upgrade Models
-
-To test Daml upgrade models, some models are duplicated with minor
-changes, e.g., canton-coin and canton-coin-upgrade. To make the
-changes easy to spot, we check in diffs in `daml/upgrade-diffs`.
-
-There are two main workflows:
-
-1. You made a change to the core Daml models and just want to sync up
-   the upgraded models. For that run `./scripts/sync-upgrade-model.sh`
-   which copies over any changes from the base to the upgrade models
-   while preserving the changes already made to the upgrade models.
-2. You changed the upgrade models to test out upgrading and want to
-   update the diffs. For that run
-   `./scripts/update-upgrade-model-diff.sh`.
-
-CI enforces that those diff files are up2date so their is no risk of
-forgetting those changes.
 
 ### Bumping External Dependencies
 

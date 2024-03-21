@@ -18,7 +18,6 @@ import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
 import java.time.Duration
-import java.util.Optional
 import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -161,7 +160,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
                   expiredDuration,
                 )
               ).asJava,
-              Optional.empty(),
             ),
             new cc.coinrules.TransferContext(
               transferContext.openMiningRound,
@@ -214,7 +212,6 @@ trait TimeTestUtil extends CNNodeTestCommon {
               )
             ).asJava,
             outputs.asJava,
-            Optional.empty(),
           ),
           new cc.coinrules.TransferContext(
             transferContext.openMiningRound,
