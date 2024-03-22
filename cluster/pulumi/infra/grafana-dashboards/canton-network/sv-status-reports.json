@@ -19,7 +19,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,
-  "id": 63,
+  "id": 19,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -241,7 +241,7 @@
           "editorMode": "code",
           "expr": "cn_sv_status_report_domain_time_us{namespace=~\"$namespace\", report_publisher=~\"$sv_party\", canton_version=~\"$version\"} / 1000",
           "instant": false,
-          "legendFormat": "{{target_node}} - {{ report_publisher }}",
+          "legendFormat": "{{target_node}} - {{ report_publisher }}  {{ report_publisher_party }}",
           "range": true,
           "refId": "A"
         }
@@ -986,6 +986,6 @@
   "timezone": "",
   "title": "SV Status Reports",
   "uid": "caffa6f7-c421-4579-a839-b026d3b76826",
-  "version": 1,
+  "version": 3,
   "weekStart": ""
 }

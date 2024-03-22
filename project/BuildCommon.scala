@@ -673,8 +673,6 @@ object BuildCommon {
           monocle_macro, // Include it here, even if unused, so that it can be used everywhere
           pprint,
           pureconfig, // Only dependencies may be needed, but it is simplest to include it like this
-          prometheus_httpserver, // Include it here to overwrite transitive dependencies by DAML libraries
-          prometheus_hotspot, // Include it here to overwrite transitive dependencies by DAML libraries
           opentelemetry_api,
           opentelemetry_sdk,
           opentelemetry_sdk_autoconfigure,

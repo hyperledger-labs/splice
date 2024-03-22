@@ -22,7 +22,7 @@ function createdNestedConfigMapForFolder(namespace: Input<string>, folderPath: s
   dirFiles.forEach(file => {
     const filePath = path.join(folderPath, file);
     if (fs.statSync(filePath).isDirectory()) {
-      createConfigMapForFolder(namespace, filePath, file);
+      createConfigMapForFolder(namespace, filePath, file.toLowerCase());
     }
   });
 }

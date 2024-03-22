@@ -185,9 +185,6 @@ object CantonDependencies {
     ExclusionRule(organization = "com.amazonaws", name = "aws-java-sdk-kms")
   )
 
-  lazy val prometheus_httpserver = "io.prometheus" % "simpleclient_httpserver" % "0.12.0"
-  lazy val prometheus_hotspot = "io.prometheus" % "simpleclient_hotspot" % "0.12.0"
-
   lazy val opentelemetry_version = "1.36.0"
   lazy val opentelemetry_java_instrumentation_version = "2.2.0"
   lazy val opentelemetry_api = "io.opentelemetry" % "opentelemetry-api" % opentelemetry_version

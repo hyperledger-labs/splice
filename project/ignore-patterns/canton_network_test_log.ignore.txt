@@ -66,8 +66,6 @@ failed with UNKNOWN/channel closed.*SvAppLedgerApiConnectivityIntegrationTest
 # This might be logged between the test finishing and shutdown of the nodes (see #8991)
 Noticed an SvcRules epoch change.*GlobalDomainMigrationIntegrationTest
 
-# Make sure to have a trailing newline
-
 # Shows up during global domain migration test, when the domain is frozen
 GlobalDomainMigrationIntegrationTest.*io.grpc.StatusRuntimeException: ABORTED: DOMAIN_BACKPRESSURE.*: The domain is overloaded
 # TODO (#10085): remove if it no longer applies
@@ -80,3 +78,8 @@ Skipped.*faucet coupons from last claimed round.*to current round
 
 # Sometimes the CircleCI executor seems to take a break, which leads to spurious failed DB activeness checks, see #9388
 DB_CONNECTION_LOST.*Database health check failed to establish a valid connection.*Connection is not available, request timed out
+
+# The prometheus export server does not wait for any ongoing requests when shutting down https://github.com/prometheus/client_java/issues/938
+The Prometheus metrics HTTPServer caught an Exception while trying to send the metrics response
+
+# Make sure to have a trailing newline
