@@ -17,6 +17,7 @@ stdenv.mkDerivation {
     find . -type f -not \( -path "*grafana/dashboards/Platform/*" -o -path "*grafana/dashboards/Participant*" -o -path "*grafana/dashboards/Canton*" \) -delete
     # Remove unused dashboard
     rm  grafana/dashboards/Platform/logs.json
+    rm  grafana/dashboards/Platform/jvm-metrics.json
     # Copy the specific folders to the output
     mkdir -p $out
     cp -R grafana/dashboards/Platform $out/platform
