@@ -100,6 +100,15 @@ export function initDumpConfig(): void {
                 ...args.inputs,
                 secretData: `{"publicKey": "${args.inputs.secret}-public-key", "privateKey": "${args.inputs.secret}-private-key"}`,
               };
+            } else if (
+              args.inputs.secret.startsWith('sv') &&
+              args.inputs.secret.endsWith('-keys')
+            ) {
+              return {
+                ...args.inputs,
+                secretData: `{"nodePrivateKey": "${args.inputs.secret}-node-private-key", "validatorPrivateKey": "${args.inputs.secret}-validator-private-key"
+                , "validatorPublicKey": "${args.inputs.secret}-validator-public-key"}`,
+              };
             } else if (args.inputs.secret == 'gcp-bucket-sa-key-secret') {
               const secretData = JSON.stringify({
                 projectId: args.inputs.project,

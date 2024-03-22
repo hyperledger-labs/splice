@@ -12,6 +12,12 @@ export type SvIdKey = {
   privateKey: string;
 };
 
+export type SvCometBftKeys = {
+  nodePrivateKey: string;
+  validatorPrivateKey: string;
+  validatorPublicKey: string;
+};
+
 export function svKeyFromSecret(sv: string): pulumi.Output<SvIdKey> {
   const keyJson = getSecretVersionOutput({ secret: `${sv}-id` });
   return keyJson.apply(k => {
@@ -20,6 +26,19 @@ export function svKeyFromSecret(sv: string): pulumi.Output<SvIdKey> {
     return {
       publicKey: String(parsed.publicKey),
       privateKey: String(parsed.privateKey),
+    };
+  });
+}
+
+export function svCometBftKeysFromSecret(name: string): pulumi.Output<SvCometBftKeys> {
+  const keyJson = getSecretVersionOutput({ secret: name });
+  return keyJson.apply(k => {
+    const secretData = k.secretData;
+    const parsed = JSON.parse(secretData);
+    return {
+      nodePrivateKey: String(parsed.nodePrivateKey),
+      validatorPrivateKey: String(parsed.validatorPrivateKey),
+      validatorPublicKey: String(parsed.validatorPublicKey),
     };
   });
 }

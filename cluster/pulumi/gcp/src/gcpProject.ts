@@ -16,7 +16,7 @@ class GcpProject extends pulumi.ComponentResource {
     );
   }
 
-  private importSvIdFromDevnet(id: string): ImportedSecret {
+  private importSecretIdFromDevnet(id: string): ImportedSecret {
     return new ImportedSecret(
       id,
       { sourceProject: 'da-cn-devnet', secretId: id },
@@ -68,10 +68,15 @@ class GcpProject extends pulumi.ComponentResource {
     // Note: this should be fine when ran against devnet itself...
     //  - But since we can automate this now, we might want to simply generate new SV secrets per project
     //  - We also want to move this to the infra stack so we can parameterize # of SVs
-    this.importSvIdFromDevnet('sv-id');
-    this.importSvIdFromDevnet('sv2-id');
-    this.importSvIdFromDevnet('sv3-id');
-    this.importSvIdFromDevnet('sv4-id');
+    // TODO(#11109): generate new SV secrets per project
+    this.importSecretIdFromDevnet('sv-id');
+    this.importSecretIdFromDevnet('sv2-id');
+    this.importSecretIdFromDevnet('sv3-id');
+    this.importSecretIdFromDevnet('sv4-id');
+    // Import CometBft keys from devnet
+    for (let i = 1; i <= 16; i++) {
+      this.importSecretIdFromDevnet(`sv${i}-cometbft-keys`);
+    }
 
     // Manage IAM and permissions
     new ServiceAccount(
@@ -97,6 +102,16 @@ class GcpProject extends pulumi.ComponentResource {
           resource.name.endsWith("secrets/sv3-id/versions/latest") ||
           resource.name.endsWith("secrets/sv4-id/versions/latest") ||
           resource.name.endsWith("secrets/sv-id/versions/latest")
+          `,
+            },
+          },
+          {
+            id: 'roles/secretmanager.secretAccessor',
+            condition: {
+              title: 'CometBft keys',
+              description: '(managed by Pulumi)',
+              expression: `
+          resource.name.endsWith("-cometbft-keys/versions/latest")
           `,
             },
           },
