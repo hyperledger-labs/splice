@@ -40,25 +40,30 @@ import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
+import scala.util.chaining.scalaUtilChainingOps
 
 /** Analogue to Canton's CommunityTests */
 object CNNodeTests {
-  private val configuredOpenTelemetry = OpenTelemetryFactory.initializeOpenTelemetry(
-    initializeGlobalOpenTelemetry = true,
-    attachReporters = sdkMeterProviderBuilder => {
-      sdkMeterProviderBuilder.registerMetricReader(
-        PrometheusHttpServer
-          .builder()
-          .setHost("localhost")
-          .setPort(25001)
-          .build()
-      )
-    },
-    metricsEnabled = true,
-    config = Tracer(),
-    histograms = Seq.empty,
-    loggerFactory = NamedLoggerFactory.root,
-  )
+  private val configuredOpenTelemetry = OpenTelemetryFactory
+    .initializeOpenTelemetry(
+      initializeGlobalOpenTelemetry = true,
+      attachReporters = sdkMeterProviderBuilder => {
+        sdkMeterProviderBuilder.registerMetricReader(
+          PrometheusHttpServer
+            .builder()
+            .setHost("localhost")
+            .setPort(25001)
+            .build()
+        )
+      },
+      metricsEnabled = true,
+      config = Tracer(),
+      histograms = Seq.empty,
+      loggerFactory = NamedLoggerFactory.root,
+    )
+    .tap { otel =>
+      sys.addShutdownHook(otel.close())
+    }
   type CNNodeTestConsoleEnvironment = TestConsoleEnvironment[CNNodeEnvironmentImpl]
   type SharedCNNodeEnvironment =
     SharedEnvironment[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
