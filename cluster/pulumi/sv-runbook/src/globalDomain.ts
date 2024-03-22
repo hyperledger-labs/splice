@@ -9,7 +9,6 @@ import {
   installCNRunbookHelmChart,
   installMigrationIdSpecificComponent,
   loadYamlFromFile,
-  defaultVersion,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
@@ -49,7 +48,7 @@ export function installGlobalDomainNode(
 
   return installMigrationIdSpecificComponent(
     globalDomainMigrationConfig,
-    (migrationId, isActive) => {
+    (migrationId, isActive, version) => {
       const globalDomainValues: ChartValues = {
         ...loadYamlFromFile(
           `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
@@ -68,7 +67,7 @@ export function installGlobalDomainNode(
         `global-domain-${migrationId}`,
         'cn-global-domain',
         globalDomainValues,
-        defaultVersion,
+        version,
         dependencies.concat([cometbft, sequencerPg, mediatorPg])
       );
     }

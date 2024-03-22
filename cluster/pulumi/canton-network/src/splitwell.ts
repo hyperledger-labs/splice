@@ -76,7 +76,7 @@ export async function installSplitwell(
         enable: true,
       },
       migration: {
-        id: globalDomainMigrationConfig.activeMigrationId,
+        id: globalDomainMigrationConfig.active.migrationId,
       },
       scanAddress: scanAddress,
       participantHost: participant.name,

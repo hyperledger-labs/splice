@@ -126,7 +126,7 @@ function installIngress(
     ingress: {
       splitwell: splitwell,
       globalDomain: {
-        activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
+        activeMigrationId: globalDomainMigrationConfig.active.migrationId.toString(),
       },
     },
   });

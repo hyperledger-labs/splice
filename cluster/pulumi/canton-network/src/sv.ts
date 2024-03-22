@@ -283,7 +283,7 @@ export async function installSvNode(
       withSvIngress: true,
       ingress: {
         globalDomain: {
-          activeMigrationId: globalDomainUpgradeConfig.activeMigrationId.toString(),
+          activeMigrationId: globalDomainUpgradeConfig.active.migrationId.toString(),
         },
       },
       cluster: {
@@ -327,12 +327,12 @@ async function installValidator(
   });
 
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
-  const globalDomainUrl = `https://sequencer-${globalDomainMigrationConfig.activeMigrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
+  const globalDomainUrl = `https://sequencer-${globalDomainMigrationConfig.active.migrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
 
   const validator = await installValidatorApp({
     xns,
     migration: {
-      id: globalDomainMigrationConfig.activeMigrationId,
+      id: globalDomainMigrationConfig.active.migrationId,
     },
     validatorWalletUser: svConfig.validatorWalletUser,
     participant: sv.participant,
@@ -377,7 +377,7 @@ function installMigrationIdSpecificComponents(
 ) {
   return installMigrationIdSpecificComponent(
     globalDomainMigrationConfig,
-    (migrationId, isActive) => {
+    (migrationId, isActive, version) => {
       const sequencerPostgres =
         defaultPostgres || postgres.installPostgres(xns, `sequencer-${migrationId}-pg`, true);
       const mediatorPostgres =
@@ -402,7 +402,8 @@ function installMigrationIdSpecificComponents(
         participantPostgres,
         auth0UserNameEnvVarSource('sv'),
         isParticipantRestoringFromDump || mustBeManuallyInitialized,
-        svConfig.onboardingName
+        svConfig.onboardingName,
+        version
       );
       const globalDomainNode = new GlobalDomainNode(
         migrationId,
@@ -412,7 +413,8 @@ function installMigrationIdSpecificComponents(
         canSyncFromCometBft ? cometbft : { ...cometbft, syncSource: undefined },
         mustBeManuallyInitialized,
         isActive,
-        svConfig.onboardingName
+        svConfig.onboardingName,
+        version
       );
       const migrationIngress = installCNHelmChart(
         xns,
@@ -434,7 +436,7 @@ function installMigrationIdSpecificComponents(
             svNamespace: xns.logicalName,
           },
         },
-        defaultVersion,
+        version,
         { dependsOn: [xns.ns] }
       );
       return {
@@ -495,7 +497,7 @@ function installSvApp(
         sequencerAddress: globalDomain.namespaceInternalSequencerAddress,
         mediatorAddress: globalDomain.namespaceInternalMediatorAddress,
         // required to prevent participants from using new nodes when the domain is upgraded
-        sequencerPublicUrl: `https://sequencer-${globalDomainMigrationConfig.activeMigrationId}.${config.nodeName}.svc.${CLUSTER_BASENAME}.network.canton.global`,
+        sequencerPublicUrl: `https://sequencer-${globalDomainMigrationConfig.active.migrationId}.${config.nodeName}.svc.${CLUSTER_BASENAME}.network.canton.global`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     scan: {
@@ -566,7 +568,7 @@ function installScan(
     sequencerAddress: globalDomainNode.namespaceInternalSequencerAddress,
     participantAddress: participant.name,
     migration: {
-      id: globalDomainMigrationConfig.activeMigrationId,
+      id: globalDomainMigrationConfig.active.migrationId,
     },
   };
   const scan = installCNHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {

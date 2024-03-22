@@ -11,7 +11,6 @@ import {
   REPO_ROOT,
   CnInput,
   GlobalDomainMigrationConfig,
-  defaultVersion,
   disableCometBftStateSync,
 } from 'cn-pulumi-common';
 import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
@@ -50,7 +49,7 @@ export function installCometBftNode(
   );
   return installMigrationIdSpecificComponent(
     globalDomainMigrationConfig,
-    (migrationId, isActive) => {
+    (migrationId, isActive, version) => {
       const cometBftValues = loadYamlFromFile(
         `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
         {
@@ -95,7 +94,7 @@ export function installCometBftNode(
             labels: [{ key: 'active_migration', value: isActive }],
           },
         }),
-        defaultVersion,
+        version,
         dependencies
       );
     }

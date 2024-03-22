@@ -4,7 +4,7 @@ import { Release } from '@pulumi/kubernetes/helm/v3';
 import {
   auth0UserNameEnvVarSource,
   BootstrappingDumpConfig,
-  defaultVersion,
+  CnChartVersion,
   disableCantonAutoInit,
   ExactNamespace,
   GlobalDomainMigrationConfig,
@@ -27,7 +27,7 @@ export function installMigrationSpecificValidatorParticipant(
 ): Release {
   return installMigrationIdSpecificComponent(
     globalDomainMigrationConfig,
-    (migrationId, isActive) => {
+    (migrationId, isActive, version) => {
       const participantPostgres =
         defaultPostgres || postgres.installPostgres(xns, `participant-${migrationId}-pg`, true);
 
@@ -42,6 +42,7 @@ export function installMigrationSpecificValidatorParticipant(
           !isActive ||
           globalDomainMigrationConfig.isRunningMigration(),
         nodeIdentifier,
+        version,
         dependsOn
       );
     }
@@ -55,6 +56,7 @@ export function installParticipant(
   participantAdminUserNameFrom: k8s.types.input.core.v1.EnvVarSource,
   disableAutoInit = false,
   nodeIdentifier: string,
+  version: CnChartVersion,
   dependsOn: pulumi.Resource[] = []
 ): Release {
   const pgName = sanitizedForPostgres(name);
@@ -78,7 +80,7 @@ export function installParticipant(
       nodeIdentifier,
       additionalJvmOptions: jmxOptions(),
     },
-    defaultVersion,
+    version,
     {
       dependsOn,
     }

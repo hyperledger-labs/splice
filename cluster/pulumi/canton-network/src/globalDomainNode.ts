@@ -8,6 +8,7 @@ import {
   DomainMigrationIndex,
   jmxOptions,
   defaultVersion,
+  CnChartVersion,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
@@ -24,6 +25,7 @@ export class GlobalDomainNode extends ComponentResource {
   };
   cometbftRpcService: Service;
   active: boolean;
+  version: CnChartVersion;
 
   constructor(
     domainMigrationId: DomainMigrationIndex,
@@ -42,13 +44,15 @@ export class GlobalDomainNode extends ComponentResource {
     },
     disableAutoInit: boolean,
     active: boolean,
-    nodeIdentifier: string
+    nodeIdentifier: string,
+    version: CnChartVersion = defaultVersion
   ) {
     super('canton:network:domain:global', `${xns.logicalName}-global-domain-${domainMigrationId}`);
     this.migrationId = domainMigrationId;
     this.cometbft = cometbft;
     this.name = 'global-domain-' + domainMigrationId.toString();
     this.active = active;
+    this.version = version;
 
     const sanitizedName = this.name.replaceAll('-', '_');
     const mediatorDbName = `${sanitizedName}_mediator`;
@@ -61,6 +65,7 @@ export class GlobalDomainNode extends ComponentResource {
       cometbft.nodeConfigs,
       domainMigrationId,
       active,
+      version,
       cometbft.syncSource,
       { parent: this }
     );
@@ -98,7 +103,7 @@ export class GlobalDomainNode extends ComponentResource {
         disableAutoInit: disableAutoInit,
         nodeIdentifier,
       },
-      defaultVersion,
+      version,
       { dependsOn: [cometBftService], parent: this }
     );
 

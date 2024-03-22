@@ -54,8 +54,8 @@ const globalDomainMigrationConfig = GlobalDomainMigrationConfig.fromEnv();
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
     defaultVersion.type === 'local'
-      ? 'Using locally built charts'
-      : `Using charts from the artifactory, version ${defaultVersion.version}`
+      ? 'Using locally built charts by default'
+      : `Using charts from the artifactory by default, version ${defaultVersion.version}`
   );
   console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
   console.error(`Installing validator node in namespace: ${RUNBOOK_NAMESPACE}`);
@@ -164,7 +164,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
-      { MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString() }
+      { MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString() }
     ),
     metrics: {
       enable: true,
@@ -221,7 +221,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
-        MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
+        MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString(),
         SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
       }
     ),

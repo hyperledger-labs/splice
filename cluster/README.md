@@ -1466,9 +1466,9 @@ The following steps assume that:
    `curl "https://${GCP_CLUSTER_BASENAME}.network.canton.global/version"` - they should be the same.
    You might need to set `CI_IGNORE_DIRTY_REPO` to `true` for `get-snapshot-version` (and the subsequent steps) to work,
    in case you have made local changes to the repo (that you can confirm are harmless).
-1. The `cncluster` commands below are wired up to use charts published to artifactory.
-   If you want to use local charts instead you (currently) need to edit `cncluster` to remove the `CHART_VERSION` exports.
-   In this case you'll also want to run `make -C $REPO_ROOT cluster/clean` and `make -C $REPO_ROOT cluster/build` to rebuild your local helm charts to the target version.
+1. The `cncluster` commands below can use helm charts published to artifactory.
+   If you want to use local charts instead you can pass `local` instead of a version string (`local` is also the default).
+   If you will be using local charts you'll want to run `make -C $REPO_ROOT cluster/clean` and `make -C $REPO_ROOT cluster/build` to rebuild your local charts to the target version.
 1. Set `export CI=true` to convince `cncluster` to let you work on non-scratch clusters manually.
 1. Run `cncluster hard_domain_migration_prepare` to deploy the new Canton and CometBFT nodes for all our SVs.
    Note that this command contains multiple `pulumi up` steps (one for the main deployment, one for the runbook SV),

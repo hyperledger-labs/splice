@@ -122,8 +122,8 @@ export async function installCluster(
 ): Promise<{ svc: Svc; validator1?: Resource }> {
   console.error(
     defaultVersion.type === 'local'
-      ? 'Using locally built charts'
-      : `Using charts from the artifactory, version ${defaultVersion.version}`
+      ? 'Using locally built charts by default'
+      : `Using charts from the artifactory by default, version ${defaultVersion.version}`
   );
 
   const bootstrapBucketSpec = await bootstrapDataBucketSpec('da-cn-devnet', 'da-cn-data-dumps');

@@ -81,8 +81,8 @@ export async function installNode(
 ): Promise<void> {
   console.error(
     defaultVersion.type === 'local'
-      ? 'Using locally built charts'
-      : `Using charts from the artifactory, version ${defaultVersion.version}`
+      ? 'Using locally built charts by default'
+      : `Using charts from the artifactory by default, version ${defaultVersion.version}`
   );
   console.error(`TARGET_CLUSTER: ${TARGET_CLUSTER}`);
   console.error(`Installing SV node in namespace: ${svNamespaceStr}`);
@@ -144,14 +144,14 @@ export async function installNode(
       },
       ingress: {
         globalDomain: {
-          activeMigrationId: globalDomainMigrationConfig.activeMigrationId.toString(),
+          activeMigrationId: globalDomainMigrationConfig.active.migrationId.toString(),
         },
       },
     },
     defaultVersion,
     ingressImagePullDeps.concat([sv, validator])
   );
-  installMigrationIdSpecificComponent(globalDomainMigrationConfig, migrationId => {
+  installMigrationIdSpecificComponent(globalDomainMigrationConfig, (migrationId, _, version) => {
     installCNRunbookHelmChartByNamespaceName(
       xns.logicalName,
       `cluster-ingress-sv-domain-${migrationId}`,
@@ -172,7 +172,7 @@ export async function installNode(
           },
         },
       },
-      defaultVersion,
+      version,
       ingressImagePullDeps.concat([sv])
     );
   });
@@ -250,7 +250,7 @@ async function installSvAndValidator(
 
   const participant = installMigrationIdSpecificComponent(
     globalDomainMigrationConfig,
-    (migrationId, isActive) => {
+    (migrationId, isActive, version) => {
       const participantValues: ChartValues = {
         ...loadYamlFromFile(
           `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/participant-values.yaml`,
@@ -283,7 +283,7 @@ async function installSvAndValidator(
         `participant-${migrationId}`,
         'cn-participant',
         participantValuesWithSpecifiedAud,
-        defaultVersion,
+        version,
         imagePullDeps
           .concat([participantPg, svAppSecret, svKeySecret_])
           .concat(loopback !== null ? loopback : [])
@@ -323,7 +323,7 @@ async function installSvAndValidator(
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
-      MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
+      MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString(),
     }
   );
 
@@ -402,7 +402,7 @@ async function installSvAndValidator(
   const scanValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
+      MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString(),
     }),
     metrics: {
       enable: true,
@@ -434,7 +434,7 @@ async function installSvAndValidator(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
         TARGET_CLUSTER: TARGET_CLUSTER,
-        MIGRATION_ID: globalDomainMigrationConfig.activeMigrationId.toString(),
+        MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString(),
       }
     ),
     metrics: {

@@ -1,64 +1,94 @@
+import { CnChartVersion, defaultVersion } from './helm';
+
 export class GlobalDomainMigrationConfig {
-  // if set then the canton components associated with this migration id are kept running, does not impact the CN apps
-  legacyMigrationId?: DomainMigrationIndex;
   // the current running migration, to which the ingresses point, and it's expected to be the active CN network
   // this is the only migration that contains the CN apps
-  activeMigrationId: DomainMigrationIndex;
+  active: MigrationInfo;
+  // if set then the canton components associated with this migration id are kept running, does not impact the CN apps
+  legacy?: MigrationInfo;
   // the next migration id that we are preparing
   // this is used to prepare the canton components for the upgrade
-  upgradeMigrationId?: DomainMigrationIndex;
-  // indicates that during this run we are actually migrating from this id to the `activeMigrationId`
+  upgrade?: MigrationInfo;
+  // indicates that during this run we are actually migrating from this id to the active migration ID
   // used to configure  the CN apps for the migration
   migratingFromActiveId?: DomainMigrationIndex;
 
   constructor(
-    activeMigrationId: DomainMigrationIndex,
-    legacyMigrationId?: DomainMigrationIndex,
-    upgradeMigrationId?: DomainMigrationIndex,
+    active: MigrationInfo,
+    legacy?: MigrationInfo,
+    upgrade?: MigrationInfo,
     migratingFromActiveId?: DomainMigrationIndex
   ) {
-    this.legacyMigrationId = legacyMigrationId;
-    this.activeMigrationId = activeMigrationId;
-    this.upgradeMigrationId = upgradeMigrationId;
+    this.active = active;
+    this.legacy = legacy;
+    this.upgrade = upgrade;
     this.migratingFromActiveId = migratingFromActiveId;
   }
 
   // TODO(#10074) read this from current deployment if available
   static fromEnv(): GlobalDomainMigrationConfig {
     return new GlobalDomainMigrationConfig(
-      processIndex(process.env.GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID) || DefaultMigrationId,
-      processIndex(process.env.GLOBAL_DOMAIN_LEGACY_MIGRATION_ID),
-      processIndex(process.env.GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID),
-      processIndex(process.env.GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID)
+      new MigrationInfo(
+        processMigrationId(process.env.GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID) || DefaultMigrationId,
+        defaultVersion
+      ),
+      MigrationInfo.fromEnv(
+        process.env.GLOBAL_DOMAIN_LEGACY_MIGRATION_ID,
+        process.env.GLOBAL_DOMAIN_LEGACY_VERSION
+      ),
+      MigrationInfo.fromEnv(
+        process.env.GLOBAL_DOMAIN_UPGRADE_MIGRATION_ID,
+        process.env.GLOBAL_DOMAIN_UPGRADE_VERSION
+      ),
+      processMigrationId(process.env.GLOBAL_DOMAIN_MIGRATE_FROM_MIGRATION_ID)
     );
   }
 
   containsUpgrade(): boolean {
-    return this.upgradeMigrationId != undefined;
+    return this.upgrade != undefined;
   }
 
   isDefaultActive(): boolean {
-    return this.activeMigrationId == DefaultMigrationId;
+    return this.active.migrationId == DefaultMigrationId;
   }
 
   isRunningMigration(): boolean {
     return (
       this.migratingFromActiveId != undefined &&
-      this.migratingFromActiveId != this.activeMigrationId
+      this.migratingFromActiveId != this.active.migrationId
     );
   }
 
   migratingNodeConfig(): { migration: { id: DomainMigrationIndex; migrating: boolean } } {
     return {
       migration: {
-        id: this.activeMigrationId,
+        id: this.active.migrationId,
         migrating: this.isRunningMigration(),
       },
     };
   }
 }
 
-function processIndex(maybeValue?: string) {
+class MigrationInfo {
+  migrationId: DomainMigrationIndex;
+  version: CnChartVersion;
+
+  constructor(migrationId: DomainMigrationIndex, version: CnChartVersion) {
+    this.migrationId = migrationId;
+    this.version = version;
+  }
+
+  static fromEnv(maybeIdValue?: string, maybeVersionValue?: string): MigrationInfo | undefined {
+    const migrationId = processMigrationId(maybeIdValue);
+    if (migrationId == undefined) {
+      return undefined;
+    } else {
+      return new MigrationInfo(migrationId, processVersion(maybeVersionValue));
+    }
+  }
+}
+
+function processMigrationId(maybeValue?: string): DomainMigrationIndex | undefined {
   if (maybeValue == undefined) {
     return undefined;
   }
@@ -70,25 +100,50 @@ function processIndex(maybeValue?: string) {
   }
 }
 
+function processVersion(maybeValue?: string): CnChartVersion {
+  if (maybeValue == undefined) {
+    return defaultVersion;
+  } else if (maybeValue == 'local') {
+    return { type: 'local' };
+  } else {
+    return {
+      type: 'remote',
+      version: maybeValue,
+    };
+  }
+}
+
 export const DefaultMigrationId = 0;
 
 export function installMigrationIdSpecificComponent<T>(
   globalDomainUpgradeConfig: GlobalDomainMigrationConfig,
-  component: (migrationId: DomainMigrationIndex, isActive: boolean) => T
+  component: (migrationId: DomainMigrationIndex, isActive: boolean, version: CnChartVersion) => T
 ): {
   activeComponent: T;
   legacyComponent?: T;
   upgradeComponent?: T;
 } {
   return {
-    activeComponent: component(globalDomainUpgradeConfig.activeMigrationId, true),
+    activeComponent: component(
+      globalDomainUpgradeConfig.active.migrationId,
+      true,
+      globalDomainUpgradeConfig.active.version
+    ),
     legacyComponent:
-      globalDomainUpgradeConfig.legacyMigrationId != undefined
-        ? component(globalDomainUpgradeConfig.legacyMigrationId, false)
+      globalDomainUpgradeConfig.legacy != undefined
+        ? component(
+            globalDomainUpgradeConfig.legacy.migrationId,
+            false,
+            globalDomainUpgradeConfig.legacy.version
+          )
         : undefined,
     upgradeComponent:
-      globalDomainUpgradeConfig.upgradeMigrationId != undefined
-        ? component(globalDomainUpgradeConfig.upgradeMigrationId, false)
+      globalDomainUpgradeConfig.upgrade != undefined
+        ? component(
+            globalDomainUpgradeConfig.upgrade.migrationId,
+            false,
+            globalDomainUpgradeConfig.upgrade.version
+          )
         : undefined,
   };
 }

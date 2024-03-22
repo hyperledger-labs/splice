@@ -11,6 +11,7 @@ import {
   isDevNet,
   DomainMigrationIndex,
   defaultVersion,
+  CnChartVersion,
 } from 'cn-pulumi-common';
 
 import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './svconfs';
@@ -35,6 +36,7 @@ export function installCometBftNode(
   },
   migrationId: DomainMigrationIndex,
   isActiveDomain: boolean,
+  version: CnChartVersion = defaultVersion,
   syncSource?: Release,
   opts?: CustomResourceOptions
 ): Service {
@@ -94,7 +96,7 @@ export function installCometBftNode(
         volumeSize: clusterLargeDisk ? '480Gi' : '240Gi',
       },
     },
-    defaultVersion,
+    version,
     {
       ...opts,
       ...{ dependsOn: syncSource ? [syncSource] : [] },

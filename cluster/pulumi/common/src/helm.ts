@@ -28,9 +28,10 @@ export type CnInput<T> = T | pulumi.OutputInstance<T>;
 
 export type CnChartVersion = { type: 'local' } | { type: 'remote'; version: string };
 
-export const defaultVersion: CnChartVersion = CHARTS_VERSION
-  ? { type: 'remote', version: CHARTS_VERSION }
-  : { type: 'local' };
+export const defaultVersion: CnChartVersion =
+  CHARTS_VERSION && CHARTS_VERSION !== 'local'
+    ? { type: 'remote', version: CHARTS_VERSION }
+    : { type: 'local' };
 
 export function installCNHelmChartByNamespaceName(
   prefix: string,
@@ -88,6 +89,13 @@ function cnChartValues(
       : {};
 
   const imageTagOverride = process.env['IMAGE_TAG'];
+
+  if (imageTagOverride && version.type == 'remote' && version.version != imageTagOverride) {
+    // Mixing versions like this sounds like something that is always a bad idea.
+    throw new Error(
+      `Remote chart version ${version.version} does not match image tag ${imageTagOverride}`
+    );
+  }
 
   const values = _.mergeWith(
     {},
