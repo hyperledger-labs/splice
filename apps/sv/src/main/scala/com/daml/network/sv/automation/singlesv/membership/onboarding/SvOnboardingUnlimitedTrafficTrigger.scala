@@ -9,6 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.sv.store.SvSvcStore
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.Member
@@ -18,13 +19,16 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-/** This trigger currently relies on enough SVs working on the same set traffic balance request around the same time.
-  * TODO(#10597): Remove this constraint by retrying the reconciliation task every setBalanceRequestSubmissionWindowSize if not successful.
+/** This trigger currently relies on enough SVs working on the same set traffic balance request around the same time,
+  * as the trigger works with limited parallelism.
+  *
+  * TODO(tech-debt): remove this constraint by ensuring that we regularly submit set-traffic-balance requests for ALL members.
   */
 class SvOnboardingUnlimitedTrafficTrigger(
     override protected val context: TriggerContext,
     svcStore: SvSvcStore,
     sequencerAdminConnectionO: Option[SequencerAdminConnection],
+    trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
@@ -51,6 +55,7 @@ class SvOnboardingUnlimitedTrafficTrigger(
           }
         }
     } yield {
+      // Sorting here so we have a better chance of all SVs working on the same set traffic balance request around the same time.
       svMembersWithTrafficState.sortBy(_._1).collect {
         case (memberId, trafficState)
             if trafficState.extraTrafficLimit != NonNegativeLong.maxValue =>
@@ -63,9 +68,13 @@ class SvOnboardingUnlimitedTrafficTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] =
     for {
-      _ <- sequencerAdminConnection.ensureSequencerTrafficControlState(
-        task.memberId,
+      // We must read the state here again to pick up on new serials
+      currentStatus <- sequencerAdminConnection.getSequencerTrafficControlState(task.memberId)
+      _ <- sequencerAdminConnection.setSequencerTrafficControlState(
+        currentStatus,
         NonNegativeLong.maxValue,
+        context.pollingClock,
+        trafficBalanceReconciliationDelay,
       )
     } yield TaskSuccess(
       s"Updated traffic limit for ${task.memberId} to NonNegativeLong.maxValue"

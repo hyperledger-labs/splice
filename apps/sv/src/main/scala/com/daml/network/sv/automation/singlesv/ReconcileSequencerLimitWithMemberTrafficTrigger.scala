@@ -10,6 +10,7 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.sv.store.SvSvcStore
 import com.daml.network.util.AssignedContract
+import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.topology.{DomainId, Member}
 import com.digitalasset.canton.tracing.TraceContext
@@ -22,12 +23,14 @@ import scala.jdk.CollectionConverters.*
 
 /** This trigger currently relies on enough SVs working on the same set traffic balance request around the same time.
   * It also depends on the sorting of tasks done in OnAssignedContractTrigger to make this more likely to succeed.
-  * TODO(#10597): Remove this constraint by retrying the reconciliation task every setBalanceRequestSubmissionWindowSize if not successful.
+  *
+  * TODO(tech-debt): remove this constraint by ensuring that we regularly submit set-traffic-balance requests for ALL members.
   */
 class ReconcileSequencerLimitWithMemberTrafficTrigger(
     override protected val context: TriggerContext,
     store: SvSvcStore,
     sequencerAdminConnectionO: Option[SequencerAdminConnection],
+    trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
     ec: ExecutionContext,
     mat: Materializer,
@@ -99,9 +102,11 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
       taskOutcome <-
         if (currentExtraTrafficLimit < newExtraTrafficLimit) {
           sequencerAdminConnection
-            .ensureSequencerTrafficControlState(
-              memberId,
+            .setSequencerTrafficControlState(
+              trafficState,
               newExtraTrafficLimit,
+              context.pollingClock,
+              trafficBalanceReconciliationDelay,
             )
             .map(_ =>
               TaskSuccess(

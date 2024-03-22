@@ -191,6 +191,8 @@ case class SvAppBackendConfig(
     extraBeneficiaries: Map[PartyId, BigDecimal] = Map.empty,
     enableOnboardingParticipantPromotionDelay: Boolean = true,
     onboardingPollingInterval: Option[NonNegativeFiniteDuration],
+    trafficBalanceReconciliationDelay: NonNegativeFiniteDuration =
+      NonNegativeFiniteDuration.ofSeconds(10),
 ) extends CNNodeBackendConfig {
   override val nodeTypeName: String = "SV"
 

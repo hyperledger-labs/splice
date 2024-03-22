@@ -1,23 +1,24 @@
 package com.daml.network.environment
 
 import com.daml.network.admin.api.client.GrpcClientMetrics
+import com.daml.network.environment.SequencerAdminConnection.TrafficStatus
 import com.digitalasset.canton.admin.api.client.commands.{
   EnterpriseSequencerAdminCommands,
   SequencerAdminCommands,
   StatusAdminCommands,
 }
-import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig}
+import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.admin.grpc.InitializeSequencerResponse
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
-import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SequencerNodeStatus}
-import com.digitalasset.canton.protocol.StaticDomainParameters
-import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
-import StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
-import com.digitalasset.canton.config.RequireTypes.{NonNegativeLong, PositiveInt}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.protocol.StaticDomainParameters
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
+import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
 import com.google.protobuf.ByteString
@@ -150,31 +151,66 @@ class SequencerAdminConnection(
     )
   }
 
-  def ensureSequencerTrafficControlState(
-      member: Member,
+  /** Set the traffic state of current.member to a state with
+    *
+    * serial >= current.nextSerial and extraTrafficLimit == newTotalExtraTrafficLimit.
+    *
+    * Fail with a retryable exception in all other cases, so the caller can recompute the target traffic state
+    * and retry setting it.
+    */
+  def setSequencerTrafficControlState(
+      current: TrafficStatus,
       newTotalExtraTrafficLimit: NonNegativeLong,
+      clock: Clock,
+      timeout: NonNegativeFiniteDuration,
   )(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
-    retryProvider.ensureThat(
-      RetryFor.WaitingOnInitDependency,
-      "sequencer_traffic_control",
-      s"Extra traffic limit for $member set to $newTotalExtraTrafficLimit",
-      getSequencerTrafficControlState(member).map(result =>
-        Either.cond(
-          result.extraTrafficLimit == newTotalExtraTrafficLimit,
-          (),
-          result,
-        )
-      ),
-      (previous: TrafficStatus) =>
+    val msgPrefix =
+      s"setting traffic state for ${current.member} to $newTotalExtraTrafficLimit with next serial ${current.nextSerial}:"
+    val deadline = clock.now.plus(timeout.asJavaApproximation)
+    // There are multiple cases where we need the caller to retry: we (ab)use gRPC Status codes to communicate this.
+    def checkSuccessOrAbort(): Future[Option[io.grpc.Status]] = {
+      getSequencerTrafficControlState(current.member).map(result =>
+        if (result.nextSerial == current.nextSerial) {
+          val now = clock.now
+          if (now.isAfter(deadline)) {
+            Some(Status.DEADLINE_EXCEEDED.withDescription(s"$msgPrefix timed out after ${timeout}"))
+          } else {
+            None // we did not yet manage to advance the serial, but there's still time left
+          }
+        } else if (result.extraTrafficLimit == newTotalExtraTrafficLimit) {
+          Some(Status.OK)
+        } else {
+          if (result.nextSerial < current.nextSerial)
+            logger.warn(
+              s"$msgPrefix unexpected decrease of nextSerial from ${current.nextSerial} to ${result.nextSerial}"
+            )
+          Some(
+            Status.ABORTED.withDescription(
+              s"$msgPrefix nextSerial changed to ${result.nextSerial} due a concurrent change of the extraTrafficLimit to ${result.extraTrafficLimit}"
+            )
+          )
+        }
+      )
+    }
+
+    retryProvider
+      .ensureThatO(
+        RetryFor.Automation,
+        "sequencer_traffic_control",
+        s"Extra traffic limit for ${current.member} set to $newTotalExtraTrafficLimit with nextSerial ${current.nextSerial}",
+        checkSuccessOrAbort(),
         setTrafficControlState(
-          member,
+          current.member,
           newTotalExtraTrafficLimit,
-          serial = previous.nextSerial,
+          serial = current.nextSerial,
         ).map(_ => ()),
-      logger,
-    )
+        logger,
+      )
+      .flatMap(status =>
+        if (status.isOk) Future.unit else Future.failed(status.asRuntimeException())
+      )
   }
 
   def getSequencerPruningStatus()(implicit
@@ -207,6 +243,9 @@ class SequencerAdminConnection(
       case NodeStatus.Success(_) => true
     }
   }
+}
+
+object SequencerAdminConnection {
 
   case class TrafficStatus(status: MemberTrafficStatus) extends PrettyPrinting {
     def member: Member = status.member

@@ -203,6 +203,7 @@ class SvSvcAutomationService(
         onboardingTriggerContext,
         svcStore,
         localDomainNode.map(_.sequencerAdminConnection),
+        config.trafficBalanceReconciliationDelay,
       )
     )
     registerTrigger(
@@ -217,6 +218,7 @@ class SvSvcAutomationService(
         triggerContext,
         svcStore,
         localDomainNode.map(_.sequencerAdminConnection),
+        config.trafficBalanceReconciliationDelay,
       )
     )
     registerTrigger(
