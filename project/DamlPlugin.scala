@@ -413,12 +413,12 @@ object DamlPlugin extends AutoPlugin {
 
     val damlProjectName = readDamlYaml(originalDamlProjectFile).get("name").toString
     val damlProjectVersion = readDamlYaml(originalDamlProjectFile).get("version").toString
-    val outputDar =
+    val versionedDar =
       outputDirectory / s"$damlProjectName-$damlProjectVersion.dar"
 
     val damlcCommand = damlc.getAbsolutePath :: "build" ::
       "--project-root" :: projectDirectory.toString ::
-      "--output" :: outputDar.getAbsolutePath :: Nil
+      "--output" :: versionedDar.getAbsolutePath :: Nil
     val command =
       // if the damlDarLfVersion is not set the daml.yaml is expected to contain the target lf-version in the build-options
       if (outputLfVersion.isEmpty) damlcCommand
@@ -431,7 +431,10 @@ object DamlPlugin extends AutoPlugin {
       extraEnv = damlLibsEnv, // env variable set so that damlc finds daml-script dar
     )
 
-    Seq(outputDar)
+    val currentDar = outputDirectory / s"$damlProjectName-current.dar"
+    IO.copyFile(versionedDar, currentDar)
+
+    Seq(versionedDar, currentDar)
   }
 
   private def readDamlYaml(damlProjectFile: File): JMap[String, Object] = {

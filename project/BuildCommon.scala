@@ -96,7 +96,7 @@ object BuildCommon {
       BuildCommon.copyDarResources ++
       Seq(
         Compile / damlCodeGeneration := {
-          val Seq(darFile) = (Compile / damlBuild).value
+          val Seq(darFile, _) = (Compile / damlBuild).value
           Seq(
             (
               (Compile / baseDirectory).value,
@@ -110,14 +110,13 @@ object BuildCommon {
   lazy val copyDarResources: Seq[Def.Setting[_]] = {
     Seq(
       Compile / resourceGenerators += Def.task {
-        val Seq(srcFile) = (Compile / damlBuild).value
-        val dstFile = (Compile / resourceDirectory).value / "dar" / srcFile.getName()
-        IO.copyFile(srcFile, dstFile)
-        val currentFilename =
-          srcFile.getName().replaceAll("(0|[1-9][0-9]*)(\\.(0|[1-9][0-9]*))*.dar", "current.dar")
-        val currentDstFile = (Compile / resourceDirectory).value / "dar" / currentFilename
-        IO.copyFile(srcFile, currentDstFile)
-        Seq(dstFile, currentDstFile)
+        val Seq(versionedDar, currentDar) = (Compile / damlBuild).value
+        val dstVersionedFile = (Compile / resourceDirectory).value / "dar" / versionedDar.getName()
+        IO.copyFile(versionedDar, dstVersionedFile)
+        val dstCurrentFile = (Compile / resourceDirectory).value / "dar" / currentDar.getName()
+        IO.copyFile(currentDar, dstCurrentFile)
+
+        Seq(dstVersionedFile, dstCurrentFile)
       }.taskValue,
       cleanFiles += {
         (Compile / resourceDirectory).value / "dar"
@@ -705,7 +704,7 @@ object BuildCommon {
         //      """
         //    ),
         Compile / damlCodeGeneration := {
-          val Seq(darFile) = (Compile / damlBuild).value
+          val Seq(darFile, _) = (Compile / damlBuild).value
           Seq(
             (
               (Compile / baseDirectory).value,

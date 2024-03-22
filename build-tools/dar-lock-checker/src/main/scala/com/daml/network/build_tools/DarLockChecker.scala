@@ -8,6 +8,7 @@ object DarLockChecker {
     args.toSeq match {
       case cmd +: outputFileName +: inputFileNames =>
         val darHashes = inputFileNames
+          .filter(!_.endsWith("-current.dar"))
           .map(name => {
             val hash = DarParser.assertReadArchiveFromFile(File(name).toJava).main.getHash
             name + " " + hash + System.lineSeparator()
