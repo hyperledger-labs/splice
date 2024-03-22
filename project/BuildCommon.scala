@@ -302,7 +302,6 @@ object BuildCommon {
           opentelemetry_sdk_autoconfigure,
           opentelemetry_instrumentation_grpc,
           opentelemetry_zipkin,
-          opentelemetry_jaeger,
         ),
         dependencyOverrides ++= Seq(log4j_core, log4j_api),
         // commented out from Canton OS repo as settings don't apply to us (yet)
@@ -359,6 +358,7 @@ object BuildCommon {
           daml_telemetry,
           daml_nonempty_cats,
           daml_tracing,
+          daml_contextualized_logging,
           logback_classic,
           logback_core,
           scala_logging,
@@ -369,7 +369,6 @@ object BuildCommon {
           opentelemetry_sdk_autoconfigure,
           opentelemetry_instrumentation_grpc,
           opentelemetry_zipkin,
-          opentelemetry_jaeger,
           opentelemetry_trace,
         ),
         dependencyOverrides ++= Seq(log4j_core, log4j_api),
@@ -503,6 +502,7 @@ object BuildCommon {
           scalapb_runtime_grpc,
           scalapb_runtime,
           slick_hikaricp,
+          CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
         ),
         Compile / PB.targets := Seq(
           scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
@@ -681,7 +681,6 @@ object BuildCommon {
           opentelemetry_sdk_autoconfigure,
           opentelemetry_instrumentation_grpc,
           opentelemetry_zipkin,
-          opentelemetry_jaeger,
           opentelemetry_prometheus,
           scaffeine,
         ),
@@ -995,6 +994,7 @@ object BuildCommon {
           caffeine,
           scalapb_runtime,
           scalapb_runtime_grpc,
+          scopt,
           awaitility % Test,
           logback_classic % Test,
           scalatest % Test,

@@ -614,7 +614,7 @@ Update the version in the `nix/cometbft-driver-sources.json` file
 
 #### Bumping Our Canton fork
 
-Current Canton commit: `3c7a79c0d7d3331756b83bac074c10dadae4308a`
+Current Canton commit: `3fee3807ffb7468403dc9197aaec73534da7b0c1`
 
 1. Check out the [Canton **Open Source** repo](https://github.com/digital-asset/canton)
    In that repo, execute the following steps:

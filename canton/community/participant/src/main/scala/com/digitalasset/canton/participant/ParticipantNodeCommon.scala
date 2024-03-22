@@ -42,6 +42,7 @@ import com.digitalasset.canton.participant.ledger.api.CantonLedgerApiServerWrapp
 }
 import com.digitalasset.canton.participant.ledger.api.*
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
+import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
 import com.digitalasset.canton.participant.scheduler.{
   ParticipantSchedulersParameters,
   SchedulersWithParticipantPruning,
@@ -82,7 +83,6 @@ class CantonLedgerApiServerFactory(
 ) extends NamedLogging {
   def create(
       name: InstanceName,
-      ledgerId: String,
       participantId: LedgerParticipantId,
       sync: CantonSyncService,
       participantNodePersistentState: Eval[ParticipantNodePersistentState],
@@ -140,7 +140,6 @@ class CantonLedgerApiServerFactory(
             jsonApiConfig = config.httpLedgerApiExperimental.map(_.toConfig),
             indexerConfig = parameters.ledgerApiServerParameters.indexer,
             indexerHaConfig = indexerHaConfig,
-            ledgerId = ledgerId,
             participantId = participantId,
             engine = engine,
             syncService = sync,
@@ -231,6 +230,12 @@ trait ParticipantNodeBootstrapCommon {
       timeouts,
     )
 
+  lazy val syncDomainAcsCommitmentProcessorHealth: MutableHealthComponent =
+    MutableHealthComponent(
+      loggerFactory,
+      AcsCommitmentProcessor.healthName,
+      timeouts,
+    )
   protected def setPostInitCallbacks(sync: CantonSyncService): Unit
 
   protected def createParticipantServices(
@@ -398,8 +403,6 @@ trait ParticipantNodeBootstrapCommon {
         )
         .mapK(FutureUnlessShutdown.outcomeK)
 
-      ledgerId = participantId.uid.id.unwrap
-
       resourceManagementService = resourceManagementServiceFactory(
         persistentState.map(_.settingsStore)
       )
@@ -454,12 +457,12 @@ trait ParticipantNodeBootstrapCommon {
         syncDomainHealth.set(sync.syncDomainHealth)
         syncDomainEphemeralHealth.set(sync.ephemeralHealth)
         syncDomainSequencerClientHealth.set(sync.sequencerClientHealth)
+        syncDomainAcsCommitmentProcessorHealth.set(sync.acsCommitmentProcessorHealth)
       }
 
       ledgerApiServer <- ledgerApiServerFactory
         .create(
           name,
-          ledgerId = ledgerId,
           participantId = participantId.toLf,
           sync = sync,
           participantNodePersistentState = persistentState,

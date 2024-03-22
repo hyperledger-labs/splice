@@ -1,7 +1,6 @@
 package com.daml.network.environment
 
 import cats.syntax.either.*
-import com.daml.metrics.JvmMetricSet
 import com.daml.network.config.CNNodeConfig
 import com.daml.network.metrics.CNNodeMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
@@ -20,8 +19,10 @@ import com.digitalasset.canton.console.{
   GrpcAdminCommandRunner,
   HealthDumpGenerator,
 }
-import com.digitalasset.canton.domain.mediator.CommunityMediatorNodeXConfig
-import com.digitalasset.canton.domain.mediator.MediatorNodeBootstrapX
+import com.digitalasset.canton.domain.mediator.{
+  CommunityMediatorNodeXConfig,
+  MediatorNodeBootstrapX,
+}
 import com.digitalasset.canton.domain.sequencing.SequencerNodeBootstrapX
 import com.digitalasset.canton.domain.sequencing.config.CommunitySequencerNodeXConfig
 import com.digitalasset.canton.environment.*
@@ -39,10 +40,6 @@ trait CNNodeEnvironment extends Environment {
       configuredOpenTelemetry.openTelemetry.getMeterProvider,
       testingConfig.metricsFactoryType,
     )
-
-  if (config.monitoring.metrics.reportJvmMetrics) {
-    JvmMetricSet.registerObservers() // requires OpenTelemetry to have the global lib setup
-  }
 
   protected def createValidator(
       name: String,

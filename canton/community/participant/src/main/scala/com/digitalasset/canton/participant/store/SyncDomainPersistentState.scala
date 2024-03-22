@@ -14,8 +14,8 @@ import com.digitalasset.canton.crypto.{Crypto, CryptoPureApi}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.config.ParticipantStoreConfig
 import com.digitalasset.canton.participant.store.EventLogId.DomainEventLogId
-import com.digitalasset.canton.participant.store.db.DbSyncDomainPersistentStateX
-import com.digitalasset.canton.participant.store.memory.InMemorySyncDomainPersistentStateX
+import com.digitalasset.canton.participant.store.db.DbSyncDomainPersistentState
+import com.digitalasset.canton.participant.store.memory.InMemorySyncDomainPersistentState
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.store.*
 import com.digitalasset.canton.time.Clock
@@ -63,7 +63,7 @@ object SyncDomainPersistentState {
       clock: Clock,
       crypto: Crypto,
       parameters: ParticipantStoreConfig,
-      TopologyConfig: TopologyConfig,
+      topologyXConfig: TopologyConfig,
       caching: CachingConfigs,
       batching: BatchingConfig,
       processingTimeouts: ProcessingTimeout,
@@ -75,19 +75,20 @@ object SyncDomainPersistentState {
     val domainLoggerFactory = loggerFactory.append("domainId", domainId.domainId.toString)
     storage match {
       case _: MemoryStorage =>
-        new InMemorySyncDomainPersistentStateX(
+        new InMemorySyncDomainPersistentState(
           clock,
           crypto,
           domainId,
           protocolVersion,
           enableAdditionalConsistencyChecks,
-          TopologyConfig.enableTopologyTransactionValidation,
+          topologyXConfig.enableTopologyTransactionValidation,
+          indexedStringStore,
           domainLoggerFactory,
           processingTimeouts,
           futureSupervisor,
         )
       case db: DbStorage =>
-        new DbSyncDomainPersistentStateX(
+        new DbSyncDomainPersistentState(
           domainId,
           protocolVersion,
           clock,
@@ -98,7 +99,7 @@ object SyncDomainPersistentState {
           batching,
           processingTimeouts,
           enableAdditionalConsistencyChecks,
-          TopologyConfig.enableTopologyTransactionValidation,
+          topologyXConfig.enableTopologyTransactionValidation,
           indexedStringStore,
           domainLoggerFactory,
           futureSupervisor,

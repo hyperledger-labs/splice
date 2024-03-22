@@ -3,7 +3,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "3.0.0-snapshot.20240312.12880.0.vde841b72"
+  val version: String = "3.0.0-snapshot.20240318.12913.0.v1c415c97"
   val daml_language_versions = Seq("2.1")
   val daml_libraries_version = version
   val daml_compiler_version = "3.0.0-snapshot.20240318.12913.0.v1c415c97"
@@ -188,35 +188,24 @@ object CantonDependencies {
   lazy val prometheus_httpserver = "io.prometheus" % "simpleclient_httpserver" % "0.12.0"
   lazy val prometheus_hotspot = "io.prometheus" % "simpleclient_hotspot" % "0.12.0"
 
-  lazy val opentelemetry_version = "1.12.0"
+  lazy val opentelemetry_version = "1.36.0"
+  lazy val opentelemetry_java_instrumentation_version = "2.2.0"
   lazy val opentelemetry_api = "io.opentelemetry" % "opentelemetry-api" % opentelemetry_version
-  lazy val opentelemetry_context =
-    "io.opentelemetry" % "opentelemetry-context" % opentelemetry_version
-  lazy val opentelemetry_semconv =
-    "io.opentelemetry" % "opentelemetry-semconv" % s"$opentelemetry_version-alpha"
   lazy val opentelemetry_sdk = "io.opentelemetry" % "opentelemetry-sdk" % opentelemetry_version
-  lazy val opentelemetry_sdk_autoconfigure =
-    "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % s"$opentelemetry_version-alpha"
-  lazy val opentelemetry_sdk_common =
-    "io.opentelemetry" % "opentelemetry-sdk-common" % opentelemetry_version
-  lazy val opentelemetry_sdk_logs =
-    "io.opentelemetry" % "opentelemetry-sdk-logs" % s"$opentelemetry_version-alpha"
-  lazy val opentelemetry_sdk_metrics =
-    "io.opentelemetry" % "opentelemetry-sdk-metrics" % s"$opentelemetry_version-alpha"
   lazy val opentelemetry_sdk_testing =
     "io.opentelemetry" % "opentelemetry-sdk-testing" % opentelemetry_version
-  lazy val opentelemetry_sdk_trace =
-    "io.opentelemetry" % "opentelemetry-sdk-trace" % opentelemetry_version
+  lazy val opentelemetry_sdk_autoconfigure =
+    "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % s"$opentelemetry_version"
   lazy val opentelemetry_prometheus =
     "io.opentelemetry" % "opentelemetry-exporter-prometheus" % s"$opentelemetry_version-alpha"
   lazy val opentelemetry_zipkin =
     "io.opentelemetry" % "opentelemetry-exporter-zipkin" % opentelemetry_version
-  lazy val opentelemetry_jaeger =
-    "io.opentelemetry" % "opentelemetry-exporter-jaeger" % opentelemetry_version
   lazy val opentelemetry_trace =
-    "io.opentelemetry" % "opentelemetry-exporter-otlp-trace" % opentelemetry_version
+    "io.opentelemetry" % "opentelemetry-exporter-otlp" % opentelemetry_version
   lazy val opentelemetry_instrumentation_grpc =
-    "io.opentelemetry.instrumentation" % "opentelemetry-grpc-1.6" % s"$opentelemetry_version-alpha"
+    "io.opentelemetry.instrumentation" % "opentelemetry-grpc-1.6" % s"$opentelemetry_java_instrumentation_version-alpha"
+  lazy val opentelemetry_instrumentation_runtime_metrics =
+    "io.opentelemetry.instrumentation" % "opentelemetry-runtime-telemetry-java17" % s"$opentelemetry_java_instrumentation_version-alpha"
 
   lazy val better_files = "com.github.pathikrit" %% "better-files" % "3.8.0"
 

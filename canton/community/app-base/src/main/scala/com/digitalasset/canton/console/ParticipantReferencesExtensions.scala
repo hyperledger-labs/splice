@@ -3,7 +3,6 @@
 
 package com.digitalasset.canton.console
 
-import com.google.protobuf.ByteString
 import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.NonNegativeDuration
@@ -12,6 +11,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainConnectionConfig
 import com.digitalasset.canton.sequencing.SequencerConnectionValidation
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
+import com.google.protobuf.ByteString
 
 class ParticipantReferencesExtensions(participants: Seq[ParticipantReference])(implicit
     override val consoleEnvironment: ConsoleEnvironment

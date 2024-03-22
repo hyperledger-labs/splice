@@ -72,7 +72,6 @@ final case class StaticDomainParameters private (
     requiredHashAlgorithms: NonEmpty[Set[HashAlgorithm]],
     requiredCryptoKeyFormats: NonEmpty[Set[CryptoKeyFormat]],
     protocolVersion: ProtocolVersion,
-    acsCommitmentsCatchUp: Option[AcsCommitmentsCatchUpConfig],
 ) extends HasProtocolVersionedWrapper[StaticDomainParameters] {
 
   override val representativeProtocolVersion: RepresentativeProtocolVersion[
@@ -93,7 +92,6 @@ final case class StaticDomainParameters private (
       requiredHashAlgorithms = requiredHashAlgorithms.toSeq.map(_.toProtoEnum),
       requiredCryptoKeyFormats = requiredCryptoKeyFormats.toSeq.map(_.toProtoEnum),
       protocolVersion = protocolVersion.toProtoPrimitive,
-      acsCommitmentsCatchUp = acsCommitmentsCatchUp.map(_.toProtoV30),
     )
 }
 object StaticDomainParameters
@@ -121,7 +119,6 @@ object StaticDomainParameters
       requiredHashAlgorithms: NonEmpty[Set[HashAlgorithm]],
       requiredCryptoKeyFormats: NonEmpty[Set[CryptoKeyFormat]],
       protocolVersion: ProtocolVersion,
-      acsCommitmentsCatchUp: Option[AcsCommitmentsCatchUpConfig],
   ): StaticDomainParameters = StaticDomainParameters(
     requiredSigningKeySchemes = requiredSigningKeySchemes,
     requiredEncryptionKeySchemes = requiredEncryptionKeySchemes,
@@ -129,7 +126,6 @@ object StaticDomainParameters
     requiredHashAlgorithms = requiredHashAlgorithms,
     requiredCryptoKeyFormats = requiredCryptoKeyFormats,
     protocolVersion = protocolVersion,
-    acsCommitmentsCatchUp = acsCommitmentsCatchUp,
   )
 
   private def requiredKeySchemes[P, A](
@@ -149,7 +145,6 @@ object StaticDomainParameters
       requiredHashAlgorithmsP,
       requiredCryptoKeyFormatsP,
       protocolVersionP,
-      acsCommitmentsCatchUpP,
     ) = domainParametersP
 
     for {
@@ -179,9 +174,6 @@ object StaticDomainParameters
         CryptoKeyFormat.fromProtoEnum,
       )
       protocolVersion <- ProtocolVersion.fromProtoPrimitive(protocolVersionP)
-      acsCommitmentsCatchUp <- acsCommitmentsCatchUpP.traverse(
-        AcsCommitmentsCatchUpConfig.fromProtoV30
-      )
     } yield StaticDomainParameters(
       requiredSigningKeySchemes,
       requiredEncryptionKeySchemes,
@@ -189,7 +181,6 @@ object StaticDomainParameters
       requiredHashAlgorithms,
       requiredCryptoKeyFormats,
       protocolVersion,
-      acsCommitmentsCatchUp,
     )
   }
 }
@@ -301,10 +292,18 @@ object OnboardingRestriction {
   *                                            Must be greater than `maxSequencingTime` specified by a participant,
   *                                            practically also requires extra slack to allow clock skew between participant and sequencer.
   * @param onboardingRestriction current onboarding restrictions for participants
+  *  @param catchUpParameters   Optional parameters of type [[com.digitalasset.canton.protocol.AcsCommitmentsCatchUpConfig]].
+  *                            Defined starting with protobuf version v2 and protocol version v30.
+  *                            If None, the catch-up mode is disabled: the participant does not trigger the
+  *                            catch-up mode when lagging behind.
+  *                            If not None, it specifies the number of reconciliation intervals that the
+  *                            participant skips in catch-up mode, and the number of catch-up intervals
+  *                           intervals a participant should lag behind in order to enter catch-up mode.
+  *
   * @throws DynamicDomainParameters$.InvalidDynamicDomainParameters
   *   if `mediatorDeduplicationTimeout` is less than twice of `ledgerTimeRecordTimeTolerance`.
   */
-final case class DynamicDomainParameters(
+final case class DynamicDomainParameters private (
     confirmationResponseTimeout: NonNegativeFiniteDuration,
     mediatorReactionTimeout: NonNegativeFiniteDuration,
     transferExclusivityTimeout: NonNegativeFiniteDuration,
@@ -317,6 +316,7 @@ final case class DynamicDomainParameters(
     sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration,
     trafficControlParameters: Option[TrafficControlParameters],
     onboardingRestriction: OnboardingRestriction,
+    acsCommitmentsCatchUpConfig: Option[AcsCommitmentsCatchUpConfig],
 )(
     override val representativeProtocolVersion: RepresentativeProtocolVersion[
       DynamicDomainParameters.type
@@ -375,6 +375,8 @@ final case class DynamicDomainParameters(
         sequencerAggregateSubmissionTimeout,
       trafficControlParameters: Option[TrafficControlParameters] = trafficControlParameters,
       onboardingRestriction: OnboardingRestriction = onboardingRestriction,
+      acsCommitmentsCatchUpConfigParameter: Option[AcsCommitmentsCatchUpConfig] =
+        acsCommitmentsCatchUpConfig,
   ): DynamicDomainParameters = DynamicDomainParameters.tryCreate(
     confirmationResponseTimeout = confirmationResponseTimeout,
     mediatorReactionTimeout = mediatorReactionTimeout,
@@ -388,6 +390,7 @@ final case class DynamicDomainParameters(
     sequencerAggregateSubmissionTimeout = sequencerAggregateSubmissionTimeout,
     trafficControlParameters = trafficControlParameters,
     onboardingRestriction = onboardingRestriction,
+    acsCommitmentsCatchUpConfigParameter = acsCommitmentsCatchUpConfigParameter,
   )(representativeProtocolVersion)
 
   def toProtoV30: v30.DynamicDomainParameters = v30.DynamicDomainParameters(
@@ -410,6 +413,7 @@ final case class DynamicDomainParameters(
     sequencerAggregateSubmissionTimeout =
       Some(sequencerAggregateSubmissionTimeout.toProtoPrimitive),
     trafficControlParameters = trafficControlParameters.map(_.toProtoV30),
+    acsCommitmentsCatchupConfig = acsCommitmentsCatchUpConfig.map(_.toProtoV30),
   )
 
   // TODO(#14052) add topology limits
@@ -437,6 +441,7 @@ final case class DynamicDomainParameters(
         param("max request size", _.maxRequestSize.value),
         param("sequencer aggregate submission timeout", _.sequencerAggregateSubmissionTimeout),
         paramIfDefined("traffic control config", _.trafficControlParameters),
+        paramIfDefined("ACS commitment catchup config", _.acsCommitmentsCatchUpConfig),
       )
     } else {
       prettyOfClass(
@@ -503,6 +508,9 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
   private val defaultOnboardingRestriction: OnboardingRestriction =
     OnboardingRestriction.UnrestrictedOpen
 
+  private val defaultAcsCommitmentsCatchUp: Option[AcsCommitmentsCatchUpConfig] =
+    Option.empty[AcsCommitmentsCatchUpConfig]
+
   /** Safely creates DynamicDomainParameters.
     *
     * @return `Left(...)` if `mediatorDeduplicationTimeout` is less than twice of `ledgerTimeRecordTimeTolerance`.
@@ -520,6 +528,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration,
       trafficControlConfig: Option[TrafficControlParameters],
       onboardingRestriction: OnboardingRestriction,
+      acsCommitmentsCatchUpConfig: Option[AcsCommitmentsCatchUpConfig],
   )(
       representativeProtocolVersion: RepresentativeProtocolVersion[DynamicDomainParameters.type]
   ): Either[InvalidDynamicDomainParameters, DynamicDomainParameters] =
@@ -537,6 +546,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
         sequencerAggregateSubmissionTimeout,
         trafficControlConfig,
         onboardingRestriction,
+        acsCommitmentsCatchUpConfig,
       )(representativeProtocolVersion)
     )
 
@@ -557,6 +567,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       sequencerAggregateSubmissionTimeout: NonNegativeFiniteDuration,
       trafficControlParameters: Option[TrafficControlParameters],
       onboardingRestriction: OnboardingRestriction,
+      acsCommitmentsCatchUpConfigParameter: Option[AcsCommitmentsCatchUpConfig],
   )(
       representativeProtocolVersion: RepresentativeProtocolVersion[DynamicDomainParameters.type]
   ): DynamicDomainParameters = {
@@ -573,6 +584,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       sequencerAggregateSubmissionTimeout,
       trafficControlParameters,
       onboardingRestriction,
+      acsCommitmentsCatchUpConfigParameter,
     )(representativeProtocolVersion)
   }
 
@@ -610,6 +622,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       sequencerAggregateSubmissionTimeout = defaultSequencerAggregateSubmissionTimeout,
       trafficControlParameters = defaultTrafficControlParameters,
       onboardingRestriction = defaultOnboardingRestriction,
+      acsCommitmentsCatchUpConfigParameter = defaultAcsCommitmentsCatchUp,
     )(
       protocolVersionRepresentativeFor(protocolVersion)
     )
@@ -640,6 +653,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       sequencerAggregateSubmissionTimeout = sequencerAggregateSubmissionTimeout,
       trafficControlParameters = defaultTrafficControlParameters,
       onboardingRestriction = defaultOnboardingRestriction,
+      acsCommitmentsCatchUpConfigParameter = defaultAcsCommitmentsCatchUp,
     )(
       protocolVersionRepresentativeFor(protocolVersion)
     )
@@ -674,6 +688,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       _partyHostingLimits,
       sequencerAggregateSubmissionTimeoutP,
       trafficControlConfigP,
+      acsCommitmentCatchupConfigP,
     ) = domainParametersP
     for {
 
@@ -739,6 +754,10 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
       onboardingRestriction <- OnboardingRestriction.fromProtoV30(onboardingRestrictionP)
       rpv <- protocolVersionRepresentativeFor(ProtoVersion(30))
 
+      acsCommitmentCatchupConfig <- acsCommitmentCatchupConfigP.traverse(
+        AcsCommitmentsCatchUpConfig.fromProtoV30
+      )
+
       domainParameters <-
         create(
           confirmationResponseTimeout = confirmationResponseTimeout,
@@ -753,6 +772,7 @@ object DynamicDomainParameters extends HasProtocolVersionedCompanion[DynamicDoma
           sequencerAggregateSubmissionTimeout = sequencerAggregateSubmissionTimeout,
           trafficControlConfig = trafficControlConfig,
           onboardingRestriction = onboardingRestriction,
+          acsCommitmentsCatchUpConfig = acsCommitmentCatchupConfig,
         )(rpv).leftMap(_.toProtoDeserializationError)
     } yield domainParameters
   }

@@ -20,6 +20,15 @@ receivers:
               regex: .*
               target_label: application_id
               replacement: ""
+        - job_name: 'tests'
+          scrape_interval: 15s
+          static_configs:
+            - targets: [ 'localhost:25001' ]
+          metric_relabel_configs:
+            - source_labels: [ application_id ]
+              regex: .*
+              target_label: application_id
+              replacement: ""
 
 exporters:
   prometheusremotewrite:

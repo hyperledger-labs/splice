@@ -34,9 +34,9 @@ case class WaitForPorts(extraPortsToWaitFor: Seq[(String, Int)])
     extraPortsToWaitFor.foreach(p => waitForPort(InstanceName.tryCreate(p._1), p._2))
     // Wait long enough that the prometheus server can start.
     config.monitoring.metrics.reporters.foreach {
-      case MetricsReporterConfig.Prometheus(_, port) =>
+      case MetricsReporterConfig.Prometheus(_, port, _) =>
         waitForPort(InstanceName.tryCreate("prometheus"), port.unwrap)
-      case _: MetricsReporterConfig.Csv =>
+      case _ =>
     }
     config
   }

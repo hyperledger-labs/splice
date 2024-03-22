@@ -264,11 +264,11 @@ class FoundingNodeInitializer(
           )
         )
         val initialValues = DynamicDomainParameters.initialValues(clock, ProtocolVersion.v30)
-        val values = initialValues.copy(
+        val values = initialValues.tryUpdate(
           // TODO(#6055) Consider increasing topology change delay again
           topologyChangeDelay = NonNegativeFiniteDuration.tryOfMillis(0),
           trafficControlParameters = Some(initialTrafficControlParameters),
-        )(initialValues.representativeProtocolVersion)
+        )
         for {
           _ <- retryProvider.ensureThatO(
             RetryFor.WaitingOnInitDependency,

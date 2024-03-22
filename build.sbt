@@ -1025,6 +1025,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case PathList("ch", "qos", "logback", _*) => MergeStrategy.first
     case PathList("com", "digitalasset", "canton", "config", "LocalNodeParametersConfig.class") =>
       MergeStrategy.first
+    case PathList("META-INF", "okio.kotlin_module") => MergeStrategy.last
     case PathList(
           "META-INF",
           "org",
@@ -1227,19 +1228,13 @@ lazy val `apps-app` =
       // Force SBT to use the right version of opentelemetry libs.
       dependencyOverrides ++= Seq(
         CantonDependencies.opentelemetry_api,
-        CantonDependencies.opentelemetry_context,
-        CantonDependencies.opentelemetry_semconv,
         CantonDependencies.opentelemetry_sdk,
-        CantonDependencies.opentelemetry_sdk_common,
         CantonDependencies.opentelemetry_sdk_autoconfigure,
-        CantonDependencies.opentelemetry_sdk_logs,
-        CantonDependencies.opentelemetry_sdk_trace,
-        CantonDependencies.opentelemetry_sdk_metrics,
         CantonDependencies.opentelemetry_sdk_autoconfigure,
         CantonDependencies.opentelemetry_prometheus,
         CantonDependencies.opentelemetry_zipkin,
-        CantonDependencies.opentelemetry_jaeger,
         CantonDependencies.opentelemetry_instrumentation_grpc,
+        CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
       ),
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,

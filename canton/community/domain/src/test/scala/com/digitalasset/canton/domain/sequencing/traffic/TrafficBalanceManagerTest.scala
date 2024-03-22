@@ -158,6 +158,51 @@ class TrafficBalanceManagerTest
       )
     }
 
+    "properly sync between getting a balance and receiving an update for the same timestamp" in {
+      val countDownLatch = new CountDownLatch(1)
+      var reachedMakePromiseForBalance = false
+      val manager = new TrafficBalanceManager(
+        store,
+        clock,
+        SequencerTrafficConfig(pruningRetentionWindow = NonNegativeFiniteDuration.ofSeconds(2)),
+        futureSupervisor,
+        SequencerMetrics.noop("traffic-balance-manager"),
+        timeouts,
+        loggerFactory,
+      ) {
+        override private[traffic] def makePromiseForBalance(
+            member: Member,
+            desired: CantonTimestamp,
+            lastSeen: CantonTimestamp,
+        )(implicit traceContext: TraceContext): Option[PromiseUnlessShutdown[
+          Either[TrafficBalanceManager.TrafficBalanceManagerError, Option[TrafficBalance]]
+        ]] = {
+          reachedMakePromiseForBalance = true
+          countDownLatch.await()
+          super.makePromiseForBalance(member, desired, lastSeen)
+        }
+      }
+      manager.addTrafficBalance(balance).futureValue
+      val getBalanceF = Future(
+        manager.getTrafficBalanceAt(
+          member,
+          timestamp.plusSeconds(1),
+          lastSeenO = Some(timestamp.plusSeconds(1)),
+        )
+      )(parallelExecutionContext)
+      eventually() {
+        reachedMakePromiseForBalance shouldBe true
+      }
+      val balance2 = mkBalance(2, 200, timestamp.plusSeconds(1))
+      // Await on the future, this ensures that we've dequeued pending updates up to timestamp.plusSeconds(1),
+      // but we haven't created the promise for it yet
+      manager.addTrafficBalance(balance2).futureValue
+      countDownLatch.countDown()
+      getBalanceF.futureValue.valueOrFailShutdown("getting balance").futureValue shouldBe Some(
+        balance
+      )
+    }
+
     "return an error if asking for a balance before the safe pruning mark" in {
       val manager = mkManager
       manager.setSafeToPruneBeforeExclusive(timestamp.plusSeconds(1))

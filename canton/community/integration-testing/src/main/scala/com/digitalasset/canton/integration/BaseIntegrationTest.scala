@@ -9,10 +9,10 @@ import com.digitalasset.canton.environment.Environment
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{
+  config,
   BaseTest,
   ProtocolVersionChecksFixtureAnyWordSpec,
   RepeatableTestSuiteTest,
-  config,
 }
 import org.scalactic.source
 import org.scalactic.source.Position
