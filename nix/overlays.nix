@@ -36,6 +36,7 @@
       outputHash = "sha256-4on4aBkRI9PiPgNcxVktTDX28qRy3hvV9+glNB6hT1k=";
     };
   });
+  git-search-replace = super.callPackage ./git-search-replace.nix {};
   jsonnet = super.callPackage ./jsonnet.nix {};
   pulumi-bin = super.pulumi-bin.overrideAttrs (_: previousAttrs:
     let
