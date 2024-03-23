@@ -56,7 +56,7 @@ trait CommonCNNodeAppInstanceReferences {
     "sv4Local"
   )
 
-  def sv1Client(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference = svcl("sv1")
+  def sv1Client(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference = sv_client("sv1")
 
   def sv1ScanBackend(implicit env: CNNodeTestConsoleEnvironment): ScanAppBackendReference = scanb(
     "sv1Scan"
@@ -234,7 +234,7 @@ trait CommonCNNodeAppInstanceReferences {
       .find(_.name == name)
       .getOrElse(sys.error(s"sv [$name] not configured"))
 
-  def svcl(name: String)(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference =
+  def sv_client(name: String)(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference =
     env.svs.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"sv [$name] not configured"))

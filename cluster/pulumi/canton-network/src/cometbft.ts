@@ -14,7 +14,7 @@ import {
   CnChartVersion,
 } from 'cn-pulumi-common';
 
-import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './svconfs';
+import { StaticCometBftConfig, StaticCometBftConfigWithNodeName } from './svConfigs';
 
 /**
  * The CometBft deployment uses a different port for the istio VirtualService for each node

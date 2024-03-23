@@ -26,7 +26,7 @@ trait PreflightAuthUtil extends PreflightIntegrationTestUtil {
   )
 
   lazy val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com", "dev")
-  protected def svclWithToken(
+  protected def svClientWithToken(
       name: String
   )(implicit env: CNNodeTestConsoleEnvironment): SvAppClientReference = {
     val clientId = clientIds.get(name).value

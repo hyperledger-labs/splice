@@ -59,7 +59,7 @@ class CometBftPreflightIntegrationTest
     "SVs prune their CometBFT stack" in { implicit env =>
       Seq("sv1", "sv2", "sv3", "sv4").foreach(svName => {
 
-        val sv = svclWithToken(svName)
+        val sv = svClientWithToken(svName)
 
         eventuallySucceeds() {
           val status = parse(

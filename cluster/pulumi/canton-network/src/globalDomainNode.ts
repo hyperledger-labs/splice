@@ -13,7 +13,7 @@ import {
 
 import { installCometBftNode } from './cometbft';
 import { Postgres, installPostgresMetrics } from './postgres';
-import { StaticCometBftConfigWithNodeName } from './svconfs';
+import { StaticCometBftConfigWithNodeName } from './svConfigs';
 
 export class GlobalDomainNode extends ComponentResource {
   migrationId: number;

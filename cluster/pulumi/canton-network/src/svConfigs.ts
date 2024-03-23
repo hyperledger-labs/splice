@@ -49,7 +49,7 @@ const svCometBftSecrets: pulumi.Output<SvCometBftKeys>[] = [
 
 // to generate new keys: https://cimain.network.canton.global/sv_operator/sv_helm.html#generating-your-cometbft-node-keys
 // TODO(#11109): rotate the keys as they have been exposed in github (once mechanism is in place)
-const svconfs: StaticSvConfig[] = [
+const svConfigs: StaticSvConfig[] = [
   {
     nodeName: 'sv-1',
     onboardingName: 'Digital-Asset-2',
@@ -326,4 +326,4 @@ const svconfs: StaticSvConfig[] = [
   },
 ];
 
-export default svconfs;
+export default svConfigs;

@@ -27,7 +27,7 @@ class RunbookSvSequencerInfoPreflightIntegrationTest
     )
 
   "The SV sequencer public url has been published to SvcRules" in { implicit env =>
-    val sv = svcl("sv")
+    val sv = sv_client("sv")
     val svcInfo = sv.getSvcInfo()
     val nodeState: SvNodeState = svcInfo.svNodeStates.get(svcInfo.svParty).value.payload
     val domainConfig = nodeState.state.domainNodes.asScala.values.headOption.value

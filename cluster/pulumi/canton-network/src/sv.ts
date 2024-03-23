@@ -40,7 +40,7 @@ import * as postgres from './postgres';
 import { GlobalDomainNode } from './globalDomainNode';
 import { installParticipant } from './participant';
 import { installPostgresMetrics, Postgres } from './postgres';
-import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svconfs';
+import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
 import { installValidatorApp, installValidatorSecrets } from './validator';
 
 export function installSvKeySecret(

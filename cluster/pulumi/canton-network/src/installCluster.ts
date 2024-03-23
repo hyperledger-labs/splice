@@ -19,8 +19,8 @@ import { installChaosMesh } from './chaosMesh';
 import { installDocs } from './docs';
 import { installSplitwell } from './splitwell';
 import { ApprovedSvIdentity } from './sv';
+import svConfigs from './svConfigs';
 import { Svc } from './svc';
-import svconfs from './svconfs';
 import { installValidator1 } from './validator1';
 
 /// Toplevel Chart Installs
@@ -100,7 +100,7 @@ function getSvcSize(): number {
     return 1;
   }
 
-  const maxSvcSize = svconfs.length;
+  const maxSvcSize = svConfigs.length;
   const svcSize = +requireEnv(
     'SVC_SIZE',
     `Specify how many foundation SV nodes this cluster should be deployed with. (min 1, max ${maxSvcSize})`

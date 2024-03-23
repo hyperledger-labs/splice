@@ -109,7 +109,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
   }
 
   "The SV rewards are claimed by the SV, with 33.33% going to validator1" in { implicit env =>
-    val svClient = svcl("sv")
+    val svClient = sv_client("sv")
     val sv1ScanClient = scancl("sv1Scan")
 
     val svcInfo = svClient.getSvcInfo()
@@ -209,7 +209,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
   }
 
   "The Scan UI shows the same total balance as sv-1" in { implicit env =>
-    val svClient = svcl("sv")
+    val svClient = sv_client("sv")
     val sv1ScanClient = scancl("sv1Scan")
 
     val svParty = svClient.getSvcInfo().svParty.toProtoPrimitive

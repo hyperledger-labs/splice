@@ -61,7 +61,7 @@ class AppUpgradeIntegrationTest
 
           eventually(5.minute) {
             Seq("sv1", "sv2", "sv3").foreach(sv => {
-              svcl(s"${sv}Client").httpHealth.successOption.exists(_.active) should be(
+              sv_client(s"${sv}Client").httpHealth.successOption.exists(_.active) should be(
                 true
               ) withClue s"${sv} SV app initialized"
               wc(s"${sv}Wallet").httpHealth.successOption.exists(_.active) should be(
@@ -77,7 +77,7 @@ class AppUpgradeIntegrationTest
           bobValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPathV1)
 
           val sv2Wallet = wc("sv2Wallet")
-          val sv1Client = svcl("sv1Client")
+          val sv1Client = sv_client("sv1Client")
 
           val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 

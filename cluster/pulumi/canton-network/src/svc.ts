@@ -23,7 +23,7 @@ import {
   SvOnboarding,
   installSvNode,
 } from './sv';
-import svconfs, { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svconfs';
+import svConfigs, { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
 
 interface SvcArgs {
   svcSize: number;
@@ -118,7 +118,7 @@ export class Svc extends pulumi.ComponentResource {
   }
 
   private async installSvc() {
-    const [founderConf, ...restSvConfs] = svconfs.slice(0, this.args.svcSize);
+    const [founderConf, ...restSvConfs] = svConfigs.slice(0, this.args.svcSize);
 
     const keys = restSvConfs.reduce<Record<string, pulumi.Output<SvIdKey>>>((acc, conf) => {
       return {

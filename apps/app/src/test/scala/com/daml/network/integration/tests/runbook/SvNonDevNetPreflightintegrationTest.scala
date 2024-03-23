@@ -31,7 +31,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   protected val svUrlPrefix = s"sv-$svNumber"
   protected val svNamespace = svUrlPrefix
 
-  protected def svClient(implicit env: CNNodeTestConsoleEnvironment) = svcl(svName)
+  protected def svClient(implicit env: CNNodeTestConsoleEnvironment) = sv_client(svName)
   protected def svValidatorClient(implicit env: CNNodeTestConsoleEnvironment) = vc(
     s"${svName}Validator"
   )

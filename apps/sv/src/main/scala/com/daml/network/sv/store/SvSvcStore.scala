@@ -1021,13 +1021,13 @@ object SvSvcStore {
   }
 
   private val svcRulesFollowers: Seq[ConstrainedTemplate] = {
-    import com.daml.network.codegen.java.cn.svcrules as svcr
+    import com.daml.network.codegen.java.cn.svcrules
     Seq[ConstrainedTemplate](
       // CoinRules is specially handled so should *not* be listed here, even
       // though it follows SvcRules
-      svcr.VoteRequest.COMPANION,
-      svcr.Confirmation.COMPANION,
-      svcr.ElectionRequest.COMPANION,
+      svcrules.VoteRequest.COMPANION,
+      svcrules.Confirmation.COMPANION,
+      svcrules.ElectionRequest.COMPANION,
       so.SvOnboardingRequest.COMPANION,
       so.SvOnboardingConfirmed.COMPANION,
       cn.svc.memberstate.SvStatusReport.COMPANION,

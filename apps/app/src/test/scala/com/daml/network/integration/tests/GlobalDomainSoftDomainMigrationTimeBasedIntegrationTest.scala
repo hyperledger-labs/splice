@@ -11,7 +11,7 @@ import com.daml.network.automation.{AssignTrigger, TransferFollowTrigger}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{
   cns,
-  svcrules as svcr,
+  svcrules,
   svonboarding as so,
   validatoronboarding as vo,
   wallet as cnw,
@@ -208,9 +208,9 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         "create VoteRequest",
         sv1Backend.createVoteRequest(
           sv1Party.toProtoPrimitive,
-          new svcr.actionrequiringconfirmation.ARC_SvcRules(
-            new svcr.svcrules_actionrequiringconfirmation.SRARC_AddMember(
-              new svcr.SvcRules_AddMember(
+          new svcrules.actionrequiringconfirmation.ARC_SvcRules(
+            new svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember(
+              new svcrules.SvcRules_AddMember(
                 "alice",
                 "Alice",
                 SvUtil.DefaultFoundingNodeWeight,
@@ -236,25 +236,25 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         exerciseSvc(
           svcRulesCid.exerciseSvcRules_RequestElection(
             sv1Party.toProtoPrimitive,
-            new svcr.electionrequestreason.ERR_OtherReason("watch the request get migrated"),
+            new svcrules.electionrequestreason.ERR_OtherReason("watch the request get migrated"),
             Seq(sv1Party.toProtoPrimitive).asJava,
           )
         ),
-      )("ElectionRequest should be there", _ => nonEmptyOnSv1(svcr.ElectionRequest.COMPANION))
+      )("ElectionRequest should be there", _ => nonEmptyOnSv1(svcrules.ElectionRequest.COMPANION))
 
       actAndCheck(
         "create sample Confirmation",
         exerciseSvc(
           svcRulesCid.exerciseSvcRules_ConfirmAction(
             sv1Party.toProtoPrimitive,
-            new svcr.actionrequiringconfirmation.ARC_SvcRules(
-              new svcr.svcrules_actionrequiringconfirmation.SRARC_OffboardMember(
-                new svcr.SvcRules_OffboardMember("nonsense")
+            new svcrules.actionrequiringconfirmation.ARC_SvcRules(
+              new svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember(
+                new svcrules.SvcRules_OffboardMember("nonsense")
               )
             ),
           )
         ),
-      )("ensure Confirmation is there", _ => nonEmptyOnSv1(svcr.Confirmation.COMPANION))
+      )("ensure Confirmation is there", _ => nonEmptyOnSv1(svcrules.Confirmation.COMPANION))
 
       actAndCheck(
         "create sample SvOnboardingRequest",
@@ -622,9 +622,9 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
     clue("see whether governance contracts follow svcrules") {
       import com.daml.network.sv.store.SvSvStore.templatesMovedByMyAutomation as templatesMovedBySvAutomation
       allContractsMigrated(
-        c(svcr.VoteRequest.COMPANION),
-        c(svcr.Confirmation.COMPANION),
-        c(svcr.ElectionRequest.COMPANION),
+        c(svcrules.VoteRequest.COMPANION),
+        c(svcrules.Confirmation.COMPANION),
+        c(svcrules.ElectionRequest.COMPANION),
         c(so.SvOnboardingRequest.COMPANION),
         c(so.SvOnboardingConfirmed.COMPANION),
       )
