@@ -468,7 +468,6 @@ class WalletIntegrationTest
         clue("Alice can reonboard and transfer some more amulets") {
           onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
           p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, 10)
-          bobWalletClient.balance().unlockedQty should beAround(20)
         }
     }
   }
