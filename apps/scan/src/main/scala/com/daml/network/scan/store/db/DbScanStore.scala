@@ -310,6 +310,7 @@ class DbScanStore(
           (sql" < ", sql""" order by entry_number desc limit ${sqlLimit(limit)};""")
       }
 
+      // TODO (#11200): don't use the event id for pagination, use the entry number
       for {
         rows <- storage.query(
           pageEndEventId.fold(

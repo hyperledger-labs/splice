@@ -22,6 +22,7 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
   CO_SubscriptionAcceptAndMakeInitialPayment,
   CO_SubscriptionMakePayment,
   CO_Tap,
+  ExtCoinOperation,
 }
 import com.daml.network.codegen.java.cn.wallet.install.{CoinOperation, CoinOperationOutcome}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
@@ -202,9 +203,9 @@ class UserWalletTxLogParser(
                 })
                 ._1
 
-            outputsWithChildEvent.foldMap {
+            outputsWithChildEvent.zipWithIndex.foldMap {
               // All errors are handled by producing a notification (if applicable)
-              case (op, _: COO_Error, Left(reason)) =>
+              case ((op, _: COO_Error, Left(reason)), idx) =>
                 // Only show notifications if the batch was submitted by the end user associated with this TxLog.
                 // We do not want the validator user (who is also signatory on the WalletAppInstall contract)
                 // to see the notifications of all other end-users hosted on the same participant.
@@ -219,25 +220,27 @@ class UserWalletTxLogParser(
                     case r: ITR_Other => s"ITR_Other: ${r.description}"
                     case _ => throw new RuntimeException(s"Invalid reason $reason")
                   }
+                  // Necessary because COO_Error does not produce any child event
+                  val syntheticEventId = s"${root.getEventId}_err_$idx"
                   op match {
                     case _: CO_CompleteAcceptedTransfer =>
                       State.fromNotification(
                         tree,
-                        root,
+                        syntheticEventId,
                         TxLogEntry.NotificationTransactionSubtype.DirectTransferFailed,
                         details,
                       )
                     case _: CO_SubscriptionMakePayment =>
                       State.fromNotification(
                         tree,
-                        root,
+                        syntheticEventId,
                         TxLogEntry.NotificationTransactionSubtype.SubscriptionPaymentFailed,
                         details,
                       )
                     // The errors below should not produce notifications
                     case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
                         _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic |
-                        _: CO_CompleteBuyTrafficRequest | _: CO_Tap =>
+                        _: CO_CompleteBuyTrafficRequest | _: CO_Tap | _: ExtCoinOperation =>
                       State.empty
                     case _ => throw new RuntimeException(s"Invalid operation $op")
                   }
@@ -246,14 +249,14 @@ class UserWalletTxLogParser(
                 })
               // Tag wallet automation (coin merging, reward collection) as such, to distinguish from
               // explicit self-transfers
-              case (_, _: COO_MergeTransferInputs, Right(Seq(childEvent))) =>
+              case ((_, _: COO_MergeTransferInputs, Right(Seq(childEvent))), _) =>
                 defer(parseTree(tree, childEvent, domainId))
                   .map(_.setTransferSubtype(TransferTransactionSubtype.WalletAutomation))
               // All other successful operations are handled by parsing their subtree
-              case (_, _, Right(childEvents)) =>
+              case ((_, _, Right(childEvents)), _) =>
                 childEvents.foldMap(parseTree(tree, _, domainId))
               // The above cases should be exhaustive
-              case (op, outcome, child) =>
+              case ((op, outcome, child), _) =>
                 throw new RuntimeException(
                   s"Impossible combination of $op with $outcome and $child"
                 )
@@ -497,7 +500,7 @@ class UserWalletTxLogParser(
             now(
               State.fromNotification(
                 tree,
-                exercised,
+                exercised.getEventId,
                 NotificationTransactionSubtype.SubscriptionExpired,
                 s"Expired by ${node.argument.value.actor} because the last subscription payment was missed",
               )
@@ -1184,12 +1187,12 @@ object UserWalletTxLogParser {
 
     def fromNotification(
         tx: TransactionTree,
-        event: TreeEvent,
+        eventId: String,
         transactionSubtype: NotificationTransactionSubtype,
         details: String,
     ): State = {
       val newEntry = NotificationTxLogEntry(
-        eventId = event.getEventId,
+        eventId = eventId,
         subtype = Some(transactionSubtype.toProto),
         date = Some(tx.getEffectiveAt),
         details = details,

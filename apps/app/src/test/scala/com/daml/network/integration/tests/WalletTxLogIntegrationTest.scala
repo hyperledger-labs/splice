@@ -8,8 +8,9 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.store.Limit
 import com.daml.network.sv.config.InitialCnsConfig
-import com.daml.network.util.{SplitwellTestUtil, WalletTestUtil}
+import com.daml.network.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
+import com.daml.network.wallet.automation.AcceptedTransferOfferTrigger
 import com.daml.network.wallet.store.{
   BalanceChangeTxLogEntry,
   NotificationTxLogEntry,
@@ -33,7 +34,8 @@ class WalletTxLogIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with SplitwellTestUtil
-    with WalletTxLogTestUtil {
+    with WalletTxLogTestUtil
+    with TriggerTestUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
 
@@ -1163,6 +1165,62 @@ class WalletTxLogIntegrationTest
       val validatorTxLogAfter = aliceValidatorWalletClient.listTransactions(None, Limit.MaxPageSize)
       validatorTxLogBefore should be(validatorTxLogAfter)
       checkTxHistory(bobWalletClient, Seq.empty)
+    }
+
+    // See #11168
+    "two batched failures shouldn't blow up the store ingestion" in { implicit env =>
+      onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+
+      def aliceAcceptedTransferOfferTrigger =
+        aliceValidatorBackend
+          .userWalletAutomation(aliceWalletClient.config.ledgerApiUser)
+          .trigger[AcceptedTransferOfferTrigger]
+
+      // We disable the trigger and use a large number of transfers to ensure at least some will get batched
+      val offerCids = setTriggersWithin(
+        triggersToPauseAtStart = Seq(aliceAcceptedTransferOfferTrigger),
+        Seq.empty,
+      ) {
+
+        val (offerCids, _) =
+          actAndCheck(
+            "Alice creates transfer offer",
+            (1 to 20).map(n =>
+              aliceWalletClient.createTransferOffer(
+                bobUserParty,
+                100.0,
+                "direct transfer test",
+                CantonTimestamp.now().plus(Duration.ofHours(1)),
+                n.toString,
+              )
+            ),
+          )(
+            "Bob sees transfer offer",
+            offerCids =>
+              bobWalletClient.listTransferOffers() should have length offerCids.size.toLong,
+          )
+
+        clue("Bob accepts transfer offer") {
+          offerCids.foreach(bobWalletClient.acceptTransferOffer)
+          // At this point, Alice's automation fails to complete the accepted offers
+        }
+
+        offerCids
+      }
+
+      eventually() {
+        val txs = aliceWalletClient.listTransactions(None, pageSize = offerCids.size)
+        // mapping to make it readable
+        txs.map(_.eventId) should have size offerCids.size.toLong
+        forAll(txs) {
+          case logEntry: NotificationTxLogEntry =>
+            logEntry.subtype.value shouldBe walletLogEntry.NotificationTransactionSubtype.DirectTransferFailed.toProto
+            logEntry.details should startWith("ITR_InsufficientFunds")
+          case bad =>
+            fail(s"Unexpected log entry: $bad")
+        }
+      }
     }
 
     "handle failed automation (app payment)" in { implicit env =>
