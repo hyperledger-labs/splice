@@ -38,9 +38,9 @@ function run_and_commit() {
 
   # Check if any files were modified
   if modified_files; then
-    # Add all modified files to the staging area, excluding the rename/ directory
+    # Add all modified files to the staging area, excluding this script.
     git add -A
-    git reset -- rename/
+    git reset -- "$rename_script"
 
     # Commit the changes
     git commit -m "$description" -m "CMD: $cmd"
@@ -204,7 +204,7 @@ function rename() {
 function commit_occurrences() {
   local pattern=$1
 
-  local cmd="GIT_PAGER=cat git grep -P '$pattern' -- ':!$rename_script'"
+  local cmd="(GIT_PAGER=cat git grep -P '$pattern' -- ':!$rename_script' ':!canton/**' || true) && (GIT_PAGER=cat git ls-files | grep -P '$pattern' || true)"
 
   _info "Checking and storing left-over occurrences of '$pattern'"
   eval "$cmd"
@@ -231,6 +231,8 @@ declare -A subcommand_whitelist
 subcommand_whitelist[internal_cleanup]='Format files and update lock files'
 
 function subcmd_internal_cleanup() {
+
+  _info "Creating cleanup changes"
 
   if [[ $SKIP_CN_CLEAN != 1 ]]; then
     sbt --client cn-clean
@@ -315,9 +317,9 @@ function subcmd_svc_dso() {
 
 # TODO(#11111): complete this part of the script
 
-subcommand_whitelist[internal_coin_amulet]='Rename: coin to amulet'
+subcommand_whitelist[internal_coin_amulet_rename]='Internal - Rename: coin to amulet'
 
-function subcmd_internal_coin_amulet() {
+function subcmd_internal_coin_amulet_rename() {
   assert_clean_working_dir
 
   if [[ $SKIP_USAGE_CHECKS != 1 ]]; then
@@ -325,30 +327,56 @@ function subcmd_internal_coin_amulet() {
   fi
 
   assert_no_canton_usage 'amulet|Amulet'
-  assert_no_canton_usage 'coin|Coin'
+  assert_no_canton_usage '\bcoin\b|\bCoin\b'
 
-  # Fix and accidental typo that's in our codebase
+  # Fix two accidental typos that are in our codebase
   rename "coinCointractId to coinContractId" \
     "'\bcoinCointractId\b///coinContractId'" \
     ""
+  rename "coints to amulets" \
+    "'\bcoints\b///amulets'" \
+    ""
+
+  # Note: not using word-boundary check for specific enough suffixes
+  # We keep '[Cc]anton coin' mentions as they are mostly in user facing docs, which we need to adjust
+  # manually once the time is ripe.
   rename "coin to amulet" \
-    "'\bcoin\b///amulet'" \
+    "'(?<!([Cc]anton ))(\b|(?<=[_-]))coin(\b|(?=([A-Z0-9_-]|rules|operation|s\b|s[A-Z0-9_]|config\b|price\b)))///amulet'" \
     ""
+  rename "createdcoin to createdamulet" \
+    "'\bcreatedcoin\b///createdamulet'" \
+    ""
+
+  # We keep '[Cc]anton Coin' mentions as they are mostly in user facing docs, which we need to adjust
+  # manually once the time is ripe.
   rename "Coin to Amulet" \
-    "'\bCoin\b///Amulet'" \
+    "'(?<!([Cc]anton ))(\b|(?<=([a-z0-9_])))Coin(\b|(?=([A-Z0-9_]|s[A-Z0-9_]|s\b)))///Amulet'" \
     ""
+
+  # Ensure our Daml code does not mention Canton Coin
+  local canton_coin_pattern="'\b[cC]anton [cC]oin\b///amulet'"
+  run_and_commit "rename Canton Coin to amulet: daml files only" "gsr -i 'daml/**' -f $canton_coin_pattern"
 }
 
 
-subcommand_whitelist[internal_coin_occs]='Check and store occurrences for: coin'
+subcommand_whitelist[internal_coin_amulet_occs]='Internal - Check and store occurrences for: coin'
 
-function subcmd_internal_coin_occs() {
+function subcmd_internal_coin_amulet_occs() {
   assert_clean_working_dir
 
-  commit_occurrences "coin"
-  commit_occurrences "Coin"
+  commit_occurrences '(?<![Cc]anton )coin'
+  commit_occurrences '(?<![Cc]anton )Coin'
   commit_occurrences "COIN"
 }
+
+subcommand_whitelist[coin_amulet]='Rename: coin to amulet (run with SKIP_USAGE_CHECKS=1 to fixup merge conflicts)'
+
+function subcmd_coin_amulet() {
+  subcmd_internal_coin_amulet_rename
+  subcmd_internal_cleanup
+  subcmd_internal_coin_amulet_occs
+}
+
 
 ### CNS
 
