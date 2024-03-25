@@ -112,16 +112,10 @@ executeCoinOperationRec execContext inputs prevResults (operation::remainingOper
           then do
             -- Calculate CC required to buy extra traffic
             (trafficCostCc, _) <- computeDomainFees execContext.validator trafficAmount coinRules context.context
-            -- Calculate transfer fees to be paid
-            let outputs = [ TransferOutput with
-                            receiver = coinRules.svc
-                            amount = trafficCostCc
-                            receiverFeeRatio = 1.0
-                            lock = None ]
-            [fees] <- exercise context.coinRules (CoinRules_ComputeFees context.context execContext.validator outputs)
-            -- Tap enough CC to cover extra traffic purchase including fees
-            ccsum <- exercise coinRulesCid (CoinRules_DevNet_Tap execContext.validator(trafficCostCc + fees) context.context.openMiningRound)
-            pure $ (InputCoin ccsum.coin) :: inputs
+            -- Tap enough CC to cover extra traffic purchase
+            ccsum <- exercise coinRulesCid (CoinRules_DevNet_Tap execContext.validator trafficCostCc context.context.openMiningRound)
+            -- Use only the newly created coin as input to avoid coin merges and having to pay for a new change coin
+            pure $ [InputCoin ccsum.coin]
           else
             pure inputs
       -- purchase extra traffic for given member

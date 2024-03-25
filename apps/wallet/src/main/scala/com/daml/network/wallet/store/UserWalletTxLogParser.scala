@@ -128,12 +128,11 @@ class UserWalletTxLogParser(
                         )
                       case (op: CO_BuyMemberTraffic, outcome) =>
                         // Special handling for CO_BuyMemberTraffic to associate multiple events with it.
-                        // Since we auto-tap coins on DevNet, there will be 7 associated events.
+                        // Since we auto-tap coins on DevNet, there will be 6 associated events.
                         // - Archive (of the old ValidatorTopUpState)
                         // - Create (of the new ValidatorTopUpState)
                         // - CoinRules_Fetch
                         // - OpenMiningRound_Fetch
-                        // - CoinRules_ComputeFees
                         // - CoinRules_DevNet_Tap
                         // - CoinRules_BuyMemberTraffic
                         // The first 4 of these are related to identifying the amount of CC to tap to cover
@@ -150,12 +149,11 @@ class UserWalletTxLogParser(
                             (4, Seq("Archive", "CoinRules_Fetch", "CoinRules_BuyMemberTraffic"))
                           case _ =>
                             (
-                              7,
+                              6,
                               Seq(
                                 "Archive",
                                 "CoinRules_Fetch",
                                 "OpenMiningRound_Fetch",
-                                "CoinRules_ComputeFees",
                                 "CoinRules_DevNet_Tap",
                                 "CoinRules_BuyMemberTraffic",
                               ),

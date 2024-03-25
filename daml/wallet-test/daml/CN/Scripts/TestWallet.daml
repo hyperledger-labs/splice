@@ -570,8 +570,11 @@ testBuyMemberTraffic = script do
   submit aliceValidator.primaryParty $ archiveCmd invalidTopupStateCid
 
   -- test that creating the initial traffic contract works
+  before <- query @Coin aliceValidator.primaryParty
   COO_BuyMemberTraffic trafficCid1 <- executeCoinOperation app aliceValidator $
     CO_BuyMemberTraffic minTopupAmount testParticipantId domainId migrationId (minutes 1) (Some topupStateCid)
+  after <- query @Coin aliceValidator.primaryParty
+  before === after
 
   -- validate the state of the member traffic contract
   Some traffic1 <- queryContractId @MemberTraffic app.svc trafficCid1
