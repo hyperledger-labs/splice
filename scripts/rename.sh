@@ -14,6 +14,7 @@ cd "$REPO_ROOT"
 
 ### Env var flag defaulting
 
+SKIP_CN_CLEAN=${SKIP_CN_CLEAN:-0}
 SKIP_USAGE_CHECKS=${SKIP_USAGE_CHECKS:-0}
 
 
@@ -155,6 +156,8 @@ canton_files=(
 
 protected_files=(
   "$rename_script"
+  '**/release_notes.rst'
+  '**/auth0.ts'
 )
 
 NO_PROTECTED=$(exclude_all "${protected_files[@]}")
@@ -199,13 +202,13 @@ function rename() {
 }
 
 function commit_occurrences() {
-  local word=$1
+  local pattern=$1
 
-  local cmd="git grep $word -- ':!$rename_script'"
+  local cmd="GIT_PAGER=cat git grep -P '$pattern' -- ':!$rename_script'"
 
-  _info "Checking and storing left-over occurrences of '$word'"
+  _info "Checking and storing left-over occurrences of '$pattern'"
   eval "$cmd"
-  run_and_store_output "left-over occurrences of '$word'" "$cmd"
+  run_and_store_output "left-over occurrences of '$pattern'" "$cmd"
 }
 
 
@@ -228,9 +231,14 @@ declare -A subcommand_whitelist
 subcommand_whitelist[internal_cleanup]='Format files and update lock files'
 
 function subcmd_internal_cleanup() {
+
+  if [[ $SKIP_CN_CLEAN != 1 ]]; then
+    sbt --client cn-clean
+  fi
+
+  run_and_commit "cleanup: regenerate .daml and .ts lock files" "sbt --client 'Test/compile; bundle; damlDarsLockFileUpdate'"
   run_and_commit "cleanup: format .scala files" "sbt --client format"
   run_and_commit "cleanup: format .ts files" "sbt --client npmFix"
-  run_and_commit "cleanup: regenerate .daml and .ts lock files" "sbt --client 'cn-clean; Test/compile; bundle; damlDarsLockFileUpdate'"
   run_and_commit "cleanup: regenerate pulumi expected.json files" "make cluster/pulumi/update-expected"
 
   git commit --allow-empty -m"Mark this renaming change as a [breaking] change."
@@ -250,11 +258,31 @@ function subcmd_internal_svc_dso_rename() {
 
   assert_no_canton_usage 'svc|Svc|SVC'
 
-  rename "svc to dso" \
-    "'(?<!(clouddns-dns01-solver-))(\b|(?<=[_]))svc(\b|(?=([A-Z_]|rules|bootstrap)))///dso'" \
-    "-e '**/Pulumi.*.yaml'" # There is an 'svc' string in one of the hashes :('
+  local k8s_files=(
+    # svc stands for k8s service in these - requires manual verification
+    'cluster/**/templates/*.yaml'
+    '**/values-template.yaml'
+    # There is an 'svc' string in one of the hashes :'(
+    '**/Pulumi.*.yaml'
+  )
+
+  local NO_K8S
+  NO_K8S="$(exclude_all "${k8s_files[@]}")"
+
+  # The use of 'svc.` mostly occurs as part of DNS names and k8s names
+  # We rename these usages separately.
+  rename "svc to dso (for occurences other than 'svc.')" \
+    "'(?<!(clouddns-dns01-solver-))(?<!(kubectl get ))(?<!(kubectl edit ))(\b|(?<=[_]))svc(?![.])(\b|(?=([A-Z_]|rules|bootstrap)))///dso'" \
+    "$NO_K8S"
+
+  # We ignore the $ suffix as that's used for string interpolation to build URLs in .scala files
+  rename "svc. to dso. (in *.scala files)" \
+    "'\bsvc\.(?![\\\$])///dso.'" \
+    "-i '*.scala'"
+
+  # The pg|gw|Gw ignores are for k8s service names
   rename "Svc to Dso" \
-    "'(\b|(?<=([a-z_])))Svc(\b|(?=([A-Z_])))///Dso'" \
+    "'(?<!(pg|gw|Gw))(\b|(?<=([a-z_])))Svc(\b|(?=([A-Z_])))///Dso'" \
     ""
   rename "SVC to DSO" \
     "'\bSVC(\b|(?=([_]|Rules)))///DSO'" \
@@ -267,7 +295,8 @@ subcommand_whitelist[internal_svc_dso_occs]='Internal - Check and store occurren
 function subcmd_internal_svc_dso_occs() {
   assert_clean_working_dir
 
-  commit_occurrences "svc"
+  # Too many occurrences of k8s service `svc.cluster` to list here
+  commit_occurrences 'svc(?!\.cluster)'
   commit_occurrences "Svc"
   commit_occurrences "SVC"
 }
