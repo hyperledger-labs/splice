@@ -51,6 +51,8 @@ import com.google.protobuf.ByteString
 import com.typesafe.config.{Config, ConfigValueFactory}
 import com.typesafe.scalalogging.Logger
 import com.zaxxer.hikari.pool.HikariPool.PoolInitializationException
+import io.opentelemetry.api.GlobalOpenTelemetry
+import io.opentelemetry.instrumentation.hikaricp.v3_0.HikariTelemetry
 import org.slf4j.event.Level
 import slick.SlickException
 import slick.dbio.*
@@ -58,6 +60,7 @@ import slick.jdbc.JdbcBackend.Database
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 import slick.jdbc.canton.*
 import slick.jdbc.{ActionBasedSQLInterpolation as _, SQLActionBuilder as _, *}
+import slick.jdbc.hikaricp.HikariCPJdbcDataSource
 import slick.lifted.Aliases
 import slick.util.{AsyncExecutor, AsyncExecutorWithMetrics, ClassLoaderUtil}
 
@@ -742,6 +745,20 @@ object DbStorage {
       val executor = metrics match {
         // inject our own Canton Async executor with metrics
         case Some(m) =>
+          source match {
+            case source: HikariCPJdbcDataSource =>
+              val globalOpenTelemetry = GlobalOpenTelemetry.get()
+              if (globalOpenTelemetry == null) {
+                logger.warn(
+                  "Not initializing HikariCP metrics because OpenTelemetry is not available"
+                )
+              } else {
+                source.ds.setMetricsTrackerFactory(
+                  HikariTelemetry.create(globalOpenTelemetry).createMetricsTrackerFactory()
+                )
+              }
+            case _ =>
+          }
           new AsyncExecutorWithMetrics(
             poolName,
             numThreads,

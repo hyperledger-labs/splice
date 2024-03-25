@@ -4,6 +4,7 @@
 package com.digitalasset.canton.concurrent
 
 import cats.syntax.either.*
+import com.daml.metrics.ExecutorServiceMetrics
 import com.digitalasset.canton.lifecycle.ClosingException
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
@@ -120,9 +121,24 @@ object Threading {
       name: String,
       logger: Logger,
   ): ExecutionContextIdlenessExecutorService =
+    newExecutionContext(name, logger, None)
+
+  def newExecutionContext(
+      name: String,
+      logger: Logger,
+      metrics: ExecutorServiceMetrics,
+  ): ExecutionContextIdlenessExecutorService =
+    newExecutionContext(name, logger, Some(metrics))
+
+  def newExecutionContext(
+      name: String,
+      logger: Logger,
+      maybeMetrics: Option[ExecutorServiceMetrics],
+  ): ExecutionContextIdlenessExecutorService =
     newExecutionContext(
       name,
       logger,
+      maybeMetrics,
       detectNumberOfThreads(logger),
     )
 
@@ -136,6 +152,7 @@ object Threading {
   def newExecutionContext(
       name: String,
       logger: Logger,
+      maybeMetrics: Option[ExecutorServiceMetrics],
       parallelism: Int,
       maxExtraThreads: Int = 256,
       exitOnFatal: Boolean = true,
@@ -157,8 +174,12 @@ object Threading {
       .asInstanceOf[ForkJoinPool.ForkJoinWorkerThreadFactory]
 
     val forkJoinPool = createForkJoinPool(parallelism, threadFactory, handler, logger)
+    val executorService =
+      maybeMetrics.fold(forkJoinPool: ExecutorService)(
+        _.monitorExecutorService(name, forkJoinPool)
+      )
 
-    new ForkJoinIdlenessExecutorService(forkJoinPool, forkJoinPool, reporter, name)
+    new ForkJoinIdlenessExecutorService(forkJoinPool, executorService, reporter, name)
   }
 
   /** Minimum parallelism of ForkJoinPool.

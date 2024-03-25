@@ -6,6 +6,8 @@ package com.digitalasset.canton.environment
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.metrics.ExecutorServiceMetrics
+import com.daml.metrics.api.MetricsContext
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.concurrent.*
 import com.digitalasset.canton.config.*
@@ -44,7 +46,7 @@ import org.slf4j.bridge.SLF4JBridgeHandler
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.{Future, blocking}
+import scala.concurrent.{blocking, Future}
 import scala.util.control.NonFatal
 
 /** Holds all significant resources held by this process.
@@ -160,6 +162,11 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     Threading.newExecutionContext(
       loggerFactory.threadName + "-env-ec",
       noTracingLogger,
+      Some(
+        new ExecutorServiceMetrics(
+          metricsRegistry.create(MetricsContext.Empty)
+        )
+      ),
       numThreads,
     )
 

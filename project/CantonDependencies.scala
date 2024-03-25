@@ -203,6 +203,8 @@ object CantonDependencies {
     "io.opentelemetry.instrumentation" % "opentelemetry-grpc-1.6" % s"$opentelemetry_java_instrumentation_version-alpha"
   lazy val opentelemetry_instrumentation_runtime_metrics =
     "io.opentelemetry.instrumentation" % "opentelemetry-runtime-telemetry-java17" % s"$opentelemetry_java_instrumentation_version-alpha"
+  lazy val opentelemetry_instrumentation_hikari =
+    "io.opentelemetry.instrumentation" % "opentelemetry-hikaricp-3.0" % s"$opentelemetry_java_instrumentation_version-alpha"
 
   lazy val better_files = "com.github.pathikrit" %% "better-files" % "3.8.0"
 

@@ -502,6 +502,7 @@ object BuildCommon {
           scalapb_runtime,
           slick_hikaricp,
           CantonDependencies.opentelemetry_instrumentation_runtime_metrics,
+          CantonDependencies.opentelemetry_instrumentation_hikari,
         ),
         Compile / PB.targets := Seq(
           scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
