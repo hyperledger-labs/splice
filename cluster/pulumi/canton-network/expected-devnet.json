@@ -1659,7 +1659,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:MaxRamPercentage=75 -XX:InitialRamPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -1682,7 +1682,7 @@
           },
           "requests": {
             "cpu": "1",
-            "memory": "4Gi"
+            "memory": "2Gi"
           }
         },
         "sequencer": {
@@ -2600,7 +2600,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:MaxRamPercentage=75 -XX:InitialRamPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -2623,7 +2623,7 @@
           },
           "requests": {
             "cpu": "1",
-            "memory": "4Gi"
+            "memory": "2Gi"
           }
         },
         "sequencer": {
@@ -3510,7 +3510,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:MaxRamPercentage=75 -XX:InitialRamPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -3533,7 +3533,7 @@
           },
           "requests": {
             "cpu": "1",
-            "memory": "4Gi"
+            "memory": "2Gi"
           }
         },
         "sequencer": {
@@ -4420,7 +4420,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms2560M -Xmx2560M -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:MaxRamPercentage=75 -XX:InitialRamPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
@@ -4443,7 +4443,7 @@
           },
           "requests": {
             "cpu": "1",
-            "memory": "4Gi"
+            "memory": "2Gi"
           }
         },
         "sequencer": {

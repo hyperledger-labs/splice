@@ -70,8 +70,12 @@ spec:
             - containerPort: 5009
               name: cs-adm-api
               protocol: TCP
-        {{- with .Values.resources }}
+        {{- if .Values.sequencer.resources }}
+          resources: {{- toYaml .Values.sequencer.resources | nindent 12 }}
+        {{- else }}
+          {{- with .Values.resources }}
           resources: {{- toYaml . | nindent 12 }}
+          {{- end }}
         {{- end }}
         {{- if .Values.enableHealthProbes }}
           livenessProbe:

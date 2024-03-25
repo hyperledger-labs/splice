@@ -69,6 +69,8 @@ export const sequencerPruningConfig = enableSequencerPruning
     }
   : { enabled: false };
 
+export const highResourceSequencer = envFlag('SEQUENCER_HIGH_RESOURCES', false);
+
 export const svOnboardingPollingInterval = process.env['SV_ONBOARDING_POLLING_INTERVAL'];
 
 // Refrence to upstream infrastructure stack.
