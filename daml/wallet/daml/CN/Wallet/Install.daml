@@ -327,9 +327,11 @@ template WalletAppInstall
         cid : ContractId FeaturedAppRight
       controller validatorParty
       do exercise cid $ FeaturedAppRight_Cancel
+         pure ()
 
     nonconsuming choice WalletAppInstall_FeaturedAppRights_SelfGrant : ContractId FeaturedAppRight
       with
         coinRulesCid : ContractId CoinRules
       controller validatorParty
-      do exercise coinRulesCid $ CoinRules_DevNet_FeatureApp endUserParty
+      do result <- exercise coinRulesCid $ CoinRules_DevNet_FeatureApp endUserParty
+         return result.featuredAppRightCid

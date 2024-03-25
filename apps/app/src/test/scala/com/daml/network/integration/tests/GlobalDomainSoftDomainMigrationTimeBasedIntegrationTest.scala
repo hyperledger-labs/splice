@@ -714,5 +714,6 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         domainId = Some(start.domain),
       )
       .exerciseResult
+      .newCoinRules
   }
 }

@@ -834,7 +834,8 @@ template SvcRules with
       controller leader
       do
         coinPrice <- fetchMedianCoinPrice svc (Map.keys members) coinPriceVoteCids
-        exercise coinRulesCid CoinRules_AdvanceOpenMiningRounds with ..
+        result <- exercise coinRulesCid CoinRules_AdvanceOpenMiningRounds with ..
+        return (result.summarizingRoundCid, result.openRoundCid)
 
 
     -- CNS entry and payment management driven directly by the leader
@@ -939,7 +940,8 @@ template SvcRules with
         choiceArg : CoinRules_ClaimExpiredRewards
       controller leader
       do
-        exercise coinRulesCid choiceArg
+        result <- exercise coinRulesCid choiceArg
+        return result.unclaimedRewardCid
 
     -- Batch merge of unclaimed rewards
     nonconsuming choice SvcRules_MergeUnclaimedRewards
@@ -950,7 +952,8 @@ template SvcRules with
       controller leader
       do
         require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
-        exercise coinRulesCid CoinRules_MergeUnclaimedRewards with ..
+        result <- exercise coinRulesCid CoinRules_MergeUnclaimedRewards with ..
+        return result.unclaimedRewardCid
 
     nonconsuming choice SvcRules_MiningRound_Close
       : ContractId ClosedMiningRound
@@ -959,7 +962,8 @@ template SvcRules with
         issuingRoundCid : ContractId IssuingMiningRound
       controller leader
       do
-        exercise coinRulesCid CoinRules_MiningRound_Close with ..
+        result <- exercise coinRulesCid CoinRules_MiningRound_Close with ..
+        return result.closedRoundCid
 
 
     -- Contract Expiry
@@ -985,7 +989,8 @@ template SvcRules with
       controller leader
       do
         require "Number of member traffic contracts is above the configured threshold" $ length trafficCids > config.numMemberTrafficContractsThreshold
-        exercise coinRulesCid CoinRules_MergeMemberTrafficContracts with ..
+        result <- exercise coinRulesCid CoinRules_MergeMemberTrafficContracts with ..
+        return result.mergedTrafficCid
 
 -- Utility functions
 --------------------

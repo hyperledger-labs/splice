@@ -27,6 +27,28 @@ data CoinCreateSummary coinCointractId = CoinCreateSummary with
     coinPrice : Decimal -- ^ The coin price at the round the coin was created
     round: Round -- ^ Round for which this coin was created.
 
+data ValidatorRight_ArchiveAsValidatorResult = ValidatorRight_ArchiveAsValidatorResult
+
+data ValidatorRight_ArchiveAsUserResult = ValidatorRight_ArchiveAsUserResult
+
+data FeaturedAppRight_WithdrawResult = FeaturedAppRight_WithdrawResult
+
+data FeaturedAppRight_CancelResult = FeaturedAppRight_CancelResult
+
+data AppRewardCoupon_SvcExpireResult = AppRewardCoupon_SvcExpireResult with
+  featured : Bool
+  amount : Decimal
+
+data ValidatorRewardCoupon_SvcExpireResult = ValidatorRewardCoupon_SvcExpireResult with
+  amount : Decimal
+
+data ValidatorRewardCoupon_ArchiveAsValidatorResult = ValidatorRewardCoupon_ArchiveAsValidatorResult with
+
+data SvRewardCoupon_SvcExpireResult = SvRewardCoupon_SvcExpireResult with
+  weight: Int
+
+data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBeneficiaryResult
+
 -- | A Canton Coin, which can be locked and whose amount expires over time.
 --
 -- The expiry serves to charge an inactivity fee, and thereby ensures that the
@@ -110,13 +132,13 @@ template ValidatorRight with
   where
     signatory user, validator
 
-    choice ValidatorRight_ArchiveAsValidator : ()
+    choice ValidatorRight_ArchiveAsValidator : ValidatorRight_ArchiveAsValidatorResult
       controller validator
-      do pure ()
+      do return ValidatorRight_ArchiveAsValidatorResult
 
-    choice ValidatorRight_ArchiveAsUser : ()
+    choice ValidatorRight_ArchiveAsUser : ValidatorRight_ArchiveAsUserResult
       controller user
-      do pure ()
+      do return ValidatorRight_ArchiveAsUserResult
 
     -- TODO(M3-90): cancellation, withdrawal
 
@@ -129,15 +151,15 @@ template FeaturedAppRight with
     signatory svc
     observer provider
 
-    choice FeaturedAppRight_Withdraw : ()
+    choice FeaturedAppRight_Withdraw : FeaturedAppRight_WithdrawResult
       with
         reason : Text
       controller svc
-      do pure ()
+      do return FeaturedAppRight_WithdrawResult
 
-    choice FeaturedAppRight_Cancel : ()
+    choice FeaturedAppRight_Cancel : FeaturedAppRight_CancelResult
       controller provider
-      do pure ()
+      do return FeaturedAppRight_CancelResult
 
 
 -- | A coupon for receiving app rewards proportional to the usage fee paid as part of a
@@ -157,14 +179,15 @@ template AppRewardCoupon
     -- They can rely on the SVC to only withdraw the coupon once it expired.
     observer provider
 
-    choice AppRewardCoupon_SvcExpire : (Bool, Decimal)
+    choice AppRewardCoupon_SvcExpire : AppRewardCoupon_SvcExpireResult
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
       do
          -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
          void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
-         pure (featured, amount)
+         return AppRewardCoupon_SvcExpireResult with
+           ..
 
 
 -- | A coupon for receiving validator rewards proportional to the usage fee paid by a user
@@ -183,17 +206,17 @@ template ValidatorRewardCoupon
     -- They can rely on the SVC to only withdraw the coupon once it expired.
     observer user
 
-    choice ValidatorRewardCoupon_SvcExpire : Decimal
+    choice ValidatorRewardCoupon_SvcExpire : ValidatorRewardCoupon_SvcExpireResult
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
       do
          -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
         void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
-        pure amount
+        return ValidatorRewardCoupon_SvcExpireResult with ..
 
 
-    choice ValidatorRewardCoupon_ArchiveAsValidator : ()
+    choice ValidatorRewardCoupon_ArchiveAsValidator : ValidatorRewardCoupon_ArchiveAsValidatorResult
       -- ^ This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
       with
         validator : Party
@@ -201,6 +224,7 @@ template ValidatorRewardCoupon
       controller svc, validator
       do
         requireMatchingContract rightCid (ValidatorRight with svc; validator, user)
+        return ValidatorRewardCoupon_ArchiveAsValidatorResult
 
 
 -- | A coupon for a beneficiary to receive part of the SVC issuance for a specific SV node and round.
@@ -223,19 +247,19 @@ template SvRewardCoupon with
     -- They are not a signatory to ensure their node's unavailability cannot block the coupon redemption.
     observer sv
 
-    choice SvRewardCoupon_SvcExpire : Int
+    choice SvRewardCoupon_SvcExpire : SvRewardCoupon_SvcExpireResult
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
       do
          -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
         void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
-        pure weight
+        return SvRewardCoupon_SvcExpireResult with ..
 
     -- Choice called by the beneficiary as part of a CoinRules_Transfer to claim the reward.
-    choice SvRewardCoupon_ArchiveAsBeneficiary : ()
+    choice SvRewardCoupon_ArchiveAsBeneficiary : SvRewardCoupon_ArchiveAsBeneficiaryResult
       controller beneficiary
-      do pure ()
+      do return SvRewardCoupon_ArchiveAsBeneficiaryResult
 
 
 -- | Rewards that have not been claimed and are thus at the disposal of the foundation.

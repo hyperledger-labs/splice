@@ -27,6 +27,46 @@ import CC.ValidatorLicense
 
 import CN.Util
 
+data CoinRules_ComputeFeesResult = CoinRules_ComputeFeesResult with
+    fees : [Decimal]
+
+data CoinRules_MergeMemberTrafficContractsResult = CoinRules_MergeMemberTrafficContractsResult with
+    mergedTrafficCid : ContractId MemberTraffic
+
+data CoinRules_DevNet_FeatureAppResult = CoinRules_DevNet_FeatureAppResult with
+    featuredAppRightCid : ContractId FeaturedAppRight
+
+data CoinRules_Bootstrap_RoundsResult = CoinRules_Bootstrap_RoundsResult with
+    openMiningRoundCid : ContractId OpenMiningRound
+
+data CoinRules_AdvanceOpenMiningRoundsResult = CoinRules_AdvanceOpenMiningRoundsResult with
+    summarizingRoundCid : ContractId SummarizingMiningRound
+    openRoundCid : ContractId OpenMiningRound
+
+data CoinRules_MiningRound_StartIssuingResult = CoinRules_MiningRound_StartIssuingResult with
+    issuingRoundCid : ContractId IssuingMiningRound
+
+data CoinRules_MiningRound_CloseResult = CoinRules_MiningRound_CloseResult with
+    closedRoundCid : ContractId ClosedMiningRound
+
+data CoinRules_MiningRound_ArchiveResult = CoinRules_MiningRound_ArchiveResult
+
+data CoinRules_ClaimExpiredRewardsResult = CoinRules_ClaimExpiredRewardsResult with
+    unclaimedRewardCid : Optional (ContractId UnclaimedReward)
+
+data CoinRules_MergeUnclaimedRewardsResult = CoinRules_MergeUnclaimedRewardsResult with
+    unclaimedRewardCid : ContractId UnclaimedReward
+
+data CoinRules_AddFutureCoinConfigScheduleResult = CoinRules_AddFutureCoinConfigScheduleResult with
+    newCoinRules : ContractId CoinRules
+
+data CoinRules_RemoveFutureCoinConfigScheduleResult = CoinRules_RemoveFutureCoinConfigScheduleResult with
+    newCoinRules : ContractId CoinRules
+
+data CoinRules_UpdateFutureCoinConfigScheduleResult = CoinRules_UpdateFutureCoinConfigScheduleResult with
+    newCoinRules : ContractId CoinRules
+
+
 -- | The rules governing how CC users can modify the CC state
 -- managed by the SVC.
 template CoinRules
@@ -39,14 +79,15 @@ template CoinRules
 
     signatory svc
 
-    nonconsuming choice CoinRules_ComputeFees : [Decimal]
+    nonconsuming choice CoinRules_ComputeFees : CoinRules_ComputeFeesResult
       -- ^ Compute the output fees for transfer against the given context
       with
         context : TransferContext
         sender : Party
         outputs : [TransferOutput]
      controller sender
-     do computeFees svc context sender outputs
+     do fees <- computeFees svc context sender outputs
+        return CoinRules_ComputeFeesResult with fees
 
     nonconsuming choice CoinRules_Transfer : TransferResult
       with
@@ -124,7 +165,7 @@ template CoinRules
           senderChangeCoin = transferResult.senderChangeCoin
 
 
-    nonconsuming choice CoinRules_MergeMemberTrafficContracts : ContractId MemberTraffic
+    nonconsuming choice CoinRules_MergeMemberTrafficContracts : CoinRules_MergeMemberTrafficContractsResult
       with
         trafficCids : [ContractId MemberTraffic]
       controller svc
@@ -152,7 +193,8 @@ template CoinRules
                 usdSpent = acc.usdSpent + traffic.usdSpent
                 ccSpent = acc.ccSpent + traffic.ccSpent
               ) (initialMemberTraffic svc first.memberId first.domainId first.migrationId) traffics
-        create mergedTraffic
+        mergedTrafficCid <- create mergedTraffic
+        return CoinRules_MergeMemberTrafficContractsResult with ..
 
     -- Coin usage
     -------------
@@ -191,21 +233,21 @@ template CoinRules
         require "isDevNet flag is true" isDevNet
         exercise self CoinRules_Mint with ..
 
-    nonconsuming choice CoinRules_DevNet_FeatureApp : ContractId FeaturedAppRight
+    nonconsuming choice CoinRules_DevNet_FeatureApp : CoinRules_DevNet_FeatureAppResult
       with
         provider : Party
       controller provider
       do
         require "isDevNet flag is true" isDevNet
-        create FeaturedAppRight with svc; provider
+        featuredAppRightCid <- create FeaturedAppRight with svc; provider
+        return CoinRules_DevNet_FeatureAppResult with ..
 
     -- Bootstrap the open mining rounds by creating
     -- - one immediately open-mining-round with 1 tick left
     -- - one immediately open-mining-round with 2 ticks left
     -- - one open-mining round that opens in 1 tick
     -- Should only be called ONCE at network genesis.
-    nonconsuming choice CoinRules_Bootstrap_Rounds
-      : ContractId OpenMiningRound
+    nonconsuming choice CoinRules_Bootstrap_Rounds : CoinRules_Bootstrap_RoundsResult
       with
         coinPrice : Decimal
         round0Duration : RelTime
@@ -246,11 +288,12 @@ template CoinRules
           svc; round = Round nr0; coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
         create OpenMiningRound with
           svc; round = Round nr1; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
-        create OpenMiningRound with
+        last <- create OpenMiningRound with
           svc; round = Round nr2; coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
+        return CoinRules_Bootstrap_RoundsResult with
+          openMiningRoundCid = last
 
-    nonconsuming choice CoinRules_AdvanceOpenMiningRounds
-      : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
+    nonconsuming choice CoinRules_AdvanceOpenMiningRounds : CoinRules_AdvanceOpenMiningRoundsResult
       with
         coinPrice : Decimal
         roundToArchiveCid : ContractId OpenMiningRound
@@ -295,10 +338,11 @@ template CoinRules
               transferConfigUsd = configUsd.transferConfig
               issuanceConfig = getValueAsOf newOpenRoundIssuingFor configUsd.issuanceCurve
               tickDuration
-        return (newSummarizingRound, newOpenRound)
+        return CoinRules_AdvanceOpenMiningRoundsResult with
+          summarizingRoundCid = newSummarizingRound
+          openRoundCid = newOpenRound
 
-    nonconsuming choice CoinRules_MiningRound_StartIssuing
-      : ContractId IssuingMiningRound
+    nonconsuming choice CoinRules_MiningRound_StartIssuing : CoinRules_MiningRound_StartIssuingResult
       with
         miningRoundCid : ContractId SummarizingMiningRound
         -- The amount of coin burned in this round.
@@ -322,7 +366,7 @@ template CoinRules
         let opensAt = addRelTime now tickDuration
         let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
 
-        create IssuingMiningRound with
+        issuingRoundCid <- create IssuingMiningRound with
           svc
           round = miningRound.round
           opensAt = opensAt
@@ -333,9 +377,9 @@ template CoinRules
           issuancePerSvRewardCoupon = params.issuancePerSvRewardCoupon
           optIssuancePerValidatorFaucetCoupon = Some params.issuancePerValidatorFaucetCoupon
 
+        return CoinRules_MiningRound_StartIssuingResult with ..
 
-    nonconsuming choice CoinRules_MiningRound_Close
-      : ContractId ClosedMiningRound
+    nonconsuming choice CoinRules_MiningRound_Close : CoinRules_MiningRound_CloseResult
       with
         issuingRoundCid : ContractId IssuingMiningRound
       controller svc
@@ -346,7 +390,7 @@ template CoinRules
         require "Mining round is past targetClosesAt" (issuingRound.targetClosesAt <= now)
 
         -- create closed round
-        create ClosedMiningRound with
+        closedRoundCid <- create ClosedMiningRound with
           svc
           issuancePerValidatorRewardCoupon = issuingRound.issuancePerValidatorRewardCoupon
           issuancePerFeaturedAppRewardCoupon = issuingRound.issuancePerFeaturedAppRewardCoupon
@@ -355,17 +399,18 @@ template CoinRules
           optIssuancePerValidatorFaucetCoupon = issuingRound.optIssuancePerValidatorFaucetCoupon
           round = issuingRound.round
 
-    nonconsuming choice CoinRules_MiningRound_Archive
-      : ()
+        return CoinRules_MiningRound_CloseResult with ..
+
+    nonconsuming choice CoinRules_MiningRound_Archive : CoinRules_MiningRound_ArchiveResult
       with
         closedRoundCid : ContractId ClosedMiningRound
       controller svc
       do
         void $ fetchAndArchive (ForSvc with svc) closedRoundCid
+        return CoinRules_MiningRound_ArchiveResult
 
     -- Batch expiry of unclaimed rewards for a specific claimed round
-    nonconsuming choice CoinRules_ClaimExpiredRewards
-      : Optional (ContractId UnclaimedReward)
+    nonconsuming choice CoinRules_ClaimExpiredRewards : CoinRules_ClaimExpiredRewardsResult
       with
         closedRoundCid : ContractId ClosedMiningRound
         validatorRewardCouponCids : [ContractId ValidatorRewardCoupon]
@@ -379,7 +424,8 @@ template CoinRules
 
         -- expire validator rewards and compute their unclaimed rewards
         expiredValidatorRewards <- forA validatorRewardCouponCids $ \validatorRewardCouponCid -> do
-          exercise validatorRewardCouponCid ValidatorRewardCoupon_SvcExpire with closedRoundCid
+          expireResult <- exercise validatorRewardCouponCid ValidatorRewardCoupon_SvcExpire with closedRoundCid
+          return expireResult.amount
 
         let validatorRewards = sum expiredValidatorRewards
 
@@ -391,14 +437,16 @@ template CoinRules
 
         -- expire app rewards and compute their unclaimed rewards
         expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
-          exercise appCouponCid AppRewardCoupon_SvcExpire with closedRoundCid
+          expireResult <- exercise appCouponCid AppRewardCoupon_SvcExpire with closedRoundCid
+          return (expireResult.featured, expireResult.amount)
 
         let featuredAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, featured ]
         let unfeaturedAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, not featured ]
 
         -- expire validator rewards and compute their unclaimed rewards
         expiredSvRewards <- forA svRewardCouponCids $ \svRewardCouponCid -> do
-          exercise svRewardCouponCid SvRewardCoupon_SvcExpire with closedRoundCid
+          expireResult <- exercise svRewardCouponCid SvRewardCoupon_SvcExpire with closedRoundCid
+          return expireResult.weight
 
         let svRewardsWeight = sum expiredSvRewards
 
@@ -409,13 +457,13 @@ template CoinRules
               featuredAppRewards * closedRound.issuancePerFeaturedAppRewardCoupon +
               unfeaturedAppRewards * closedRound.issuancePerUnfeaturedAppRewardCoupon +
               intToDecimal svRewardsWeight * closedRound.issuancePerSvRewardCoupon
-        if (amount <= 0.0)
-          then pure None
-          else Some <$> create UnclaimedReward with svc; amount
+        unclaimedRewardCid <- if (amount <= 0.0)
+              then pure None
+              else Some <$> create UnclaimedReward with svc; amount
+        return CoinRules_ClaimExpiredRewardsResult with unclaimedRewardCid
 
     -- Batch merge of unclaimed rewards
-    nonconsuming choice CoinRules_MergeUnclaimedRewards
-      : ContractId UnclaimedReward
+    nonconsuming choice CoinRules_MergeUnclaimedRewards : CoinRules_MergeUnclaimedRewardsResult
       with
         unclaimedRewardCids : [ContractId UnclaimedReward]
       controller svc
@@ -428,9 +476,11 @@ template CoinRules
           pure unclaimedReward.amount
 
         -- create a new unclaimed reward over the total
-        create UnclaimedReward with
+        unclaimedRewardCid <- create UnclaimedReward with
           svc
           amount = sum archivedAmounts
+
+        return CoinRules_MergeUnclaimedRewardsResult with ..
 
     -- This allows fetchByKey-style fetches if you have readAs
     -- but not actAs claims.
@@ -442,34 +492,37 @@ template CoinRules
         pure this
 
     -- This inserts a new CoinConfig Schedule into the future Schedules
-    choice CoinRules_AddFutureCoinConfigSchedule: ContractId CoinRules
+    choice CoinRules_AddFutureCoinConfigSchedule: CoinRules_AddFutureCoinConfigScheduleResult
       with
         newScheduleItem : (Time, CoinConfig USD)
       controller svc
       do
         now <- getTime
         require "The insertion is scheduled in the future" (now < newScheduleItem._1)
-        create this with configSchedule = prune now (insert newScheduleItem this.configSchedule)
+        newCoinRules <- create this with configSchedule = prune now (insert newScheduleItem this.configSchedule)
+        return CoinRules_AddFutureCoinConfigScheduleResult with ..
 
     -- This removes a CoinConfig Schedule defined in the future Schedules
-    choice CoinRules_RemoveFutureCoinConfigSchedule: ContractId CoinRules
+    choice CoinRules_RemoveFutureCoinConfigSchedule: CoinRules_RemoveFutureCoinConfigScheduleResult
       with
         scheduleTime: Time
       controller svc
       do
         now <- getTime
         require "The removal is scheduled in the future" (now < scheduleTime)
-        create this with configSchedule = prune now (remove scheduleTime this.configSchedule)
+        newCoinRules <- create this with configSchedule = prune now (remove scheduleTime this.configSchedule)
+        return CoinRules_RemoveFutureCoinConfigScheduleResult with ..
 
     -- This updates a CoinConfig Schedule defined in the future Schedules
-    choice CoinRules_UpdateFutureCoinConfigSchedule: ContractId CoinRules
+    choice CoinRules_UpdateFutureCoinConfigSchedule: CoinRules_UpdateFutureCoinConfigScheduleResult
       with
         scheduleItem: (Time, CoinConfig USD)
       controller svc
       do
         now <- getTime
         require "The update is scheduled in the future" (now < scheduleItem._1)
-        create this with configSchedule = prune now (update scheduleItem this.configSchedule)
+        newCoinRules <- create this with configSchedule = prune now (update scheduleItem this.configSchedule)
+        return CoinRules_UpdateFutureCoinConfigScheduleResult with ..
 
 -- Transfer logic
 -- ==============
@@ -932,11 +985,12 @@ exercisePaymentTransfer PaymentTransferContext{..} transfer =
     context
 
 exerciseComputeFees : PaymentTransferContext -> Party -> [TransferOutput] -> Update [Decimal]
-exerciseComputeFees PaymentTransferContext{..} sender outputs =
-  exercise coinRules CoinRules_ComputeFees with
-    context
-    sender
-    outputs
+exerciseComputeFees PaymentTransferContext{..} sender outputs = do
+  feesResult <- exercise coinRules CoinRules_ComputeFees with
+        context
+        sender
+        outputs
+  return feesResult.fees
 
 data PaymentTransferContext = PaymentTransferContext
   with

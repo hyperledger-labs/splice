@@ -224,11 +224,12 @@ runNextIssuanceInternal app coinPrice = do
     -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
     -- create a new OpenMiningRound
     [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getActiveOpenRoundsSorted app
-    (closingRoundCid, _) <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_AdvanceOpenMiningRounds with
+    advanceResult <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_AdvanceOpenMiningRounds with
       coinPrice
       roundToArchiveCid
       middleRoundCid = r2Cid
       latestRoundCid = r3Cid
+    let closingRoundCid = advanceResult.summarizingRoundCid
 
     -- compute total burn
     appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
@@ -553,8 +554,9 @@ tap app user amount = do
 
 featureApp : CCApp -> CCUser -> Script (ContractId FeaturedAppRight)
 featureApp app provider = do
-  submitExerciseCoinRulesByKey' app provider CoinRules_DevNet_FeatureApp with
+  result <- submitExerciseCoinRulesByKey' app provider CoinRules_DevNet_FeatureApp with
     provider = provider.primaryParty
+  return result.featuredAppRightCid
 
 getNormalizedBalance: Party -> Script Decimal
 getNormalizedBalance party = do
