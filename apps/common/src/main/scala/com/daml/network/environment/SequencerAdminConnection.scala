@@ -1,7 +1,9 @@
 package com.daml.network.environment
 
+import cats.implicits.catsSyntaxTuple2Semigroupal
 import com.daml.network.admin.api.client.GrpcClientMetrics
-import com.daml.network.environment.SequencerAdminConnection.TrafficStatus
+import com.daml.network.environment.SequencerAdminConnection.TrafficState
+import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.digitalasset.canton.admin.api.client.commands.{
   EnterpriseSequencerAdminCommands,
   SequencerAdminCommands,
@@ -18,6 +20,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
+import com.digitalasset.canton.topology.transaction.SequencerDomainStateX
 import com.digitalasset.canton.topology.{Member, NodeIdentity, SequencerId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.traffic.MemberTrafficStatus
@@ -109,14 +112,14 @@ class SequencerAdminConnection(
 
   def listSequencerTrafficControlState(filterMembers: Seq[Member] = Seq.empty)(implicit
       traceContext: TraceContext
-  ): Future[Seq[TrafficStatus]] =
+  ): Future[Seq[TrafficState]] =
     runCmd(
       SequencerAdminCommands.GetTrafficControlState(filterMembers)
-    ).map(_.members.map(TrafficStatus))
+    ).map(_.members.map(TrafficState))
 
   def getSequencerTrafficControlState(
       member: Member
-  )(implicit traceContext: TraceContext): Future[TrafficStatus] = {
+  )(implicit traceContext: TraceContext): Future[TrafficState] = {
     lookupSequencerTrafficControlState(member).map(
       _.getOrElse(
         throw Status.NOT_FOUND
@@ -128,7 +131,7 @@ class SequencerAdminConnection(
 
   def lookupSequencerTrafficControlState(
       member: Member
-  )(implicit traceContext: TraceContext): Future[Option[TrafficStatus]] = {
+  )(implicit traceContext: TraceContext): Future[Option[TrafficState]] = {
     listSequencerTrafficControlState(Seq(member)).map {
       case Seq() => None
       case Seq(m) => Some(m)
@@ -151,15 +154,26 @@ class SequencerAdminConnection(
     )
   }
 
-  /** Set the traffic state of current.member to a state with
+  def getSequencerDomainState()(implicit
+      traceContext: TraceContext
+  ): Future[TopologyResult[SequencerDomainStateX]] = {
+    for {
+      domainId <- getStatus.map(_.trySuccess.domainId)
+      sequencerState <- getSequencerDomainState(domainId)
+    } yield sequencerState
+  }
+
+  /** Set the traffic state of currentTrafficState.member to a state with
     *
-    * serial >= current.nextSerial and extraTrafficLimit == newTotalExtraTrafficLimit.
+    * serial >= currentTrafficState.nextSerial and extraTrafficLimit == newTotalExtraTrafficLimit
+    * as long as currentSequencerState's serial remains unchanged.
     *
     * Fail with a retryable exception in all other cases, so the caller can recompute the target traffic state
     * and retry setting it.
     */
   def setSequencerTrafficControlState(
-      current: TrafficStatus,
+      currentTrafficState: TrafficState,
+      currentSequencerState: TopologyResult[SequencerDomainStateX],
       newTotalExtraTrafficLimit: NonNegativeLong,
       clock: Clock,
       timeout: NonNegativeFiniteDuration,
@@ -167,44 +181,55 @@ class SequencerAdminConnection(
       traceContext: TraceContext
   ): Future[Unit] = {
     val msgPrefix =
-      s"setting traffic state for ${current.member} to $newTotalExtraTrafficLimit with next serial ${current.nextSerial}:"
+      s"setting traffic state for ${currentTrafficState.member} to $newTotalExtraTrafficLimit with next serial ${currentTrafficState.nextSerial}:"
     val deadline = clock.now.plus(timeout.asJavaApproximation)
     // There are multiple cases where we need the caller to retry: we (ab)use gRPC Status codes to communicate this.
-    def checkSuccessOrAbort(): Future[Option[io.grpc.Status]] = {
-      getSequencerTrafficControlState(current.member).map(result =>
-        if (result.nextSerial == current.nextSerial) {
-          val now = clock.now
-          if (now.isAfter(deadline)) {
-            Some(Status.DEADLINE_EXCEEDED.withDescription(s"$msgPrefix timed out after ${timeout}"))
-          } else {
-            None // we did not yet manage to advance the serial, but there's still time left
-          }
-        } else if (result.extraTrafficLimit == newTotalExtraTrafficLimit) {
-          Some(Status.OK)
+    def checkSuccessOrAbort(): Future[Option[io.grpc.Status]] = for {
+      (sequencerState, trafficState) <- (
+        getSequencerDomainState(),
+        getSequencerTrafficControlState(currentTrafficState.member),
+      ).tupled
+    } yield {
+      if (
+        trafficState.nextSerial == currentTrafficState.nextSerial && sequencerState.base.serial == currentSequencerState.base.serial
+      ) {
+        val now = clock.now
+        if (now.isAfter(deadline)) {
+          Some(Status.DEADLINE_EXCEEDED.withDescription(s"$msgPrefix timed out after ${timeout}"))
         } else {
-          if (result.nextSerial < current.nextSerial)
-            logger.warn(
-              s"$msgPrefix unexpected decrease of nextSerial from ${current.nextSerial} to ${result.nextSerial}"
-            )
-          Some(
-            Status.ABORTED.withDescription(
-              s"$msgPrefix nextSerial changed to ${result.nextSerial} due a concurrent change of the extraTrafficLimit to ${result.extraTrafficLimit}"
-            )
-          )
+          None // we did not yet manage to advance the traffic state serial, but there's still time left
         }
-      )
+      } else if (trafficState.extraTrafficLimit == newTotalExtraTrafficLimit) {
+        Some(Status.OK)
+      } else if (sequencerState.base.serial != currentSequencerState.base.serial) {
+        Some(
+          Status.ABORTED.withDescription(
+            s"$msgPrefix concurrent change of sequencer state serial to ${sequencerState.base.serial} detected"
+          )
+        )
+      } else {
+        if (trafficState.nextSerial < currentTrafficState.nextSerial)
+          logger.warn(
+            s"$msgPrefix unexpected decrease of traffic state serial from ${currentTrafficState.nextSerial} to ${trafficState.nextSerial}"
+          )
+        Some(
+          Status.ABORTED.withDescription(
+            s"$msgPrefix traffic state serial changed to ${trafficState.nextSerial} due a concurrent change of the extraTrafficLimit to ${trafficState.extraTrafficLimit}"
+          )
+        )
+      }
     }
 
     retryProvider
       .ensureThatO(
         RetryFor.Automation,
         "sequencer_traffic_control",
-        s"Extra traffic limit for ${current.member} set to $newTotalExtraTrafficLimit with nextSerial ${current.nextSerial}",
+        s"Extra traffic limit for ${currentTrafficState.member} set to $newTotalExtraTrafficLimit with nextSerial ${currentTrafficState.nextSerial}",
         checkSuccessOrAbort(),
         setTrafficControlState(
-          current.member,
+          currentTrafficState.member,
           newTotalExtraTrafficLimit,
-          serial = current.nextSerial,
+          serial = currentTrafficState.nextSerial,
         ).map(_ => ()),
         logger,
       )
@@ -247,14 +272,14 @@ class SequencerAdminConnection(
 
 object SequencerAdminConnection {
 
-  case class TrafficStatus(status: MemberTrafficStatus) extends PrettyPrinting {
+  case class TrafficState(status: MemberTrafficStatus) extends PrettyPrinting {
     def member: Member = status.member
     def extraTrafficConsumed: NonNegativeLong = status.trafficState.extraTrafficConsumed
     def extraTrafficLimit: NonNegativeLong =
       status.trafficState.extraTrafficLimit.fold(NonNegativeLong.zero)(_.toNonNegative)
     def nextSerial: PositiveInt = status.balanceSerial.fold(PositiveInt.one)(_.increment)
 
-    override def pretty: Pretty[TrafficStatus] = prettyOfClass(
+    override def pretty: Pretty[TrafficState] = prettyOfClass(
       param("member", _.member),
       param("extraTrafficConsumed", _.extraTrafficConsumed),
       param("extraTrafficLimit", _.extraTrafficLimit),

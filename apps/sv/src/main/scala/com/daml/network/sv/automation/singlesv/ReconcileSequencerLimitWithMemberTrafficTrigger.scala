@@ -57,24 +57,46 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
           Future.successful(TaskSuccess(s"Skipping MemberTraffic with invalid memberId: ${err}"))
         },
         memberId => {
-          store
-            .getSvcRulesWithMemberNodeStates()
-            .flatMap(rulesAndStates => {
-              if (rulesAndStates.activeSvParticipantAndMediatorIds().contains(memberId)) {
-                // SVs are granted unlimited traffic and do not need to purchase it via MemberTraffic contracts.
-                // While the top-up trigger for SV validators is disabled by default, we also explicitly ignore
-                // SV related MemberTraffic contracts here as a safeguard for the case of 3rd party top-ups
-                // of SV nodes or an SV validator misconfiguration that changes the defaults.
-                Future
-                  .successful(TaskSuccess(s"Skipping MemberTraffic contract for SV node $memberId"))
-              } else {
-                val domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
-                val trafficLimitOffset = rulesAndStates.svcRules.payload.initialTrafficState.asScala
-                  .get(memberId.toProtoPrimitive)
-                  .fold(0L)(_.consumedTraffic)
-                reconcileExtraTrafficLimitForMember(memberId, domainId, trafficLimitOffset)
-              }
-            })
+          val domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
+          sequencerAdminConnection.getStatus
+            .map(_.successOption.map(_.domainId))
+            .flatMap {
+              case None =>
+                Future.failed(
+                  Status.FAILED_PRECONDITION
+                    .withDescription("Sequencer is not yet initialized")
+                    .asRuntimeException()
+                )
+              case Some(sequencerDomainId) if sequencerDomainId != domainId =>
+                Future.failed(
+                  Status.INTERNAL
+                    .withDescription(
+                      s"The MemberTraffic contract domainId must match the connected domain ${sequencerDomainId}"
+                    )
+                    .asRuntimeException()
+                )
+              case _ =>
+                store
+                  .getSvcRulesWithMemberNodeStates()
+                  .flatMap(rulesAndStates => {
+                    if (rulesAndStates.activeSvParticipantAndMediatorIds().contains(memberId)) {
+                      // SVs are granted unlimited traffic and do not need to purchase it via MemberTraffic contracts.
+                      // While the top-up trigger for SV validators is disabled by default, we also explicitly ignore
+                      // SV related MemberTraffic contracts here as a safeguard for the case of 3rd party top-ups
+                      // of SV nodes or an SV validator misconfiguration that changes the defaults.
+                      Future
+                        .successful(
+                          TaskSuccess(s"Skipping MemberTraffic contract for SV node $memberId")
+                        )
+                    } else {
+                      val trafficLimitOffset =
+                        rulesAndStates.svcRules.payload.initialTrafficState.asScala
+                          .get(memberId.toProtoPrimitive)
+                          .fold(0L)(_.consumedTraffic)
+                      reconcileExtraTrafficLimitForMember(memberId, domainId, trafficLimitOffset)
+                    }
+                  })
+            }
         },
       )
   }
@@ -84,11 +106,6 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
       domainId: DomainId,
       trafficLimitOffset: Long,
   )(implicit tc: TraceContext): Future[TaskSuccess] = {
-    val sequencerAdminConnection = sequencerAdminConnectionO.getOrElse(
-      throw Status.FAILED_PRECONDITION
-        .withDescription("No sequencer admin connection configured for SV App")
-        .asRuntimeException()
-    )
     for {
       // Compute new extra traffic limit
       totalPurchasedTraffic <- store.getTotalPurchasedMemberTraffic(memberId, domainId)
@@ -98,12 +115,16 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
       trafficState <- sequencerAdminConnection.getSequencerTrafficControlState(memberId)
       currentExtraTrafficLimit = trafficState.extraTrafficLimit
 
+      // Get current sequencer domain state
+      sequencerDomainState <- sequencerAdminConnection.getSequencerDomainState()
+
       // Compare and reconcile old and new limits
       taskOutcome <-
         if (currentExtraTrafficLimit < newExtraTrafficLimit) {
           sequencerAdminConnection
             .setSequencerTrafficControlState(
               trafficState,
+              sequencerDomainState,
               newExtraTrafficLimit,
               context.pollingClock,
               trafficBalanceReconciliationDelay,
@@ -122,5 +143,11 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
         }
     } yield taskOutcome
   }
+
+  private def sequencerAdminConnection = sequencerAdminConnectionO.getOrElse(
+    throw Status.FAILED_PRECONDITION
+      .withDescription("No sequencer admin connection configured for SV App")
+      .asRuntimeException()
+  )
 
 }

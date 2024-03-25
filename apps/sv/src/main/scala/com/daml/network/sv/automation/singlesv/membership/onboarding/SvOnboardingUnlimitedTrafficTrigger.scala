@@ -1,5 +1,6 @@
 package com.daml.network.sv.automation.singlesv.membership.onboarding
 
+import cats.implicits.catsSyntaxTuple2Semigroupal
 import cats.syntax.traverseFilter.*
 import com.daml.network.automation.{
   PollingParallelTaskExecutionTrigger,
@@ -69,9 +70,13 @@ class SvOnboardingUnlimitedTrafficTrigger(
   ): Future[TaskOutcome] =
     for {
       // We must read the state here again to pick up on new serials
-      currentStatus <- sequencerAdminConnection.getSequencerTrafficControlState(task.memberId)
+      (trafficState, sequencerState) <- (
+        sequencerAdminConnection.getSequencerTrafficControlState(task.memberId),
+        sequencerAdminConnection.getSequencerDomainState(),
+      ).tupled
       _ <- sequencerAdminConnection.setSequencerTrafficControlState(
-        currentStatus,
+        trafficState,
+        sequencerState,
         NonNegativeLong.maxValue,
         context.pollingClock,
         trafficBalanceReconciliationDelay,
