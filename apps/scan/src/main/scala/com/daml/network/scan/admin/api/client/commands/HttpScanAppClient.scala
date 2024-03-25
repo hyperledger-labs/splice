@@ -20,10 +20,9 @@ import com.daml.network.codegen.java.cc.round.{
   OpenMiningRound,
 }
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
-import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
+import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
-import com.daml.network.http.v0.definitions.{GetCnsRulesRequest, GetCoinRulesRequest}
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.store.MultiDomainAcsStore
 import com.daml.network.util.{Codec, Contract, ContractWithState, TemplateJsonDecoder}
@@ -174,7 +173,7 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCoinRulesResponse] = {
       import MultiDomainAcsStore.ContractState.*
       client.getCoinRules(
-        GetCoinRulesRequest(
+        definitions.GetCoinRulesRequest(
           cachedCoinRules.map(_.contractId.contractId),
           cachedCoinRules.flatMap(_.state match {
             case Assigned(domain) => Some(domain.toProtoPrimitive)
@@ -209,7 +208,7 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCnsRulesResponse] = {
       import MultiDomainAcsStore.ContractState.*
       client.getCnsRules(
-        GetCnsRulesRequest(
+        definitions.GetCnsRulesRequest(
           cachedCnsRules.map(_.contractId.contractId),
           cachedCnsRules.flatMap(_.state match {
             case Assigned(domain) => Some(domain.toProtoPrimitive)
@@ -297,9 +296,7 @@ object HttpScanAppClient {
   case class ListCnsEntries(
       namePrefix: Option[String],
       pageSize: Int,
-  ) extends InternalBaseCommand[http.ListCnsEntriesResponse, Seq[
-        Contract[CnsEntry.ContractId, CnsEntry]
-      ]] {
+  ) extends InternalBaseCommand[http.ListCnsEntriesResponse, Seq[definitions.CnsEntry]] {
 
     def submitRequest(client: Client, headers: List[HttpHeader]) =
       client.listCnsEntries(namePrefix, pageSize, headers = headers)
@@ -307,18 +304,13 @@ object HttpScanAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.ListCnsEntriesResponse.OK(response) =>
-      response.entries
-        .traverse(entry => Contract.fromHttp(CnsEntry.COMPANION)(entry))
-        .leftMap(_.toString)
+      Right(response.entries)
     }
   }
 
   case class LookupCnsEntryByParty(
       party: PartyId
-  ) extends InternalBaseCommand[
-        http.LookupCnsEntryByPartyResponse,
-        Option[Contract[CnsEntry.ContractId, CnsEntry]],
-      ] {
+  ) extends InternalBaseCommand[http.LookupCnsEntryByPartyResponse, Option[definitions.CnsEntry]] {
 
     override def submitRequest(
         client: Client,
@@ -329,11 +321,7 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = {
       case http.LookupCnsEntryByPartyResponse.OK(response) =>
-        for {
-          entry <- Contract
-            .fromHttp(CnsEntry.COMPANION)(response.entry)
-            .leftMap(_.toString)
-        } yield Some(entry)
+        Right(Some(response.entry))
       case http.LookupCnsEntryByPartyResponse.NotFound(_) =>
         Right(None)
     }
@@ -341,10 +329,7 @@ object HttpScanAppClient {
 
   case class LookupCnsEntryByName(
       name: String
-  ) extends InternalBaseCommand[
-        http.LookupCnsEntryByNameResponse,
-        Option[Contract[CnsEntry.ContractId, CnsEntry]],
-      ] {
+  ) extends InternalBaseCommand[http.LookupCnsEntryByNameResponse, Option[definitions.CnsEntry]] {
 
     override def submitRequest(
         client: Client,
@@ -355,11 +340,7 @@ object HttpScanAppClient {
         decoder: TemplateJsonDecoder
     ) = {
       case http.LookupCnsEntryByNameResponse.OK(response) =>
-        for {
-          entry <- Contract
-            .fromHttp(CnsEntry.COMPANION)(response.entry)
-            .leftMap(_.toString)
-        } yield Some(entry)
+        Right(Some(response.entry))
       case http.LookupCnsEntryByNameResponse.NotFound(_) =>
         Right(None)
     }

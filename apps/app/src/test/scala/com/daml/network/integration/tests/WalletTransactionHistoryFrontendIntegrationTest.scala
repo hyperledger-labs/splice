@@ -14,11 +14,13 @@ import com.daml.network.util.{
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.wallet.store.{NotificationTxLogEntry, TxLogEntry as walletLogEntry}
+import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 
 import java.time.Duration
 import java.util.UUID
 import scala.collection.parallel.immutable.ParVector
+import scala.jdk.CollectionConverters.*
 
 class WalletTransactionHistoryFrontendIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("alice", "sv1")
@@ -56,7 +58,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         charlieWalletClient,
       )
 
-      val entryForCns = createCnsEntryForItself
+      val svcEntry = expectedSvcCns
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
@@ -145,7 +147,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               coinPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "CNS Entry Initial Payment Collected",
-              expectedPartyDescription = Some(s"$entryForCns $entryForCns"),
+              expectedPartyDescription = Some(s"$svcEntry $svcEntry"),
               expectedAmountCC = BigDecimal(0), // 0 USD
             )
             matchTransaction(lockForCns)(
@@ -181,13 +183,24 @@ class WalletTransactionHistoryFrontendIntegrationTest
             val txs = findAll(className("tx-row")).toSeq
             val sv1ValidatorParty = sv1WalletClient.userStatus().party
             val svcParty = sv1ScanBackend.getSvcPartyId()
+            val sv1Name =
+              sv1Backend
+                .getSvcInfo()
+                .svcRules
+                .payload
+                .members
+                .asScala
+                .get(sv1ValidatorParty)
+                .value
+                .name
             forExactly(1, txs) { tx =>
               matchTransaction(tx)(
                 coinPrice = 2,
                 expectedAction = "Sent",
                 expectedSubtype = "Extra Traffic Purchase",
-                expectedPartyDescription =
-                  Some(s"${expectedCns(svcParty, "cns.cns")} ${sv1ValidatorParty}"),
+                expectedPartyDescription = Some(
+                  s"${expectedCns(svcParty, "dso.ans")} ${expectedCns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.ans")}"
+                ),
                 expectedAmountCC = -trafficCostCc,
               )
             }

@@ -7,8 +7,6 @@ import {
   GetSvcPartyIdResponse,
 } from 'scan-openapi';
 
-import { CnsEntry } from '@daml.js/cns/lib/CN/Cns';
-
 import { alicePartyId, bobPartyId } from '../constants';
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [
@@ -26,20 +24,13 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
         return res(
           ctx.json<LookupEntryByPartyResponse>({
             entry: {
-              template_id:
-                '5c14f1a1caa3f7916ccb572ea7b8685dce90b90c5307dd6aeefd7b711013a7ea:CN.Cns:CnsEntry',
               contract_id:
                 '00c8e178f8b0b2c2955103b3fa59ccdc5f34861c4bcf659844c2959ba9febf3f61ca0212207e6c7b0db1b456c2f3f23c3b0c75b02dfc0c470cd1ea3fb603a01527e414c922',
-              payload: CnsEntry.encode({
-                name: 'alice.unverified.cns',
-                svc: 'SVC::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
-                url: 'https://alice-url.cns.com',
-                description: '',
-                expiresAt: '2024-01-07T14:50:26.364476Z',
-                user: alicePartyId,
-              }),
-              created_event_blob: '',
-              created_at: '2023-10-09T14:50:26.364476Z',
+              name: 'alice.unverified.cns',
+              url: 'https://alice-url.cns.com',
+              description: '',
+              expires_at: new Date('2024-01-07T14:50:26.364476Z'),
+              user: alicePartyId,
             },
           })
         );
@@ -49,20 +40,13 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
         return res(
           ctx.json<LookupEntryByPartyResponse>({
             entry: {
-              template_id:
-                '5c14f1a1caa3f7916ccb572ea7b8685dce90b90c5307dd6aeefd7b711013a7ea:CN.Cns:CnsEntry',
               contract_id:
                 '00c8e178f8b0b2c2955103b3fa59ccdc5f34861c4bcf659844c2959ba9febf3f61ca0212207e6c7b0db1b456c2f3f23c3b0c75b02dfc0c470cd1ea3fb603a01527e414c922',
-              payload: CnsEntry.encode({
-                name: 'bob.unverified.cns',
-                svc: 'SVC::1220aafbf2c3901ecf0766fb6a65e9eac904f9f320829b9f3202592f7d57c0da9a70',
-                url: 'https://bob-url.cns.com',
-                description: '',
-                expiresAt: '2024-01-07T14:50:26.364476Z',
-                user: bobPartyId,
-              }),
-              created_event_blob: '',
-              created_at: '2023-10-09T14:50:26.364476Z',
+              name: 'bob.unverified.cns',
+              url: 'https://bob-url.cns.com',
+              description: '',
+              expires_at: new Date('2024-01-07T14:50:26.364476Z'),
+              user: bobPartyId,
             },
           })
         );

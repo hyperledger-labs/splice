@@ -33,7 +33,7 @@ export const PostPayment: React.FC = () => {
 
   const fullEntryName = toFullEntryName(entryName, ENTRY_NAME_SUFFIX);
 
-  const cnsEntryOwner = cnsEntry?.payload.user;
+  const cnsEntryOwner = cnsEntry?.user;
 
   if (!primaryPartyId || !cnsEntryOwner || cnsEntryIsLoading) {
     return <CnsLoading fullEntryName={fullEntryName} />;

@@ -1,8 +1,6 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract, PollingStrategy } from 'common-frontend-utils';
-import { ApiException, LookupEntryByNameResponse } from 'scan-openapi';
-
-import { CnsEntry } from '@daml.js/cns/lib/CN/Cns/';
+import { PollingStrategy } from 'common-frontend-utils';
+import { ApiException, CnsEntry, LookupEntryByNameResponse } from 'scan-openapi';
 
 import { useScanClient } from './ScanClientContext';
 
@@ -11,7 +9,7 @@ const useLookupCnsEntryByName = (
   enabled: boolean = true,
   retryWhenNotFound: boolean = false,
   retry: number = 3
-): UseQueryResult<Contract<CnsEntry>> => {
+): UseQueryResult<CnsEntry> => {
   const scanClient = useScanClient();
 
   return useLookupCnsEntryByNameFromResponse(
@@ -29,14 +27,14 @@ export function useLookupCnsEntryByNameFromResponse(
   enabled: boolean = true,
   retryWhenNotFound: boolean = false,
   retry: number = 3
-): UseQueryResult<Contract<CnsEntry>> {
+): UseQueryResult<CnsEntry> {
   return useQuery({
     refetchInterval: PollingStrategy.NONE,
     queryKey: ['scan-api', 'lookupCnsEntryByName', CnsEntry, name],
     queryFn: async () => {
       try {
         const response = await getResponse(name);
-        return Contract.decodeOpenAPI(response.entry, CnsEntry);
+        return response.entry;
       } catch (e: unknown) {
         if ((e as ApiException<undefined>).code === 404) {
           console.info(`No CNS entry for name ${name} found`);

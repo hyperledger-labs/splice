@@ -1,10 +1,8 @@
-import { Contract } from 'common-frontend-utils';
 import React from 'react';
+import { CnsEntry as CnsEntryC } from 'scan-openapi';
 
 import { Typography, TypographyProps } from '@mui/material';
 import Tooltip from '@mui/material/Tooltip';
-
-import { CnsEntry as CnsEntryC } from '@daml.js/cns/lib/CN/Cns/';
 
 import useLookupCnsEntryByParty from '../api/scan/useLookupCnsEntryByParty';
 import PartyId, { PartyIdProps } from './PartyId';
@@ -22,9 +20,7 @@ const CnsEntry: React.FC<CnsEntryProps> = props => {
   }
 };
 
-export const CnsEntryDisplay: React.FC<
-  CnsEntryProps & { cnsEntry: Contract<CnsEntryC> | null }
-> = props => {
+export const CnsEntryDisplay: React.FC<CnsEntryProps & { cnsEntry: CnsEntryC | null }> = props => {
   const { cnsEntry, partyId, className, noCopy: _, ...typographyProps } = props;
 
   if (cnsEntry === null) {
@@ -34,11 +30,11 @@ export const CnsEntryDisplay: React.FC<
       <div
         style={{ display: 'flex', alignItems: 'center', whiteSpace: 'nowrap' }}
         className={`cns-entry ${className}`}
-        data-selenium-text={`${cnsEntry.payload.name} (${partyId})`}
+        data-selenium-text={`${cnsEntry.name} (${partyId})`}
       >
         <Tooltip title="Directory Entry" style={{ marginRight: '4px' }}>
           <div style={{ display: 'flex', alignItems: 'center' }}>
-            <Typography {...typographyProps}>{cnsEntry.payload.name}</Typography>
+            <Typography {...typographyProps}>{cnsEntry.name}</Typography>
           </div>
         </Tooltip>
         <Typography {...typographyProps}>(</Typography>

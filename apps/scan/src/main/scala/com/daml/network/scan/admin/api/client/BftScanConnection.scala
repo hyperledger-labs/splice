@@ -6,11 +6,11 @@ import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
+import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.PackageIdResolver.HasCoinRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
-import com.daml.network.http.v0.definitions.MigrationSchedule
+import com.daml.network.http.v0.definitions.{CnsEntry, MigrationSchedule}
 import com.daml.network.scan.admin.api.client.BftScanConnection.{
   ConsensusNotReached,
   ConsensusNotReachedRetryable,
@@ -109,15 +109,17 @@ class BftScanConnection(
 
   def lookupCnsEntryByParty(id: PartyId)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[CnsEntry.ContractId, CnsEntry]]] =
+  ): Future[Option[CnsEntry]] =
     bftCall(_.lookupCnsEntryByParty(id))
 
   def lookupCnsEntryByName(name: String)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[CnsEntry.ContractId, CnsEntry]]] =
+  ): Future[Option[CnsEntry]] =
     bftCall(_.lookupCnsEntryByName(name))
 
-  def listCnsEntries(namePrefix: Option[String], pageSize: Int)(implicit tc: TraceContext) =
+  def listCnsEntries(namePrefix: Option[String], pageSize: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[CnsEntry]] =
     bftCall(_.listCnsEntries(namePrefix, pageSize))
 
   override protected def runGetOpenAndIssuingMiningRounds(

@@ -42,12 +42,14 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
   SvRewardCollected,
   Transfer,
 }
+import com.daml.network.scan.svc.SvcCnsResolver
 import com.daml.network.store.PageLimit
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 class HttpScanHandler(
     participantAdminConnection: ParticipantAdminConnection,
     store: ScanStore,
+    svcCnsResolver: SvcCnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -626,27 +628,78 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.listEntries") { _ => _ =>
       for {
-        entries <- store.listEntries(namePrefix.getOrElse(""), PageLimit.tryCreate(pageSize))
-      } yield definitions.ListEntriesResponse(entries.map(_.contract.toHttp).toVector)
+        entryContracts <- store.listEntries(namePrefix.getOrElse(""), PageLimit.tryCreate(pageSize))
+        entries = entryContracts.map { contract =>
+          definitions.CnsEntry(
+            Some(contract.contractId.contractId),
+            contract.payload.user,
+            contract.payload.name,
+            contract.payload.url,
+            contract.payload.description,
+            Some(java.time.OffsetDateTime.ofInstant(contract.payload.expiresAt, ZoneOffset.UTC)),
+          )
+        }
+        sizeToAppendSvcEntries = pageSize - entries.size
+        appended <-
+          if (sizeToAppendSvcEntries > 0) {
+            getSvcEntriesFromSvcRules(namePrefix).map { svcEntries =>
+              entries ++ svcEntries.take(sizeToAppendSvcEntries)
+            }
+          } else Future.successful(entries)
+      } yield definitions.ListEntriesResponse(appended.toVector)
     }
   }
+
+  private def getSvcEntriesFromSvcRules(namePrefix: Option[String])(implicit tc: TraceContext) =
+    store.lookupSvcRules().map { svcRulesOpt =>
+      svcRulesOpt.toList.flatMap { svcRules =>
+        svcCnsResolver
+          .listEntries(svcRules.contract, namePrefix)
+          .map(_.toHttp)
+      }
+    }
 
   override def lookupCnsEntryByName(respond: ScanResource.LookupCnsEntryByNameResponse.type)(
       name: String
   )(extracted: TraceContext): Future[ScanResource.LookupCnsEntryByNameResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupEntryByName") { _ => _ =>
-      store.lookupEntryByName(name).flatMap {
-        case Some(entry) =>
-          Future.successful(
-            v0.ScanResource.LookupCnsEntryByNameResponse.OK(
-              definitions.LookupEntryByNameResponse(entry.contract.toHttp)
-            )
-          )
+      store.lookupSvcRules().flatMap {
+        case Some(svcRules) =>
+          svcCnsResolver.lookupEntryByName(svcRules.contract, name) match {
+            case Some(svcCnsEntry) =>
+              Future.successful(
+                v0.ScanResource.LookupCnsEntryByNameResponse
+                  .OK(definitions.LookupEntryByNameResponse(svcCnsEntry.toHttp))
+              )
+            case None =>
+              store.lookupEntryByName(name).map {
+                case Some(entry) =>
+                  v0.ScanResource.LookupCnsEntryByNameResponse.OK(
+                    definitions.LookupEntryByNameResponse(
+                      definitions.CnsEntry(
+                        Some(entry.contractId.contractId),
+                        entry.payload.user,
+                        entry.payload.name,
+                        entry.payload.url,
+                        entry.payload.description,
+                        Some(
+                          java.time.OffsetDateTime
+                            .ofInstant(entry.payload.expiresAt, ZoneOffset.UTC)
+                        ),
+                      )
+                    )
+                  )
+                case None =>
+                  v0.ScanResource.LookupCnsEntryByNameResponse.NotFound(
+                    definitions.ErrorResponse(s"No cns entry found for name: $name")
+                  )
+              }
+          }
         case None =>
           Future.successful(
             v0.ScanResource.LookupCnsEntryByNameResponse.NotFound(
-              definitions.ErrorResponse(s"No cns entry found for name: $name")
+              definitions.ErrorResponse(s"No SvcRules contract found")
             )
           )
       }
@@ -658,22 +711,52 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.LookupCnsEntryByPartyResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupEntryByParty") { _ => _ =>
-      store
-        .lookupEntryByParty(PartyId.tryFromProtoPrimitive(party))
-        .flatMap {
-          case Some(entry) =>
-            Future.successful(
-              v0.ScanResource.LookupCnsEntryByPartyResponse.OK(
-                definitions.LookupEntryByPartyResponse(entry.contract.toHttp)
+      val partyId = PartyId.tryFromProtoPrimitive(party)
+      store.lookupSvcRules().flatMap {
+        case Some(svcRules) =>
+          svcCnsResolver.lookupEntryByParty(svcRules.contract, partyId) match {
+            case Some(svcCnsEntry) =>
+              Future.successful(
+                v0.ScanResource.LookupCnsEntryByPartyResponse
+                  .OK(definitions.LookupEntryByPartyResponse(svcCnsEntry.toHttp))
               )
+            case None =>
+              store
+                .lookupEntryByParty(partyId)
+                .flatMap {
+                  case Some(entry) =>
+                    Future.successful(
+                      v0.ScanResource.LookupCnsEntryByPartyResponse.OK(
+                        definitions.LookupEntryByPartyResponse(
+                          definitions.CnsEntry(
+                            Some(entry.contractId.contractId),
+                            entry.payload.user,
+                            entry.payload.name,
+                            entry.payload.url,
+                            entry.payload.description,
+                            Some(
+                              java.time.OffsetDateTime
+                                .ofInstant(entry.payload.expiresAt, ZoneOffset.UTC)
+                            ),
+                          )
+                        )
+                      )
+                    )
+                  case None =>
+                    Future.successful(
+                      v0.ScanResource.LookupCnsEntryByPartyResponse.NotFound(
+                        definitions.ErrorResponse(s"No cns entry found for party: $party")
+                      )
+                    )
+                }
+          }
+        case None =>
+          Future.successful(
+            v0.ScanResource.LookupCnsEntryByPartyResponse.NotFound(
+              definitions.ErrorResponse(s"No SvcRules contract found")
             )
-          case None =>
-            Future.successful(
-              v0.ScanResource.LookupCnsEntryByPartyResponse.NotFound(
-                definitions.ErrorResponse(s"No cns entry found for party: $party")
-              )
-            )
-        }
+          )
+      }
     }
   }
 

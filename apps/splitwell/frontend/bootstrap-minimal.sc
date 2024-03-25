@@ -39,7 +39,7 @@ def ensureCnsEntry(
     wallet: WalletAppClientReference,
 ) {
   try {
-    val nameUser = sv1Scan.lookupEntryByName(name).payload.user
+    val nameUser = sv1Scan.lookupEntryByName(name).user
     if (nameUser == user.toProtoPrimitive) {
       println(s"CNS name \"$name\" already allocated to \"$user\". Doing nothing.")
     } else {
@@ -62,7 +62,7 @@ def ensureCnsEntry(
       println("Waiting for CNS entry allocation")
       utils.retry_until_true {
         scala.util
-          .Try(sv1Scan.lookupEntryByName(name).payload.user)
+          .Try(sv1Scan.lookupEntryByName(name).user)
           .toOption
           .exists(_ == user.toProtoPrimitive)
       }

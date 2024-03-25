@@ -119,24 +119,3 @@ components:
           type: string
         paymentDuration:
           type: string
-    CreateCnsInstallResponse:
-      type: object
-      required:
-        - contractId
-      properties:
-        contractId:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
-    FetchCnsInstallResponse:
-      type: object
-      required:
-        - contractId
-        - entryFee
-        - entryLifetime
-      properties:
-        contractId:
-          $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
-        entryFee:
-          type: string
-        entryLifetime:
-          type: string
-

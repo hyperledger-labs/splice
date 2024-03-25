@@ -1,15 +1,10 @@
 import { UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend-utils';
 import { useListCnsEntriesFromResponse } from 'common-frontend/scan-api';
-
-import { CnsEntry } from '@daml.js/canton-name-service-0.1.0/lib/CN/Cns';
+import { CnsEntry } from 'scan-openapi';
 
 import { useValidatorScanProxyClient } from '../../contexts/ValidatorScanProxyContext';
 
-const useListCnsEntries = (
-  pageSize: number,
-  namePrefix?: string
-): UseQueryResult<Contract<CnsEntry>[]> => {
+const useListCnsEntries = (pageSize: number, namePrefix?: string): UseQueryResult<CnsEntry[]> => {
   const scanClient = useValidatorScanProxyClient();
   return useListCnsEntriesFromResponse(
     (pageSize, namePrefix) => scanClient.listCnsEntries(pageSize, namePrefix),

@@ -43,7 +43,7 @@ def ensureCnsEntry(
     wallet: WalletAppClientReference,
 ) {
   try {
-    val nameUser = sv1Scan.lookupEntryByName(name).payload.user
+    val nameUser = sv1Scan.lookupEntryByName(name).user
     if (nameUser == user.toProtoPrimitive) {
       println(s"CNS name \"$name\" already allocated to \"$user\". Doing nothing.")
     } else {

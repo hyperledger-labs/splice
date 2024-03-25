@@ -4,7 +4,7 @@ import cats.data.OptionT
 import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
+import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -109,7 +109,7 @@ class SingleScanConnection private[client] (
 
   def lookupCnsEntryByParty(
       id: PartyId
-  )(implicit tc: TraceContext): Future[Option[Contract[CnsEntry.ContractId, CnsEntry]]] = {
+  )(implicit tc: TraceContext): Future[Option[com.daml.network.http.v0.definitions.CnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.LookupCnsEntryByParty(id),
@@ -118,14 +118,16 @@ class SingleScanConnection private[client] (
 
   def lookupCnsEntryByName(
       name: String
-  )(implicit tc: TraceContext): Future[Option[Contract[CnsEntry.ContractId, CnsEntry]]] = {
+  )(implicit tc: TraceContext): Future[Option[com.daml.network.http.v0.definitions.CnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.LookupCnsEntryByName(name),
     )
   }
 
-  def listCnsEntries(namePrefix: Option[String], pageSize: Int)(implicit tc: TraceContext) = {
+  def listCnsEntries(namePrefix: Option[String], pageSize: Int)(implicit
+      tc: TraceContext
+  ): Future[Seq[com.daml.network.http.v0.definitions.CnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
       HttpScanAppClient.ListCnsEntries(namePrefix, pageSize),

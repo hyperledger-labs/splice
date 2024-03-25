@@ -26,6 +26,7 @@ import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.db.{ScanAggregatesReader, ScanAggregatesReaderContext}
+import com.daml.network.scan.svc.SvcCnsResolver
 import com.daml.network.store.PageLimit
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -158,10 +159,11 @@ class ScanApp(
           logger,
         )
       }
-
+      svcCnsResolver = new SvcCnsResolver(svcParty)
       internalHandler = new HttpScanHandler(
         participantAdminConnection,
         store,
+        svcCnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         loggerFactory,
       )

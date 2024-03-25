@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
+import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
@@ -96,7 +96,7 @@ abstract class ScanAppReference(
   def listEntries(
       namePrefix: String,
       pageSize: Int,
-  ): Seq[Contract[CnsEntry.ContractId, CnsEntry]] =
+  ): Seq[definitions.CnsEntry] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.ListCnsEntries(Some(namePrefix), pageSize))
     }
@@ -104,7 +104,7 @@ abstract class ScanAppReference(
   @Help.Summary("Lookup a cns entry by the party that registered it")
   def lookupEntryByParty(
       party: PartyId
-  ): Option[Contract[CnsEntry.ContractId, CnsEntry]] =
+  ): Option[definitions.CnsEntry] =
     consoleEnvironment.run {
       httpCommand(HttpScanAppClient.LookupCnsEntryByParty(party))
     }
@@ -112,7 +112,7 @@ abstract class ScanAppReference(
   @Help.Summary("Lookup a cns entry by its name")
   def lookupEntryByName(
       name: String
-  ): Contract[CnsEntry.ContractId, CnsEntry] =
+  ): definitions.CnsEntry =
     consoleEnvironment
       .run {
         httpCommand(HttpScanAppClient.LookupCnsEntryByName(name))

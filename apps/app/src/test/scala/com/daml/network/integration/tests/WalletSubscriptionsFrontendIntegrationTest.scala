@@ -30,7 +30,7 @@ class WalletSubscriptionsFrontendIntegrationTest
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val alicePartyId = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
-      val cnsParty = createCnsEntryForItself
+      val svcEntry = expectedSvcCns
       createCnsEntry(aliceCnsExternalClient, aliceEntryName, aliceWalletClient)
       val cnsPaymentDue = LocalDate.now().plusDays(90)
       val aDate = LocalDate.now().plusDays(1)
@@ -66,8 +66,8 @@ class WalletSubscriptionsFrontendIntegrationTest
             val subscriptionRows = findAll(className("subscription-row")).toSeq
             subscriptionRows should have size 2
             matchSubscription(subscriptionRows.head)(
-              expectedReceiver = cnsParty,
-              expectedProvider = cnsParty,
+              expectedReceiver = svcEntry,
+              expectedProvider = svcEntry,
               expectedPrice = "1 USD per 90 days",
               expectedCoinPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =
@@ -135,7 +135,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         walletCoinToUsd(5),
       )
 
-      val cnsParty = createCnsEntryForItself
+      val svcEntry = expectedSvcCns
       val cnsPaymentDue = LocalDate.now().plusDays(90)
       val newlyPurchasedName = perTestCaseName("new")
       val respond =
@@ -188,8 +188,8 @@ class WalletSubscriptionsFrontendIntegrationTest
             val subscriptionRows = findAll(className("subscription-row")).toSeq
             subscriptionRows should have size 2 // from createCnsEntry and just-accepted requestCnsEntry
             matchSubscription(subscriptionRows.last)(
-              expectedReceiver = cnsParty,
-              expectedProvider = cnsParty,
+              expectedReceiver = svcEntry,
+              expectedProvider = svcEntry,
               expectedPrice = "1 USD per 90 days",
               expectedCoinPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =

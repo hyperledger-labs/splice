@@ -20,7 +20,7 @@ export const CurrentUserProvider: React.FC<React.PropsWithChildren> = ({ childre
 
   const [currentUser, setCurrentUser] = useState<CurrentUser>({ state: 'not_onboarded' });
   const { data: cnsEntry } = useLookupCnsEntryByParty(primaryPartyId);
-  const cnsEntryName = cnsEntry?.payload.name;
+  const cnsEntryName = cnsEntry?.name;
 
   useQuery({
     refetchInterval: PollingStrategy.NONE,

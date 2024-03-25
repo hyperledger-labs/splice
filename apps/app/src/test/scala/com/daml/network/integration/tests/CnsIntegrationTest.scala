@@ -12,13 +12,14 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.util.{DisclosedContracts, TriggerTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.PartyId
 import com.daml.network.sv.config.InitialCnsConfig
 
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
 import cats.syntax.parallel.*
 import com.daml.network.automation.Trigger
+import com.daml.network.http.v0.definitions
+import com.daml.network.scan.svc.SvcCnsResolver
 import com.daml.network.sv.automation.leaderbased.{
   ExpiredCnsEntryTrigger,
   ExpiredCnsSubscriptionTrigger,
@@ -26,10 +27,11 @@ import com.daml.network.sv.automation.leaderbased.{
 import com.daml.network.wallet.automation.SubscriptionReadyForPaymentTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.logging.SuppressionRule
+import com.digitalasset.canton.topology.PartyId
 import org.scalatest.Assertion
 import org.slf4j.event.Level
 
-import java.time.Instant
+import java.time.{Instant, ZoneOffset}
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
@@ -69,8 +71,6 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
   "cns" should {
     "allocate unique cns entries, even when multiple parties race for them" in { implicit env =>
       implicit val ec: ExecutionContext = env.executionContext
-      val svc = sv1Backend.getSvcInfo().svcParty
-
       // Setup alice
       val aliceStaticRefs =
         StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
@@ -101,16 +101,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         lookupEntryByName(testEntryName).value
       }
 
-      val winnerUserParty = PartyId.tryFromProtoPrimitive(entry.data.user)
-
-      entry.data shouldBe new codegen.CnsEntry(
-        winnerUserParty.toProtoPrimitive,
-        svc.toProtoPrimitive,
-        testEntryName,
-        entry.data.url,
-        entry.data.description,
-        entry.data.expiresAt,
-      )
+      entry.name shouldBe testEntryName
     }
 
     "archive expired CNS entries" in { implicit env =>
@@ -119,7 +110,16 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         triggersToResumeAtStart = Seq(leaderExpiredCnsEntryTrigger),
       ) {
         clue("Creating a CNS entry that expires immediately") {
-          sv1ScanBackend.listEntries("", 25) shouldBe empty
+          clue("no user entries is created") {
+            val userEntries = sv1ScanBackend
+              .listEntries("", 25)
+              .filter(entry =>
+                !entry.name.endsWith(
+                  SvcCnsResolver.svCnsNameSuffix
+                ) && entry.name != SvcCnsResolver.svcCnsName
+              )
+            userEntries shouldBe empty
+          }
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
             .submitJava(
               actAs = Seq(svcParty),
@@ -252,7 +252,6 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
         aliceSubscriptionReadyForPaymentTrigger.pause().futureValue
 
-        val svc = sv1Backend.getSvcInfo().svcParty
         val cnsRules = sv1ScanBackend.getCnsRules()
 
         val subReqId = clue("Alice requests a cns entry") {
@@ -283,15 +282,12 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
           )
         }
         clue("Checking payload of new entry") {
-          val expectedPayload = new codegen.CnsEntry(
-            aliceUserParty.toProtoPrimitive,
-            svc.toProtoPrimitive,
-            testEntryName,
-            testEntryUrl,
-            testEntryDescription,
-            entry.data.expiresAt,
-          )
-          entry.data shouldBe expectedPayload
+          entry.contractId should not be empty
+          entry.user shouldBe aliceUserParty.toProtoPrimitive
+          entry.name shouldBe testEntryName
+          entry.url shouldBe testEntryUrl
+          entry.description shouldBe testEntryDescription
+          entry.expiresAt should not be empty
         }
 
         aliceSubscriptionReadyForPaymentTrigger.resume()
@@ -301,20 +297,16 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         ) {
           eventually() {
             val renewed = lookupEntryByName(testEntryName).value
-            renewed.id should not equal entry.id
+            renewed.contractId.value should not equal entry.contractId.value
             renewed
           }
         }
         clue("Checking payload of renewed entry") {
-          val newEntry = new codegen.CnsEntry(
-            entry.data.user,
-            entry.data.svc,
-            entry.data.name,
-            testEntryUrl,
-            testEntryDescription,
-            entry.data.expiresAt.plus(10, ChronoUnit.SECONDS),
-          )
-          renewedEntry.data shouldBe newEntry
+          renewedEntry.user shouldBe aliceUserParty.toProtoPrimitive
+          renewedEntry.name shouldBe testEntryName
+          renewedEntry.url shouldBe testEntryUrl
+          renewedEntry.description shouldBe testEntryDescription
+          renewedEntry.expiresAt.value shouldBe entry.expiresAt.value.plus(10, ChronoUnit.SECONDS)
         }
 
     }
@@ -367,7 +359,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
           _ => {
             aliceWalletClient.listSubscriptions() should have length 1
             inside(lookupEntryByName(testEntryName)) { case Some(entry) =>
-              entry.data.name shouldBe testEntryName
+              entry.name shouldBe testEntryName
             }
           },
         )
@@ -386,11 +378,50 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         }
       }
     }
+
+    "svc cns entries can be seen via scan api" in { implicit env =>
+      val expectedSvcEntry = definitions.CnsEntry(
+        None,
+        svcParty.toProtoPrimitive,
+        SvcCnsResolver.svcCnsName,
+        "",
+        "",
+        None,
+      )
+
+      sv1ScanBackend.lookupEntryByName(SvcCnsResolver.svcCnsName) shouldBe expectedSvcEntry
+      sv1ScanBackend.lookupEntryByParty(svcParty).value shouldBe expectedSvcEntry
+      sv1ScanBackend.listEntries("", 100) should contain(expectedSvcEntry)
+    }
+
+    "sv member cns entries can be seen via scan api" in { implicit env =>
+      val svcRules = sv1Backend.getSvcInfo().svcRules
+      svcRules.payload.members.asScala.foreach { case (svParty, memberInfo) =>
+        val expectedSvEntry = svEntry(memberInfo.name, svParty)
+        sv1ScanBackend.lookupEntryByName(
+          s"${memberInfo.name.toLowerCase}${SvcCnsResolver.svCnsNameSuffix}"
+        ) shouldBe expectedSvEntry
+        sv1ScanBackend
+          .lookupEntryByParty(PartyId.tryFromProtoPrimitive(svParty))
+          .value shouldBe expectedSvEntry
+        sv1ScanBackend.listEntries("", 100) should contain(expectedSvEntry)
+      }
+    }
   }
+
+  private def svEntry(svName: String, svParty: String) =
+    definitions.CnsEntry(
+      None,
+      svParty,
+      s"${svName.toLowerCase}${SvcCnsResolver.svCnsNameSuffix}",
+      "",
+      "",
+      None,
+    )
 
   private def lookupEntryByName(
       name: String
-  )(implicit env: CNNodeTestConsoleEnvironment): Option[codegen.CnsEntry.Contract] = {
+  )(implicit env: CNNodeTestConsoleEnvironment): Option[definitions.CnsEntry] = {
     val svc = sv1Backend.getSvcInfo().svcParty
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(codegen.CnsEntry.COMPANION)(
@@ -398,6 +429,18 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         (co: codegen.CnsEntry.Contract) => co.data.name == name,
       )
       .headOption
+      .map(entry =>
+        definitions.CnsEntry(
+          Some(entry.id.contractId),
+          entry.data.user,
+          entry.data.name,
+          entry.data.url,
+          entry.data.description,
+          Some(
+            java.time.OffsetDateTime
+              .ofInstant(entry.data.expiresAt, ZoneOffset.UTC)
+          ),
+        )
+      )
   }
-
 }

@@ -1194,19 +1194,19 @@ components:
         entries:
           type: array
           items:
-            "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+            "$ref": "#/components/schemas/CnsEntry"
     LookupEntryByPartyResponse:
       type: object
       required: [ "entry" ]
       properties:
         entry:
-          "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+          "$ref": "#/components/schemas/CnsEntry"
     LookupEntryByNameResponse:
       type: object
       required: [ "entry" ]
       properties:
         entry:
-          "$ref": "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
+          "$ref": "#/components/schemas/CnsEntry"
     GetAcsSnapshotResponse:
       type: object
       required: [ "acs_snapshot" ]
@@ -1214,6 +1214,23 @@ components:
         acs_snapshot:
           description: base64-encoded ACS snapshot for the intersection of the SVC party and the requested party’s ACS
           type: string
+    CnsEntry:
+      type: object
+      required: [ "user", "name", "url", "description" ]
+      properties:
+        contract_id:
+          type: string
+        user:
+          type: string
+        name:
+          type: string
+        url:
+          type: string
+        description:
+          type: string
+        expires_at:
+          type: string
+          format: date-time
     GetAggregatedRoundsResponse:
       type: object
       required: [ "start", "end" ]

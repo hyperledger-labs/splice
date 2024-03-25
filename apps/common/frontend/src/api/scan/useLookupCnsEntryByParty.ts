@@ -1,12 +1,10 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
-import { Contract, PollingStrategy } from 'common-frontend-utils';
-import { ApiException, LookupEntryByPartyResponse } from 'scan-openapi';
-
-import { CnsEntry } from '@daml.js/cns/lib/CN/Cns/';
+import { PollingStrategy } from 'common-frontend-utils';
+import { ApiException, CnsEntry, LookupEntryByPartyResponse } from 'scan-openapi';
 
 import { useScanClient } from './ScanClientContext';
 
-const useLookupCnsEntryByParty = (party?: string): UseQueryResult<Contract<CnsEntry>> => {
+const useLookupCnsEntryByParty = (party?: string): UseQueryResult<CnsEntry> => {
   const scanClient = useScanClient();
 
   return useLookupCnsEntryByPartyFromResponse(p => scanClient.lookupCnsEntryByParty(p), party);
@@ -15,14 +13,14 @@ const useLookupCnsEntryByParty = (party?: string): UseQueryResult<Contract<CnsEn
 export function useLookupCnsEntryByPartyFromResponse(
   getResponse: (party: string) => Promise<LookupEntryByPartyResponse>,
   party?: string
-): UseQueryResult<Contract<CnsEntry>> {
+): UseQueryResult<CnsEntry> {
   return useQuery({
     refetchInterval: PollingStrategy.NONE,
     queryKey: ['scan-api', 'lookupCnsEntryByParty', CnsEntry, party],
     queryFn: async () => {
       try {
         const response = await getResponse(party!);
-        return Contract.decodeOpenAPI(response.entry, CnsEntry);
+        return response.entry;
       } catch (e: unknown) {
         if ((e as ApiException<undefined>).code === 404) {
           console.debug(`No CNS entry for party ${party} found`);

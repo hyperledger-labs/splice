@@ -16,6 +16,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
+import com.daml.network.scan.svc.SvcCnsResolver
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.WalletTestUtil.{DynamicUserRefs, StaticUserRefs}
 import com.daml.network.wallet.store.TxLogEntry
@@ -24,8 +25,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import org.scalatest.Assertion
 
-import java.time.temporal.ChronoUnit
-import java.time.{Duration, Instant}
+import java.time.Duration
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -427,27 +427,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       disclosedContracts = Seq.empty,
     )
   }
-
-  protected def createCnsEntryForItself(implicit
-      env: CNNodeTestConsoleEnvironment
-  ): String = {
-    val cnsEntryName = "cns.cns"
-    val entryUrl = "https://cns-dir-url.com"
-    val entryDescription = "Sample CNS Entry Description"
-    sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-      actAs = Seq(svcParty),
-      commands = new cnsCodegen.CnsEntry(
-        svcParty.toProtoPrimitive,
-        svcParty.toProtoPrimitive,
-        cnsEntryName,
-        entryUrl,
-        entryDescription,
-        Instant.now().plus(90, ChronoUnit.DAYS),
-      ).create.commands.asScala.toSeq,
-      optTimeout = None,
-    )
-    waitForCnsEntry(cnsEntryName)
-    expectedCns(svcParty, cnsEntryName)
+  protected def expectedSvcCns(implicit env: CNNodeTestConsoleEnvironment): String = {
+    expectedCns(svcParty, SvcCnsResolver.svcCnsName)
   }
 
   protected def createCnsEntry(

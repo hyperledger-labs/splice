@@ -1,10 +1,9 @@
 import { UseQueryResult } from '@tanstack/react-query';
-import { Contract } from 'common-frontend-utils';
 import React, { useEffect } from 'react';
+import { CnsEntry } from 'scan-openapi';
 
 import { Autocomplete, StandardTextFieldProps, TextField } from '@mui/material';
 
-import { CnsEntry } from '@daml.js/cns/lib/CN/Cns';
 import { Party } from '@daml/types';
 
 import useListCnsEntries from '../api/scan/useListCnsEntries';
@@ -35,8 +34,8 @@ const CnsField: React.FC<CnsFieldProps> = props => {
 interface BaseCnsFieldProps extends CnsFieldProps {
   userInput: UserInput;
   updateUserInput: (userInput: UserInput) => void;
-  cnsEntries: UseQueryResult<Contract<CnsEntry>[]>;
-  cnsEntry: UseQueryResult<Contract<CnsEntry>>;
+  cnsEntries: UseQueryResult<CnsEntry[]>;
+  cnsEntry: UseQueryResult<CnsEntry>;
 }
 
 export const BaseCnsField: React.FC<BaseCnsFieldProps> = ({
@@ -54,7 +53,7 @@ export const BaseCnsField: React.FC<BaseCnsFieldProps> = ({
       onPartyChanged(party);
       setResolvedPartyId(party);
     };
-    const cnsEntryParty = cnsEntry.data?.payload.user || userInput.value;
+    const cnsEntryParty = cnsEntry.data?.user || userInput.value;
     setPartyAndNotify(cnsEntryParty);
   }, [userInput, cnsEntry, onPartyChanged]);
 
@@ -70,15 +69,12 @@ export const BaseCnsField: React.FC<BaseCnsFieldProps> = ({
     updateUserInput({ type: 'typed', value: newValue });
   };
 
-  const onItemSelected = async (
-    _: React.SyntheticEvent,
-    item: Contract<CnsEntry> | string | null
-  ) => {
+  const onItemSelected = async (_: React.SyntheticEvent, item: CnsEntry | string | null) => {
     if (item === null || typeof item === 'string') {
       return;
     }
     // User selected an item from the auto-complete dropdown. Use the party associated with that entry.
-    updateUserInput({ type: 'selected', value: item.payload.user });
+    updateUserInput({ type: 'selected', value: item.user });
   };
 
   return (
@@ -96,8 +92,8 @@ export const BaseCnsField: React.FC<BaseCnsFieldProps> = ({
         />
       )}
       options={cnsEntries.data || []}
-      getOptionLabel={(option: Contract<CnsEntry> | string) =>
-        typeof option === 'string' ? option : option.payload.name
+      getOptionLabel={(option: CnsEntry | string) =>
+        typeof option === 'string' ? option : option.name
       }
       onInputChange={onInputChange}
       onChange={onItemSelected}

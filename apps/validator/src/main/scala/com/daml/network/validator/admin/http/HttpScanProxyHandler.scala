@@ -87,7 +87,7 @@ class HttpScanProxyHandler(
       } yield {
         entry match {
           case Some(value) =>
-            respond.OK(definitions.LookupEntryByPartyResponse(value.toHttp))
+            respond.OK(definitions.LookupEntryByPartyResponse(value))
           case None =>
             respond.NotFound(definitions.ErrorResponse(s"Party $party does not have any CNSEntry."))
         }
@@ -106,7 +106,7 @@ class HttpScanProxyHandler(
       } yield {
         entry match {
           case Some(value) =>
-            respond.OK(definitions.LookupEntryByNameResponse(value.toHttp))
+            respond.OK(definitions.LookupEntryByNameResponse(value))
           case None =>
             respond.NotFound(definitions.ErrorResponse(s"Did not find a CnsEntry with name $name"))
         }
@@ -125,7 +125,7 @@ class HttpScanProxyHandler(
       for {
         entries <- scanConnection.listCnsEntries(namePrefix, pageSize)
       } yield {
-        respond.OK(definitions.ListEntriesResponse(entries.map(_.toHttp).toVector))
+        respond.OK(definitions.ListEntriesResponse(entries.toVector))
       }
     }
   }
