@@ -792,8 +792,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
       )
       (
-        cnsCodegen.CnsEntryContext.COMPANION.toContractId(result.exerciseResult._1),
-        subsCodegen.SubscriptionRequest.COMPANION.toContractId(result.exerciseResult._2),
+        cnsCodegen.CnsEntryContext.COMPANION.toContractId(result.exerciseResult.entryCid),
+        subsCodegen.SubscriptionRequest.COMPANION.toContractId(result.exerciseResult.requestCid),
       )
     }
   }
@@ -1034,7 +1034,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
       )
       .exerciseResult
-      ._2
+      .requestCid
   }
 
   protected def requestAndPayForEntry(

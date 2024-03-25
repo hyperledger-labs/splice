@@ -5,8 +5,6 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleState
-import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, QualifiedName}
 
 case class Transfer(
@@ -138,39 +136,31 @@ object CoinRules_BuyMemberTraffic extends ExerciseNodeCompanion {
 object CnsRules_CollectInitialEntryPayment extends ExerciseNodeCompanion {
   override type Tpl = cnsCodegen.CnsRules
   override type Arg = cnsCodegen.CnsRules_CollectInitialEntryPayment
-  override type Res =
-    Tuple2[cnsCodegen.CnsEntry.ContractId, SubscriptionIdleState.ContractId]
+  override type Res = cnsCodegen.CnsRules_CollectInitialEntryPaymentResult
   override val choice = cnsCodegen.CnsRules.CHOICE_CnsRules_CollectInitialEntryPayment
   override val template = cnsCodegen.CnsRules.COMPANION
   override val argDecoder = cnsCodegen.CnsRules_CollectInitialEntryPayment.valueDecoder()
 
   override def argToValue(arg: Arg): Value = arg.toValue
 
-  override val resDecoder = Tuple2.valueDecoder(
-    cid => new cnsCodegen.CnsEntry.ContractId(cid.asContractId().get().getValue),
-    cid => new SubscriptionIdleState.ContractId(cid.asContractId().get().getValue),
-  )
+  override val resDecoder = cnsCodegen.CnsRules_CollectInitialEntryPaymentResult.valueDecoder
 
-  override def resToValue(res: Res): Value = res.toValue(_.toValue, _.toValue)
+  override def resToValue(res: Res): Value = res.toValue
 }
 
 object CnsRules_CollectEntryRenewalPayment extends ExerciseNodeCompanion {
   override type Tpl = cnsCodegen.CnsRules
   override type Arg = cnsCodegen.CnsRules_CollectEntryRenewalPayment
-  override type Res =
-    Tuple2[cnsCodegen.CnsEntry.ContractId, SubscriptionIdleState.ContractId]
+  override type Res = cnsCodegen.CnsRules_CollectEntryRenewalPaymentResult
   override val choice = cnsCodegen.CnsRules.CHOICE_CnsRules_CollectEntryRenewalPayment
   override val template = cnsCodegen.CnsRules.COMPANION
   override val argDecoder = cnsCodegen.CnsRules_CollectEntryRenewalPayment.valueDecoder()
 
   override def argToValue(arg: Arg): Value = arg.toValue
 
-  override val resDecoder = Tuple2.valueDecoder(
-    cid => new cnsCodegen.CnsEntry.ContractId(cid.asContractId().get().getValue),
-    cid => new SubscriptionIdleState.ContractId(cid.asContractId().get().getValue),
-  )
+  override val resDecoder = cnsCodegen.CnsRules_CollectEntryRenewalPaymentResult.valueDecoder
 
-  override def resToValue(res: Res): Value = res.toValue(_.toValue, _.toValue)
+  override def resToValue(res: Res): Value = res.toValue
 }
 
 object CoinArchive {

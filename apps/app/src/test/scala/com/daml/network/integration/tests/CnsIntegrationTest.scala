@@ -271,7 +271,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
               disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
             )
             .exerciseResult
-            ._2
+            .requestCid
         }
         clue("Alice obtains some coins and accepts the subscription") {
           aliceWalletClient.tap(5.0)
@@ -354,7 +354,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
               disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
             )
             .exerciseResult
-            ._2
+            .requestCid
         }
 
         aliceWalletClient.tap(50.0)

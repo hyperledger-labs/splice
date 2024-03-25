@@ -846,7 +846,8 @@ template SvcRules with
         choiceArg : CnsEntryContext_CollectEntryRenewalPayment
       controller leader
       do
-        exercise cnsEntryContextCid choiceArg
+        summary <- exercise cnsEntryContextCid choiceArg
+        return (summary.entryCid, summary.subscriptionStateCid)
 
     nonconsuming choice SvcRules_ExpireCnsEntry : ()
       with
@@ -855,6 +856,7 @@ template SvcRules with
       controller leader
       do
         exercise cnsEntryCid choiceArg
+        pure ()
 
     nonconsuming choice SvcRules_ExpireSubscription : ()
       with
@@ -865,6 +867,7 @@ template SvcRules with
       do
         aborted <- exercise subscriptionIdleStateCid choiceArg
         exercise cnsEntryContextCid (CnsEntryContext_Terminate svc aborted)
+        pure ()
 
     nonconsuming choice SvcRules_TerminateSubscription : ()
       with
@@ -873,6 +876,7 @@ template SvcRules with
       controller leader
       do
         exercise cnsEntryContextCid (CnsEntryContext_Terminate svc terminatedSubscriptionCid)
+        pure ()
 
 
     -- Reward management driven directly by the leader

@@ -55,8 +55,8 @@ class HttpExternalCnsHandler(
             .map { e =>
               r0.CreateCnsEntryResponse.OK(
                 d0.CreateCnsEntryResponse(
-                  e.exerciseResult._1.contractId,
-                  e.exerciseResult._2.contractId,
+                  e.exerciseResult.entryCid.contractId,
+                  e.exerciseResult.requestCid.contractId,
                   body.name,
                   body.url,
                   body.description,

@@ -242,7 +242,7 @@ testDecentralizedCns = do
   [(svcRulesCid, _)] <- query @SvcRules svc
   [(cnsRulesCid, _)] <- query @CnsRules svc
 
-  (entryContext, subscriptionRequest) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+  cnsSummary <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
     name = "cns.darth.vader"
     url = "https://darth-vader-cns.com"
     description = "Darth Vader's CNS Description"
@@ -251,7 +251,7 @@ testDecentralizedCns = do
   coin <- tap app alice 1.5
 
   paymentContext <- getPaymentTransferContext app alice
-  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd cnsSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
@@ -259,7 +259,7 @@ testDecentralizedCns = do
   -- SVs create confirmations for SVC to collect initial payment of the requested cns entry.
   appContext <- getAppTransferContext app app.svcUser
   let collectInitialPaymentAction = ARC_CnsEntryContext with
-        cnsEntryContextCid = entryContext
+        cnsEntryContextCid = cnsSummary.entryCid
         cnsEntryContextAction = CNSRARC_CollectInitialEntryPayment $ CnsEntryContext_CollectInitialEntryPayment with
           paymentCid = initialPaymentCid
           transferContext = appContext
@@ -298,7 +298,7 @@ testDecentralizedCns = do
 
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
     SvcRules_CollectEntryRenewalPayment with
-      cnsEntryContextCid = entryContext
+      cnsEntryContextCid = cnsSummary.entryCid
       choiceArg = CnsEntryContext_CollectEntryRenewalPayment with
         paymentCid
         entryCid
@@ -313,7 +313,7 @@ testDecentralizedCns = do
 
   -- SVs confirm to reject invalid entry payment of CNS request.
 
-  (entryContextToReject, subscriptionRequestToReject) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+  rejectedSummary <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
     name = "reject.darth.vader"
     url = "invalid url which will be rejected by SVs by creating confirmations."
     description = "CNS Description"
@@ -322,7 +322,7 @@ testDecentralizedCns = do
   coin <- tap app alice 1.5
 
   paymentContext <- getPaymentTransferContext app alice
-  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequestToReject SubscriptionRequest_AcceptAndMakePayment with
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd rejectedSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputCoin coin]
     context = paymentContext
     walletProvider = app.svc
@@ -330,7 +330,7 @@ testDecentralizedCns = do
   -- SVs create confirmations for SVC to reject initial payment of the requested cns entry.
   appContext <- getAppTransferContext app app.svcUser
   let rejectInitialPaymentAction = ARC_CnsEntryContext with
-        cnsEntryContextCid = entryContextToReject
+        cnsEntryContextCid = rejectedSummary.entryCid
         cnsEntryContextAction = CNSRARC_RejectEntryInitialPayment $ CnsEntryContext_RejectEntryInitialPayment with
           paymentCid = initialPaymentCid
           transferContext = appContext
@@ -367,15 +367,15 @@ terminatedSubscriptionCanBeCleanedUp = script do
   [(svcRulesCid, _)] <- query @SvcRules svc
   [(cnsRulesCid, _)] <- query @CnsRules svc
 
-  (entryContext, subscriptionRequest) <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+  cnsSummary <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
     name = "cns.darth.vader"
     url = "https://darth-vader-cns.com"
     description = "Darth Vader's CNS Description"
     user = alice.primaryParty
 
-  aborted <- submit alice.primaryParty $ exerciseCmd subscriptionRequest SubscriptionRequest_Reject
+  aborted <- submit alice.primaryParty $ exerciseCmd cnsSummary.requestCid SubscriptionRequest_Reject
 
-  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid (SvcRules_TerminateSubscription entryContext aborted)
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid (SvcRules_TerminateSubscription cnsSummary.entryCid aborted)
 
   entryContexts <- query @CnsEntryContext app.svc
   entryContexts === []

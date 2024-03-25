@@ -1,13 +1,13 @@
 daml/app-manager/.daml/dist/app-manager-0.1.0.dar ae8a5a65404610283c84b403ea985e6b62077ff3269ad19e818e5e1651346525
 daml/canton-coin-test/.daml/dist/canton-coin-test-0.1.0.dar fec514b9a752e7f690bce229508c29c615513387613e7f1232378c7e0cb86a96
 daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar cedcff64c20df3e47a48be3969a86f9e2600b3312ab912f6fbabab0ac2e51cec
-daml/canton-name-service-test/.daml/dist/canton-name-service-test-0.1.0.dar cca4914c6be773e365a681d8f10c6b2af5bc41b46ac5d6e8b3518b89cf75a51e
-daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar ac0098d3afa63815db1791daaa2e83b671de6a016deb59c2faa81f1cc109093f
+daml/canton-name-service-test/.daml/dist/canton-name-service-test-0.1.0.dar 6de07c41d4cff1cdf85e4211f5d905619befe4759942b85af0bd69fff1516fea
+daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar 6b86cb091b7455b67e14f950d6a951d2730624c2b3dbbac79a63dacb2f8f4d3c
 daml/cn-util/.daml/dist/cn-util-0.1.0.dar 6fac187f13f72be6f994a73ce0e4b0b4a26d1cb5ddde2f7b40840e794231ac7d
 daml/splitwell-test/.daml/dist/splitwell-test-0.1.0.dar 9df563d6aad4b7639d0ce9df6c476e7e81c29343d0c5d9ead7ff3a802496019a
 daml/splitwell/.daml/dist/splitwell-0.1.0.dar 5d934ee428d41d43de0a345ad6c619cb2df621705fb1258fa75da112e276964a
-daml/svc-governance-test/.daml/dist/svc-governance-test-0.1.0.dar eb505ae0d2165bd7485517d42d4f9f6df3009f02a3bca447b63941c64f29dd58
-daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar 942d51a391898f23c059c10b80a74fa4d388c576896634096bca28fbe28e1e58
+daml/svc-governance-test/.daml/dist/svc-governance-test-0.1.0.dar 30daafb132cc2a6ec23d02e6edcabc77b4f4e336941164e429204e69914d1476
+daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar e6e141f0ffbc237e69b64350b386a391b7a3aaf590dd2439f71c7a249c4e24d1
 daml/validator-lifecycle-test/.daml/dist/validator-lifecycle-test-0.1.0.dar 759515680d9c6b1ac78916d1bdaf42b403f0a40bb4ad745c5d0f6daff7044e94
 daml/validator-lifecycle/.daml/dist/validator-lifecycle-0.1.0.dar db1cd34c56682bd5f6b45cdd7d889f389218da7bc97161951580fedcaa8bf8ee
 daml/wallet-payments/.daml/dist/wallet-payments-0.1.0.dar d206f852a54592ad24d01c7a7fd07cc071d223a0d4496e5bd812d9671abb56b8
