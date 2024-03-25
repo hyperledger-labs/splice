@@ -50,7 +50,7 @@ object TopologyAdminCommandsX {
   object Read {
 
     abstract class BaseCommand[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-      override type Svc = TopologyManagerReadServiceStub
+      override type Srvc = TopologyManagerReadServiceStub
       override def createService(channel: ManagedChannel): TopologyManagerReadServiceStub =
         v30.TopologyManagerReadServiceGrpc.stub(channel)
 
@@ -608,7 +608,7 @@ object TopologyAdminCommandsX {
 
   object Write {
     abstract class BaseWriteCommand[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-      override type Svc = TopologyManagerWriteServiceStub
+      override type Srvc = TopologyManagerWriteServiceStub
 
       override def createService(channel: ManagedChannel): TopologyManagerWriteServiceStub =
         v30.TopologyManagerWriteServiceGrpc.stub(channel)
@@ -796,7 +796,7 @@ object TopologyAdminCommandsX {
 
     abstract class BaseInitializationService[Req, Resp, Res]
         extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = IdentityInitializationXServiceStub
+      override type Srvc = IdentityInitializationXServiceStub
       override def createService(channel: ManagedChannel): IdentityInitializationXServiceStub =
         v30.IdentityInitializationXServiceGrpc.stub(channel)
     }

@@ -45,15 +45,15 @@ trait AdminCommand[Req, Res, Result] {
   */
 trait GrpcAdminCommand[Req, Res, Result] extends AdminCommand[Req, Res, Result] {
 
-  type Svc <: AbstractStub[Svc]
+  type Srvc <: AbstractStub[Srvc]
 
   /** Create the GRPC service to call
     */
-  def createService(channel: ManagedChannel): Svc
+  def createService(channel: ManagedChannel): Srvc
 
   /** Submit the created request to our service
     */
-  def submitRequest(service: Svc, request: Req): Future[Res]
+  def submitRequest(service: Srvc, request: Req): Future[Res]
 
 }
 

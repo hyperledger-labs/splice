@@ -35,7 +35,7 @@ class GrpcCtlRunner(
       timeout: Duration,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): EitherT[Future, String, Result] = {
 
-    val baseService: command.Svc = command
+    val baseService: command.Srvc = command
       .createService(channel)
       .withInterceptors(TraceContextGrpc.clientInterceptor)
 
@@ -48,9 +48,9 @@ class GrpcCtlRunner(
     } yield result
   }
 
-  private def submitRequest[Svc <: AbstractStub[Svc], Req, Res, Result](
+  private def submitRequest[Srvc <: AbstractStub[Srvc], Req, Res, Result](
       command: GrpcAdminCommand[Req, Res, Result]
-  )(instanceName: String, service: command.Svc, request: Req, timeout: Duration)(implicit
+  )(instanceName: String, service: command.Srvc, request: Req, timeout: Duration)(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): EitherT[Future, String, Res] =

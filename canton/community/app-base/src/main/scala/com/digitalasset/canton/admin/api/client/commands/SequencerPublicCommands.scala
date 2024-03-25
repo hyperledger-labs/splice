@@ -19,7 +19,7 @@ object SequencerPublicCommands {
 
   abstract class SequencerConnectServiceCommands[Req, Rep, Res]
       extends GrpcAdminCommand[Req, Rep, Res] {
-    override type Svc = SequencerConnectServiceStub
+    override type Srvc = SequencerConnectServiceStub
 
     override def createService(channel: ManagedChannel): SequencerConnectServiceStub =
       proto.SequencerConnectServiceGrpc.stub(channel)

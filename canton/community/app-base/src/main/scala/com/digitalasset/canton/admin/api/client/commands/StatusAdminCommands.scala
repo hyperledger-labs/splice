@@ -17,7 +17,7 @@ import scala.concurrent.Future
 object StatusAdminCommands {
   abstract class GetStatusBase[Result]
       extends GrpcAdminCommand[v30.StatusRequest, v30.StatusResponse, Result] {
-    override type Svc = v30.StatusServiceGrpc.StatusServiceStub
+    override type Srvc = v30.StatusServiceGrpc.StatusServiceStub
     override def createService(channel: ManagedChannel): v30.StatusServiceGrpc.StatusServiceStub =
       v30.StatusServiceGrpc.stub(channel)
     override def createRequest(): Either[String, v30.StatusRequest] = Right(v30.StatusRequest())
@@ -46,7 +46,7 @@ object StatusAdminCommands {
       observer: StreamObserver[HealthDumpResponse],
       chunkSize: Option[Int],
   ) extends GrpcAdminCommand[HealthDumpRequest, CancellableContext, CancellableContext] {
-    override type Svc = v30.StatusServiceGrpc.StatusServiceStub
+    override type Srvc = v30.StatusServiceGrpc.StatusServiceStub
     override def createService(channel: ManagedChannel): v30.StatusServiceGrpc.StatusServiceStub =
       v30.StatusServiceGrpc.stub(channel)
     override def submitRequest(

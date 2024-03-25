@@ -156,7 +156,7 @@ object LedgerApiCommands {
 
   object PartyManagementService {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = PartyManagementServiceStub
+      override type Srvc = PartyManagementServiceStub
 
       override def createService(channel: ManagedChannel): PartyManagementServiceStub =
         PartyManagementServiceGrpc.stub(channel)
@@ -304,7 +304,7 @@ object LedgerApiCommands {
   object PackageService {
 
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = PackageManagementServiceStub
+      override type Srvc = PackageManagementServiceStub
       override def createService(channel: ManagedChannel): PackageManagementServiceStub =
         PackageManagementServiceGrpc.stub(channel)
     }
@@ -353,7 +353,7 @@ object LedgerApiCommands {
   }
   object ParticipantPruningService {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = ParticipantPruningServiceStub
+      override type Srvc = ParticipantPruningServiceStub
       override def createService(channel: ManagedChannel): ParticipantPruningServiceStub =
         ParticipantPruningServiceGrpc.stub(channel)
 
@@ -391,7 +391,7 @@ object LedgerApiCommands {
 
   object Users {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = UserManagementServiceStub
+      override type Srvc = UserManagementServiceStub
 
       override def createService(channel: ManagedChannel): UserManagementServiceStub =
         UserManagementServiceGrpc.stub(channel)
@@ -686,7 +686,7 @@ object LedgerApiCommands {
 
   object IdentityProviderConfigs {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = IdentityProviderConfigServiceStub
+      override type Srvc = IdentityProviderConfigServiceStub
 
       override def createService(channel: ManagedChannel): IdentityProviderConfigServiceStub =
         IdentityProviderConfigServiceGrpc.stub(channel)
@@ -839,7 +839,7 @@ object LedgerApiCommands {
 
   object Metering {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = MeteringReportServiceStub
+      override type Srvc = MeteringReportServiceStub
 
       override def createService(channel: ManagedChannel): MeteringReportServiceStub =
         MeteringReportServiceGrpc.stub(channel)
@@ -884,7 +884,7 @@ object LedgerApiCommands {
     def observer: StreamObserver[Res]
 
     def doRequest(
-        service: this.Svc,
+        service: this.Srvc,
         request: Req,
         rawObserver: StreamObserver[Resp],
     ): Unit
@@ -894,7 +894,7 @@ object LedgerApiCommands {
     implicit def loggingContext: ErrorLoggingContext
 
     override def submitRequest(
-        service: this.Svc,
+        service: this.Srvc,
         request: Req,
     ): Future[AutoCloseable] = {
       val rawObserver = new ForwardingStreamObserver[Resp, Res](observer, extractResults)
@@ -967,7 +967,7 @@ object LedgerApiCommands {
     }
 
     trait BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = UpdateServiceStub
+      override type Srvc = UpdateServiceStub
 
       override def createService(channel: ManagedChannel): UpdateServiceStub =
         UpdateServiceGrpc.stub(channel)
@@ -1134,7 +1134,7 @@ object LedgerApiCommands {
 
   object CommandSubmissionService {
     trait BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = CommandSubmissionServiceStub
+      override type Srvc = CommandSubmissionServiceStub
       override def createService(channel: ManagedChannel): CommandSubmissionServiceStub =
         CommandSubmissionServiceGrpc.stub(channel)
     }
@@ -1255,7 +1255,7 @@ object LedgerApiCommands {
 
   object CommandService {
     trait BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = CommandServiceStub
+      override type Srvc = CommandServiceStub
       override def createService(channel: ManagedChannel): CommandServiceStub =
         CommandServiceGrpc.stub(channel)
     }
@@ -1335,7 +1335,7 @@ object LedgerApiCommands {
 
   object StateService {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = StateServiceStub
+      override type Srvc = StateServiceStub
 
       override def createService(channel: ManagedChannel): StateServiceStub =
         StateServiceGrpc.stub(channel)
@@ -1444,7 +1444,7 @@ object LedgerApiCommands {
 
   object CommandCompletionService {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = CommandCompletionServiceStub
+      override type Srvc = CommandCompletionServiceStub
 
       override def createService(channel: ManagedChannel): CommandCompletionServiceStub =
         CommandCompletionServiceGrpc.stub(channel)
@@ -1609,7 +1609,7 @@ object LedgerApiCommands {
 
   object Time {
     abstract class BaseCommand[Req, Resp, Res] extends GrpcAdminCommand[Req, Resp, Res] {
-      override type Svc = TimeServiceStub
+      override type Srvc = TimeServiceStub
 
       override def createService(channel: ManagedChannel): TimeServiceStub =
         TimeServiceGrpc.stub(channel)
@@ -1673,7 +1673,7 @@ object LedgerApiCommands {
   object QueryService {
 
     abstract class BaseCommand[Req, Res] extends GrpcAdminCommand[Req, Res, Res] {
-      override type Svc = EventQueryServiceStub
+      override type Srvc = EventQueryServiceStub
 
       override def createService(channel: ManagedChannel): EventQueryServiceStub =
         EventQueryServiceGrpc.stub(channel)

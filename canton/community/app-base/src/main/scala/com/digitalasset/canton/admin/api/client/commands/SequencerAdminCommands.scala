@@ -19,7 +19,7 @@ object SequencerAdminCommands {
 
   abstract class BaseSequencerAdministrationCommands[Req, Rep, Res]
       extends GrpcAdminCommand[Req, Rep, Res] {
-    override type Svc =
+    override type Srvc =
       admin.v30.SequencerAdministrationServiceGrpc.SequencerAdministrationServiceStub
 
     override def createService(

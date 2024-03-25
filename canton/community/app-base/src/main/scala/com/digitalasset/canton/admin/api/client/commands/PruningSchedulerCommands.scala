@@ -27,11 +27,11 @@ class PruningSchedulerCommands[Stub <: AbstractStub[Stub]](
     submitGetSchedule: (Stub, GetSchedule.Request) => Future[GetSchedule.Response],
 ) {
   abstract class BaseCommand[Req, Res, Ret] extends GrpcAdminCommand[Req, Res, Ret] {
-    override type Svc = Stub
-    override def createService(channel: ManagedChannel): Svc = createServiceStub(channel)
+    override type Srvc = Stub
+    override def createService(channel: ManagedChannel): Srvc = createServiceStub(channel)
   }
 
-  // case classes not final as the scala compiler can't check outer Svc type reference
+  // case classes not final as the scala compiler can't check outer Srvc type reference
   case class SetScheduleCommand(
       cron: String,
       maxDuration: PositiveDurationSeconds,
@@ -51,7 +51,7 @@ class PruningSchedulerCommands[Stub <: AbstractStub[Stub]](
       )
 
     override def submitRequest(
-        service: Svc,
+        service: Srvc,
         request: SetSchedule.Request,
     ): Future[SetSchedule.Response] = submitSetSchedule(service, request)
 
@@ -67,7 +67,7 @@ class PruningSchedulerCommands[Stub <: AbstractStub[Stub]](
       Right(ClearSchedule.Request())
 
     override def submitRequest(
-        service: Svc,
+        service: Srvc,
         request: ClearSchedule.Request,
     ): Future[ClearSchedule.Response] =
       submitClearSchedule(service, request)
@@ -84,7 +84,7 @@ class PruningSchedulerCommands[Stub <: AbstractStub[Stub]](
       Right(SetCron.Request(cron))
 
     override def submitRequest(
-        service: Svc,
+        service: Srvc,
         request: SetCron.Request,
     ): Future[SetCron.Response] =
       submitSetCron(service, request)
@@ -103,7 +103,7 @@ class PruningSchedulerCommands[Stub <: AbstractStub[Stub]](
       )
 
     override def submitRequest(
-        service: Svc,
+        service: Srvc,
         request: SetMaxDuration.Request,
     ): Future[SetMaxDuration.Response] =
       submitSetMaxDuration(service, request)
@@ -120,7 +120,7 @@ class PruningSchedulerCommands[Stub <: AbstractStub[Stub]](
       Right(SetRetention.Request(Some(retention.toProtoPrimitive)))
 
     override def submitRequest(
-        service: Svc,
+        service: Srvc,
         request: SetRetention.Request,
     ): Future[SetRetention.Response] =
       submitSetRetention(service, request)
@@ -141,7 +141,7 @@ class PruningSchedulerCommands[Stub <: AbstractStub[Stub]](
       Right(GetSchedule.Request())
 
     override def submitRequest(
-        service: Svc,
+        service: Srvc,
         request: GetSchedule.Request,
     ): Future[GetSchedule.Response] =
       submitGetSchedule(service, request)

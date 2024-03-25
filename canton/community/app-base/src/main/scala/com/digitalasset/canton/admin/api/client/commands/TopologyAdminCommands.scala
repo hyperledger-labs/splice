@@ -26,7 +26,7 @@ object TopologyAdminCommands {
   object Aggregation {
 
     abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
-      override type Svc = TopologyAggregationServiceStub
+      override type Srvc = TopologyAggregationServiceStub
       override def createService(channel: ManagedChannel): TopologyAggregationServiceStub =
         v30.TopologyAggregationServiceGrpc.stub(channel)
     }

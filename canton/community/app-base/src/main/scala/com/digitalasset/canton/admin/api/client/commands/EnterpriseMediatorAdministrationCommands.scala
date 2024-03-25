@@ -27,7 +27,7 @@ import scala.concurrent.Future
 object EnterpriseMediatorAdministrationCommands {
   abstract class BaseMediatorXInitializationCommand[Req, Rep, Res]
       extends GrpcAdminCommand[Req, Rep, Res] {
-    override type Svc = v30.MediatorInitializationServiceGrpc.MediatorInitializationServiceStub
+    override type Srvc = v30.MediatorInitializationServiceGrpc.MediatorInitializationServiceStub
     override def createService(
         channel: ManagedChannel
     ): v30.MediatorInitializationServiceGrpc.MediatorInitializationServiceStub =
@@ -35,7 +35,7 @@ object EnterpriseMediatorAdministrationCommands {
   }
   abstract class BaseMediatorAdministrationCommand[Req, Rep, Res]
       extends GrpcAdminCommand[Req, Rep, Res] {
-    override type Svc =
+    override type Srvc =
       v30.MediatorAdministrationServiceGrpc.MediatorAdministrationServiceStub
     override def createService(
         channel: ManagedChannel
@@ -84,7 +84,7 @@ object EnterpriseMediatorAdministrationCommands {
         v30.MediatorPruning.PruneResponse,
         Unit,
       ] {
-    override type Svc =
+    override type Srvc =
       v30.MediatorAdministrationServiceGrpc.MediatorAdministrationServiceStub
     override def createService(
         channel: ManagedChannel
