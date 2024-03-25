@@ -341,7 +341,7 @@ The validator app backend requires the following secret.
         # Optional. uncomment it if you want to set audience for ledger API
         # "--from-literal=audience=${OIDC_AUTHORITY_LEDGER_API_AUDIENCE}"
 
-To setup the wallet and SV UI, create the following two secrets.
+To setup the wallet, CNS and SV UI, create the following two secrets.
 
 .. code-block:: bash
 
@@ -576,6 +576,8 @@ that. Please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/validator
 - If you want to configure the audience for the Ledger API, replace ``OIDC_AUTHORITY_LEDGER_API_AUDIENCE`` in the `auth.ledgerApiAudience` entry with audience for the Ledger API. e.g. ``https://ledger_api.example.com``.
 - Replace ``OPERATOR_WALLET_USER_ID`` with the user ID in your IAM that you want to use to log into the wallet as the SV party. Note that this should be the full user id, e.g., ``auth0|43b68e1e4978b000cefba352``, *not* only the suffix ``43b68e1e4978b000cefba352``
 - Update the `auth.jwksUrl` entry to point to your auth provider's JWK set document by replacing ``OIDC_AUTHORITY_URL`` with your auth provider's OIDC URL, as explained above.
+- If your validator is not supposed to hold any CC, you should disable the wallet by setting `enableWallet` to `false`.
+  Note that if the wallet is disabled, you shouldn't install the wallet or CNS UIs, as they won't work.
 
 Additionally, please modify the file ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/sv-validator-values.yaml`` as follows:
 

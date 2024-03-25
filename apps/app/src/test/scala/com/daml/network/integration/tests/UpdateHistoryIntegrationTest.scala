@@ -194,6 +194,7 @@ class UpdateHistoryIntegrationTest
         compareHistory(
           aliceValidatorBackend.participantClient,
           aliceValidatorBackend.appState.walletManager
+            .getOrElse(throw new RuntimeException(s"Wallet is disabled"))
             .lookupUserWallet(aliceWalletClient.config.ledgerApiUser)
             .getOrElse(throw new RuntimeException("Alice wallet should exist"))
             .store

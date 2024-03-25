@@ -276,6 +276,7 @@ final class ValidatorAppBackendReference(
   )
   def userWalletAutomation(userName: String): UserWalletAutomationService = {
     appState.walletManager
+      .getOrElse(throw new RuntimeException(s"Wallet is disabled"))
       .lookupUserWallet(userName)
       .getOrElse(throw new RuntimeException(s"User ${userName} doesn't exist"))
       .automation

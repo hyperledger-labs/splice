@@ -184,6 +184,9 @@ spec:
         - name: ADDITIONAL_CONFIG_GLOBAL_DOMAIN_UPGRADE_DUMP_PATH
           value: |
             canton.validator-apps.validator_backend.domain-migration-dump-path = "/domain-upgrade-dump/domain_migration_dump.json"
+        - name: ADDITIONAL_CONFIG_ENABLE_WALLET
+          value: |
+            canton.validator-apps.validator_backend.enable-wallet = {{ .Values.enableWallet | quote }}
         {{- end }}
         - name: FAIL_ON_APP_VERSION_MISMATCH
           value: {{ .Values.failOnAppVersionMismatch | quote }}

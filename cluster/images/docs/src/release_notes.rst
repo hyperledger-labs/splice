@@ -3,6 +3,12 @@
 Release Notes
 =============
 
+2024-04-01
+----------
+
+* Added an option to disable the Validator apps' wallet. This can be done by setting `enableWallet` to `false` in the `validator-values.yaml` file.
+
+
 2024-03-25
 ----------
 

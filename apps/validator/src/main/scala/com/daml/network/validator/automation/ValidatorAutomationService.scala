@@ -40,7 +40,7 @@ class ValidatorAutomationService(
     globalDomainAlias: DomainAlias,
     isSvValidator: Boolean,
     clock: Clock,
-    walletManager: UserWalletManager,
+    walletManagerOpt: Option[UserWalletManager], // None when config.enableWallet=false
     store: ValidatorStore,
     scanConnection: BftScanConnection,
     ledgerClient: CNLedgerClient,
@@ -82,31 +82,45 @@ class ValidatorAutomationService(
       loggerFactory,
     )
 
-  registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, connection))
-  registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
+  walletManagerOpt.foreach { walletManager =>
+    registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, connection))
 
-  if (isSvValidator)
-    logger.info(
-      s"Not starting TopupMemberTrafficTrigger, as this is an SV validator."
-    )(TraceContext.empty)
-  else if (buyExtraTrafficConfig.targetThroughput.value <= 0L)
-    logger.info(
-      s"Not starting TopupMemberTrafficTrigger, as the validator is not configured to buy extra traffic."
-    )(TraceContext.empty)
-  else
-    registerTrigger(
-      new TopupMemberTrafficTrigger(
-        triggerContext,
-        store,
-        connection,
-        participantAdminConnection,
-        buyExtraTrafficConfig,
-        clock,
-        walletManager,
-        scanConnection,
-        domainMigrationId,
+    registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
+
+    if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
+      registerTrigger(
+        new ReceiveFaucetCouponTrigger(
+          triggerContext,
+          scanConnection,
+          store,
+          connection,
+        )
       )
-    )
+    }
+
+    if (isSvValidator)
+      logger.info(
+        s"Not starting TopupMemberTrafficTrigger, as this is an SV validator."
+      )(TraceContext.empty)
+    else if (buyExtraTrafficConfig.targetThroughput.value <= 0L)
+      logger.info(
+        s"Not starting TopupMemberTrafficTrigger, as the validator is not configured to buy extra traffic."
+      )(TraceContext.empty)
+    else
+      registerTrigger(
+        new TopupMemberTrafficTrigger(
+          triggerContext,
+          store,
+          connection,
+          participantAdminConnection,
+          buyExtraTrafficConfig,
+          clock,
+          walletManager,
+          scanConnection,
+          domainMigrationId,
+        )
+      )
+  }
 
   backupDumpConfig.foreach(config =>
     registerTrigger(
@@ -127,17 +141,6 @@ class ValidatorAutomationService(
       )
     )
   )
-
-  if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
-    registerTrigger(
-      new ReceiveFaucetCouponTrigger(
-        triggerContext,
-        scanConnection,
-        store,
-        connection,
-      )
-    )
-  }
 
   registerTrigger(
     new TransferFollowTrigger(

@@ -16,3 +16,5 @@
 {{- end }}
 
 {{ $_ := required ".Values.persistence.secretName is required" .Values.persistence.secretName }}
+
+{{ $_ := required ".Values.enableWallet is required" .Values.enableWallet }}

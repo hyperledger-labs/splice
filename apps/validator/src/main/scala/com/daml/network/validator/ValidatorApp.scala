@@ -552,22 +552,29 @@ class ValidatorApp(
         config.domainMigrationId,
         participantId,
       )
-      walletManager =
-        new UserWalletManager(
-          ledgerClient,
-          store,
-          config.ledgerApiUser,
-          config.automation,
-          clock,
-          config.treasury,
-          storage: Storage,
-          retryProvider,
-          scanConnection,
-          loggerFactory,
-          config.domainMigrationId,
-          participantId,
-          config.ingestFromParticipantBegin,
-        )
+      walletManagerOpt =
+        if (config.enableWallet)
+          Some(
+            new UserWalletManager(
+              ledgerClient,
+              store,
+              config.ledgerApiUser,
+              config.automation,
+              clock,
+              config.treasury,
+              storage: Storage,
+              retryProvider,
+              scanConnection,
+              loggerFactory,
+              config.domainMigrationId,
+              participantId,
+              config.ingestFromParticipantBegin,
+            )
+          )
+        else {
+          logger.info("Not starting wallet as it's disabled")
+          None
+        }
       automation = new ValidatorAutomationService(
         config.automation,
         config.participantIdentitiesBackup,
@@ -578,7 +585,7 @@ class ValidatorApp(
         config.domains.global.alias,
         config.svValidator,
         clock,
-        walletManager,
+        walletManagerOpt,
         store,
         scanConnection,
         ledgerClient,
@@ -668,25 +675,31 @@ class ValidatorApp(
         loggerFactory,
       )
 
-      walletInternalHandler = new HttpWalletHandler(
-        walletManager,
-        scanConnection,
-        loggerFactory,
-        retryProvider,
+      walletInternalHandler = walletManagerOpt.map(walletManager =>
+        new HttpWalletHandler(
+          walletManager,
+          scanConnection,
+          loggerFactory,
+          retryProvider,
+        )
       )
 
-      walletExternalHandler = new HttpExternalWalletHandler(
-        walletManager,
-        loggerFactory,
-        retryProvider,
-        participantAdminConnection,
-        config.domainMigrationId,
+      walletExternalHandler = walletManagerOpt.map(walletManager =>
+        new HttpExternalWalletHandler(
+          walletManager,
+          loggerFactory,
+          retryProvider,
+          participantAdminConnection,
+          config.domainMigrationId,
+        )
       )
 
-      cnsExternalHandler = new HttpExternalCnsHandler(
-        walletManager,
-        scanConnection,
-        loggerFactory,
+      cnsExternalHandler = walletManagerOpt.map(walletManager =>
+        new HttpExternalCnsHandler(
+          walletManager,
+          scanConnection,
+          loggerFactory,
+        )
       )
 
       scanProxyHandler = new HttpScanProxyHandler(
@@ -782,18 +795,6 @@ class ValidatorApp(
                     handler,
                     AuthExtractor(verifier, loggerFactory, "canton network validator realm"),
                   ),
-                  InternalWalletResource.routes(
-                    walletInternalHandler,
-                    AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
-                  ),
-                  ExternalWalletResource.routes(
-                    walletExternalHandler,
-                    AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
-                  ),
-                  CnsResource.routes(
-                    cnsExternalHandler,
-                    AuthExtractor(verifier, loggerFactory, "canton network cns realm"),
-                  ),
                   ScanproxyResource.routes(
                     scanProxyHandler,
                     AuthExtractor(verifier, loggerFactory, "canton network scan proxy realm"),
@@ -816,7 +817,22 @@ class ValidatorApp(
                   pathPrefix("api" / "validator")(
                     CommonAdminResource.routes(commonAdminHandler, _ => provide(traceContext))
                   ),
-                ) ++
+                ) ++ walletInternalHandler.toList.map { walletHandler =>
+                  InternalWalletResource.routes(
+                    walletHandler,
+                    AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+                  )
+                } ++ walletExternalHandler.toList.map { walletHandler =>
+                  ExternalWalletResource.routes(
+                    walletHandler,
+                    AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
+                  )
+                } ++ cnsExternalHandler.toList.map { cnsHandler =>
+                  CnsResource.routes(
+                    cnsHandler,
+                    AuthExtractor(verifier, loggerFactory, "canton network cns realm"),
+                  )
+                } ++
                   appManagerHandlersO.toList.flatMap {
                     case (adminHandler, handler, publicHandler, jsonApiHandler) =>
                       Seq(
@@ -871,7 +887,7 @@ class ValidatorApp(
         storage,
         store,
         automation,
-        walletManager,
+        walletManagerOpt,
         binding,
         timeouts,
         loggerFactory.getTracedLogger(ValidatorApp.State.getClass),
@@ -891,7 +907,7 @@ object ValidatorApp {
       storage: Storage,
       store: ValidatorStore,
       automation: ValidatorAutomationService,
-      walletManager: UserWalletManager,
+      walletManager: Option[UserWalletManager],
       binding: Http.ServerBinding,
       timeouts: ProcessingTimeout,
       logger: TracedLogger,
@@ -902,17 +918,19 @@ object ValidatorApp {
 
     override def close(): Unit =
       Lifecycle.close(
-        AsyncCloseable(
-          "http binding",
-          binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
-          timeouts.shutdownNetwork,
-        ),
-        automation,
-        walletManager,
-        store,
-        storage,
-        scanConnection,
-        participantAdminConnection,
+        (Seq(
+          AsyncCloseable(
+            "http binding",
+            binding.terminate(timeouts.shutdownNetwork.asFiniteApproximation),
+            timeouts.shutdownNetwork,
+          ),
+          automation,
+        ) ++ walletManager.toList ++ Seq(
+          store,
+          storage,
+          scanConnection,
+          participantAdminConnection,
+        ))*
       )(logger)
   }
 }
