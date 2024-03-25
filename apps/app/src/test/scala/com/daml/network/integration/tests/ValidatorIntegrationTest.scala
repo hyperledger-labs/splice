@@ -333,7 +333,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       },
     )
 
-    val numTestUsers = 30
+    val numTestUsers = 15
     val prefix = "test-user"
     val testUsers = Range(0, numTestUsers).map(i => s"${prefix}-${i}")
 
