@@ -21,6 +21,7 @@ interface MultiNodeDeploymentArgs extends BaseMultiNodeArgs {
     ports: k8s.types.input.core.v1.ContainerPort[];
     livenessProbe?: k8s.types.input.core.v1.Probe;
     readinessProbe?: k8s.types.input.core.v1.Probe;
+    resources: k8s.types.input.core.v1.ResourceRequirements;
   };
   serviceSpec: k8s.types.input.core.v1.ServiceSpec;
 }
@@ -85,7 +86,8 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                     },
                     {
                       name: 'JAVA_TOOL_OPTIONS',
-                      value: '-Xms24576M -Xmx24576M -Dscala.concurrent.context.minThreads=8',
+                      value:
+                        '-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=16',
                     },
                   ],
                 },

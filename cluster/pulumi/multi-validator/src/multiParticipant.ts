@@ -41,6 +41,16 @@ export class MultiParticipant extends MultiNodeDeployment {
             containerPort: port.port,
             protocol: 'TCP',
           })),
+          resources: {
+            requests: {
+              cpu: '1',
+              memory: '4Gi',
+            },
+            limits: {
+              cpu: '4',
+              memory: '16Gi',
+            },
+          },
         },
         serviceSpec: { ports },
       },
