@@ -64,7 +64,7 @@ message DynamicDomainParameters {
   OnboardingRestriction onboarding_restriction = 9;
 
   // required packages are the default packages that must be supported by all participants on a domain
-  // TODO(#14054) enable this feature (necessary for canton network such that an SVC can't do a rug-pull)
+  // TODO(#14054) enable this feature (necessary to avoid single SVs in the network to have too much power)
   repeated string required_packages = 11;
 
   // if true, then only the required packages are supported on the given domain
