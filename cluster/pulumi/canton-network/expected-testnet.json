@@ -1159,7 +1159,7 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-XX:MaxRamPercentage=75 -XX:InitialRamPercentage=75 -Dscala.concurrent.context.minThreads=8",
+        "defaultJvmOptions": "-XX:MaxRAMPercentage=75 -XX:InitialRAMPercentage=75 -Dscala.concurrent.context.minThreads=8",
         "disableAutoInit": false,
         "enableHealthProbes": true,
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
