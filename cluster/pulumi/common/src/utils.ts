@@ -69,7 +69,21 @@ export const sequencerPruningConfig = enableSequencerPruning
     }
   : { enabled: false };
 
-export const highResourceSequencer = envFlag('SEQUENCER_HIGH_RESOURCES', false);
+const highResourceSequencer = envFlag('SEQUENCER_HIGH_RESOURCES', false);
+export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceRequirements } =
+  highResourceSequencer
+    ? {
+        resources: {
+          limits: {
+            memory: '6Gi',
+          },
+          requests: {
+            cpu: '2',
+            memory: '4Gi',
+          },
+        },
+      }
+    : {};
 
 export const svOnboardingPollingInterval = process.env['SV_ONBOARDING_POLLING_INTERVAL'];
 

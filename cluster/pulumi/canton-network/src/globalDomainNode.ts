@@ -9,7 +9,7 @@ import {
   jmxOptions,
   defaultVersion,
   CnChartVersion,
-  highResourceSequencer,
+  sequencerResources,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
@@ -89,19 +89,7 @@ export class GlobalDomainNode extends ComponentResource {
             host: pulumi.interpolate`${cometBftService.metadata.name}.${cometBftService.metadata.namespace}.svc.cluster.local`,
             port: 26657,
           },
-          ...(highResourceSequencer
-            ? {
-                resources: {
-                  limits: {
-                    memory: '6Gi',
-                  },
-                  requests: {
-                    cpu: '2',
-                    memory: '4Gi',
-                  },
-                },
-              }
-            : {}),
+          ...sequencerResources,
         },
         mediator: {
           persistence: {

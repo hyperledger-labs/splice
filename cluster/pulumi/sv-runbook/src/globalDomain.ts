@@ -9,6 +9,7 @@ import {
   installCNRunbookHelmChart,
   installMigrationIdSpecificComponent,
   loadYamlFromFile,
+  sequencerResources,
 } from 'cn-pulumi-common';
 
 import { installCometBftNode } from './cometbft';
@@ -62,11 +63,18 @@ export function installGlobalDomainNode(
         },
         disableAutoInit: globalDomainMigrationConfig.isRunningMigration() || !isActive,
       };
+
       return installCNRunbookHelmChart(
         svNamespace,
         `global-domain-${migrationId}`,
         'cn-global-domain',
-        globalDomainValues,
+        {
+          ...globalDomainValues,
+          sequencer: {
+            ...globalDomainValues.sequencer,
+            ...sequencerResources,
+          },
+        },
         version,
         dependencies.concat([cometbft, sequencerPg, mediatorPg])
       );
