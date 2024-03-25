@@ -6,11 +6,11 @@ import { loadIPRanges } from '../../common';
 import { clusterBasename } from './config';
 
 export const istioVersion = {
-  istio: '1.20.0',
+  istio: '1.21.0',
   //   updated from https://grafana.com/orgs/istio/dashboards, must be updated on each istio version
   dashboards: {
-    general: 188,
-    wasm: 145,
+    general: 201,
+    wasm: 158,
   },
 };
 
