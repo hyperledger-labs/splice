@@ -82,7 +82,7 @@ class ValidatorAutomationService(
       loggerFactory,
     )
 
-  registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
+  registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager, connection))
   registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
 
   if (isSvValidator)

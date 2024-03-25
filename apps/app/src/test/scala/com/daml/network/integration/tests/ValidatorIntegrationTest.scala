@@ -337,7 +337,9 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     val prefix = "test-user"
     val testUsers = Range(0, numTestUsers).map(i => s"${prefix}-${i}")
 
-    loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+    loggerFactory.assertEventuallyLogsSeq(
+      SuppressionRule.LevelAndAbove(Level.DEBUG)
+    )(
       testUsers.foreach(aliceValidatorBackend.onboardUser(_)),
       entries => {
         forAtLeast(numTestUsers, entries)(
@@ -346,6 +348,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
           )
         )
       },
+      timeUntilSuccess = 40.seconds,
     )
 
     val tapAmount = 100.0

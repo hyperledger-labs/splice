@@ -13,12 +13,15 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithS
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{JavaDecodeUtil as DecodeUtil, WalletTestUtil}
 import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 import com.typesafe.config.ConfigFactory
 import org.slf4j.event.Level
 
+import java.time.Duration
+import java.util.UUID
 import scala.concurrent.Future
 import scala.util.Try
 
@@ -393,6 +396,80 @@ class WalletIntegrationTest
             accepted
           },
       )
+    }
+
+    "accepted transfer offers are completed even if the recipient user does not exist" in {
+      implicit env =>
+        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        val aliceUser = aliceWalletClient.config.ledgerApiUser
+        val aliceValidatorUser = aliceValidatorBackend.config.ledgerApiUser
+        val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+        aliceWalletClient.tap(50)
+
+        val (offerCid, _) =
+          actAndCheck(
+            "Alice creates transfer",
+            aliceWalletClient.createTransferOffer(
+              bobParty,
+              10,
+              "transfer 10 amulets to Bob",
+              CantonTimestamp.now().plus(Duration.ofMinutes(1)),
+              UUID.randomUUID.toString,
+            ),
+          )(
+            "Bob sees transfer offer",
+            _ => bobWalletClient.listTransferOffers() should have length 1,
+          )
+
+        // We simulate things here that can happen during a hard domain migration or disaster recovery.
+        clue("Alice's validator shuts down") {
+          aliceValidatorBackend.stop()
+        }
+        actAndCheck(
+          "Alice's user disappears",
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.delete(aliceUser),
+        )(
+          "Alice's user is gone",
+          _ =>
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+              .list()
+              .users
+              .find(_.id == aliceUser) shouldBe None,
+        )
+        actAndCheck(
+          "Alice's validator loses rights over Alice's party",
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.rights
+            .revoke(aliceValidatorUser, Set(aliceParty), Set()),
+        )(
+          "Alice's validator has no rights over Alice's party",
+          _ => {
+            val rights =
+              aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.rights
+                .list(aliceValidatorUser)
+            rights.actAs should not(contain((aliceParty)))
+            rights.readAs should not(contain((aliceParty)))
+          },
+        )
+        clue("Alice's validator starts back up") {
+          aliceValidatorBackend.startSync()
+        }
+
+        actAndCheck(
+          "Bob accepts transfer offer",
+          bobWalletClient.acceptTransferOffer(offerCid),
+        )(
+          "Bob sees updated balance",
+          _ => {
+            bobWalletClient.listTransferOffers() should have length 0
+            bobWalletClient.balance().unlockedQty should beAround(10)
+          },
+        )
+
+        clue("Alice can reonboard and transfer some more amulets") {
+          onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+          p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, 10)
+          bobWalletClient.balance().unlockedQty should beAround(20)
+        }
     }
   }
 }
