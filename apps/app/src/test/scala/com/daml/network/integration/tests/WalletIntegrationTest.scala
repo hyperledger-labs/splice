@@ -5,7 +5,7 @@ import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCo
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.cc.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.http.v0.definitions.TapRequest
 import com.daml.network.http.v0.wallet.WalletClient

@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.amuletrules.AppTransferContext
+import com.daml.network.codegen.java.splice.amuletrules.AppTransferContext
 import com.daml.network.codegen.java.cn.ans.{
   AnsEntryContext,
   AnsEntryContext_CollectInitialEntryPayment,

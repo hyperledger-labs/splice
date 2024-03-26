@@ -17,7 +17,7 @@ import java.time.{LocalDateTime, ZoneOffset}
 import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
-import com.daml.network.codegen.java.cc.amuletconfig.AmuletConfig
+import com.daml.network.codegen.java.splice.amuletconfig.AmuletConfig
 import com.daml.network.codegen.java.cn.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
 import com.daml.network.codegen.java.cn.wallet.payment.Currency
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger

@@ -3,9 +3,9 @@ package com.daml.network.scan.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
-import com.daml.network.codegen.java.cc.amulet.{AmuletCreateSummary, AmuletExpireSummary}
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.fees.ExpiringAmount
+import com.daml.network.codegen.java.splice.amulet.{AmuletCreateSummary, AmuletExpireSummary}
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.fees.ExpiringAmount
 import com.daml.network.history.*
 import com.daml.network.store.TxLogStore
 import com.daml.network.scan.store.TxLogEntry.*
@@ -263,7 +263,7 @@ object ScanTxLogParser {
 
     def rewardsEntriesFromTransferSummary(
         sender: PartyId,
-        summary: cc.amuletrules.TransferSummary,
+        summary: splice.amuletrules.TransferSummary,
         event: TreeEvent,
         round: Long,
         domainId: DomainId,
@@ -616,7 +616,7 @@ object ScanTxLogParser {
   private def entryFromAmulet(
       eventId: String,
       domainId: DomainId,
-      amulet: cc.amulet.Amulet,
+      amulet: splice.amulet.Amulet,
   ): TxLogEntry = {
     val amount = amulet.amount
     val amountAO0 = amountAsOfRoundZero(amount)

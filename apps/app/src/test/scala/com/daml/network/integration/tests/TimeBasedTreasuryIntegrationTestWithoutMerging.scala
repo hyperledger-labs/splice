@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.WalletAppClientReference
@@ -168,7 +168,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     // We then schedule a reduction of maxNumInputs to 3
     val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
     val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
-    val configSchedule = new cc.schedule.Schedule(
+    val configSchedule = new splice.schedule.Schedule(
       mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 4),
       List(
         new Tuple2(

@@ -85,7 +85,7 @@ class WalletPaymentFrontendIntegrationTest
                 expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 1.5,
-                expectedComputeText = "3 USD @ 0.5 CC/USD",
+                expectedComputeText = "3 USD @ 0.5 Amulet/USD",
                 expectedDescription = description,
               )
             },
@@ -254,7 +254,7 @@ class WalletPaymentFrontendIntegrationTest
                 ),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 4.0,
-                expectedComputeText = "8 USD @ 0.5 CC/USD",
+                expectedComputeText = "8 USD @ 0.5 Amulet/USD",
                 expectedDescription = description,
               )
             },
@@ -422,7 +422,7 @@ class WalletPaymentFrontendIntegrationTest
                 ),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.75,
-                expectedComputeText = "5.5 USD @ 0.5 CC/USD",
+                expectedComputeText = "5.5 USD @ 0.5 Amulet/USD",
                 expectedDescription = description,
               )
             },

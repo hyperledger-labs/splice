@@ -6,11 +6,11 @@ import DA.Time
 import Daml.Script
 import DA.List
 
-import CC.Amulet
-import CC.AmuletRules
-import CC.Types
-import CC.Schedule
-import CC.GlobalDomain
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Types
+import Splice.Schedule
+import Splice.GlobalDomain
 import CN.Wallet.Install
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -18,9 +18,9 @@ import CN.Wallet.TopUpState
 import CN.Wallet.BuyTrafficRequest
 import CN.Scripts.Wallet.TestSubscriptions
 
-import CC.Fees
-import CC.Scripts.Util
-import CC.Scripts.Parameters
+import Splice.Fees
+import Splice.Scripts.Util
+import Splice.Scripts.Parameters
 
 createPaymentRequest : AmuletApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
 createPaymentRequest app provider sender receiverAmounts = do
@@ -239,17 +239,17 @@ testCCPaymentRequest = script do
   (_, round) <- getLatestActiveOpenRound app
 
   [(_, coupon)] <- query @AppRewardCoupon provider1.primaryParty
-  let transferConfigCC = transferConfigCCFromOpenRound round
+  let transferConfigAmulet = transferConfigAmuletFromOpenRound round
   coupon.amount ===
-    transferConfigCC.transferFee.initialRate * (15.0 + 10.0) +
-    transferConfigCC.createFee.fee * 2.0
+    transferConfigAmulet.transferFee.initialRate * (15.0 + 10.0) +
+    transferConfigAmulet.createFee.fee * 2.0
   coupon.featured === False
 
   [(_, coupon)] <- query @AppRewardCoupon aliceValidator.primaryParty
   coupon.amount ===
-    transferConfigCC.createFee.fee + -- for one locked amulet
-    transferConfigCC.lockHolderFee.fee * 3.0 +
-    transferConfigCC.extraFeaturedAppRewardAmount
+    transferConfigAmulet.createFee.fee + -- for one locked amulet
+    transferConfigAmulet.lockHolderFee.fee * 3.0 +
+    transferConfigAmulet.extraFeaturedAppRewardAmount
   coupon.provider === aliceValidator.primaryParty
   coupon.featured === True
 
@@ -536,7 +536,7 @@ testBuyMemberTraffic = script do
 
   now <- getTime
   [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.dso
-  let globalDomainConfig = (CC.Schedule.getValueAsOf now amuletRules.configSchedule).globalDomain
+  let globalDomainConfig = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).globalDomain
   let domainId = globalDomainConfig.activeDomain
   let migrationId = 0
   let testParticipantId = "alice_validator_participant_id"
@@ -822,7 +822,7 @@ calculateDomainFees : AmuletApp -> Int -> Script (Decimal, Decimal)
 calculateDomainFees app trafficAmount = do
   now <- getTime
   [(_, amuletRules)] <- query @AmuletRules app.dso
-  let globalDomainConfig = (CC.Schedule.getValueAsOf now amuletRules.configSchedule).globalDomain
+  let globalDomainConfig = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).globalDomain
   let extraTrafficPrice = globalDomainConfig.fees.extraTrafficPrice
   (_, openRound) <- getLatestOpenRound app
   let amuletPrice = openRound.amuletPrice

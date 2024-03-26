@@ -7,10 +7,10 @@ import Daml.Script
 import DA.Time
 import DA.List
 
-import CC.AmuletConfig
-import CC.AmuletRules
-import CC.Schedule
-import CC.Scripts.Util
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.Schedule
+import Splice.Scripts.Util
 
 import CN.CometBft
 import CN.DsoRules

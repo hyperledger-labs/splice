@@ -84,7 +84,7 @@ message TransferOfferStatusAccepted {
 }
 
 message TransferOfferStatusCompleted {
-  string contract_id = 1; // com.daml.network.codegen.java.cc.amulet.Amulet.ContractId
+  string contract_id = 1; // com.daml.network.codegen.java.splice.amulet.Amulet.ContractId
   string transaction_id = 2;
 }
 

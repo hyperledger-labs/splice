@@ -1,12 +1,12 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amuletrules.{
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amuletrules.{
   AmuletRules_AddFutureAmuletConfigSchedule,
   AmuletRules_RemoveFutureAmuletConfigSchedule,
 }
-import com.daml.network.codegen.java.cc.amuletconfig.{AmuletConfig, USD}
-import com.daml.network.codegen.java.cc.schedule.Schedule
+import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
+import com.daml.network.codegen.java.splice.schedule.Schedule
 import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.{
@@ -41,7 +41,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
       nextDomainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTests.CNNodeTestConsoleEnvironment
-  ): cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD] = {
+  ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] = {
     val activeDomainId =
       AmuletConfigSchedule(currentSchedule)
         .getConfigAsOf(env.environment.clock.now)
@@ -65,10 +65,10 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
     */
   def createConfigSchedule(
       currentSchedule: Schedule[Instant, AmuletConfig[USD]],
-      newSchedules: (Duration, cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD])*
+      newSchedules: (Duration, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD])*
   )(implicit env: CNNodeTestConsoleEnvironment): Schedule[Instant, AmuletConfig[USD]] = {
     val configSchedule = {
-      new cc.schedule.Schedule(
+      new splice.schedule.Schedule(
         mkUpdatedAmuletConfig(currentSchedule, defaultTickDuration),
         newSchedules
           .map { case (durationUntilScheduled, config) =>

@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.cn.splitwell.Group
 import com.daml.network.codegen.java.cn.splitwell.balanceupdatetype.Transfer
 import com.daml.network.codegen.java.cn.dsorules.{DomainUpgradeSchedule, DsoRules_AddMember}

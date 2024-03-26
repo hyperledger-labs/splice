@@ -1,8 +1,8 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.amulet as amuletCodegen
-import com.daml.network.codegen.java.cc.fees as feesCodegen
+import com.daml.network.codegen.java.splice.types.Round
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.fees as feesCodegen
 import com.daml.network.codegen.java.cn.ans as ansCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as walletInstallCodegen,
@@ -40,7 +40,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   def walletUsdToAmulet(usd: BigDecimal) = usd / walletAmuletPrice
   def walletAmuletToUsd(cc: BigDecimal) = cc * walletAmuletPrice
 
-  lazy val defaultHoldingFeeCC = walletUsdToAmulet(CNNodeUtil.defaultHoldingFee.rate)
+  lazy val defaultHoldingFeeAmulet = walletUsdToAmulet(CNNodeUtil.defaultHoldingFee.rate)
 
   /** @param expectedAmountRanges : lower and upper bounds for amulets sorted by their initial amount in ascending order. */
   def checkWallet(
@@ -49,7 +49,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       expectedAmountRanges: Seq[(BigDecimal, BigDecimal)],
   ): Unit = clue(s"checking wallet with $expectedAmountRanges") {
     val expectedRatePerRound = new feesCodegen.RatePerRound(
-      defaultHoldingFeeCC.bigDecimal setScale 10
+      defaultHoldingFeeAmulet.bigDecimal setScale 10
     )
     eventually(10.seconds, 500.millis) {
       val amulets =

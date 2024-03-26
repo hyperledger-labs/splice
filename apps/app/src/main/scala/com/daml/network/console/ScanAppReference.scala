@@ -1,11 +1,11 @@
 package com.daml.network.console
 
 import org.apache.pekko.actor.ActorSystem
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.cc.amuletrules.{AppTransferContext, AmuletRules}
-import com.daml.network.codegen.java.cc.round.{
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.types.Round
+import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.splice.amuletrules.{AppTransferContext, AmuletRules}
+import com.daml.network.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
   OpenMiningRound,
@@ -126,7 +126,7 @@ abstract class ScanAppReference(
   )
   def getAmuletConfigAsOf(
       now: CantonTimestamp
-  ): cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD] = {
+  ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] = {
     AmuletConfigSchedule(getTransferContextWithInstances(now).amuletRules).getConfigAsOf(now)
   }
 

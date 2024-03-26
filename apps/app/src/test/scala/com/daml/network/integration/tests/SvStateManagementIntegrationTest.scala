@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.amuletconfig.{AmuletConfig, TransferConfig, USD}
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
-import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, TransferConfig, USD}
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_DsoRules,

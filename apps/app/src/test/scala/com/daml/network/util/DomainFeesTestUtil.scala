@@ -1,10 +1,10 @@
 package com.daml.network.util
 
 import com.daml.ledger.javaapi
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.round.IssuingMiningRound
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.cn.wallet.buytrafficrequest.BuyTrafficRequest
 import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.CO_BuyMemberTraffic
 import com.daml.network.codegen.java.cn.wallet.install.{
@@ -120,19 +120,19 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
         )
     ) { case Seq(install) => install }
     val executeBatchCmd = walletInstall.id.exerciseWalletAppInstall_ExecuteBatch(
-      new cc.amuletrules.PaymentTransferContext(
+      new splice.amuletrules.PaymentTransferContext(
         transferContext.amuletRules.contract.contractId,
-        new cc.amuletrules.TransferContext(
+        new splice.amuletrules.TransferContext(
           transferContext.latestOpenMiningRound.contract.contractId,
           Map.empty[Round, IssuingMiningRound.ContractId].asJava,
-          Map.empty[String, cc.amulet.ValidatorRight.ContractId].asJava,
+          Map.empty[String, splice.amulet.ValidatorRight.ContractId].asJava,
           None.toJava,
         ),
       ),
       inputAmulets
         .map(_.contract.contractId.contractId)
-        .map[cc.amuletrules.TransferInput](cid =>
-          new cc.amuletrules.transferinput.InputAmulet(new cc.amulet.Amulet.ContractId(cid))
+        .map[splice.amuletrules.TransferInput](cid =>
+          new splice.amuletrules.transferinput.InputAmulet(new splice.amulet.Amulet.ContractId(cid))
         )
         .asJava,
       List[AmuletOperation](

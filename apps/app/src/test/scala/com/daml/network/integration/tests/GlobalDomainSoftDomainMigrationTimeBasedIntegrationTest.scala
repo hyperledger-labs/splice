@@ -8,7 +8,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion as TemplateCompanion,
 }
 import com.daml.network.automation.{AssignTrigger, TransferFollowTrigger}
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.cn.{
   ans,
   dsorules,
@@ -201,7 +201,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       companion.toContractId(new ContractId(created.contractId.contractId))
     }
 
-    val dummyRound = new cc.types.Round(42)
+    val dummyRound = new splice.types.Round(42)
     val dummyDecimal = new java.math.BigDecimal(42)
 
     clue("create governance contracts of various kinds") {
@@ -297,8 +297,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         (rounds.headOption.value, rounds.lastOption.value)
       }
 
-      createSampleAndEnsurePresence(cc.round.IssuingMiningRound.COMPANION)(
-        new cc.round.IssuingMiningRound(
+      createSampleAndEnsurePresence(splice.round.IssuingMiningRound.COMPANION)(
+        new splice.round.IssuingMiningRound(
           dsoParty.toProtoPrimitive,
           dummyRound,
           dummyDecimal,
@@ -311,8 +311,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         )
       )
 
-      createSampleAndEnsurePresence(cc.round.ClosedMiningRound.COMPANION)(
-        new cc.round.ClosedMiningRound(
+      createSampleAndEnsurePresence(splice.round.ClosedMiningRound.COMPANION)(
+        new splice.round.ClosedMiningRound(
           dsoParty.toProtoPrimitive,
           dummyRound,
           dummyDecimal,
@@ -328,11 +328,11 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         exerciseDso(amuletRulesCid.exerciseAmuletRules_DevNet_FeatureApp(sv1Party.toProtoPrimitive)),
       )(
         "ensure FeaturedAppRight is there",
-        _ => nonEmptyOnSv1(cc.amulet.FeaturedAppRight.COMPANION),
+        _ => nonEmptyOnSv1(splice.amulet.FeaturedAppRight.COMPANION),
       )
 
-      createSampleAndEnsurePresence(cc.amulet.UnclaimedReward.COMPANION)(
-        new cc.amulet.UnclaimedReward(dsoParty.toProtoPrimitive, dummyDecimal)
+      createSampleAndEnsurePresence(splice.amulet.UnclaimedReward.COMPANION)(
+        new splice.amulet.UnclaimedReward(dsoParty.toProtoPrimitive, dummyDecimal)
       )
     }
 
@@ -406,8 +406,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       protectAppRewardCoupons.pause().futureValue
 
-      createSampleAndEnsurePresence(cc.amulet.AppRewardCoupon.COMPANION)(
-        new cc.amulet.AppRewardCoupon(
+      createSampleAndEnsurePresence(splice.amulet.AppRewardCoupon.COMPANION)(
+        new splice.amulet.AppRewardCoupon(
           dsoParty.toProtoPrimitive,
           provider.toProtoPrimitive,
           false,
@@ -416,18 +416,18 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         )
       )
       val lockedAmuletCid = loggerFactory.assertLogs(
-        createSampleAndEnsurePresence(cc.amulet.LockedAmulet.COMPANION)(
-          new cc.amulet.LockedAmulet(
-            new cc.amulet.Amulet(
+        createSampleAndEnsurePresence(splice.amulet.LockedAmulet.COMPANION)(
+          new splice.amulet.LockedAmulet(
+            new splice.amulet.Amulet(
               dsoParty.toProtoPrimitive,
               provider.toProtoPrimitive,
-              new cc.fees.ExpiringAmount(
+              new splice.fees.ExpiringAmount(
                 dummyDecimal,
                 dummyRound,
-                new cc.fees.RatePerRound(dummyDecimal),
+                new splice.fees.RatePerRound(dummyDecimal),
               ),
             ),
-            new cc.expiry.TimeLock(
+            new splice.expiry.TimeLock(
               java.util.List.of(),
               maxTimestamp,
             ),
@@ -438,8 +438,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         ),
       )
 
-      createSampleAndEnsurePresence(cc.amulet.ValidatorRewardCoupon.COMPANION)(
-        new cc.amulet.ValidatorRewardCoupon(
+      createSampleAndEnsurePresence(splice.amulet.ValidatorRewardCoupon.COMPANION)(
+        new splice.amulet.ValidatorRewardCoupon(
           dsoParty.toProtoPrimitive,
           validator.toProtoPrimitive,
           dummyDecimal,
@@ -447,16 +447,16 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         )
       )
 
-      createSampleAndEnsurePresence(cc.validatorlicense.ValidatorFaucetCoupon.COMPANION)(
-        new cc.validatorlicense.ValidatorFaucetCoupon(
+      createSampleAndEnsurePresence(splice.validatorlicense.ValidatorFaucetCoupon.COMPANION)(
+        new splice.validatorlicense.ValidatorFaucetCoupon(
           dsoParty.toProtoPrimitive,
           validator.toProtoPrimitive,
           dummyRound,
         )
       )
 
-      createSampleAndEnsurePresence(cc.amulet.SvRewardCoupon.COMPANION)(
-        new cc.amulet.SvRewardCoupon(
+      createSampleAndEnsurePresence(splice.amulet.SvRewardCoupon.COMPANION)(
+        new splice.amulet.SvRewardCoupon(
           dsoParty.toProtoPrimitive,
           sv1Party.toProtoPrimitive,
           sv1Party.toProtoPrimitive,
@@ -647,7 +647,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         SvDsoStore.amuletRulesFollowers
           filterNot Set(
             cnw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
-            cc.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
+            splice.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
           )
           map (c(_)): _*
       )
@@ -689,9 +689,12 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
   }
 
   private[this] def cleanAndAddNewSchedule(
-      start: AssignedContract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules],
-      newSchedule: Tuple2[Instant, cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD]],
-  )(implicit fp: FixtureParam): cc.amuletrules.AmuletRules.ContractId = {
+      start: AssignedContract[
+        splice.amuletrules.AmuletRules.ContractId,
+        splice.amuletrules.AmuletRules,
+      ],
+      newSchedule: Tuple2[Instant, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]],
+  )(implicit fp: FixtureParam): splice.amuletrules.AmuletRules.ContractId = {
     sv1ScanBackend
       .getAmuletRules()
       .payload

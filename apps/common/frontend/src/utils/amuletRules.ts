@@ -1,8 +1,8 @@
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
-import { AmuletConfig } from '@daml.js/canton-amulet/lib/CC/AmuletConfig';
-import { Schedule } from '@daml.js/canton-amulet/lib/CC/Schedule';
+import { AmuletConfig } from '@daml.js/canton-amulet/lib/Splice/AmuletConfig';
+import { Schedule } from '@daml.js/canton-amulet/lib/Splice/Schedule';
 
 dayjs.extend(utc);
 

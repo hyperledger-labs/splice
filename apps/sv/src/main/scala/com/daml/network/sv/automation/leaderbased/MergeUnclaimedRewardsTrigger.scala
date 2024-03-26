@@ -6,7 +6,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.amulet.UnclaimedReward
+import com.daml.network.codegen.java.splice.amulet.UnclaimedReward
 import com.daml.network.codegen.java.cn.dsorules.DsoRules_MergeUnclaimedRewards
 import com.daml.network.store.PageLimit
 import com.daml.network.util.Contract

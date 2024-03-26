@@ -1,6 +1,6 @@
 package com.daml.network.store.events
 
-import com.daml.network.codegen.java.cc.amulet
+import com.daml.network.codegen.java.splice.amulet
 import com.daml.network.util.ExerciseNodeCompanion
 
 object SvRewardCoupon_ArchiveAsBeneficiary extends ExerciseNodeCompanion {

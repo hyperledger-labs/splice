@@ -3,9 +3,9 @@ package com.daml.network.scan.admin.api.client
 import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import com.daml.network.admin.http.HttpErrorWithHttpCode
-import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.ans.AnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.PackageIdResolver.HasAmuletRules

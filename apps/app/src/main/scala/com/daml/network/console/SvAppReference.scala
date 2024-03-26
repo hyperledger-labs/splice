@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
+import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
 import com.daml.network.codegen.java.cn.dso.amuletprice as cp
 import com.daml.network.codegen.java.cn.dsorules.{

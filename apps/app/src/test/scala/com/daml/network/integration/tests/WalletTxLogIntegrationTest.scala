@@ -309,12 +309,12 @@ class WalletTxLogIntegrationTest
       val aliceValidatorUserParty = aliceValidatorBackend.getValidatorPartyId()
 
       // Based on Numeric to make sure divisions match Decimal computation in Daml.
-      val transferAmountCC = Numeric.assertFromBigDecimal(scale, 22.0)
+      val transferAmountAmulet = Numeric.assertFromBigDecimal(scale, 22.0)
       val transferAmountUSD = Numeric.assertFromBigDecimal(scale, 20.0)
-      val transferAmountUSDinCC = Numeric
+      val transferAmountUSDinAmulet = Numeric
         .divide(scale, transferAmountUSD, Numeric.assertFromBigDecimal(scale, amuletPrice))
         .value
-      val transferAmountTotalCC = transferAmountCC.add(transferAmountUSDinCC)
+      val transferAmountTotalCC = transferAmountAmulet.add(transferAmountUSDinAmulet)
 
       clue("Tap to get some amulets") {
         aliceWalletClient.tap(100.0)
@@ -327,7 +327,7 @@ class WalletTxLogIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(charlieUserParty, transferAmountCC, walletCodegen.Currency.CC),
+            receiverAmount(charlieUserParty, transferAmountAmulet, walletCodegen.Currency.CC),
             receiverAmount(aliceValidatorUserParty, transferAmountUSD, walletCodegen.Currency.USD),
           ),
         ),
@@ -371,12 +371,12 @@ class WalletTxLogIntegrationTest
             inside(logEntry.receivers) { case Seq(receiver1, receiver2) =>
               receiver1.party shouldBe charlieUserParty.toProtoPrimitive
               receiver1.amount should beWithin(
-                BigDecimal(transferAmountCC) - smallAmount,
-                transferAmountCC,
+                BigDecimal(transferAmountAmulet) - smallAmount,
+                transferAmountAmulet,
               )
 
               receiver2.party shouldBe aliceValidatorUserParty.toProtoPrimitive
-              receiver2.amount shouldBe BigDecimal(transferAmountUSDinCC)
+              receiver2.amount shouldBe BigDecimal(transferAmountUSDinAmulet)
             }
             logEntry.senderHoldingFees should beWithin(0, smallAmount)
             logEntry.amuletPrice shouldBe amuletPrice

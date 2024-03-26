@@ -14,7 +14,7 @@ export interface ConvertedCurrency {
  * E.g.:
  * originalAmount = 2, originalCurrency = CC, amuletPrice = 2 (USD/CC)
  * would return:
- * amount = 4, currency = USD, amuletPriceToShow = 0.5 (CC/USD)
+ * amount = 4, currency = USD, amuletPriceToShow = 0.5 (Amulet/USD)
  */
 export function convertCurrency(
   originalAmount: BigNumber,

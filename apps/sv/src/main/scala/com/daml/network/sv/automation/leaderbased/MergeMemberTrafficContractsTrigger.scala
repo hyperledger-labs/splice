@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cn.dsorules.DsoRules_MergeMemberTrafficContracts
 import com.daml.network.store.PageLimit
 import com.daml.network.util.{AssignedContract, Contract}

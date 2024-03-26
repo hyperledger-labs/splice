@@ -334,8 +334,8 @@ class ScanTimeBasedIntegrationTest
       val total1 = sv1ScanBackend.getTotalAmuletBalance(1)
       val total2 = sv1ScanBackend.getTotalAmuletBalance(2)
 
-      val holdingFeeAfterOneRound = 1 * defaultHoldingFeeCC
-      val holdingFeeAfterTwoRounds = 2 * defaultHoldingFeeCC
+      val holdingFeeAfterOneRound = 1 * defaultHoldingFeeAmulet
+      val holdingFeeAfterTwoRounds = 2 * defaultHoldingFeeAmulet
 
       total0 shouldBe 0.0
       total1 shouldBe (walletUsdToAmulet(tapRound1Amount) - holdingFeeAfterOneRound)

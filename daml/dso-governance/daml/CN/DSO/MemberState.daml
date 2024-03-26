@@ -1,7 +1,7 @@
 -- | Templates to track per-member state.
 module CN.DSO.MemberState where
 
-import CC.Types
+import Splice.Types
 
 import CN.DSO.GlobalDomain
 import CN.Util

@@ -3,8 +3,8 @@ package com.daml.network.wallet.store
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.{
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
   round as roundCodegen,
@@ -266,7 +266,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   def listSortedAppRewards(
-      issuingRoundsMap: Map[cc.types.Round, roundCodegen.IssuingMiningRound],
+      issuingRoundsMap: Map[splice.types.Round, roundCodegen.IssuingMiningRound],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon], BigDecimal)
@@ -276,7 +276,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   def listSortedValidatorFaucets(
-      issuingRoundsMap: Map[cc.types.Round, roundCodegen.IssuingMiningRound],
+      issuingRoundsMap: Map[splice.types.Round, roundCodegen.IssuingMiningRound],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (
@@ -292,7 +292,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
     * Only up to `maxNumInputs` rewards are returned and all rewards are from the given `activeIssuingRounds`.
     */
   def listSortedSvRewardCoupons(
-      issuingRoundsMap: Map[cc.types.Round, roundCodegen.IssuingMiningRound],
+      issuingRoundsMap: Map[splice.types.Round, roundCodegen.IssuingMiningRound],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
     (

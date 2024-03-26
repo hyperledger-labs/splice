@@ -1,8 +1,8 @@
 module CN.Wallet.BuyTrafficRequest where
 
-import CC.Amulet
-import CC.AmuletRules
-import CC.GlobalDomain (MemberTraffic)
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.GlobalDomain (MemberTraffic)
 import CN.Util
 
 

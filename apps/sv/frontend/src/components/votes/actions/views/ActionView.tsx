@@ -11,7 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/CC/AmuletConfig';
+import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/Splice/AmuletConfig';
 import {
   ActionRequiringConfirmation,
   DsoRulesConfig,

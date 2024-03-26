@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.amulet.{Amulet, SvRewardCoupon, UnclaimedReward}
+import com.daml.network.codegen.java.splice.amulet.{Amulet, SvRewardCoupon, UnclaimedReward}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{

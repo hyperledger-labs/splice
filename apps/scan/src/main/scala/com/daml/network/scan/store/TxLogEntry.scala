@@ -1,6 +1,6 @@
 package com.daml.network.scan.store
 
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.store.StoreErrors
 import com.daml.network.util.Codec
 
@@ -207,8 +207,8 @@ object TxLogEntry extends StoreErrors {
   }
 
   def parseSenderAmount(
-      arg: cc.amuletrules.AmuletRules_Transfer,
-      res: cc.amuletrules.TransferResult,
+      arg: splice.amuletrules.AmuletRules_Transfer,
+      res: splice.amuletrules.TransferResult,
   ): SenderAmount = {
     val sender = arg.transfer.sender
     val senderFee = parseOutputAmounts(arg, res)
@@ -228,8 +228,8 @@ object TxLogEntry extends StoreErrors {
   }
 
   def parseReceiverAmounts(
-      arg: cc.amuletrules.AmuletRules_Transfer,
-      res: cc.amuletrules.TransferResult,
+      arg: splice.amuletrules.AmuletRules_Transfer,
+      res: splice.amuletrules.TransferResult,
   ): Seq[ReceiverAmount] = {
 
     // Note: the same receiver party can appear multiple times in the transfer result
@@ -264,14 +264,14 @@ object TxLogEntry extends StoreErrors {
     * @param receiverFee Actual amount of fees paid by the receiver.
     */
   private final case class OutputWithFees(
-      output: cc.amuletrules.TransferOutput,
+      output: splice.amuletrules.TransferOutput,
       senderFee: BigDecimal,
       receiverFee: BigDecimal,
   )
 
   private def parseOutputAmounts(
-      arg: cc.amuletrules.AmuletRules_Transfer,
-      res: cc.amuletrules.TransferResult,
+      arg: splice.amuletrules.AmuletRules_Transfer,
+      res: splice.amuletrules.TransferResult,
   ): Seq[OutputWithFees] = {
     assert(
       arg.transfer.outputs.size() == res.summary.outputFees.size(),

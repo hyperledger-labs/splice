@@ -309,10 +309,10 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
         })()}
       </TableCell>
       <TableCell align="right">
-        <ActivityAmountDisplay amountCC={activity.transferAmount} />
+        <ActivityAmountDisplay amountAmulet={activity.transferAmount} />
       </TableCell>
       <TableCell align="right">
-        <ActivityAmountDisplay amountCC={activity.feesBurnt} />
+        <ActivityAmountDisplay amountAmulet={activity.feesBurnt} />
       </TableCell>
       <TableCell align="right">
         <RateDisplay base="CC" quote="USD" amuletPrice={activity.amuletPrice} />
@@ -322,14 +322,14 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
 };
 
 interface TransactionAmountProps {
-  amountCC: BigNumber;
+  amountAmulet: BigNumber;
 }
 
-const ActivityAmountDisplay: React.FC<TransactionAmountProps> = ({ amountCC }) => {
+const ActivityAmountDisplay: React.FC<TransactionAmountProps> = ({ amountAmulet }) => {
   return (
     <Stack direction="column">
       <Typography className="tx-amount-cc">
-        <AmountDisplay amount={amountCC} currency="CC" />
+        <AmountDisplay amount={amountAmulet} currency="CC" />
       </Typography>
     </Stack>
   );

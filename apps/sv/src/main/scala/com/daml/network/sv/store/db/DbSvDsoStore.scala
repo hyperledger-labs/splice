@@ -6,11 +6,14 @@ import com.daml.ledger.javaapi.data as javab
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amulet.*
-import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cc.round.ClosedMiningRound
-import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amulet.*
+import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.round.ClosedMiningRound
+import com.daml.network.codegen.java.splice.validatorlicense.{
+  ValidatorFaucetCoupon,
+  ValidatorLicense,
+}
 import com.daml.network.codegen.java.cn.ans.{AnsEntry, AnsEntryContext}
 import com.daml.network.codegen.java.cn.dso.amuletprice.AmuletPriceVote
 import com.daml.network.codegen.java.cn.dso.memberstate.{MemberRewardState, SvNodeState}
@@ -98,7 +101,7 @@ class DbSvDsoStore(
 
   override def handleIngestionSummary(summary: IngestionSummary): Unit = {
     summary.ingestedCreatedEvents.foreach { ev =>
-      Contract.fromCreatedEvent(cc.round.OpenMiningRound.COMPANION)(ev).foreach { round =>
+      Contract.fromCreatedEvent(splice.round.OpenMiningRound.COMPANION)(ev).foreach { round =>
         dsoStoreMetrics.latestOpenMiningRound.updateValue(round.payload.round.number)
       }
     }
@@ -697,7 +700,7 @@ class DbSvDsoStore(
                   where store_id = $storeId
                     and migration_id = $domainMigrationId
                     and template_id_qualified_name = ${QualifiedName(
-                  cc.round.OpenMiningRound.TEMPLATE_ID
+                  splice.round.OpenMiningRound.TEMPLATE_ID
                 )}
                     and mining_round is not null
                   order by mining_round desc limit 1)""",

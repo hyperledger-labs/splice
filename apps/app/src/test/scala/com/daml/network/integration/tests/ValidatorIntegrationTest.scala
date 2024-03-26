@@ -7,8 +7,8 @@ import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2Bearer
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.environment.{BaseLedgerConnection, CNNodeEnvironmentImpl}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -46,11 +46,11 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     initDsoWithSv1Only()
     // Check that there is exactly one AmuletRule and OpenMiningRound
     val amuletRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(cc.amuletrules.AmuletRules.COMPANION)(dsoParty)
+      .filterJava(splice.amuletrules.AmuletRules.COMPANION)(dsoParty)
     amuletRules should have length 1
 
     val openRounds = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(cc.round.OpenMiningRound.COMPANION)(dsoParty)
+      .filterJava(splice.round.OpenMiningRound.COMPANION)(dsoParty)
     openRounds should have length 3
 
     // Start Alice’s validator

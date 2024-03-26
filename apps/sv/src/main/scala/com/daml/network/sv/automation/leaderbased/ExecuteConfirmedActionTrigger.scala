@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, SummarizingMiningRound}
+import com.daml.network.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
 import com.daml.network.codegen.java.cn.dsorules.Confirmation
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
   ARC_AnsEntryContext,

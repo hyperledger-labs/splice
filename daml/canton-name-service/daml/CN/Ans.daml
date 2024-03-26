@@ -3,9 +3,9 @@ module CN.Ans where
 import DA.Action (void)
 import DA.Time
 
-import CC.Amulet
-import CC.AmuletRules
-import CC.Types
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Types
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 import CN.Util

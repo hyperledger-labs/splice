@@ -2,7 +2,7 @@
   "offset": "000000000000000034",
   "contracts": [
     {
-      "template_id": "deadbeef001:CC.Amulet:Amulet",
+      "template_id": "deadbeef001:Splice.Amulet:Amulet",
       "contract_id": "00086905fab468531d4cbf26fc750b8ae2c7987bbe4a6a36a77ae5216e273abdf8ca0212204bbd5c8a72f6fb8923b93f4be00619addd4df16269e5468492e7a12a52b9b05d",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -22,7 +22,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Amulet:Amulet",
+      "template_id": "deadbeef001:Splice.Amulet:Amulet",
       "contract_id": "00090a9ba7b1addeba87c8ae8d9562cbe70e6d8f06ae83f1f153aace06771c2cd0ca02122044c42ff7286d2a8eb3a7c55735afb0064cc976123efa1874786cff25f22450e8",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -42,7 +42,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Amulet:Amulet",
+      "template_id": "deadbeef001:Splice.Amulet:Amulet",
       "contract_id": "00d2a322a7b626a7b154af265d2af5dfb870558d6c4a5ffc970c8e7696cfb18580ca021220f3e18f148e5ba64082deddc7f59efac36f2fbe038ac1bc4120bed0f3558e935a",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -62,7 +62,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Amulet:Amulet",
+      "template_id": "deadbeef001:Splice.Amulet:Amulet",
       "contract_id": "00483db7cef89a74bb72c537a11371bfe53a43fed724488dd92ffa1caac4f3b41dca0212205c4c80b6b9036ef14ed2570581c35a04327f35126971922f2bc74d3dd78fdc01",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -82,7 +82,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.AmuletImport:ImportCrate",
+      "template_id": "deadbeef001:Splice.AmuletImport:ImportCrate",
       "contract_id": "003d0c4156b123bd527be56edd22c5cddb8c4399d70733300b9e5d7186e5cc7053ca0212208ed98a8d17c4296f80a2c30b69fdc914c4c20d3707a35865e20e27166a0ffdd6",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -109,7 +109,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Amulet:LockedAmulet",
+      "template_id": "deadbeef001:Splice.Amulet:LockedAmulet",
       "contract_id": "00cbccd1d46f5b707d74d5c61645019e84895534fdfd7df84953d92c82a43fc7cbca0212203a1a79892adc6ee3518fa146b9e8df07f379465f1b8f0183682a811ff9535f91",
       "payload": {
         "amulet": {
@@ -135,7 +135,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.AmuletRules:AmuletRules",
+      "template_id": "deadbeef001:Splice.AmuletRules:AmuletRules",
       "contract_id": "0017028f8349afbc1d1c773a721f68261f7aba5934d449f6c7bffb71ad8f256ccfca0212205aa5ff43a477e34eb631cb4771adcd5ff72c99415b4e6a50dd87aa7ff006b82b",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -280,7 +280,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.Amulet:UnclaimedReward",
+      "template_id": "deadbeef001:Splice.Amulet:UnclaimedReward",
       "contract_id": "007a7cf290ce574cc77cff3bfaca4c0a5488061f23a7e950bfaa90c14c7b8aa341ca0212208054c9d9a0e6448252318675ba91825b71f787044d7e88daa25366757cae246a",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -290,7 +290,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.GlobalDomain:MemberTraffic",
+      "template_id": "deadbeef001:Splice.GlobalDomain:MemberTraffic",
       "contract_id": "00c53f0347c1358274ed80da4f7d8b219576621f19ea5b84ca2d463c41bb171c11ca021220538fb1993f44202002e9ad18ddcb49b5f6b0cbc6de8660759d34ba3d2b63305b",
       "payload": {
         "usdSpent": "0.0",
@@ -305,7 +305,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.Round:IssuingMiningRound",
+      "template_id": "deadbeef001:Splice.Round:IssuingMiningRound",
       "contract_id": "002d11c5440776dfa01b2be5867a132058075a742b8f15ee4003ed44d610a9e97bca021220b98804e89e8ef09a651b4971083235861629e920a049d185bb3a6ef9649ed85e",
       "payload": {
         "issuancePerFeaturedAppRewardCoupon": "100.0",
@@ -322,7 +322,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Round:OpenMiningRound",
+      "template_id": "deadbeef001:Splice.Round:OpenMiningRound",
       "contract_id": "0089846cd5c586e2bd79de051da87783c04580b05a3325ebbf5c2ec87980cf6c33ca021220dcd2725753003aecf238947f4082194d361c6a7d3481df211bfc0dc83ea33bdf",
       "payload": {
         "issuingFor": {
@@ -382,7 +382,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.Round:OpenMiningRound",
+      "template_id": "deadbeef001:Splice.Round:OpenMiningRound",
       "contract_id": "0002a171921f0030ac4099aa53b111b77190a14d2bb2cc3e02b2db336b29024fe5ca021220ef8aab1700af3e71e0a8c75b16104964dbe324dbeb05ae2af202ee37e5512fd4",
       "payload": {
         "issuingFor": {
@@ -442,7 +442,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.Round:OpenMiningRound",
+      "template_id": "deadbeef001:Splice.Round:OpenMiningRound",
       "contract_id": "00bb8c48ea847f5be33061a87580c2441d9be87c3b61d1098ae778410ec456701bca02122093bdcbdbed086d540a326526b6064599f48e376e03f1d19c2f62e4d3cf9136be",
       "payload": {
         "issuingFor": {
@@ -502,7 +502,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
+      "template_id": "deadbeef001:Splice.ValidatorLicense:ValidatorLicense",
       "contract_id": "0094f7b3123703bccdb92e4983c9c26eb5dbf004ecfea22f7eab1f67ea727d9d5dca021220ad12eb01411597a797bfbb7f90f15bb97915678ae7d825eba83ea706e4994e9c",
       "payload": {
         "validator": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
@@ -513,7 +513,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
+      "template_id": "deadbeef001:Splice.ValidatorLicense:ValidatorLicense",
       "contract_id": "008aae2d81bc1ceef31c5c04955716b219ec41f447348c107b6b2128941b459a73ca0212203ea44e0db8633f6c84d9f429ceb912927611c8a517d745035a3a1c34117d6621",
       "payload": {
         "validator": "bob__validator__user-fbae5254::1220792ad917e8da5de02ebf27408f25ba6d5e75b251d44cb0709cad4ae4bce142ef",
@@ -524,7 +524,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
+      "template_id": "deadbeef001:Splice.ValidatorLicense:ValidatorLicense",
       "contract_id": "00f2b68e825ed53bfa638bf765a081b42cd56d2d06ceb762b6fce0b2b6bd95b655ca0212208fd19ef64427defd60ed432afec9d6628c8e885aec40d65f14eef436891906d0",
       "payload": {
         "validator": "alice__validator__user-fbae5254::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
@@ -535,7 +535,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.ValidatorLicense:ValidatorLicense",
+      "template_id": "deadbeef001:Splice.ValidatorLicense:ValidatorLicense",
       "contract_id": "00b354967cb839753f19a1495594a443e409539487c52a3d18641eb37a5e7d42dbca021220e54cd09c37b616967243d22a6932a8361a63ffbc0160c617481f8b2da6204089",
       "payload": {
         "validator": "splitwell__validator__user-fbae5254::12201b4b3dc69d968e32513982e4a412b76e1430b394bf8c13a35267fa4e33bd5c31",

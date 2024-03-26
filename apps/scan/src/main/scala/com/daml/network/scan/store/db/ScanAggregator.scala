@@ -15,9 +15,9 @@ import slick.jdbc.GetResult
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import slick.jdbc.PostgresProfile
-import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
-import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
+import com.daml.network.codegen.java.splice.round.IssuingMiningRound
+import com.daml.network.codegen.java.splice.round.OpenMiningRound
+import com.daml.network.codegen.java.splice.round.SummarizingMiningRound
 import ScanAggregator.*
 import com.daml.network.scan.store.TxLogEntry.EntryType
 import slick.dbio.{DBIO, DBIOAction, NoStream, Effect}

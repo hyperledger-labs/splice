@@ -116,7 +116,7 @@ class ScanFrontendTimeBasedIntegrationTest
             )
 
             find(id("holding-fee")).value.text should matchText(
-              s"${CNNodeUtil.defaultHoldingFee.rate} CC/Round"
+              s"${CNNodeUtil.defaultHoldingFee.rate} Amulet/Round"
             )
 
             find(id("lock-holder-fee")).value.text should matchText(
@@ -176,7 +176,7 @@ class ScanFrontendTimeBasedIntegrationTest
         _ => {
           withFrontEnd("scan-ui") { implicit webDriver =>
             find(id("holding-fee")).value.text should matchText(
-              s"${2 * newHoldingFee} CC/Round"
+              s"${2 * newHoldingFee} Amulet/Round"
             )
 
             find(id("next-config-update-time")).value.text should equal(
@@ -211,7 +211,7 @@ class ScanFrontendTimeBasedIntegrationTest
         _ => {
           withFrontEnd("scan-ui") { implicit webDriver =>
             find(id("holding-fee")).value.text should matchText(
-              s"${sv1ScanBackend.getAmuletRules().contract.payload.configSchedule.initialValue.transferConfig.holdingFee.rate} CC/Round"
+              s"${sv1ScanBackend.getAmuletRules().contract.payload.configSchedule.initialValue.transferConfig.holdingFee.rate} Amulet/Round"
             )
 
             find(id("next-config-update-time")).value.text should equal("1 day").or(

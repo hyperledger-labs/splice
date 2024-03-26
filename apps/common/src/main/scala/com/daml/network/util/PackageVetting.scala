@@ -1,8 +1,8 @@
 package com.daml.network.util
 
 import cats.syntax.foldable.*
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.environment.{
   DarResource,
   DarResources,
@@ -50,7 +50,7 @@ class PackageVetting(
 
   // The current config must be vetted.
   private def vetCurrentConfig(
-      config: cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD]
+      config: splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]
   )(implicit tc: TraceContext): Future[Unit] =
     packages.toSeq.traverse_ { pkg =>
       val version = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
@@ -69,7 +69,7 @@ class PackageVetting(
   // you must upgrade soon.
   private def warnIfFutureConfigUnknown(
       time: CantonTimestamp,
-      config: cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD],
+      config: splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD],
   )(implicit tc: TraceContext): Future[Unit] =
     packages.toSeq.traverse_ { pkg =>
       val version = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)

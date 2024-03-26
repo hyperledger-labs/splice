@@ -106,15 +106,21 @@ function computeTotal(
   amuletPrice: BigNumber
 ): Total | undefined {
   // The currency is NOT necessarily the same for all receivers
-  const { totalCC, totalUSD } = receiverAmounts.reduce(
+  const { totalAmulet, totalUSD } = receiverAmounts.reduce(
     (acc, next) => {
       let newAcc;
       switch (next.amount.currency) {
         case 'CC':
-          newAcc = { totalCC: acc.totalCC.plus(next.amount.amount), totalUSD: acc.totalUSD };
+          newAcc = {
+            totalAmulet: acc.totalAmulet.plus(next.amount.amount),
+            totalUSD: acc.totalUSD,
+          };
           break;
         case 'USD':
-          newAcc = { totalUSD: acc.totalUSD.plus(next.amount.amount), totalCC: acc.totalCC };
+          newAcc = {
+            totalUSD: acc.totalUSD.plus(next.amount.amount),
+            totalAmulet: acc.totalAmulet,
+          };
           break;
         case 'ExtCurrency':
           console.error(
@@ -126,22 +132,22 @@ function computeTotal(
       return newAcc;
     },
     {
-      totalCC: new BigNumber(0),
+      totalAmulet: new BigNumber(0),
       totalUSD: new BigNumber(0),
     }
   );
 
-  if (totalCC.eq(0) && totalUSD.eq(0)) {
+  if (totalAmulet.eq(0) && totalUSD.eq(0)) {
     return undefined;
   } else if (totalUSD.eq(0)) {
     // everything is in CC
-    return { totalCurrency: 'CC', totalAmount: totalCC, currencyForAllReceivers: 'CC' };
-  } else if (totalCC.eq(0)) {
+    return { totalCurrency: 'CC', totalAmount: totalAmulet, currencyForAllReceivers: 'CC' };
+  } else if (totalAmulet.eq(0)) {
     // everything is in USD
     return { totalCurrency: 'USD', totalAmount: totalUSD, currencyForAllReceivers: 'USD' };
   } else {
     // both, we use CC to show the total amount
-    const totalAmount = totalUSD.div(amuletPrice).plus(totalCC);
+    const totalAmount = totalUSD.div(amuletPrice).plus(totalAmulet);
     return { totalCurrency: 'CC', totalAmount, currencyForAllReceivers: 'CC & USD' };
   }
 }
@@ -258,8 +264,8 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
   const converted = convertCurrency(total.totalAmount, total.totalCurrency, amuletPrice);
   const ccAmount = total.totalCurrency === 'CC' ? total.totalAmount : converted.amount;
 
-  const totalCC = ccAmount; // TODO (#3492): compute actual fee
-  const totalUSD = totalCC.times(amuletPrice);
+  const totalAmulet = ccAmount; // TODO (#3492): compute actual fee
+  const totalUSD = totalAmulet.times(amuletPrice);
 
   return (
     <Container>
@@ -268,7 +274,7 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
           <Typography variant="body1">{"You'll pay:"}</Typography>
           <Stack alignItems="center">
             <Typography variant="h5" className="payment-total-cc">
-              <AmountDisplay amount={totalCC} currency={'CC'} />
+              <AmountDisplay amount={totalAmulet} currency={'CC'} />
             </Typography>
             <Typography variant="body2" className="payment-compute">
               <AmountDisplay amount={totalUSD} currency={'USD'} /> @{' '}

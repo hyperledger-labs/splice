@@ -4,7 +4,7 @@ import DA.Date
 import DA.Time
 
 import CN.Util
-import CC.GlobalDomain
+import Splice.GlobalDomain
 
 -- | The state of a given top-up loop.
 --

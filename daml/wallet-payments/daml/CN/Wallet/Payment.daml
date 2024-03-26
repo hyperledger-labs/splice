@@ -4,11 +4,11 @@ import DA.List (dedupSort)
 import DA.Time
 
 import CN.Util
-import CC.Amulet
-import CC.AmuletRules
-import CC.Expiry
-import CC.Round
-import CC.Types
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Expiry
+import Splice.Round
+import Splice.Types
 
 data Currency
   = USD

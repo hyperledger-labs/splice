@@ -1,9 +1,9 @@
 package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.ans.AnsRules
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.http.v0.definitions.MigrationSchedule

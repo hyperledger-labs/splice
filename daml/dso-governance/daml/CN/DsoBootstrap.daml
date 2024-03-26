@@ -3,10 +3,10 @@ module CN.DsoBootstrap where
 import qualified DA.Map as Map
 import DA.Time
 
-import CC.AmuletConfig
-import CC.AmuletRules
-import CC.Schedule
-import CC.Types
+import Splice.AmuletConfig
+import Splice.AmuletRules
+import Splice.Schedule
+import Splice.Types
 
 import CN.Ans
 import CN.DSO.GlobalDomain

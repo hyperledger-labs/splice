@@ -1,23 +1,23 @@
 package com.daml.network.wallet.treasury
 
 import com.daml.ledger.javaapi.data.codegen.Exercised
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amulet as amuletCodegen
-import com.daml.network.codegen.java.cc.amulet.ValidatorRight
-import com.daml.network.codegen.java.cc.amuletrules.transferinput.{
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.amulet.ValidatorRight
+import com.daml.network.codegen.java.splice.amuletrules.transferinput.{
   ExtTransferInput,
   InputAppRewardCoupon,
   InputAmulet,
   InputSvRewardCoupon,
   InputValidatorRewardCoupon,
 }
-import com.daml.network.codegen.java.cc.amuletrules.{
+import com.daml.network.codegen.java.splice.amuletrules.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
 }
-import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.splice.round.IssuingMiningRound
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.codegen.java.cn.wallet.install.{
   ExecuteBatchResult,
@@ -461,9 +461,9 @@ class TreasuryService(
       ec: ExecutionContext,
   ): Future[Option[
     (
-        Seq[cc.amuletrules.TransferInput],
+        Seq[splice.amuletrules.TransferInput],
         Set[PartyId],
-        cc.amuletrules.PaymentTransferContext,
+        splice.amuletrules.PaymentTransferContext,
         DisclosedContracts.NE,
     )
   ]] = {
@@ -651,7 +651,7 @@ class TreasuryService(
         (
           rw._2.payload.round,
           rw._3,
-          new cc.amuletrules.transferinput.InputValidatorRewardCoupon(
+          new splice.amuletrules.transferinput.InputValidatorRewardCoupon(
             rw._2.contractId
           ),
         )
@@ -675,7 +675,7 @@ class TreasuryService(
         (
           rw._1.payload.round,
           rw._2,
-          new cc.amuletrules.transferinput.ExtTransferInput(
+          new splice.amuletrules.transferinput.ExtTransferInput(
             com.daml.ledger.javaapi.data.Unit.getInstance(),
             Optional.of(rw._1.contractId),
           ),
@@ -700,7 +700,7 @@ class TreasuryService(
         (
           rw._1.payload.round,
           rw._2,
-          new cc.amuletrules.transferinput.InputSvRewardCoupon(rw._1.contractId),
+          new splice.amuletrules.transferinput.InputSvRewardCoupon(rw._1.contractId),
         )
       )
     } yield (svRewardCouponsQuantity, svRewardCouponInputs)
@@ -722,7 +722,7 @@ class TreasuryService(
         (
           rw._1.payload.round,
           rw._2,
-          new cc.amuletrules.transferinput.InputAppRewardCoupon(
+          new splice.amuletrules.transferinput.InputAppRewardCoupon(
             rw._1.contractId
           ),
         )

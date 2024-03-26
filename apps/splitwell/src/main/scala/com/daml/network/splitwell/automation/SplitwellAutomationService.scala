@@ -10,7 +10,7 @@ import com.daml.network.automation.{
   TransferFollowTrigger,
   UnassignTrigger,
 }
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{
@@ -143,7 +143,7 @@ object SplitwellAutomationService extends AutomationServiceCompanion {
     }.toMap
 
   private[automation] def extraPackageIdResolver(
-      packageConfig: cc.amuletconfig.PackageConfig,
+      packageConfig: splice.amuletconfig.PackageConfig,
       template: QualifiedName,
   ): Option[String] =
     Option.when(template.moduleName == "CN.Splitwell") {

@@ -12,7 +12,7 @@ import DA.Optional
 
 import CN.Util
 
-import CC.Types
+import Splice.Types
 
 
 -- | A vote by an SV for their desired amulet price.

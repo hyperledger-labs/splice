@@ -1,10 +1,10 @@
 package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.cc.amuletrules.{AppTransferContext, AmuletRules}
-import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.splice.amuletrules.{AppTransferContext, AmuletRules}
+import com.daml.network.codegen.java.splice.types.Round
+import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.ans.AnsRules
 import com.daml.network.environment.{
   CNLedgerClient,

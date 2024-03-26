@@ -3,9 +3,9 @@ package com.daml.network.wallet.admin.http
 import org.apache.pekko.stream.Materializer
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
-import com.daml.network.codegen.java.cc.amulet as amuletCodegen
-import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
-import com.daml.network.codegen.java.cc.amulet.{Amulet, LockedAmulet}
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
+import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
 import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.install.{
   AmuletOperationOutcome,

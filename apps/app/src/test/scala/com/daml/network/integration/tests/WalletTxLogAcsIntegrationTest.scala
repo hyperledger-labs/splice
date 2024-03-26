@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.integration.CNNodeEnvironmentDefinition

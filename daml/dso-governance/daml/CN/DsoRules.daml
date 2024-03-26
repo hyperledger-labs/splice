@@ -11,14 +11,14 @@ import qualified DA.Set as Set
 import qualified DA.Text as T
 import DA.Time
 
-import CC.Amulet
-import CC.AmuletRules
+import Splice.Amulet
+import Splice.AmuletRules
 
-import CC.Round
-import CC.Types
-import CC.ValidatorLicense
+import Splice.Round
+import Splice.Types
+import Splice.ValidatorLicense
 import CN.Wallet.Subscriptions
-import CC.GlobalDomain (MemberTraffic)
+import Splice.GlobalDomain (MemberTraffic)
 
 import qualified CN.CometBft as CometBft
 import CN.Ans

@@ -1,7 +1,7 @@
 import * as jtv from '@mojotech/json-type-validation';
 import { GetDsoInfoResponse } from 'sv-openapi';
 
-import { AmuletRules } from '@daml.js/canton-amulet/lib/CC/AmuletRules';
+import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules';
 import { DsoRules } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
 // Static constants for mock values
@@ -17,7 +17,7 @@ export const dsoInfo: GetDsoInfoResponse = {
   voting_threshold: 3,
   latest_mining_round: {
     template_id:
-      '218bd1d12914957ff65c2f26f3e752337f10b643b2115af712e287e06dc248ca:CC.Round:OpenMiningRound',
+      '218bd1d12914957ff65c2f26f3e752337f10b643b2115af712e287e06dc248ca:Splice.Round:OpenMiningRound',
     contract_id:
       '00c5e96485ac00043b7e0b576faefe6ef597b9a279f07807eea3b18a2789c65e1cca021220ab83da15af4b90ea1042477b33ea68cebd055e07480608c3f96152b1c49f7106',
     payload: {
@@ -81,7 +81,7 @@ export const dsoInfo: GetDsoInfoResponse = {
   },
   amulet_rules: {
     template_id:
-      '218bd1d12914957ff65c2f26f3e752337f10b643b2115af712e287e06dc248ca:CC.AmuletRules:AmuletRules',
+      '218bd1d12914957ff65c2f26f3e752337f10b643b2115af712e287e06dc248ca:Splice.AmuletRules:AmuletRules',
     contract_id:
       '0084bd1732e6ef1757c2755a83d6acfdc9bf68688b7f55d19d4586008ee3228bceca02122028af9a1d4fff115e10a40adb65d08dcd69463ad6bf5c3055e12d1b960bbad9da',
     payload: {

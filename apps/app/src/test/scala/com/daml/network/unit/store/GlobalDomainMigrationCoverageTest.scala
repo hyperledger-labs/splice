@@ -154,7 +154,7 @@ object GlobalDomainMigrationCoverageTest {
   // and (hopefully) forestall overlooked required changes that way.
 
   private val knownNotHandled = {
-    import codegen.java.cc.globaldomain
+    import codegen.java.splice.globaldomain
     import codegen.java.cn.wallet.topupstate as topUpCodegen
     import codegen.java.cn.wallet.buytrafficrequest as trafficRequestCodegen
     Seq(

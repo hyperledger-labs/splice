@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.{splice, cn}
 import com.daml.network.console.CNParticipantClientReference
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.util.WalletTestUtil
@@ -198,10 +198,10 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
   private def getAmulets(
       participant: CNParticipantClientReference,
       party: PartyId,
-      predicate: cc.amulet.Amulet.Contract => Boolean = _ => true,
-  ): Seq[cc.amulet.Amulet.Contract] = {
+      predicate: splice.amulet.Amulet.Contract => Boolean = _ => true,
+  ): Seq[splice.amulet.Amulet.Contract] = {
     participant.ledger_api_extensions.acs
-      .filterJava(cc.amulet.Amulet.COMPANION)(party, predicate)
+      .filterJava(splice.amulet.Amulet.COMPANION)(party, predicate)
       .sortBy(_.data.amount.initialAmount)
   }
 }

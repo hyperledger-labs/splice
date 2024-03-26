@@ -4,12 +4,12 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
-import CC.Amulet
-import CC.AmuletRules
+import Splice.Amulet
+import Splice.AmuletRules
 import CN.Wallet.Install
 import CN.Wallet.Payment
 
-import CC.Scripts.Util
+import Splice.Scripts.Util
 
 testTransferOffers : Script ()
 testTransferOffers = script do

@@ -4,16 +4,16 @@ import com.daml.ledger.javaapi.data.Unit as DamlUnit
 import com.daml.lf.data.Numeric
 import com.daml.lf.data.Ref.PackageVersion
 import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.amulet.Amulet
-import com.daml.network.codegen.java.cc.globaldomain.{
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.types.Round
+import com.daml.network.codegen.java.splice.amulet.Amulet
+import com.daml.network.codegen.java.splice.globaldomain.{
   BaseRateTrafficLimits,
   AmuletGlobalDomainConfig,
   DomainFeesConfig,
 }
-import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
-import com.daml.network.codegen.java.cc.schedule.Schedule
+import com.daml.network.codegen.java.splice.issuance.IssuanceConfig
+import com.daml.network.codegen.java.splice.schedule.Schedule
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.da.set.types.Set as DamlSet
@@ -43,8 +43,8 @@ object CNNodeUtil {
   private def readDarVersion(resource: DarResource): PackageVersion =
     DarUtil.readDarMetadata(resource.path).version
 
-  private def readPackageConfig(): cc.amuletconfig.PackageConfig = {
-    new cc.amuletconfig.PackageConfig(
+  private def readPackageConfig(): splice.amuletconfig.PackageConfig = {
+    new splice.amuletconfig.PackageConfig(
       readDarVersion(DarResources.cantonAmulet.bootstrap).toString,
       readDarVersion(DarResources.cantonNameService.bootstrap).toString,
       readDarVersion(DarResources.dsoGovernance.bootstrap).toString,
@@ -54,7 +54,7 @@ object CNNodeUtil {
     )
   }
 
-  def selectLatestOpenMiningRound[Ct <: ContractWithState[?, cc.round.OpenMiningRound]](
+  def selectLatestOpenMiningRound[Ct <: ContractWithState[?, splice.round.OpenMiningRound]](
       now: CantonTimestamp,
       openMiningRounds: Seq[Ct],
   ): Ct = {
@@ -69,7 +69,7 @@ object CNNodeUtil {
       )
   }
 
-  def selectSpecificOpenMiningRound[Ct <: ContractWithState[?, cc.round.OpenMiningRound]](
+  def selectSpecificOpenMiningRound[Ct <: ContractWithState[?, splice.round.OpenMiningRound]](
       now: CantonTimestamp,
       openMiningRounds: Seq[Ct],
       specifiedRound: Round,
@@ -90,7 +90,7 @@ object CNNodeUtil {
       dso: PartyId,
       validator: PartyId,
       user: PartyId,
-  ) = new cc.amulet.ValidatorRight(
+  ) = new splice.amulet.ValidatorRight(
     dso.toProtoPrimitive,
     user.toProtoPrimitive,
     validator.toProtoPrimitive,
@@ -108,7 +108,9 @@ object CNNodeUtil {
           PartyId
       ) => Future[
         QueryResult[
-          Option[ContractWithState[cc.amulet.ValidatorRight.ContractId, cc.amulet.ValidatorRight]]
+          Option[
+            ContractWithState[splice.amulet.ValidatorRight.ContractId, splice.amulet.ValidatorRight]
+          ]
         ]
       ],
       priority: CommandPriority = CommandPriority.Low,
@@ -140,7 +142,7 @@ object CNNodeUtil {
     )
 
   lazy val defaultHoldingFee = // ~= 4.822530864197531E-6 ~= 4.8E-6
-    new cc.fees.RatePerRound(damlDecimal(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
+    new splice.fees.RatePerRound(damlDecimal(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
 
   // TODO (#6285) surely there's a better way to define Daml Numeric values in Scala
   def damlDecimal(x: Double): java.math.BigDecimal =
@@ -151,7 +153,7 @@ object CNNodeUtil {
       amuletsToIssuePerYear: Double,
       validatorPercentage: Double,
       appPercentage: Double,
-  ): cc.issuance.IssuanceConfig = new IssuanceConfig(
+  ): splice.issuance.IssuanceConfig = new IssuanceConfig(
     damlDecimal(amuletsToIssuePerYear),
     damlDecimal(validatorPercentage),
     damlDecimal(appPercentage),
@@ -172,7 +174,7 @@ object CNNodeUtil {
   private def hours(h: Long): RelTime = new RelTime(TimeUnit.HOURS.toMicros(h))
 
   // Curve taken as-is from whitepaper: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
-  val defaultIssuanceCurve: cc.schedule.Schedule[RelTime, IssuanceConfig] =
+  val defaultIssuanceCurve: splice.schedule.Schedule[RelTime, IssuanceConfig] =
     new Schedule(
       issuanceConfig(40e9, 0.5, 0.15),
       Seq(
@@ -183,9 +185,9 @@ object CNNodeUtil {
       ).asJava,
     )
 
-  val defaultCreateFee = new cc.fees.FixedFee(damlDecimal(0.03))
+  val defaultCreateFee = new splice.fees.FixedFee(damlDecimal(0.03))
 
-  val defaultTransferFee = new cc.fees.SteppedRate(
+  val defaultTransferFee = new splice.fees.SteppedRate(
     damlDecimal(0.01),
     Seq(
       new Tuple2(damlDecimal(100.0), damlDecimal(0.001)),
@@ -194,7 +196,7 @@ object CNNodeUtil {
     ).asJava,
   )
 
-  val defaultLockHolderFee = new cc.fees.FixedFee(damlDecimal(0.005))
+  val defaultLockHolderFee = new splice.fees.FixedFee(damlDecimal(0.005))
 
   // TODO(#6032): determine the best defaults here
   val defaultExtraTrafficPrice = BigDecimal(1.0) // extraTrafficPrice (in $/MB)
@@ -218,7 +220,9 @@ object CNNodeUtil {
       initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
-  ) = new cc.schedule.Schedule[Instant, cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD]](
+  ) = new splice.schedule.Schedule[Instant, splice.amuletconfig.AmuletConfig[
+    splice.amuletconfig.USD
+  ]](
     defaultAmuletConfig(
       initialTickDuration,
       initialMaxNumInputs,
@@ -228,7 +232,7 @@ object CNNodeUtil {
       initialReadVsWriteScalingFactor,
       holdingFee,
     ),
-    List.empty[Tuple2[Instant, cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD]]].asJava,
+    List.empty[Tuple2[Instant, splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD]]].asJava,
   )
 
   def defaultAmuletConfig(
@@ -240,26 +244,27 @@ object CNNodeUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
       nextDomainId: Option[DomainId] = None,
-  ): cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD] = new cc.amuletconfig.AmuletConfig(
-    // transferConfig
-    defaultTransferConfig(initialMaxNumInputs, holdingFee),
+  ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
+    new splice.amuletconfig.AmuletConfig(
+      // transferConfig
+      defaultTransferConfig(initialMaxNumInputs, holdingFee),
 
-    // issuance curve from whitepaper
-    defaultIssuanceCurve,
+      // issuance curve from whitepaper
+      defaultIssuanceCurve,
 
-    // global domain config
-    defaultGlobalDomainConfig(
-      initialDomainId,
-      nextDomainId,
-      initialBaseRateBurstAmount,
-      initialBaseRateBurstWindow,
-      initialReadVsWriteScalingFactor,
-    ),
+      // global domain config
+      defaultGlobalDomainConfig(
+        initialDomainId,
+        nextDomainId,
+        initialBaseRateBurstAmount,
+        initialBaseRateBurstWindow,
+        initialReadVsWriteScalingFactor,
+      ),
 
-    // tick duration
-    new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
-    readPackageConfig(),
-  )
+      // tick duration
+      new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
+      readPackageConfig(),
+    )
 
   def defaultAnsConfig(
       renewalDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
@@ -310,41 +315,42 @@ object CNNodeUtil {
   def defaultTransferConfig(
       initialMaxNumInputs: Int,
       holdingFee: BigDecimal,
-  ): cc.amuletconfig.TransferConfig[cc.amuletconfig.USD] = new cc.amuletconfig.TransferConfig(
-    // Fee to create a new amulet.
-    // Set to the fixed part of the transfer fee.
-    defaultCreateFee,
+  ): splice.amuletconfig.TransferConfig[splice.amuletconfig.USD] =
+    new splice.amuletconfig.TransferConfig(
+      // Fee to create a new amulet.
+      // Set to the fixed part of the transfer fee.
+      defaultCreateFee,
 
-    // Fee for keeping a amulet around.
-    // This is roughly equivalent to 1$/360 days but expressed as rounds
-    // with one day corresponding to 24*60/2.5 rounds, i.e., one round
-    // every 2.5 minutes.
-    // Incentivizes users to actively merge their amulets.
-    new cc.fees.RatePerRound(
-      holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
-    ),
+      // Fee for keeping a amulet around.
+      // This is roughly equivalent to 1$/360 days but expressed as rounds
+      // with one day corresponding to 24*60/2.5 rounds, i.e., one round
+      // every 2.5 minutes.
+      // Incentivizes users to actively merge their amulets.
+      new splice.fees.RatePerRound(
+        holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
+      ),
 
-    // Fee for transferring some amount of amulet to a new owner.
-    defaultTransferFee,
+      // Fee for transferring some amount of amulet to a new owner.
+      defaultTransferFee,
 
-    // Fee per lock holder.
-    // Chosen to match the update fee to cover the cost of informing lock-holders about
-    // actions on the locked amulet.
-    defaultLockHolderFee,
+      // Fee per lock holder.
+      // Chosen to match the update fee to cover the cost of informing lock-holders about
+      // actions on the locked amulet.
+      defaultLockHolderFee,
 
-    // Extra featured app reward amount, chosen to be equal to the domain fee cost of a single CC transfer
-    damlDecimal(1.0),
+      // Extra featured app reward amount, chosen to be equal to the domain fee cost of a single CC transfer
+      damlDecimal(1.0),
 
-    // These should be large enough to ensure efficient batching, but not too large
-    // to avoid creating very large transactions.
-    initialMaxNumInputs.toLong,
-    100,
+      // These should be large enough to ensure efficient batching, but not too large
+      // to avoid creating very large transactions.
+      initialMaxNumInputs.toLong,
+      100,
 
-    // Maximum number of lock holders.
-    // Chosen conservatively, but high enough to invite thinking about what's possible.
-    50,
-    // 2.5 min default duration
-  )
+      // Maximum number of lock holders.
+      // Chosen conservatively, but high enough to invite thinking about what's possible.
+      50,
+      // 2.5 min default duration
+    )
 
   def baseRateLimits(baseRateBurstAmount: Long, baseRateBurstWindow: NonNegativeFiniteDuration) = {
     new BaseRateTrafficLimits(

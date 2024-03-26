@@ -6,7 +6,10 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.amuletrules.{AmuletRules, AmuletRules_ClaimExpiredRewards}
+import com.daml.network.codegen.java.splice.amuletrules.{
+  AmuletRules,
+  AmuletRules_ClaimExpiredRewards,
+}
 import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.sv.store.ExpiredRewardCouponsBatch
 import com.daml.network.util.{AssignedContract, Contract}

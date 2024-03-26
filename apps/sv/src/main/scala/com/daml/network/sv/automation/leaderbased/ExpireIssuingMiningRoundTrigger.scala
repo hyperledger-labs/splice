@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -23,12 +23,12 @@ class ExpireIssuingMiningRoundTrigger(
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
-      cc.round.IssuingMiningRound.ContractId,
-      cc.round.IssuingMiningRound,
+      splice.round.IssuingMiningRound.ContractId,
+      splice.round.IssuingMiningRound,
     ](
       svTaskContext.dsoStore.multiDomainAcsStore,
       svTaskContext.dsoStore.listExpiredIssuingMiningRounds,
-      cc.round.IssuingMiningRound.COMPANION,
+      splice.round.IssuingMiningRound.COMPANION,
     )
     with SvTaskBasedTrigger[Task] {
 
@@ -57,7 +57,7 @@ class ExpireIssuingMiningRoundTrigger(
 
 private[leaderbased] object ExpireIssuingMiningRoundTrigger {
   type Task = ScheduledTaskTrigger.ReadyTask[AssignedContract[
-    cc.round.IssuingMiningRound.ContractId,
-    cc.round.IssuingMiningRound,
+    splice.round.IssuingMiningRound.ContractId,
+    splice.round.IssuingMiningRound,
   ]]
 }

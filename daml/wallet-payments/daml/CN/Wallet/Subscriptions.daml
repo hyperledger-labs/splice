@@ -3,11 +3,11 @@ module CN.Wallet.Subscriptions where
 import DA.Time
 import DA.List (dedupSort)
 
-import CC.Amulet
-import CC.AmuletRules
-import CC.Expiry
-import CC.Types
-import CC.Round
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Expiry
+import Splice.Types
+import Splice.Round
 import CN.Wallet.Payment
 import CN.Util
 

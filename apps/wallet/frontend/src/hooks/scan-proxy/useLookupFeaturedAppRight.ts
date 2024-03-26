@@ -2,7 +2,7 @@ import { UseQueryResult } from '@tanstack/react-query';
 import { Contract } from 'common-frontend-utils';
 import { useLookupFeaturedAppRightBuilder } from 'common-frontend/scan-api';
 
-import { FeaturedAppRight } from '@daml.js/canton-amulet/lib/CC/Amulet/';
+import { FeaturedAppRight } from '@daml.js/canton-amulet/lib/Splice/Amulet/';
 
 import { useValidatorScanProxyClient } from '../../contexts/ValidatorScanProxyContext';
 

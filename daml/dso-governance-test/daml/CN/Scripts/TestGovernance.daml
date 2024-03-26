@@ -7,10 +7,10 @@ import qualified DA.Map as Map
 import Daml.Script
 import DA.Time
 
-import CC.Amulet
-import CC.AmuletRules
-import CC.Round
-import CC.Schedule
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Round
+import Splice.Schedule
 
 import CN.DsoRules
 import CN.DSO.AmuletPrice
@@ -448,7 +448,7 @@ testAmuletPriceVoting = do
 
   [(amuletRulesCid, amuletRules)] <- query @AmuletRules dso
   now <- getTime
-  let amuletConfig = CC.Schedule.getValueAsOf now amuletRules.configSchedule
+  let amuletConfig = Splice.Schedule.getValueAsOf now amuletRules.configSchedule
   passTime (amuletConfig.tickDuration)
 
   -- pass enough time to advance the open mining round and lock in the price

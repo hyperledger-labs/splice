@@ -384,7 +384,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
         Some(DarResources.dsoGovernance.bootstrap.packageId)
       // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
-      case "CC.AmuletImport" =>
+      case "Splice.AmuletImport" =>
         Some(DarResources.cantonAmulet.bootstrap.packageId)
       case _ => None
     }

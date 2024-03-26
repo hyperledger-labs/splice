@@ -1,11 +1,11 @@
 package com.daml.network.store.db
 
-import com.daml.network.codegen.java.cc.{
+import com.daml.network.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
   round as roundCodegen,
 }
-import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,

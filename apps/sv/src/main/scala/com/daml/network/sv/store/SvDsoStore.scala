@@ -5,13 +5,13 @@ import com.daml.ledger.javaapi.data as javab
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
-import com.daml.network.codegen.java.cc.amulet.UnclaimedReward
-import com.daml.network.codegen.java.cc.amuletrules.{
+import com.daml.network.codegen.java.splice.amulet.UnclaimedReward
+import com.daml.network.codegen.java.splice.amuletrules.{
   AppTransferContext,
   AmuletRules_MiningRound_Archive,
 }
-import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.validatorlicense as vl
+import com.daml.network.codegen.java.splice.types.Round
+import com.daml.network.codegen.java.splice.validatorlicense as vl
 import com.daml.network.codegen.java.cn.dso.amuletprice as cp
 import com.daml.network.codegen.java.cn.dso.memberstate.MemberRewardState
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
@@ -28,7 +28,7 @@ import com.daml.network.codegen.java.cn.dsorules.{
 }
 import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
-import com.daml.network.codegen.java.{cc, cn}
+import com.daml.network.codegen.java.{splice, cn}
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.*
@@ -186,22 +186,24 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
 
   def lookupAmuletRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
-      AssignedContract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]
+      AssignedContract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]
     ]]
   ] = multiDomainAcsStore
-    .findAnyContractWithOffset(cc.amuletrules.AmuletRules.COMPANION)
+    .findAnyContractWithOffset(splice.amuletrules.AmuletRules.COMPANION)
     .map(_.map(_.flatMap(_.toAssignedContract)))
 
   def lookupAmuletRules()(implicit
       tc: TraceContext
   ): Future[
-    Option[AssignedContract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]]
+    Option[
+      AssignedContract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]
+    ]
   ] =
     lookupAmuletRulesWithOffset().map(_.value)
 
   def getAmuletRules()(implicit
       tc: TraceContext
-  ): Future[Contract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]] =
+  ): Future[Contract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]] =
     lookupAmuletRules().map(
       _.map(_.contract).getOrElse(
         throw Status.NOT_FOUND
@@ -252,7 +254,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   ): Future[Option[SvDsoStore.OpenMiningRoundTriple]] =
     for {
       openMiningRounds <- multiDomainAcsStore.listAssignedContracts(
-        cc.round.OpenMiningRound.COMPANION
+        splice.round.OpenMiningRound.COMPANION
       )
     } yield for {
       newestOverallRound <- openMiningRounds.maxByOption(_.payload.round.number)
@@ -307,13 +309,13 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
 
   /** List amulets that are expired and can never be used as transfer input. */
   final def listExpiredAmulets
-      : ListExpiredContracts[cc.amulet.Amulet.ContractId, cc.amulet.Amulet] =
-    listExpiredRoundBased(cc.amulet.Amulet.COMPANION)(identity)
+      : ListExpiredContracts[splice.amulet.Amulet.ContractId, splice.amulet.Amulet] =
+    listExpiredRoundBased(splice.amulet.Amulet.COMPANION)(identity)
 
   /** List locked amulets that are expired and can never be used as transfer input. */
   final def listLockedExpiredAmulets
-      : ListExpiredContracts[cc.amulet.LockedAmulet.ContractId, cc.amulet.LockedAmulet] =
-    listExpiredRoundBased(cc.amulet.LockedAmulet.COMPANION)(_.amulet)
+      : ListExpiredContracts[splice.amulet.LockedAmulet.ContractId, splice.amulet.LockedAmulet] =
+    listExpiredRoundBased(splice.amulet.LockedAmulet.COMPANION)(_.amulet)
 
   def listExpiredVoteRequests(): ListExpiredContracts[VoteRequest.ContractId, VoteRequest] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest.COMPANION)(_.voteBefore)
@@ -331,7 +333,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       limit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[cc.amulet.AppRewardCoupon.ContractId, cc.amulet.AppRewardCoupon]]]
+  ): Future[Seq[Contract[splice.amulet.AppRewardCoupon.ContractId, splice.amulet.AppRewardCoupon]]]
 
   def sumAppRewardCouponsOnDomain(
       round: Long,
@@ -346,14 +348,16 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Seq[cc.amulet.AppRewardCoupon.ContractId]]]
+  ): Future[Seq[Seq[splice.amulet.AppRewardCoupon.ContractId]]]
 
   def listValidatorRewardCouponsOnDomain(
       round: Long,
       domainId: DomainId,
       limit: Limit,
   )(implicit tc: TraceContext): Future[
-    Seq[Contract[cc.amulet.ValidatorRewardCoupon.ContractId, cc.amulet.ValidatorRewardCoupon]]
+    Seq[
+      Contract[splice.amulet.ValidatorRewardCoupon.ContractId, splice.amulet.ValidatorRewardCoupon]
+    ]
   ]
 
   def sumValidatorRewardCouponsOnDomain(
@@ -365,7 +369,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       roundNumber: Long,
       roundDomain: DomainId,
       totalCouponsLimit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[Seq[cc.amulet.ValidatorRewardCoupon.ContractId]]]
+  )(implicit tc: TraceContext): Future[Seq[Seq[splice.amulet.ValidatorRewardCoupon.ContractId]]]
 
   def listValidatorFaucetCouponsOnDomain(
       round: Long,
@@ -373,8 +377,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       limit: Limit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[
-      cc.validatorlicense.ValidatorFaucetCoupon.ContractId,
-      cc.validatorlicense.ValidatorFaucetCoupon,
+      splice.validatorlicense.ValidatorFaucetCoupon.ContractId,
+      splice.validatorlicense.ValidatorFaucetCoupon,
     ]]
   ]
 
@@ -389,7 +393,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Seq[cc.validatorlicense.ValidatorFaucetCoupon.ContractId]]]
+  ): Future[Seq[Seq[splice.validatorlicense.ValidatorFaucetCoupon.ContractId]]]
 
   def listSvRewardCouponsOnDomain(
       round: Long,
@@ -397,8 +401,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       limit: Limit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[
-      cc.amulet.SvRewardCoupon.ContractId,
-      cc.amulet.SvRewardCoupon,
+      splice.amulet.SvRewardCoupon.ContractId,
+      splice.amulet.SvRewardCoupon,
     ]]
   ]
 
@@ -413,14 +417,14 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Seq[cc.amulet.SvRewardCoupon.ContractId]]]
+  ): Future[Seq[Seq[splice.amulet.SvRewardCoupon.ContractId]]]
 
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
   ): Future[
     Option[AssignedContract[
-      cc.round.ClosedMiningRound.ContractId,
-      cc.round.ClosedMiningRound,
+      splice.round.ClosedMiningRound.ContractId,
+      splice.round.ClosedMiningRound,
     ]]
   ]
 
@@ -511,8 +515,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   )(implicit tc: TraceContext): Future[
     Seq[QueryResult[
       AssignedContract[
-        cc.round.ClosedMiningRound.ContractId,
-        cc.round.ClosedMiningRound,
+        splice.round.ClosedMiningRound.ContractId,
+        splice.round.ClosedMiningRound,
       ]
     ]]
   ] = {
@@ -523,7 +527,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       // There's no harm "missing" closed rounds awaiting reassignment, because
       // they'll be seen on the next poll
       closedRounds <- multiDomainAcsStore.listContractsOnDomain(
-        cc.round.ClosedMiningRound.COMPANION,
+        splice.round.ClosedMiningRound.COMPANION,
         domain,
         limit,
       )
@@ -701,16 +705,16 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
 
   protected def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
       companion: TemplateCompanion[Id, T]
-  )(amulet: T => cc.amulet.Amulet): ListExpiredContracts[Id, T]
+  )(amulet: T => splice.amulet.Amulet): ListExpiredContracts[Id, T]
 
   final def listUnclaimedRewards(
       limit: Limit
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.amulet.UnclaimedReward]]] =
+  ): Future[Seq[Contract[UnclaimedReward.ContractId, splice.amulet.UnclaimedReward]]] =
     for {
       unclaimedRewards <- multiDomainAcsStore.listContracts(
-        cc.amulet.UnclaimedReward.COMPANION,
+        splice.amulet.UnclaimedReward.COMPANION,
         limit = limit,
       )
     } yield unclaimedRewards map (_.contract)
@@ -718,15 +722,15 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Limit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[Contract[cc.globaldomain.MemberTraffic.ContractId, cc.globaldomain.MemberTraffic]]
+    Seq[Contract[splice.globaldomain.MemberTraffic.ContractId, splice.globaldomain.MemberTraffic]]
   ]
 
   /** List issuing mining rounds past their targetClosesAt */
   def listExpiredIssuingMiningRounds: ListExpiredContracts[
-    cc.round.IssuingMiningRound.ContractId,
-    cc.round.IssuingMiningRound,
+    splice.round.IssuingMiningRound.ContractId,
+    splice.round.IssuingMiningRound,
   ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(cc.round.IssuingMiningRound.COMPANION)(
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.round.IssuingMiningRound.COMPANION)(
       _.targetClosesAt
     )
 
@@ -895,7 +899,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   def listAmuletRulesTransferFollowers()(implicit
       tc: TraceContext
   ): Future[
-    Seq[FollowTask[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules, ?, ?]]
+    Seq[FollowTask[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules, ?, ?]]
   ] = {
     lookupAmuletRules().flatMap(_.map { amuletRules =>
       multiDomainAcsStore
@@ -951,7 +955,9 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       providerPartyId: PartyId
   )(implicit tc: TraceContext): Future[
     QueryResult[
-      Option[AssignedContract[cc.amulet.FeaturedAppRight.ContractId, cc.amulet.FeaturedAppRight]]
+      Option[
+        AssignedContract[splice.amulet.FeaturedAppRight.ContractId, splice.amulet.FeaturedAppRight]
+      ]
     ]
   ]
 
@@ -960,7 +966,9 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   )(implicit
       tc: TraceContext
   ): Future[
-    Option[AssignedContract[cc.amulet.FeaturedAppRight.ContractId, cc.amulet.FeaturedAppRight]]
+    Option[
+      AssignedContract[splice.amulet.FeaturedAppRight.ContractId, splice.amulet.FeaturedAppRight]
+    ]
   ] =
     lookupFeaturedAppRightWithOffset(providerPartyId).map(_.value)
 
@@ -1044,13 +1052,13 @@ object SvDsoStore {
   }
 
   private[network] val amuletRulesFollowers: Seq[ConstrainedTemplate] = Seq[ConstrainedTemplate](
-    cc.round.OpenMiningRound.COMPANION,
-    cc.round.SummarizingMiningRound.COMPANION,
-    cc.round.IssuingMiningRound.COMPANION,
-    cc.round.ClosedMiningRound.COMPANION,
-    cc.amulet.FeaturedAppRight.COMPANION,
-    cc.amulet.UnclaimedReward.COMPANION,
-    cc.validatorlicense.ValidatorLicense.COMPANION,
+    splice.round.OpenMiningRound.COMPANION,
+    splice.round.SummarizingMiningRound.COMPANION,
+    splice.round.IssuingMiningRound.COMPANION,
+    splice.round.ClosedMiningRound.COMPANION,
+    splice.amulet.FeaturedAppRight.COMPANION,
+    splice.amulet.UnclaimedReward.COMPANION,
+    splice.validatorlicense.ValidatorLicense.COMPANION,
     cn.ans.AnsEntry.COMPANION,
     cn.ans.AnsEntryContext.COMPANION,
     cn.ans.AnsRules.COMPANION,
@@ -1062,7 +1070,7 @@ object SvDsoStore {
     (dsoRulesFollowers ++ amuletRulesFollowers) ++ Seq[ConstrainedTemplate](
       // AmuletRules and DsoRules are specially handled, so not listed in followers
       cn.dsorules.DsoRules.COMPANION,
-      cc.amuletrules.AmuletRules.COMPANION,
+      splice.amuletrules.AmuletRules.COMPANION,
     )
 
   /** Contract filter of an sv acs store for a specific acs party. */
@@ -1176,28 +1184,29 @@ object SvDsoStore {
           svCandidateName = Some(contract.payload.svName),
         )
       },
-      mkFilter(cc.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
+      mkFilter(splice.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
         DsoAcsStoreRowData(_)
       ),
-      mkFilter(cc.amulet.Amulet.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.amulet.Amulet.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           amuletRoundOfExpiry = Some(CNNodeUtil.amuletExpiresAt(contract.payload).number),
         )
       },
-      mkFilter(cc.amulet.FeaturedAppRight.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.amulet.FeaturedAppRight.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           featuredAppRightProvider = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
         )
       },
-      mkFilter(cc.amulet.LockedAmulet.COMPANION)(co => co.payload.amulet.dso == dso) { contract =>
-        DsoAcsStoreRowData(
-          contract,
-          amuletRoundOfExpiry = Some(CNNodeUtil.amuletExpiresAt(contract.payload.amulet).number),
-        )
+      mkFilter(splice.amulet.LockedAmulet.COMPANION)(co => co.payload.amulet.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract,
+            amuletRoundOfExpiry = Some(CNNodeUtil.amuletExpiresAt(contract.payload.amulet).number),
+          )
       },
-      mkFilter(cc.amulet.AppRewardCoupon.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.amulet.AppRewardCoupon.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           rewardRound = Some(contract.payload.round.number),
@@ -1206,23 +1215,25 @@ object SvDsoStore {
           appRewardIsFeatured = Some(contract.payload.featured),
         )
       },
-      mkFilter(cc.amulet.ValidatorRewardCoupon.COMPANION)(co => co.payload.dso == dso) { contract =>
-        DsoAcsStoreRowData(
-          contract,
-          rewardRound = Some(contract.payload.round.number),
-          rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
-          rewardAmount = Some(contract.payload.amount),
-        )
-      },
-      mkFilter(cc.validatorlicense.ValidatorFaucetCoupon.COMPANION)(co => co.payload.dso == dso) {
+      mkFilter(splice.amulet.ValidatorRewardCoupon.COMPANION)(co => co.payload.dso == dso) {
         contract =>
           DsoAcsStoreRowData(
             contract,
             rewardRound = Some(contract.payload.round.number),
-            rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+            rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+            rewardAmount = Some(contract.payload.amount),
           )
       },
-      mkFilter(cc.amulet.SvRewardCoupon.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.validatorlicense.ValidatorFaucetCoupon.COMPANION)(co =>
+        co.payload.dso == dso
+      ) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          rewardRound = Some(contract.payload.round.number),
+          rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
+        )
+      },
+      mkFilter(splice.amulet.SvRewardCoupon.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           rewardRound = Some(contract.payload.round.number),
@@ -1230,32 +1241,33 @@ object SvDsoStore {
           rewardWeight = Some(contract.payload.weight),
         )
       },
-      mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           miningRound = Some(contract.payload.round.number),
         )
       },
-      mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.round.IssuingMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
           miningRound = Some(contract.payload.round.number),
         )
       },
-      mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.round.SummarizingMiningRound.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract,
+            miningRound = Some(contract.payload.round.number),
+          )
+      },
+      mkFilter(splice.round.ClosedMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           miningRound = Some(contract.payload.round.number),
         )
       },
-      mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
-        DsoAcsStoreRowData(
-          contract,
-          miningRound = Some(contract.payload.round.number),
-        )
-      },
-      mkFilter(cc.amulet.UnclaimedReward.COMPANION)(co => co.payload.dso == dso)(
+      mkFilter(splice.amulet.UnclaimedReward.COMPANION)(co => co.payload.dso == dso)(
         DsoAcsStoreRowData(_)
       ),
       mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.dso == dso) { contract =>
@@ -1264,7 +1276,7 @@ object SvDsoStore {
           validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
         )
       },
-      mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt =>
+      mkFilter(splice.globaldomain.MemberTraffic.COMPANION)(vt =>
         vt.payload.dso == dso && vt.payload.migrationId == domainMigrationId
       ) { contract =>
         DsoAcsStoreRowData(
@@ -1339,7 +1351,7 @@ object SvDsoStore {
   }
 
   type OpenMiningRound[Ct[_, _]] =
-    Ct[cc.round.OpenMiningRound.ContractId, cc.round.OpenMiningRound]
+    Ct[splice.round.OpenMiningRound.ContractId, splice.round.OpenMiningRound]
   type OpenMiningRoundContract =
     OpenMiningRound[Contract]
 
@@ -1496,12 +1508,12 @@ object SvDsoStore {
 }
 
 case class ExpiredRewardCouponsBatch(
-    closedRoundCid: cc.round.ClosedMiningRound.ContractId,
+    closedRoundCid: splice.round.ClosedMiningRound.ContractId,
     closedRoundNumber: Long,
-    validatorCoupons: Seq[cc.amulet.ValidatorRewardCoupon.ContractId],
-    appCoupons: Seq[cc.amulet.AppRewardCoupon.ContractId],
-    svRewardCoupons: Seq[cc.amulet.SvRewardCoupon.ContractId],
-    validatorFaucets: Seq[cc.validatorlicense.ValidatorFaucetCoupon.ContractId],
+    validatorCoupons: Seq[splice.amulet.ValidatorRewardCoupon.ContractId],
+    appCoupons: Seq[splice.amulet.AppRewardCoupon.ContractId],
+    svRewardCoupons: Seq[splice.amulet.SvRewardCoupon.ContractId],
+    validatorFaucets: Seq[splice.validatorlicense.ValidatorFaucetCoupon.ContractId],
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =
     prettyOfClass(

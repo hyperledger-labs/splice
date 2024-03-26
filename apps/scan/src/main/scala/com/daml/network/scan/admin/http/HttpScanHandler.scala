@@ -4,9 +4,9 @@ import cats.data.OptionT
 import cats.syntax.either.*
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
-import com.daml.network.codegen.java.cc.round.{
+import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.round.{
   ClosedMiningRound,
   IssuingMiningRound,
   OpenMiningRound,

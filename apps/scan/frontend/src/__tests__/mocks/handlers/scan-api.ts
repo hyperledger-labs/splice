@@ -10,7 +10,7 @@ import {
   LookupEntryByPartyResponse,
 } from 'scan-openapi';
 
-import { AmuletRules } from '@daml.js/canton-amulet/lib/CC/AmuletRules/module';
+import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules/module';
 import damlTypes from '@daml/types';
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [
@@ -78,7 +78,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
         amulet_rules_update: {
           contract: {
             template_id:
-              'f4693252b3cab434649f66f5fd309ae98ca01512b10b482086aa8ff529ca83e3:CC.Amulet:AmuletRules',
+              'f4693252b3cab434649f66f5fd309ae98ca01512b10b482086aa8ff529ca83e3:Splice.Amulet:AmuletRules',
             contract_id:
               '00ed7531fa0fb6a06f0d0f1ea8a31867704da8a6c341e7262894c5d0e15312aca6ca0212200412a9e6c1b9bff1449205e02c88596bad60b8eb8d14bee48f26509f6531d4db',
             payload: AmuletRules.encode({

@@ -3,7 +3,7 @@ import BigNumber from 'bignumber.js';
 import { Contract } from 'common-frontend-utils';
 import { useAmuletPriceFromOpenRounds } from 'common-frontend/scan-api';
 
-import { OpenMiningRound } from '@daml.js/canton-amulet/lib/CC/Round';
+import { OpenMiningRound } from '@daml.js/canton-amulet/lib/Splice/Round';
 
 import { useValidatorScanProxyClient } from '../../contexts/ValidatorScanProxyContext';
 

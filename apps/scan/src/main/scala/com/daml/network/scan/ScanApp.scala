@@ -6,7 +6,7 @@ import org.apache.pekko.http.scaladsl.server.Directives.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.codegen.java.cc.round as roundCodegen
+import com.daml.network.codegen.java.splice.round as roundCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{
   CNLedgerClient,

@@ -1,7 +1,7 @@
 package com.daml.network.validator.store
 
 import cats.syntax.traverseFilter.*
-import com.daml.network.codegen.java.cc.{
+import com.daml.network.codegen.java.splice.{
   amulet as amuletCodegen,
   amuletrules as amuletrulesCodegen,
   validatorlicense as validatorLicenseCodegen,

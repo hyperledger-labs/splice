@@ -121,7 +121,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAction = "Sent",
               expectedSubtype = "App Payment Accepted",
               expectedPartyDescription = Some(s"Automation $aliceValidatorParty"),
-              expectedAmountCC = BigDecimal("-1.31415"),
+              expectedAmountAmulet = BigDecimal("-1.31415"),
             )
             matchTransaction(sent)(
               amuletPrice = 2,
@@ -130,7 +130,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedPartyDescription = Some(
                 s"${expectedAns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
               ),
-              expectedAmountCC = BigDecimal("-1.18"),
+              expectedAmountAmulet = BigDecimal("-1.18"),
             )
             matchTransaction(received)(
               amuletPrice = 2,
@@ -139,7 +139,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedPartyDescription = Some(
                 s"${expectedAns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
               ),
-              expectedAmountCC = BigDecimal("1.07"),
+              expectedAmountAmulet = BigDecimal("1.07"),
             )
             // Note: this transfer has no effect on the balance of the sender:
             // the input for the app payment is a locked amulet that was unlocked in the same transaction.
@@ -148,21 +148,21 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAction = "Sent",
               expectedSubtype = "ANS Entry Initial Payment Collected",
               expectedPartyDescription = Some(s"$dsoEntry $dsoEntry"),
-              expectedAmountCC = BigDecimal(0), // 0 USD
+              expectedAmountAmulet = BigDecimal(0), // 0 USD
             )
             matchTransaction(lockForAns)(
               amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "Subscription Initial Payment Accepted",
               expectedPartyDescription = Some(s"Automation $aliceValidatorParty"),
-              expectedAmountCC = BigDecimal("-0.5"), // 1 USD
+              expectedAmountAmulet = BigDecimal("-0.5"), // 1 USD
             )
             matchTransaction(balanceChange)(
               amuletPrice = 2,
               expectedAction = "Balance Change",
               expectedSubtype = "Tap",
               expectedPartyDescription = None,
-              expectedAmountCC = BigDecimal(5),
+              expectedAmountAmulet = BigDecimal(5),
             )
         }
       }
@@ -201,7 +201,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedPartyDescription = Some(
                   s"${expectedAns(dsoParty, "dso.ans")} ${expectedAns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.ans")}"
                 ),
-                expectedAmountCC = -trafficCostCc,
+                expectedAmountAmulet = -trafficCostCc,
               )
             }
           },

@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { useSvClient } from 'common-frontend';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { AmuletRules } from '@daml.js/canton-amulet/lib/CC/AmuletRules';
+import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules';
 import { ElectionRequest, DsoRules } from '@daml.js/dso-governance/lib/CN/DsoRules';
 
 import { useSvAdminClient } from './SvAdminServiceContext';

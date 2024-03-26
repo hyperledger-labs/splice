@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { OpenMiningRound } from '@daml.js/canton-amulet/lib/CC/Round';
+import { OpenMiningRound } from '@daml.js/canton-amulet/lib/Splice/Round';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 

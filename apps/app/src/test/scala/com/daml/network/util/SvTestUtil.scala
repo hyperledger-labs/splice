@@ -2,7 +2,7 @@ package com.daml.network.util
 
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.ledger.javaapi.data.TransactionTree
-import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
+import com.daml.network.codegen.java.splice.issuance.IssuanceConfig
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig

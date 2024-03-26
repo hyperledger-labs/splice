@@ -92,7 +92,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           expectedAction = "Balance Change",
           expectedSubtype = "Tap",
           expectedPartyDescription = None,
-          expectedAmountCC = BigDecimal(5),
+          expectedAmountAmulet = BigDecimal(5),
         )
       }
     }
@@ -115,7 +115,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
               "ANS Entry Initial Payment Collected"
             else "ANS Entry Renewal Payment Collected",
           expectedPartyDescription = Some(s"$entryForAns $entryForAns"),
-          expectedAmountCC = BigDecimal(0), // 0 USD
+          expectedAmountAmulet = BigDecimal(0), // 0 USD
         )
         matchTransaction(lockForAns)(
           amuletPrice = 2,
@@ -126,7 +126,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
             else "Subscription Payment Accepted",
           expectedPartyDescription =
             Some(s"Automation ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"),
-          expectedAmountCC = BigDecimal("-0.5"), // 1 USD
+          expectedAmountAmulet = BigDecimal("-0.5"), // 1 USD
         )
       }
     }

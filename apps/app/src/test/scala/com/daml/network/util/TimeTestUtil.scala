@@ -1,10 +1,10 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amuletrules.TransferOutput
-import com.daml.network.codegen.java.cc.expiry.TimeLock
-import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amuletrules.TransferOutput
+import com.daml.network.codegen.java.splice.expiry.TimeLock
+import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.console.*
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
@@ -91,7 +91,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       receiver: PartyId,
       receiverFeeRatio: BigDecimal,
       amount: BigDecimal,
-  ): cc.amuletrules.TransferOutput = {
+  ): splice.amuletrules.TransferOutput = {
     new TransferOutput(
       receiver.toProtoPrimitive,
       receiverFeeRatio.bigDecimal,
@@ -106,7 +106,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       receiverFeeRatio: BigDecimal,
       amount: BigDecimal,
       expiredDuration: Duration,
-  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): cc.amuletrules.TransferOutput = {
+  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): splice.amuletrules.TransferOutput = {
     val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
     val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
 
@@ -143,15 +143,15 @@ trait TimeTestUtil extends CNNodeTestCommon {
         optTimeout = None,
         commands = transferContext.amuletRules
           .exerciseAmuletRules_Transfer(
-            new cc.amuletrules.Transfer(
+            new splice.amuletrules.Transfer(
               userParty.toProtoPrimitive,
               userParty.toProtoPrimitive,
-              Seq[cc.amuletrules.TransferInput](
-                new cc.amuletrules.transferinput.InputAmulet(
+              Seq[splice.amuletrules.TransferInput](
+                new splice.amuletrules.transferinput.InputAmulet(
                   amulet.contract.contractId
                 )
               ).asJava,
-              Seq[cc.amuletrules.TransferOutput](
+              Seq[splice.amuletrules.TransferOutput](
                 transferOutputLockedAmulet(
                   userParty,
                   Seq(userParty),
@@ -161,10 +161,10 @@ trait TimeTestUtil extends CNNodeTestCommon {
                 )
               ).asJava,
             ),
-            new cc.amuletrules.TransferContext(
+            new splice.amuletrules.TransferContext(
               transferContext.openMiningRound,
               Map.empty[Round, IssuingMiningRound.ContractId].asJava,
-              Map.empty[String, cc.amulet.ValidatorRight.ContractId].asJava,
+              Map.empty[String, splice.amulet.ValidatorRight.ContractId].asJava,
               // note: we don't provide a featured app right as sender == provider
               None.toJava,
             ),
@@ -186,7 +186,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
       userParty: PartyId,
       validatorParty: PartyId,
       amulet: HttpWalletAppClient.AmuletPosition,
-      outputs: Seq[cc.amuletrules.TransferOutput],
+      outputs: Seq[splice.amuletrules.TransferOutput],
       now: CantonTimestamp,
   )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment) = {
     val amuletRules = sv1ScanBackend.getAmuletRules()
@@ -204,20 +204,20 @@ trait TimeTestUtil extends CNNodeTestCommon {
       readAs = Seq.empty,
       commands = transferContext.amuletRules
         .exerciseAmuletRules_Transfer(
-          new cc.amuletrules.Transfer(
+          new splice.amuletrules.Transfer(
             userParty.toProtoPrimitive,
             userParty.toProtoPrimitive,
-            Seq[cc.amuletrules.TransferInput](
-              new cc.amuletrules.transferinput.InputAmulet(
+            Seq[splice.amuletrules.TransferInput](
+              new splice.amuletrules.transferinput.InputAmulet(
                 amulet.contract.contractId
               )
             ).asJava,
             outputs.asJava,
           ),
-          new cc.amuletrules.TransferContext(
+          new splice.amuletrules.TransferContext(
             transferContext.openMiningRound,
             Map.empty[Round, IssuingMiningRound.ContractId].asJava,
-            Map.empty[String, cc.amulet.ValidatorRight.ContractId].asJava,
+            Map.empty[String, splice.amulet.ValidatorRight.ContractId].asJava,
             // note: we don't provide a featured app right as sender == provider
             None.toJava,
           ),

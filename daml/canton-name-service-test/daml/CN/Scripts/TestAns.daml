@@ -4,9 +4,9 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
-import CC.Amulet
-import CC.AmuletRules
-import CC.Scripts.Util
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Scripts.Util
 import CN.Ans
 import CN.Scripts.AnsRulesParameters
 import CN.Wallet.Subscriptions
@@ -44,11 +44,11 @@ testWithSubscription = script do
   pure ()
 
   (_, round) <- getLatestActiveOpenRound app
-  let transferConfigCC = transferConfigCCFromOpenRound round
-  [(acceptRewardCid, reward)] <- query @CC.Amulet.AppRewardCoupon app.dso
+  let transferConfigAmulet = transferConfigAmuletFromOpenRound round
+  [(acceptRewardCid, reward)] <- query @Splice.Amulet.AppRewardCoupon app.dso
   reward.amount ===
-    transferConfigCC.createFee.fee +
-    transferConfigCC.lockHolderFee.fee
+    transferConfigAmulet.createFee.fee +
+    transferConfigAmulet.lockHolderFee.fee
   reward.featured === False
 
   -- dso transactionally unlocks & transfer amulets and creates ans entry and a subscription in return.
@@ -62,10 +62,10 @@ testWithSubscription = script do
   dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
   dsoAmulets === []
 
-  [(_, reward)] <- filter (\(cid, _) -> cid /= acceptRewardCid) <$> query @CC.Amulet.AppRewardCoupon app.dso
+  [(_, reward)] <- filter (\(cid, _) -> cid /= acceptRewardCid) <$> query @Splice.Amulet.AppRewardCoupon app.dso
   reward.amount ===
-    transferConfigCC.createFee.fee +
-    transferConfigCC.transferFee.initialRate * defaultAnsRulesConfig.entryFee
+    transferConfigAmulet.createFee.fee +
+    transferConfigAmulet.transferFee.initialRate * defaultAnsRulesConfig.entryFee
   reward.featured === False
 
   Some entry <- queryContractId alice.primaryParty collectPaymentSummary.entryCid

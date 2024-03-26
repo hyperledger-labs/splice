@@ -3,11 +3,11 @@ package com.daml.network.scan.store.db
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
-import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cn.ans.{AnsEntry, AnsRules}
-import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
+import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
 import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.environment.RetryProvider

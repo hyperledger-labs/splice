@@ -9,7 +9,7 @@ import { FormControl, Stack, Typography } from '@mui/material';
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
 import { Tuple2 } from '@daml.js/5aee9b21b8e9a4c4975b5f4c4198e6e6e8469df49e2010820e792f393db870f4/lib/DA/Types';
-import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/CC/AmuletConfig';
+import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/Splice/AmuletConfig';
 
 import { useDsoInfos } from '../../../contexts/SvContext';
 import { ActionFromForm } from '../VoteRequest';

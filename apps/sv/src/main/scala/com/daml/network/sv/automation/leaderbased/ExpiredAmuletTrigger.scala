@@ -1,7 +1,7 @@
 package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -17,12 +17,12 @@ class ExpiredAmuletTrigger(
     override val ec: ExecutionContext,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
-      cc.amulet.Amulet.ContractId,
-      cc.amulet.Amulet,
+      splice.amulet.Amulet.ContractId,
+      splice.amulet.Amulet,
     ](
       svTaskContext.dsoStore.multiDomainAcsStore,
       svTaskContext.dsoStore.listExpiredAmulets,
-      cc.amulet.Amulet.COMPANION,
+      splice.amulet.Amulet.COMPANION,
     )
     with SvTaskBasedTrigger[Task] {
   private val store = svTaskContext.dsoStore
@@ -34,7 +34,7 @@ class ExpiredAmuletTrigger(
       cmd = dsoRules.exercise(
         _.exerciseDsoRules_Amulet_Expire(
           co.work.contractId,
-          new cc.amulet.Amulet_Expire(
+          new splice.amulet.Amulet_Expire(
             latestOpenMiningRound.contractId
           ),
         )
@@ -52,5 +52,7 @@ class ExpiredAmuletTrigger(
 
 object ExpiredAmuletTrigger {
   type Task =
-    ScheduledTaskTrigger.ReadyTask[AssignedContract[cc.amulet.Amulet.ContractId, cc.amulet.Amulet]]
+    ScheduledTaskTrigger.ReadyTask[
+      AssignedContract[splice.amulet.Amulet.ContractId, splice.amulet.Amulet]
+    ]
 }

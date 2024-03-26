@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.amulet.Amulet
+import com.daml.network.codegen.java.splice.amulet.Amulet
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.dsorules.DsoRules_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules

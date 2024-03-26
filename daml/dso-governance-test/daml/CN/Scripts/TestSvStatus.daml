@@ -5,7 +5,7 @@ import DA.Time
 
 import Daml.Script
 
-import CC.Types
+import Splice.Types
 import CN.Scripts.DsoTestUtils
 import CN.DsoRules
 import CN.DSO.MemberState

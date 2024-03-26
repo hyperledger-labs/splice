@@ -6,7 +6,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.environment.SequencerAdminConnection
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
@@ -36,17 +36,17 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      cc.globaldomain.MemberTraffic.ContractId,
-      cc.globaldomain.MemberTraffic,
+      splice.globaldomain.MemberTraffic.ContractId,
+      splice.globaldomain.MemberTraffic,
     ](
       store,
-      cc.globaldomain.MemberTraffic.COMPANION,
+      splice.globaldomain.MemberTraffic.COMPANION,
     ) {
 
   override def completeTask(
       memberTraffic: AssignedContract[
-        cc.globaldomain.MemberTraffic.ContractId,
-        cc.globaldomain.MemberTraffic,
+        splice.globaldomain.MemberTraffic.ContractId,
+        splice.globaldomain.MemberTraffic,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     Member

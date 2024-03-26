@@ -2,14 +2,14 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.DamlRecord
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amuletrules.{
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amuletrules.{
   AppTransferContext,
   AmuletRules_MiningRound_Archive,
 }
-import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
-import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.round.OpenMiningRound
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.cn.ans.*
 import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
 import com.daml.network.codegen.java.cn.dso.globaldomain.{
@@ -1001,8 +1001,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         new SubscriptionInitialPayment.ContractId(validContractId(1)),
   ): ActionRequiringConfirmation = {
     val appTransferContext = new AppTransferContext(
-      new cc.amuletrules.AmuletRules.ContractId(validContractId(1)),
-      new cc.round.OpenMiningRound.ContractId(validContractId(1)),
+      new splice.amuletrules.AmuletRules.ContractId(validContractId(1)),
+      new splice.round.OpenMiningRound.ContractId(validContractId(1)),
       Optional.empty(),
     )
     new ARC_AnsEntryContext(

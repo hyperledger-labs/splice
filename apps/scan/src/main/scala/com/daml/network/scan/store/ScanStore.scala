@@ -1,12 +1,12 @@
 package com.daml.network.scan.store
 
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
-import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.scan.store.db.{
   DbScanStore,
   ScanAggregatesReader,
@@ -76,12 +76,16 @@ trait ScanStore
   def lookupAmuletRules()(implicit
       tc: TraceContext
   ): Future[
-    Option[ContractWithState[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]]
+    Option[
+      ContractWithState[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]
+    ]
   ]
 
   private def getAmuletRulesWithState()(implicit
       tc: TraceContext
-  ): Future[ContractWithState[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]] =
+  ): Future[
+    ContractWithState[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]
+  ] =
     lookupAmuletRules().map(
       _.getOrElse(
         throw Status.NOT_FOUND
@@ -118,7 +122,7 @@ trait ScanStore
   }
   def getAmuletRules()(implicit
       tc: TraceContext
-  ): Future[Contract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]] =
+  ): Future[Contract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]] =
     getAmuletRulesWithState().map(_.contract)
 
   def getGlobalDomainId()(implicit
@@ -190,12 +194,15 @@ trait ScanStore
   ): Future[Seq[ValidatorPurchasedTraffic]]
 
   def getTopValidatorLicenses(limit: Limit)(implicit tc: TraceContext): Future[Seq[
-    Contract[cc.validatorlicense.ValidatorLicense.ContractId, cc.validatorlicense.ValidatorLicense]
+    Contract[
+      splice.validatorlicense.ValidatorLicense.ContractId,
+      splice.validatorlicense.ValidatorLicense,
+    ]
   ]]
 
   def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[cc.globaldomain.BaseRateTrafficLimits] =
+  ): Future[splice.globaldomain.BaseRateTrafficLimits] =
     getAmuletRulesWithState().map(cr =>
       AmuletConfigSchedule(cr)
         .getConfigAsOf(t)
@@ -316,59 +323,65 @@ object ScanStore {
     MultiDomainAcsStore.SimpleContractFilter(
       key.dsoParty,
       Map(
-        mkFilter(cc.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
+        mkFilter(splice.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
           ScanAcsStoreRowData(_)
         ),
         mkFilter(cn.ans.AnsRules.COMPANION)(co => co.payload.dso == dso)(ScanAcsStoreRowData(_)),
         mkFilter(cn.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso)(
           ScanAcsStoreRowData(_)
         ),
-        mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
+        mkFilter(splice.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
             round = Some(contract.payload.round.number),
           )
         },
-        mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
-          ScanAcsStoreRowData(
-            contract = contract,
-            round = Some(contract.payload.round.number),
-          )
-        },
-        mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
-          ScanAcsStoreRowData(
-            contract = contract,
-            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
-            round = Some(contract.payload.round.number),
-          )
-        },
-        mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.dso == dso) {
+        mkFilter(splice.round.ClosedMiningRound.COMPANION)(co => co.payload.dso == dso) {
           contract =>
             ScanAcsStoreRowData(
               contract = contract,
               round = Some(contract.payload.round.number),
             )
         },
-        mkFilter(cc.amulet.FeaturedAppRight.COMPANION)(co => co.payload.dso == dso) { contract =>
-          ScanAcsStoreRowData(
-            contract = contract,
-            featuredAppRightProvider =
-              Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
-          )
+        mkFilter(splice.round.IssuingMiningRound.COMPANION)(co => co.payload.dso == dso) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt =
+                Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
+              round = Some(contract.payload.round.number),
+            )
         },
-        mkFilter(cc.amulet.Amulet.COMPANION)(co => co.payload.dso == dso) { contract =>
+        mkFilter(splice.round.SummarizingMiningRound.COMPANION)(co => co.payload.dso == dso) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract = contract,
+              round = Some(contract.payload.round.number),
+            )
+        },
+        mkFilter(splice.amulet.FeaturedAppRight.COMPANION)(co => co.payload.dso == dso) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract = contract,
+              featuredAppRightProvider =
+                Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
+            )
+        },
+        mkFilter(splice.amulet.Amulet.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             amount = Some(contract.payload.amount.initialAmount),
           )
         },
-        mkFilter(cc.amulet.LockedAmulet.COMPANION)(co => co.payload.amulet.dso == dso) { contract =>
-          ScanAcsStoreRowData(
-            contract = contract,
-            contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.lock.expiresAt)),
-            amount = Some(contract.payload.amulet.amount.initialAmount),
-          )
+        mkFilter(splice.amulet.LockedAmulet.COMPANION)(co => co.payload.amulet.dso == dso) {
+          contract =>
+            ScanAcsStoreRowData(
+              contract = contract,
+              contractExpiresAt =
+                Some(Timestamp.assertFromInstant(contract.payload.lock.expiresAt)),
+              amount = Some(contract.payload.amulet.amount.initialAmount),
+            )
         },
         mkFilter(cn.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
@@ -377,7 +390,7 @@ object ScanStore {
             ansEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
           )
         },
-        mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt =>
+        mkFilter(splice.globaldomain.MemberTraffic.COMPANION)(vt =>
           vt.payload.dso == dso && vt.payload.migrationId == domainMigrationId
         ) { contract =>
           ScanAcsStoreRowData(
@@ -393,7 +406,7 @@ object ScanStore {
             totalTrafficPurchased = Some(contract.payload.totalPurchased),
           )
         },
-        mkFilter(cc.validatorlicense.ValidatorLicense.COMPANION)(co => co.payload.dso == dso) {
+        mkFilter(splice.validatorlicense.ValidatorLicense.COMPANION)(co => co.payload.dso == dso) {
           contract =>
             val roundsCollected = contract.payload.faucetState.map { faucetState =>
               faucetState.lastReceivedFor.number - faucetState.firstReceivedFor.number - faucetState.numCouponsMissed + 1L

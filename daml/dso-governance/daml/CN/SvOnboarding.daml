@@ -1,6 +1,6 @@
 module CN.SvOnboarding where
 
-import CC.Types
+import Splice.Types
 
 import CN.Util
 

@@ -7,10 +7,10 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_MiningRound_StartIssuing
-import com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary
-import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_MiningRound_StartIssuing
+import com.daml.network.codegen.java.splice.issuance.OpenMiningRoundSummary
+import com.daml.network.codegen.java.splice.round.SummarizingMiningRound
 import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
@@ -34,11 +34,11 @@ class SummarizingMiningRoundTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      cc.round.SummarizingMiningRound.ContractId,
-      cc.round.SummarizingMiningRound,
+      splice.round.SummarizingMiningRound.ContractId,
+      splice.round.SummarizingMiningRound,
     ](
       store,
-      cc.round.SummarizingMiningRound.COMPANION,
+      splice.round.SummarizingMiningRound.COMPANION,
     ) {
 
   private val svParty = store.key.svParty
@@ -59,8 +59,8 @@ class SummarizingMiningRoundTrigger(
 
   override def completeTask(
       summarizingRound: AssignedContract[
-        cc.round.SummarizingMiningRound.ContractId,
-        cc.round.SummarizingMiningRound,
+        splice.round.SummarizingMiningRound.ContractId,
+        splice.round.SummarizingMiningRound,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
@@ -122,13 +122,14 @@ class SummarizingMiningRoundTrigger(
       validatorFaucetCoupons: Long,
       svRewardCouponsWeightSum: Long,
   ) {
-    lazy val summary: cc.issuance.OpenMiningRoundSummary = new cc.issuance.OpenMiningRoundSummary(
-      validatorRewardCoupons.bigDecimal,
-      featuredAppRewardCoupons.bigDecimal,
-      unfeaturedAppRewardCoupons.bigDecimal,
-      svRewardCouponsWeightSum,
-      Optional.of(validatorFaucetCoupons),
-    )
+    lazy val summary: splice.issuance.OpenMiningRoundSummary =
+      new splice.issuance.OpenMiningRoundSummary(
+        validatorRewardCoupons.bigDecimal,
+        featuredAppRewardCoupons.bigDecimal,
+        unfeaturedAppRewardCoupons.bigDecimal,
+        svRewardCouponsWeightSum,
+        Optional.of(validatorFaucetCoupons),
+      )
   }
 
   /** Query the open reward contracts for a given round. This should only be used

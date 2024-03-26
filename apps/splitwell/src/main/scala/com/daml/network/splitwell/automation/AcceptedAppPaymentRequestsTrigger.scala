@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   OnAssignedContractTrigger,
   TaskSuccess,
 }
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -48,7 +48,7 @@ class AcceptedAppPaymentRequestsTrigger(
     val round = payment.payload.round
     def rejectPayment(
         reason: String,
-        transferContext: cc.amuletrules.AppTransferContext,
+        transferContext: splice.amuletrules.AppTransferContext,
         disclosedContracts: DisclosedContracts.NE,
     ) = {
       logger.warn(s"rejecting accepted app payment: $reason")

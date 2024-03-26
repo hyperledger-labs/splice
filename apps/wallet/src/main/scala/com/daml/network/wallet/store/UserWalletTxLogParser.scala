@@ -4,10 +4,10 @@ import cats.{Eval, Monoid}
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amulet.AmuletCreateSummary
-import com.daml.network.codegen.java.cc.amuletrules.InvalidTransferReason
-import com.daml.network.codegen.java.cc.amuletrules.invalidtransferreason.{
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amulet.AmuletCreateSummary
+import com.daml.network.codegen.java.splice.amuletrules.InvalidTransferReason
+import com.daml.network.codegen.java.splice.amuletrules.invalidtransferreason.{
   ITR_InsufficientFunds,
   ITR_InsufficientTopupAmount,
   ITR_Other,
@@ -952,7 +952,7 @@ object UserWalletTxLogParser {
     ): State = {
       val trackingInfo = node.result.value._1._2
       val receiverAmuletContractId = node.result.value._1._1.createdAmulets.asScala.toList match {
-        case (amulet: cc.amuletrules.createdamulet.TransferResultAmulet) :: Nil =>
+        case (amulet: splice.amuletrules.createdamulet.TransferResultAmulet) :: Nil =>
           amulet.contractIdValue.contractId
         case x =>
           throw new RuntimeException(
@@ -1253,8 +1253,8 @@ object UserWalletTxLogParser {
   }
 
   private def parseSender(
-      arg: cc.amuletrules.AmuletRules_Transfer,
-      res: cc.amuletrules.TransferResult,
+      arg: splice.amuletrules.AmuletRules_Transfer,
+      res: splice.amuletrules.TransferResult,
   ): PartyAndAmount = {
     val sender = arg.transfer.sender
 
@@ -1279,8 +1279,8 @@ object UserWalletTxLogParser {
 
   /** Returns a list of receivers and their net balance changes */
   private def parseReceivers(
-      arg: cc.amuletrules.AmuletRules_Transfer,
-      res: cc.amuletrules.TransferResult,
+      arg: splice.amuletrules.AmuletRules_Transfer,
+      res: splice.amuletrules.TransferResult,
   ): Seq[PartyAndAmount] = {
     def netBalanceChange(o: OutputWithFees) =
       if (o.output.lock.isEmpty) {
@@ -1309,14 +1309,14 @@ object UserWalletTxLogParser {
     * @param receiverFee Actual amount of fees paid by the receiver.
     */
   private final case class OutputWithFees(
-      output: cc.amuletrules.TransferOutput,
+      output: splice.amuletrules.TransferOutput,
       senderFee: BigDecimal,
       receiverFee: BigDecimal,
   )
 
   private def parseOutputAmounts(
-      arg: cc.amuletrules.AmuletRules_Transfer,
-      res: cc.amuletrules.TransferResult,
+      arg: splice.amuletrules.AmuletRules_Transfer,
+      res: splice.amuletrules.TransferResult,
   ): Seq[OutputWithFees] = {
     assert(
       arg.transfer.outputs.size() == res.summary.outputFees.size(),

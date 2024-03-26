@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{ConfigScheduleUtil, JavaDecodeUtil as DecodeUtil}
@@ -70,7 +70,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
           )
       val rounds =
         transactions.flatMap(
-          DecodeUtil.decodeAllCreatedTree(cc.round.ClosedMiningRound.COMPANION)(_)
+          DecodeUtil.decodeAllCreatedTree(splice.round.ClosedMiningRound.COMPANION)(_)
         )
       rounds should have size 1
     }
@@ -84,7 +84,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     clue("Wait until the closed round is archived") {
       eventually()(
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.round.ClosedMiningRound.COMPANION)(dsoParty) should have size 0
+          .filterJava(splice.round.ClosedMiningRound.COMPANION)(dsoParty) should have size 0
       )
     }
 
@@ -398,7 +398,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     {
       val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
       val configSchedule = {
-        new cc.schedule.Schedule(
+        new splice.schedule.Schedule(
           mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration),
           List(
             new Tuple2(

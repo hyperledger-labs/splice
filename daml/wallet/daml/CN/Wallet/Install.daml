@@ -6,10 +6,10 @@ import DA.Time
 import DA.Foldable (forA_)
 import DA.Optional (isSome)
 
-import CC.Amulet
-import CC.Types
-import CC.AmuletRules
-import CC.GlobalDomain
+import Splice.Amulet
+import Splice.Types
+import Splice.AmuletRules
+import Splice.GlobalDomain
 
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -81,7 +81,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
         executeAmuletOperationRec execContext inputAmulets (COO_MergeTransferInputs senderChange :: prevResults) remainingOperations
 
-    handleResultTap : Either InvalidTransferReason (AmuletCreateSummary (ContractId CC.Amulet.Amulet)) -> Update [AmuletOperationOutcome]
+    handleResultTap : Either InvalidTransferReason (AmuletCreateSummary (ContractId Splice.Amulet.Amulet)) -> Update [AmuletOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
       Right ccsum -> do

@@ -1,7 +1,7 @@
 package com.daml.network.validator.store.db
 
 import cats.implicits.*
-import com.daml.network.codegen.java.cc.{
+import com.daml.network.codegen.java.splice.{
   amulet as amuletCodegen,
   validatorlicense as validatorLicenseCodegen,
 }

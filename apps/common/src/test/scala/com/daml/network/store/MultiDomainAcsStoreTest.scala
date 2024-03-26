@@ -4,7 +4,7 @@ import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time
-import com.daml.network.codegen.java.cc.amulet.AppRewardCoupon
+import com.daml.network.codegen.java.splice.amulet.AppRewardCoupon
 import com.daml.network.codegen.java.cn.splitwell.*
 import com.daml.network.codegen.java.cn.wallet.payment.AppPaymentRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -697,7 +697,7 @@ abstract class MultiDomainAcsStoreTest[
 
     "read assignment-mismatched contracts in a stable order" in {
       import com.daml.lf.value.Value
-      import com.daml.network.codegen.java.cc.amulet.{FeaturedAppRight, AppRewardCoupon}
+      import com.daml.network.codegen.java.splice.amulet.{FeaturedAppRight, AppRewardCoupon}
       import MultiDomainAcsStore.ConstrainedTemplate
 
       // the specific templates don't matter, we just need 2 of them

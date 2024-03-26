@@ -20,7 +20,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.DomainAlias
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.TxLogEntry.EntryType
@@ -696,7 +696,7 @@ class ScanAggregatorTest
     for {
       _ <- dummyDomain.exercise(
         amuletRulesContract,
-        interfaceId = Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
+        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(party, 0),
         mkTransferResult(
@@ -705,7 +705,7 @@ class ScanAggregatorTest
           inputAmuletAmount = 0,
           inputValidatorRewardAmount = 0,
           balanceChanges = Map(
-            party.toProtoPrimitive -> new cc.amuletrules.BalanceChange(
+            party.toProtoPrimitive -> new splice.amuletrules.BalanceChange(
               balanceChangeRoundZero.bigDecimal,
               balanceChangeHoldingFees.bigDecimal,
             )
@@ -745,7 +745,7 @@ class ScanAggregatorTest
     for {
       _ <- dummyDomain.exercise(
         amuletRulesContract,
-        interfaceId = Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
+        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(rewardedParty, 0),
         mkTransferResult(
@@ -773,7 +773,7 @@ class ScanAggregatorTest
     for {
       _ <- dummyDomain.exercise(
         amuletRulesContract,
-        interfaceId = Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
+        interfaceId = Some(splice.amuletrules.AmuletRules.TEMPLATE_ID),
         Transfer.choice.name,
         mkAmuletRulesTransfer(rewardedParty, 0),
         mkTransferResult(

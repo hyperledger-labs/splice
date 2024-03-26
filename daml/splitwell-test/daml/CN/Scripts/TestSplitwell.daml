@@ -11,7 +11,7 @@ import qualified DA.Map as M
 import DA.Assert
 import DA.Time
 import Daml.Script
-import CC.Scripts.Util
+import Splice.Scripts.Util
 import CN.Wallet.Payment
 
 

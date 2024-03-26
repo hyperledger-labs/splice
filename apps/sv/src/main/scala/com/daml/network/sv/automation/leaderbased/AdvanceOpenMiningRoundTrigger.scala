@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.leaderbased
 
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.daml.network.sv.store.SvDsoStore
 
 import com.digitalasset.canton.data.CantonTimestamp
@@ -79,7 +79,7 @@ class AdvanceOpenMiningRoundTrigger(
       // domain reassignment
       _ <- OptionT(
         store.multiDomainAcsStore
-          .lookupContractByIdOnDomain(cc.amuletrules.AmuletRules.COMPANION)(
+          .lookupContractByIdOnDomain(splice.amuletrules.AmuletRules.COMPANION)(
             domainId,
             task.work.amuletRulesId,
           )
@@ -87,7 +87,7 @@ class AdvanceOpenMiningRoundTrigger(
       _ <- task.work.openRounds.toSeq.traverse(co =>
         OptionT(
           store.multiDomainAcsStore
-            .lookupContractByIdOnDomain(cc.round.OpenMiningRound.COMPANION)(
+            .lookupContractByIdOnDomain(splice.round.OpenMiningRound.COMPANION)(
               domainId,
               co.contractId,
             )
@@ -99,7 +99,7 @@ class AdvanceOpenMiningRoundTrigger(
 
 object AdvanceOpenMiningRoundTrigger {
   case class Task(
-      amuletRulesId: cc.amuletrules.AmuletRules.ContractId,
+      amuletRulesId: splice.amuletrules.AmuletRules.ContractId,
       openRounds: SvDsoStore.OpenMiningRoundTriple,
   ) extends PrettyPrinting {
 

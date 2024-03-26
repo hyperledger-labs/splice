@@ -1,9 +1,9 @@
 package com.daml.network.wallet.store
 
 import com.daml.ledger.javaapi.data.{DamlOptional, Value}
-import com.daml.network.codegen.java.cc.amulet as amuletCodegen
-import com.daml.network.codegen.java.cc.amuletrules as amuletrulesCodegen
-import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.amuletrules as amuletrulesCodegen
+import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,

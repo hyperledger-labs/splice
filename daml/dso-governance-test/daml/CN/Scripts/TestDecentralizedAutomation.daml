@@ -8,15 +8,15 @@ import qualified DA.Set as Set
 import Daml.Script
 import DA.Time
 
-import CC.Round
-import CC.Types
-import CC.Amulet
-import CC.AmuletRules
+import Splice.Round
+import Splice.Types
+import Splice.Amulet
+import Splice.AmuletRules
 
 import CN.DsoRules
 import CN.Util
 
-import CC.Scripts.Util
+import Splice.Scripts.Util
 import CN.Scripts.DsoTestUtils
 import CN.Ans
 import CN.Scripts.AnsRulesParameters

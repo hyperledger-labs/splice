@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
@@ -134,12 +134,12 @@ class AppUpgradeIntegrationTest
           // before it is reached but close enough that we don't need to wait for long.
           // 12 seconds seems to work well empirically.
           val scheduledTime = Instant.now().plus(12, ChronoUnit.SECONDS)
-          val newAmuletConfig = new cc.amuletconfig.AmuletConfig(
+          val newAmuletConfig = new splice.amuletconfig.AmuletConfig(
             amuletConfig.transferConfig,
             amuletConfig.issuanceCurve,
             amuletConfig.globalDomain,
             amuletConfig.tickDuration,
-            new cc.amuletconfig.PackageConfig(
+            new splice.amuletconfig.PackageConfig(
               "0.1.1",
               "0.1.1",
               "0.1.1",

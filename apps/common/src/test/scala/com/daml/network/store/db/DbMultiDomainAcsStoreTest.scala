@@ -1,7 +1,7 @@
 package com.daml.network.store.db
 
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.codegen.java.cc.amulet.AppRewardCoupon
+import com.daml.network.codegen.java.splice.amulet.AppRewardCoupon
 import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.StoreTest.testTxLogConfig

@@ -8,10 +8,10 @@ import DA.Time
 
 import Daml.Script
 
-import CC.Amulet
-import CC.Round
-import CC.Types
-import CC.Scripts.Util
+import Splice.Amulet
+import Splice.Round
+import Splice.Types
+import Splice.Scripts.Util
 import CN.DsoRules
 import CN.DSO.MemberState
 import CN.Scripts.DsoTestUtils

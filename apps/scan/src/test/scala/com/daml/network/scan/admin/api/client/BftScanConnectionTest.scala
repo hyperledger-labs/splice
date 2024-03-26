@@ -26,7 +26,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.codegen.java.cc.amuletrules as amuletrulesCodegen
+import com.daml.network.codegen.java.splice.amuletrules as amuletrulesCodegen
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.tracing.TraceContext
 import org.slf4j.event.Level

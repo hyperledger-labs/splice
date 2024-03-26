@@ -2,8 +2,8 @@ package com.daml.network.environment
 
 import com.daml.lf.data.Ref.{PackageName, PackageVersion}
 import com.daml.ledger.javaapi.data.{Command, Identifier}
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
@@ -131,14 +131,14 @@ object PackageIdResolver {
       // when AmuletRules is not yet created.
       bootstrapPackageIdResolver: QualifiedName => Option[String] = _ => None,
       // Resolver that is checked when none of the standard packages match.
-      extraPackageIdResolver: (cc.amuletconfig.PackageConfig, QualifiedName) => Option[String] =
+      extraPackageIdResolver: (splice.amuletconfig.PackageConfig, QualifiedName) => Option[String] =
         (_, _) => None,
   )(implicit ec: ExecutionContext) = new PackageIdResolver with NamedLogging {
 
     override val loggerFactory = loggerFactory0
 
     private def fromAmuletRules(
-        packageConfig: cc.amuletconfig.PackageConfig,
+        packageConfig: splice.amuletconfig.PackageConfig,
         name: QualifiedName,
     ): Option[String] = {
       modulePackages
@@ -175,7 +175,7 @@ object PackageIdResolver {
   }
 
   def readPackageVersion(
-      packageConfig: cc.amuletconfig.PackageConfig,
+      packageConfig: splice.amuletconfig.PackageConfig,
       pkg: Package,
   ): PackageVersion = {
     import Package.*
@@ -192,12 +192,12 @@ object PackageIdResolver {
 
   // Map from module name to package containing that module
   private val modulePackages: Map[String, Package] = Map(
-    "CC.Amulet" -> Package.CantonAmulet,
-    "CC.AmuletRules" -> Package.CantonAmulet,
-    "CC.AmuletImport" -> Package.CantonAmulet,
-    "CC.GlobalDomain" -> Package.CantonAmulet,
-    "CC.ValidatorLicense" -> Package.CantonAmulet,
-    "CC.Round" -> Package.CantonAmulet,
+    "Splice.Amulet" -> Package.CantonAmulet,
+    "Splice.AmuletRules" -> Package.CantonAmulet,
+    "Splice.AmuletImport" -> Package.CantonAmulet,
+    "Splice.GlobalDomain" -> Package.CantonAmulet,
+    "Splice.ValidatorLicense" -> Package.CantonAmulet,
+    "Splice.Round" -> Package.CantonAmulet,
     "CN.Ans" -> Package.CantonNameService,
     "CN.DsoBootstrap" -> Package.DsoGovernance,
     "CN.DsoRules" -> Package.DsoGovernance,

@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.amulet as amuletCodegen
-import com.daml.network.codegen.java.cc.amuletrules.AppTransferContext
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.amuletrules.AppTransferContext
 import com.daml.network.codegen.java.cn.ans.{
   AnsEntryContext,
   AnsEntryContext_CollectInitialEntryPayment,

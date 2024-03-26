@@ -13,7 +13,7 @@ const RateDisplay: React.FC<RateDisplayProps> = props => {
   switch (true) {
     case base === 'CC' && quote === 'USD':
       amount = BigNumber(1).div(amuletPrice);
-      rate = 'CC/USD';
+      rate = 'Amulet/USD';
       break;
     case base === 'USD' && quote === 'CC':
       amount = amuletPrice;

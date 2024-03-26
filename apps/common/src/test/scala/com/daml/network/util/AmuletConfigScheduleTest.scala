@@ -1,6 +1,6 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.splice
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -15,7 +15,9 @@ class AmuletConfigScheduleTest extends AnyWordSpec with BaseTest {
   private val dummyDomainId = DomainId.tryFromString(
     "global::122084763882fa4111e288caf832fd9e83b666acf8f167a09fc63344d2df9bcf72a7"
   )
-  private def mkConfig(maxNumInputs: Int): cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD] =
+  private def mkConfig(
+      maxNumInputs: Int
+  ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] =
     CNNodeUtil.defaultAmuletConfig(
       dummyTickDuration,
       maxNumInputs,

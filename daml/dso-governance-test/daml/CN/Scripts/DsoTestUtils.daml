@@ -11,15 +11,15 @@ import qualified DA.Text as T
 import Daml.Script
 import DA.Time
 
-import CC.Amulet
-import CC.AmuletRules
-import CC.Issuance
-import CC.Round
-import CC.Types
-import CC.ValidatorLicense
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Issuance
+import Splice.Round
+import Splice.Types
+import Splice.ValidatorLicense
 
-import CC.Scripts.Util
-import CC.Scripts.Parameters
+import Splice.Scripts.Util
+import Splice.Scripts.Parameters
 
 import CN.CometBft
 import CN.DsoRules

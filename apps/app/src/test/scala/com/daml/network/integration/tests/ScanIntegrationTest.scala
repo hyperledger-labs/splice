@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
+import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.config.CNNodeConfigTransforms
 import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -329,7 +329,7 @@ class ScanIntegrationTest
               ),
               Codec.encode(
                 BigDecimal(
-                  0 // See AmuletRules: transferConfigCC.holdingFee.rate - amulet.amount.ratePerRound.rate
+                  0 // See AmuletRules: transferConfigAmulet.holdingFee.rate - amulet.amount.ratePerRound.rate
                 )
               ),
             ),

@@ -6,9 +6,9 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_MiningRound_Archive
-import com.daml.network.codegen.java.cc.round.ClosedMiningRound
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_MiningRound_Archive
+import com.daml.network.codegen.java.splice.round.ClosedMiningRound
 import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
@@ -112,7 +112,7 @@ class ArchiveClosedMiningRoundsTrigger(
       // archived or reassigned; if the latter, listArchivableClosedMiningRounds
       // can give us a corrected task with the new assignment
       closedRoundExists <- store.multiDomainAcsStore
-        .lookupContractByIdOnDomain(cc.round.ClosedMiningRound.COMPANION)(
+        .lookupContractByIdOnDomain(splice.round.ClosedMiningRound.COMPANION)(
           domainId,
           closedRound.contractId,
         )

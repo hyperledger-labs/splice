@@ -381,23 +381,23 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, prim
     return <></>;
   }
 
-  let amountCC: BigNumber;
+  let amountAmulet: BigNumber;
   switch (transaction.transactionType) {
     case 'transfer':
       if (transaction.senderId === primaryPartyId) {
-        amountCC = transaction.senderAmountCC;
+        amountAmulet = transaction.senderAmountCC;
       } else {
-        amountCC = transaction.receivers.find(r => r.party === primaryPartyId)!.amount;
+        amountAmulet = transaction.receivers.find(r => r.party === primaryPartyId)!.amount;
       }
       break;
     case 'balance_change':
-      amountCC = transaction.receivers.find(r => r.party === primaryPartyId)!.amount;
+      amountAmulet = transaction.receivers.find(r => r.party === primaryPartyId)!.amount;
       break;
   }
 
   // This is forcing <AmountDisplay> to show a "+" sign for positive balance changes.
   // If the balance change is negative, the number already contains the minus sign.
-  const sign = amountCC.isPositive() ? '+' : '';
+  const sign = amountAmulet.isPositive() ? '+' : '';
 
   const amuletPriceAtTimeOfTransaction = transaction.amuletPrice;
 
@@ -405,13 +405,13 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, prim
     <Stack direction="column">
       <Typography className="tx-amount-cc">
         {sign}
-        <AmountDisplay amount={amountCC} currency="CC" />
+        <AmountDisplay amount={amountAmulet} currency="CC" />
       </Typography>
       <Stack direction="row" spacing={0.5}>
         <Typography variant="caption" className="tx-amount-usd">
           {sign}
           <AmountDisplay
-            amount={amountCC}
+            amount={amountAmulet}
             currency="CC"
             convert="CCtoUSD"
             amuletPrice={amuletPriceAtTimeOfTransaction}

@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.network.codegen.java.cc.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.topology.DomainId
 

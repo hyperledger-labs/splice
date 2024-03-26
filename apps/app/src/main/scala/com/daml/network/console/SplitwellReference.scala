@@ -366,7 +366,7 @@ final class SplitwellAppClientReference(
   @Help.Summary("Net balances of the parties in the group.")
   @Help.Description(
     """This allows us to emulate [splitwell simplify debt feature](https://www.splitwell.com/l/sdv/FgPQSo3Bsev).
-      |E.g., if Alice owes Bob 10CC, and Charlie owes Alice 10CC, we can net that to Charlie owing Bob 10CC.
+      |E.g., if Alice owes Bob 10Amulet, and Charlie owes Alice 10Amulet, we can net that to Charlie owing Bob 10Amulet.
       |Note that we do not enforce that the resulting balances are simpler but we do enforce
       |that the total balance of each party stays the same.
       |"""

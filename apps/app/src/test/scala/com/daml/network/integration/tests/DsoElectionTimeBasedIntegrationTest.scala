@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
+import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.dsorules.DsoRules_OffboardMember
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules

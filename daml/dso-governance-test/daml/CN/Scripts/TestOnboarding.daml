@@ -7,17 +7,17 @@ import qualified DA.Map as Map
 import Daml.Script
 import DA.Time
 
-import CC.ValidatorLicense
+import Splice.ValidatorLicense
 
 import CN.CometBft
 import CN.DsoRules
 import CN.DSO.GlobalDomain
 import CN.SvOnboarding
 
-import CC.Scripts.Util
+import Splice.Scripts.Util
 import CN.Scripts.DsoTestUtils
-import CC.AmuletRules (AmuletRules)
-import CC.Types
+import Splice.AmuletRules (AmuletRules)
+import Splice.Types
 
 
 testOnboardValidator : Script ()

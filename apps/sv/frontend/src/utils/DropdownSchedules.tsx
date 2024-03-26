@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { NativeSelect, Stack } from '@mui/material';
 
 import { Tuple2 } from '@daml.js/5aee9b21b8e9a4c4975b5f4c4198e6e6e8469df49e2010820e792f393db870f4/lib/DA/Types';
-import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/CC/AmuletConfig';
+import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/Splice/AmuletConfig';
 
 dayjs.extend(utc);
 

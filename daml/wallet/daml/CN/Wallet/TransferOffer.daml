@@ -2,9 +2,9 @@ module CN.Wallet.TransferOffer where
 
 import DA.Text
 
-import CC.Amulet
-import CC.AmuletRules
-import CC.Round
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Round
 import CN.Util
 import CN.Wallet.Payment
 

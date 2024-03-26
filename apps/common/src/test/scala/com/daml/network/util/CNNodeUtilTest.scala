@@ -1,8 +1,8 @@
 package com.daml.network.util
 
-import com.daml.network.codegen.java.cc.amulet.Amulet
-import com.daml.network.codegen.java.cc.fees.{ExpiringAmount, RatePerRound}
-import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.splice.amulet.Amulet
+import com.daml.network.codegen.java.splice.fees.{ExpiringAmount, RatePerRound}
+import com.daml.network.codegen.java.splice.types.Round
 import com.digitalasset.canton.BaseTest
 import java.math.BigDecimal
 import org.scalatest.wordspec.AnyWordSpec

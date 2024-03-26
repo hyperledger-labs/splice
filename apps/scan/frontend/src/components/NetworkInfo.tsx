@@ -17,8 +17,8 @@ import {
   Typography,
 } from '@mui/material';
 
-import { AmuletConfig } from '@daml.js/canton-amulet/lib/CC/AmuletConfig/module';
-import { SteppedRate } from '@daml.js/canton-amulet/lib/CC/Fees/module';
+import { AmuletConfig } from '@daml.js/canton-amulet/lib/Splice/AmuletConfig/module';
+import { SteppedRate } from '@daml.js/canton-amulet/lib/Splice/Fees/module';
 
 const NetworkInfo: React.FC = () => {
   const getAmuletRulesQuery = useGetAmuletRules();
@@ -107,7 +107,7 @@ const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConf
           />
           <FeeTableRow
             name="Holding Fee"
-            value={`${BigNumber(amuletConfig.transferConfig.holdingFee.rate)} CC/Round`}
+            value={`${BigNumber(amuletConfig.transferConfig.holdingFee.rate)} Amulet/Round`}
             description="A fixed fee for maintaining each active amulet record, charged per round."
           />
           <FeeTableRow

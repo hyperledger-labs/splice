@@ -1,10 +1,10 @@
 package com.daml.network.wallet.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.codegen.java.cc.amulet as amuletCodegen
-import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
-import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.codegen.java.cc.types.Round
+import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.validatorlicense as validatorCodegen
+import com.daml.network.codegen.java.splice.round.IssuingMiningRound
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}

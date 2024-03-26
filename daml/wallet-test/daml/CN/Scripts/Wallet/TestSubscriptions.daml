@@ -6,13 +6,13 @@ import DA.Time
 import DA.List
 import Daml.Script
 
-import CC.Amulet
-import CC.AmuletRules
-import CC.Types
+import Splice.Amulet
+import Splice.AmuletRules
+import Splice.Types
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
-import CC.Scripts.Util
+import Splice.Scripts.Util
 
 data Users = Users with
   validator : Party
@@ -160,28 +160,28 @@ testUSDSubscription = script do
 
   (_, round) <- getLatestOpenRound app
 
-  let transferConfigCC = transferConfigCCFromOpenRound round
+  let transferConfigAmulet = transferConfigAmuletFromOpenRound round
       expectedValidatorRewardInLockLeg =
-          2.0 * transferConfigCC.lockHolderFee.fee +
-          transferConfigCC.createFee.fee
-      expectedAppRewardInLockLeg = expectedValidatorRewardInLockLeg + transferConfigCC.extraFeaturedAppRewardAmount
+          2.0 * transferConfigAmulet.lockHolderFee.fee +
+          transferConfigAmulet.createFee.fee
+      expectedAppRewardInLockLeg = expectedValidatorRewardInLockLeg + transferConfigAmulet.extraFeaturedAppRewardAmount
       expectedValidatorRewardInUnlockLeg =
-          transferConfigCC.createFee.fee +
-          transferConfigCC.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round.amuletPrice)
-      expectedAppRewardInUnlockLeg = expectedValidatorRewardInUnlockLeg + transferConfigCC.extraFeaturedAppRewardAmount
-  [(_, reward)] <- query @CC.Amulet.AppRewardCoupon validator
+          transferConfigAmulet.createFee.fee +
+          transferConfigAmulet.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round.amuletPrice)
+      expectedAppRewardInUnlockLeg = expectedValidatorRewardInUnlockLeg + transferConfigAmulet.extraFeaturedAppRewardAmount
+  [(_, reward)] <- query @Splice.Amulet.AppRewardCoupon validator
   reward.amount === expectedAppRewardInLockLeg
   reward.featured === True
 
   amulets0 <- query @Amulet pizzeria.primaryParty
   (_subscriptionCid, subscriptionStateCid, _pizzeriasAmulet) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
 
-  [(_, reward)] <- query @CC.Amulet.AppRewardCoupon provider.primaryParty
+  [(_, reward)] <- query @Splice.Amulet.AppRewardCoupon provider.primaryParty
   reward.amount === expectedAppRewardInUnlockLeg
 
   reward.featured === True
 
-  rewards <- query @CC.Amulet.ValidatorRewardCoupon alice.primaryParty
+  rewards <- query @Splice.Amulet.ValidatorRewardCoupon alice.primaryParty
   let amounts = map (._2.amount) rewards
   sort amounts === sort ([expectedValidatorRewardInLockLeg, expectedValidatorRewardInUnlockLeg])
 
@@ -195,24 +195,24 @@ testUSDSubscription = script do
 
   (_, round2) <- getLatestOpenRound app
 
-  let transferConfigCC2 = transferConfigCCFromOpenRound round2
+  let transferConfigAmulet2 = transferConfigAmuletFromOpenRound round2
       expectedAppRewardInLockLeg2 =
-          2.0 * transferConfigCC2.lockHolderFee.fee +
-          transferConfigCC2.createFee.fee
+          2.0 * transferConfigAmulet2.lockHolderFee.fee +
+          transferConfigAmulet2.createFee.fee
           -- no extra app reward when locking as the transfer below does not pass in the featured app right
       expectedAppRewardInUnlockLeg2 =
-          transferConfigCC2.createFee.fee +
-          transferConfigCC2.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round2.amuletPrice) +
-          transferConfigCC2.extraFeaturedAppRewardAmount
+          transferConfigAmulet2.createFee.fee +
+          transferConfigAmulet2.transferFee.initialRate * payData.paymentAmount.amount * (1.0 / round2.amuletPrice) +
+          transferConfigAmulet2.extraFeaturedAppRewardAmount
 
   payment2Cid <- makeSubscriptionPayment app alice validator None subscriptionStateCid
   (subscriptionState2Cid, _pizzeriasAmulet2) <- collectSubscriptionPayment app provider pizzeria alice.primaryParty payment2Cid
 
-  rewards <- query @CC.Amulet.AppRewardCoupon validator
+  rewards <- query @Splice.Amulet.AppRewardCoupon validator
   let amounts = map (._2.amount) rewards
   sort amounts === sort ([expectedAppRewardInLockLeg, expectedAppRewardInLockLeg2])
 
-  rewards <- query @CC.Amulet.AppRewardCoupon provider.primaryParty
+  rewards <- query @Splice.Amulet.AppRewardCoupon provider.primaryParty
   let amounts = map (._2.amount) rewards
   sort amounts === sort ([expectedAppRewardInUnlockLeg, expectedAppRewardInUnlockLeg2])
 

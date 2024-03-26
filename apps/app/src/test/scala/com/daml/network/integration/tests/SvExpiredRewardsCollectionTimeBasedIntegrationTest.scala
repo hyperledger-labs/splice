@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.amulet.{AppRewardCoupon, ValidatorRewardCoupon}
-import com.daml.network.codegen.java.cc.round.OpenMiningRound
+import com.daml.network.codegen.java.splice.amulet.{AppRewardCoupon, ValidatorRewardCoupon}
+import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.util.{Contract, SvTestUtil}
 
 import scala.concurrent.duration.*
