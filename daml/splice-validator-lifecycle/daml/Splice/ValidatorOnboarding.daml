@@ -2,6 +2,11 @@ module Splice.ValidatorOnboarding where
 
 import Splice.Util
 
+data ValidatorOnboarding_MatchResult = ValidatorOnboarding_MatchResult with
+    usedSecret : ContractId UsedSecret
+
+data ValidatorOnboarding_ExpireResult = ValidatorOnboarding_ExpireResult
+
 -- | Template used by a sponsoring SV node to keep track of the onboarding of a validator candidate.
 -- We use a secret for authenticating the candidate once he has set up his participant.
 -- The secret should be unique, contain at least 256-bits of entropy,
@@ -17,24 +22,25 @@ template ValidatorOnboarding with
     signatory sv
 
     -- Archive the offer if the right secret was provided, noting which validator (party) used it.
-    choice ValidatorOnboarding_Match: ContractId UsedSecret
+    choice ValidatorOnboarding_Match: ValidatorOnboarding_MatchResult
       with
         providedSecret : Text
         validator : Party
       controller sv
       do
         require "provided secret matches the stored secret" (providedSecret == candidateSecret)
-        create UsedSecret with
+        usedSecret <- create UsedSecret with
           secret = candidateSecret
           ..
+        return ValidatorOnboarding_MatchResult with ..
 
     -- Archive if we are past the `expiresAt`.
-    choice ValidatorOnboarding_Expire : ()
+    choice ValidatorOnboarding_Expire : ValidatorOnboarding_ExpireResult
       controller sv
       do
         now <- getTime
         require "ValidatorOnboarding has expired" (now >= expiresAt)
-        pure ()
+        pure ValidatorOnboarding_ExpireResult
 
 
 -- | Template used by a sponsoring SV node for enforcing that an onboarding secret is used only once.
