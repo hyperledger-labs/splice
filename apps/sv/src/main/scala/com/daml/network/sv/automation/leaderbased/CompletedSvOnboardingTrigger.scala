@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
@@ -27,29 +27,29 @@ class CompletedSvOnboardingTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      SvcRules.ContractId,
-      SvcRules,
+      DsoRules.ContractId,
+      DsoRules,
     ](
-      svTaskContext.svcStore,
-      SvcRules.COMPANION,
+      svTaskContext.dsoStore,
+      DsoRules.COMPANION,
     )
-    with SvTaskBasedTrigger[SvcRulesContract] {
-  private val store = svTaskContext.svcStore
+    with SvTaskBasedTrigger[DsoRulesContract] {
+  private val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(
-      svcRules: SvcRulesContract
+      dsoRules: DsoRulesContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svOnboardings <- store.listSvOnboardingRequestsBySvcMembers(svcRules)
+      svOnboardings <- store.listSvOnboardingRequestsByDsoMembers(dsoRules)
       cmds = svOnboardings.map(co =>
-        svcRules.exercise(_.exerciseSvcRules_ArchiveSvOnboardingRequest(co.contractId))
+        dsoRules.exercise(_.exerciseDsoRules_ArchiveSvOnboardingRequest(co.contractId))
       )
       _ <- Future.sequence(
         cmds.map(cmd =>
           svTaskContext.connection
             .submit(
               Seq(store.key.svParty),
-              Seq(store.key.svcParty),
+              Seq(store.key.dsoParty),
               cmd,
             )
             .noDedup
@@ -57,14 +57,14 @@ class CompletedSvOnboardingTrigger(
         )
       )
     } yield TaskSuccess(
-      show"Archived ${cmds.size} `SvOnboardingRequest` contract(s) as the SV(s) are added to SVC."
+      show"Archived ${cmds.size} `SvOnboardingRequest` contract(s) as the SV(s) are added to DSO."
     )
   }
 }
 
 private[leaderbased] object CompletedSvOnboardingTrigger {
-  type SvcRulesContract = AssignedContract[
-    SvcRules.ContractId,
-    SvcRules,
+  type DsoRulesContract = AssignedContract[
+    DsoRules.ContractId,
+    DsoRules,
   ]
 }

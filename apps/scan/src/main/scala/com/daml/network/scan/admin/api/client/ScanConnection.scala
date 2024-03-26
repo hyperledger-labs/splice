@@ -41,18 +41,18 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
   implicit protected val mat: Materializer
   protected def logger: TracedLogger
 
-  def getSvcPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId]
+  def getDsoPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId]
 
-  /** Query for the SVC party id, retrying until it succeeds.
+  /** Query for the DSO party id, retrying until it succeeds.
     *
     * Intended to be used for app init.
     */
-  def getSvcPartyIdWithRetries()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
+  def getDsoPartyIdWithRetries()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
-      "scan_read_svc_party_id",
-      "SVC party ID from scan",
-      getSvcPartyId(),
+      "scan_read_dso_party_id",
+      "DSO party ID from scan",
+      getDsoPartyId(),
       logger,
     )
 
@@ -84,11 +84,11 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
       tc: TraceContext,
   ): Future[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]
 
-  def listSvcSequencers()(implicit
+  def listDsoSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]]
 
-  def listSvcScans()(implicit tc: TraceContext): Future[Seq[HttpScanAppClient.DomainScans]]
+  def listDsoScans()(implicit tc: TraceContext): Future[Seq[HttpScanAppClient.DomainScans]]
 
   def getTransferContextWithInstances()(implicit
       ec: ExecutionContext,

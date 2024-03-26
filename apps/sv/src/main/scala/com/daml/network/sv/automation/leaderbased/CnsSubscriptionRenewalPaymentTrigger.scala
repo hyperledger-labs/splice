@@ -33,17 +33,17 @@ class CnsSubscriptionRenewalPaymentTrigger(
       SubscriptionPayment.ContractId,
       SubscriptionPayment,
     ](
-      svTaskContext.svcStore,
+      svTaskContext.dsoStore,
       SubscriptionPayment.COMPANION,
     )
     with SvTaskBasedTrigger[
       AssignedContract[SubscriptionPayment.ContractId, SubscriptionPayment]
     ] {
 
-  private val svcStore = svTaskContext.svcStore
+  private val dsoStore = svTaskContext.dsoStore
   private val connection = svTaskContext.connection
-  private val svParty = svcStore.key.svParty
-  private val svcParty = svcStore.key.svcParty
+  private val svParty = dsoStore.key.svParty
+  private val dsoParty = dsoStore.key.dsoParty
 
   // We do not actively reject CNS renewal payment on invalid states. Instead, we do nothing and rely on payment expiry.
   // The cases where this happens are the following:
@@ -57,13 +57,13 @@ class CnsSubscriptionRenewalPaymentTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val AssignedContract(payment, _) = subscriptionPayment
-    svcStore.lookupCnsEntryContext(subscriptionPayment.contract.payload.reference).flatMap {
+    dsoStore.lookupCnsEntryContext(subscriptionPayment.contract.payload.reference).flatMap {
       case Some(cnsContext) =>
         for {
-          transferContextOpt <- svcStore.getSvcTransferContextForRound(payment.payload.round)
+          transferContextOpt <- dsoStore.getDsoTransferContextForRound(payment.payload.round)
           result <- transferContextOpt match {
             case Some(transferContext) =>
-              svcStore.lookupCnsEntryByName(cnsContext.payload.name).flatMap {
+              dsoStore.lookupCnsEntryByName(cnsContext.payload.name).flatMap {
                 case Some(entry) =>
                   collectPayment(
                     cnsContext.contract.contractId,
@@ -104,10 +104,10 @@ class CnsSubscriptionRenewalPaymentTrigger(
       entry: AssignedContract[CnsEntry.ContractId, CnsEntry],
       transferContext: AppTransferContext,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    svcRules <- svcStore.getSvcRules()
-    cnsRules <- svcStore.getCnsRules()
-    cmd = svcRules.exercise(
-      _.exerciseSvcRules_CollectEntryRenewalPayment(
+    dsoRules <- dsoStore.getDsoRules()
+    cnsRules <- dsoStore.getCnsRules()
+    cmd = dsoRules.exercise(
+      _.exerciseDsoRules_CollectEntryRenewalPayment(
         cnsContextCId,
         new CnsEntryContext_CollectEntryRenewalPayment(
           paymentCid,
@@ -120,7 +120,7 @@ class CnsSubscriptionRenewalPaymentTrigger(
     taskOutcome <- connection
       .submit(
         actAs = Seq(svParty),
-        readAs = Seq(svcParty),
+        readAs = Seq(dsoParty),
         update = cmd,
       )
       .noDedup

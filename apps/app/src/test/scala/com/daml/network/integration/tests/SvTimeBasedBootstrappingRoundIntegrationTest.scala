@@ -22,7 +22,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest
 
   "round management with a 24 hour bootstrapping round" in { implicit env =>
     clue("Check bootstrapped rounds") {
-      val rounds = getSortedOpenMiningRounds(sv1Backend.participantClientWithAdminToken, svcParty)
+      val rounds = getSortedOpenMiningRounds(sv1Backend.participantClientWithAdminToken, dsoParty)
       val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
       rounds should have size 3
       val round0 = rounds.head
@@ -45,7 +45,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest
       _ =>
         getSortedIssuingRounds(
           sv1Backend.participantClientWithAdminToken,
-          svcParty,
+          dsoParty,
         ) should have size 0,
     )
 
@@ -63,7 +63,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest
       _ =>
         getSortedIssuingRounds(
           sv1Backend.participantClientWithAdminToken,
-          svcParty,
+          dsoParty,
         ) should have size 1,
     )
 
@@ -72,7 +72,7 @@ class SvTimeBasedBootstrappingRoundIntegrationTest
       _ =>
         getSortedIssuingRounds(
           sv1Backend.participantClientWithAdminToken,
-          svcParty,
+          dsoParty,
         ) should have size 2,
     )
   }

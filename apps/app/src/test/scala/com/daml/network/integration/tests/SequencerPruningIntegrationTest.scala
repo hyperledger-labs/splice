@@ -62,7 +62,7 @@ class SequencerPruningIntegrationTest
       )
 
   "sequencer can be pruned even if a participant is down" in { implicit env =>
-    clue("Initialize SVC with 2 SVs") {
+    clue("Initialize DSO with 2 SVs") {
       startAllSync(
         sv1ScanBackend,
         sv2ScanBackend,
@@ -72,7 +72,7 @@ class SequencerPruningIntegrationTest
         sv2ValidatorBackend,
       )
     }
-    sv1Backend.getSvcInfo().svcRules.payload.members should have size 2
+    sv1Backend.getDsoInfo().dsoRules.payload.members should have size 2
     val bobValidatorLocalBackend: ValidatorAppBackendReference = v("bobValidatorLocal")
 
     val unavailableParticipantId = withCanton(

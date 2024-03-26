@@ -23,7 +23,7 @@ import scala.util.{Failure, Success}
 import ScanAggregator.*
 
 trait ScanAggregatesReader extends AutoCloseable {
-  def readRoundAggregateFromSvc(round: Long)(implicit
+  def readRoundAggregateFromDso(round: Long)(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[Option[RoundAggregate]]
@@ -80,7 +80,7 @@ object ScanAggregatesReader {
       }
     }
 
-    def readRoundAggregateFromSvc(round: Long)(implicit
+    def readRoundAggregateFromDso(round: Long)(implicit
         ec: ExecutionContext,
         traceContext: TraceContext,
     ): Future[Option[RoundAggregate]] = {
@@ -120,7 +120,7 @@ object ScanAggregatesReader {
     ): Future[ScanAggregatesConnection] = {
       for {
         globalDomainId <- store.getGlobalDomainId().map(_.unwrap.toProtoPrimitive)
-        scans <- store.listSvcScans()
+        scans <- store.listDsoScans()
         scanUrls = scans
           .filter(_._1 == globalDomainId)
           .flatMap { case (_, scans) =>
@@ -130,7 +130,7 @@ object ScanAggregatesReader {
           .distinct
         nonEmptyScanUrls = NonEmptyList.fromList(scanUrls) match {
           case Some(urls) => Future.successful(urls)
-          case None => Future.failed(CannotAdvance("No scan urls found in Svc Rules."))
+          case None => Future.failed(CannotAdvance("No scan urls found in Dso Rules."))
         }
         config <- nonEmptyScanUrls.map(BftScanConnection.BftScanClientConfig.Bft(_))
         con <- ScanAggregatesConnection(

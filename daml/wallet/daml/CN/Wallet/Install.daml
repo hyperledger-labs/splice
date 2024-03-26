@@ -30,7 +30,7 @@ catchAll operation =
     (ex : AnyException) -> return $ Left $ ITR_Other $ message ex
 
 data ExecutionContext = ExecutionContext with
-  svc : Party
+  dso : Party
   endUser : Party
   validator : Party
   paymentContext : PaymentTransferContext
@@ -96,7 +96,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
       now <- getTime
       -- validate and update topupState if provided
       forA_ topupStateCidO $ \topupStateCid -> do
-        topupState <- fetchAndArchive (ForMemberTraffic with svc = execContext.svc; memberId, domainId, migrationId)  topupStateCid
+        topupState <- fetchAndArchive (ForMemberTraffic with dso = execContext.dso; memberId, domainId, migrationId)  topupStateCid
         require "validator party and ValidatorTopUpState match" (execContext.validator== topupState.validator)
         -- protect against successive topups being too close together
         require "enough time has elapsed since the last topup" (addRelTime topupState.lastPurchasedAt minTopupInterval <= now)
@@ -105,7 +105,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
       -- Note that auto-tapping is done only to make integration testing of the valdiator top-up loop easier.
       -- So, we only do this when the choice is exercised from the top-up automation and we are on DevNet.
       let amuletRulesCid = context.amuletRules
-      amuletRules <- fetchPublicReferenceData (ForSvc with svc = execContext.svc) amuletRulesCid (AmuletRules_Fetch execContext.validator)
+      amuletRules <- fetchPublicReferenceData (ForDso with dso = execContext.dso) amuletRulesCid (AmuletRules_Fetch execContext.validator)
       newInputs <-
         -- Check that we are on DevNet and the topupState is defined
         if (amuletRules.isDevNet && isSome topupStateCidO)
@@ -187,7 +187,7 @@ data ExecuteBatchResult = ExecuteBatchResult
 
 template WalletAppInstall
   with
-    svcParty : Party
+    dsoParty : Party
     validatorParty : Party -- The validator operator, who will receive app rewards for the first (locking) leg of payments by this user
     endUserName : Text -- The participant user name of the end-user
     endUserParty : Party -- The primary party of the end-user
@@ -203,7 +203,7 @@ template WalletAppInstall
       controller validatorParty
       do
         let executionContext = ExecutionContext with
-              svc = svcParty
+              dso = dsoParty
               endUser = endUserParty
               validator = validatorParty
               paymentContext = context
@@ -247,7 +247,7 @@ template WalletAppInstall
       do
         create TransferOffer with
           sender = endUserParty
-          svc = svcParty
+          dso = dsoParty
           ..
 
     nonconsuming choice WalletAppInstall_TransferOffer_Accept : ContractId AcceptedTransferOffer
@@ -306,7 +306,7 @@ template WalletAppInstall
       controller validatorParty
       do
         create BuyTrafficRequest with
-          svc = svcParty
+          dso = dsoParty
           ..
 
     nonconsuming choice WalletAppInstall_BuyTrafficRequest_Cancel : BuyTrafficRequestTrackingInfo

@@ -36,7 +36,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
   async requestGroup(
     user: string,
     provider: string,
-    svc: string,
+    dso: string,
     id: string,
     domainId: string,
     rules: Contract<SplitwellRules>
@@ -50,7 +50,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
         group: {
           owner: user,
           provider: provider,
-          svc: svc,
+          dso: dso,
           id: { unpack: id },
           members: [],
           acceptDuration: { microseconds: this.acceptDuration },

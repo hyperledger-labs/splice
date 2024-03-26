@@ -60,7 +60,7 @@ abstract class WalletAppReference(
 
   @Help.Summary("Self-grant a featured app right")
   @Help.Description(
-    "This function will only be available in the devnet. It allows an app provider to grant a featured app right to themselves without the SVC having to approve."
+    "This function will only be available in the devnet. It allows an app provider to grant a featured app right to themselves without the DSO having to approve."
   )
   def selfGrantFeaturedAppRight(): amuletCodegen.FeaturedAppRight.ContractId = {
     consoleEnvironment.run {

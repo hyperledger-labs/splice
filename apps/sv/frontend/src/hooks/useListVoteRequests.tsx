@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { VoteRequest, VoteRequestResult } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { VoteRequest, VoteRequestResult } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 import { List } from '@daml/types';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
@@ -14,14 +14,14 @@ export type ListVoteRequestResultParams = {
   effectiveTo?: string;
 };
 
-export const useListSvcRulesVoteRequests = (): UseQueryResult<Contract<VoteRequest>[]> => {
-  const { listSvcRulesVoteRequests } = useSvAdminClient();
+export const useListDsoRulesVoteRequests = (): UseQueryResult<Contract<VoteRequest>[]> => {
+  const { listDsoRulesVoteRequests } = useSvAdminClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
-    queryKey: ['listSvcRulesVoteRequests'],
+    queryKey: ['listDsoRulesVoteRequests'],
     queryFn: async () => {
-      const { svc_rules_vote_requests } = await listSvcRulesVoteRequests();
-      return svc_rules_vote_requests.map(c => Contract.decodeOpenAPI(c, VoteRequest));
+      const { dso_rules_vote_requests } = await listDsoRulesVoteRequests();
+      return dso_rules_vote_requests.map(c => Contract.decodeOpenAPI(c, VoteRequest));
     },
   });
 };
@@ -45,7 +45,7 @@ export const useListVoteRequestResult = (
     ],
     keepPreviousData: true,
     queryFn: async () => {
-      const { svc_rules_vote_results } = await listVoteRequestResults(
+      const { dso_rules_vote_results } = await listVoteRequestResults(
         limit,
         query.actionName,
         query.requester,
@@ -53,7 +53,7 @@ export const useListVoteRequestResult = (
         query.effectiveTo,
         query.executed
       );
-      return List(VoteRequestResult).decoder.runWithException(svc_rules_vote_results);
+      return List(VoteRequestResult).decoder.runWithException(dso_rules_vote_results);
     },
   });
 };

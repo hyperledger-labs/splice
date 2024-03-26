@@ -36,21 +36,21 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       .withoutInitialManagerApps // TODO (#7539): this should no longer be required once app-instances is removed
 
   "start and restart cleanly" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     splitwellValidatorBackend.startSync()
     splitwellValidatorBackend.stop()
     splitwellValidatorBackend.startSync()
   }
 
-  "initialize SVC and validator apps" in { implicit env =>
-    initSvcWithSv1Only()
+  "initialize DSO and validator apps" in { implicit env =>
+    initDsoWithSv1Only()
     // Check that there is exactly one AmuletRule and OpenMiningRound
     val amuletRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(cc.amuletrules.AmuletRules.COMPANION)(svcParty)
+      .filterJava(cc.amuletrules.AmuletRules.COMPANION)(dsoParty)
     amuletRules should have length 1
 
     val openRounds = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
+      .filterJava(cc.round.OpenMiningRound.COMPANION)(dsoParty)
     openRounds should have length 3
 
     // Start Alice’s validator
@@ -65,12 +65,12 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
     aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
   }
 
-  "validator apps connect to all SVC sequencers" in { implicit env =>
-    initSvc()
+  "validator apps connect to all DSO sequencers" in { implicit env =>
+    initDso()
     // Start Alice’s validator
     aliceValidatorBackend.startSync()
 
-    // check that alice's validator connects to all SVC sequencers.
+    // check that alice's validator connects to all DSO sequencers.
     // we need to wait for a minute due to non sv validator only connect to sequencers after initialization + sequencerAvailabilityDelay which is is 60s
     eventually(timeUntilSuccess = 1.minutes, maxPollInterval = 1.seconds) {
       val sequencerConnections = aliceValidatorBackend.participantClientWithAdminToken.domains
@@ -87,7 +87,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "onboard users with party hint sanitizer" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
 
     // Make uniqueness of the user ID more probable when running the test multiple times in a row
@@ -106,7 +106,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "register user" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
 
     val aliceUser = aliceWalletClient.config.ledgerApiUser
@@ -129,7 +129,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
 
     implicit val sys = env.actorSystem
@@ -169,7 +169,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "fail admin endpoint when not authenticated as validator operator" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
 
     implicit val sys = env.actorSystem
@@ -266,7 +266,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "create and list CNS entries" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
     aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
     aliceWalletClient.tap(10)
@@ -290,7 +290,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "onboard user multiple times" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
 
     val party1 = aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser)
@@ -299,7 +299,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "register user multiple times" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
 
     val aliceUser = aliceWalletClient.config.ledgerApiUser
@@ -319,7 +319,7 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
   }
 
   "onboard, list and offboard users" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
 
     actAndCheck("Onboard a user", onboardWalletUser(aliceWalletClient, aliceValidatorBackend))(

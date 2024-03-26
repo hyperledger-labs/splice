@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.environment.{ParticipantAdminConnection, TopologyAdminConnection}
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AllProposals
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
@@ -20,7 +20,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
 
-/** Authorized the hosting of the SVC party on a new participant.
+/** Authorized the hosting of the DSO party on a new participant.
   * For this to happen the following rules must be met:
   * - There must exist an OnboardingConfirmed contract for the sv party having the same namespace as the participant
   * - There must exist a proposal for the party hosting which is signed by at least 2 participants (candidate and sponsor).
@@ -28,7 +28,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class SvOnboardingPartyToParticipantProposalTrigger(
     override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
@@ -37,30 +37,30 @@ class SvOnboardingPartyToParticipantProposalTrigger(
 
   import SvOnboardingPartyToParticipantProposalTrigger.Task
 
-  private val svParty = svcStore.key.svParty
-  private val svcParty: PartyId = svcStore.key.svcParty
+  private val svParty = dsoStore.key.svParty
+  private val dsoParty: PartyId = dsoStore.key.dsoParty
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[Task]] = {
-    svcStore
+    dsoStore
       .listSvOnboardingConfirmed()
       .map(_.map(_.payload.svParty).map(PartyId.tryFromProtoPrimitive).map(_.uid.namespace))
       .flatMap { confirmedOnboardingNamespacesThatCorrespondToParticipants =>
         // avoid listing all the proposals if no onboarding contract is present
         if (confirmedOnboardingNamespacesThatCorrespondToParticipants.nonEmpty) {
           for {
-            svcRules <- svcStore.getSvcRules()
+            dsoRules <- dsoStore.getDsoRules()
             currentlyHostingParticipants <- participantAdminConnection.getPartyToParticipant(
-              svcRules.domain,
-              svcParty,
+              dsoRules.domain,
+              dsoParty,
             )
-            svcPartyHostingProposals <- participantAdminConnection.listPartyToParticipant(
-              filterStore = svcRules.domain.filterString,
-              filterParty = svcParty.filterString,
+            dsoPartyHostingProposals <- participantAdminConnection.listPartyToParticipant(
+              filterStore = dsoRules.domain.filterString,
+              filterParty = dsoParty.filterString,
               proposals = AllProposals,
             )
-            _ = svcPartyHostingProposals.foreach { proposal =>
+            _ = dsoPartyHostingProposals.foreach { proposal =>
               if (
                 proposal.base.serial != currentlyHostingParticipants.base.serial + PositiveInt.one
               ) {
@@ -78,7 +78,7 @@ class SvOnboardingPartyToParticipantProposalTrigger(
             // Without this check, the transaction can become valid while the candidate is still connected
             // which then results in all kinds of errors because it does not have an ACS import.
             val proposalsSignedByCandidateAndSponsor =
-              svcPartyHostingProposals.filter(_.base.signedBy.size >= 2)
+              dsoPartyHostingProposals.filter(_.base.signedBy.size >= 2)
             val proposalsNotSignedBySv = proposalsSignedByCandidateAndSponsor
               .filterNot(_.base.signedBy.contains(svParty.uid.namespace.fingerprint))
             val newlyAddedParticipantIds = proposalsNotSignedBySv
@@ -105,11 +105,11 @@ class SvOnboardingPartyToParticipantProposalTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = {
     for {
-      svcRules <- svcStore.getSvcRules()
+      dsoRules <- dsoStore.getDsoRules()
       _ <- participantAdminConnection
         .ensurePartyToParticipantAdditionProposalWithSerial(
-          svcRules.domain,
-          svcParty,
+          dsoRules.domain,
+          dsoParty,
           task.participantId,
           task.serial,
           svParty.uid.namespace.fingerprint,
@@ -119,7 +119,7 @@ class SvOnboardingPartyToParticipantProposalTrigger(
           throw Status.FAILED_PRECONDITION.withDescription(ex.getMessage).asRuntimeException()
         }
     } yield {
-      TaskSuccess(show"Hosted SVC party $svcParty on participant $task")
+      TaskSuccess(show"Hosted DSO party $dsoParty on participant $task")
     }
   }
 
@@ -128,10 +128,10 @@ class SvOnboardingPartyToParticipantProposalTrigger(
   override protected def isStaleTask(task: Task)(implicit
       tc: TraceContext
   ): Future[Boolean] = for {
-    svcRules <- svcStore.getSvcRules()
+    dsoRules <- dsoStore.getDsoRules()
     partyToParticipant <- participantAdminConnection.getPartyToParticipant(
-      svcRules.domain,
-      svcParty,
+      dsoRules.domain,
+      dsoParty,
     )
   } yield {
     partyToParticipant.base.serial != task.serial

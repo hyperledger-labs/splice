@@ -109,19 +109,19 @@ final class ScanAggregator(
       tc: TraceContext
   ): Future[Unit] = {
     for {
-      aggregatedRound <- reader.readRoundAggregateFromSvc(round)
+      aggregatedRound <- reader.readRoundAggregateFromDso(round)
       res <- aggregatedRound match {
         case Some(RoundAggregate(rt, rpt)) =>
           storage
             .update_(
               insertRoundTotals(rt).andThen(insertRoundPartyTotals(rpt)).transactionally,
-              "backfill insert round aggregates from svc",
+              "backfill insert round aggregates from dso",
             )
             .map(_ => ())
         case None =>
           Future.failed(
             CannotAdvance(
-              s"Could not read aggregates for round $round from svc while backfilling aggregates."
+              s"Could not read aggregates for round $round from dso while backfilling aggregates."
             )
           )
       }
@@ -169,17 +169,17 @@ final class ScanAggregator(
               prev <- openRound match {
                 case Some(round) if round == 0L =>
                   logger.debug(
-                    s"Updating aggregates from SVC for round zero, store_id = $storeId"
+                    s"Updating aggregates from DSO for round zero, store_id = $storeId"
                   )
-                  updateRoundAggregateFromSvc(0)
+                  updateRoundAggregateFromDso(0)
                 case Some(round) if round > 0L =>
                   logger.debug(
-                    s"Aggregation starts from round $round once last aggregates are updated from SVC, store_id = $storeId"
+                    s"Aggregation starts from round $round once last aggregates are updated from DSO, store_id = $storeId"
                   )
                   logger.debug(
-                    s"Updating aggregates from SVC for round ${round - 1}, before the first detected open mining round: $round, store_id = $storeId"
+                    s"Updating aggregates from DSO for round ${round - 1}, before the first detected open mining round: $round, store_id = $storeId"
                   )
-                  updateRoundAggregateFromSvc(round - 1)
+                  updateRoundAggregateFromDso(round - 1)
                 case Some(round) =>
                   Future.failed(
                     CannotAdvance(
@@ -200,24 +200,24 @@ final class ScanAggregator(
       previousRoundTotals
     }
 
-  def updateRoundAggregateFromSvc(
+  def updateRoundAggregateFromDso(
       round: Long
   )(implicit traceContext: TraceContext): Future[Option[RoundTotals]] = {
     for {
-      aggregatedRound <- reader.readRoundAggregateFromSvc(round)
+      aggregatedRound <- reader.readRoundAggregateFromDso(round)
       lastRoundTotals <- aggregatedRound match {
         case Some(RoundAggregate(rt, rpt)) =>
           for {
             _ <- storage.update_(
               insertRoundTotals(rt).andThen(insertRoundPartyTotals(rpt)).transactionally,
-              "insert round aggregates from svc",
+              "insert round aggregates from dso",
             )
             lastRoundTotals <- getLastAggregatedRoundTotals()
           } yield lastRoundTotals
         case None =>
           Future.failed(
             CannotAdvance(
-              s"Could not read aggregates for round $round from svc"
+              s"Could not read aggregates for round $round from dso"
             )
           )
       }

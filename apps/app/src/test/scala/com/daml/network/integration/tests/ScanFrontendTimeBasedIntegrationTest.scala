@@ -390,7 +390,7 @@ class ScanFrontendTimeBasedIntegrationTest
               s"${aliceValidatorWalletParty} ${openRounds.size} 0 $firstCollectedInRound $lastCollectedInRound"
             )
             actual.tail should contain theSameElementsAs Seq(
-              sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
               splitwellValidatorBackend.getValidatorPartyId().toProtoPrimitive,
               bobValidatorWalletParty,
             ).map(party => s"$party 0 0 0 0")

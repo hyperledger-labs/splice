@@ -10,7 +10,7 @@ test : Script ()
 test = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
-  -- -- start issuing so the SVC has some amulets to invite users
+  -- -- start issuing so the DSO has some amulets to invite users
   runNextIssuance app
   runAmuletDepositBots app
 

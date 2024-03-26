@@ -27,7 +27,7 @@ requestGroup app p provider id =
       provider = provider.primaryParty
       members = []
       id = GroupId id
-      svc = app.svc
+      dso = app.dso
       acceptDuration = minutes 5
     user = p.primaryParty
 

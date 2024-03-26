@@ -7,10 +7,10 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svcrules.ElectionRequest
+import com.daml.network.codegen.java.cn.dsorules.ElectionRequest
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.tracing.TraceContext
@@ -23,7 +23,7 @@ import scala.jdk.CollectionConverters.*
 /** Trigger to react to the creation of `ElectionRequest` contracts and complete the election if there are enough of them. */
 class ElectionRequestTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     connection: CNLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
@@ -41,16 +41,16 @@ class ElectionRequestTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svcRules <- store.getSvcRules()
-      currentLeader = svcRules.payload.leader
+      dsoRules <- store.getDsoRules()
+      currentLeader = dsoRules.payload.leader
       self = store.key.svParty.toProtoPrimitive
 
-      requiredNumRequests = CNThresholds.requiredNumVotes(svcRules)
-      requestCids <- store.listElectionRequests(svcRules).map(_.map(_.contractId))
+      requiredNumRequests = CNThresholds.requiredNumVotes(dsoRules)
+      requestCids <- store.listElectionRequests(dsoRules).map(_.map(_.contractId))
       taskOutcome <-
         if (requestCids.size >= requiredNumRequests) {
-          val cmd = svcRules.exercise(
-            _.exerciseSvcRules_ElectLeader(
+          val cmd = dsoRules.exercise(
+            _.exerciseDsoRules_ElectLeader(
               self,
               requestCids.asJava,
             )
@@ -58,16 +58,16 @@ class ElectionRequestTrigger(
           connection
             .submit(
               Seq(store.key.svParty),
-              Seq(store.key.svcParty),
+              Seq(store.key.dsoParty),
               cmd,
             )
             .noDedup
             .yieldResultAndOffset()
-            .flatMap(_ => store.getSvcRules())
-            .map(svcRules => {
+            .flatMap(_ => store.getDsoRules())
+            .map(dsoRules => {
 
               TaskSuccess(
-                show"Successfully completed a leader election to replace the leader $currentLeader with ${svcRules.payload.leader}"
+                show"Successfully completed a leader election to replace the leader $currentLeader with ${dsoRules.payload.leader}"
               )
             })
         } else

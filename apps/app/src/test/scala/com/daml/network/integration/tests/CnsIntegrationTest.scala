@@ -19,7 +19,7 @@ import com.digitalasset.canton.util.FutureInstances.*
 import cats.syntax.parallel.*
 import com.daml.network.automation.Trigger
 import com.daml.network.http.v0.definitions
-import com.daml.network.scan.svc.SvcCnsResolver
+import com.daml.network.scan.dso.DsoCnsResolver
 import com.daml.network.sv.automation.leaderbased.{
   ExpiredCnsEntryTrigger,
   ExpiredCnsSubscriptionTrigger,
@@ -115,17 +115,17 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
               .listEntries("", 25)
               .filter(entry =>
                 !entry.name.endsWith(
-                  SvcCnsResolver.svCnsNameSuffix
-                ) && entry.name != SvcCnsResolver.svcCnsName
+                  DsoCnsResolver.svCnsNameSuffix
+                ) && entry.name != DsoCnsResolver.dsoCnsName
               )
             userEntries shouldBe empty
           }
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
             .submitJava(
-              actAs = Seq(svcParty),
+              actAs = Seq(dsoParty),
               commands = new codegen.CnsEntry(
-                svcParty.toProtoPrimitive,
-                svcParty.toProtoPrimitive,
+                dsoParty.toProtoPrimitive,
+                dsoParty.toProtoPrimitive,
                 testEntryName,
                 testEntryUrl,
                 testEntryDescription,
@@ -293,7 +293,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         aliceSubscriptionReadyForPaymentTrigger.resume()
 
         val renewedEntry = clue(
-          "Eventually, Alice makes a follow-up subscription payment, which the SVC collects, renewing her entry."
+          "Eventually, Alice makes a follow-up subscription payment, which the DSO collects, renewing her entry."
         ) {
           eventually() {
             val renewed = lookupEntryByName(testEntryName).value
@@ -379,27 +379,27 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       }
     }
 
-    "svc cns entries can be seen via scan api" in { implicit env =>
-      val expectedSvcEntry = definitions.CnsEntry(
+    "dso cns entries can be seen via scan api" in { implicit env =>
+      val expectedDsoEntry = definitions.CnsEntry(
         None,
-        svcParty.toProtoPrimitive,
-        SvcCnsResolver.svcCnsName,
+        dsoParty.toProtoPrimitive,
+        DsoCnsResolver.dsoCnsName,
         "",
         "",
         None,
       )
 
-      sv1ScanBackend.lookupEntryByName(SvcCnsResolver.svcCnsName) shouldBe expectedSvcEntry
-      sv1ScanBackend.lookupEntryByParty(svcParty).value shouldBe expectedSvcEntry
-      sv1ScanBackend.listEntries("", 100) should contain(expectedSvcEntry)
+      sv1ScanBackend.lookupEntryByName(DsoCnsResolver.dsoCnsName) shouldBe expectedDsoEntry
+      sv1ScanBackend.lookupEntryByParty(dsoParty).value shouldBe expectedDsoEntry
+      sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry)
     }
 
     "sv member cns entries can be seen via scan api" in { implicit env =>
-      val svcRules = sv1Backend.getSvcInfo().svcRules
-      svcRules.payload.members.asScala.foreach { case (svParty, memberInfo) =>
+      val dsoRules = sv1Backend.getDsoInfo().dsoRules
+      dsoRules.payload.members.asScala.foreach { case (svParty, memberInfo) =>
         val expectedSvEntry = svEntry(memberInfo.name, svParty)
         sv1ScanBackend.lookupEntryByName(
-          s"${memberInfo.name.toLowerCase}${SvcCnsResolver.svCnsNameSuffix}"
+          s"${memberInfo.name.toLowerCase}${DsoCnsResolver.svCnsNameSuffix}"
         ) shouldBe expectedSvEntry
         sv1ScanBackend
           .lookupEntryByParty(PartyId.tryFromProtoPrimitive(svParty))
@@ -413,7 +413,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
     definitions.CnsEntry(
       None,
       svParty,
-      s"${svName.toLowerCase}${SvcCnsResolver.svCnsNameSuffix}",
+      s"${svName.toLowerCase}${DsoCnsResolver.svCnsNameSuffix}",
       "",
       "",
       None,
@@ -422,10 +422,10 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
   private def lookupEntryByName(
       name: String
   )(implicit env: CNNodeTestConsoleEnvironment): Option[definitions.CnsEntry] = {
-    val svc = sv1Backend.getSvcInfo().svcParty
+    val dso = sv1Backend.getDsoInfo().dsoParty
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(codegen.CnsEntry.COMPANION)(
-        svc,
+        dso,
         (co: codegen.CnsEntry.Contract) => co.data.name == name,
       )
       .headOption

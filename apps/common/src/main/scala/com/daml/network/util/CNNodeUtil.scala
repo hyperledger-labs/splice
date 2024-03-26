@@ -47,7 +47,7 @@ object CNNodeUtil {
     new cc.amuletconfig.PackageConfig(
       readDarVersion(DarResources.cantonAmulet.bootstrap).toString,
       readDarVersion(DarResources.cantonNameService.bootstrap).toString,
-      readDarVersion(DarResources.svcGovernance.bootstrap).toString,
+      readDarVersion(DarResources.dsoGovernance.bootstrap).toString,
       readDarVersion(DarResources.validatorLifecycle.bootstrap).toString,
       readDarVersion(DarResources.wallet.bootstrap).toString,
       readDarVersion(DarResources.walletPayments.bootstrap).toString,
@@ -87,17 +87,17 @@ object CNNodeUtil {
 
   /** Creates a contract that gives the given validator the right to claim amulet issuances for the given user's burns. */
   private def createValidatorRightCommand(
-      svc: PartyId,
+      dso: PartyId,
       validator: PartyId,
       user: PartyId,
   ) = new cc.amulet.ValidatorRight(
-    svc.toProtoPrimitive,
+    dso.toProtoPrimitive,
     user.toProtoPrimitive,
     validator.toProtoPrimitive,
   ).create
 
   def createValidatorRight(
-      svc: PartyId,
+      dso: PartyId,
       validator: PartyId,
       user: PartyId,
       logger: TracedLogger,
@@ -122,7 +122,7 @@ object CNNodeUtil {
             .submit(
               actAs = Seq(validator, user),
               readAs = Seq.empty,
-              createValidatorRightCommand(svc, validator, user),
+              createValidatorRightCommand(dso, validator, user),
               priority = priority,
             )
             .withDedup(

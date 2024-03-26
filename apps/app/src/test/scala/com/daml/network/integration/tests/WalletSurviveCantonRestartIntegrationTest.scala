@@ -57,7 +57,7 @@ class WalletSurviveCantonRestartIntegrationTest
 
   "Wallet" should {
     "survive Canton restarts" in { implicit env =>
-      initSvc()
+      initDso()
       aliceValidatorBackend.start()
       clue("First run of Canton participant") {
         withCanton(cantonArgs, cantonExtraConfig, "wallet-survives-canton-restarts-1") {

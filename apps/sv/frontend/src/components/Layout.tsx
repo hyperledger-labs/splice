@@ -19,7 +19,7 @@ const Layout: React.FC<LayoutProps> = (props: LayoutProps) => {
         <Header
           title="Super Validator Operations"
           navLinks={[
-            { name: 'Information', path: 'svc' },
+            { name: 'Information', path: 'dso' },
             { name: 'Validator Onboarding', path: 'validator-onboarding' },
             { name: 'Canton Coin Price', path: 'cc-price' },
             { name: 'Leader Election', path: 'leader' },

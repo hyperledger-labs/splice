@@ -8,23 +8,23 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, SummarizingMiningRound}
-import com.daml.network.codegen.java.cn.svcrules.Confirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.dsorules.Confirmation
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
   ARC_CnsEntryContext,
   ARC_AmuletRules,
-  ARC_SvcRules,
+  ARC_DsoRules,
 }
-import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.dsorules.cnsentrycontext_actionrequiringconfirmation.{
   CNSRARC_CollectInitialEntryPayment,
   CNSRARC_RejectEntryInitialPayment,
 }
-import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.{
   CRARC_MiningRound_Archive,
   CRARC_MiningRound_StartIssuing,
 }
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.config.CNThresholds
-import com.daml.network.sv.SvApp.{isDevNet, isSvcMemberName, isSvcMemberParty}
+import com.daml.network.sv.SvApp.{isDevNet, isDsoMemberName, isDsoMemberParty}
 import com.daml.network.util.AssignedContract
 import com.daml.network.util.PrettyInstances.*
 import com.digitalasset.canton.topology.PartyId
@@ -43,12 +43,12 @@ class ExecuteConfirmedActionTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[Confirmation.ContractId, Confirmation](
-      svTaskContext.svcStore,
+      svTaskContext.dsoStore,
       Confirmation.COMPANION,
     )
     with SvTaskBasedTrigger[AssignedContract[Confirmation.ContractId, Confirmation]] {
 
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(
       confirmationContract: AssignedContract[Confirmation.ContractId, Confirmation]
@@ -63,8 +63,8 @@ class ExecuteConfirmedActionTrigger(
         )
       else
         for {
-          svcRules <- store.getSvcRules()
-          requiredNumConfirmations = CNThresholds.requiredNumVotes(svcRules)
+          dsoRules <- store.getDsoRules()
+          requiredNumConfirmations = CNThresholds.requiredNumVotes(dsoRules)
           confirmations <- store.listConfirmations(action)
           uniqueConfirmations = confirmations.distinctBy(_.payload.confirmer)
           taskOutcome <-
@@ -72,8 +72,8 @@ class ExecuteConfirmedActionTrigger(
               for {
                 amuletRules <- store.getAmuletRules()
                 amuletRulesId = amuletRules.contractId
-                cmd = svcRules.exercise(
-                  _.exerciseSvcRules_ExecuteConfirmedAction(
+                cmd = dsoRules.exercise(
+                  _.exerciseDsoRules_ExecuteConfirmedAction(
                     action,
                     java.util.Optional.of(amuletRulesId),
                     uniqueConfirmations
@@ -84,7 +84,7 @@ class ExecuteConfirmedActionTrigger(
                 _ <- svTaskContext.connection
                   .submit(
                     Seq(store.key.svParty),
-                    Seq(store.key.svcParty),
+                    Seq(store.key.dsoParty),
                     cmd,
                   )
                   .noDedup
@@ -138,32 +138,32 @@ class ExecuteConfirmedActionTrigger(
               show"AmuletRules $action is not yet supported"
             )
         }
-      case arcSvcRules: ARC_SvcRules =>
-        arcSvcRules.svcAction match {
+      case arcDsoRules: ARC_DsoRules =>
+        arcDsoRules.dsoAction match {
           case confirmSvAction: SRARC_ConfirmSvOnboarding =>
             for {
               isSvOnboardingConfirmed <- store
                 .lookupSvOnboardingConfirmedByParty(
                   PartyId.tryFromProtoPrimitive(
-                    confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberParty
+                    confirmSvAction.dsoRules_ConfirmSvOnboardingValue.newMemberParty
                   )
                 )
                 .map(_.nonEmpty)
               newMemberParty = PartyId.tryFromProtoPrimitive(
-                confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberParty
+                confirmSvAction.dsoRules_ConfirmSvOnboardingValue.newMemberParty
               )
-              newMemberName = confirmSvAction.svcRules_ConfirmSvOnboardingValue.newMemberName
-              isSvPartOfSvc <- store
-                .getSvcRules()
-                .map(svcRules =>
-                  isSvcMemberParty(newMemberParty, svcRules) || (
-                    !isDevNet(svcRules) && isSvcMemberName(newMemberName, svcRules)
+              newMemberName = confirmSvAction.dsoRules_ConfirmSvOnboardingValue.newMemberName
+              isSvPartOfDso <- store
+                .getDsoRules()
+                .map(dsoRules =>
+                  isDsoMemberParty(newMemberParty, dsoRules) || (
+                    !isDevNet(dsoRules) && isDsoMemberName(newMemberName, dsoRules)
                   )
                 )
-            } yield isSvOnboardingConfirmed || isSvPartOfSvc
+            } yield isSvOnboardingConfirmed || isSvPartOfDso
           case action =>
             throw new UnsupportedOperationException(
-              show"SvcRules $action is not yet supported"
+              show"DsoRules $action is not yet supported"
             )
         }
       case arcCnsEntryContext: ARC_CnsEntryContext =>

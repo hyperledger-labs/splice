@@ -8,8 +8,8 @@ import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
-import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
+import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
@@ -66,10 +66,10 @@ class DbScanStore(
       storeDescriptor = StoreDescriptor(
         version = 1,
         name = "DbScanStore",
-        party = key.svcParty,
+        party = key.dsoParty,
         participant = participantId,
         key = Map(
-          "svcParty" -> key.svcParty.toProtoPrimitive
+          "dsoParty" -> key.dsoParty.toProtoPrimitive
         ),
       ),
       domainMigrationId,
@@ -184,9 +184,9 @@ class DbScanStore(
       } yield contractWithState
     }
 
-  override def lookupSvcRules()(implicit
+  override def lookupDsoRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[SvcRules.ContractId, SvcRules]]] =
+  ): Future[Option[ContractWithState[DsoRules.ContractId, DsoRules]]] =
     waitUntilAcsIngested {
       for {
         row <- storage
@@ -195,14 +195,14 @@ class DbScanStore(
               ScanTables.acsTableName,
               storeId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(SvcRules.TEMPLATE_ID)}""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(DsoRules.TEMPLATE_ID)}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
-            "lookupSvcRules",
+            "lookupDsoRules",
           )
           .value
         contractWithState = row.map(
-          contractWithStateFromRow(SvcRules.COMPANION)(_)
+          contractWithStateFromRow(DsoRules.COMPANION)(_)
         )
       } yield contractWithState
     }

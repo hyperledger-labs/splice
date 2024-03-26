@@ -5,7 +5,7 @@ import com.daml.network.console.LedgerApiExtensions._
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 
-println("Waiting for SVC initialization...")
+println("Waiting for DSO initialization...")
 // We need to do this at the beginning, otherwise later commands can fail because AmuletRules is locked.n
 sv1.waitForInitialization()
 

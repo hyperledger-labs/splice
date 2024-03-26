@@ -113,7 +113,7 @@ Deploying Splitwell to a separate domain
 ========================================
 
 In the example above, we deployed splitwell to the global domain
-operated for the SVC. This can be a good option to get
+operated for the DSO. This can be a good option to get
 started. However, over time you might want to operate your own domain
 for your application. This provides you with better scalability,
 reduces the domain fees you have to pay on the global domain,

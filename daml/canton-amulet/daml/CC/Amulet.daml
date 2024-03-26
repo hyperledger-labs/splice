@@ -35,16 +35,16 @@ data FeaturedAppRight_WithdrawResult = FeaturedAppRight_WithdrawResult
 
 data FeaturedAppRight_CancelResult = FeaturedAppRight_CancelResult
 
-data AppRewardCoupon_SvcExpireResult = AppRewardCoupon_SvcExpireResult with
+data AppRewardCoupon_DsoExpireResult = AppRewardCoupon_DsoExpireResult with
   featured : Bool
   amount : Decimal
 
-data ValidatorRewardCoupon_SvcExpireResult = ValidatorRewardCoupon_SvcExpireResult with
+data ValidatorRewardCoupon_DsoExpireResult = ValidatorRewardCoupon_DsoExpireResult with
   amount : Decimal
 
 data ValidatorRewardCoupon_ArchiveAsValidatorResult = ValidatorRewardCoupon_ArchiveAsValidatorResult with
 
-data SvRewardCoupon_SvcExpireResult = SvRewardCoupon_SvcExpireResult with
+data SvRewardCoupon_DsoExpireResult = SvRewardCoupon_DsoExpireResult with
   weight: Int
 
 data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBeneficiaryResult
@@ -52,21 +52,21 @@ data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBenefic
 -- | A amulet, which can be locked and whose amount expires over time.
 --
 -- The expiry serves to charge an inactivity fee, and thereby ensures that the
--- SVC can reclaim all amulets at some point in the future.
+-- DSO can reclaim all amulets at some point in the future.
 template Amulet
   with
-    svc : Party
+    dso : Party
     owner : Party
     amount : ExpiringAmount
   where
-    signatory svc, owner
+    signatory dso, owner
     ensure validExpiringAmount amount
 
     choice Amulet_Expire : AmuletExpireSummary
       with
         roundCid : ContractId OpenMiningRound
-      -- For simplicity and to communicate this as the standard-case, we only allow the SVC to expire amulets (see #1789 for full context)
-      controller svc
+      -- For simplicity and to communicate this as the standard-case, we only allow the DSO to expire amulets (see #1789 for full context)
+      controller dso
       do  requireAmuletExpiredForAllOpenRounds roundCid this
           return AmuletExpireSummary with
             owner = owner
@@ -86,7 +86,7 @@ template LockedAmulet
       with
         openRoundCid : ContractId OpenMiningRound
       controller amulet.owner :: lock.holders
-      do openMiningRound <- fetchReferenceData (ForSvc with svc = amulet.svc) openRoundCid
+      do openMiningRound <- fetchReferenceData (ForDso with dso = amulet.dso) openRoundCid
          amuletCid <- create amulet
          return AmuletCreateSummary with
            amulet = amuletCid
@@ -97,7 +97,7 @@ template LockedAmulet
       with
         openRoundCid : ContractId OpenMiningRound
       controller amulet.owner
-      do openMiningRound <- fetchReferenceData (ForSvc with svc = amulet.svc) openRoundCid
+      do openMiningRound <- fetchReferenceData (ForDso with dso = amulet.dso) openRoundCid
          t <- getTime
          require "Lock is expired" (lock.expiresAt < t)
          amuletCid <- create amulet
@@ -109,8 +109,8 @@ template LockedAmulet
     choice LockedAmulet_ExpireAmulet : AmuletExpireSummary
       with
         roundCid : ContractId OpenMiningRound
-      -- For simplicity and to communicate this as the standard-case, we only allow the SVC to expire amulets (see #1789 for full context)
-      controller amulet.svc
+      -- For simplicity and to communicate this as the standard-case, we only allow the DSO to expire amulets (see #1789 for full context)
+      controller amulet.dso
       do t <- getTime
          require "Lock is expired" (lock.expiresAt < t)
          requireAmuletExpiredForAllOpenRounds roundCid amulet
@@ -126,7 +126,7 @@ template LockedAmulet
 
 -- | The right to claim amulet issuances for a user's burns as their validator.
 template ValidatorRight with
-    svc : Party
+    dso : Party
     user : Party
     validator : Party
   where
@@ -145,16 +145,16 @@ template ValidatorRight with
 
 -- | The right for an application provider to earn featured app rewards.
 template FeaturedAppRight with
-    svc : Party
+    dso : Party
     provider : Party
   where
-    signatory svc
+    signatory dso
     observer provider
 
     choice FeaturedAppRight_Withdraw : FeaturedAppRight_WithdrawResult
       with
         reason : Text
-      controller svc
+      controller dso
       do return FeaturedAppRight_WithdrawResult
 
     choice FeaturedAppRight_Cancel : FeaturedAppRight_CancelResult
@@ -166,27 +166,27 @@ template FeaturedAppRight with
 -- CC transfer coordinated by the app of a provider.
 template AppRewardCoupon
   with
-    svc : Party
+    dso : Party
     provider : Party -- ^ Application provider
     featured : Bool
     amount : Decimal
     round : Round
   where
-    signatory svc
+    signatory dso
     ensure amount > 0.0
 
     -- The provider is no signatory so their node's unavailability does not hold up the rewards issuance process.
-    -- They can rely on the SVC to only withdraw the coupon once it expired.
+    -- They can rely on the DSO to only withdraw the coupon once it expired.
     observer provider
 
-    choice AppRewardCoupon_SvcExpire : AppRewardCoupon_SvcExpireResult
+    choice AppRewardCoupon_DsoExpire : AppRewardCoupon_DsoExpireResult
       with
         closedRoundCid : ContractId ClosedMiningRound
-      controller svc
+      controller dso
       do
          -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
-         void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
-         return AppRewardCoupon_SvcExpireResult with
+         void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
+         return AppRewardCoupon_DsoExpireResult with
            ..
 
 
@@ -194,26 +194,26 @@ template AppRewardCoupon
 -- hosted by a validator operator.
 template ValidatorRewardCoupon
   with
-    svc : Party
+    dso : Party
     user : Party
     amount : Decimal
     round : Round
   where
-    signatory svc
+    signatory dso
     ensure amount > 0.0
 
     -- The user is no signatory so their node's unavailability does not hold up the rewards issuance process.
-    -- They can rely on the SVC to only withdraw the coupon once it expired.
+    -- They can rely on the DSO to only withdraw the coupon once it expired.
     observer user
 
-    choice ValidatorRewardCoupon_SvcExpire : ValidatorRewardCoupon_SvcExpireResult
+    choice ValidatorRewardCoupon_DsoExpire : ValidatorRewardCoupon_DsoExpireResult
       with
         closedRoundCid : ContractId ClosedMiningRound
-      controller svc
+      controller dso
       do
          -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
-        void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
-        return ValidatorRewardCoupon_SvcExpireResult with ..
+        void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
+        return ValidatorRewardCoupon_DsoExpireResult with ..
 
 
     choice ValidatorRewardCoupon_ArchiveAsValidator : ValidatorRewardCoupon_ArchiveAsValidatorResult
@@ -221,23 +221,23 @@ template ValidatorRewardCoupon
       with
         validator : Party
         rightCid : ContractId ValidatorRight
-      controller svc, validator
+      controller dso, validator
       do
-        requireMatchingContract rightCid (ValidatorRight with svc; validator, user)
+        requireMatchingContract rightCid (ValidatorRight with dso; validator, user)
         return ValidatorRewardCoupon_ArchiveAsValidatorResult
 
 
--- | A coupon for a beneficiary to receive part of the SVC issuance for a specific SV node and round.
+-- | A coupon for a beneficiary to receive part of the DSO issuance for a specific SV node and round.
 template SvRewardCoupon with
-    svc : Party
+    dso : Party
     sv : Party -- ^ The party identifying the SV node for which the reward is issued.
     beneficiary : Party -- ^ The beneficiary allowed to receive the reward.
     round : Round
-    weight : Int -- ^ Coupons receive a share of the SVC issuance proportional to their weight.
+    weight : Int -- ^ Coupons receive a share of the DSO issuance proportional to their weight.
   where
     ensure weight > 0
 
-    signatory svc
+    signatory dso
 
     -- The beneficiary is an observer of the coupon, as they need to be able to claim it; but they are not
     -- a signatory, to avoid their node's unavailability to block the coupon issuance.
@@ -247,14 +247,14 @@ template SvRewardCoupon with
     -- They are not a signatory to ensure their node's unavailability cannot block the coupon redemption.
     observer sv
 
-    choice SvRewardCoupon_SvcExpire : SvRewardCoupon_SvcExpireResult
+    choice SvRewardCoupon_DsoExpire : SvRewardCoupon_DsoExpireResult
       with
         closedRoundCid : ContractId ClosedMiningRound
-      controller svc
+      controller dso
       do
          -- Expiry requires proof of the coupon's round being closed, as all rounds go through their phases at their own pace
-        void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
-        return SvRewardCoupon_SvcExpireResult with ..
+        void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
+        return SvRewardCoupon_DsoExpireResult with ..
 
     -- Choice called by the beneficiary as part of a AmuletRules_Transfer to claim the reward.
     choice SvRewardCoupon_ArchiveAsBeneficiary : SvRewardCoupon_ArchiveAsBeneficiaryResult
@@ -264,16 +264,16 @@ template SvRewardCoupon with
 
 -- | Rewards that have not been claimed and are thus at the disposal of the foundation.
 template UnclaimedReward with
-    svc : Party
+    dso : Party
     amount : Decimal
   where
     ensure amount > 0.0
 
-    signatory svc
+    signatory dso
 
 requireAmuletExpiredForAllOpenRounds : ContractId OpenMiningRound -> Amulet -> Update ()
 requireAmuletExpiredForAllOpenRounds roundCid amulet = do
-  round <- fetchReferenceData (ForSvc with svc = amulet.svc) roundCid
+  round <- fetchReferenceData (ForDso with dso = amulet.dso) roundCid
   -- Note: we exploit that there are exactly three open rounds active at any
   -- point in time; and we ensure that a amulet can be expired as soon as it can
   -- definitely not be used as an input to transfer anymore.
@@ -290,15 +290,15 @@ instance HasCheckedFetch LockedAmulet ForOwner where
   contractGroupId lockedAmulet = contractGroupId (lockedAmulet.amulet)
 
 instance HasCheckedFetch AppRewardCoupon ForOwner where
-  contractGroupId AppRewardCoupon{..} = ForOwner with svc; owner = provider
+  contractGroupId AppRewardCoupon{..} = ForOwner with dso; owner = provider
 
 instance HasCheckedFetch SvRewardCoupon ForOwner where
-  contractGroupId SvRewardCoupon{..} = ForOwner with svc; owner = beneficiary
+  contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary
 
 -- This instance is slightly dangerous, as it could lead to a missed check of the validator.
--- We accept this, as at least the SVC check is done, and the remainder is careful coding.
-instance HasCheckedFetch ValidatorRewardCoupon ForSvc where
-  contractGroupId ValidatorRewardCoupon {..} = ForSvc with svc
+-- We accept this, as at least the DSO check is done, and the remainder is careful coding.
+instance HasCheckedFetch ValidatorRewardCoupon ForDso where
+  contractGroupId ValidatorRewardCoupon {..} = ForDso with dso
 
-instance HasCheckedFetch UnclaimedReward ForSvc where
-  contractGroupId UnclaimedReward {..} = ForSvc with svc
+instance HasCheckedFetch UnclaimedReward ForDso where
+  contractGroupId UnclaimedReward {..} = ForDso with dso

@@ -64,7 +64,7 @@ Trying to re-register template.*
 failed with UNKNOWN/channel closed.*SvAppLedgerApiConnectivityIntegrationTest
 
 # This might be logged between the test finishing and shutdown of the nodes (see #8991)
-Noticed an SvcRules epoch change.*GlobalDomainMigrationIntegrationTest
+Noticed an DsoRules epoch change.*GlobalDomainMigrationIntegrationTest
 
 # Shows up during global domain migration test, when the domain is frozen
 GlobalDomainMigrationIntegrationTest.*io.grpc.StatusRuntimeException: ABORTED: DOMAIN_BACKPRESSURE.*: The domain is overloaded

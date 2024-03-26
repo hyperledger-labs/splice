@@ -9,7 +9,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.environment.SequencerAdminConnection
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class SvOnboardingUnlimitedTrafficTrigger(
     override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     sequencerAdminConnectionO: Option[SequencerAdminConnection],
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
@@ -41,15 +41,15 @@ class SvOnboardingUnlimitedTrafficTrigger(
       tc: TraceContext
   ): Future[Seq[Task]] = {
     for {
-      svcRulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
-      svMembersWithTrafficState <- svcRulesAndStates
+      dsoRulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+      svMembersWithTrafficState <- dsoRulesAndStates
         .activeSvParticipantAndMediatorIds()
         .traverseFilter { memberId =>
           for {
             stateO <- sequencerAdminConnection.lookupSequencerTrafficControlState(memberId)
           } yield {
             if (stateO.isEmpty) {
-              // This can happen for mediators which are registered in SvcRules before they connect.
+              // This can happen for mediators which are registered in DsoRules before they connect.
               logger.info(s"Member $memberId does not yet have a traffic state, skipping")
             }
             stateO.map(memberId -> _)
@@ -88,10 +88,10 @@ class SvOnboardingUnlimitedTrafficTrigger(
   override protected def isStaleTask(task: Task)(implicit
       tc: TraceContext
   ): Future[Boolean] = for {
-    svcRulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
+    dsoRulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
     trafficState <- sequencerAdminConnection.getSequencerTrafficControlState(task.memberId)
   } yield {
-    !svcRulesAndStates.activeSvParticipantAndMediatorIds().contains(task.memberId)
+    !dsoRulesAndStates.activeSvParticipantAndMediatorIds().contains(task.memberId)
     || trafficState.extraTrafficLimit == NonNegativeLong.maxValue
   }
 

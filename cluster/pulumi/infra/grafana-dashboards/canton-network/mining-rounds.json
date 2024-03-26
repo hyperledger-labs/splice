@@ -107,7 +107,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "cn_sv_svc_store_latest_open_mining_round",
+          "expr": "cn_sv_dso_store_latest_open_mining_round",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,

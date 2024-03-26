@@ -360,7 +360,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
               store <- mkStore(endUserParty)
               _ <- dummyDomain.create(
                 walletInstall(endUserParty),
-                createdEventSignatories = Seq(endUserParty, svcParty),
+                createdEventSignatories = Seq(endUserParty, dsoParty),
               )(store.multiDomainAcsStore)
             } yield store
           }
@@ -430,7 +430,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           store1 <- mkStore(user1)
           _ <- dummyDomain.create(
             walletInstall(user1),
-            createdEventSignatories = Seq(user1, svcParty),
+            createdEventSignatories = Seq(user1, dsoParty),
           )(store1.multiDomainAcsStore)
           request1 = appPaymentRequest(
             user1,
@@ -892,7 +892,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   private lazy val validator = mkPartyId(s"validator")
   private lazy val participantId = mkParticipantId("user-1")
   protected def storeKey(endUserParty: PartyId) = UserWalletStore.Key(
-    svcParty = svcParty,
+    dsoParty = dsoParty,
     validatorParty = validator,
     endUserName = endUserParty.toProtoPrimitive,
     endUserParty = endUserParty,
@@ -903,7 +903,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   private def walletInstall(endUserParty: PartyId) = {
     val templateId = installCodegen.WalletAppInstall.TEMPLATE_ID
     val template = new installCodegen.WalletAppInstall(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       validator.toProtoPrimitive,
       endUserParty.toProtoPrimitive,
       endUserParty.toProtoPrimitive,
@@ -927,7 +927,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     val template = new transferOffersCodegen.TransferOffer(
       sender.toProtoPrimitive,
       receiver.toProtoPrimitive,
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), currency),
       s"Payment from $sender to $receiver for $amount $currency, expiring at $expiresAt",
       expiresAt.toInstant,
@@ -953,7 +953,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     val template = new transferOffersCodegen.AcceptedTransferOffer(
       sender.toProtoPrimitive,
       receiver.toProtoPrimitive,
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       new paymentCodegen.PaymentAmount(new java.math.BigDecimal(amount), currency),
       expiresAt.toInstant,
       trackingId,
@@ -976,7 +976,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   ) = {
     val templateId = trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID
     val template = new trafficRequestCodegen.BuyTrafficRequest(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       buyer.toProtoPrimitive,
       expiresAt.toInstant,
       trackingId,
@@ -1010,7 +1010,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         )
       ),
       provider.toProtoPrimitive,
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       expiresAt.toInstant,
       description,
     )
@@ -1032,7 +1032,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         user.toProtoPrimitive,
         provider.toProtoPrimitive,
         provider.toProtoPrimitive,
-        svcParty.toProtoPrimitive,
+        dsoParty.toProtoPrimitive,
         s"Party $user subscribes to a service provided by party $provider",
       ),
       reference,
@@ -1188,7 +1188,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
   ) = {
     val templateId = cnsCodegen.CnsEntryContext.TEMPLATE_ID
     val template = new cnsCodegen.CnsEntryContext(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       user.toProtoPrimitive,
       name,
       entryUrl,

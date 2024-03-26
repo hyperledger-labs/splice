@@ -182,8 +182,8 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
       // - general slowness
       eventuallySucceeds(timeUntilSuccess = 240.seconds) {
         val nextScheduledDomainUpgrade = sv1
-          .getSvcInfo()
-          .svcRules
+          .getDsoInfo()
+          .dsoRules
           .payload
           .config
           .nextScheduledDomainUpgrade

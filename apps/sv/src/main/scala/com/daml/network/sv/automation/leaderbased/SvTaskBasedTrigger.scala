@@ -4,7 +4,7 @@ import com.daml.network.automation.*
 import com.daml.network.codegen.java.cn
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 
@@ -21,15 +21,15 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   protected implicit def ec: ExecutionContext
   protected def svTaskContext: SvTaskBasedTrigger.Context
   protected def enableAutomaticLeaderElection: Boolean = false
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   final protected override def completeTask(
       task: T
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svcRules <- store.getSvcRules()
-      sameEpoch = svcRules.payload.epoch == svTaskContext.epoch
-      isLeader = svcRules.payload.leader == store.key.svParty.toProtoPrimitive
+      dsoRules <- store.getDsoRules()
+      sameEpoch = dsoRules.payload.epoch == svTaskContext.epoch
+      isLeader = dsoRules.payload.leader == store.key.svParty.toProtoPrimitive
       result <-
         if (sameEpoch) {
           if (isLeader) {
@@ -41,7 +41,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
           // TODO(#6856) Could this be busy-looping as well, if we are a polling trigger?
           Future.successful(
             TaskSuccess(
-              s"Skipping because current epoch ${svcRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
+              s"Skipping because current epoch ${dsoRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
             )
           )
         }
@@ -51,7 +51,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   /** Handle leader failure by voting for a new leader
     */
   final protected def voteForNewLeader(
-      svcRules: AssignedContract[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      dsoRules: AssignedContract[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
       currentLeader: String,
   )(implicit
       tc: TraceContext
@@ -71,12 +71,12 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
         case QueryResult(offset, None) => {
           val self = store.key.svParty.toProtoPrimitive
           val otherParties =
-            svcRules.payload.members.keySet.asScala.to(Set) - currentLeader - self
+            dsoRules.payload.members.keySet.asScala.to(Set) - currentLeader - self
           val ranking = self :: Random.shuffle(otherParties.toList) ++ List(currentLeader)
-          val cmd = svcRules.exercise(
-            _.exerciseSvcRules_RequestElection(
+          val cmd = dsoRules.exercise(
+            _.exerciseDsoRules_RequestElection(
               self,
-              new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
+              new cn.dsorules.electionrequestreason.ERR_LeaderUnavailable(
                 com.daml.ledger.javaapi.data.Unit.getInstance()
               ),
               ranking.asJava,
@@ -85,13 +85,13 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
           svTaskContext.connection
             .submit(
               actAs = Seq(store.key.svParty),
-              readAs = Seq(store.key.svcParty),
+              readAs = Seq(store.key.dsoParty),
               update = cmd,
             )
             .withDedup(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.requestElection",
-                Seq(store.key.svParty, store.key.svcParty),
+                Seq(store.key.svParty, store.key.dsoParty),
                 svTaskContext.epoch.toString,
               ),
               deduplicationOffset = offset,
@@ -117,9 +117,9 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
 
     logger.debug(s"Starting check for leader inactivity")
     for {
-      svcRules <- store.getSvcRules()
-      monitoredEpoch = svcRules.payload.epoch
-      monitoredLeader = svcRules.payload.leader
+      dsoRules <- store.getDsoRules()
+      monitoredEpoch = dsoRules.payload.epoch
+      monitoredLeader = dsoRules.payload.leader
       timer <- context.retryProvider
         .waitUnlessShutdown(
           context.clock
@@ -130,7 +130,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
               },
               // NOTE: We don't restart existing inactivity checks when the leaderInactiveTimeout changes
               SvUtil
-                .fromRelTime(svcRules.payload.config.leaderInactiveTimeout)
+                .fromRelTime(dsoRules.payload.config.leaderInactiveTimeout)
                 .plus(context.config.pollingInterval.asJava),
             )
         )
@@ -145,22 +145,22 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
         case UnlessShutdown.Outcome(()) => {
           val isLeaderInactiveF = for {
             sameEpoch <- store
-              .getSvcRules()
+              .getDsoRules()
               .map(_.payload.epoch == monitoredEpoch)
             taskStale <- isStaleTask(task)
           } yield sameEpoch && !taskStale
 
           isLeaderInactiveF.flatMap(isLeaderInactive => {
-            if (isLeaderInactive && svcRules.payload.epoch != svTaskContext.epoch) {
+            if (isLeaderInactive && dsoRules.payload.epoch != svTaskContext.epoch) {
               Future.successful(
                 TaskSuccess(
-                  s"skipping vote to replace leader $monitoredLeader because current epoch ${svcRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
+                  s"skipping vote to replace leader $monitoredLeader because current epoch ${dsoRules.payload.epoch} is not the same as trigger registration epoch ${svTaskContext.epoch}"
                 )
               )
             } else if (isLeaderInactive) {
               // TODO(#6856) Resolve the busy loop in a more elegant way.
               if (enableAutomaticLeaderElection) {
-                voteForNewLeader(svcRules, monitoredLeader)
+                voteForNewLeader(dsoRules, monitoredLeader)
               } else {
                 Future.successful(
                   TaskSuccess(
@@ -184,7 +184,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
 
 object SvTaskBasedTrigger {
   case class Context(
-      svcStore: SvSvcStore,
+      dsoStore: SvDsoStore,
       connection: CNLedgerConnection,
       leader: PartyId,
       epoch: Long,

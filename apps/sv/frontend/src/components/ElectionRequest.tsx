@@ -7,10 +7,10 @@ import { Button, Stack, Table, TableBody, Typography } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 
-import { ElectionRequest } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { ElectionRequest } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
-import { useElectionContext, useSvcInfos } from '../contexts/SvContext';
+import { useElectionContext, useDsoInfos } from '../contexts/SvContext';
 import { config } from '../utils';
 import { Alerting, AlertState } from '../utils/Alerting';
 import RankingForm, { User } from '../utils/RankingForm';
@@ -38,25 +38,25 @@ const ListRankings: React.FC<ListRankingsProps> = ({ electionRequest }) => {
 
 const ElectionRequests: React.FC = () => {
   const [ranking, setRanking] = useState<User[]>();
-  const svcInfosQuery = useSvcInfos();
+  const dsoInfosQuery = useDsoInfos();
   const { createElectionRequest } = useSvAdminClient();
   const [alertState, setAlertState] = useState<AlertState>({});
 
   const electionContextQuery = useElectionContext();
 
   const cs: User[] = [];
-  svcInfosQuery.data?.svcRules.payload.members.forEach((_v, a) =>
+  dsoInfosQuery.data?.dsoRules.payload.members.forEach((_v, a) =>
     cs.push({ id: cs.length + 1, name: a })
   );
 
   useEffect(() => {
     setRanking(cs);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [svcInfosQuery.isSuccess]);
+  }, [dsoInfosQuery.isSuccess]);
 
   const createElectionRequestMutation = useMutation({
     mutationFn: async () => {
-      const requester = svcInfosQuery.data?.svPartyId!;
+      const requester = dsoInfosQuery.data?.svPartyId!;
       const userList = ranking?.map(v => v.name)!;
       return await createElectionRequest(requester, userList);
     },
@@ -72,7 +72,7 @@ const ElectionRequests: React.FC = () => {
     },
 
     onError: error => {
-      console.error(`Failed to send vote request to svc`, error);
+      console.error(`Failed to send vote request to dso`, error);
       setAlertState({ severity: 'error', message: 'Fail to update ranking.' });
       setTimeout(() => {
         setAlertState({});
@@ -95,19 +95,19 @@ const ElectionRequests: React.FC = () => {
           <TableRow>
             <TableCell>Epoch:</TableCell>
             <TableCell id={'leader-election-epoch'}>
-              {svcInfosQuery.data?.svcRules.payload.epoch}
+              {dsoInfosQuery.data?.dsoRules.payload.epoch}
             </TableCell>
           </TableRow>
           <TableRow>
             <TableCell>Leader:</TableCell>
             <TableCell id={'leader-election-current-leader'}>
-              {svcInfosQuery.data?.svcRules.payload.leader}
+              {dsoInfosQuery.data?.dsoRules.payload.leader}
             </TableCell>
           </TableRow>
         </TableBody>
       </Table>
       <Typography mt={4} variant="h4">
-        Configuration for Epoch {parseInt(svcInfosQuery.data?.svcRules.payload.epoch!) + 1}
+        Configuration for Epoch {parseInt(dsoInfosQuery.data?.dsoRules.payload.epoch!) + 1}
       </Typography>
       {electionContextQuery.data.ranking.length > 0 && (
         <Typography mt={4} variant="h5">
@@ -128,9 +128,9 @@ const ElectionRequests: React.FC = () => {
           {
             disabled:
               electionContextQuery.data!.ranking.find(
-                e => e.payload.requester === svcInfosQuery.data?.svPartyId!
+                e => e.payload.requester === dsoInfosQuery.data?.svPartyId!
               ) !== undefined,
-            reason: `Party ${svcInfosQuery.data?.svPartyId} has already submitted`,
+            reason: `Party ${dsoInfosQuery.data?.svPartyId} has already submitted`,
           },
         ]}
       >

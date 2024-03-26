@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 import com.daml.network.environment.{CNLedgerClient, PackageIdResolver, RetryProvider}
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvStore, SvDsoStore}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
@@ -20,7 +20,7 @@ class SvSvAutomationService(
     clock: Clock,
     config: SvAppBackendConfig,
     svStore: SvSvStore,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     ledgerClient: CNLedgerClient,
     retryProvider: RetryProvider,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -35,7 +35,7 @@ class SvSvAutomationService(
       PackageIdResolver
         .inferFromAmuletRules(
           clock,
-          svcStore,
+          dsoStore,
           loggerFactory,
         ),
       ledgerClient,

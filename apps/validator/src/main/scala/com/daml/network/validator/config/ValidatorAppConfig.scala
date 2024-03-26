@@ -83,7 +83,7 @@ final case class BuyExtraTrafficConfig(
       * will charge them domain fees making spends more predictable. This should be greater than the
       * polling interval of the top-up trigger.
       *
-      * Note that the actual interval between top-ups might be larger due to the SVC requiring
+      * Note that the actual interval between top-ups might be larger due to the DSO requiring
       * a minimal top-up amount larger than `targetThroughput * minTopupInterval`.
       */
     minTopupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),

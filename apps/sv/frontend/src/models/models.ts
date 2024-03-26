@@ -1,4 +1,4 @@
-import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { VoteRequest } from '@daml.js/dso-governance/lib/CN/DsoRules';
 import { ContractId, Numeric, Optional, Party } from '@daml/types';
 
 export interface AmuletPriceVote {

@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.digitalasset.canton.logging.SuppressionRule
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.splitwell.automation.SplitwellInstallRequestTrigger
-import com.daml.network.sv.automation.SvSvcAutomationService
+import com.daml.network.sv.automation.SvDsoAutomationService
 import org.slf4j.event.Level
 
 import java.util.regex.Pattern
@@ -20,11 +20,11 @@ class AutomationServiceIntegrationTest extends SvIntegrationTestBase {
 
   "initialization warns on invalid paused-trigger setting" in { implicit env =>
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.WARN))(
-      initSvcWithSv1Only() withClue "spin up svc",
+      initDsoWithSv1Only() withClue "spin up dso",
       _.filter(
         _.message.matches(
           s"paused-triggers specified but not present.*"
-            + Pattern.quote(classOf[SvSvcAutomationService].getSimpleName)
+            + Pattern.quote(classOf[SvDsoAutomationService].getSimpleName)
             + ".*"
             + Pattern.quote(SomeNonSvTrigger.getSimpleName)
         )

@@ -100,7 +100,7 @@ groups:
           runbook_url: ""
           summary: Domain Time progressing too slowly
         labels:
-          topology_level: svc
+          topology_level: dso
         isPaused: false
       - uid: f60b1225-4458-483a-8168-240baac4f6fe
         title: SV Status - Unexpected CometBFT Lag
@@ -202,13 +202,13 @@ groups:
           __dashboardUid__: caffa6f7-c421-4579-a839-b026d3b76826
           __panelId__: "15"
           description: |-
-            The SV status reports observed by the SVC report a lag of {{ index $values "alert" }}.
+            The SV status reports observed by the DSO report a lag of {{ index $values "alert" }}.
             Reported maximum height {{ index $values "cometbft_height_per_publisher" }} for  {{ $labels.report_publisher }} and a global maximum of {{ index $values "max_cometbft_height" }}
           runbook_url: ""
           summary: '{{ index $values "alert" }} CometBFT lag in SV status reports for {{ $labels.report_publisher }}'
         labels:
           "": ""
-          topology_level: svc
+          topology_level: dso
         isPaused: false
       - uid: d28ac95d-4724-4a82-a848-49198c5c6d80
         title: SV Status - Unexpected Mining Round Lag
@@ -357,5 +357,5 @@ groups:
           summary: 'Unexpected mining round lag {{ index $values "max_publisher_lag" }} in SV status reports for publisher {{ $labels.report_publisher }} '
         labels:
           "": ""
-          topology_level: svc
+          topology_level: dso
         isPaused: false

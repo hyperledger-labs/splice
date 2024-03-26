@@ -3,30 +3,30 @@ import React, { useState } from 'react';
 
 import { FormControl, Stack, TextField, Typography } from '@mui/material';
 
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
-import { useSvcInfos } from '../../../contexts/SvContext';
+import { useDsoInfos } from '../../../contexts/SvContext';
 
 const GrantFeaturedAppRight: React.FC<{
   chooseAction: (action: ActionRequiringConfirmation) => void;
 }> = ({ chooseAction }) => {
-  const svcInfosQuery = useSvcInfos();
+  const dsoInfosQuery = useDsoInfos();
   const [provider, setProvider] = useState<string>('');
 
-  if (svcInfosQuery.isLoading) {
+  if (dsoInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (svcInfosQuery.isError) {
-    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
+  if (dsoInfosQuery.isError) {
+    return <p>Error: {JSON.stringify(dsoInfosQuery.error)}</p>;
   }
 
   function setProviderAction(provider: string) {
     setProvider(provider);
     chooseAction({
-      tag: 'ARC_SvcRules',
+      tag: 'ARC_DsoRules',
       value: {
-        svcAction: {
+        dsoAction: {
           tag: 'SRARC_GrantFeaturedAppRight',
           value: { provider: provider },
         },

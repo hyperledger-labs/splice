@@ -52,7 +52,7 @@ data PackageConfig = PackageConfig
   with
     cantonAmulet : Text
     cantonNameService : Text
-    svcGovernance : Text
+    dsoGovernance : Text
     validatorLifecycle : Text
     wallet : Text
     walletPayments : Text

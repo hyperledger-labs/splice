@@ -3,14 +3,14 @@ package com.daml.network.sv.automation.singlesv.membership
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.ledger.javaapi.data.codegen.ContractCompanion
 import com.daml.network.automation.{SourceBasedTrigger, TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.sv.automation.singlesv.membership.SvTopologyStatePollingAndAssignedTrigger.{
   StreamedAssignedContract,
   TaskTrigger,
   Tick,
 }
-import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.store.SvSvcStore.SvcRulesWithMemberNodeStates
+import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.store.SvDsoStore.DsoRulesWithMemberNodeStates
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.tracing.TraceContext
@@ -24,20 +24,20 @@ import pprint.Tree
 
 import scala.concurrent.{ExecutionContext, Future}
 
-trait SvcRulesTopologyStateReconciler[Task] {
+trait DsoRulesTopologyStateReconciler[Task] {
 
-  protected def svSvcStore: SvSvcStore
+  protected def svDsoStore: SvDsoStore
 
-  def diffSvcRulesWithTopology(
+  def diffDsoRulesWithTopology(
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ): Future[Seq[Task]] = {
-    svSvcStore.getSvcRulesWithMemberNodeStates().flatMap(diffSvcRulesWithTopology)
+    svDsoStore.getDsoRulesWithMemberNodeStates().flatMap(diffDsoRulesWithTopology)
   }
 
-  protected def diffSvcRulesWithTopology(
-      svcRulesAndState: SvcRulesWithMemberNodeStates
+  protected def diffDsoRulesWithTopology(
+      dsoRulesAndState: DsoRulesWithMemberNodeStates
   )(implicit
       tc: TraceContext,
       ec: ExecutionContext,
@@ -51,14 +51,14 @@ trait SvcRulesTopologyStateReconciler[Task] {
   ): Future[TaskOutcome]
 }
 
-/** Trigger that runs both on a regular interval and if the SvcRules contract is assigned.
-  * It reconciles the SvcRules contract with the topology state.
+/** Trigger that runs both on a regular interval and if the DsoRules contract is assigned.
+  * It reconciles the DsoRules contract with the topology state.
   * This is done to ensure that we have minimum latency in applying any changes to the topology state (by using the assigned contract source)
   * and to also ensure that the changes are eventually applied if currently not possible (by using the regular ticking interval)
   */
 abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
     originalContext: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,
@@ -69,10 +69,10 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
   override protected val context: TriggerContext =
     originalContext.focus(_.config.parallelism).replace(1)
 
-  val reconciler: SvcRulesTopologyStateReconciler[Task]
+  val reconciler: DsoRulesTopologyStateReconciler[Task]
   protected val contractsToRunOn
-      : Seq[ContractCompanion.WithoutKey[SvcRules.Contract, SvcRules.ContractId, SvcRules]] = Seq(
-    SvcRules.COMPANION
+      : Seq[ContractCompanion.WithoutKey[DsoRules.Contract, DsoRules.ContractId, DsoRules]] = Seq(
+    DsoRules.COMPANION
   )
 
   override protected def source(implicit traceContext: TraceContext): Source[TaskTrigger, NotUsed] =
@@ -94,13 +94,13 @@ abstract class SvTopologyStatePollingAndAssignedTrigger[Task](
   override protected def isStaleTask(task: TaskTrigger)(implicit
       tc: TraceContext
   ): Future[Boolean] =
-    store.lookupSvcRules().map(_.isEmpty)
+    store.lookupDsoRules().map(_.isEmpty)
 
   override protected def completeTask(task: TaskTrigger)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
     reconciler
-      .diffSvcRulesWithTopology()
+      .diffDsoRulesWithTopology()
       .flatMap { tasks =>
         if (tasks.nonEmpty) {
           logger.info(s"Reconciling tasks: $tasks")

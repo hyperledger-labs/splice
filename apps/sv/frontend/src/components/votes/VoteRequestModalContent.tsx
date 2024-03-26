@@ -22,10 +22,10 @@ import {
   Typography,
 } from '@mui/material';
 
-import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { VoteRequest } from '@daml.js/dso-governance/lib/CN/DsoRules';
 import { ContractId, Party } from '@daml/types';
 
-import { useSvcInfos } from '../../contexts/SvContext';
+import { useDsoInfos } from '../../contexts/SvContext';
 import { useListVotes } from '../../hooks/useListVotes';
 import { useVoteRequest } from '../../hooks/useVoteRequest';
 import { SvVote } from '../../models/models';
@@ -53,15 +53,15 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
     }
   }, [votesQuery, handleClose]);
 
-  const svcInfosQuery = useSvcInfos();
-  const svPartyId = svcInfosQuery.data?.svPartyId;
+  const dsoInfosQuery = useDsoInfos();
+  const svPartyId = dsoInfosQuery.data?.svPartyId;
 
   const getMemberName = useCallback(
     (partyId: string) => {
-      const member = svcInfosQuery.data?.svcRules.payload.members.get(partyId);
+      const member = dsoInfosQuery.data?.dsoRules.payload.members.get(partyId);
       return member ? member.name : '';
     },
-    [svcInfosQuery.data]
+    [dsoInfosQuery.data]
   );
 
   if (voteRequestQuery.isLoading) {

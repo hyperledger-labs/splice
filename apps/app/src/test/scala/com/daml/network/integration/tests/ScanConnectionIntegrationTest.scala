@@ -20,7 +20,7 @@ class ScanConnectionIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
+      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
       .withoutAutomaticRewardsCollectionAndAmuletMerging
 
   "amulet rules cache should be invalidated when the amulet rules change" in { implicit env =>

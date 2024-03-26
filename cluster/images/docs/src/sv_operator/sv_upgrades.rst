@@ -11,9 +11,9 @@ Overview
 --------
 
 1. Canton releases containing breaking changes become available and Canton Network Node releases compatible with these Canton releases become available.
-2. SVC members agree and eventually confirm via an on-ledger vote (cast via the SV UI) on which specific date and time the network downtime necessary for the upgrade will start. It is the responsibility of the SVC to make sure that validator operators are informed about planned upgrades and upgrade timelines.
+2. DSO members agree and eventually confirm via an on-ledger vote (cast via the SV UI) on which specific date and time the network downtime necessary for the upgrade will start. It is the responsibility of the DSO to make sure that validator operators are informed about planned upgrades and upgrade timelines.
 3. Once the downtime has been scheduled, all SVs deploy new Kubernetes pods containing the new versions of the Canton components of their Super Validator node (participant, sequencer, and mediator) as well as a new CometBFT node, alongside the old versioned ones which are not yet deleted. See :ref:`sv-upgrades-deploying-domain`.
-4. At the start of the downtime window, the SV app of SVC members automatically pauses all traffic on the operating version of the global synchronizer.
+4. At the start of the downtime window, the SV app of DSO members automatically pauses all traffic on the operating version of the global synchronizer.
 5. Shortly after pausing traffic on the global synchronizer (there is a short delay to ensure that all components have synced up to the final state of the existing synchronizer), the node software of SVs and validators automatically exports so-called migration dumps to attached Kubernetes volumes. See :ref:`sv-upgrades-dumps`.
 6. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`sv_backups`.
 7. All SVs upgrade theirs CN apps pods. See :ref:`sv-upgrades-deploying-apps`.
@@ -153,7 +153,7 @@ The operators representing an SV must be:
 Testing
 -------
 
-The success of synchronizer upgrades and the duration of downtime both depend on the effectiveness of all SVC members in performing the necessary upgrading steps. We therefore recommend that the SVC performs :ref:`coordinated tests <sv-upgrades-testing-coordinated>`
+The success of synchronizer upgrades and the duration of downtime both depend on the effectiveness of all DSO members in performing the necessary upgrading steps. We therefore recommend that the DSO performs :ref:`coordinated tests <sv-upgrades-testing-coordinated>`
 before attempting an upgrade on MainNet.
 Mirroring the recommended process for an actual upgrade,
 we also recommend that SVs perform :ref:`preparation <sv-upgrades-testing-preparation>` steps in advance of every coordinated test.

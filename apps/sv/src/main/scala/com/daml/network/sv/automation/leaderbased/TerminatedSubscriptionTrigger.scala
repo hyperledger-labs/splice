@@ -24,13 +24,13 @@ class TerminatedSubscriptionTrigger(
 ) extends OnAssignedContractTrigger.Template[
       subsCodegen.TerminatedSubscription.ContractId,
       subsCodegen.TerminatedSubscription,
-    ](svTaskContext.svcStore, subsCodegen.TerminatedSubscription.COMPANION)
+    ](svTaskContext.dsoStore, subsCodegen.TerminatedSubscription.COMPANION)
     with SvTaskBasedTrigger[AssignedContract[
       subsCodegen.TerminatedSubscription.ContractId,
       subsCodegen.TerminatedSubscription,
     ]] {
 
-  private val svcParty = svTaskContext.svcStore.key.svcParty
+  private val dsoParty = svTaskContext.dsoStore.key.dsoParty
 
   override def completeTaskAsLeader(
       task: AssignedContract[
@@ -39,7 +39,7 @@ class TerminatedSubscriptionTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      cnsEntryContextO <- svTaskContext.svcStore.lookupCnsEntryContext(
+      cnsEntryContextO <- svTaskContext.dsoStore.lookupCnsEntryContext(
         task.contract.payload.reference
       )
       _ <- cnsEntryContextO match {
@@ -54,11 +54,11 @@ class TerminatedSubscriptionTrigger(
           for {
             _ <- svTaskContext.connection
               .submit(
-                Seq(svcParty),
+                Seq(dsoParty),
                 Seq.empty,
                 cnsEntryContext.exercise(
                   _.exerciseCnsEntryContext_Terminate(
-                    svcParty.toProtoPrimitive,
+                    dsoParty.toProtoPrimitive,
                     task.contract.contractId,
                   )
                 ),

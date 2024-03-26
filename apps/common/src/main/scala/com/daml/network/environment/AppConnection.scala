@@ -105,7 +105,7 @@ abstract class AppConnection(
       cmd: GrpcAdminCommand[Req, Res, Result],
       credentials: Option[CallCredentials] = None,
   )(implicit traceContext: TraceContext): Future[Result] = {
-    val svc =
+    val dso =
       cmd
         .createService(channel.channel)
         .withInterceptors(
@@ -116,14 +116,14 @@ abstract class AppConnection(
           new GrpcMetricsClientInterceptor(grpcClientMetrics),
         )
 
-    val svcAuth = credentials match {
-      case Some(creds) => svc.withCallCredentials(creds)
-      case None => svc
+    val dsoAuth = credentials match {
+      case Some(creds) => dso.withCallCredentials(creds)
+      case None => dso
     }
 
     for {
       req <- toFuture(cmd.createRequest())
-      response <- TraceContextGrpc.withGrpcContext(traceContext)(cmd.submitRequest(svcAuth, req))
+      response <- TraceContextGrpc.withGrpcContext(traceContext)(cmd.submitRequest(dsoAuth, req))
       result <- toFuture(cmd.handleResponse(response))
     } yield result
   }

@@ -9,12 +9,12 @@ object SvStore {
   case class Key(
       /** The party-id of the SV that this store belongs to. */
       svParty: PartyId,
-      /** The party-id of the SVC issuing CC accepted by this provider. */
-      svcParty: PartyId,
+      /** The party-id of the DSO issuing CC accepted by this provider. */
+      dsoParty: PartyId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
       param("svParty", _.svParty),
-      param("svcParty", _.svcParty),
+      param("dsoParty", _.dsoParty),
     )
   }
 }

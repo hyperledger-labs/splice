@@ -14,10 +14,10 @@ class SvOnboardingTokenTest extends AsyncWordSpec with BaseTest {
           "svX::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
         )
         .value
-    val svcParty =
+    val dsoParty =
       Codec
         .decode(Codec.Party)(
-          "SVC::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
+          "DSO::122020c99a2f48cd66782404648771eeaa104f108131c0c876a6ed04dd2e4175f27d"
         )
         .value
     val candidateParticipantId =
@@ -38,7 +38,7 @@ class SvOnboardingTokenTest extends AsyncWordSpec with BaseTest {
       publicKey,
       candidateParty,
       candidateParticipantId,
-      svcParty,
+      dsoParty,
     )
 
     val encodedToken = token.signAndEncode(SvUtil.parsePrivateKey(privateKey).value).value

@@ -5,9 +5,9 @@ import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.splitwell.Group
 import com.daml.network.codegen.java.cn.splitwell.balanceupdatetype.Transfer
-import com.daml.network.codegen.java.cn.svcrules.{DomainUpgradeSchedule, SvcRules_AddMember}
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember
+import com.daml.network.codegen.java.cn.dsorules.{DomainUpgradeSchedule, DsoRules_AddMember}
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddMember
 import com.daml.network.codegen.java.cn.wallet.payment.ReceiverCCAmount
 import com.daml.network.config.{
   CNNodeConfigTransforms,
@@ -438,7 +438,7 @@ class GlobalDomainMigrationIntegrationTest
 
     clue("All sequencers are registered") {
       eventually() {
-        inside(sv1ScanBackend.listSvcSequencers()) {
+        inside(sv1ScanBackend.listDsoSequencers()) {
           case Seq(DomainSequencers(domainId, sequencers)) =>
             domainId shouldBe globalDomainId
             sequencers should have size 4
@@ -568,8 +568,8 @@ class GlobalDomainMigrationIntegrationTest
       ) { case (upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4) =>
         val allNodes =
           Seq(upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
-        val svcPartyDecentralizedNamespace =
-          sv1Backend.appState.svcStore.key.svcParty.uid.namespace
+        val dsoPartyDecentralizedNamespace =
+          sv1Backend.appState.dsoStore.key.dsoParty.uid.namespace
 
         val domainDynamicParams =
           sv1Backend.participantClientWithAdminToken.topology.domain_parameters
@@ -608,7 +608,7 @@ class GlobalDomainMigrationIntegrationTest
           {
             // pausing DomainUpgradeTrigger of all all old SV to avoid them from setting the confirmationRequestsMaxRate back to zero.
             allNodes.foreach { node =>
-              node.oldBackend.svcAutomation
+              node.oldBackend.dsoAutomation
                 .trigger[GlobalDomainMigrationTrigger]
                 .pause()
                 .futureValue
@@ -665,7 +665,7 @@ class GlobalDomainMigrationIntegrationTest
                     .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
                       "keep just sv1",
                       globalDomainId,
-                      svcPartyDecentralizedNamespace,
+                      dsoPartyDecentralizedNamespace,
                       _ => NonEmpty(Set, sv1Party.uid.namespace),
                       id.namespace.fingerprint,
                       RetryFor.WaitingOnInitDependency,
@@ -684,7 +684,7 @@ class GlobalDomainMigrationIntegrationTest
               upgradeDomainNode1.newParticipantConnection
                 .getDecentralizedNamespaceDefinition(
                   globalDomainId,
-                  svcPartyDecentralizedNamespace,
+                  dsoPartyDecentralizedNamespace,
                 )
                 .futureValue
                 .base
@@ -709,7 +709,7 @@ class GlobalDomainMigrationIntegrationTest
               sv1Backend.appState.participantAdminConnection
                 .getDecentralizedNamespaceDefinition(
                   globalDomainId,
-                  svcPartyDecentralizedNamespace,
+                  dsoPartyDecentralizedNamespace,
                 )
                 .futureValue
                 .mapping
@@ -748,7 +748,7 @@ class GlobalDomainMigrationIntegrationTest
 
           clue(s"validator should connect to sequencers in upgraded domain $charlieUserParty") {
             eventually() {
-              inside(sv1ScanLocalBackend.listSvcSequencers()) {
+              inside(sv1ScanLocalBackend.listDsoSequencers()) {
                 case Seq(DomainSequencers(domainId, sequencers)) =>
                   domainId shouldBe globalDomainId
                   sequencers.foreach { sequencer =>
@@ -777,7 +777,7 @@ class GlobalDomainMigrationIntegrationTest
             sw("providerSplitwellBackendLocal")
           )
 
-          sv1LocalBackend.getSvcInfo().svcRules.payload.members.size() shouldBe 4
+          sv1LocalBackend.getDsoInfo().dsoRules.payload.members.size() shouldBe 4
 
           clue("Old wallet balance is recorded") {
             eventually() {
@@ -808,9 +808,9 @@ class GlobalDomainMigrationIntegrationTest
             "validate domain with create VoteRequest",
             sv1LocalBackend.createVoteRequest(
               sv1Party.toProtoPrimitive,
-              new ARC_SvcRules(
+              new ARC_DsoRules(
                 new SRARC_AddMember(
-                  new SvcRules_AddMember(
+                  new DsoRules_AddMember(
                     "bob",
                     "Bob",
                     SvUtil.DefaultFoundingNodeWeight,
@@ -821,7 +821,7 @@ class GlobalDomainMigrationIntegrationTest
               ),
               "url",
               "description",
-              sv1LocalBackend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+              sv1LocalBackend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
             ),
           )(
             "VoteRequest and Vote should be there",

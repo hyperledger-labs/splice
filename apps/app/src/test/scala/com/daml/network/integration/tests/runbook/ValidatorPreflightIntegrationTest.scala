@@ -343,10 +343,10 @@ abstract class ValidatorPreflightIntegrationTestBase
     validatorClient.dumpParticipantIdentities()
   }
 
-  "connect to all sequencers stated in latest SvcRules contract" in { implicit env =>
+  "connect to all sequencers stated in latest DsoRules contract" in { implicit env =>
     val sv1ScanClient = scancl("sv1Scan")
     eventually() {
-      val connections = inside(sv1ScanClient.listSvcSequencers()) {
+      val connections = inside(sv1ScanClient.listDsoSequencers()) {
         case Seq(DomainSequencers(_, connections)) => connections
       }
       connections should not be empty

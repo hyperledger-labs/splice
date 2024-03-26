@@ -19,12 +19,12 @@ testWithSubscription = script do
   runNextIssuance app
   runAmuletDepositBots app
 
-  cnsRulesCid <- submitMulti [app.svc] [] $ createCmd CnsRules with
-    svc = app.svc
+  cnsRulesCid <- submitMulti [app.dso] [] $ createCmd CnsRules with
+    dso = app.dso
     config = defaultCnsRulesConfig
 
   -- user requests entry
-  requestSummary <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+  requestSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
     name = "cns.darth.vader"
     url = "https://darth-vader-cns.com"
     description = "Darth Vader's CNS Description"
@@ -34,35 +34,35 @@ testWithSubscription = script do
 
   -- cc wallet selects a large enough amulet
   amulet <- tap app alice 1.5
-  -- cc wallet accepts subscription and first payment and locks amulet to svc
+  -- cc wallet accepts subscription and first payment and locks amulet to dso
 
   paymentContext <- getPaymentTransferContext app alice
-  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
-    walletProvider = app.svc
+    walletProvider = app.dso
   pure ()
 
   (_, round) <- getLatestActiveOpenRound app
   let transferConfigCC = transferConfigCCFromOpenRound round
-  [(acceptRewardCid, reward)] <- query @CC.Amulet.AppRewardCoupon app.svc
+  [(acceptRewardCid, reward)] <- query @CC.Amulet.AppRewardCoupon app.dso
   reward.amount ===
     transferConfigCC.createFee.fee +
     transferConfigCC.lockHolderFee.fee
   reward.featured === False
 
-  -- svc transactionally unlocks & transfer amulets and creates cns entry and a subscription in return.
-  appContext <- getAppTransferContext app app.svcUser
-  collectPaymentSummary <- submit app.svc $ exerciseCmd entryContext CnsEntryContext_CollectInitialEntryPayment with
+  -- dso transactionally unlocks & transfer amulets and creates cns entry and a subscription in return.
+  appContext <- getAppTransferContext app app.dsoUser
+  collectPaymentSummary <- submit app.dso $ exerciseCmd entryContext CnsEntryContext_CollectInitialEntryPayment with
     paymentCid = initialPaymentCid
     transferContext = appContext
     cnsRulesCid
 
   -- the amulet received by sv is brunt
-  svcAmulets <- queryFilter @Amulet app.svc (\amulet -> amulet.owner == app.svc)
-  svcAmulets === []
+  dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
+  dsoAmulets === []
 
-  [(_, reward)] <- filter (\(cid, _) -> cid /= acceptRewardCid) <$> query @CC.Amulet.AppRewardCoupon app.svc
+  [(_, reward)] <- filter (\(cid, _) -> cid /= acceptRewardCid) <$> query @CC.Amulet.AppRewardCoupon app.dso
   reward.amount ===
     transferConfigCC.createFee.fee +
     transferConfigCC.transferFee.initialRate * defaultCnsRulesConfig.entryFee
@@ -81,65 +81,65 @@ testWithSubscription = script do
   runNextIssuance app
   passTimeToRoundOpen app
   paymentContext <- getPaymentTransferContext app alice
-  appContext <- getAppTransferContext app app.svcUser
+  appContext <- getAppTransferContext app app.dsoUser
 
   amulet <- tap app alice 1.5
-  (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd collectPaymentSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+  (paymentCid, _) <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd collectPaymentSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
-    walletProvider = app.svc
+    walletProvider = app.dso
 
-  -- svc transactionally unlocks & transfer amulets and renews directory entry in return
-  renewalSummary <- submit app.svc $ exerciseCmd entryContext CnsEntryContext_CollectEntryRenewalPayment with
+  -- dso transactionally unlocks & transfer amulets and renews directory entry in return
+  renewalSummary <- submit app.dso $ exerciseCmd entryContext CnsEntryContext_CollectEntryRenewalPayment with
     paymentCid
     entryCid = collectPaymentSummary.entryCid
     transferContext = appContext
     cnsRulesCid
 
   -- the amulet received by sv is brunt
-  svcAmulets <- queryFilter @Amulet app.svc (\amulet -> amulet.owner == app.svc)
-  svcAmulets === []
+  dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
+  dsoAmulets === []
 
-  submitMustFail app.svc $ exerciseCmd renewalSummary.entryCid (CnsEntry_Expire app.svc)
+  submitMustFail app.dso $ exerciseCmd renewalSummary.entryCid (CnsEntry_Expire app.dso)
 
   -- user can't pay earlier than `renewalDuration` from the next due date
   amulet <- tap app alice 1.5
-  submitMultiMustFail [alice.primaryParty, app.svc] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+  submitMultiMustFail [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
-    walletProvider = app.svc
+    walletProvider = app.dso
 
   passTime (days 90)
   runNextIssuance app
   passTimeToRoundOpen app
   paymentContext <- getPaymentTransferContext app alice
-  appContext <- getAppTransferContext app app.svcUser
+  appContext <- getAppTransferContext app app.dsoUser
 
-  -- cc wallet and svc can repeat the "payment and collect" cycle indefinitely
-  (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
+  -- cc wallet and dso can repeat the "payment and collect" cycle indefinitely
+  (paymentCid, _) <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
-    walletProvider = app.svc
-  renewalSummary <- submit app.svc $ exerciseCmd entryContext CnsEntryContext_CollectEntryRenewalPayment with
+    walletProvider = app.dso
+  renewalSummary <- submit app.dso $ exerciseCmd entryContext CnsEntryContext_CollectEntryRenewalPayment with
     paymentCid
     entryCid = renewalSummary.entryCid
     transferContext = appContext
     cnsRulesCid
 
   -- the amulet received by sv is brunt
-  svcAmulets <- queryFilter @Amulet app.svc (\amulet -> amulet.owner == app.svc)
-  svcAmulets === []
+  dsoAmulets <- queryFilter @Amulet app.dso (\amulet -> amulet.owner == app.dso)
+  dsoAmulets === []
 
-  submitMustFail app.svc $ exerciseCmd renewalSummary.entryCid (CnsEntry_Expire app.svc)
+  submitMustFail app.dso $ exerciseCmd renewalSummary.entryCid (CnsEntry_Expire app.dso)
 
-  -- svc can eventually expire an unfunded entry
+  -- dso can eventually expire an unfunded entry
   passTime (days 121)
   runNextIssuance app
   passTimeToRoundOpen app
-  submit app.svc $ exerciseCmd renewalSummary.entryCid (CnsEntry_Expire app.svc)
+  submit app.dso $ exerciseCmd renewalSummary.entryCid (CnsEntry_Expire app.dso)
 
-  -- svc can then also terminate the subscription
-  submit app.svc $ exerciseCmd renewalSummary.subscriptionStateCid (SubscriptionIdleState_ExpireSubscription app.svc)
+  -- dso can then also terminate the subscription
+  submit app.dso $ exerciseCmd renewalSummary.subscriptionStateCid (SubscriptionIdleState_ExpireSubscription app.dso)
 
   pure ()
 
@@ -150,22 +150,22 @@ terminatedSubscriptionCanBeCleanedUp = script do
   runNextIssuance app
   runAmuletDepositBots app
 
-  cnsRulesCid <- submitMulti [app.svc] [] $ createCmd CnsRules with
-    svc = app.svc
+  cnsRulesCid <- submitMulti [app.dso] [] $ createCmd CnsRules with
+    dso = app.dso
     config = defaultCnsRulesConfig
 
-  requestSummary <- submitMulti [alice.primaryParty] [app.svc] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+  requestSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
     name = "cns.darth.vader"
     url = "https://darth-vader-cns.com"
     description = "Darth Vader's CNS Description"
     user = alice.primaryParty
 
-  terminated <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd requestSummary.requestCid SubscriptionRequest_Reject
-  submit app.svc $ exerciseCmd requestSummary.entryCid (CnsEntryContext_Terminate app.svc terminated)
+  terminated <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd requestSummary.requestCid SubscriptionRequest_Reject
+  submit app.dso $ exerciseCmd requestSummary.entryCid (CnsEntryContext_Terminate app.dso terminated)
 
-  entryContexts <- query @CnsEntryContext app.svc
+  entryContexts <- query @CnsEntryContext app.dso
   entryContexts === []
 
-  terminatedSubscriptions <- query @TerminatedSubscription app.svc
+  terminatedSubscriptions <- query @TerminatedSubscription app.dso
   terminatedSubscriptions === []
   pure ()

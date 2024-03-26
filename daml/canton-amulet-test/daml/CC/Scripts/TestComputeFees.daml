@@ -87,11 +87,11 @@ testScaledHoldingFees = do
     initialAmuletPrice = 2.0
     scaledHoldingFee = (holdingFee / initialAmuletPrice)
 
-  Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
 
   -- Set holding fee and initial amulet price
   now <- getTime
-  submitMulti [app.svc] [app.svc] $ exerciseCmd amuletRulesCid AmuletRules_AddFutureAmuletConfigSchedule with
+  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_AddFutureAmuletConfigSchedule with
     newScheduleItem = (
           addRelTime now (minutes 1),
           amuletRules.configSchedule.initialValue with
@@ -113,7 +113,7 @@ testScaledHoldingFees = do
 
   -- Make a transfer, so that holding fees will be charged
   context <- getPaymentTransferContext app alice
-  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $
+  transferResult <- submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty

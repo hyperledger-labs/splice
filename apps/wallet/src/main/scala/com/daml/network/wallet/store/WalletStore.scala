@@ -53,12 +53,12 @@ object WalletStore {
   case class Key(
       /** The validator party. */
       validatorParty: PartyId,
-      /** The party-id of the SVC issuing CC managed by this wallet. */
-      svcParty: PartyId,
+      /** The party-id of the DSO issuing CC managed by this wallet. */
+      dsoParty: PartyId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
       param("validatorParty", _.validatorParty),
-      param("svcParty", _.svcParty),
+      param("dsoParty", _.dsoParty),
     )
   }
 }

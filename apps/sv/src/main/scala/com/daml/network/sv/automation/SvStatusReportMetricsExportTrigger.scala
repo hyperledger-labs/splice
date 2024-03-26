@@ -9,10 +9,10 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svc.memberstate.SvStatusReport
+import com.daml.network.codegen.java.cn.dso.memberstate.SvStatusReport
 import com.daml.network.environment.CNMetrics
 import com.daml.network.sv.automation.SvStatusReportMetricsExportTrigger.SvStatusMetrics
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, SyncCloseable}
@@ -29,7 +29,7 @@ import scala.jdk.OptionConverters.*
 /** A trigger to export the SvStatus reports as metrics. */
 class SvStatusReportMetricsExportTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
 )(implicit
     override val ec: ExecutionContext,
     mat: Materializer,

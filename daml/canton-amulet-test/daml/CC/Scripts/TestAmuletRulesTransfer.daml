@@ -35,7 +35,7 @@ testUsageFees = do
   context <- getPaymentTransferContext app alice
   runNextIssuance app
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -139,7 +139,7 @@ testAmuletUsedInRoundBeforeItsCreation = do
   amuletRound2.amount.createdAt.number === 2
   round1.round.number === 1
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $
     exerciseCmd contextWithRound1.amuletRules AmuletRules_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty
@@ -170,9 +170,9 @@ testAmuletUsedAfterHoldingFeeChanged = do
       smallerHoldingFee = 0.00005
       transferAmount = 10.0
 
-  Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (amuletRulesCid, amuletRules) <- queryAmuletRulesByKey app.dso
 
-  submitMulti [app.svc] [app.svc] $ exerciseCmd amuletRulesCid AmuletRules_AddFutureAmuletConfigSchedule with
+  submitMulti [app.dso] [app.dso] $ exerciseCmd amuletRulesCid AmuletRules_AddFutureAmuletConfigSchedule with
     newScheduleItem = (
           addRelTime now (minutes 1),
           amuletRules.configSchedule.initialValue with
@@ -202,10 +202,10 @@ testAmuletUsedAfterHoldingFeeChanged = do
   context <- getPaymentTransferContext app alice
 
   -- use the amulet created in round 2 before holding fee changes
-  transferResult2 <- checkBalanceChanges defaultAppWithUsers $ submitTransfer context.amuletRules context.context app.svc alice.primaryParty bob.primaryParty amuletRound2Cid transferAmount
+  transferResult2 <- checkBalanceChanges defaultAppWithUsers $ submitTransfer context.amuletRules context.context app.dso alice.primaryParty bob.primaryParty amuletRound2Cid transferAmount
 
   -- use the amulet created in round 3 when holding fee changes
-  transferResult3 <- checkBalanceChanges defaultAppWithUsers $ submitTransfer context.amuletRules context.context app.svc alice.primaryParty bob.primaryParty amuletRound3Cid transferAmount
+  transferResult3 <- checkBalanceChanges defaultAppWithUsers $ submitTransfer context.amuletRules context.context app.dso alice.primaryParty bob.primaryParty amuletRound3Cid transferAmount
 
   -- Both amulets are used as transfer input at round 7
 
@@ -217,8 +217,8 @@ testAmuletUsedAfterHoldingFeeChanged = do
   transferResult3.summary.holdingFees === smallerHoldingFee * (7.0 - 3.0)
 
 submitTransfer: ContractId AmuletRules -> TransferContext -> Party -> Party -> Party -> ContractId Amulet -> Decimal -> Script TransferResult
-submitTransfer amuletRulesCid transferContext svc sender receiver amuletCid amount = do
-  submitMulti [sender, receiver] [svc] $
+submitTransfer amuletRulesCid transferContext dso sender receiver amuletCid amount = do
+  submitMulti [sender, receiver] [dso] $
     exerciseCmd amuletRulesCid AmuletRules_Transfer with
       transfer = Transfer with
         sender = sender
@@ -248,7 +248,7 @@ testSenderChangeAndOutput = do
   runNextIssuance app
   aliceNormalizedBalanceBefore <- getNormalizedBalance alice.primaryParty
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -297,7 +297,7 @@ testSenderNoChange = do
   context <- getPaymentTransferContext app alice
   runNextIssuance app
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty
@@ -343,7 +343,7 @@ testSenderNoChangeNoSenderOutput = do
   context <- getPaymentTransferContext app alice
   runNextIssuance app
 
-  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.svc] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
+  transferResult <- checkBalanceChanges defaultAppWithUsers $ submitMulti [alice.primaryParty, bob.primaryParty, provider1.primaryParty] [app.dso] $ exerciseCmd context.amuletRules AmuletRules_Transfer with
     transfer = Transfer with
       sender = alice.primaryParty
       provider = alice.primaryParty

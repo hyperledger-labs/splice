@@ -44,7 +44,7 @@ abstract class MultiDomainAcsStoreTest[
     import MultiDomainAcsStore.mkFilter
 
     MultiDomainAcsStore.SimpleContractFilter(
-      svcParty,
+      dsoParty,
       templateFilters = Map(
         mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured) { contract =>
           GenericAcsRowData(contract)
@@ -115,9 +115,9 @@ abstract class MultiDomainAcsStoreTest[
       _ shouldBe expected
     }
 
-  protected def c(i: Int): C = appRewardCoupon(i, svcParty, contractId = validContractId(i))
+  protected def c(i: Int): C = appRewardCoupon(i, dsoParty, contractId = validContractId(i))
   protected def cUpgraded(i: Int): C = {
-    val coupon = appRewardCoupon(i, svcParty, contractId = validContractId(i))
+    val coupon = appRewardCoupon(i, dsoParty, contractId = validContractId(i))
     coupon.copy(
       identifier = new Identifier(
         upgradedPackageId,
@@ -152,7 +152,7 @@ abstract class MultiDomainAcsStoreTest[
     }
 
   protected def cFeatured(i: Int): C =
-    appRewardCoupon(i, svcParty, true, contractId = validContractId(i))
+    appRewardCoupon(i, dsoParty, true, contractId = validContractId(i))
 
   def transferInProgress(
       i: Int,
@@ -163,14 +163,14 @@ abstract class MultiDomainAcsStoreTest[
       contractId = new TransferInProgress.ContractId(s"#$i"),
       payload = new TransferInProgress(
         new Group(
-          svcParty.toProtoPrimitive,
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           Seq.empty.asJava,
           new GroupId("mygroup"),
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           new RelTime(5),
         ),
-        svcParty.toProtoPrimitive,
+        dsoParty.toProtoPrimitive,
         Seq.empty.asJava,
         paymentRequest,
       ),
@@ -705,8 +705,8 @@ abstract class MultiDomainAcsStoreTest[
       val evenCompanion = FeaturedAppRight.COMPANION
       val oddCompanion = AppRewardCoupon.COMPANION
       def smallestContract(coid: Value.ContractId, ix: Int) =
-        if (ix % 2 == 0) featuredAppRight(svcParty, coid.coid)
-        else appRewardCoupon(1, svcParty, contractId = coid.coid)
+        if (ix % 2 == 0) featuredAppRight(dsoParty, coid.coid)
+        else appRewardCoupon(1, dsoParty, contractId = coid.coid)
       val coids = MultiDomainAcsStoreTest.generatedCoids.value
       val expectedOrder = reassignmentContractOrder(
         coids,
@@ -717,7 +717,7 @@ abstract class MultiDomainAcsStoreTest[
         import MultiDomainAcsStore.mkFilter
 
         MultiDomainAcsStore.SimpleContractFilter(
-          svcParty,
+          dsoParty,
           templateFilters = Map(
             mkFilter(evenCompanion)(_ => true)(GenericAcsRowData(_)),
             mkFilter(oddCompanion)(_ => true)(GenericAcsRowData(_)),

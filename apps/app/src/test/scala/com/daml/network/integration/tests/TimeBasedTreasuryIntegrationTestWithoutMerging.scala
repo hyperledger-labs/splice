@@ -418,7 +418,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
   }
 
   private def getOpenIssuingRounds(now: Instant)(implicit env: CNNodeTestConsoleEnvironment) = {
-    val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, svcParty)
+    val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, dsoParty)
     issuingRounds.filter(r => now.isAfter(r.data.opensAt))
   }
 

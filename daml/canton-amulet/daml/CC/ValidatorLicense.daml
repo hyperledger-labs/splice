@@ -20,16 +20,16 @@ data ValidatorLicense_WithdrawResult = ValidatorLicense_WithdrawResult
 
 data ValidatorLicense_CancelResult = ValidatorLicense_CancelResult
 
-data ValidatorFaucetCoupon_SvcExpireResult = ValidatorFaucetCoupon_SvcExpireResult
+data ValidatorFaucetCoupon_DsoExpireResult = ValidatorFaucetCoupon_DsoExpireResult
 
 -- | The existence of a validator license is what makes a validator an (onboarded) validator.
 template ValidatorLicense with
     validator : Party           -- ^ The validator (party) that this license is about.
     sponsor : Party             -- ^ The SV node that sponsored the onboarding.
-    svc : Party                 -- ^ The party representing the network's SV collective.
+    dso : Party                 -- ^ The party representing the network's SV collective.
     faucetState : Optional FaucetState
   where
-    signatory svc -- sponsor is not a signatory as that complicates re-issuing crates
+    signatory dso -- sponsor is not a signatory as that complicates re-issuing crates
     observer validator -- not a signatory to simplify the creation of the license as part of onboarding
 
 
@@ -40,7 +40,7 @@ template ValidatorLicense with
       controller validator
       do
         now <- getTime
-        openRound <- fetchReferenceData (ForSvc with svc) openRoundCid
+        openRound <- fetchReferenceData (ForDso with dso) openRoundCid
         require "OpenRound is open" (openRound.opensAt <= now)
 
         newFaucetState <- case faucetState of
@@ -59,17 +59,17 @@ template ValidatorLicense with
         licenseCid <- create this with faucetState = newFaucetState
 
         couponCid <- create ValidatorFaucetCoupon with
-          svc
+          dso
           validator
           round = openRound.round
 
         return ValidatorLicense_ReceiveFaucetCouponResult with ..
 
-    -- We expect the SVC to call this choice for misbehaving validators.
+    -- We expect the DSO to call this choice for misbehaving validators.
     choice ValidatorLicense_Withdraw : ValidatorLicense_WithdrawResult
       with
         reason : Text
-      controller svc
+      controller dso
       do return ValidatorLicense_WithdrawResult
 
     choice ValidatorLicense_Cancel : ValidatorLicense_CancelResult
@@ -80,24 +80,24 @@ template ValidatorLicense with
 
 
 template ValidatorFaucetCoupon with
-    svc : Party
+    dso : Party
     validator : Party
     round : Round
   where
-    signatory svc, validator
+    signatory dso, validator
 
-    choice ValidatorFaucetCoupon_SvcExpire : ValidatorFaucetCoupon_SvcExpireResult
+    choice ValidatorFaucetCoupon_DsoExpire : ValidatorFaucetCoupon_DsoExpireResult
       with
         closedRoundCid : ContractId ClosedMiningRound
-      controller svc
+      controller dso
       do
          -- Expiry requires proof of the coupon's round being closed, as all rounds advance on their own time.
-         void $ fetchReferenceData (ForRound with svc; round) closedRoundCid
-         return ValidatorFaucetCoupon_SvcExpireResult
+         void $ fetchReferenceData (ForRound with dso; round) closedRoundCid
+         return ValidatorFaucetCoupon_DsoExpireResult
 
 
 -- instances
 ------------
 
 instance HasCheckedFetch ValidatorFaucetCoupon ForOwner where
-  contractGroupId ValidatorFaucetCoupon{..} = ForOwner with svc; owner = validator
+  contractGroupId ValidatorFaucetCoupon{..} = ForOwner with dso; owner = validator

@@ -56,7 +56,7 @@ testEstimateOpenRoundCreatedAt = script do
       transferConfigUsd = amuletConfigUsd.transferConfig
       issuanceConfig0 = getValueAsOf issuingFor0 amuletConfigUsd.issuanceCurve
       issuanceConfig3 = getValueAsOf issuingFor3 amuletConfigUsd.issuanceCurve
-      openRound0 = OpenMiningRound with svc = app.svc; round = Round 0; amuletPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
+      openRound0 = OpenMiningRound with dso = app.dso; round = Round 0; amuletPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
       openRound3 = openRound0 with round = Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
 
 

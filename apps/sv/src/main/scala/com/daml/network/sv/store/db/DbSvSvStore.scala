@@ -41,7 +41,7 @@ class DbSvSvStore(
         participant = participantId,
         key = Map(
           "svParty" -> key.svParty.toProtoPrimitive,
-          "svcParty" -> key.svcParty.toProtoPrimitive,
+          "dsoParty" -> key.dsoParty.toProtoPrimitive,
         ),
       ),
       domainMigrationId,

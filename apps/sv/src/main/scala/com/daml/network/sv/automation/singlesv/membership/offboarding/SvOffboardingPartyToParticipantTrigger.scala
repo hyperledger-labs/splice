@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -16,27 +16,27 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.{CollectionHasAsScala}
 
-/** Offboard a participant from the hosting of the SVC party.
+/** Offboard a participant from the hosting of the DSO party.
   * - Runs when a member part of offboardedMembers still exist on the partyToParticipantX mapping
   */
 class SvOffboardingPartyToParticipantProposalTrigger(
     override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[ParticipantId] {
 
-  private val svParty = svcStore.key.svParty
-  private val svcParty: PartyId = svcStore.key.svcParty
+  private val svParty = dsoStore.key.svParty
+  private val dsoParty: PartyId = dsoStore.key.dsoParty
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[ParticipantId]] = {
     for {
-      svcRules <- svcStore.getSvcRules()
-      offboardedMembers = svcRules.contract.payload.offboardedMembers
+      dsoRules <- dsoStore.getDsoRules()
+      offboardedMembers = dsoRules.contract.payload.offboardedMembers
       offboardedParticipants = offboardedMembers
         .values()
         .asScala
@@ -45,8 +45,8 @@ class SvOffboardingPartyToParticipantProposalTrigger(
         .toSeq
       currentHostingParticipantIds <- participantAdminConnection
         .getPartyToParticipant(
-          svcRules.domain,
-          svcParty,
+          dsoRules.domain,
+          dsoParty,
         )
         .map(_.mapping.participantIds)
     } yield currentHostingParticipantIds.filter(e => offboardedParticipants.contains(e))
@@ -56,18 +56,18 @@ class SvOffboardingPartyToParticipantProposalTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = {
     logger.info(
-      s"Removing participant with participantId $task from the hosting of the SVC party"
+      s"Removing participant with participantId $task from the hosting of the DSO party"
     )
     for {
-      svcRules <- svcStore.getSvcRules()
+      dsoRules <- dsoStore.getDsoRules()
       _ <- participantAdminConnection.ensurePartyToParticipantRemovalProposal(
-        svcRules.domain,
-        svcParty,
+        dsoRules.domain,
+        dsoParty,
         task,
         svParty.uid.namespace.fingerprint,
       )
     } yield {
-      TaskSuccess(show"Removed $task from the participant hosting the SVC party $svcParty")
+      TaskSuccess(show"Removed $task from the participant hosting the DSO party $dsoParty")
     }
   }
 
@@ -76,11 +76,11 @@ class SvOffboardingPartyToParticipantProposalTrigger(
       tc: TraceContext
   ): Future[Boolean] = {
     for {
-      svcRules <- svcStore.getSvcRules()
+      dsoRules <- dsoStore.getDsoRules()
       currentHostingParticipants <- participantAdminConnection
         .getPartyToParticipant(
-          svcRules.domain,
-          svcParty,
+          dsoRules.domain,
+          dsoParty,
         )
     } yield {
       !currentHostingParticipants.mapping.participantIds.contains(task)

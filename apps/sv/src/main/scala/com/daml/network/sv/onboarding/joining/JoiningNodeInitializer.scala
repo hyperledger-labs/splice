@@ -16,7 +16,7 @@ import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
-import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
+import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.automation.singlesv.SvPackageVettingTrigger
 import com.daml.network.sv.cometbft.{
   CometBftClient,
@@ -30,9 +30,9 @@ import com.daml.network.sv.onboarding.{
   DomainNodeReconciler,
   NodeInitializerUtil,
   SetupUtil,
-  SvcPartyHosting,
+  DsoPartyHosting,
 }
-import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.util.{Contract, PackageVetting, TemplateJsonDecoder, UploadablePackage}
@@ -91,11 +91,11 @@ class JoiningNodeInitializer(
   def joinCollectiveAndOnboardNodes(): Future[
     (
         DomainId,
-        SvcPartyHosting,
+        DsoPartyHosting,
         SvSvStore,
         SvSvAutomationService,
-        SvSvcStore,
-        SvSvcAutomationService,
+        SvDsoStore,
+        SvDsoAutomationService,
     )
   ] = {
     val initConnection = ledgerClient.readOnlyConnection(
@@ -115,9 +115,9 @@ class JoiningNodeInitializer(
       manualConnect = true,
     )
     for {
-      (svcPartyId, darUploads) <- (
+      (dsoPartyId, darUploads) <- (
         // If we're not onboarded yet, this waits for the sponsoring SV
-        getSvcPartyId(initConnection),
+        getDsoPartyId(initConnection),
         for {
           // Register domain with manualConnect=true. Confusingly, this still connects the first time.
           // However, it won't connect if we crash and get here again which is what we're really after.
@@ -131,7 +131,7 @@ class JoiningNodeInitializer(
           RetryFor.WaitingOnInitDependency,
         ),
       ).tupled
-      _ <- connectToDomainUnlessMigratingSvcParty(svcPartyId)
+      _ <- connectToDomainUnlessMigratingDsoParty(dsoPartyId)
       svParty <- SetupUtil.setupSvParty(
         initConnection,
         config,
@@ -141,62 +141,62 @@ class JoiningNodeInitializer(
         loggerFactory,
       )
       _ <- darUploads
-      storeKey = SvStore.Key(svParty, svcPartyId)
+      storeKey = SvStore.Key(svParty, dsoPartyId)
       svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
-      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantId)
+      dsoStore = newDsoStore(svStore.key, config.domainMigrationId, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
-        svcStore,
+        dsoStore,
         ledgerClient,
       )
       globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
-      svcPartyHosting = newSvcPartyHosting(storeKey)
+      dsoPartyHosting = newDsoPartyHosting(storeKey)
       // We need to first wait to ensure the CometBFT node is caught up
       // If the CometBFT node is not caught up and we start the CometBFT triggers, if the network doesn't have any
       // fault tolerance then it might be blocked until the CometBFT node is caught up.
       _ <- waitUntilCometBftNodeHasCaughtUp
-      svcPartyIsAuthorized <- svcPartyHosting.isSvcPartyAuthorizedOn(
+      dsoPartyIsAuthorized <- dsoPartyHosting.isDsoPartyAuthorizedOn(
         globalDomain,
         participantId,
       )
       withSvStore = new WithSvStore(
         svAutomation,
-        new JoiningNodeSvcPartyHosting(
+        new JoiningNodeDsoPartyHosting(
           participantAdminConnection,
           joiningConfig,
-          svcPartyId,
-          svcPartyHosting,
+          dsoPartyId,
+          dsoPartyHosting,
           retryProvider,
           loggerFactory,
         ),
         globalDomain,
       )
-      svcAutomation <-
-        if (svcPartyIsAuthorized) {
-          logger.info("SVC party is authorized to our participant.")
+      dsoAutomation <-
+        if (dsoPartyIsAuthorized) {
+          logger.info("DSO party is authorized to our participant.")
           for {
-            _ <- SetupUtil.grantSvUserRightReadAsSvc(
+            _ <- SetupUtil.grantSvUserRightReadAsDso(
               svAutomation.connection,
               config.ledgerApiUser,
-              svStore.key.svcParty,
+              svStore.key.dsoParty,
             )
-            svcAutomation =
-              newSvSvcAutomationService(
+            dsoAutomation =
+              newSvDsoAutomationService(
                 svStore,
-                svcStore,
+                dsoStore,
                 localDomainNode,
               )
-            _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
+            _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThatB(
               RetryFor.WaitingOnInitDependency,
-              "svc_onboard",
-              show"the SvcRules list the SV party ${svcStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
-              isOnboarded(svcStore), {
+              "dso_onboard",
+              show"the DsoRules list the SV party ${dsoStore.key.svParty} as a member and its namespace as part of the decentralized namespace",
+              isOnboarded(dsoStore), {
                 for {
                   (joiningConfig, svConnection) <- svConnection
-                  _ <- withSvStore.startOnboardingWithSvcPartyHosted(
-                    svcAutomation,
+                  _ <- withSvStore.startOnboardingWithDsoPartyHosted(
+                    dsoAutomation,
                     svConnection,
                     joiningConfig,
                   )
@@ -204,51 +204,51 @@ class JoiningNodeInitializer(
               },
               logger,
             )
-          } yield svcAutomation
+          } yield dsoAutomation
         } else {
           logger.info(
-            "The SVC party is not authorized to our participant. " +
-              "Starting onboarding with SVC party migration."
+            "The DSO party is not authorized to our participant. " +
+              "Starting onboarding with DSO party migration."
           )
           for {
             (joiningConfig, svConnection) <- svConnection
-            svcAutomation <- withSvStore
-              .startOnboardingWithSvcPartyMigration(
+            dsoAutomation <- withSvStore
+              .startOnboardingWithDsoPartyMigration(
                 initConnection,
-                svcStore,
+                dsoStore,
                 svConnection,
                 joiningConfig,
               )
-          } yield svcAutomation
+          } yield dsoAutomation
         }
-      // Set autoConnect=true now that SVC party migration is complete
+      // Set autoConnect=true now that DSO party migration is complete
       _ <- participantAdminConnection.modifyDomainConnectionConfig(
         config.domains.global.alias,
         config => if (config.manualConnect) Some(config.copy(manualConnect = false)) else None,
       )
-      _ <- onboard(globalDomain, svcAutomation, svAutomation)
+      _ <- onboard(globalDomain, dsoAutomation, svAutomation)
     } yield {
       (
         globalDomain,
-        svcPartyHosting,
+        dsoPartyHosting,
         svStore,
         svAutomation,
-        svcStore,
-        svcAutomation,
+        dsoStore,
+        dsoAutomation,
       )
     }
   }
 
   def onboard(
       globalDomain: DomainId,
-      svcAutomationService: SvSvcAutomationService,
+      dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
   ): Future[Unit] = {
-    val svcStore = svcAutomationService.store
-    val svcPartyId = svcStore.key.svcParty
+    val dsoStore = dsoAutomationService.store
+    val dsoPartyId = dsoStore.key.dsoParty
     val domainNodeReconciler = new DomainNodeReconciler(
-      svcStore,
-      svcAutomationService.connection,
+      dsoStore,
+      dsoAutomationService.connection,
       clock,
       retryProvider,
       logger,
@@ -256,23 +256,23 @@ class JoiningNodeInitializer(
     for {
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
-        "svc_rules_visible",
-        show"the SvcRules and AmuletRules are visible",
-        svcStore.getSvcRules().map(_ => ()),
+        "dso_rules_visible",
+        show"the DsoRules and AmuletRules are visible",
+        dsoStore.getDsoRules().map(_ => ()),
         logger,
       )
-      // Register triggers once the SvcRules are visible and have been ingested
-      _ = svcAutomationService.registerPostOnboardingTriggers()
+      // Register triggers once the DsoRules are visible and have been ingested
+      _ = dsoAutomationService.registerPostOnboardingTriggers()
       // It is important to wait only here since at this point we may have been added
       // to the decentralized namespace so we depend on our own automation promoting us to
       // submission rights.
       _ <- (
-        waitForSvParticipantToHaveSubmissionRights(svcPartyId, globalDomain),
-        waitForSvcMembership(svcStore),
-        SetupUtil.ensureSvcPartyMetadataAnnotation(
+        waitForSvParticipantToHaveSubmissionRights(dsoPartyId, globalDomain),
+        waitForDsoMembership(dsoStore),
+        SetupUtil.ensureDsoPartyMetadataAnnotation(
           svSvAutomationService.connection,
           config,
-          svcPartyId,
+          dsoPartyId,
         ),
       ).tupled
       _ <- localDomainNode.traverse_ { localDomainNode =>
@@ -286,7 +286,7 @@ class JoiningNodeInitializer(
               ),
               localDomainNode.addLocalMediatorIdentityIfRequired(globalDomain),
             ).tupled
-          // Then, add the new local domain node to the SVC rules with an "onboarding" status
+          // Then, add the new local domain node to the DSO rules with an "onboarding" status
           // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
           _ <- domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
             Some(localDomainNode),
@@ -314,27 +314,27 @@ class JoiningNodeInitializer(
     }
   }
 
-  private def waitForSvParticipantToHaveSubmissionRights(svcParty: PartyId, domainId: DomainId) = {
+  private def waitForSvParticipantToHaveSubmissionRights(dsoParty: PartyId, domainId: DomainId) = {
     val description =
-      show"SV participant $participantId has Submission rights for party $svcParty"
+      show"SV participant $participantId has Submission rights for party $dsoParty"
     retryProvider.getValueWithRetries(
       RetryFor.WaitingOnInitDependency,
       "submission_rights",
       description,
       for {
-        svcPartyHosting <- participantAdminConnection
-          .getPartyToParticipant(domainId, svcParty)
+        dsoPartyHosting <- participantAdminConnection
+          .getPartyToParticipant(domainId, dsoParty)
       } yield {
-        svcPartyHosting.mapping.participants.find(_.participantId == participantId) match {
+        dsoPartyHosting.mapping.participants.find(_.participantId == participantId) match {
           case None =>
             throw Status.NOT_FOUND
               .withDescription(
-                show"Party $svcParty is not hosted on participant $participantId"
+                show"Party $dsoParty is not hosted on participant $participantId"
               )
               .asRuntimeException()
           case Some(HostingParticipant(_, permission)) =>
             if (permission == ParticipantPermission.Submission)
-              svcPartyHosting
+              dsoPartyHosting
             else
               throw Status.FAILED_PRECONDITION.withDescription(description).asRuntimeException()
         }
@@ -382,35 +382,35 @@ class JoiningNodeInitializer(
       })
   }
 
-  /** Private class to share svStore, svcPartyHosting, and global domain-id
+  /** Private class to share svStore, dsoPartyHosting, and global domain-id
     * across utility methods.
     */
   private class WithSvStore(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      svcPartyHosting: JoiningNodeSvcPartyHosting,
+      dsoPartyHosting: JoiningNodeDsoPartyHosting,
       domainId: DomainId,
   ) {
 
     private val svStore = svStoreWithIngestion.store
     private val svParty = svStore.key.svParty
-    private val svcParty = svStore.key.svcParty
+    private val dsoParty = svStore.key.dsoParty
 
-    def startOnboardingWithSvcPartyHosted(
-        svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+    def startOnboardingWithDsoPartyHosted(
+        dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
         svConnection: SvConnection,
         joiningConfig: SvOnboardingConfig.JoinWithKey,
     ): Future[Unit] = {
-      new WithSvcStore(svcStoreWithIngestion)
-        .startOnboardingWithSvcPartyHosted(svConnection, joiningConfig)
+      new WithDsoStore(dsoStoreWithIngestion)
+        .startOnboardingWithDsoPartyHosted(svConnection, joiningConfig)
     }
 
-    /** A private class to share the svcStoreWithIngestion across utility methods. */
-    private class WithSvcStore(
-        svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore]
+    /** A private class to share the dsoStoreWithIngestion across utility methods. */
+    private class WithDsoStore(
+        dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore]
     ) {
-      private val svcStore: SvSvcStore = svcStoreWithIngestion.store
+      private val dsoStore: SvDsoStore = dsoStoreWithIngestion.store
 
-      def startOnboardingWithSvcPartyHosted(
+      def startOnboardingWithDsoPartyHosted(
           svConnection: SvConnection,
           joiningConfig: SvOnboardingConfig.JoinWithKey,
       ): Future[Unit] = {
@@ -425,60 +425,60 @@ class JoiningNodeInitializer(
                 publicKey,
                 privateKey_,
               )
-              _ <- addConfirmedMemberToSvc()
+              _ <- addConfirmedMemberToDso()
             } yield ()
           case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
         }
       }
 
-      private def waitForSvOnboardingConfirmedInSvcStore()
+      private def waitForSvOnboardingConfirmedInDsoStore()
           : Future[Contract[SvOnboardingConfirmed.ContractId, SvOnboardingConfirmed]] =
         waitForSvOnboardingConfirmed(() =>
-          svcStore.lookupSvOnboardingConfirmedByParty(svcStore.key.svParty)
+          dsoStore.lookupSvOnboardingConfirmedByParty(dsoStore.key.svParty)
         )
 
-      def addConfirmedMemberToSvc(): Future[Unit] = {
-        val svcStore = svcStoreWithIngestion.store
+      def addConfirmedMemberToDso(): Future[Unit] = {
+        val dsoStore = dsoStoreWithIngestion.store
         for {
-          // Wait on the SVC store to make sure that we atomically see either the SvOnboardingConfirmed contract
-          // or the SvcRules contract.
-          _ <- waitForSvOnboardingConfirmedInSvcStore()
+          // Wait on the DSO store to make sure that we atomically see either the SvOnboardingConfirmed contract
+          // or the DsoRules contract.
+          _ <- waitForSvOnboardingConfirmedInDsoStore()
           _ <- retryProvider.retry(
             RetryFor.WaitingOnInitDependency,
-            "add_svc_member",
-            "add member to Svc",
+            "add_dso_member",
+            "add member to Dso",
             for {
-              (svcRules, amuletRules, openMiningRounds, svOnboardingConfirmedOpt) <- (
-                svcStore.getSvcRules(),
-                svcStore.getAmuletRules(),
-                svcStore.getOpenMiningRoundTriple(),
-                svcStore.lookupSvOnboardingConfirmedByParty(
-                  svcStore.key.svParty
+              (dsoRules, amuletRules, openMiningRounds, svOnboardingConfirmedOpt) <- (
+                dsoStore.getDsoRules(),
+                dsoStore.getAmuletRules(),
+                dsoStore.getOpenMiningRoundTriple(),
+                dsoStore.lookupSvOnboardingConfirmedByParty(
+                  dsoStore.key.svParty
                 ),
               ).tupled
-              svIsSvcMember = svcRules.payload.members.asScala
-                .contains(svcStore.key.svParty.toProtoPrimitive)
+              svIsDsoMember = dsoRules.payload.members.asScala
+                .contains(dsoStore.key.svParty.toProtoPrimitive)
               _ <- svOnboardingConfirmedOpt match {
                 case None =>
-                  if (svIsSvcMember) {
-                    logger.info(s"SV is already a member of the SVC")
+                  if (svIsDsoMember) {
+                    logger.info(s"SV is already a member of the DSO")
                     Future.unit
                   } else {
                     val msg =
-                      "SV is not a member of the SVC but there is also no confirmed onboarding, giving up"
+                      "SV is not a member of the DSO but there is also no confirmed onboarding, giving up"
                     logger.error(msg)
                     Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
                   }
                 case Some(confirmed) =>
-                  if (svIsSvcMember) {
+                  if (svIsDsoMember) {
                     logger.info(
-                      "SvOnboardingConfirmed exists but SV is already a member of the SVC"
+                      "SvOnboardingConfirmed exists but SV is already a member of the DSO"
                     )
                     Future.unit
                   } else {
-                    val cmd = svcRules.exercise(
-                      _.exerciseSvcRules_AddConfirmedMember(
-                        svcStore.key.svParty.toProtoPrimitive,
+                    val cmd = dsoRules.exercise(
+                      _.exerciseDsoRules_AddConfirmedMember(
+                        dsoStore.key.svParty.toProtoPrimitive,
                         confirmed.contractId,
                         openMiningRounds.oldest.contractId,
                         openMiningRounds.middle.contractId,
@@ -486,20 +486,20 @@ class JoiningNodeInitializer(
                         amuletRules.contractId,
                       )
                     )
-                    svcStoreWithIngestion.connection
-                      .submit(Seq(svcStore.key.svParty), Seq(svcStore.key.svcParty), cmd)
+                    dsoStoreWithIngestion.connection
+                      .submit(Seq(dsoStore.key.svParty), Seq(dsoStore.key.dsoParty), cmd)
                       .noDedup
                       .yieldUnit()
                   }
               }
-            } yield svcRules,
+            } yield dsoRules,
             logger,
           )
           _ = logger.info("Adding member to the decentralized namespace.")
           _ <- participantAdminConnection
             .ensureDecentralizedNamespaceDefinitionProposalAccepted(
               domainId,
-              svcParty.uid.namespace,
+              dsoParty.uid.namespace,
               svParty.uid.namespace,
               svParty.uid.namespace.fingerprint,
               RetryFor.WaitingOnInitDependency,
@@ -509,12 +509,12 @@ class JoiningNodeInitializer(
 
     }
 
-    def startOnboardingWithSvcPartyMigration(
+    def startOnboardingWithDsoPartyMigration(
         initConnection: BaseLedgerConnection,
-        svcStore: SvSvcStore,
+        dsoStore: SvDsoStore,
         svConnection: SvConnection,
         joiningConfig: SvOnboardingConfig.JoinWithKey,
-    ): Future[SvSvcAutomationService] = {
+    ): Future[SvDsoAutomationService] = {
       joiningConfig match {
         case SvOnboardingConfig.JoinWithKey(name, _, publicKey, privateKey) =>
           SvUtil.keyPairMatches(publicKey, privateKey) match {
@@ -527,25 +527,25 @@ class JoiningNodeInitializer(
                   publicKey,
                   privateKey_,
                 )
-                // Wait on the SV store because the SVC party is not yet onboarded.
+                // Wait on the SV store because the DSO party is not yet onboarded.
                 _ <- waitForSvOnboardingConfirmedInSvStore()
-                _ <- startHostingSvcPartyInParticipant()
+                _ <- startHostingDsoPartyInParticipant()
                 // We need to wait for the ledger API server to see the party otherwise the
                 // grantUserRights call will fail.
-                _ <- initConnection.waitForPartyOnLedgerApi(svStore.key.svcParty)
+                _ <- initConnection.waitForPartyOnLedgerApi(svStore.key.dsoParty)
                 _ <- svStoreWithIngestion.connection.grantUserRights(
                   config.ledgerApiUser,
                   Seq.empty,
-                  Seq(svStore.key.svcParty),
+                  Seq(svStore.key.dsoParty),
                 )
-                _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for svcParty")
-                svcAutomation = newSvSvcAutomationService(svStore, svcStore, localDomainNode)
-                _ <- svcAutomation.store.domains.waitForDomainConnection(
+                _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for dsoParty")
+                dsoAutomation = newSvDsoAutomationService(svStore, dsoStore, localDomainNode)
+                _ <- dsoAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias
                 )
-                withSvcStore = new WithSvcStore(svcAutomation)
-                _ <- withSvcStore.addConfirmedMemberToSvc()
-              } yield svcAutomation
+                withDsoStore = new WithDsoStore(dsoAutomation)
+                _ <- withDsoStore.addConfirmedMemberToDso()
+              } yield dsoAutomation
             case Left(reason) => sys.error(s"Failed parsing provided keys: $reason")
           }
       }
@@ -583,8 +583,8 @@ class JoiningNodeInitializer(
         // This is not a BFT read: That's acceptable because
         // we will only vet packages that have been statically compiled into the app.
         // At most, we can be tricked into vetting a package a bit too early.
-        svcInfo <- svConnection.getSvcInfo()
-        amuletRules = svcInfo.amuletRules
+        dsoInfo <- svConnection.getDsoInfo()
+        amuletRules = dsoInfo.amuletRules
         vetting = new PackageVetting(
           SvPackageVettingTrigger.packages,
           config.prevetDuration,
@@ -604,7 +604,7 @@ class JoiningNodeInitializer(
         publicKey: String,
         privateKey: ECPrivateKey,
     ): Future[Unit] = {
-      SvOnboardingToken(name, publicKey, svParty, participantId, svcParty).signAndEncode(
+      SvOnboardingToken(name, publicKey, svParty, participantId, dsoParty).signAndEncode(
         privateKey
       ) match {
         case Right(token) =>
@@ -633,97 +633,97 @@ class JoiningNodeInitializer(
       }
     }
 
-    private def startHostingSvcPartyInParticipant(): Future[Unit] = {
-      svcPartyHosting
-        // TODO(#5364): consider inlining the relevant parts from SvcPartyHosting
+    private def startHostingDsoPartyInParticipant(): Future[Unit] = {
+      dsoPartyHosting
+        // TODO(#5364): consider inlining the relevant parts from DsoPartyHosting
         .hostPartyOnOwnParticipant(config.domains.global.alias, domainId, participantId, svParty)
         .map(
           _.getOrElse(
-            sys.error(s"Failed to host SVC party on participant $participantId")
+            sys.error(s"Failed to host DSO party on participant $participantId")
           )
         )
     }
   }
 
-  private def getSvcPartyId(connection: BaseLedgerConnection): Future[PartyId] = for {
-    svcPartyFromMetadata <- connection.lookupSvcPartyFromUserMetadata(config.ledgerApiUser)
-    svcParty <- svcPartyFromMetadata
+  private def getDsoPartyId(connection: BaseLedgerConnection): Future[PartyId] = for {
+    dsoPartyFromMetadata <- connection.lookupDsoPartyFromUserMetadata(config.ledgerApiUser)
+    dsoParty <- dsoPartyFromMetadata
       .fold(
         {
           val sponsorConfig = joiningConfig
             .getOrElse(
               sys.error(
-                "An onboarding config is required to get the SVC party ID from a sponsoring SV; exiting."
+                "An onboarding config is required to get the DSO party ID from a sponsoring SV; exiting."
               )
             )
             .svClient
             .adminApi
           retryProvider.getValueWithRetries(
             RetryFor.WaitingOnInitDependency,
-            "svc_party_from_sponsor",
-            "SVC party ID from sponsoring SV",
-            getSvcPartyIdFromSponsor(sponsorConfig),
+            "dso_party_from_sponsor",
+            "DSO party ID from sponsoring SV",
+            getDsoPartyIdFromSponsor(sponsorConfig),
             logger,
           )
         }
       )(Future.successful)
-  } yield svcParty
+  } yield dsoParty
 
-  private def getSvcPartyIdFromSponsor(sponsorConfig: NetworkAppClientConfig): Future[PartyId] =
+  private def getDsoPartyIdFromSponsor(sponsorConfig: NetworkAppClientConfig): Future[PartyId] =
     SvConnection(
       sponsorConfig,
       retryProvider,
       loggerFactory,
     ).flatMap { svConnection =>
-      svConnection.getSvcInfo().map(_.svcParty).andThen(_ => svConnection.close())
+      svConnection.getDsoInfo().map(_.dsoParty).andThen(_ => svConnection.close())
     }
 
-  private def isOnboarded(svcStore: SvSvcStore): Future[Boolean] = for {
-    svcRules <- svcStore.lookupSvcRules()
-    isInSvcRulesMembers = svcRules.exists(
-      _.payload.members.keySet.contains(svcStore.key.svParty.toProtoPrimitive)
+  private def isOnboarded(dsoStore: SvDsoStore): Future[Boolean] = for {
+    dsoRules <- dsoStore.lookupDsoRules()
+    isInDsoRulesMembers = dsoRules.exists(
+      _.payload.members.keySet.contains(dsoStore.key.svParty.toProtoPrimitive)
     )
     isMemberOfDecentralizedNamespace <-
-      if (isInSvcRulesMembers) {
+      if (isInDsoRulesMembers) {
         participantAdminConnection
           .getDecentralizedNamespaceDefinition(
-            svcRules
+            dsoRules
               .map(_.domain)
               .getOrElse(
                 throw Status.NOT_FOUND
-                  .withDescription("Domain not found in SvcRules")
+                  .withDescription("Domain not found in DsoRules")
                   .asRuntimeException()
               ),
-            svcStore.key.svcParty.uid.namespace,
+            dsoStore.key.dsoParty.uid.namespace,
           )
-          .map(_.mapping.owners.contains(svcStore.key.svParty.uid.namespace))
+          .map(_.mapping.owners.contains(dsoStore.key.svParty.uid.namespace))
       } else {
         Future.successful(false)
       }
-  } yield isInSvcRulesMembers && isMemberOfDecentralizedNamespace
+  } yield isInDsoRulesMembers && isMemberOfDecentralizedNamespace
 
-  private def waitForSvcMembership(svcStore: SvSvcStore): Future[Unit] = {
-    val svParty = svcStore.key.svParty
+  private def waitForDsoMembership(dsoStore: SvDsoStore): Future[Unit] = {
+    val svParty = dsoStore.key.svParty
     retryProvider.waitUntil(
       RetryFor.WaitingOnInitDependency,
-      "svc_membership",
-      show"SvcRules are visible and list $svParty as a member",
+      "dso_membership",
+      show"DsoRules are visible and list $svParty as a member",
       for {
-        svcRules <- svcStore.lookupSvcRules()
-        _ <- svcRules match {
+        dsoRules <- dsoStore.lookupDsoRules()
+        _ <- dsoRules match {
           case Some(c) =>
-            if (SvApp.isSvcMemberParty(svcStore.key.svParty, c.contract)) {
+            if (SvApp.isDsoMemberParty(dsoStore.key.svParty, c.contract)) {
               Future.successful(())
             } else {
               throw Status.FAILED_PRECONDITION
                 .withDescription(
-                  show"SvcRules found but $svParty is not a member"
+                  show"DsoRules found but $svParty is not a member"
                 )
                 .asRuntimeException()
             }
           case None =>
             throw Status.NOT_FOUND
-              .withDescription(show"SvcRules contract not found")
+              .withDescription(show"DsoRules contract not found")
               .asRuntimeException()
         }
       } yield (),
@@ -731,21 +731,21 @@ class JoiningNodeInitializer(
     )
   }
 
-  private def connectToDomainUnlessMigratingSvcParty(svcPartyId: PartyId): Future[Unit] = for {
+  private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[Unit] = for {
     globalDomainId <- participantAdminConnection.getDomainId(config.domains.global.alias)
     participantId <- participantAdminConnection.getParticipantId()
-    // Check if we have a proposal for hosting the SVC party signed by our particpant. If so,
-    // we are in the middle of an SVC party migration so don't reconnect to the domain.
+    // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
+    // we are in the middle of an DSO party migration so don't reconnect to the domain.
     proposals <- participantAdminConnection.listPartyToParticipant(
       TopologyStoreId.DomainStore(globalDomainId).filterName,
-      filterParty = svcPartyId.filterString,
+      filterParty = dsoPartyId.filterString,
       filterParticipant = participantId.filterString,
       proposals = TopologyTransactionType.ProposalSignedBy(participantId.uid.namespace.fingerprint),
     )
     _ <-
       if (proposals.nonEmpty) {
         logger.info(
-          "Participant is in process of hosting the SVC party, not reconnecting to domain to avoid inconsistent ACS"
+          "Participant is in process of hosting the DSO party, not reconnecting to domain to avoid inconsistent ACS"
         )
         Future.unit
       } else {

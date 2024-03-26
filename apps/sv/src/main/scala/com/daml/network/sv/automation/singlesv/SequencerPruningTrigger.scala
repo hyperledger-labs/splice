@@ -6,7 +6,7 @@ import com.daml.network.environment.{
   ParticipantAdminConnection,
   SequencerAdminConnection,
 }
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerPruningStatus
@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class SequencerPruningTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     sequencerAdminConnection: SequencerAdminConnection,
     mediatorAdminConnection: MediatorAdminConnection,
     clock: Clock,
@@ -44,16 +44,16 @@ class SequencerPruningTrigger(
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
-      rulesAndState <- store.getSvcRulesWithSvNodeState(store.key.svParty)
+      rulesAndState <- store.getDsoRulesWithSvNodeState(store.key.svParty)
       // TODO(#4906): check whether are passing the right domain-id to make this work with soft-domain migration
-      svcRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
-        rulesAndState.svcRules.domain,
+      dsoRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
+        rulesAndState.dsoRules.domain,
         clock.now.toInstant,
         migrationId,
       )
-      _ <- svcRulesActiveSequencerConfig.fold {
+      _ <- dsoRulesActiveSequencerConfig.fold {
         logger.debug(
-          show"Member info or sequencer info not (yet) published to SvcRules for our own party ${store.key.svParty}, skipping"
+          show"Member info or sequencer info not (yet) published to DsoRules for our own party ${store.key.svParty}, skipping"
         )
         Future.unit
       } { _ =>

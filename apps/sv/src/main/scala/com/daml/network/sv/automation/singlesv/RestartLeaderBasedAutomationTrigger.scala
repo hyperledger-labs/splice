@@ -13,7 +13,7 @@ import com.daml.network.util.AssignedContract
 import com.daml.network.sv.automation.LeaderBasedAutomationService
 import com.daml.network.sv.automation.leaderbased.SvTaskBasedTrigger
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -29,7 +29,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 
 class RestartLeaderBasedAutomationTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     connection: CNLedgerConnection,
     clock: Clock,
     config: SvAppBackendConfig,
@@ -39,15 +39,15 @@ class RestartLeaderBasedAutomationTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      cn.svcrules.SvcRules.ContractId,
-      cn.svcrules.SvcRules,
+      cn.dsorules.DsoRules.ContractId,
+      cn.dsorules.DsoRules,
     ](
       store,
-      cn.svcrules.SvcRules.COMPANION,
+      cn.dsorules.DsoRules.COMPANION,
     ) {
-  type SvcRulesContract = AssignedContract[
-    cn.svcrules.SvcRules.ContractId,
-    cn.svcrules.SvcRules,
+  type DsoRulesContract = AssignedContract[
+    cn.dsorules.DsoRules.ContractId,
+    cn.dsorules.DsoRules,
   ]
 
   @volatile
@@ -78,31 +78,31 @@ class RestartLeaderBasedAutomationTrigger(
     SyncCloseable("Per-epoch LeaderBasedAutomationService", closeService()) +: super.closeAsync()
 
   override def completeTask(
-      svcRules: SvcRulesContract
+      dsoRules: DsoRulesContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = Future {
     blocking {
 
       synchronized {
-        val currentEpoch = svcRules.payload.epoch
-        val currentLeader = PartyId.tryFromProtoPrimitive(svcRules.payload.leader)
+        val currentEpoch = dsoRules.payload.epoch
+        val currentLeader = PartyId.tryFromProtoPrimitive(dsoRules.payload.leader)
         val lastKnownEpoch = epochStateVar.map(_.epoch)
 
         epochStateVar match {
           case None =>
             logger.debug(s"Learned first epoch $currentEpoch")
-            restartAutomation(currentEpoch, svcRules)
+            restartAutomation(currentEpoch, dsoRules)
           case Some(state) =>
             if (state.epoch != currentEpoch) {
               logger.info(
-                show"Noticed an SvcRules epoch change (from ${state.epoch} with leader ${state.leader} to $currentEpoch with leader ${currentLeader})."
+                show"Noticed an DsoRules epoch change (from ${state.epoch} with leader ${state.leader} to $currentEpoch with leader ${currentLeader})."
               )
               logger.debug(
                 s"Restarting automation, as the epoch changed from ${state.epoch} to $currentEpoch"
               )
-              restartAutomation(currentEpoch, svcRules)
+              restartAutomation(currentEpoch, dsoRules)
             } else {
               TaskSuccess(
-                s"SvcRules changed, but the epoch stayed the same (epoch $lastKnownEpoch)"
+                s"DsoRules changed, but the epoch stayed the same (epoch $lastKnownEpoch)"
               )
             }
         }
@@ -110,14 +110,14 @@ class RestartLeaderBasedAutomationTrigger(
     }
   }
 
-  private def restartAutomation(epoch: Long, svcRules: SvcRulesContract)(implicit
+  private def restartAutomation(epoch: Long, dsoRules: DsoRulesContract)(implicit
       ec: ExecutionContext
   ): TaskOutcome = {
     val svTaskContext =
       new SvTaskBasedTrigger.Context(
         store,
         connection,
-        PartyId.tryFromProtoPrimitive(svcRules.payload.leader),
+        PartyId.tryFromProtoPrimitive(dsoRules.payload.leader),
         epoch,
       )
 
@@ -130,7 +130,7 @@ class RestartLeaderBasedAutomationTrigger(
 
        val leaderLoggerFactory = loggerFactory.appendUnnamedKey(
          "isLeader",
-         (svcRules.contract.payload.leader == store.key.svParty.toProtoPrimitive).toString,
+         (dsoRules.contract.payload.leader == store.key.svParty.toProtoPrimitive).toString,
        )
        val retryProvider =
          RetryProvider(
@@ -150,7 +150,7 @@ class RestartLeaderBasedAutomationTrigger(
        epochStateVar = Some(
          EpochState(
            epoch,
-           PartyId.tryFromProtoPrimitive(svcRules.payload.leader),
+           PartyId.tryFromProtoPrimitive(dsoRules.payload.leader),
            leaderBasedAutomation,
            retryProvider,
          )

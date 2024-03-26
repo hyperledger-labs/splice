@@ -343,7 +343,7 @@ create table scan_acs_store
     validator_license_rounds_collected bigint,
 
     -- generic by sv party field for templates with one instance per svParty
-    -- mostly used to keep track of SVC state
+    -- mostly used to keep track of DSO state
     --
     -- Note: no index as the template_id_qualified_name index should be sufficient.
     sv_party text
@@ -566,10 +566,10 @@ create index sv_acs_store_sid_mid_tid_asicn
     where sv_candidate_name is not null;
 
 
--- SVC store
+-- DSO store
 ------------------
 
-create table svc_acs_store
+create table dso_acs_store
 (
     like acs_store_template including all,
 
@@ -685,86 +685,86 @@ create table svc_acs_store
 );
 
 -- ordered mining rounds
-create index svc_acs_store_sid_tid_mr
-    on svc_acs_store (store_id, migration_id,  template_id_qualified_name, mining_round)
+create index dso_acs_store_sid_tid_mr
+    on dso_acs_store (store_id, migration_id,  template_id_qualified_name, mining_round)
     where mining_round is not null;
 
 -- ordered trackingCid
-create index svc_acs_store_sid_tid_tcid
-    on svc_acs_store (store_id, migration_id,  template_id_qualified_name, vote_request_tracking_cid)
+create index dso_acs_store_sid_tid_tcid
+    on dso_acs_store (store_id, migration_id,  template_id_qualified_name, vote_request_tracking_cid)
     where vote_request_tracking_cid is not null;
 
 -- list expired amulets
-create index svc_acs_store_sid_tid_croe
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, amulet_round_of_expiry)
+create index dso_acs_store_sid_tid_croe
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, amulet_round_of_expiry)
     where amulet_round_of_expiry is not null;
 
 -- list confirmations
-create index svc_acs_store_sid_tid_ah_c
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, action_requiring_confirmation, confirmer)
+create index dso_acs_store_sid_tid_ah_c
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, action_requiring_confirmation, confirmer)
     where action_requiring_confirmation is not null;
 
 -- list, count and sum reward coupons (AppRewardCoupon, ValidatorRewardCoupon, ValidatorFaucetCoupon)
-create index svc_acs_store_coupons
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, reward_round, reward_party, app_reward_is_featured)
+create index dso_acs_store_coupons
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, reward_round, reward_party, app_reward_is_featured)
     where reward_round is not null and reward_party is not null;
 
 -- lookup sv onboarding by token
-create index svc_acs_store_sid_tid_sot
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, sv_onboarding_token)
+create index dso_acs_store_sid_tid_sot
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, sv_onboarding_token)
     where sv_onboarding_token is not null;
 
 -- lookup sv onboarding by party and/or name
-create index svc_acs_store_sid_mid_tid_scp_scn
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, sv_candidate_party, sv_candidate_name)
+create index dso_acs_store_sid_mid_tid_scp_scn
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, sv_candidate_party, sv_candidate_name)
     where sv_candidate_party is not null;
 
 -- lookup sv onboarding by name
-create index svc_acs_store_sid_mid_tid_scn
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, sv_candidate_name)
+create index dso_acs_store_sid_mid_tid_scn
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, sv_candidate_name)
     where sv_candidate_name is not null;
 
 -- list by validator
-create index svc_acs_store_sid_mid_tid_v_tp
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, validator, total_traffic_purchased)
+create index dso_acs_store_sid_mid_tid_v_tp
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, validator, total_traffic_purchased)
     where validator is not null;
 
 -- list vote requests
-create index svc_acs_store_sid_mid_tid_ah_r
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, action_requiring_confirmation, requester)
+create index dso_acs_store_sid_mid_tid_ah_r
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, action_requiring_confirmation, requester)
     where action_requiring_confirmation is not null;
 
 -- list election requests
-create index svc_acs_store_sid_mid_tid_ere_r
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, election_request_epoch, requester)
+create index dso_acs_store_sid_mid_tid_ere_r
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, election_request_epoch, requester)
     where election_request_epoch is not null and requester is not null;
 
 -- list import crates
-create index svc_acs_store_sid_mid_tid_icr
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, import_crate_receiver)
+create index dso_acs_store_sid_mid_tid_icr
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, import_crate_receiver)
     where import_crate_receiver is not null;
 
-create index svc_acs_store_sid_mid_tid_mtm
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, member_traffic_member)
+create index dso_acs_store_sid_mid_tid_mtm
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, member_traffic_member)
     where member_traffic_member is not null;
 
-create index svc_acs_store_sid_mid_tid_cen
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, cns_entry_name)
+create index dso_acs_store_sid_mid_tid_cen
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, cns_entry_name)
     where cns_entry_name is not null;
 
-create index svc_acs_store_sid_mid_tid_acecc
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, action_cns_entry_context_cid)
+create index dso_acs_store_sid_mid_tid_acecc
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, action_cns_entry_context_cid)
     where action_cns_entry_context_cid is not null;
 
-create index svc_acs_store_sid_mid_tid_sccid
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, subscription_reference_contract_id)
+create index dso_acs_store_sid_mid_tid_sccid
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, subscription_reference_contract_id)
     where subscription_reference_contract_id is not null;
 
-create index svc_acs_store_sid_mid_tid_snpd
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, subscription_next_payment_due_at)
+create index dso_acs_store_sid_mid_tid_snpd
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, subscription_next_payment_due_at)
     where subscription_next_payment_due_at is not null;
 
-create table svc_txlog_store
+create table dso_txlog_store
 (
     like txlog_store_template including all,
 
@@ -785,9 +785,9 @@ create table svc_txlog_store
     voted_at                                                 text
 );
 
-create index svc_txlog_store_sid_et_an_e
-    on svc_txlog_store (store_id, entry_type, action_name, executed desc)
-    where svc_txlog_store.action_name is not null and executed is not null;
+create index dso_txlog_store_sid_et_an_e
+    on dso_txlog_store (store_id, entry_type, action_name, executed desc)
+    where dso_txlog_store.action_name is not null and executed is not null;
 
 -- Splitwell store
 ------------------

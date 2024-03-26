@@ -16,7 +16,7 @@ data BuyTrafficRequestTrackingInfo = BuyTrafficRequestTrackingInfo
 -- for a member of a domain.
 template BuyTrafficRequest
   with
-    svc : Party
+    dso : Party
     endUserParty : Party
     expiresAt : Time -- ^ Buy the traffic before this time.
     trackingId : Text -- ^ Used to deduplicate requests

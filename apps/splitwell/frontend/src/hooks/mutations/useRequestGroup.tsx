@@ -8,14 +8,14 @@ import { useSplitwellLedgerApiClient } from '../../contexts/SplitwellLedgerApiCo
 export const useRequestGroup = (
   party: string,
   provider: string,
-  svc: string,
+  dso: string,
   domainId: string,
   rules: Contract<SplitwellRules>
 ): UseMutationResult<void, unknown, string> => {
   const ledgerApiClient = useSplitwellLedgerApiClient();
   return useMutation({
     mutationFn: async (id: string) => {
-      await ledgerApiClient.requestGroup(party, provider, svc, id, domainId, rules);
+      await ledgerApiClient.requestGroup(party, provider, dso, id, domainId, rules);
     },
   });
 };

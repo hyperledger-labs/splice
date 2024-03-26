@@ -181,20 +181,20 @@ testE4 = script do
   expectedParameters_E3_0_0p5 === computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_0_0p5 summaryExample3
 
 
--- Example 4: fully subscribed SVC after 10 years
+-- Example 4: fully subscribed DSO after 10 years
 -------------------------------------------------
 
 
-summaryExampleFullSvc : OpenMiningRoundSummary
-summaryExampleFullSvc = OpenMiningRoundSummary with
+summaryExampleFullDso : OpenMiningRoundSummary
+summaryExampleFullDso = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 0.0
   totalFeaturedAppRewardCoupons = 0.0
   totalUnfeaturedAppRewardCoupons = 0.0
   optTotalValidatorFaucetCoupons = Some 0
   totalSvRewardWeight = 240 * 10000  -- total weight is 240 and it is represented in basis points
 
-expectedParameters_FullSvc_10plus : IssuingRoundParameters
-expectedParameters_FullSvc_10plus = IssuingRoundParameters with
+expectedParameters_FullDso_10plus : IssuingRoundParameters
+expectedParameters_FullDso_10plus = IssuingRoundParameters with
   issuancePerValidatorRewardCoupon = 0.2000000000
   issuancePerFeaturedAppRewardCoupon = 100.0000000000
   issuancePerUnfeaturedAppRewardCoupon = 0.6000000000
@@ -204,12 +204,12 @@ expectedParameters_FullSvc_10plus = IssuingRoundParameters with
   unclaimedValidatorRewards = 9512.9375951294
   unclaimedSvRewards = 0.0
 
-testFullSvc : Script ()
-testFullSvc = script do
+testFullDso : Script ()
+testFullDso = script do
   validateOpenMiningRoundSummary summaryExamplNoActivity
 
-  let actual = computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_10plus summaryExampleFullSvc
-  expectedParameters_FullSvc_10plus === actual
+  let actual = computeIssuingRoundParameters tickDuration amuletPrice issuanceConfig_10plus summaryExampleFullDso
+  expectedParameters_FullDso_10plus === actual
 
 
 

@@ -7,9 +7,9 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
+import com.daml.network.codegen.java.cn.dso.globaldomain.DomainNodeConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.util.MemberIdUtil
 import com.digitalasset.canton.topology.MediatorId
 import com.digitalasset.canton.tracing.TraceContext
@@ -20,22 +20,22 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 import scala.jdk.OptionConverters.RichOptional
 
 /** Offboard a mediator from the current global domain topology state.
-  * The offboarding happens if the mediator is present in the topology state but not in SvcRules.
+  * The offboarding happens if the mediator is present in the topology state but not in DsoRules.
   * We deliberately do not go through off-boarded member since contrary to the party the mediator id is mutable
   * so for a single SV we would then need to track a list of mediator ids that have been used in the past which gets quite messy.
-  * Relying on the diff between topology state and SvcRules does allow for a race:
-  * An SV might have seen an updated topology state but not yet the updated SvcRules. However for the topology state to be updated a threshold of SVs must have seen the SvcRules change first so the offboarding proposal will just die.
+  * Relying on the diff between topology state and DsoRules does allow for a race:
+  * An SV might have seen an updated topology state but not yet the updated DsoRules. However for the topology state to be updated a threshold of SVs must have seen the DsoRules change first so the offboarding proposal will just die.
   */
 class SvOffboardingMediatorTrigger(
     override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[MediatorId] {
 
-  private val svParty = svcStore.key.svParty
+  private val svParty = dsoStore.key.svParty
 
   // TODO(tech-debt): this is an almost exact copy of SvOffboardingSequencerTrigger => share the code to avoid missed bugfixes
 
@@ -43,15 +43,15 @@ class SvOffboardingMediatorTrigger(
       tc: TraceContext
   ): Future[Seq[MediatorId]] = {
     for {
-      rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
+      rulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
       currentMediatorState <- participantAdminConnection.getMediatorDomainState(
-        rulesAndStates.svcRules.domain
+        rulesAndStates.dsoRules.domain
       )
     } yield {
-      val svcRulesCurrentMediators = getMediatorIds(
+      val dsoRulesCurrentMediators = getMediatorIds(
         rulesAndStates.svNodeStates.values.flatMap(_.payload.state.domainNodes.values().asScala)
       )
-      if (svcRulesCurrentMediators.isEmpty) {
+      if (dsoRulesCurrentMediators.isEmpty) {
         // Prudent engineering: always keep at least one mediator active
         logger.warn(
           show"Not reconciling with target state that would leave no active mediators: $rulesAndStates"
@@ -59,7 +59,7 @@ class SvOffboardingMediatorTrigger(
         Seq.empty
       } else {
         val mediatorsToRemove = currentMediatorState.mapping.active
-          .filterNot(e => svcRulesCurrentMediators.contains(e))
+          .filterNot(e => dsoRulesCurrentMediators.contains(e))
         if (mediatorsToRemove.nonEmpty)
           logger.info {
             import com.digitalasset.canton.util.ShowUtil.showPretty
@@ -74,15 +74,15 @@ class SvOffboardingMediatorTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = {
     for {
-      svcRules <- svcStore.getSvcRules()
+      dsoRules <- dsoStore.getDsoRules()
       _ <- participantAdminConnection.ensureMediatorDomainStateRemovalProposal(
-        svcRules.domain,
+        dsoRules.domain,
         task,
         svParty.uid.namespace.fingerprint,
         RetryFor.Automation,
       )
     } yield {
-      TaskSuccess(show"Removed mediator $task from domain ${svcRules.domain}")
+      TaskSuccess(show"Removed mediator $task from domain ${dsoRules.domain}")
     }
   }
 

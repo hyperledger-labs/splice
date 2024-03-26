@@ -47,7 +47,7 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
           node.newParticipantConnection
             .getPartyToParticipant(
               domainId,
-              svcParty,
+              dsoParty,
             )
             .futureValue
             .mapping
@@ -79,14 +79,14 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
     withClueAndLog("decentralized namespace is replicated on the new global domain") {
       val globalDomainDecentralizedNamespaceDefinition =
         sv1Backend.appState.participantAdminConnection
-          .getDecentralizedNamespaceDefinition(domainId, svcParty.uid.namespace)
+          .getDecentralizedNamespaceDefinition(domainId, dsoParty.uid.namespace)
           .futureValue
       eventuallySucceeds(timeUntilSuccess = 1.minute) {
         nodes.foreach { node =>
           node.newParticipantConnection
             .getDecentralizedNamespaceDefinition(
               domainId,
-              svcParty.uid.namespace,
+              dsoParty.uid.namespace,
             )
             .futureValue
             .mapping shouldBe globalDomainDecentralizedNamespaceDefinition.mapping

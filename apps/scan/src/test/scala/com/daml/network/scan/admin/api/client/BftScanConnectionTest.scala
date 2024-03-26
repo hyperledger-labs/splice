@@ -3,7 +3,7 @@ package com.daml.network.scan.admin.api.client
 import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryProvider}
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.{DomainScans, SvcScan}
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.{DomainScans, DsoScan}
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.{CNNodeUtil, Contract, ContractWithState}
@@ -79,13 +79,13 @@ class BftScanConnectionTest
             )
           )
         )
-      when(connection.listSvcScans()(any[TraceContext])).thenReturn(
+      when(connection.listDsoScans()(any[TraceContext])).thenReturn(
         Future.successful(
           Seq(
             DomainScans(
               domainId,
               scans = connections.zipWithIndex.map { case (_, n) =>
-                SvcScan(s"https://$n.example.com", n.toString)
+                DsoScan(s"https://$n.example.com", n.toString)
               },
               Map.empty,
             )
@@ -96,10 +96,10 @@ class BftScanConnectionTest
     connections
   }
   def makeMockReturn(mock: SingleScanConnection, returns: PartyId): Unit = {
-    when(mock.getSvcPartyId()).thenReturn(Future.successful(returns))
+    when(mock.getDsoPartyId()).thenReturn(Future.successful(returns))
   }
   def makeMockFail(mock: SingleScanConnection, failure: Throwable): Unit = {
-    when(mock.getSvcPartyId()).thenReturn(Future.failed(failure))
+    when(mock.getDsoPartyId()).thenReturn(Future.failed(failure))
   }
   def getBft(
       initialConnections: Seq[SingleScanConnection],
@@ -134,8 +134,8 @@ class BftScanConnectionTest
       val bft = getBft(connections)
 
       for {
-        svcPartyId <- bft.getSvcPartyId()
-      } yield svcPartyId should be(partyIdA)
+        dsoPartyId <- bft.getDsoPartyId()
+      } yield dsoPartyId should be(partyIdA)
     }
 
     "return the agreed response when 2f+1 agree and log disagreements" in {
@@ -148,8 +148,8 @@ class BftScanConnectionTest
       val bft = getBft(connections)
 
       for {
-        svcPartyId <- bft.getSvcPartyId()
-      } yield svcPartyId should be(partyIdA)
+        dsoPartyId <- bft.getDsoPartyId()
+      } yield dsoPartyId should be(partyIdA)
     }
 
     "forward the failure if the agreement is a failure" in {
@@ -166,7 +166,7 @@ class BftScanConnectionTest
       connections.foreach(makeMockFail(_, failure))
 
       for {
-        failure <- bft.getSvcPartyId().failed
+        failure <- bft.getDsoPartyId().failed
       } yield failure should be(failure)
     }
 
@@ -179,7 +179,7 @@ class BftScanConnectionTest
 
       loggerFactory.assertLogs(
         for {
-          failure <- bft.getSvcPartyId().failed
+          failure <- bft.getDsoPartyId().failed
         } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
           code should be(StatusCodes.BadGateway)
           message should include("Failed to reach consensus from 3 Scan nodes.") // 2f+1 = 3
@@ -199,8 +199,8 @@ class BftScanConnectionTest
 
       // eventually the refresh goes through and the second connection is used
       eventually() {
-        val result = bft.getSvcPartyId().futureValue
-        try { verify(connections(1), atLeast(1)).getSvcPartyId() }
+        val result = bft.getDsoPartyId().futureValue
+        try { verify(connections(1), atLeast(1)).getDsoPartyId() }
         catch { case cause: MockitoAssertionError => fail("Mockito fail", cause) }
         result should be(partyIdA)
       }
@@ -221,7 +221,7 @@ class BftScanConnectionTest
 
       loggerFactory.assertLogs(
         for {
-          failure <- bft.getSvcPartyId().failed
+          failure <- bft.getDsoPartyId().failed
         } yield inside(failure) { case HttpErrorWithHttpCode(code, message) =>
           code should be(StatusCodes.BadGateway)
           message should include(
@@ -248,8 +248,8 @@ class BftScanConnectionTest
       )
 
       for {
-        svcPartyId <- bft.getSvcPartyId()
-      } yield svcPartyId should be(partyIdA)
+        dsoPartyId <- bft.getDsoPartyId()
+      } yield dsoPartyId should be(partyIdA)
     }
 
     "retry on failure" in {
@@ -259,12 +259,12 @@ class BftScanConnectionTest
       connections.zipWithIndex.foreach { case (mock, n) =>
         val failure = new RuntimeException(s"Mock #$n Failed. Hopefully only once.")
         // fail once, then succeed
-        when(mock.getSvcPartyId()).thenReturn(Future.failed(failure), Future.successful(partyIdA))
+        when(mock.getDsoPartyId()).thenReturn(Future.failed(failure), Future.successful(partyIdA))
       }
 
       loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.INFO))(
         for {
-          result <- bft.getSvcPartyId()
+          result <- bft.getDsoPartyId()
         } yield result should be(partyIdA),
         logs => {
           logs.exists(log =>

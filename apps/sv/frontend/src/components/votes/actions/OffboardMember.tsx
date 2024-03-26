@@ -3,9 +3,9 @@ import React, { useState } from 'react';
 
 import { FormControl, NativeSelect, Stack, Typography } from '@mui/material';
 
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
-import { useSvcInfos } from '../../../contexts/SvContext';
+import { useDsoInfos } from '../../../contexts/SvContext';
 
 function createRow(key: string, value: string, isParty: boolean = false) {
   return { key, value, isParty };
@@ -14,27 +14,27 @@ function createRow(key: string, value: string, isParty: boolean = false) {
 const OffboardMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmation) => void }> = ({
   chooseAction,
 }) => {
-  const svcInfosQuery = useSvcInfos();
+  const dsoInfosQuery = useDsoInfos();
   const [member, setMember] = useState<string | undefined>(undefined);
 
-  if (svcInfosQuery.isLoading) {
+  if (dsoInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (svcInfosQuery.isError) {
-    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
+  if (dsoInfosQuery.isError) {
+    return <p>Error: {JSON.stringify(dsoInfosQuery.error)}</p>;
   }
 
   var memberOptions: { key: string; value: string }[] = [];
-  svcInfosQuery.data!.svcRules.payload.members.forEach((value, key) =>
+  dsoInfosQuery.data!.dsoRules.payload.members.forEach((value, key) =>
     memberOptions.push(createRow(key, value.name))
   );
   function setMemberAction(member: string) {
     setMember(member);
     chooseAction({
-      tag: 'ARC_SvcRules',
+      tag: 'ARC_DsoRules',
       value: {
-        svcAction: {
+        dsoAction: {
           tag: 'SRARC_OffboardMember',
           value: { member: member },
         },

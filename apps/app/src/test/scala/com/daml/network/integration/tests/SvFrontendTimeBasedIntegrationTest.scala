@@ -19,7 +19,7 @@ class SvFrontendTimeBasedIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
-  private val dummySvcDomainId = DomainId.tryFromString("domain1::domain")
+  private val dummyDsoDomainId = DomainId.tryFromString("domain1::domain")
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -33,9 +33,9 @@ class SvFrontendTimeBasedIntegrationTest
     queryResult should not be empty
     inside(queryResult) {
       case Some(queryRow) => {
-        queryRow.childElement(className("general-svc-key-name")).text should matchText(key)
+        queryRow.childElement(className("general-dso-key-name")).text should matchText(key)
         seleniumText(
-          queryRow.childElement(className("general-svc-value-name"))
+          queryRow.childElement(className("general-dso-value-name"))
         ) should matchText(value)
       }
     }
@@ -46,11 +46,11 @@ class SvFrontendTimeBasedIntegrationTest
     queryResult should not be empty
     inside(queryResult) {
       case Some(queryRow) => {
-        queryRow.childElement(className("general-svc-key-name")).text should matchText(
+        queryRow.childElement(className("general-dso-key-name")).text should matchText(
           key
         )
         seleniumText(
-          queryRow.childElement(className("general-svc-value-name"))
+          queryRow.childElement(className("general-dso-value-name"))
         ) shouldNot matchText(value)
       }
     }
@@ -69,10 +69,10 @@ class SvFrontendTimeBasedIntegrationTest
           _ => {
             click on "information-tab-general"
             assertRowContentsMatch(
-              "svcLeaderPartyId",
-              sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+              "dsoLeaderPartyId",
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
             )
-            assertRowContentsMatch("svcEpoch", "0")
+            assertRowContentsMatch("dsoEpoch", "0")
           },
         )
 
@@ -82,7 +82,7 @@ class SvFrontendTimeBasedIntegrationTest
       clue("stop the leader sv1 long enough for an election to occur") {
         val automationConfig = sv2Backend.config.automation
         val effectiveTimeoutPlusBuffer = SvUtil
-          .fromRelTime(SvUtil.defaultSvcRulesConfig(dummySvcDomainId).leaderInactiveTimeout)
+          .fromRelTime(SvUtil.defaultDsoRulesConfig(dummyDsoDomainId).leaderInactiveTimeout)
           .plus(automationConfig.pollingInterval.asJava)
           .plus(JavaDuration.ofSeconds(5))
         sv1Backend.stop()
@@ -94,7 +94,7 @@ class SvFrontendTimeBasedIntegrationTest
           entries => {
             forExactly(3, entries) { line =>
               line.message should include(
-                "Noticed an SvcRules epoch change"
+                "Noticed an DsoRules epoch change"
               )
             }
           },
@@ -111,10 +111,10 @@ class SvFrontendTimeBasedIntegrationTest
           _ => {
             click on "information-tab-general"
             assertRowContentsDiffer(
-              "svcLeaderPartyId",
-              sv2Backend.getSvcInfo().svParty.toProtoPrimitive,
+              "dsoLeaderPartyId",
+              sv2Backend.getDsoInfo().svParty.toProtoPrimitive,
             )
-            assertRowContentsMatch("svcEpoch", "1")
+            assertRowContentsMatch("dsoEpoch", "1")
           },
         )
       }

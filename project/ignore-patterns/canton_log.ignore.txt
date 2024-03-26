@@ -71,8 +71,8 @@ Failed to submit submission due to .*\(Overloaded\(Submission rate exceeds rate 
 # TODO(#9544): remove once the slowdown in Canton has been fixed
 Timeout 10 seconds expired, but tasks still running. Shutting down forcibly
 
-# Shows up during the test case in SvOnboardingAddlIntegrationTest when submitting command with actAs = SVC and there are more than 1 SV onboarded
-Received a request with id RequestId\(.*\) with a view that is not correctly authorized.*is not authorized to submit on behalf of the submitting parties SVC-.*
+# Shows up during the test case in SvOnboardingAddlIntegrationTest when submitting command with actAs = DSO and there are more than 1 SV onboarded
+Received a request with id RequestId\(.*\) with a view that is not correctly authorized.*is not authorized to submit on behalf of the submitting parties DSO-.*
 
 # TODO(#10160) Remove this ignore once Canton fixes this.
 SEQUENCER_MAX_SEQUENCING_TIME_TOO_FAR

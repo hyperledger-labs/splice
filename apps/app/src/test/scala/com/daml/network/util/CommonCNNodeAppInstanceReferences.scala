@@ -26,7 +26,7 @@ trait CommonCNNodeAppInstanceReferences {
   def globalDomainAlias(implicit env: CNNodeTestConsoleEnvironment): DomainAlias =
     sv1Backend.config.domains.global.alias
 
-  def svcParty(implicit env: CNNodeTestConsoleEnvironment): PartyId = sv1ScanBackend.getSvcPartyId()
+  def dsoParty(implicit env: CNNodeTestConsoleEnvironment): PartyId = sv1ScanBackend.getDsoPartyId()
 
   def sv1Backend(implicit env: CNNodeTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
 

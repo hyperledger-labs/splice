@@ -1,7 +1,7 @@
 package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn.svcrules.VoteRequest
+import com.daml.network.codegen.java.cn.dsorules.VoteRequest
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -18,8 +18,8 @@ class CloseVoteRequestTrigger(
       VoteRequest.ContractId,
       VoteRequest,
     ](
-      svTaskContext.svcStore.multiDomainAcsStore,
-      svTaskContext.svcStore.listExpiredVoteRequests(),
+      svTaskContext.dsoStore.multiDomainAcsStore,
+      svTaskContext.dsoStore.listExpiredVoteRequests(),
       VoteRequest.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
@@ -29,20 +29,20 @@ class CloseVoteRequestTrigger(
   type Task =
     ScheduledTaskTrigger.ReadyTask[AssignedContract[VoteRequest.ContractId, VoteRequest]]
 
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(task: Task)(implicit tc: TraceContext): Future[TaskOutcome] = {
     val voteRequestCid = task.work.contractId
     for {
-      svcRules <- svTaskContext.svcStore.getSvcRules()
+      dsoRules <- svTaskContext.dsoStore.getDsoRules()
       amuletRules <- store.getAmuletRules()
       amuletRulesId = amuletRules.contractId
       _ <- svTaskContext.connection
         .submit(
-          Seq(svTaskContext.svcStore.key.svParty),
-          Seq(svTaskContext.svcStore.key.svcParty),
-          svcRules.exercise(
-            _.exerciseSvcRules_CloseVoteRequest(
+          Seq(svTaskContext.dsoStore.key.svParty),
+          Seq(svTaskContext.dsoStore.key.dsoParty),
+          dsoRules.exercise(
+            _.exerciseDsoRules_CloseVoteRequest(
               voteRequestCid,
               java.util.Optional.of(amuletRulesId),
             )

@@ -6,8 +6,8 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
-import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
+import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.http.v0.{definitions, sv as http}
@@ -26,14 +26,14 @@ import java.util.Base64
 import scala.concurrent.{ExecutionContext, Future}
 
 object HttpSvAppClient {
-  final case class SvcInfo(
+  final case class DsoInfo(
       svUser: String,
       svParty: PartyId,
-      svcParty: PartyId,
+      dsoParty: PartyId,
       votingThreshold: BigInt,
       latestMiningRound: Contract[OpenMiningRound.ContractId, OpenMiningRound],
       amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
-      svcRules: Contract[SvcRules.ContractId, SvcRules],
+      dsoRules: Contract[DsoRules.ContractId, DsoRules],
       svNodeStates: Map[PartyId, Contract[SvNodeState.ContractId, SvNodeState]],
   )
 
@@ -52,7 +52,7 @@ object HttpSvAppClient {
     ) extends SvOnboardingStatus
     final case class Completed(
         name: String,
-        svcRulesCid: SvcRules.ContractId,
+        dsoRulesCid: DsoRules.ContractId,
     ) extends SvOnboardingStatus
   }
 
@@ -133,11 +133,11 @@ object HttpSvAppClient {
           case definitions.GetSvOnboardingStatusResponse.members
                 .SvOnboardingStateCompleted(status) =>
             for {
-              svcRulesCid <- Codec
-                .decodeJavaContractId(SvcRules.COMPANION)(status.contractId)
+              dsoRulesCid <- Codec
+                .decodeJavaContractId(DsoRules.COMPANION)(status.contractId)
             } yield SvOnboardingStatus.Completed(
               status.name,
-              svcRulesCid,
+              dsoRulesCid,
             )
           case definitions.GetSvOnboardingStatusResponse.members.SvOnboardingStateUnknown(_) =>
             Right(SvOnboardingStatus.Unknown())
@@ -164,51 +164,51 @@ object HttpSvAppClient {
     }
   }
 
-  case object GetSvcInfo extends BaseCommand[http.GetSvcInfoResponse, SvcInfo] {
+  case object GetDsoInfo extends BaseCommand[http.GetDsoInfoResponse, DsoInfo] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvcInfoResponse] =
-      client.getSvcInfo(headers = headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDsoInfoResponse] =
+      client.getDsoInfo(headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = {
-      case http.GetSvcInfoResponse.OK(
-            definitions.GetSvcInfoResponse(
+      case http.GetDsoInfoResponse.OK(
+            definitions.GetDsoInfoResponse(
               svUser,
               svPartyId,
-              svcPartyId,
+              dsoPartyId,
               votingThreshold,
               latestMiningRound,
               amuletRules,
-              svcRules,
+              dsoRules,
               svNodeStates,
             )
           ) =>
         for {
           svPartyId <- Codec.decode(Codec.Party)(svPartyId)
-          svcPartyId <- Codec.decode(Codec.Party)(svcPartyId)
+          dsoPartyId <- Codec.decode(Codec.Party)(dsoPartyId)
           latestMiningRound <- Contract
             .fromHttp(OpenMiningRound.COMPANION)(latestMiningRound)
             .leftMap(_.toString)
           amuletRules <- Contract.fromHttp(AmuletRules.COMPANION)(amuletRules).left.map(_.toString)
-          svcRules <- Contract.fromHttp(SvcRules.COMPANION)(svcRules).left.map(_.toString)
+          dsoRules <- Contract.fromHttp(DsoRules.COMPANION)(dsoRules).left.map(_.toString)
           svNodeStates <- svNodeStates.traverse { co =>
             for {
               nodeState <- Contract.fromHttp(SvNodeState.COMPANION)(co).left.map(_.toString)
               partyId <- Codec.decode(Codec.Party)(nodeState.payload.sv)
             } yield partyId -> nodeState
           }
-        } yield SvcInfo(
+        } yield DsoInfo(
           svUser,
           svPartyId,
-          svcPartyId,
+          dsoPartyId,
           votingThreshold,
           latestMiningRound,
           amuletRules,
-          svcRules,
+          dsoRules,
           svNodeStates.toMap,
         )
     }

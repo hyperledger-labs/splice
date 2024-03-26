@@ -18,7 +18,7 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.cc.amuletconfig.AmuletConfig
-import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome.VRO_AcceptedButActionFailed
+import com.daml.network.codegen.java.cn.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
 import com.daml.network.codegen.java.cn.wallet.payment.Currency
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
 
@@ -87,7 +87,7 @@ class SvFrontendIntegrationTest
     "have 5 information tabs" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
-          "SVC and amulet infos are displayed in pretty json", {
+          "DSO and amulet infos are displayed in pretty json", {
             login(sv1UIPort, sv1Backend.config.ledgerApiUser)
           },
         )(
@@ -96,8 +96,8 @@ class SvFrontendIntegrationTest
             inside(find(id("information-tab-general"))) { case Some(e) =>
               e.text shouldBe "General"
             }
-            inside(find(id("information-tab-svc-info"))) { case Some(e) =>
-              e.text shouldBe "SVC Info"
+            inside(find(id("information-tab-dso-info"))) { case Some(e) =>
+              e.text shouldBe "DSO Info"
             }
             inside(find(id("information-tab-cc-info"))) { case Some(e) =>
               e.text shouldBe "Canton Coin Info"
@@ -113,14 +113,14 @@ class SvFrontendIntegrationTest
         actAndCheck("Click on general information tab", click on "information-tab-general")(
           "observe information on party information",
           _ => {
-            val valueCells = findAll(className("general-svc-value-name")).toSeq
+            val valueCells = findAll(className("general-dso-value-name")).toSeq
             valueCells should have length 9
             forExactly(1, valueCells)(cell =>
               seleniumText(cell) should matchText(sv1Backend.config.ledgerApiUser)
             )
             forExactly(3, valueCells)(cell =>
               seleniumText(cell) should matchText(
-                sv1Backend.getSvcInfo().svParty.toProtoPrimitive
+                sv1Backend.getDsoInfo().svParty.toProtoPrimitive
               )
             )
           },
@@ -191,7 +191,7 @@ class SvFrontendIntegrationTest
             val validator =
               seleniumText(row.childElement(className("validator-licenses-validator")))
 
-            sponsor shouldBe sv1Backend.getSvcInfo().svParty.toProtoPrimitive
+            sponsor shouldBe sv1Backend.getDsoInfo().svParty.toProtoPrimitive
             validator shouldBe newValidatorParty.toProtoPrimitive
           },
         )
@@ -217,9 +217,9 @@ class SvFrontendIntegrationTest
             }
             val rows = findAll(className("amulet-price-table-row")).toSeq
             rows should have size 3
-            svAmuletPriceShouldMatch(rows, sv2Backend.getSvcInfo().svParty, shownAmuletPrice)
-            svAmuletPriceShouldMatch(rows, sv3Backend.getSvcInfo().svParty, "Not Set")
-            svAmuletPriceShouldMatch(rows, sv4Backend.getSvcInfo().svParty, "Not Set")
+            svAmuletPriceShouldMatch(rows, sv2Backend.getDsoInfo().svParty, shownAmuletPrice)
+            svAmuletPriceShouldMatch(rows, sv3Backend.getDsoInfo().svParty, "Not Set")
+            svAmuletPriceShouldMatch(rows, sv4Backend.getDsoInfo().svParty, "Not Set")
 
             val roundRows = findAll(className("open-mining-round-row")).toSeq
             roundRows should have size 3
@@ -245,7 +245,7 @@ class SvFrontendIntegrationTest
           ) { (backend, otherValueRow) =>
             svAmuletPriceShouldMatch(
               rows,
-              backend.getSvcInfo().svParty,
+              backend.getDsoInfo().svParty,
               otherValues
                 .lift(otherValueRow)
                 .fold("Not Set")(v => s"${showBigDecimal(v)} USD"),
@@ -438,7 +438,7 @@ class SvFrontendIntegrationTest
           "sv2 can see the new vote request detail",
           _ => {
             inside(find(id("vote-request-modal-action-type"))) { case Some(element) =>
-              element.text should matchText("ARC_SvcRules")
+              element.text should matchText("ARC_DsoRules")
             }
             inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
               element.text should matchText("SRARC_OffboardMember")
@@ -686,7 +686,7 @@ class SvFrontendIntegrationTest
         }
     }
 
-    "SV1 can create valid SRARC_SetConfig (new SvcRules Configuration) vote requests that can expire and get rejected by other SVs" in {
+    "SV1 can create valid SRARC_SetConfig (new DsoRules Configuration) vote requests that can expire and get rejected by other SVs" in {
       implicit env =>
         val requestReasonUrl = "This is a request reason url."
         val requestReasonBody = "This is a request reason."
@@ -1319,7 +1319,7 @@ class SvFrontendIntegrationTest
           }
       }
 
-    "can request SVC leader election" in { implicit env =>
+    "can request DSO leader election" in { implicit env =>
       withFrontEnd("sv1") { implicit webDriver =>
         actAndCheck(
           "sv1 operator can login and browse to the leader election tab", {
@@ -1334,12 +1334,12 @@ class SvFrontendIntegrationTest
         )
 
         val members: Vector[String] =
-          sv3Backend.getSvcInfo().svcRules.payload.members.keySet().asScala.toVector
+          sv3Backend.getDsoInfo().dsoRules.payload.members.keySet().asScala.toVector
 
         val newLeader = members.head
 
-        sv2Backend.createElectionRequest(sv2Backend.getSvcInfo().svParty.toProtoPrimitive, members)
-        sv3Backend.createElectionRequest(sv3Backend.getSvcInfo().svParty.toProtoPrimitive, members)
+        sv2Backend.createElectionRequest(sv2Backend.getDsoInfo().svParty.toProtoPrimitive, members)
+        sv3Backend.createElectionRequest(sv3Backend.getDsoInfo().svParty.toProtoPrimitive, members)
 
         loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
           actAndCheck(
@@ -1350,7 +1350,7 @@ class SvFrontendIntegrationTest
             "The epoch advances by one and the leader name is changed.",
             _ => {
               find(id("leader-election-epoch")).value.text should include(
-                sv1Backend.getSvcInfo().svcRules.payload.epoch.toString
+                sv1Backend.getDsoInfo().dsoRules.payload.epoch.toString
               )
               find(id("leader-election-current-leader")).value.text should include(newLeader)
             },
@@ -1358,7 +1358,7 @@ class SvFrontendIntegrationTest
           entries => {
             forExactly(4, entries) { line =>
               line.message should include(
-                "Noticed an SvcRules epoch change"
+                "Noticed an DsoRules epoch change"
               )
             }
           },

@@ -130,7 +130,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
           computeSvRewardInRound0(
             defaultIssuanceCurve.initialValue,
             defaultTickDuration,
-            svcSize = 2,
+            dsoSize = 2,
           )
         )
       forEvery(

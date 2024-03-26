@@ -30,7 +30,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     "lookupWalletInstallByNameWithOffset" should {
 
       "return correct results" in {
-        val signatories = Seq(svcParty, validator)
+        val signatories = Seq(dsoParty, validator)
         for {
           store <- mkStore()
           unwantedContract = walletInstall(user2, "user2")
@@ -53,7 +53,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     "lookupValidatorLicenseWithOffset" should {
 
       "return correct results" in {
-        val signatories = Seq(svcParty, validator) // actually, validator is only observer
+        val signatories = Seq(dsoParty, validator) // actually, validator is only observer
         for {
           store <- mkStore()
           license1 = validatorLicense(validator, sponsor)
@@ -116,7 +116,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     "listUsers" should {
 
       "return correct results" in {
-        val signatories = Seq(svcParty, validator)
+        val signatories = Seq(dsoParty, validator)
         for {
           store <- mkStore()
           user1Contract = walletInstall(user1, "user1")
@@ -440,7 +440,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   private lazy val validator = mkPartyId(s"validator")
   private lazy val sponsor = mkPartyId(s"sponsor")
   protected lazy val storeKey = ValidatorStore.Key(
-    svcParty = svcParty,
+    dsoParty = dsoParty,
     validatorParty = validator,
     appManagerEnabled = true,
   )
@@ -448,7 +448,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   private def walletInstall(endUserParty: PartyId, endUserName: String) = {
     val templateId = walletCodegen.WalletAppInstall.TEMPLATE_ID
     val template = new walletCodegen.WalletAppInstall(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       validator.toProtoPrimitive,
       endUserName,
       endUserParty.toProtoPrimitive,
@@ -463,7 +463,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   private def validatorRight(user: PartyId) = {
     val templateId = amuletCodegen.ValidatorRight.TEMPLATE_ID
     val template = new amuletCodegen.ValidatorRight(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       user.toProtoPrimitive,
       validator.toProtoPrimitive,
     )
@@ -479,7 +479,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
     val sequencerMemberId = "sequencerMemberId"
     val lastPurchasedAt = Instant.EPOCH
     val template = new topUpCodegen.ValidatorTopUpState(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       validator.toProtoPrimitive,
       sequencerMemberId,
       domainId.toProtoPrimitive,

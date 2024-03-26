@@ -9,8 +9,8 @@ import org.scalatest.wordspec.AnyWordSpec
 
 class CNNodeUtilTest extends AnyWordSpec with BaseTest {
   val amulet = new Amulet(
-    "svc",
-    "svc",
+    "dso",
+    "dso",
     new ExpiringAmount(
       new BigDecimal(1.0).setScale(10),
       new Round(0L),

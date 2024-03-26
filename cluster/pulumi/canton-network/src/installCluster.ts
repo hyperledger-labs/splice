@@ -17,10 +17,10 @@ import {
 
 import { installChaosMesh } from './chaosMesh';
 import { installDocs } from './docs';
+import { Dso } from './dso';
 import { installSplitwell } from './splitwell';
 import { ApprovedSvIdentity } from './sv';
 import svConfigs from './svConfigs';
-import { Svc } from './svc';
 import { installValidator1 } from './validator1';
 
 /// Toplevel Chart Installs
@@ -94,32 +94,32 @@ const standaloneValidatorOnboarding = {
 let periodicBackupConfig: BackupConfig | undefined;
 let bootstrappingDumpConfig: BootstrappingDumpConfig | undefined;
 
-function getSvcSize(): number {
+function getDsoSize(): number {
   // If not devnet, enforce 1 sv
   if (!isDevNet) {
     return 1;
   }
 
-  const maxSvcSize = svConfigs.length;
-  const svcSize = +requireEnv(
-    'SVC_SIZE',
-    `Specify how many foundation SV nodes this cluster should be deployed with. (min 1, max ${maxSvcSize})`
+  const maxDsoSize = svConfigs.length;
+  const dsoSize = +requireEnv(
+    'DSO_SIZE',
+    `Specify how many foundation SV nodes this cluster should be deployed with. (min 1, max ${maxDsoSize})`
   );
 
-  if (svcSize < 1) {
-    throw new Error('SVC_SIZE must be at least 1');
+  if (dsoSize < 1) {
+    throw new Error('DSO_SIZE must be at least 1');
   }
 
-  if (svcSize > maxSvcSize) {
-    throw new Error(`SVC_SIZE must be at most ${maxSvcSize}`);
+  if (dsoSize > maxDsoSize) {
+    throw new Error(`DSO_SIZE must be at most ${maxDsoSize}`);
   }
 
-  return svcSize;
+  return dsoSize;
 }
 
 export async function installCluster(
   auth0Client: Auth0Client
-): Promise<{ svc: Svc; validator1?: Resource }> {
+): Promise<{ dso: Dso; validator1?: Resource }> {
   console.error(
     defaultVersion.type === 'local'
       ? 'Using locally built charts by default'
@@ -147,8 +147,8 @@ export async function installCluster(
     };
   }
 
-  const svc = new Svc('svc', {
-    svcSize: getSvcSize(),
+  const dso = new Dso('dso', {
+    dsoSize: getDsoSize(),
 
     auth0Client,
     approvedSvIdentities: approveSvRunbook ? svRunbookApprovedSvIdentities : [],
@@ -169,7 +169,7 @@ export async function installCluster(
     disableOnboardingParticipantPromotionDelay,
   });
 
-  const allSvs = await svc.allSvs;
+  const allSvs = await dso.allSvs;
 
   const svDependencies = allSvs.flatMap(sv => [sv.scan, sv.svApp, sv.validatorApp, sv.ingress]);
 
@@ -218,7 +218,7 @@ export async function installCluster(
   }
 
   return {
-    svc,
+    dso,
     validator1,
   };
 }

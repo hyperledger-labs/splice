@@ -9,14 +9,14 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.codegen.java.cn.cometbft.CometBftConfig
-import com.daml.network.codegen.java.cn.svc.globaldomain.{MediatorConfig, SequencerConfig}
+import com.daml.network.codegen.java.cn.dso.globaldomain.{MediatorConfig, SequencerConfig}
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.config.SvScanConfig
-import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.store.SvSvcStore.SvcRulesWithSvNodeState
+import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.store.SvDsoStore.DsoRulesWithSvNodeState
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.health.admin.data.NodeStatus
@@ -36,7 +36,7 @@ import scala.util.{Failure, Success}
 
 class PublishScanConfigTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     connection: CNLedgerConnection,
     scanConfig: SvScanConfig,
 )(implicit
@@ -53,11 +53,11 @@ class PublishScanConfigTrigger(
       tc: TraceContext
   ): Future[Seq[PublishScanConfigTrigger.PublishLocalConfigTask]] =
     (for {
-      rulesAndState <- OptionT.liftF(store.getSvcRulesWithSvNodeState(store.key.svParty))
-      domainId = rulesAndState.svcRules.domain
+      rulesAndState <- OptionT.liftF(store.getDsoRulesWithSvNodeState(store.key.svParty))
+      domainId = rulesAndState.dsoRules.domain
       nodeState = rulesAndState.svNodeState.payload
       domainNodeConfig = nodeState.state.domainNodes.asScala.get(domainId.toProtoPrimitive)
-      damlScanConfig = new daml.svc.globaldomain.ScanConfig(scanConfig.publicUrl.toString)
+      damlScanConfig = new daml.dso.globaldomain.ScanConfig(scanConfig.publicUrl.toString)
       // Check if config is already up2date first so we can avoid even querying scan if it is.
       if Some(damlScanConfig) != domainNodeConfig.flatMap(_.scan.toScala)
       // We create the scan connection here because the version check
@@ -111,48 +111,48 @@ class PublishScanConfigTrigger(
   )(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    val cmd = task.svcRulesAndState.svcRules.exercise(
-      _.exerciseSvcRules_SetDomainNodeConfig(
+    val cmd = task.dsoRulesAndState.dsoRules.exercise(
+      _.exerciseDsoRules_SetDomainNodeConfig(
         store.key.svParty.toProtoPrimitive,
         task.domainId.toProtoPrimitive,
         task.damlSvNodeConfig,
-        task.svcRulesAndState.svNodeState.contractId,
+        task.dsoRulesAndState.svNodeState.contractId,
       )
     )
     for {
       _ <- connection
-        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldResult()
-    } yield TaskSuccess(show"Updated SVC-wide scan node configuration for ${store.key.svParty}")
+    } yield TaskSuccess(show"Updated DSO-wide scan node configuration for ${store.key.svParty}")
   }
 
   override protected def isStaleTask(
       task: PublishScanConfigTrigger.PublishLocalConfigTask
   )(implicit tc: TraceContext): Future[Boolean] =
-    task.svcRulesAndState.isStale(store.multiDomainAcsStore)
+    task.dsoRulesAndState.isStale(store.multiDomainAcsStore)
 }
 
 object PublishScanConfigTrigger {
   case class PublishLocalConfigTask(
       svNodeId: String,
-      svcRulesAndState: SvcRulesWithSvNodeState,
+      dsoRulesAndState: DsoRulesWithSvNodeState,
       cometBftConfig: CometBftConfig,
       sequencerConfig: Optional[SequencerConfig],
       mediatorConfig: Optional[MediatorConfig],
-      scanConfig: daml.svc.globaldomain.ScanConfig,
+      scanConfig: daml.dso.globaldomain.ScanConfig,
       domainId: DomainId,
   ) extends PrettyPrinting {
 
     import com.daml.network.util.PrettyInstances.*
 
     override def pretty: Pretty[this.type] = prettyOfClass(
-      param("svcRulesAndState", _.svcRulesAndState),
+      param("dsoRulesAndState", _.dsoRulesAndState),
       param("publicScanUrl", _.scanConfig.publicUrl.unquoted),
     )
 
-    val damlSvNodeConfig: daml.svc.globaldomain.DomainNodeConfig =
-      new daml.svc.globaldomain.DomainNodeConfig(
+    val damlSvNodeConfig: daml.dso.globaldomain.DomainNodeConfig =
+      new daml.dso.globaldomain.DomainNodeConfig(
         cometBftConfig,
         sequencerConfig,
         mediatorConfig,

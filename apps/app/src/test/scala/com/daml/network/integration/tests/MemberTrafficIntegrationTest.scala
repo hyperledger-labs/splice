@@ -80,7 +80,7 @@ class MemberTrafficIntegrationTest
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount.toLong, 1_000_000L)
       val participantId = aliceValidatorBackend.participantClient.id
       val trafficContractsMergeThreshold =
-        sv1Backend.getSvcInfo().svcRules.payload.config.numMemberTrafficContractsThreshold
+        sv1Backend.getDsoInfo().dsoRules.payload.config.numMemberTrafficContractsThreshold
 
       clue("No member traffic contracts for aliceValidator exist initially") {
         listMemberTrafficContracts(participantId) isEmpty
@@ -124,7 +124,7 @@ class MemberTrafficIntegrationTest
       val memberId = aliceValidatorBackend.participantClient.id
 
       val actualStateAsPerSequencer = getTrafficState(aliceValidatorBackend, activeDomainId)
-      val actualTotalPurchasedAsPerSvc =
+      val actualTotalPurchasedAsPerDso =
         listMemberTrafficContracts(memberId).map(_.data.totalPurchased.toLong).sum
 
       val statusAsPerScan = sv1ScanBackend.getMemberTrafficStatus(activeDomainId, memberId)
@@ -133,7 +133,7 @@ class MemberTrafficIntegrationTest
       statusAsPerScan.actual.totalLimit shouldBe actualStateAsPerSequencer.extraTrafficLimit.fold(
         0L
       )(_.value)
-      statusAsPerScan.target.totalPurchased shouldBe actualTotalPurchasedAsPerSvc
+      statusAsPerScan.target.totalPurchased shouldBe actualTotalPurchasedAsPerDso
     }
   }
 
@@ -141,7 +141,7 @@ class MemberTrafficIntegrationTest
       memberId: Member
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     sv1Backend.participantClient.ledger_api_extensions.acs.filterJava(MemberTraffic.COMPANION)(
-      sv1Backend.getSvcInfo().svcParty,
+      sv1Backend.getDsoInfo().dsoParty,
       _.data.memberId == memberId.toProtoPrimitive,
     )
   }

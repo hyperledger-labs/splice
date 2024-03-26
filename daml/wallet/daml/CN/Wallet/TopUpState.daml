@@ -12,7 +12,7 @@ import CC.GlobalDomain
 -- 1. allow for crash fault tolerant deduplication of traffic purchases
 -- 2. allow enforcing a rate limit to prevent the validator from spending too much on traffic purchases.
 template ValidatorTopUpState with
-    svc : Party -- ^ The SVC from which we are purchasing traffic
+    dso : Party -- ^ The DSO from which we are purchasing traffic
     validator : Party -- ^ The validator operator purchasing traffic for the given member
     memberId : Text -- ^ The id of the sequencer member (participant or mediator) for which traffic has been purchased
     domainId : Text -- ^ The id of the domain for which this contract tracks purchased extra traffic
@@ -23,9 +23,9 @@ template ValidatorTopUpState with
 
 
 initialValidatorTopUpState: Party -> Party -> Text -> Text -> ValidatorTopUpState
-initialValidatorTopUpState svc validator memberId domainId = do
+initialValidatorTopUpState dso validator memberId domainId = do
   ValidatorTopUpState with
-    svc
+    dso
     validator
     memberId
     domainId

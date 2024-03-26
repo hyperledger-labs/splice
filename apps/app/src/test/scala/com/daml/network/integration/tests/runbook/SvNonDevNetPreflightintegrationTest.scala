@@ -38,7 +38,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
   protected def svScanClient(implicit env: CNNodeTestConsoleEnvironment) = scancl(s"${svName}Scan")
 
   "SV reports devnet=false" in { implicit env =>
-    svClient.getSvcInfo().svcRules.payload.isDevNet shouldBe false
+    svClient.getDsoInfo().dsoRules.payload.isDevNet shouldBe false
   }
 
   val svUsername = s"admin@${svName}.com"

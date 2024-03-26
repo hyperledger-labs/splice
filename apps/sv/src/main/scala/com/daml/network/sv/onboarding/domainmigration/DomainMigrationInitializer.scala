@@ -12,17 +12,17 @@ import com.daml.network.identities.NodeIdentitiesDump
 import com.daml.network.migration.DomainDataRestorer
 import com.daml.network.setup.NodeInitializer
 import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
+import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.migration.{DomainMigrationDump, DomainNodeIdentities}
-import com.daml.network.sv.onboarding.{NodeInitializerUtil, SetupUtil, SvcPartyHosting}
+import com.daml.network.sv.onboarding.{NodeInitializerUtil, SetupUtil, DsoPartyHosting}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer.{
   loadDomainMigrationDump,
   DomainNodeInitializer,
 }
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
-import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -81,11 +81,11 @@ class DomainMigrationInitializer(
   def migrateDomain(): Future[
     (
         DomainId,
-        SvcPartyHosting,
+        DsoPartyHosting,
         SvSvStore,
         SvSvAutomationService,
-        SvSvcStore,
-        SvSvcAutomationService,
+        SvDsoStore,
+        SvDsoAutomationService,
     )
   ] = {
     val migrationDump = loadDomainMigrationDump(domainMigrationConfig.dumpFilePath)
@@ -96,50 +96,50 @@ class DomainMigrationInitializer(
         )
         .asRuntimeException()
     val storeKey =
-      SvStore.Key(migrationDump.nodeIdentities.svPartyId, migrationDump.nodeIdentities.svcPartyId)
-    val svcPartyHosting = newSvcPartyHosting(storeKey)
+      SvStore.Key(migrationDump.nodeIdentities.svPartyId, migrationDump.nodeIdentities.dsoPartyId)
+    val dsoPartyHosting = newDsoPartyHosting(storeKey)
     for {
       _ <- migrateToNewDomainNode(migrationDump)
       globalDomainId = migrationDump.nodeIdentities.domainId
-      _ <- svcPartyHosting.waitForSvcPartyToParticipantAuthorization(
+      _ <- dsoPartyHosting.waitForDsoPartyToParticipantAuthorization(
         globalDomainId,
         ParticipantId(migrationDump.nodeIdentities.participant.id.uid),
         RetryFor.Automation,
       )
       _ = logger.info(
-        s"SVC party hosting is replicated on the new global domain"
+        s"DSO party hosting is replicated on the new global domain"
       )
       _ <- readOnlyConnection.ensureUserHasPrimaryParty(
         config.ledgerApiUser,
         storeKey.svParty,
       )
       svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
-      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantId)
+      dsoStore = newDsoStore(svStore.key, config.domainMigrationId, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
-        svcStore,
+        dsoStore,
         ledgerClient,
       )
       _ <- SetupUtil
-        .grantSvUserRightReadAsSvc(
+        .grantSvUserRightReadAsDso(
           svAutomation.connection,
           config.ledgerApiUser,
-          svStore.key.svcParty,
+          svStore.key.dsoParty,
         )
-      svcAutomationService =
-        newSvSvcAutomationService(svStore, svcStore, Some(localDomainNode))
+      dsoAutomationService =
+        newSvDsoAutomationService(svStore, dsoStore, Some(localDomainNode))
       _ <- joiningNodeInitializer.onboard(
         globalDomainId,
-        svcAutomationService,
+        dsoAutomationService,
         svAutomation,
       )
     } yield (
       globalDomainId,
-      svcPartyHosting,
+      dsoPartyHosting,
       svStore,
       svAutomation,
-      svcStore,
-      svcAutomationService,
+      dsoStore,
+      dsoAutomationService,
     )
   }
 

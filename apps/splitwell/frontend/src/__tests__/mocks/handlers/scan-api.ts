@@ -4,16 +4,16 @@ import {
   LookupEntryByNameResponse,
   LookupEntryByPartyResponse,
   ListEntriesResponse,
-  GetSvcPartyIdResponse,
+  GetDsoPartyIdResponse,
 } from 'scan-openapi';
 
 import { alicePartyId, bobPartyId } from '../constants';
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [
-  rest.get(`${scanUrl}/v0/svc-party-id`, (_, res, ctx) => {
+  rest.get(`${scanUrl}/v0/dso-party-id`, (_, res, ctx) => {
     return res(
-      ctx.json<GetSvcPartyIdResponse>({
-        svc_party_id: 'SVC::1220809612f787469c92b924ad1d32f1cbc0bdbd4eeda55a50469250bcf64b8becf2',
+      ctx.json<GetDsoPartyIdResponse>({
+        dso_party_id: 'DSO::1220809612f787469c92b924ad1d32f1cbc0bdbd4eeda55a50469250bcf64b8becf2',
       })
     );
   }),

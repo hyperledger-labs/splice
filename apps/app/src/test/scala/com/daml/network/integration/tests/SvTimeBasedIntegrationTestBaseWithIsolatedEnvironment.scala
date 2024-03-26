@@ -42,7 +42,7 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
   ): OpenMiningRoundsTriplet = {
     val rounds = getSortedOpenMiningRounds(
       sv1Backend.participantClientWithAdminToken,
-      svcParty,
+      dsoParty,
     )
     rounds should have length 3
     OpenMiningRoundsTriplet(rounds.head, rounds(1), rounds(2))
@@ -88,7 +88,7 @@ trait SvTimeBasedIntegrationTestUtil extends SvTestUtil with WalletTestUtil with
   protected def assertTickDurationOfIssuingRound(
       roundNumberToTickDuration: Map[Long, JavaDuration]
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = eventually() {
-    val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, svcParty)
+    val issuingRounds = getSortedIssuingRounds(sv1Backend.participantClientWithAdminToken, dsoParty)
     issuingRounds.map(_.data.round.number) shouldBe roundNumberToTickDuration.keySet.toSeq.sorted
     issuingRounds.map { issuingRound =>
       val expectedDuration = roundNumberToTickDuration(issuingRound.data.round.number)
@@ -107,7 +107,7 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
   protected val baseEnvironmentDefinition: CNNodeEnvironmentDefinition = CNNodeEnvironmentDefinition
     .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
     .withManualStart
-    // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
+    // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
     .withoutAutomaticRewardsCollectionAndAmuletMerging
     .addConfigTransforms((_, config) =>
       updateAutomationConfig(ConfigurableApp.Sv)(
@@ -134,7 +134,7 @@ abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
   override def environmentDefinition: CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition
       .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
-      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
+      // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the dso to consider unclaimed
       .withoutAutomaticRewardsCollectionAndAmuletMerging
       .withoutLeaderReplacement
 }

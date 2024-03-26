@@ -4,13 +4,13 @@ import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
 import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_SetConfig
-import com.daml.network.codegen.java.cn.svcrules.{
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
+import com.daml.network.codegen.java.cn.dsorules.{
   ActionRequiringConfirmation,
   DomainUpgradeSchedule,
-  SvcRulesConfig,
-  SvcRules_SetConfig,
+  DsoRulesConfig,
+  DsoRules_SetConfig,
   VoteRequest,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -79,7 +79,7 @@ trait SvTestUtil extends CNNodeTestCommon {
   }
 
   def getConfirmingSvs(svBackends: Seq[SvAppBackendReference]): Seq[ConfirmingSv] =
-    svBackends.map(sv => ConfirmingSv(sv.participantClientWithAdminToken, sv.getSvcInfo().svParty))
+    svBackends.map(sv => ConfirmingSv(sv.participantClientWithAdminToken, sv.getDsoInfo().svParty))
 
   def getSvName(sv: Integer): String =
     if (sv == 1) {
@@ -94,24 +94,24 @@ trait SvTestUtil extends CNNodeTestCommon {
   )(implicit
       ec: ExecutionContextExecutor
   ): Unit = {
-    val svcRules = svToCreateVoteRequest.getSvcInfo().svcRules
-    val action = new ARC_SvcRules(
+    val dsoRules = svToCreateVoteRequest.getDsoInfo().dsoRules
+    val action = new ARC_DsoRules(
       new SRARC_SetConfig(
-        new SvcRules_SetConfig(
-          updateNextScheduledDomainUpgrade(svcRules.payload.config, domainUpgradeSchedule)
+        new DsoRules_SetConfig(
+          updateNextScheduledDomainUpgrade(dsoRules.payload.config, domainUpgradeSchedule)
         )
       )
     )
 
     actAndCheck(timeUntilSuccess = 60.seconds)(
-      "Voting on an SvcRules config change for scheduled migration", {
+      "Voting on an DsoRules config change for scheduled migration", {
         def onlySetConfigVoteRequests(
             voteRequests: Seq[Contract[VoteRequest.ContractId, VoteRequest]]
         ) =
           voteRequests.filter {
             _.payload.action match {
-              case action: ARC_SvcRules =>
-                action.svcAction match {
+              case action: ARC_DsoRules =>
+                action.dsoAction match {
                   case _: SRARC_SetConfig => true
                   case _ => false
                 }
@@ -123,7 +123,7 @@ trait SvTestUtil extends CNNodeTestCommon {
           "Creating vote request",
           eventuallySucceeds() {
             svToCreateVoteRequest.createVoteRequest(
-              svToCreateVoteRequest.getSvcInfo().svParty.toProtoPrimitive,
+              svToCreateVoteRequest.getDsoInfo().svParty.toProtoPrimitive,
               action,
               "url",
               "description",
@@ -159,10 +159,10 @@ trait SvTestUtil extends CNNodeTestCommon {
         }.futureValue
       },
     )(
-      "observing SvcRules with changed config",
+      "observing DsoRules with changed config",
       _ => {
-        val newSvcRules = svToCreateVoteRequest.getSvcInfo().svcRules
-        newSvcRules.payload.config.nextScheduledDomainUpgrade.toScala shouldBe domainUpgradeSchedule
+        val newDsoRules = svToCreateVoteRequest.getDsoInfo().dsoRules
+        newDsoRules.payload.config.nextScheduledDomainUpgrade.toScala shouldBe domainUpgradeSchedule
       },
     )
   }
@@ -173,17 +173,17 @@ trait SvTestUtil extends CNNodeTestCommon {
       action: ActionRequiringConfirmation,
   )(implicit env: CNNodeTestConsoleEnvironment): TransactionTree = {
     eventuallySucceeds() {
-      val svcRulesCid = participantClient.ledger_api_extensions.acs
-        .filterJava(cn.svcrules.SvcRules.COMPANION)(svcParty)
+      val dsoRulesCid = participantClient.ledger_api_extensions.acs
+        .filterJava(cn.dsorules.DsoRules.COMPANION)(dsoParty)
         .head
         .id
       participantClient.ledger_api_extensions.commands
         .submitJava(
           actAs = Seq(svPartyId),
-          readAs = Seq(svcParty),
+          readAs = Seq(dsoParty),
           optTimeout = None,
-          commands = svcRulesCid
-            .exerciseSvcRules_ConfirmAction(svPartyId.toProtoPrimitive, action)
+          commands = dsoRulesCid
+            .exerciseDsoRules_ConfirmAction(svPartyId.toProtoPrimitive, action)
             .commands
             .asScala
             .toSeq,
@@ -192,23 +192,23 @@ trait SvTestUtil extends CNNodeTestCommon {
   }
 
   private def updateNextScheduledDomainUpgrade(
-      svcRulesConfig: SvcRulesConfig,
+      dsoRulesConfig: DsoRulesConfig,
       domainUpgradeSchedule: Option[DomainUpgradeSchedule],
-  ) = new SvcRulesConfig(
-    svcRulesConfig.numUnclaimedRewardsThreshold,
-    svcRulesConfig.numMemberTrafficContractsThreshold,
-    svcRulesConfig.actionConfirmationTimeout,
-    svcRulesConfig.svOnboardingRequestTimeout,
-    svcRulesConfig.svOnboardingConfirmedTimeout,
-    svcRulesConfig.voteRequestTimeout,
-    svcRulesConfig.leaderInactiveTimeout,
-    svcRulesConfig.domainNodeConfigLimits,
-    svcRulesConfig.maxTextLength,
-    svcRulesConfig.globalDomain,
+  ) = new DsoRulesConfig(
+    dsoRulesConfig.numUnclaimedRewardsThreshold,
+    dsoRulesConfig.numMemberTrafficContractsThreshold,
+    dsoRulesConfig.actionConfirmationTimeout,
+    dsoRulesConfig.svOnboardingRequestTimeout,
+    dsoRulesConfig.svOnboardingConfirmedTimeout,
+    dsoRulesConfig.voteRequestTimeout,
+    dsoRulesConfig.leaderInactiveTimeout,
+    dsoRulesConfig.domainNodeConfigLimits,
+    dsoRulesConfig.maxTextLength,
+    dsoRulesConfig.globalDomain,
     domainUpgradeSchedule.toJava,
   )
 
-  def computeAmuletsToIssueToSvc(
+  def computeAmuletsToIssueToDso(
       config: IssuanceConfig,
       tickDuration: NonNegativeFiniteDuration,
   ): java.math.BigDecimal = {
@@ -229,10 +229,10 @@ trait SvTestUtil extends CNNodeTestCommon {
   def computeSvRewardInRound0(
       config: IssuanceConfig,
       tickDuration: NonNegativeFiniteDuration,
-      svcSize: Int,
+      dsoSize: Int,
   ): java.math.BigDecimal = {
-    computeAmuletsToIssueToSvc(config, tickDuration)
-      .divide(BigDecimal(svcSize).bigDecimal, RoundingMode.HALF_UP)
+    computeAmuletsToIssueToDso(config, tickDuration)
+      .divide(BigDecimal(dsoSize).bigDecimal, RoundingMode.HALF_UP)
       .setScale(10, RoundingMode.HALF_UP)
   }
 

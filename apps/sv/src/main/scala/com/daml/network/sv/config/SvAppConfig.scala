@@ -71,7 +71,7 @@ object SvOnboardingConfig {
   case class FoundCollective(
       name: String,
       founderSvRewardWeightBps: Long,
-      svcPartyHint: String = "SVC",
+      dsoPartyHint: String = "DSO",
       initialTickDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(150),
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,

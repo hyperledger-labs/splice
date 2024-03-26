@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleState_ExpireSubscription
 import com.daml.network.store.PageLimit
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -19,30 +19,30 @@ class ExpiredCnsSubscriptionTrigger(
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends ScheduledTaskTrigger[SvSvcStore.IdleCnsSubscription]
-    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[SvSvcStore.IdleCnsSubscription]] {
-  private val store = svTaskContext.svcStore
+) extends ScheduledTaskTrigger[SvDsoStore.IdleCnsSubscription]
+    with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[SvDsoStore.IdleCnsSubscription]] {
+  private val store = svTaskContext.dsoStore
 
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[SvSvcStore.IdleCnsSubscription]] =
+  ): Future[Seq[SvDsoStore.IdleCnsSubscription]] =
     store.listExpiredCnsSubscriptions(now, PageLimit.tryCreate(limit))
 
   override protected def completeTaskAsLeader(
-      task: ScheduledTaskTrigger.ReadyTask[SvSvcStore.IdleCnsSubscription]
+      task: ScheduledTaskTrigger.ReadyTask[SvDsoStore.IdleCnsSubscription]
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    svcRules <- store.getSvcRules()
-    cmd = svcRules.exercise(
-      _.exerciseSvcRules_ExpireSubscription(
+    dsoRules <- store.getDsoRules()
+    cmd = dsoRules.exercise(
+      _.exerciseDsoRules_ExpireSubscription(
         task.work.context.contractId,
         task.work.state.contractId,
-        new SubscriptionIdleState_ExpireSubscription(store.key.svcParty.toProtoPrimitive),
+        new SubscriptionIdleState_ExpireSubscription(store.key.dsoParty.toProtoPrimitive),
       )
     )
     result <- svTaskContext.connection
       .submit(
         actAs = Seq(store.key.svParty),
-        readAs = Seq(store.key.svcParty),
+        readAs = Seq(store.key.dsoParty),
         cmd,
       )
       .noDedup
@@ -52,7 +52,7 @@ class ExpiredCnsSubscriptionTrigger(
   } yield result
 
   override protected def isStaleTask(
-      task: ScheduledTaskTrigger.ReadyTask[SvSvcStore.IdleCnsSubscription]
+      task: ScheduledTaskTrigger.ReadyTask[SvDsoStore.IdleCnsSubscription]
   )(implicit tc: TraceContext): Future[Boolean] =
     (for {
       _ <- OptionT(

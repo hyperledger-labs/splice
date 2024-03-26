@@ -18,7 +18,7 @@ const transferOfferPayload = z.object({
     currency: z.enum(['CC', 'USD']),
   }),
   sender: z.string(),
-  svc: z.string(),
+  dso: z.string(),
 });
 
 export const acceptTransferOfferResponse = z.object({

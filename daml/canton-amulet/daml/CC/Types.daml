@@ -10,26 +10,26 @@ isDefinedRound : Round -> Bool
 isDefinedRound round = round.number >= 0
 
 
--- | The group of contracts issued by the same SVC.
+-- | The group of contracts issued by the same DSO.
 --
 -- Used for checked fetches.
-data ForSvc = ForSvc with
-    svc : Party
+data ForDso = ForDso with
+    dso : Party
   deriving (Eq, Show)
 
 
--- | The groupp of contracts issued by the SVC for a specific mining round.
+-- | The groupp of contracts issued by the DSO for a specific mining round.
 --
 -- Used for checked fetches.
 data ForRound = ForRound with
-    svc : Party
+    dso : Party
     round : Round
   deriving (Eq, Show)
 
--- | The group of contracts issued by the SVC and owned by party.
+-- | The group of contracts issued by the DSO and owned by party.
 --
 -- Used for checked fetches.
 data ForOwner = ForOwner with
-    svc : Party
+    dso : Party
     owner : Party
   deriving (Eq, Show)

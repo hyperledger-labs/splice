@@ -1,0 +1,45 @@
+module CN.Scripts.TestDomainSequencerTracking where
+
+import DA.Assert
+import DA.Foldable (forA_)
+import qualified DA.Map as Map
+import Daml.Script
+
+import CN.CometBft
+import CN.DSO.GlobalDomain
+
+import CN.Scripts.DsoTestUtils
+
+testDomainMigration : Script ()
+testDomainMigration = do
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  let svs = [sv1, sv2, sv3, sv4]
+      domainId = "domain-id"
+
+  -- SV's onboard their nodes
+  now <- getTime
+  forA_ svs $ \sv -> do
+    setDomainNodeConfig app sv domainId $ DomainNodeConfig with
+      cometBft = CometBftConfig with
+        nodes = Map.fromList [("nodeId-1-" <> partyToText sv, CometBftNodeConfig ("pubKey-" <> partyToText sv) 1)]
+        sequencingKeys = []
+        governanceKeys = []
+      sequencer = Some SequencerConfig with
+        migrationId = 0
+        sequencerId = "sequencer-id-" <> partyToText sv
+        url = "sequencer-" <> partyToText sv <> ".address:1234"
+        availableAfter = Some now
+      mediator = Some MediatorConfig with
+        mediatorId = "mediator-id-" <> partyToText sv
+      scan = Some ScanConfig with
+        publicUrl = "https://" <> partyToText sv <> ".example.com"
+
+  -- sequencer info are published to dsoRules and amuletRules
+  forA_ svs $ \sv -> do
+    (_, nodeState) <- getSvNodeState app sv
+    let  Some domainConfig = Map.lookup domainId nodeState.state.domainNodes
+    domainConfig.sequencer === Some SequencerConfig with
+      migrationId = 0
+      sequencerId = "sequencer-id-" <> partyToText sv
+      url = "sequencer-" <> partyToText sv <> ".address:1234"
+      availableAfter = Some now

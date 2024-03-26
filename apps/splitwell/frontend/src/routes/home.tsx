@@ -1,5 +1,5 @@
 import { usePrimaryParty } from 'common-frontend';
-import { useGetSvcPartyId } from 'common-frontend/scan-api';
+import { useGetDsoPartyId } from 'common-frontend/scan-api';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Container, Stack, Typography } from '@mui/material';
@@ -28,7 +28,7 @@ function collectFirst<A, B>(xs: A[], f: (elt: A) => B | undefined): B | undefine
 
 const Home: React.FC = () => {
   const ledgerApiClient = useSplitwellLedgerApiClient();
-  const { data: svc = undefined } = useGetSvcPartyId();
+  const { data: dso = undefined } = useGetDsoPartyId();
 
   const primaryPartyQuery = usePrimaryParty();
   const primaryPartyId = primaryPartyQuery.data;
@@ -115,14 +115,14 @@ const Home: React.FC = () => {
 
   const [preferredDomainId, preferredRulesDomain] = pickPreferredRulesDomain();
 
-  if (provider.data && primaryPartyId && svc && splitwellDomainIds && preferredRulesDomain) {
+  if (provider.data && primaryPartyId && dso && splitwellDomainIds && preferredRulesDomain) {
     return (
       <Container>
         <Stack spacing={3}>
           <GroupSetup
             party={primaryPartyId}
             provider={provider.data}
-            svc={svc}
+            dso={dso}
             domainId={preferredDomainId}
             newGroupRules={preferredRulesDomain}
             rulesMap={rulesMap}

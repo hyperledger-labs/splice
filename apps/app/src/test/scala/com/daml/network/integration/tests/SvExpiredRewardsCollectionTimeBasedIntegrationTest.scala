@@ -16,12 +16,12 @@ class SvExpiredRewardsCollectionTimeBasedIntegrationTest
     ) = {
       sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
         .filterJava(AppRewardCoupon.COMPANION)(
-          svcParty,
+          dsoParty,
           co => co.data.round.number == round.payload.round.number,
         ) ++
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(ValidatorRewardCoupon.COMPANION)(
-            svcParty,
+            dsoParty,
             co => co.data.round.number == round.payload.round.number,
           )
     }

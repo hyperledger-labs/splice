@@ -33,7 +33,7 @@ testValidatorOnboarding = do
   usedSecret.secret === secret
   usedSecret.validator === validator
 
-  -- sv can now onboard the validator with the authority granted it via the `SvcRules`
+  -- sv can now onboard the validator with the authority granted it via the `DsoRules`
   return ()
 
 

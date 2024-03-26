@@ -9,13 +9,13 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_MiningRound_Archive
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
-import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_AmuletRules
-import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
+import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -26,14 +26,14 @@ import ArchiveClosedMiningRoundsTrigger.*
 
 class ArchiveClosedMiningRoundsTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     connection: CNLedgerConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[Task] {
   private val svParty = store.key.svParty
-  private val svcParty = store.key.svcParty
+  private val dsoParty = store.key.dsoParty
 
   private def amuletRulesArchiveMiningRoundAction(
       closedRoundCid: ClosedMiningRound.ContractId
@@ -69,13 +69,13 @@ class ArchiveClosedMiningRoundsTrigger(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svcRules <- store.getSvcRules()
+      dsoRules <- store.getDsoRules()
       closedRound = task.value
       action = amuletRulesArchiveMiningRoundAction(
         closedRound.contractId
       )
-      update = svcRules.exercise(
-        _.exerciseSvcRules_ConfirmAction(
+      update = dsoRules.exercise(
+        _.exerciseDsoRules_ConfirmAction(
           svParty.toProtoPrimitive,
           action,
         )
@@ -83,13 +83,13 @@ class ArchiveClosedMiningRoundsTrigger(
       _ <- connection
         .submit(
           actAs = Seq(svParty),
-          readAs = Seq(svcParty),
+          readAs = Seq(dsoParty),
           update = update,
         )
         .withDedup(
           commandId = CNLedgerConnection.CommandId(
             "com.daml.network.sv.createMiningRoundArchiveConfirmation",
-            Seq(svParty, svcParty),
+            Seq(svParty, dsoParty),
             closedRound.contractId.contractId,
           ),
           deduplicationConfig = DedupOffset(task.offset),

@@ -6,12 +6,12 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.svcrules.{
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.cn.dsorules.{
   ActionRequiringConfirmation,
-  SvcRules,
-  SvcRules_ConfirmSvOnboarding,
+  DsoRules,
+  DsoRules_ConfirmSvOnboarding,
 }
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.environment.CNLedgerConnection
@@ -19,7 +19,7 @@ import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.SvApp
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvStore, SvDsoStore}
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -31,7 +31,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class SvOnboardingRequestTrigger(
     override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     svStore: SvSvStore,
     config: SvAppBackendConfig,
     connection: CNLedgerConnection,
@@ -43,23 +43,23 @@ class SvOnboardingRequestTrigger(
       SvOnboardingRequest.ContractId,
       SvOnboardingRequest,
     ](
-      svcStore,
+      dsoStore,
       SvOnboardingRequest.COMPANION,
     ) {
 
-  private val svParty = svcStore.key.svParty
-  private val svcParty = svcStore.key.svcParty
+  private val svParty = dsoStore.key.svParty
+  private val dsoParty = dsoStore.key.dsoParty
 
-  private def svcRulesConfirmSvOnboardingAction(
+  private def dsoRulesConfirmSvOnboardingAction(
       candidateParty: PartyId,
       candidateName: String,
       weightBps: Long,
       candidateParticipantId: String,
       reason: String,
   ): ActionRequiringConfirmation = {
-    new ARC_SvcRules(
+    new ARC_DsoRules(
       new SRARC_ConfirmSvOnboarding(
-        new SvcRules_ConfirmSvOnboarding(
+        new DsoRules_ConfirmSvOnboarding(
           candidateParty.toProtoPrimitive,
           candidateName,
           candidateParticipantId,
@@ -71,7 +71,7 @@ class SvOnboardingRequestTrigger(
   }
 
   private def attemptConfirmation(
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
       svOnboarding: AssignedContract[
         SvOnboardingRequest.ContractId,
         SvOnboardingRequest,
@@ -100,17 +100,17 @@ class SvOnboardingRequestTrigger(
         case Right((party, name, weightBps)) => Future.successful((party, name, weightBps))
       }
       outcome <-
-        if (SvApp.isSvcMember(name, party, svcRules)) {
+        if (SvApp.isDsoMember(name, party, dsoRules)) {
           Future.successful(
             TaskSuccess(
-              s"skipping as SV $name is already an SVC member"
+              s"skipping as SV $name is already an DSO member"
             )
           )
         } else {
           SvApp.validateCandidateSv(
             party,
             name,
-            svcRules,
+            dsoRules,
           ) match {
             case Left(err) =>
               Future.failed(err.asRuntimeException())
@@ -121,7 +121,7 @@ class SvOnboardingRequestTrigger(
                 weightBps,
                 svOnboarding.payload.candidateParticipantId,
                 svOnboarding.payload.token,
-                svcRules,
+                dsoRules,
               )
           }
         }
@@ -135,8 +135,8 @@ class SvOnboardingRequestTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svcRules <- svcStore.getSvcRules()
-      isPartyOnboardingConfirmed <- svcStore
+      dsoRules <- dsoStore.getDsoRules()
+      isPartyOnboardingConfirmed <- dsoStore
         .lookupSvOnboardingConfirmedByParty(
           PartyId.tryFromProtoPrimitive(svOnboarding.payload.candidateParty)
         )
@@ -156,7 +156,7 @@ class SvOnboardingRequestTrigger(
             )
           )
         } else {
-          attemptConfirmation(svcRules, svOnboarding)
+          attemptConfirmation(dsoRules, svOnboarding)
         }
     } yield outcome
   }
@@ -167,13 +167,13 @@ class SvOnboardingRequestTrigger(
       weightBps: Long,
       participantId: String,
       reason: String,
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
-    val action = svcRulesConfirmSvOnboardingAction(party, name, weightBps, participantId, reason)
+    val action = dsoRulesConfirmSvOnboardingAction(party, name, weightBps, participantId, reason)
     for {
-      queryResult <- svcStore.lookupConfirmationByActionWithOffset(svParty, action)
-      cmd = svcRules.exercise(
-        _.exerciseSvcRules_ConfirmAction(
+      queryResult <- dsoStore.lookupConfirmationByActionWithOffset(svParty, action)
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_ConfirmAction(
           svParty.toProtoPrimitive,
           action,
         )
@@ -189,13 +189,13 @@ class SvOnboardingRequestTrigger(
           connection
             .submit(
               actAs = Seq(svParty),
-              readAs = Seq(svcParty),
+              readAs = Seq(dsoParty),
               update = cmd,
             )
             .withDedup(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.svOnboardingConfirmSvOnboardingConfirmation",
-                Seq(svParty, svcParty),
+                Seq(svParty, dsoParty),
                 party.toProtoPrimitive,
               ),
               deduplicationConfig = DedupOffset(offset),

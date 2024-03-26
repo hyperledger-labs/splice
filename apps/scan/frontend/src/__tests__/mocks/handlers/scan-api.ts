@@ -4,7 +4,7 @@ import {
   GetAmuletRulesResponse,
   GetRewardsCollectedResponse,
   GetRoundOfLatestDataResponse,
-  GetSvcPartyIdResponse,
+  GetDsoPartyIdResponse,
   GetTotalAmuletBalanceResponse,
   ListActivityResponse,
   LookupEntryByPartyResponse,
@@ -14,10 +14,10 @@ import { AmuletRules } from '@daml.js/canton-amulet/lib/CC/AmuletRules/module';
 import damlTypes from '@daml/types';
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [
-  rest.get(`${scanUrl}/v0/svc-party-id`, (_, res, ctx) => {
+  rest.get(`${scanUrl}/v0/dso-party-id`, (_, res, ctx) => {
     return res(
-      ctx.json<GetSvcPartyIdResponse>({
-        svc_party_id: 'SVC::1220809612f787469c92b924ad1d32f1cbc0bdbd4eeda55a50469250bcf64b8becf2',
+      ctx.json<GetDsoPartyIdResponse>({
+        dso_party_id: 'DSO::1220809612f787469c92b924ad1d32f1cbc0bdbd4eeda55a50469250bcf64b8becf2',
       })
     );
   }),
@@ -82,7 +82,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
             contract_id:
               '00ed7531fa0fb6a06f0d0f1ea8a31867704da8a6c341e7262894c5d0e15312aca6ca0212200412a9e6c1b9bff1449205e02c88596bad60b8eb8d14bee48f26509f6531d4db',
             payload: AmuletRules.encode({
-              svc: 'SVC::1220af85fa0c58e7f551de289be22793993ce7672cb0751afa2f2de397ce4a695677',
+              dso: 'DSO::1220af85fa0c58e7f551de289be22793993ce7672cb0751afa2f2de397ce4a695677',
               configSchedule: {
                 initialValue: {
                   transferConfig: {
@@ -216,7 +216,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                   packageConfig: {
                     cantonAmulet: '0.1.0',
                     cantonNameService: '0.1.0',
-                    svcGovernance: '0.1.0',
+                    dsoGovernance: '0.1.0',
                     validatorLifecycle: '0.1.0',
                     wallet: '0.1.0',
                     walletPayments: '0.1.0',

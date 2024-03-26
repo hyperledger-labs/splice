@@ -1,10 +1,10 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
-import com.daml.network.codegen.java.cn.svcrules.{
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.cn.dsorules.{
   ActionRequiringConfirmation,
-  SvcRules_OffboardMember,
+  DsoRules_OffboardMember,
 }
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.SvAppBackendReference
@@ -69,18 +69,18 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
       sv4Backend.cometBftNodeStatus().votingPower.doubleValue should be(1d)
     }
     val action: ActionRequiringConfirmation =
-      new ARC_SvcRules(
+      new ARC_DsoRules(
         new SRARC_OffboardMember(
-          new SvcRules_OffboardMember(sv4Backend.getSvcInfo().svParty.toProtoPrimitive)
+          new DsoRules_OffboardMember(sv4Backend.getDsoInfo().svParty.toProtoPrimitive)
         )
       )
     sv4Backend.stop()
     sv1Backend.createVoteRequest(
-      sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+      sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
       action,
       "url",
       "description",
-      sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+      sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
     )
     val trackingCid = sv1Backend.getLatestVoteRequestTrackingCid()
     Seq(sv2Backend, sv3Backend).foreach { sv =>
@@ -104,7 +104,7 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
         sv.participantClient.topology.decentralized_namespaces
           .list(
             filterStore = globalDomainId.filterString,
-            filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
+            filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
           )
           .loneElement
           .item

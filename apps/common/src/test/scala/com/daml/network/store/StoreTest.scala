@@ -43,7 +43,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.cc.amuletconfig.{AmuletConfig, USD}
-import com.daml.network.codegen.java.cn.svc.memberstate.{MemberRewardState, RewardState}
+import com.daml.network.codegen.java.cn.dso.memberstate.{MemberRewardState, RewardState}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.history.{AppRewardCreate, AmuletCreate}
 import com.daml.network.store.MultiDomainAcsStore.HasIngestionSink
@@ -72,7 +72,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   protected def mkParticipantId(name: String) =
     ParticipantId.tryFromProtoPrimitive("PAR::" + name + "::dummy")
 
-  protected val svcParty: PartyId = mkPartyId("svc")
+  protected val dsoParty: PartyId = mkPartyId("dso")
 
   protected def userParty(i: Int) = mkPartyId(s"user-$i")
 
@@ -102,7 +102,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID
 
     val template = new amuletrulesCodegen.AmuletRules(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       schedule,
       false,
     )
@@ -117,7 +117,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val templateId = cnsCodegen.CnsRules.TEMPLATE_ID
 
     val template = new cnsCodegen.CnsRules(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       new cnsCodegen.CnsRulesConfig(
         new RelTime(1_000_000),
         new RelTime(1_000_000),
@@ -133,9 +133,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val holdingFee = 1.0
 
-  protected def openMiningRound(svc: PartyId, round: Long, amuletPrice: Double) = {
+  protected def openMiningRound(dso: PartyId, round: Long, amuletPrice: Double) = {
     val template = new roundCodegen.OpenMiningRound(
-      svc.toProtoPrimitive,
+      dso.toProtoPrimitive,
       new Round(round),
       numeric(amuletPrice),
       Instant.now().truncatedTo(ChronoUnit.MICROS),
@@ -153,9 +153,9 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  protected def closedMiningRound(svc: PartyId, round: Long) = {
+  protected def closedMiningRound(dso: PartyId, round: Long) = {
     val template = new roundCodegen.ClosedMiningRound(
-      svc.toProtoPrimitive,
+      dso.toProtoPrimitive,
       new Round(round),
       numeric(1),
       numeric(1),
@@ -179,7 +179,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ) = {
     val templateId = amuletCodegen.Amulet.TEMPLATE_ID
     val template = new amuletCodegen.Amulet(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       owner.toProtoPrimitive,
       new feesCodegen.ExpiringAmount(
         numeric(amount),
@@ -224,7 +224,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier = amuletCodegen.AppRewardCoupon.TEMPLATE_ID,
       contractId = new amuletCodegen.AppRewardCoupon.ContractId(contractId),
       payload = new amuletCodegen.AppRewardCoupon(
-        svcParty.toProtoPrimitive,
+        dsoParty.toProtoPrimitive,
         provider.toProtoPrimitive,
         featured,
         amount,
@@ -245,7 +245,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     val template = new validatorLicenseCodegen.ValidatorLicense(
       validator.toProtoPrimitive,
       sponsor.toProtoPrimitive,
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       faucetState.toJava,
     )
     contract(
@@ -267,7 +267,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier = amuletCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
       contractId = new amuletCodegen.ValidatorRewardCoupon.ContractId(nextCid()),
       payload = new amuletCodegen.ValidatorRewardCoupon(
-        svcParty.toProtoPrimitive,
+        dsoParty.toProtoPrimitive,
         user.toProtoPrimitive,
         amount,
         new Round(round),
@@ -279,7 +279,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier = validatorLicenseCodegen.ValidatorFaucetCoupon.TEMPLATE_ID,
       contractId = new validatorLicenseCodegen.ValidatorFaucetCoupon.ContractId(nextCid()),
       payload = new validatorLicenseCodegen.ValidatorFaucetCoupon(
-        svcParty.toProtoPrimitive,
+        dsoParty.toProtoPrimitive,
         validator.toProtoPrimitive,
         new Round(round),
       ),
@@ -298,7 +298,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         userParty.toProtoPrimitive,
         providerParty.toProtoPrimitive,
         providerParty.toProtoPrimitive,
-        svcParty.toProtoPrimitive,
+        dsoParty.toProtoPrimitive,
         "description",
       )
     val payData = new subCodegen.SubscriptionPayData(
@@ -325,7 +325,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       providerParty: PartyId,
       contractId: String = nextCid(),
   ) = {
-    val template = new FeaturedAppRight(svcParty.toProtoPrimitive, providerParty.toProtoPrimitive)
+    val template = new FeaturedAppRight(dsoParty.toProtoPrimitive, providerParty.toProtoPrimitive)
     contract(
       FeaturedAppRight.TEMPLATE_ID,
       new FeaturedAppRight.ContractId(contractId),
@@ -344,7 +344,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier = amuletCodegen.SvRewardCoupon.TEMPLATE_ID,
       contractId = new amuletCodegen.SvRewardCoupon.ContractId(contractId),
       payload = new amuletCodegen.SvRewardCoupon(
-        svcParty.toProtoPrimitive,
+        dsoParty.toProtoPrimitive,
         sv.toProtoPrimitive,
         beneficiary.toProtoPrimitive,
         new Round(round),
@@ -361,7 +361,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       identifier = MemberRewardState.TEMPLATE_ID,
       contractId = new MemberRewardState.ContractId(contractId),
       payload = new MemberRewardState(
-        svcParty.toProtoPrimitive,
+        dsoParty.toProtoPrimitive,
         svName,
         rewardState,
       ),
@@ -414,7 +414,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
   ): ActiveContract =
     ActiveContract(
       domain,
-      toCreatedEvent(contract, Seq(svcParty)),
+      toCreatedEvent(contract, Seq(dsoParty)),
       counter,
     )
 
@@ -519,7 +519,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       target,
       counter,
     ),
-    toCreatedEvent(contract, Seq(svcParty)),
+    toCreatedEvent(contract, Seq(dsoParty)),
   )
 
   protected def toIncompleteAssign(
@@ -565,7 +565,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     submitter = userParty(1),
     source = source,
     target = target,
-    createdEvent = toCreatedEvent(contract, Seq(svcParty)),
+    createdEvent = toCreatedEvent(contract, Seq(dsoParty)),
     counter = counter,
   )
 
@@ -608,7 +608,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       acs.map { case (contract, domain, counter) =>
         ActiveContract(
           domain,
-          toCreatedEvent(contract, Seq(svcParty)),
+          toCreatedEvent(contract, Seq(dsoParty)),
           counter,
         )
       },
@@ -701,7 +701,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         c: Contract[TCid, T],
         offset: String = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
-        createdEventSignatories: Seq[PartyId] = Seq(svcParty),
+        createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
     )(implicit store: HasIngestionSink): Future[TransactionTree] = {
       val tx = mkCreateTx(
@@ -725,7 +725,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         c: Contract[TCid, T],
         offset: String = nextOffset(),
         txEffectiveAt: Instant = defaultEffectiveAt,
-        createdEventSignatories: Seq[PartyId] = Seq(svcParty),
+        createdEventSignatories: Seq[PartyId] = Seq(dsoParty),
         workflowId: String = "",
     )(implicit stores: Seq[HasIngestionSink]): Future[TransactionTree] = {
       val tx = mkCreateTx(

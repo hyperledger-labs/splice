@@ -257,13 +257,13 @@ object ValidatorStore {
   case class Key(
       /** The validator party. */
       validatorParty: PartyId,
-      /** The party-id of the SVC issuing CC managed by this wallet. */
-      svcParty: PartyId,
+      /** The party-id of the DSO issuing CC managed by this wallet. */
+      dsoParty: PartyId,
       appManagerEnabled: Boolean,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
       param("validatorParty", _.validatorParty),
-      param("svcParty", _.svcParty),
+      param("dsoParty", _.dsoParty),
     )
   }
 
@@ -290,14 +290,14 @@ object ValidatorStore {
   ): MultiDomainAcsStore.ContractFilter[ValidatorAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
     val validator = key.validatorParty.toProtoPrimitive
-    val svc = key.svcParty.toProtoPrimitive
+    val dso = key.dsoParty.toProtoPrimitive
 
     MultiDomainAcsStore.SimpleContractFilter(
       key.validatorParty,
       Map[PackageQualifiedName, TemplateFilter[?, ?, ValidatorAcsStoreRowData]](
         mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
           co.payload.validatorParty == validator &&
-            co.payload.svcParty == svc
+            co.payload.dsoParty == dso
         ) { contract =>
           ValidatorAcsStoreRowData(
             contract = contract,
@@ -306,7 +306,7 @@ object ValidatorStore {
           )
         },
         mkFilter(validatorLicenseCodegen.ValidatorLicense.COMPANION)(co =>
-          co.payload.validator == validator && co.payload.svc == svc
+          co.payload.validator == validator && co.payload.dso == dso
         ) { contract =>
           ValidatorAcsStoreRowData(
             contract = contract,
@@ -315,7 +315,7 @@ object ValidatorStore {
         },
         mkFilter(amuletCodegen.ValidatorRight.COMPANION)(co =>
           co.payload.validator == validator &&
-            co.payload.svc == svc
+            co.payload.dso == dso
         ) { contract =>
           ValidatorAcsStoreRowData(
             contract = contract,
@@ -324,7 +324,7 @@ object ValidatorStore {
           )
         },
         mkFilter(amuletCodegen.FeaturedAppRight.COMPANION)(co =>
-          co.payload.svc == svc && co.payload.provider == validator
+          co.payload.dso == dso && co.payload.provider == validator
         ) { contract =>
           ValidatorAcsStoreRowData(
             contract = contract,
@@ -341,7 +341,7 @@ object ValidatorStore {
           )
         },
         mkFilter(amuletCodegen.Amulet.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             co.payload.owner == validator
         )(ValidatorAcsStoreRowData(_)),
       ) ++ (if (key.appManagerEnabled)

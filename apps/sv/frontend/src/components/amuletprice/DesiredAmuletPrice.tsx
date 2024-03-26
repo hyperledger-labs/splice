@@ -21,7 +21,7 @@ import {
 import { Numeric, Optional, Party } from '@daml/types';
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
-import { useSvcInfos } from '../../contexts/SvContext';
+import { useDsoInfos } from '../../contexts/SvContext';
 import { useAmuletPriceVotes } from '../../hooks/useAmuletPriceVotes';
 import { AmuletPriceVote } from '../../models/models';
 import { config } from '../../utils';
@@ -44,24 +44,24 @@ const DesiredAmuletPrice: React.FC = () => {
     return maybeNumeric !== null ? new BigNumber(maybeNumeric) : undefined;
   };
 
-  const svcInfosQuery = useSvcInfos();
+  const dsoInfosQuery = useDsoInfos();
   const getMemberName = useCallback(
     (partyId: string) => {
-      const member = svcInfosQuery.data?.svcRules.payload.members.get(partyId);
+      const member = dsoInfosQuery.data?.dsoRules.payload.members.get(partyId);
       return member ? member.name : '';
     },
-    [svcInfosQuery.data]
+    [dsoInfosQuery.data]
   );
 
-  if (amuletPriceVotesQuery.isLoading || svcInfosQuery.isLoading) {
+  if (amuletPriceVotesQuery.isLoading || dsoInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (amuletPriceVotesQuery.isError || svcInfosQuery.isError) {
+  if (amuletPriceVotesQuery.isError || dsoInfosQuery.isError) {
     return <p>Error, something went wrong.</p>;
   }
 
-  const svPartyId = svcInfosQuery.data!.svPartyId;
+  const svPartyId = dsoInfosQuery.data!.svPartyId;
 
   const curSvAmuletPriceVote: AmuletPriceVote | undefined = amuletPriceVotesQuery.data.find(
     v => v.sv === svPartyId

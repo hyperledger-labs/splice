@@ -8,8 +8,8 @@ import cats.syntax.either.*
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
-import com.daml.network.codegen.java.cn.svc.amuletprice.AmuletPriceVote
-import com.daml.network.codegen.java.cn.svcrules.{
+import com.daml.network.codegen.java.cn.dso.amuletprice.AmuletPriceVote
+import com.daml.network.codegen.java.cn.dsorules.{
   ActionRequiringConfirmation,
   VoteRequest,
   VoteRequestResult,
@@ -227,22 +227,22 @@ object HttpSvAdminAppClient {
   }
 
   case object ListVoteRequests
-      extends BaseCommand[http.ListSvcRulesVoteRequestsResponse, Seq[
+      extends BaseCommand[http.ListDsoRulesVoteRequestsResponse, Seq[
         Contract[VoteRequest.ContractId, VoteRequest]
       ]] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListSvcRulesVoteRequestsResponse] =
-      client.listSvcRulesVoteRequests(
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListDsoRulesVoteRequestsResponse] =
+      client.listDsoRulesVoteRequests(
         headers = headers
       )
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.ListSvcRulesVoteRequestsResponse.OK(response) =>
-      response.svcRulesVoteRequests
+    ) = { case http.ListDsoRulesVoteRequestsResponse.OK(response) =>
+      response.dsoRulesVoteRequests
         .traverse(req => Contract.fromHttp(VoteRequest.COMPANION)(req))
         .leftMap(_.toString)
     }
@@ -250,24 +250,24 @@ object HttpSvAdminAppClient {
 
   case class LookupVoteRequest(trackingCid: VoteRequest.ContractId)()
       extends BaseCommand[
-        http.LookupSvcRulesVoteRequestResponse,
+        http.LookupDsoRulesVoteRequestResponse,
         Contract[VoteRequest.ContractId, VoteRequest],
       ] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.LookupSvcRulesVoteRequestResponse] =
-      client.lookupSvcRulesVoteRequest(
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.LookupDsoRulesVoteRequestResponse] =
+      client.lookupDsoRulesVoteRequest(
         trackingCid.contractId,
         headers = headers,
       )
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.LookupSvcRulesVoteRequestResponse.OK(response) =>
+    ) = { case http.LookupDsoRulesVoteRequestResponse.OK(response) =>
       Contract
-        .fromHttp(VoteRequest.COMPANION)(response.svcRulesVoteRequest)
+        .fromHttp(VoteRequest.COMPANION)(response.dsoRulesVoteRequest)
         .leftMap(_.toString)
     }
   }
@@ -303,12 +303,12 @@ object HttpSvAdminAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListVoteRequestResultsResponse.OK(response) =>
       Right(
-        response.svcRulesVoteResults
+        response.dsoRulesVoteResults
           .map(e =>
             decoder.decodeValue(
               VoteRequestResult.valueDecoder(),
               VoteRequestResult._packageId,
-              "CN.SvcRules",
+              "CN.DsoRules",
               "VoteRequestResult",
             )(e)
           )

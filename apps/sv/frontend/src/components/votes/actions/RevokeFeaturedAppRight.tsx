@@ -4,31 +4,31 @@ import React, { useState } from 'react';
 import { FormControl, Stack, TextField, Typography } from '@mui/material';
 
 import { FeaturedAppRight } from '@daml.js/canton-amulet/lib/CC/Amulet';
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 import { ContractId } from '@daml/types';
 
-import { useSvcInfos } from '../../../contexts/SvContext';
+import { useDsoInfos } from '../../../contexts/SvContext';
 
 const RevokeFeaturedAppRight: React.FC<{
   chooseAction: (action: ActionRequiringConfirmation) => void;
 }> = ({ chooseAction }) => {
-  const svcInfosQuery = useSvcInfos();
+  const dsoInfosQuery = useDsoInfos();
   const [rightCid, setRightCid] = useState<string>('');
 
-  if (svcInfosQuery.isLoading) {
+  if (dsoInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (svcInfosQuery.isError) {
-    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
+  if (dsoInfosQuery.isError) {
+    return <p>Error: {JSON.stringify(dsoInfosQuery.error)}</p>;
   }
 
   function setRightCidAction(rightCid: string) {
     setRightCid(rightCid);
     chooseAction({
-      tag: 'ARC_SvcRules',
+      tag: 'ARC_DsoRules',
       value: {
-        svcAction: {
+        dsoAction: {
           tag: 'SRARC_RevokeFeaturedAppRight',
           value: { rightCid: rightCid as ContractId<FeaturedAppRight> },
         },

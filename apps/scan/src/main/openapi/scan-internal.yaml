@@ -15,18 +15,18 @@ paths:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1status"
   /version:
     $ref: "../../../../common/src/main/openapi/common-external.yaml#/paths/~1version"
-  /v0/svc-party-id:
+  /v0/dso-party-id:
     get:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "getSvcPartyId"
+      operationId: "getDsoPartyId"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetSvcPartyIdResponse"
+                "$ref": "#/components/schemas/GetDsoPartyIdResponse"
   /v0/closed-rounds:
     get:
       tags: [scan]
@@ -338,30 +338,30 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /v0/svc-sequencers:
+  /v0/dso-sequencers:
     get:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "listSvcSequencers"
+      operationId: "listDsoSequencers"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListSvcSequencersResponse"
+                "$ref": "#/components/schemas/ListDsoSequencersResponse"
   /v0/scans:
     get:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "listSvcScans"
+      operationId: "listDsoScans"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListSvcScansResponse"
+                "$ref": "#/components/schemas/ListDsoScansResponse"
   /v0/activities:
     post:
       tags: [scan]
@@ -573,11 +573,11 @@ paths:
 
 components:
   schemas:
-    GetSvcPartyIdResponse:
+    GetDsoPartyIdResponse:
       type: object
-      required: ["svc_party_id"]
+      required: ["dso_party_id"]
       properties:
-        svc_party_id:
+        dso_party_id:
           type: string
     GetClosedRoundsResponse:
       type: object
@@ -816,7 +816,7 @@ components:
           items:
             # TODO(#6073): consider using a more precise type; i.e., no 'MaybeCached'
             $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
-    ListSvcSequencersResponse:
+    ListDsoSequencersResponse:
       type: object
       required: ["domainSequencers"]
       properties:
@@ -833,8 +833,8 @@ components:
         sequencers:
           type: array
           items:
-            $ref: "#/components/schemas/SvcSequencer"
-    SvcSequencer:
+            $ref: "#/components/schemas/DsoSequencer"
+    DsoSequencer:
       type: object
       required: ["migrationId", "id", "url", "svName", "availableAfter"]
       properties:
@@ -850,7 +850,7 @@ components:
         availableAfter:
           type: string
           format: date-time
-    ListSvcScansResponse:
+    ListDsoScansResponse:
       type: object
       required: [ "scans" ]
       properties:
@@ -964,7 +964,7 @@ components:
           $ref: "#/components/schemas/Transfer"
         mint:
           description: |
-            The SVC mints amulet for the cases where the collective rules allow for that.
+            The DSO mints amulet for the cases where the collective rules allow for that.
           $ref: "#/components/schemas/AmuletAmount"
         tap:
           description: |
@@ -1051,7 +1051,7 @@ components:
           $ref: "#/components/schemas/Transfer"
         mint:
           description: |
-            The SVC mints amulet for the cases where the collective rules allow for that.
+            The DSO mints amulet for the cases where the collective rules allow for that.
           $ref: "#/components/schemas/AmuletAmount"
         tap:
           description: |
@@ -1212,7 +1212,7 @@ components:
       required: [ "acs_snapshot" ]
       properties:
         acs_snapshot:
-          description: base64-encoded ACS snapshot for the intersection of the SVC party and the requested party’s ACS
+          description: base64-encoded ACS snapshot for the intersection of the DSO party and the requested party’s ACS
           type: string
     CnsEntry:
       type: object

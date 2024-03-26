@@ -3,7 +3,7 @@ package com.daml.network.sv.admin.http
 import cats.data.{EitherT, OptionT}
 import cats.syntax.applicative.*
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
 import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
 import com.daml.network.config.CNThresholds
@@ -15,9 +15,9 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.{LocalDomainNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.onboarding.SvcPartyHosting
-import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
-import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
+import com.daml.network.sv.onboarding.DsoPartyHosting
+import com.daml.network.sv.onboarding.sponsor.DsoPartyMigration
+import com.daml.network.sv.store.{SvDsoStore, SvSvStore}
 import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{Codec, Contract}
@@ -40,14 +40,14 @@ import scala.jdk.CollectionConverters.*
 class HttpSvHandler(
     svUserName: String,
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-    svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+    dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
     isDevNet: Boolean,
     config: SvAppBackendConfig,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
     localDomainNode: Option[LocalDomainNode],
     retryProvider: RetryProvider,
-    svcPartyMigration: SvcPartyMigration,
+    dsoPartyMigration: DsoPartyMigration,
     cometBftClient: Option[CometBftClient],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -58,9 +58,9 @@ class HttpSvHandler(
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
   private val svStore = svStoreWithIngestion.store
-  private val svcStore = svcStoreWithIngestion.store
-  private val svParty = svcStore.key.svParty
-  private val svcParty = svcStore.key.svcParty
+  private val dsoStore = dsoStoreWithIngestion.store
+  private val svParty = dsoStore.key.svParty
+  private val dsoParty = dsoStore.key.dsoParty
 
   def onboardValidator(
       respond: v0.SvResource.OnboardValidatorResponse.type
@@ -91,7 +91,7 @@ class HttpSvHandler(
                 // which can lead to races.
                 _ <- retryProvider.retryForClientCalls(
                   "onboard_validator",
-                  "onboard validator via SvcRules",
+                  "onboard validator via DsoRules",
                   onboardValidator(partyId, body.secret, vo),
                   logger,
                 )
@@ -117,10 +117,10 @@ class HttpSvHandler(
           )
         case Right(token) =>
           for {
-            svcRules <- svcStore.getSvcRules()
+            dsoRules <- dsoStore.getDsoRules()
             isCandidatePartyHostedOnParticipant <- participantAdminConnection
               .listPartyToParticipant(
-                svcRules.domain.filterString,
+                dsoRules.domain.filterString,
                 filterParty = token.candidateParty.filterString,
                 filterParticipant = token.candidateParticipantId.toProtoPrimitive,
               )
@@ -157,11 +157,11 @@ class HttpSvHandler(
                       )
                     )
                   case Right(_) =>
-                    // We retry here because the SvcRules can change while attempting this.
+                    // We retry here because the DsoRules can change while attempting this.
                     retryProvider
                       .retryForClientCalls(
                         "start_sv_onboarding",
-                        s"start SV ${token.candidateName} onboarding via SvcRules",
+                        s"start SV ${token.candidateName} onboarding via DsoRules",
                         startSvOnboarding(
                           token.candidateName,
                           token.candidateParty,
@@ -196,13 +196,13 @@ class HttpSvHandler(
       Codec.decode(Codec.Party)(svPartyOrName) match {
         case Left(error) =>
           for {
-            svcRules <- svcStore.getSvcRules()
+            dsoRules <- dsoStore.getDsoRules()
             result <- OptionT
               .fromOption[Future](
-                isCompleted(svPartyOrName, svcRules)
+                isCompleted(svPartyOrName, dsoRules)
               )
-              .orElse(isConfirmed(svPartyOrName, svcStore))
-              .orElse(isRequested(svPartyOrName, svcRules))
+              .orElse(isConfirmed(svPartyOrName, dsoStore))
+              .orElse(isRequested(svPartyOrName, dsoRules))
               .value
           } yield result match {
             case Some(result) => result
@@ -219,16 +219,16 @@ class HttpSvHandler(
           }
         case Right(svPartyId) =>
           for {
-            svcRules <- svcStore.getSvcRules()
+            dsoRules <- dsoStore.getDsoRules()
             result <- OptionT
               .fromOption[Future](
-                isCompleted(svPartyId, svcRules)
+                isCompleted(svPartyId, dsoRules)
               )
               .orElse(
-                isConfirmed(svPartyId, svcStore)
+                isConfirmed(svPartyId, dsoStore)
               )
               .orElse(
-                isRequested(svPartyId, svcRules)
+                isRequested(svPartyId, dsoRules)
               )
               .value
           } yield result match {
@@ -250,15 +250,15 @@ class HttpSvHandler(
       if (isDevNet) {
         val secret = generateRandomOnboardingSecret()
         val expiresIn = NonNegativeFiniteDuration.ofHours(1)
-        svcStore
-          .getSvcRules()
-          .flatMap { svcRules =>
+        dsoStore
+          .getDsoRules()
+          .flatMap { dsoRules =>
             SvApp
               .prepareValidatorOnboarding(
                 secret,
                 expiresIn,
                 svStoreWithIngestion,
-                svcRules.domain,
+                dsoRules.domain,
                 clock,
                 logger,
               )
@@ -281,24 +281,24 @@ class HttpSvHandler(
     }
   }
 
-  def getSvcInfo(
-      respond: v0.SvResource.GetSvcInfoResponse.type
-  )()(extracted: TraceContext): Future[v0.SvResource.GetSvcInfoResponse] = {
+  def getDsoInfo(
+      respond: v0.SvResource.GetDsoInfoResponse.type
+  )()(extracted: TraceContext): Future[v0.SvResource.GetDsoInfoResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getSvcInfo") { _ => _ =>
+    withSpan(s"$workflowId.getDsoInfo") { _ => _ =>
       for {
-        latestOpenMiningRound <- svcStore.getLatestActiveOpenMiningRound()
-        amuletRules <- svcStore.getAmuletRules()
-        rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
-        svcRules = rulesAndStates.svcRules
-      } yield definitions.GetSvcInfoResponse(
+        latestOpenMiningRound <- dsoStore.getLatestActiveOpenMiningRound()
+        amuletRules <- dsoStore.getAmuletRules()
+        rulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+        dsoRules = rulesAndStates.dsoRules
+      } yield definitions.GetDsoInfoResponse(
         svUser = svUserName,
         svPartyId = svParty.toProtoPrimitive,
-        svcPartyId = svcParty.toProtoPrimitive,
-        votingThreshold = CNThresholds.requiredNumVotes(svcRules),
+        dsoPartyId = dsoParty.toProtoPrimitive,
+        votingThreshold = CNThresholds.requiredNumVotes(dsoRules),
         latestMiningRound = latestOpenMiningRound.contract.toHttp,
         amuletRules = amuletRules.toHttp,
-        svcRules = svcRules.contract.toHttp,
+        dsoRules = dsoRules.contract.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
       )
     }
@@ -363,9 +363,9 @@ class HttpSvHandler(
           s"Candidate party is not a member and no `SvOnboardingConfirmed` for the candidate party is found."
         for {
           isCandidateOnboardingConfirmed <- isOnboardingConfirmed(candidateParty)
-          svcRules <- svcStore.getSvcRules()
-          isCandidateMember = SvApp.isSvcMemberParty(candidateParty, svcRules)
-          contracts <- svcStore.lookupSvOnboardingConfirmedByParty(candidateParty)
+          dsoRules <- dsoStore.getDsoRules()
+          isCandidateMember = SvApp.isDsoMemberParty(candidateParty, dsoRules)
+          contracts <- dsoStore.lookupSvOnboardingConfirmedByParty(candidateParty)
           candidateParticipantId = contracts
             .getOrElse(
               throw Status.NOT_FOUND
@@ -380,7 +380,7 @@ class HttpSvHandler(
                 )
               )
             else
-              authorizeParticipantForHostingSvcParty(
+              authorizeParticipantForHostingDsoParty(
                 ParticipantId.tryFromProtoPrimitive(candidateParticipantId.payload.svParticipantId)
               )
         } yield res
@@ -388,16 +388,16 @@ class HttpSvHandler(
     }
   }
 
-  private def authorizeParticipantForHostingSvcParty(
+  private def authorizeParticipantForHostingDsoParty(
       participantId: ParticipantId
   )(implicit tc: TraceContext): Future[v0.SvResource.OnboardSvPartyMigrationAuthorizeResponse] = {
-    svcPartyMigration
-      .authorizeParticipantForHostingSvcParty(
+    dsoPartyMigration
+      .authorizeParticipantForHostingDsoParty(
         participantId
       )
       .fold(
         {
-          case SvcPartyHosting
+          case DsoPartyHosting
                 .RequiredProposalNotFound(
                   partyToParticipantSerial
                 ) =>
@@ -465,7 +465,7 @@ class HttpSvHandler(
         "wait_onboarding_contract",
         s"wait for onboarding contract for party $party",
         for {
-          maybeConfirmed <- svcStore
+          maybeConfirmed <- dsoStore
             .lookupSvOnboardingConfirmedByParty(party)
         } yield
           if (maybeConfirmed.isDefined) maybeConfirmed
@@ -491,7 +491,7 @@ class HttpSvHandler(
       sequencerId: SequencerId,
   )(implicit traceContext: TraceContext): Future[CantonTimestamp] = {
     for {
-      globalDomain <- svcStore.getSvcRules().map(_.domain)
+      globalDomain <- dsoStore.getDsoRules().map(_.domain)
       sequenced <- retryProvider.getValueWithRetries(
         RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
         "sequencer_added_to_topology_state",
@@ -538,7 +538,7 @@ class HttpSvHandler(
         sequencerAdminConnection,
         sequencerId,
       )
-      globalDomain <- svcStore.getSvcRules().map(_.domain)
+      globalDomain <- dsoStore.getDsoRules().map(_.domain)
       _ = logger.info(s"Downloading sequencer onboarding state for $sequencerId")
       onboardingState <- sequencerAdminConnection.getOnboardingState(sequencerId)
     } yield onboardingState
@@ -546,53 +546,53 @@ class HttpSvHandler(
 
   private def isCompleted(
       svParty: PartyId,
-      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
+      dsoRules: Contract.Has[DsoRules.ContractId, DsoRules],
   ): Option[definitions.GetSvOnboardingStatusResponse] = {
-    Option.when(SvApp.isSvcMemberParty(svParty, svcRules))(
+    Option.when(SvApp.isDsoMemberParty(svParty, dsoRules))(
       definitions.SvOnboardingStateCompleted(
         state = "completed",
-        name = svcRules.payload.members.get(svParty.toProtoPrimitive).name,
-        contractId = Codec.encodeContractId(svcRules.contractId),
+        name = dsoRules.payload.members.get(svParty.toProtoPrimitive).name,
+        contractId = Codec.encodeContractId(dsoRules.contractId),
       )
     )
   }
 
   private def isCompleted(
       svParty: String,
-      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
+      dsoRules: Contract.Has[DsoRules.ContractId, DsoRules],
   ): Option[definitions.GetSvOnboardingStatusResponse] = {
-    Option.when(SvApp.isSvcMemberName(svParty, svcRules))(
+    Option.when(SvApp.isDsoMemberName(svParty, dsoRules))(
       definitions.SvOnboardingStateCompleted(
         state = "completed",
         name = svParty,
-        contractId = Codec.encodeContractId(svcRules.contractId),
+        contractId = Codec.encodeContractId(dsoRules.contractId),
       )
     )
   }
 
   private def isRequested(
       svParty: PartyId,
-      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
+      dsoRules: Contract.Has[DsoRules.ContractId, DsoRules],
   )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     for {
-      svOnboardingRequest <- OptionT(svcStore.lookupSvOnboardingRequestByCandidateParty(svParty))
-      result <- getOnboardedStatus(svOnboardingRequest, svcRules)
+      svOnboardingRequest <- OptionT(dsoStore.lookupSvOnboardingRequestByCandidateParty(svParty))
+      result <- getOnboardedStatus(svOnboardingRequest, dsoRules)
     } yield result
   }
 
   private def isRequested(
       svParty: String,
-      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
+      dsoRules: Contract.Has[DsoRules.ContractId, DsoRules],
   )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     for {
-      svOnboardingRequest <- OptionT(svcStore.lookupSvOnboardingRequestByCandidateName(svParty))
-      result <- getOnboardedStatus(svOnboardingRequest, svcRules)
+      svOnboardingRequest <- OptionT(dsoStore.lookupSvOnboardingRequestByCandidateName(svParty))
+      result <- getOnboardedStatus(svOnboardingRequest, dsoRules)
     } yield result
   }
 
   private def getOnboardedStatus(
       svOnboardingRequest: Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest],
-      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
+      dsoRules: Contract.Has[DsoRules.ContractId, DsoRules],
   )(implicit tc: TraceContext) = {
     val candidateName = svOnboardingRequest.payload.candidateName
     val weight = config
@@ -606,11 +606,11 @@ class HttpSvHandler(
       )
     for {
       confirmations <- OptionT.liftF(
-        svcStore.listSvOnboardingConfirmations(svOnboardingRequest, weight)
+        dsoStore.listSvOnboardingConfirmations(svOnboardingRequest, weight)
       )
       confirmedBy = confirmations
         .map(c =>
-          svcRules.payload.members.asScala.get(c.payload.confirmer) match {
+          dsoRules.payload.members.asScala.get(c.payload.confirmer) match {
             case Some(member) => member.name
             case None => c.payload.confirmer
           }
@@ -621,16 +621,16 @@ class HttpSvHandler(
       name = candidateName,
       contractId = Codec.encodeContractId(svOnboardingRequest.contractId),
       confirmedBy = confirmedBy,
-      requiredNumConfirmations = CNThresholds.requiredNumVotes(svcRules),
+      requiredNumConfirmations = CNThresholds.requiredNumVotes(dsoRules),
     )
   }
 
   private def isConfirmed(
       svParty: PartyId,
-      svcStore: SvSvcStore,
+      dsoStore: SvDsoStore,
   )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     OptionT(
-      svcStore
+      dsoStore
         .lookupSvOnboardingConfirmedByParty(svParty)
     ).map(svOnboardingConfirmed =>
       definitions.SvOnboardingStateConfirmed(
@@ -643,10 +643,10 @@ class HttpSvHandler(
 
   private def isConfirmed(
       svName: String,
-      svcStore: SvSvcStore,
+      dsoStore: SvDsoStore,
   )(implicit tc: TraceContext): OptionT[Future, definitions.GetSvOnboardingStatusResponse] = {
     OptionT(
-      svcStore
+      dsoStore
         .lookupSvOnboardingConfirmedByName(svName)
     ).map(svOnboardingConfirmed =>
       definitions.SvOnboardingStateConfirmed(
@@ -663,10 +663,10 @@ class HttpSvHandler(
       validatorOnboarding: Contract[ValidatorOnboarding.ContractId, ValidatorOnboarding],
   )(implicit tc: TraceContext): Future[Unit] =
     for {
-      svcRules <- svcStore.getSvcRules()
+      dsoRules <- dsoStore.getDsoRules()
       cmds = Seq(
-        svcRules.exercise(
-          _.exerciseSvcRules_OnboardValidator(
+        dsoRules.exercise(
+          _.exerciseDsoRules_OnboardValidator(
             svParty.toProtoPrimitive,
             candidateParty.toProtoPrimitive,
           )
@@ -675,9 +675,9 @@ class HttpSvHandler(
           _.exerciseValidatorOnboarding_Match(secret, candidateParty.toProtoPrimitive)
         ),
       ) map (_.update)
-      _ <- svcStoreWithIngestion.connection
-        .submit(Seq(svParty), Seq(svcParty), cmds)
-        .withDomainId(svcRules.domain)
+      _ <- dsoStoreWithIngestion.connection
+        .submit(Seq(svParty), Seq(dsoParty), cmds)
+        .withDomainId(dsoRules.domain)
         .noDedup // No command-dedup required, as the ValidatorOnboarding contract is archived
         .yieldUnit()
     } yield ()
@@ -690,8 +690,8 @@ class HttpSvHandler(
   )(implicit tc: TraceContext): Future[Either[String, Unit]] = {
     withSpan(s"$workflowId.startSvOnboarding") { _ => _ =>
       for {
-        svcRules <- svcStore.getSvcRules()
-        lookup <- svcStore.lookupSvOnboardingRequestByTokenWithOffset(token)
+        dsoRules <- dsoStore.getDsoRules()
+        lookup <- dsoStore.lookupSvOnboardingRequestByTokenWithOffset(token)
         outcome <- lookup match {
           case QueryResult(_, Some(_)) =>
             logger.info("An SV onboarding contract for this token already exists.")
@@ -702,13 +702,13 @@ class HttpSvHandler(
                 SvApp.validateCandidateSv(
                   candidateParty,
                   candidateName,
-                  svcRules,
+                  dsoRules,
                 )
               )
               .leftMap(_.getDescription)
               .semiflatMap { _ =>
-                val cmd = svcRules.exercise(
-                  _.exerciseSvcRules_StartSvOnboarding(
+                val cmd = dsoRules.exercise(
+                  _.exerciseDsoRules_StartSvOnboarding(
                     candidateName,
                     candidateParty.toProtoPrimitive,
                     candidateParticipantId.toProtoPrimitive,
@@ -716,8 +716,8 @@ class HttpSvHandler(
                     svParty.toProtoPrimitive,
                   )
                 )
-                svcStoreWithIngestion.connection
-                  .submit(actAs = Seq(svParty), readAs = Seq(svcParty), cmd)
+                dsoStoreWithIngestion.connection
+                  .submit(actAs = Seq(svParty), readAs = Seq(dsoParty), cmd)
                   .withDedup(
                     commandId = CNLedgerConnection.CommandId(
                       "com.daml.network.sv.startSvOnboarding",

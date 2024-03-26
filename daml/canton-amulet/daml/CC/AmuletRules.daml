@@ -68,16 +68,16 @@ data AmuletRules_UpdateFutureAmuletConfigScheduleResult = AmuletRules_UpdateFutu
 
 
 -- | The rules governing how CC users can modify the CC state
--- managed by the SVC.
+-- managed by the DSO.
 template AmuletRules
   with
-    svc : Party
+    dso : Party
     configSchedule : Schedule Time (AmuletConfig USD)
     isDevNet : Bool
   where
     ensure validSchedule configSchedule validAmuletConfig
 
-    signatory svc
+    signatory dso
 
     nonconsuming choice AmuletRules_ComputeFees : AmuletRules_ComputeFeesResult
       -- ^ Compute the output fees for transfer against the given context
@@ -86,7 +86,7 @@ template AmuletRules
         sender : Party
         outputs : [TransferOutput]
      controller sender
-     do fees <- computeFees svc context sender outputs
+     do fees <- computeFees dso context sender outputs
         return AmuletRules_ComputeFeesResult with fees
 
     nonconsuming choice AmuletRules_Transfer : TransferResult
@@ -98,7 +98,7 @@ template AmuletRules
         let rewardsConfig = RewardsIssuanceConfig with
               issueAppRewards = True
               issueValidatorRewards = True
-        executeTransfer rewardsConfig context svc transfer
+        executeTransfer rewardsConfig context dso transfer
 
     -- Global domain usage
     ----------------------
@@ -127,7 +127,7 @@ template AmuletRules
               provider
               inputs
               outputs = [ TransferOutput with
-                            receiver = svc
+                            receiver = dso
                             amount = trafficCostCc
                             receiverFeeRatio = 1.0 -- ensure the provider pays only the traffic cost
                             lock = None
@@ -136,19 +136,19 @@ template AmuletRules
             rewardsConfig = RewardsIssuanceConfig with
               issueAppRewards = False
               issueValidatorRewards = False
-        transferResult <- executeTransfer rewardsConfig context svc transfer
+        transferResult <- executeTransfer rewardsConfig context dso transfer
         let [TransferResultAmulet amuletCid] = transferResult.createdAmulets
-        -- burn the amulet created for the SVC (using fetchAndArchive for extra safety)
-        void $ fetchAndArchive (ForOwner with svc; owner = svc) amuletCid
+        -- burn the amulet created for the DSO (using fetchAndArchive for extra safety)
+        void $ fetchAndArchive (ForOwner with dso; owner = dso) amuletCid
         -- issue validator rewards over the whole burn
         create ValidatorRewardCoupon with
-          svc
+          dso
           round = transferResult.round
           user = provider
           amount = trafficCostCc
         -- create a new MemberTraffic contract for the purchased traffic
         purchasedTraffic <- create MemberTraffic with
-          svc
+          dso
           memberId
           domainId
           migrationId
@@ -168,14 +168,14 @@ template AmuletRules
     nonconsuming choice AmuletRules_MergeMemberTrafficContracts : AmuletRules_MergeMemberTrafficContractsResult
       with
         trafficCids : [ContractId MemberTraffic]
-      controller svc
+      controller dso
       do
         -- fetch, validate and archive all given contracts
         let firstCid::remainingCids = trafficCids
-        first <- fetchAndArchive (ForSvc with svc) firstCid
+        first <- fetchAndArchive (ForDso with dso) firstCid
         rest <- forA remainingCids $ \trafficCid -> do
           let expectedTrafficContract = ForMemberTraffic with
-                svc
+                dso
                 memberId = first.memberId
                 domainId = first.domainId
                 migrationId = first.migrationId
@@ -184,7 +184,7 @@ template AmuletRules
 
         -- create a new aggregated member traffic contract.
         let mergedTraffic = foldl (\acc traffic -> MemberTraffic with
-                svc
+                dso
                 memberId = acc.memberId
                 domainId = acc.domainId
                 migrationId = acc.migrationId
@@ -192,23 +192,23 @@ template AmuletRules
                 numPurchases = acc.numPurchases + traffic.numPurchases
                 usdSpent = acc.usdSpent + traffic.usdSpent
                 ccSpent = acc.ccSpent + traffic.ccSpent
-              ) (initialMemberTraffic svc first.memberId first.domainId first.migrationId) traffics
+              ) (initialMemberTraffic dso first.memberId first.domainId first.migrationId) traffics
         mergedTrafficCid <- create mergedTraffic
         return AmuletRules_MergeMemberTrafficContractsResult with ..
 
     -- Amulet usage
     -------------
 
-    -- A choice for the SVC to mint amulet for the cases where the
-    -- collective rules allow for that; e.g., when redeeming SVC rewards.
+    -- A choice for the DSO to mint amulet for the cases where the
+    -- collective rules allow for that; e.g., when redeeming DSO rewards.
     nonconsuming choice AmuletRules_Mint: AmuletCreateSummary (ContractId Amulet)
       with
         receiver: Party
         amount: Decimal
         openRound: ContractId OpenMiningRound
-      controller svc, receiver
+      controller dso, receiver
       do
-        openRound <- fetchReferenceData (ForSvc with svc) openRound
+        openRound <- fetchReferenceData (ForDso with dso) openRound
         let transferConfigCC = transferConfigCCFromOpenRound openRound
             expiringAmount = ExpiringAmount with
                         initialAmount = amount
@@ -239,7 +239,7 @@ template AmuletRules
       controller provider
       do
         require "isDevNet flag is true" isDevNet
-        featuredAppRightCid <- create FeaturedAppRight with svc; provider
+        featuredAppRightCid <- create FeaturedAppRight with dso; provider
         return AmuletRules_DevNet_FeatureAppResult with ..
 
     -- Bootstrap the open mining rounds by creating
@@ -252,7 +252,7 @@ template AmuletRules
         amuletPrice : Decimal
         round0Duration : RelTime
         -- Duration of the very first round, typically set to a number large enough for all initial members to complete joining and grab their SvReward coupon.
-      controller svc
+      controller dso
       do
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
@@ -261,7 +261,7 @@ template AmuletRules
         let nr1 = nr0 + 1
         let nr2 = nr1 + 1
 
-        -- Round0 is essentially a round that happens to not get closed for 24h by the SVC, which is
+        -- Round0 is essentially a round that happens to not get closed for 24h by the DSO, which is
         -- why we keep it's tick-duration at the normal tickDuration, and check that it is not too short.
         -- Thereby we can keep the expiry logic for locked amulets simple.
         require "Round0 duration is larger or equal to tick duration" (tickDuration <= round0Duration)
@@ -285,11 +285,11 @@ template AmuletRules
         let transferConfigUsd = configUsd.transferConfig
 
         create OpenMiningRound with
-          svc; round = Round nr0; amuletPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
+          dso; round = Round nr0; amuletPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0; issuingFor = issuingFor0; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig0
         create OpenMiningRound with
-          svc; round = Round nr1; amuletPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
+          dso; round = Round nr1; amuletPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1; issuingFor = issuingFor1; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig1
         last <- create OpenMiningRound with
-          svc; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
+          dso; round = Round nr2; amuletPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2; issuingFor = issuingFor2; transferConfigUsd ; tickDuration ; issuanceConfig = issuanceConfig2
         return AmuletRules_Bootstrap_RoundsResult with
           openMiningRoundCid = last
 
@@ -299,11 +299,11 @@ template AmuletRules
         roundToArchiveCid : ContractId OpenMiningRound
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
-      controller svc
+      controller dso
       do
-        roundToArchive <- fetchAndArchive (ForSvc with svc) roundToArchiveCid
-        middleRound <- fetchReferenceData (ForSvc with svc) middleRoundCid
-        latestRound <- fetchReferenceData (ForSvc with svc) latestRoundCid
+        roundToArchive <- fetchAndArchive (ForDso with dso) roundToArchiveCid
+        middleRound <- fetchReferenceData (ForDso with dso) middleRoundCid
+        latestRound <- fetchReferenceData (ForDso with dso) latestRoundCid
 
         now <- getTime
         require "middleRound is one after roundToArchive" (middleRound.round.number == roundToArchive.round.number + 1)
@@ -314,7 +314,7 @@ template AmuletRules
 
         -- archive and create the rounds
         newSummarizingRound <- create SummarizingMiningRound with
-            svc
+            dso
             round = roundToArchive.round
             amuletPrice = roundToArchive.amuletPrice
             issuanceConfig = roundToArchive.issuanceConfig
@@ -326,13 +326,13 @@ template AmuletRules
               opensAt = addRelTime (max now latestRound.opensAt) tickDuration
               newOpenRoundIssuingFor = latestRound.issuingFor + latestRound.tickDuration
           create OpenMiningRound with
-              svc
+              dso
               round = Round (latestRound.round.number + 1)
               amuletPrice
               opensAt
               -- round is open for two ticks.
               targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
-              -- We advance the time for which the SVC has been issuing independent of how real world advances.
+              -- We advance the time for which the DSO has been issuing independent of how real world advances.
               -- Note that given the checks above the real time can only be slower.
               issuingFor = newOpenRoundIssuingFor
               transferConfigUsd = configUsd.transferConfig
@@ -347,9 +347,9 @@ template AmuletRules
         miningRoundCid : ContractId SummarizingMiningRound
         -- The amount of amulet burned in this round.
         summary : OpenMiningRoundSummary
-      controller svc
+      controller dso
       do
-        miningRound <- fetchAndArchive (ForSvc with svc) miningRoundCid
+        miningRound <- fetchAndArchive (ForDso with dso) miningRoundCid
         validateOpenMiningRoundSummary summary
 
         let params = computeIssuingRoundParameters
@@ -357,7 +357,7 @@ template AmuletRules
 
         -- record unclaimed reward contract
         create UnclaimedReward with
-          svc
+          dso
           amount = params.unclaimedValidatorRewards + params.unclaimedAppRewards + params.unclaimedSvRewards
 
         -- create issuing round
@@ -367,7 +367,7 @@ template AmuletRules
         let targetClosesAt = addRelTime opensAt (tickDuration + tickDuration)
 
         issuingRoundCid <- create IssuingMiningRound with
-          svc
+          dso
           round = miningRound.round
           opensAt = opensAt
           targetClosesAt = targetClosesAt
@@ -382,16 +382,16 @@ template AmuletRules
     nonconsuming choice AmuletRules_MiningRound_Close : AmuletRules_MiningRound_CloseResult
       with
         issuingRoundCid : ContractId IssuingMiningRound
-      controller svc
+      controller dso
       do
         -- archive issuing mining round
         now <- getTime
-        issuingRound <- fetchAndArchive (ForSvc with svc) issuingRoundCid
+        issuingRound <- fetchAndArchive (ForDso with dso) issuingRoundCid
         require "Mining round is past targetClosesAt" (issuingRound.targetClosesAt <= now)
 
         -- create closed round
         closedRoundCid <- create ClosedMiningRound with
-          svc
+          dso
           issuancePerValidatorRewardCoupon = issuingRound.issuancePerValidatorRewardCoupon
           issuancePerFeaturedAppRewardCoupon = issuingRound.issuancePerFeaturedAppRewardCoupon
           issuancePerUnfeaturedAppRewardCoupon = issuingRound.issuancePerUnfeaturedAppRewardCoupon
@@ -404,9 +404,9 @@ template AmuletRules
     nonconsuming choice AmuletRules_MiningRound_Archive : AmuletRules_MiningRound_ArchiveResult
       with
         closedRoundCid : ContractId ClosedMiningRound
-      controller svc
+      controller dso
       do
-        void $ fetchAndArchive (ForSvc with svc) closedRoundCid
+        void $ fetchAndArchive (ForDso with dso) closedRoundCid
         return AmuletRules_MiningRound_ArchiveResult
 
     -- Batch expiry of unclaimed rewards for a specific claimed round
@@ -417,27 +417,27 @@ template AmuletRules
         appCouponCids : [ContractId AppRewardCoupon]
         svRewardCouponCids : [ContractId SvRewardCoupon]
         optValidatorFaucetCouponCids : Optional [ContractId ValidatorFaucetCoupon]
-      controller svc
+      controller dso
       do
         -- retrieve round
-        closedRound <- fetchReferenceData (ForSvc with svc) closedRoundCid
+        closedRound <- fetchReferenceData (ForDso with dso) closedRoundCid
 
         -- expire validator rewards and compute their unclaimed rewards
         expiredValidatorRewards <- forA validatorRewardCouponCids $ \validatorRewardCouponCid -> do
-          expireResult <- exercise validatorRewardCouponCid ValidatorRewardCoupon_SvcExpire with closedRoundCid
+          expireResult <- exercise validatorRewardCouponCid ValidatorRewardCoupon_DsoExpire with closedRoundCid
           return expireResult.amount
 
         let validatorRewards = sum expiredValidatorRewards
 
         -- expire validator faucet coupons and compute their unclaimed rewards
         forA_ (fromOptional [] optValidatorFaucetCouponCids) $ \validatorFaucetCouponCid -> do
-          exercise validatorFaucetCouponCid ValidatorFaucetCoupon_SvcExpire with closedRoundCid
+          exercise validatorFaucetCouponCid ValidatorFaucetCoupon_DsoExpire with closedRoundCid
 
         let numValidatorFaucetCoupons = optional 0.0 (intToDecimal . length) optValidatorFaucetCouponCids
 
         -- expire app rewards and compute their unclaimed rewards
         expiredAppRewards <- forA appCouponCids $ \appCouponCid -> do
-          expireResult <- exercise appCouponCid AppRewardCoupon_SvcExpire with closedRoundCid
+          expireResult <- exercise appCouponCid AppRewardCoupon_DsoExpire with closedRoundCid
           return (expireResult.featured, expireResult.amount)
 
         let featuredAppRewards = sum [ amount | (featured, amount) <- expiredAppRewards, featured ]
@@ -445,7 +445,7 @@ template AmuletRules
 
         -- expire validator rewards and compute their unclaimed rewards
         expiredSvRewards <- forA svRewardCouponCids $ \svRewardCouponCid -> do
-          expireResult <- exercise svRewardCouponCid SvRewardCoupon_SvcExpire with closedRoundCid
+          expireResult <- exercise svRewardCouponCid SvRewardCoupon_DsoExpire with closedRoundCid
           return expireResult.weight
 
         let svRewardsWeight = sum expiredSvRewards
@@ -459,25 +459,25 @@ template AmuletRules
               intToDecimal svRewardsWeight * closedRound.issuancePerSvRewardCoupon
         unclaimedRewardCid <- if (amount <= 0.0)
               then pure None
-              else Some <$> create UnclaimedReward with svc; amount
+              else Some <$> create UnclaimedReward with dso; amount
         return AmuletRules_ClaimExpiredRewardsResult with unclaimedRewardCid
 
     -- Batch merge of unclaimed rewards
     nonconsuming choice AmuletRules_MergeUnclaimedRewards : AmuletRules_MergeUnclaimedRewardsResult
       with
         unclaimedRewardCids : [ContractId UnclaimedReward]
-      controller svc
+      controller dso
       do
         require "More than one unclaimed reward contracts" (length unclaimedRewardCids > 1)
 
         -- archive all given rewards
         archivedAmounts <- forA unclaimedRewardCids $ \unclaimedRewardCid -> do
-          unclaimedReward <- fetchAndArchive (ForSvc with svc) unclaimedRewardCid
+          unclaimedReward <- fetchAndArchive (ForDso with dso) unclaimedRewardCid
           pure unclaimedReward.amount
 
         -- create a new unclaimed reward over the total
         unclaimedRewardCid <- create UnclaimedReward with
-          svc
+          dso
           amount = sum archivedAmounts
 
         return AmuletRules_MergeUnclaimedRewardsResult with ..
@@ -495,7 +495,7 @@ template AmuletRules
     choice AmuletRules_AddFutureAmuletConfigSchedule: AmuletRules_AddFutureAmuletConfigScheduleResult
       with
         newScheduleItem : (Time, AmuletConfig USD)
-      controller svc
+      controller dso
       do
         now <- getTime
         require "The insertion is scheduled in the future" (now < newScheduleItem._1)
@@ -506,7 +506,7 @@ template AmuletRules
     choice AmuletRules_RemoveFutureAmuletConfigSchedule: AmuletRules_RemoveFutureAmuletConfigScheduleResult
       with
         scheduleTime: Time
-      controller svc
+      controller dso
       do
         now <- getTime
         require "The removal is scheduled in the future" (now < scheduleTime)
@@ -517,7 +517,7 @@ template AmuletRules
     choice AmuletRules_UpdateFutureAmuletConfigSchedule: AmuletRules_UpdateFutureAmuletConfigScheduleResult
       with
         scheduleItem: (Time, AmuletConfig USD)
-      controller svc
+      controller dso
       do
         now <- getTime
         require "The update is scheduled in the future" (now < scheduleItem._1)
@@ -544,8 +544,8 @@ scaleAmuletConfig amuletPrice config = AmuletConfig with
   packageConfig = config.packageConfig
 
 computeFees : Party -> TransferContext -> Party -> [TransferOutput] -> Update [Decimal]
-computeFees svc context sender outputs = do
-  openRound <- fetchReferenceData (ForSvc with svc) context.openMiningRound
+computeFees dso context sender outputs = do
+  openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
   let transferConfigCC = transferConfigCCFromOpenRound openRound
   return $ map (computeOutputFee transferConfigCC sender) outputs
 
@@ -592,10 +592,10 @@ data RewardsIssuanceConfig = RewardsIssuanceConfig with
 
 -- | Execute a transfer.
 executeTransfer : RewardsIssuanceConfig -> TransferContext -> Party -> Transfer -> Update TransferResult
-executeTransfer config context svc t = do
+executeTransfer config context dso t = do
   -- compute summaries
-  csum <- summarizeAndValidateContext context svc t
-  isum <- summarizeAndConsumeInputs csum svc t.sender t.inputs
+  csum <- summarizeAndValidateContext context dso t
+  isum <- summarizeAndConsumeInputs csum dso t.sender t.inputs
   osum <- preprocessOutputs csum.config t.sender t.outputs
   summary <- summarizeTransfer t.sender csum.openRound csum.config isum osum
   -- check that overall transfer constraints are satisfied
@@ -607,7 +607,7 @@ executeTransfer config context svc t = do
   issueRewards config csum t.sender t.provider summary
   -- record outputs
   (createdAmulets, senderChangeAmulet) <-
-    createTransferOutputs csum.openRound csum.config svc t.sender summary osum
+    createTransferOutputs csum.openRound csum.config dso t.sender summary osum
 
   return TransferResult with
     round = csum.openRound.round
@@ -645,27 +645,27 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
   deriving (Eq, Show)
 
 summarizeAndValidateContext : TransferContext -> Party -> Transfer -> Update TransferContextSummary
-summarizeAndValidateContext context svc tf = do
+summarizeAndValidateContext context dso tf = do
   now <- getTime
-  -- check that the current mining round is open and issued by the svc
-  openRound <- fetchReferenceData (ForSvc with svc) context.openMiningRound
+  -- check that the current mining round is open and issued by the dso
+  openRound <- fetchReferenceData (ForDso with dso) context.openMiningRound
   require ("mining round is open: " <> show openRound) (openRound.opensAt <= now)
 
   -- check the featured app right, if present
   featuredAppProvider <- forA context.featuredAppRight $ \featuredAppRightCid -> do
-    requireMatchingContract featuredAppRightCid (FeaturedAppRight with svc; provider = tf.provider)
+    requireMatchingContract featuredAppRightCid (FeaturedAppRight with dso; provider = tf.provider)
     pure tf.provider
 
   -- pre-resolve issuing mining rounds
   issuingMiningRounds <- forA (Map.toList context.issuingMiningRounds) $ \(round, issuingRoundCid) -> do
-    issuingRound <- fetchReferenceData (ForRound with svc; round) issuingRoundCid
+    issuingRound <- fetchReferenceData (ForRound with dso; round) issuingRoundCid
     now <- getTime
     require "issuing round is open" (issuingRound.opensAt <= now)
     pure (round, issuingRound)
 
   -- pre-resolve validator rights
   validatorRights <- forA (Map.toList context.validatorRights) $ \(user, rightCid) -> do
-      requireMatchingContract rightCid (ValidatorRight with svc; validator = tf.sender; user)
+      requireMatchingContract rightCid (ValidatorRight with dso; validator = tf.sender; user)
       pure (user, rightCid)
 
   return TransferContextSummary with
@@ -689,10 +689,10 @@ getIssuingMiningRound csum round = do
 
 summarizeAndConsumeInputs
   : TransferContextSummary -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
-summarizeAndConsumeInputs csum svc sender inps = do
+summarizeAndConsumeInputs csum dso sender inps = do
     foldlA (summarizeAndConsumeInput csum.openRound.round) initialSummary inps
   where
-    forOwner = ForOwner with svc; owner = sender
+    forOwner = ForOwner with dso; owner = sender
 
     initialSummary = TransferInputsSummary with
       totalAmuletAmount = 0.0
@@ -738,7 +738,7 @@ summarizeAndConsumeInputs csum svc sender inps = do
 
     summarizeAndConsumeInput _round s (InputValidatorRewardCoupon couponCid) = do
       -- we must and do use the validator right to archive the coupon of the user
-      coupon <- fetchButArchiveLater (ForSvc with svc) couponCid
+      coupon <- fetchButArchiveLater (ForDso with dso) couponCid
       do
         rightCid <- getValidatorRight csum coupon.user
         exercise couponCid ValidatorRewardCoupon_ArchiveAsValidator with
@@ -882,14 +882,14 @@ issueRewards config csum sender provider summary
   | otherwise = do
       when (config.issueValidatorRewards) $
         void $ create ValidatorRewardCoupon with
-          svc = csum.openRound.svc
+          dso = csum.openRound.dso
           user = sender
           amount = usageFees
           round = csum.openRound.round
 
       when (config.issueAppRewards) $
         void $ create AppRewardCoupon with
-          svc = csum.openRound.svc
+          dso = csum.openRound.dso
           provider
           featured
           amount = usageFees + extraAppReward
@@ -902,7 +902,7 @@ issueRewards config csum sender provider summary
 createTransferOutputs
   : OpenMiningRound -> TransferConfig CC -> Party -> Party -> TransferSummary -> TransferOutputsSummary
   -> Update ([CreatedAmulet], Optional (ContractId Amulet))
-createTransferOutputs currentOpenRound transferConfigCC svc sender summary preprocessedOutputs = do
+createTransferOutputs currentOpenRound transferConfigCC dso sender summary preprocessedOutputs = do
     outputAmulets <- mapA createOutput preprocessedOutputs
     senderChangeAmulet <- createSenderChange
     return (outputAmulets, senderChangeAmulet)
@@ -911,12 +911,12 @@ createTransferOutputs currentOpenRound transferConfigCC svc sender summary prepr
       | summary.senderChangeAmount <= 0.0 = return None
       | otherwise =
           Some <$> create Amulet with
-            svc
+            dso
             owner = sender
             amount = expiringAmount transferConfigCC.holdingFee summary.senderChangeAmount currentOpenRound.round
     createOutput out = do
       let amulet = Amulet with
-            svc
+            dso
             owner = out.owner
             amount = expiringAmount transferConfigCC.holdingFee out.amount currentOpenRound.round
 
@@ -924,7 +924,7 @@ createTransferOutputs currentOpenRound transferConfigCC svc sender summary prepr
         None -> TransferResultAmulet <$> create amulet
         Some lock -> do
           -- We require the lock to expire before the amulet to allow CN app authors to
-          -- assume that a locked amulet is never archived by the SVC while the lock is held.
+          -- assume that a locked amulet is never archived by the DSO while the lock is held.
           require "lock expires before amulet"
             (doesLockExpireBeforeAmulet currentOpenRound lock amulet.amount currentOpenRound.tickDuration)
           TransferResultLockedAmulet <$> create LockedAmulet with amulet; lock
@@ -1134,5 +1134,5 @@ instance Additive BalanceChange where
      changeToHoldingFeesRate = l.changeToHoldingFeesRate - r.changeToHoldingFeesRate
 
 
-instance HasCheckedFetch AmuletRules ForSvc where
-  contractGroupId AmuletRules with .. = ForSvc with ..
+instance HasCheckedFetch AmuletRules ForDso where
+  contractGroupId AmuletRules with .. = ForDso with ..

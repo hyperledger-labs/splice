@@ -46,7 +46,7 @@ class WalletTxLogAcsIntegrationTest
           )
           .map(_.data)
 
-      clue("Start all SVC apps except the SVC validator node") {
+      clue("Start all DSO apps except the DSO validator node") {
         val localToStart = env.mergeLocalCNNodeInstances(
           env.svs.local,
           env.scans.local,
@@ -57,7 +57,7 @@ class WalletTxLogAcsIntegrationTest
 
       // Note: this test uses an SV party, as it's easier to create
       // amulets for parties hosted on a SV participant.
-      val sv1UserParty = sv1Backend.getSvcInfo().svParty
+      val sv1UserParty = sv1Backend.getDsoInfo().svParty
 
       clue("SV1 has no amulets initially") {
         amulets(sv1ValidatorBackend, sv1UserParty) should be(empty)

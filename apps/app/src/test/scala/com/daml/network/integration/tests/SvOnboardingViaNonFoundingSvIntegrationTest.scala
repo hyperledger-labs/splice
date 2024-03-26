@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.svcrules.SvcRules_OffboardMember
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.cn.dsorules.DsoRules_OffboardMember
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
 import com.daml.network.config.CNNodeConfigTransforms.bumpUrl
 import com.daml.network.config.{CNNodeConfigTransforms, NetworkAppClientConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -89,7 +89,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
       })
       .withManualStart
 
-  "A new SV can: 1) onboard via a non-founding SV while founding SV is offboarded from the SVC and " +
+  "A new SV can: 1) onboard via a non-founding SV while founding SV is offboarded from the DSO and " +
     "2) bootstrap using a sequencer that is not founding SV's sequencer" in { implicit env =>
       withCantonSvNodes(
         (
@@ -102,7 +102,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
         sv4 = false,
       )() {
         actAndCheck(
-          "Initialize SVC with SV1 and SV2",
+          "Initialize DSO with SV1 and SV2",
           startAllSync(
             sv1ScanBackend,
             sv2ScanBackend,
@@ -110,30 +110,30 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             sv2Backend,
           ),
         )(
-          "SV1 and SV2 are part of the SVC",
+          "SV1 and SV2 are part of the DSO",
           _ => {
             sv2Backend
-              .getSvcInfo()
-              .svcRules
+              .getDsoInfo()
+              .dsoRules
               .payload
               .members
               .keySet() should contain theSameElementsAs Seq(sv1Backend, sv2Backend).map(
-              _.getSvcInfo().svParty.toProtoPrimitive
+              _.getDsoInfo().svParty.toProtoPrimitive
             )
           },
         )
         actAndCheck(
           "SV2 creates a request to offboard SV1",
           sv2Backend.createVoteRequest(
-            sv2Backend.getSvcInfo().svParty.toProtoPrimitive,
-            new ARC_SvcRules(
+            sv2Backend.getDsoInfo().svParty.toProtoPrimitive,
+            new ARC_DsoRules(
               new SRARC_OffboardMember(
-                new SvcRules_OffboardMember(sv1Backend.getSvcInfo().svParty.toProtoPrimitive)
+                new DsoRules_OffboardMember(sv1Backend.getDsoInfo().svParty.toProtoPrimitive)
               )
             ),
             "url",
             "description",
-            sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           ),
         )("the request is created", _ => sv1Backend.listVoteRequests() should not be empty)
         actAndCheck(
@@ -148,13 +148,13 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
           "SV2 is now the only member",
           _ => {
             sv2Backend
-              .getSvcInfo()
-              .svcRules
+              .getDsoInfo()
+              .dsoRules
               .payload
               .members
               .keySet() should contain theSameElementsAs Seq(
               sv2Backend
-            ).map(_.getSvcInfo().svParty.toProtoPrimitive)
+            ).map(_.getDsoInfo().svParty.toProtoPrimitive)
           },
         )
         clue("SV1 is offboarded from the Decentralized Namespace") {
@@ -163,7 +163,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               sv2Backend.participantClient.topology.decentralized_namespaces
                 .list(
                   filterStore = globalDomainId.filterString,
-                  filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
+                  filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
                 )
             inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
               decentralizedNamespace.item.owners shouldBe Seq(
@@ -184,12 +184,12 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
           "SV3 is now member",
           _ => {
             sv2Backend
-              .getSvcInfo()
-              .svcRules
+              .getDsoInfo()
+              .dsoRules
               .payload
               .members
               .keySet() should contain theSameElementsAs Seq(sv2Backend, sv3Backend).map(
-              _.getSvcInfo().svParty.toProtoPrimitive
+              _.getDsoInfo().svParty.toProtoPrimitive
             )
           },
         )

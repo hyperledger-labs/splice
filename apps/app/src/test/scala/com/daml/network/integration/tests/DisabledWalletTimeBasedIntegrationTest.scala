@@ -70,16 +70,16 @@ class DisabledWalletTimeBasedIntegrationTest
           computeSvRewardInRound0(
             defaultIssuanceCurve.initialValue,
             defaultTickDuration,
-            svcSize = 1,
+            dsoSize = 1,
           )
         ) - smallAmount
 
       eventually() {
         sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(SvRewardCoupon.COMPANION)(
-            svcParty,
+            dsoParty,
             coupon => {
-              coupon.data.sv == sv1Backend.getSvcInfo().svParty.toProtoPrimitive &&
+              coupon.data.sv == sv1Backend.getDsoInfo().svParty.toProtoPrimitive &&
               coupon.data.round.number == currentRound
             },
           ) should not be empty
@@ -89,13 +89,13 @@ class DisabledWalletTimeBasedIntegrationTest
 
         val unclaimed = sv1Backend.participantClient.ledger_api_extensions.acs
           .filterJava(UnclaimedReward.COMPANION)(
-            svcParty,
+            dsoParty,
             reward => BigDecimal(reward.data.amount) >= expectedMinAmount,
           )
         unclaimed should not be empty
 
         sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(Amulet.COMPANION)(svcParty, _ => true) shouldBe empty
+          .filterJava(Amulet.COMPANION)(dsoParty, _ => true) shouldBe empty
       }
     }
 

@@ -18,7 +18,7 @@ import com.daml.network.scan.admin.api.client.BftScanConnection.{
   ScanList,
 }
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcScan
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DsoScan
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.util.{Contract, ContractWithState, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -89,9 +89,9 @@ class BftScanConnection(
       )
   }
 
-  override def getSvcPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
+  override def getDsoPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] =
     bftCall(
-      _.getSvcPartyId()
+      _.getDsoPartyId()
     )
 
   override protected def runGetAmuletRulesWithState(
@@ -133,16 +133,16 @@ class BftScanConnection(
     )
   ] = bftCall(_.getOpenAndIssuingMiningRounds(cachedOpenRounds, cachedIssuingRounds))
 
-  override def listSvcSequencers()(implicit
+  override def listDsoSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]] = {
-    bftCall(_.listSvcSequencers())
+    bftCall(_.listDsoSequencers())
   }
 
-  override def listSvcScans()(implicit
+  override def listDsoScans()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainScans]] = {
-    bftCall(_.listSvcScans())
+    bftCall(_.listDsoScans())
   }
 
   override def lookupFeaturedAppRight(providerPartyId: PartyId)(implicit
@@ -347,7 +347,7 @@ object BftScanConnection {
         )
       )
 
-    /** Updates the scan list according to the scans present in the SvcRules.
+    /** Updates the scan list according to the scans present in the DsoRules.
       * Additionally, if any previous connections to a Scan failed, they're retried.
       * This method should only be called once when creating a BftScanConnection and periodically by PeriodicAction,
       *  which ensures that there's never two concurrent calls to it.
@@ -359,14 +359,14 @@ object BftScanConnection {
         currentScanConnectionsRef.get()
       val currentScans = (currentScanConnections.keys ++ currentFailed.keys).toSet
       logger.info(s"Started refreshing scan list from $currentState")
-      getScansInSvcRules(connection).flatMap { scansInSvcRules =>
-        val newScans = scansInSvcRules.filter(scan => !currentScans.contains(scan.publicUrl))
-        val removedScans = currentScans.filter(url => !scansInSvcRules.exists(_.publicUrl == url))
-        if (scansInSvcRules.isEmpty) {
+      getScansInDsoRules(connection).flatMap { scansInDsoRules =>
+        val newScans = scansInDsoRules.filter(scan => !currentScans.contains(scan.publicUrl))
+        val removedScans = currentScans.filter(url => !scansInDsoRules.exists(_.publicUrl == url))
+        if (scansInDsoRules.isEmpty) {
           // This is expected on app init, and is retried when building the BftScanConnection
           Future.failed(
             new IllegalStateException(
-              s"Scan list in SvcRules is empty. Last known list: $currentState"
+              s"Scan list in DsoRules is empty. Last known list: $currentState"
             )
           )
         } else if (newScans.isEmpty && removedScans.isEmpty && currentFailed.isEmpty) {
@@ -380,13 +380,13 @@ object BftScanConnection {
             toRetry = currentFailed -- removedScans
             (retriedScansFailedConnections, retriedScansSuccessfulConnections) <-
               attemptConnections(
-                toRetry.map { case (url, (_, svName)) => SvcScan(url, svName) }.toSeq
+                toRetry.map { case (url, (_, svName)) => DsoScan(url, svName) }.toSeq
               )
           } yield {
             removedScans.foreach { url =>
               currentScanConnections.get(url).foreach { case (connection, svName) =>
                 logger.info(
-                  s"Closing connection to scan of $svName ($url) as it's been removed from the SvcRules scan list."
+                  s"Closing connection to scan of $svName ($url) as it's been removed from the DsoRules scan list."
                 )
                 attemptToClose(connection)
               }
@@ -425,10 +425,10 @@ object BftScanConnection {
       }
     }
 
-    private def getScansInSvcRules(connection: BftScanConnection)(implicit tc: TraceContext) = {
+    private def getScansInDsoRules(connection: BftScanConnection)(implicit tc: TraceContext) = {
       for {
         globalDomainId <- connection.getAmuletRulesDomain()(tc)
-        scans <- connection.listSvcScans()
+        scans <- connection.listDsoScans()
         domainScans <- scans
           .find(_.domainId == globalDomainId)
           .map(e => Future.successful(e.scans))
@@ -446,7 +446,7 @@ object BftScanConnection {
       * and the ones that succeeded, respectively.
       */
     private def attemptConnections(
-        scans: Seq[SvcScan]
+        scans: Seq[DsoScan]
     )(implicit
         tc: TraceContext
     ): Future[(Seq[(Uri, (Throwable, SvName))], Seq[(Uri, (SingleScanConnection, SvName))])] = {

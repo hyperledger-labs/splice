@@ -4,7 +4,7 @@ import cats.implicits.{catsSyntaxApplicativeId, toFoldableOps}
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.scan.admin.api.client.BftScanConnection
-import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.SvcSequencer
+import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DsoSequencer
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DomainAlias, SequencerAlias}
@@ -113,7 +113,7 @@ class DomainConnector(
   ): Future[Seq[GrpcSequencerConnection]] = {
     for {
       globalDomainId <- scanConnection.getAmuletRulesDomain()(traceContext)
-      domainSequencers <- scanConnection.listSvcSequencers()
+      domainSequencers <- scanConnection.listDsoSequencers()
       maybeSequencers = domainSequencers.find(_.domainId == globalDomainId)
     } yield maybeSequencers.fold {
       logger.warn("global domain sequencer list not found.")
@@ -124,14 +124,14 @@ class DomainConnector(
   }
 
   private def extractValidConnections(
-      sequencers: Seq[SvcSequencer],
+      sequencers: Seq[DsoSequencer],
       domainTime: CantonTimestamp,
       migrationId: Long,
   ): Seq[GrpcSequencerConnection] = {
     // sequencer connections will be ignore if they are with a invalid Alias, empty url or not yet available (`before availableAfter`)
     val validConnections = sequencers
       .collect {
-        case SvcSequencer(sequencerMigrationId, _, url, svName, availableAfter)
+        case DsoSequencer(sequencerMigrationId, _, url, svName, availableAfter)
             if migrationId == sequencerMigrationId && url.nonEmpty && !domainTime.toInstant
               .isBefore(availableAfter) =>
           for {

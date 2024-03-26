@@ -3,7 +3,7 @@ package com.daml.network.sv.automation.leaderbased
 import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -21,7 +21,7 @@ class AdvanceOpenMiningRoundTrigger(
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[AdvanceOpenMiningRoundTrigger.Task]
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]] {
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   /** Retrieve a batch of tasks that are ready for execution now. */
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
@@ -41,11 +41,11 @@ class AdvanceOpenMiningRoundTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val rounds = task.work.openRounds
     for {
-      svcRules <- store.getSvcRules()
-      _ = logger.debug(s"Starting work as leader ${svcRules.payload.leader} for ${task.work}")
+      dsoRules <- store.getDsoRules()
+      _ = logger.debug(s"Starting work as leader ${dsoRules.payload.leader} for ${task.work}")
       amuletPriceVotes <- store.listMemberAmuletPriceVotes()
-      cmd = svcRules.exercise(
-        _.exerciseSvcRules_AdvanceOpenMiningRounds(
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_AdvanceOpenMiningRounds(
           task.work.amuletRulesId,
           rounds.oldest.contractId,
           rounds.middle.contractId,
@@ -56,7 +56,7 @@ class AdvanceOpenMiningRoundTrigger(
       (offset, _) <- svTaskContext.connection
         .submit(
           Seq(store.key.svParty),
-          Seq(store.key.svcParty),
+          Seq(store.key.dsoParty),
           cmd,
         )
         .noDedup
@@ -100,7 +100,7 @@ class AdvanceOpenMiningRoundTrigger(
 object AdvanceOpenMiningRoundTrigger {
   case class Task(
       amuletRulesId: cc.amuletrules.AmuletRules.ContractId,
-      openRounds: SvSvcStore.OpenMiningRoundTriple,
+      openRounds: SvDsoStore.OpenMiningRoundTriple,
   ) extends PrettyPrinting {
 
     import com.daml.network.util.PrettyInstances.*

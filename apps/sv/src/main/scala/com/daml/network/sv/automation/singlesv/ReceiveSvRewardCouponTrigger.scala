@@ -7,12 +7,12 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svc.memberstate.MemberRewardState
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.dso.memberstate.MemberRewardState
+import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.CNLedgerConnection
-import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.store.SvSvcStore.OpenMiningRoundContract
+import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.store.SvDsoStore.OpenMiningRoundContract
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -26,7 +26,7 @@ import scala.math.Ordering.Implicits.*
 
 class ReceiveSvRewardCouponTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     cnLedgerConnection: CNLedgerConnection,
     extraBeneficiaries: Map[PartyId, BigDecimal],
 )(implicit
@@ -35,7 +35,7 @@ class ReceiveSvRewardCouponTrigger(
 ) extends PollingParallelTaskExecutionTrigger[ReceiveSvRewardCouponTrigger.Task] {
 
   private val svParty = store.key.svParty
-  private val svcParty = store.key.svcParty
+  private val dsoParty = store.key.dsoParty
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -47,10 +47,10 @@ class ReceiveSvRewardCouponTrigger(
       tc: TraceContext
   ): OptionT[Future, ReceiveSvRewardCouponTrigger.Task] = {
     for {
-      // Note that the SvcRules will be different for every task, so we have to return them one-by-one.
-      svcRules <- OptionT.liftF(store.getSvcRules())
+      // Note that the DsoRules will be different for every task, so we have to return them one-by-one.
+      dsoRules <- OptionT.liftF(store.getDsoRules())
       memberInfo <- OptionT.fromOption[Future](
-        Option(svcRules.payload.members.get(svParty.toProtoPrimitive))
+        Option(dsoRules.payload.members.get(svParty.toProtoPrimitive))
       )
       rewardState <- OptionT(store.lookupMemberRewardState(memberInfo.name))
       openRounds <- OptionT.liftF(store.getOpenMiningRoundTriple())
@@ -64,7 +64,7 @@ class ReceiveSvRewardCouponTrigger(
           .minByOption(_.payload.opensAt)
       )
     } yield ReceiveSvRewardCouponTrigger.Task(
-      svcRules,
+      dsoRules,
       memberInfo.svRewardWeight,
       rewardState,
       firstOpenNotClaimed,
@@ -72,14 +72,14 @@ class ReceiveSvRewardCouponTrigger(
   }
 
   private def memberLastReceivedFor(rewardState: MemberRewardState): Option[Long] = {
-    // -1 is the value set in SvcRules_ConfirmSvOnboarding for new SVs
+    // -1 is the value set in DsoRules_ConfirmSvOnboarding for new SVs
     Option(rewardState.state.lastRoundCollected.number.longValue()).filter(_ > -1)
   }
 
   override protected def completeTask(task: ReceiveSvRewardCouponTrigger.Task)(implicit
       tc: TraceContext
   ): Future[TaskOutcome] = {
-    val ReceiveSvRewardCouponTrigger.Task(svcRules, svRewardWeight, rewardState, unclaimedRound) =
+    val ReceiveSvRewardCouponTrigger.Task(dsoRules, svRewardWeight, rewardState, unclaimedRound) =
       task
     val lastReceivedForOpt = memberLastReceivedFor(rewardState.payload)
     lastReceivedForOpt match {
@@ -100,10 +100,10 @@ class ReceiveSvRewardCouponTrigger(
     cnLedgerConnection
       .submit(
         actAs = Seq(svParty),
-        readAs = Seq(svcParty),
-        svcRules
+        readAs = Seq(dsoParty),
+        dsoRules
           .exercise(
-            _.exerciseSvcRules_ReceiveSvRewardCoupon(
+            _.exerciseDsoRules_ReceiveSvRewardCoupon(
               svParty.toProtoPrimitive,
               unclaimedRound.contractId,
               rewardState.contractId,
@@ -136,7 +136,7 @@ class ReceiveSvRewardCouponTrigger(
 object ReceiveSvRewardCouponTrigger {
 
   case class Task(
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
       svRewardWeight: Long,
       rewardState: AssignedContract[MemberRewardState.ContractId, MemberRewardState],
       round: OpenMiningRoundContract,
@@ -144,7 +144,7 @@ object ReceiveSvRewardCouponTrigger {
     import com.daml.network.util.PrettyInstances.*
     override def pretty: Pretty[this.type] =
       prettyOfClass(
-        param("svcRulesCid", _.svcRules.contractId),
+        param("dsoRulesCid", _.dsoRules.contractId),
         param("svRewardWeight", _.svRewardWeight),
         param("rewardState", _.rewardState),
         param("round", _.round),

@@ -37,7 +37,7 @@ testTransferExceedsMaxInputs = do
       pure $ InputAmulet amulet
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of inputs
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.dso] $
       createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
         transfer = Transfer with
           sender = alice.primaryParty
@@ -56,7 +56,7 @@ testTransferExceedsMaxOutputs = do
         outputAmulets = map (const outputAmulet) [1..101]
     context <- getPaymentTransferContext app alice
     -- More than the maximum number of outputs
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.dso] $
       createAndExerciseCmd (CheckError [alice.primaryParty, bob.primaryParty, charlie.primaryParty]) Test_Transfer with
         transfer = Transfer with
           sender = alice.primaryParty
@@ -70,7 +70,7 @@ testTransferExceedsMaxOutputs = do
 testTransferExceedsMaxLockHolders: Script ()
 testTransferExceedsMaxLockHolders = do
     DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
-    [(_, amuletRules)] <- query @AmuletRules app.svc
+    [(_, amuletRules)] <- query @AmuletRules app.dso
     now <- getTime
     let config = getValueAsOf now amuletRules.configSchedule
     bobs <- forA [0..config.transferConfig.maxNumLockHolders] $ \i -> setupUser app ("bob_" <> show i) bobValidator.primaryParty
@@ -79,7 +79,7 @@ testTransferExceedsMaxLockHolders = do
     now <- getTime
     let bobParties = map (.primaryParty) bobs
     -- More than the allowed number of lock holders
-    submitMulti ([alice.primaryParty, charlie.primaryParty] ++ bobParties) [app.svc] $
+    submitMulti ([alice.primaryParty, charlie.primaryParty] ++ bobParties) [app.dso] $
       createAndExerciseCmd (CheckError ([alice.primaryParty, charlie.primaryParty] ++ bobParties)) Test_Transfer with
       transfer = Transfer with
         sender = alice.primaryParty

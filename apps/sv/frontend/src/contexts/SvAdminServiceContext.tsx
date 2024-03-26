@@ -12,12 +12,12 @@ import {
   ListAmuletPriceVotesResponse,
   ListOngoingValidatorOnboardingsResponse,
   ListOpenMiningRoundsResponse,
-  ListSvcRulesVoteRequestsResponse,
-  ListSvcRulesVoteResultsResponse,
+  ListDsoRulesVoteRequestsResponse,
+  ListDsoRulesVoteResultsResponse,
   ListValidatorLicensesResponse,
   ListVoteRequestByTrackingCidResponse,
   ListVoteResultsRequest,
-  LookupSvcRulesVoteRequestResponse,
+  LookupDsoRulesVoteRequestResponse,
   Middleware,
   PrepareValidatorOnboardingRequest,
   PrepareValidatorOnboardingResponse,
@@ -28,7 +28,7 @@ import {
 } from 'sv-openapi';
 
 import { RelTime } from '@daml.js/b70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946/lib/DA/Time/Types';
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
 const SvAdminContext = React.createContext<SvAdminClient | undefined>(undefined);
 
@@ -47,7 +47,7 @@ export interface SvAdminClient {
     description: string,
     expiration: RelTime
   ) => Promise<void>;
-  listSvcRulesVoteRequests: () => Promise<ListSvcRulesVoteRequestsResponse>;
+  listDsoRulesVoteRequests: () => Promise<ListDsoRulesVoteRequestsResponse>;
   listVoteRequestResults: (
     limit: number,
     actionName?: string,
@@ -55,10 +55,10 @@ export interface SvAdminClient {
     effectiveFrom?: string,
     effectiveTo?: string,
     executed?: boolean
-  ) => Promise<ListSvcRulesVoteResultsResponse>;
-  lookupSvcRulesVoteRequest: (
+  ) => Promise<ListDsoRulesVoteResultsResponse>;
+  lookupDsoRulesVoteRequest: (
     voteRequestContractId: string
-  ) => Promise<LookupSvcRulesVoteRequestResponse>;
+  ) => Promise<LookupDsoRulesVoteRequestResponse>;
   listVoteRequestsByTrackingCid: (
     voteRequestContractIds: string[]
   ) => Promise<ListVoteRequestByTrackingCidResponse>;
@@ -126,8 +126,8 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         };
         return await svAdminClient.createVoteRequest(request);
       },
-      listSvcRulesVoteRequests: async (): Promise<ListSvcRulesVoteRequestsResponse> => {
-        return await svAdminClient.listSvcRulesVoteRequests();
+      listDsoRulesVoteRequests: async (): Promise<ListDsoRulesVoteRequestsResponse> => {
+        return await svAdminClient.listDsoRulesVoteRequests();
       },
       listVoteRequestResults: async (
         limit: number,
@@ -136,7 +136,7 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         effectiveFrom?: string,
         effectiveTo?: string,
         executed?: boolean
-      ): Promise<ListSvcRulesVoteResultsResponse> => {
+      ): Promise<ListDsoRulesVoteResultsResponse> => {
         const request: ListVoteResultsRequest = {
           actionName: actionName,
           executed: executed,
@@ -147,10 +147,10 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
         };
         return await svAdminClient.listVoteRequestResults(request);
       },
-      lookupSvcRulesVoteRequest: async (
+      lookupDsoRulesVoteRequest: async (
         voteRequestContractId: string
-      ): Promise<LookupSvcRulesVoteRequestResponse> => {
-        return await svAdminClient.lookupSvcRulesVoteRequest(voteRequestContractId);
+      ): Promise<LookupDsoRulesVoteRequestResponse> => {
+        return await svAdminClient.lookupDsoRulesVoteRequest(voteRequestContractId);
       },
       listVoteRequestsByTrackingCid: async (
         voteRequestContractIds: string[]

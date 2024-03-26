@@ -17,14 +17,14 @@ test_ValidatorFaucet = do
     [(faucetCid, _)] <- query @ValidatorLicense aliceValidator.primaryParty
 
     let checkRewardCouponsExist round = do
-          coupons <- queryFilter @ValidatorFaucetCoupon app.svc (\co -> co.round == round)
+          coupons <- queryFilter @ValidatorFaucetCoupon app.dso (\co -> co.round == round)
           map (._2) coupons === [ValidatorFaucetCoupon with
-                svc = app.svc
+                dso = app.dso
                 validator = aliceValidator.primaryParty
                 round]
 
     let checkRewardCouponsDoNotExist round = do
-          [] <- queryFilter @ValidatorFaucetCoupon app.svc (\co -> co.round == round)
+          [] <- queryFilter @ValidatorFaucetCoupon app.dso (\co -> co.round == round)
           pure ()
 
     let checkAliceValidatorBalanceAbove amount = do
@@ -35,17 +35,17 @@ test_ValidatorFaucet = do
 
     -- round0 can be received
     passTime (hours 1)
-    result <- submitMulti [aliceValidator.primaryParty] [app.svc] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
+    result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
       openRoundCid = round0._1
     let faucetCid = result.licenseCid
     checkRewardCouponsExist (round0._2.round)
 
     -- but not twice
-    submitMultiMustFail [aliceValidator.primaryParty] [app.svc] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
+    submitMultiMustFail [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
       openRoundCid = round0._1
 
     -- round1 can be received
-    result <- submitMulti [aliceValidator.primaryParty] [app.svc] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
+    result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
       openRoundCid = round1._1
     let faucetCid = result.licenseCid
     checkRewardCouponsExist (round1._2.round)
@@ -79,7 +79,7 @@ test_ValidatorFaucet = do
     passTime (days 1)
 
     -- round3 can be received despite round 2 not yet being recieved, i.e., we can skip rounds
-    result <- submitMulti [aliceValidator.primaryParty] [app.svc] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
+    result <- submitMulti [aliceValidator.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
       openRoundCid = round3._1
     let faucetCid = result.licenseCid
 
@@ -92,7 +92,7 @@ test_ValidatorFaucet = do
     faucetState.numCouponsMissed === 2
 
     -- round2 can no longer be received
-    submitMultiMustFail [alice.primaryParty] [app.svc] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
+    submitMultiMustFail [alice.primaryParty] [app.dso] $ exerciseCmd faucetCid ValidatorLicense_ReceiveFaucetCoupon with
       openRoundCid = round2._1
 
     return ()

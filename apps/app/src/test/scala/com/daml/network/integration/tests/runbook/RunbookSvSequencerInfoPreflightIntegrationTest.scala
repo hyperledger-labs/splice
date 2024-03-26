@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
+import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -12,7 +12,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-/** Preflight test that makes sure that the sequencer url is published to svcRules
+/** Preflight test that makes sure that the sequencer url is published to dsoRules
   */
 class RunbookSvSequencerInfoPreflightIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
@@ -26,10 +26,10 @@ class RunbookSvSequencerInfoPreflightIntegrationTest
       this.getClass.getSimpleName
     )
 
-  "The SV sequencer public url has been published to SvcRules" in { implicit env =>
+  "The SV sequencer public url has been published to DsoRules" in { implicit env =>
     val sv = sv_client("sv")
-    val svcInfo = sv.getSvcInfo()
-    val nodeState: SvNodeState = svcInfo.svNodeStates.get(svcInfo.svParty).value.payload
+    val dsoInfo = sv.getDsoInfo()
+    val nodeState: SvNodeState = dsoInfo.svNodeStates.get(dsoInfo.svParty).value.payload
     val domainConfig = nodeState.state.domainNodes.asScala.values.headOption.value
     val sequencer = domainConfig.sequencer.toScala.value
     sequencer.migrationId shouldBe migrationId

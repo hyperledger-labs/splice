@@ -16,7 +16,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.scan.svc.SvcCnsResolver
+import com.daml.network.scan.dso.DsoCnsResolver
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.WalletTestUtil.{DynamicUserRefs, StaticUserRefs}
 import com.daml.network.wallet.store.TxLogEntry
@@ -427,8 +427,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       disclosedContracts = Seq.empty,
     )
   }
-  protected def expectedSvcCns(implicit env: CNNodeTestConsoleEnvironment): String = {
-    expectedCns(svcParty, SvcCnsResolver.svcCnsName)
+  protected def expectedDsoCns(implicit env: CNNodeTestConsoleEnvironment): String = {
+    expectedCns(dsoParty, DsoCnsResolver.dsoCnsName)
   }
 
   protected def createCnsEntry(
@@ -517,7 +517,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userParty.toProtoPrimitive,
       receiverAmounts.asJava,
       userParty.toProtoPrimitive,
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       now.plus(expirationTime).toInstant,
       description,
     )
@@ -595,7 +595,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userParty.toProtoPrimitive,
       receiverParty.toProtoPrimitive,
       providerParty.toProtoPrimitive,
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       description,
     )
     val payData = new subsCodegen.SubscriptionPayData(
@@ -815,7 +815,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )
   }
 
-  /** Directly executes the AmuletRules_Mint choice. Note that the receiver must be hosted on the same participant as the SVC. */
+  /** Directly executes the AmuletRules_Mint choice. Note that the receiver must be hosted on the same participant as the DSO. */
   def mintAmulet(
       participantClient: CNParticipantClientReference,
       receiver: PartyId,
@@ -829,7 +829,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = aliceWalletClient.config.ledgerApiUser,
-      actAs = Seq(svcParty, receiver),
+      actAs = Seq(dsoParty, receiver),
       readAs = Seq.empty,
       update = tc.amuletRules.contract.contractId.exerciseAmuletRules_Mint(
         receiver.toLf,
@@ -843,7 +843,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )
   }
 
-  /** Directly executes the AmuletRules_DevNet_Tap choice. Note that the receiver must be hosted on the same participant as the SVC. */
+  /** Directly executes the AmuletRules_DevNet_Tap choice. Note that the receiver must be hosted on the same participant as the DSO. */
   def tapAmulet(
       participantClient: CNParticipantClientReference,
       receiver: PartyId,
@@ -858,7 +858,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = aliceWalletClient.config.ledgerApiUser,
       actAs = Seq(receiver),
-      readAs = Seq(svcParty),
+      readAs = Seq(dsoParty),
       update = tc.amuletRules.contract.contractId.exerciseAmuletRules_DevNet_Tap(
         receiver.toLf,
         amount.bigDecimal,
@@ -871,7 +871,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )
   }
 
-  /** Directly creates a new amulet. Note that the receiver must be hosted on the same participant as the SVC. */
+  /** Directly creates a new amulet. Note that the receiver must be hosted on the same participant as the DSO. */
   def createAmulet(
       participantClient: CNParticipantClientReference,
       userId: String,
@@ -885,7 +885,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   ): amuletCodegen.Amulet.ContractId = {
     val amulet =
       new amuletCodegen.Amulet(
-        svcParty.toProtoPrimitive,
+        dsoParty.toProtoPrimitive,
         owner.toProtoPrimitive,
         new feesCodegen.ExpiringAmount(
           amount.bigDecimal,
@@ -896,7 +896,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val created = participantClient.ledger_api_extensions.commands
       .submitWithResult(
         userId = userId,
-        actAs = Seq(svcParty, owner),
+        actAs = Seq(dsoParty, owner),
         readAs = Seq.empty,
         update = amulet,
         domainId = domainId,
@@ -916,7 +916,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   ): Unit = {
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
-      actAs = Seq(svcParty, owner),
+      actAs = Seq(dsoParty, owner),
       readAs = Seq.empty,
       update = amulet.exerciseArchive(
         new com.daml.network.codegen.java.da.internal.template.Archive()

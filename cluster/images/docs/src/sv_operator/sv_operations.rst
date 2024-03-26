@@ -70,13 +70,13 @@ Participant identities
 ++++++++++++++++++++++
 
 - Used for securing Daml workflows and for determining an SV's ``svPartyId``,
-  which is used for various SVC governance flows as well as for receiving SV rewards.
+  which is used for various DSO governance flows as well as for receiving SV rewards.
   For general information on Canton and Daml identities see the `Canton documentation on Identity Management <https://docs.daml.com/canton/usermanual/identity_management.html>`_.
 - Participant identities are important for multiple types of quorums
 
-  - Quorums for confirming Daml transactions as the SVC party (>⅓ of onboarded SVs)
-  - Quorums for administering the domain topology on behalf of the SVC party (>⅔ of onboarded SVs once activated)
-  - Quorums for confirmation-based SVC Daml workflows (>⅔ of onboarded SVs; on DevNet instead usually >½)
+  - Quorums for confirming Daml transactions as the DSO party (>⅓ of onboarded SVs)
+  - Quorums for administering the domain topology on behalf of the DSO party (>⅔ of onboarded SVs once activated)
+  - Quorums for confirmation-based DSO Daml workflows (>⅔ of onboarded SVs; on DevNet instead usually >½)
 
   .. TODO(#7746): remove "once activated"
 
@@ -85,7 +85,7 @@ Participant identities
 
 - Loss of control over a participant namespace implies loss of control over the coin balances for all parties hosted under that namespace.
   On a network level, loss of a participant namespace constitutes an SV failure and reduces the overall fault tolerance buffer,
-  until the respective SV is offboarded from the SVC.
+  until the respective SV is offboarded from the DSO.
 
 CometBFT node identities
 ++++++++++++++++++++++++

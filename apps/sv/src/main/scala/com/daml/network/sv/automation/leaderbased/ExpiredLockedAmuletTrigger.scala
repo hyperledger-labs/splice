@@ -20,20 +20,20 @@ class ExpiredLockedAmuletTrigger(
       cc.amulet.LockedAmulet.ContractId,
       cc.amulet.LockedAmulet,
     ](
-      svTaskContext.svcStore.multiDomainAcsStore,
-      svTaskContext.svcStore.listLockedExpiredAmulets,
+      svTaskContext.dsoStore.multiDomainAcsStore,
+      svTaskContext.dsoStore.listLockedExpiredAmulets,
       cc.amulet.LockedAmulet.COMPANION,
     )
     with SvTaskBasedTrigger[Task] {
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override protected def completeTaskAsLeader(
       co: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
     latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
-    svcRules <- store.getSvcRules()
-    cmd = svcRules.exercise(
-      _.exerciseSvcRules_LockedAmulet_ExpireAmulet(
+    dsoRules <- store.getDsoRules()
+    cmd = dsoRules.exercise(
+      _.exerciseDsoRules_LockedAmulet_ExpireAmulet(
         co.work.contractId,
         new cc.amulet.LockedAmulet_ExpireAmulet(
           latestOpenMiningRound.contractId
@@ -43,7 +43,7 @@ class ExpiredLockedAmuletTrigger(
     _ <- svTaskContext.connection
       .submit(
         Seq(store.key.svParty),
-        Seq(store.key.svcParty),
+        Seq(store.key.dsoParty),
         update = cmd,
       )
       .noDedup

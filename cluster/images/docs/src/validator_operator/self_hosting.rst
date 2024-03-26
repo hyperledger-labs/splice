@@ -7,7 +7,7 @@ These pages give a step-by-step guide how to deploy your own validator node to t
 
 **Please note that this setup is NOT intended for production use, but rather for learning about the
 structure of a validator node and how to interact with it. Among other things, the validator deployed
-here does not persist its data and is not configured to read from the SVC in a BFT manner.**
+here does not persist its data and is not configured to read from the DSO in a BFT manner.**
 
 .. _old-validator_prerequisites:
 

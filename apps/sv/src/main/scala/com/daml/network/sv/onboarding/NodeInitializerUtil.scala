@@ -2,10 +2,10 @@ package com.daml.network.sv.onboarding
 
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
+import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLogging
@@ -49,7 +49,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
 
   protected def newSvSvAutomationService(
       svStore: SvSvStore,
-      svcStore: SvSvcStore,
+      dsoStore: SvDsoStore,
       ledgerClient: CNLedgerClient,
   )(implicit
       ec: ExecutionContextExecutor,
@@ -60,13 +60,13 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
       clock,
       config,
       svStore,
-      svcStore,
+      dsoStore,
       ledgerClient,
       retryProvider,
       loggerFactory,
     )
 
-  protected def newSvcStore(
+  protected def newDsoStore(
       key: SvStore.Key,
       // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
       domainMigrationId: Long,
@@ -75,8 +75,8 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
       ec: ExecutionContext,
       templateDecoder: TemplateJsonDecoder,
       closeContext: CloseContext,
-  ): SvSvcStore = {
-    SvSvcStore(
+  ): SvDsoStore = {
+    SvDsoStore(
       key,
       storage,
       loggerFactory,
@@ -86,9 +86,9 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
     )
   }
 
-  protected def newSvSvcAutomationService(
+  protected def newSvDsoAutomationService(
       svStore: SvSvStore,
-      svcStore: SvSvcStore,
+      dsoStore: SvDsoStore,
       localDomainNode: Option[LocalDomainNode],
   )(implicit
       ec: ExecutionContextExecutor,
@@ -97,11 +97,11 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
       httpClient: HttpRequest => Future[HttpResponse],
       templateJsonDecoder: TemplateJsonDecoder,
   ) =
-    new SvSvcAutomationService(
+    new SvDsoAutomationService(
       clock,
       config,
       svStore,
-      svcStore,
+      dsoStore,
       ledgerClient,
       participantAdminConnection,
       retryProvider,
@@ -110,11 +110,11 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
       loggerFactory,
     )
 
-  protected def newSvcPartyHosting(
+  protected def newDsoPartyHosting(
       storeKey: SvStore.Key
-  )(implicit ec: ExecutionContextExecutor) = new SvcPartyHosting(
+  )(implicit ec: ExecutionContextExecutor) = new DsoPartyHosting(
     participantAdminConnection,
-    storeKey.svcParty,
+    storeKey.dsoParty,
     retryProvider,
     loggerFactory,
   )

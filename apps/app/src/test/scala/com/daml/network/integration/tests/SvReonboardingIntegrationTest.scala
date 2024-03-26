@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.svcrules.*
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.*
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.*
+import com.daml.network.codegen.java.cn.dsorules.*
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.*
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.*
 import com.daml.network.config.{
   CNDbConfig,
   CNNodeConfigTransforms,
@@ -222,15 +222,15 @@ class SvReonboardingIntegrationTest
           sv4ValidatorBackend,
         )
 
-        val sv1Party = sv1Backend.getSvcInfo().svParty
-        val sv2Party = sv2Backend.getSvcInfo().svParty
-        val sv3Party = sv3Backend.getSvcInfo().svParty
-        val sv4Party = sv4Backend.getSvcInfo().svParty
+        val sv1Party = sv1Backend.getDsoInfo().svParty
+        val sv2Party = sv2Backend.getDsoInfo().svParty
+        val sv3Party = sv3Backend.getDsoInfo().svParty
+        val sv4Party = sv4Backend.getDsoInfo().svParty
 
         val sv4Name =
           sv1Backend
-            .getSvcInfo()
-            .svcRules
+            .getDsoInfo()
+            .dsoRules
             .payload
             .members
             .asScala
@@ -255,7 +255,7 @@ class SvReonboardingIntegrationTest
             (sv1, sv2, sv3, sv4)
           }
 
-        sv1Backend.getSvcInfo().svcRules.payload.members.keySet.asScala shouldBe Set(
+        sv1Backend.getDsoInfo().dsoRules.payload.members.keySet.asScala shouldBe Set(
           sv1Party,
           sv2Party,
           sv3Party,
@@ -292,15 +292,15 @@ class SvReonboardingIntegrationTest
           val (_, voteRequestCid) = actAndCheck(
             "SV1 create a vote request to remove sv4", {
               val action: ActionRequiringConfirmation =
-                new ARC_SvcRules(
-                  new SRARC_OffboardMember(new SvcRules_OffboardMember(sv4Party.toProtoPrimitive))
+                new ARC_DsoRules(
+                  new SRARC_OffboardMember(new DsoRules_OffboardMember(sv4Party.toProtoPrimitive))
                 )
               sv1Backend.createVoteRequest(
-                sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+                sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
                 action,
                 "url",
                 "description",
-                sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+                sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
               )
             },
           )(
@@ -316,13 +316,13 @@ class SvReonboardingIntegrationTest
           }
 
           eventually() {
-            sv1Backend.getSvcInfo().svcRules.payload.members.keySet.asScala shouldBe Set(
+            sv1Backend.getDsoInfo().dsoRules.payload.members.keySet.asScala shouldBe Set(
               sv1Party,
               sv2Party,
               sv3Party,
             ).map(_.toProtoPrimitive)
             val mapping = sv1Backend.appState.participantAdminConnection
-              .getPartyToParticipant(globalDomainId, sv1Backend.getSvcInfo().svcParty)
+              .getPartyToParticipant(globalDomainId, sv1Backend.getDsoInfo().dsoParty)
               .futureValue
               .mapping
             mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
@@ -397,14 +397,14 @@ class SvReonboardingIntegrationTest
           validatorLocalBackend,
         )
 
-        val sv4PartyNew = sv4ReonboardBackend.getSvcInfo().svParty
+        val sv4PartyNew = sv4ReonboardBackend.getDsoInfo().svParty
         clue("partyId of re-onboarded sv4 is different") {
           sv4PartyNew should not be sv4Party
           sv4PartyNew.uid.id.unwrap should startWith("digital-asset-eng-4-reonboard")
           sv4PartyNew.uid.namespace should not be sv4Party.uid.namespace
         }
 
-        sv1Backend.getSvcInfo().svcRules.payload.members.keySet.asScala shouldBe Set(
+        sv1Backend.getDsoInfo().dsoRules.payload.members.keySet.asScala shouldBe Set(
           sv1Party,
           sv2Party,
           sv3Party,
@@ -412,8 +412,8 @@ class SvReonboardingIntegrationTest
         ).map(_.toProtoPrimitive)
 
         sv1Backend
-          .getSvcInfo()
-          .svcRules
+          .getDsoInfo()
+          .dsoRules
           .payload
           .members
           .asScala
@@ -422,7 +422,7 @@ class SvReonboardingIntegrationTest
           .name shouldBe sv4Name
 
         val mapping = sv1Backend.appState.participantAdminConnection
-          .getPartyToParticipant(globalDomainId, sv1Backend.getSvcInfo().svcParty)
+          .getPartyToParticipant(globalDomainId, sv1Backend.getDsoInfo().dsoParty)
           .futureValue
           .mapping
         mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
@@ -460,9 +460,9 @@ class SvReonboardingIntegrationTest
         mapping.threshold shouldBe PositiveInt.tryCreate(3)
         // Test that SV4 can submit transactions and they're observed by others.
         val action: ActionRequiringConfirmation =
-          new ARC_SvcRules(
+          new ARC_DsoRules(
             new SRARC_GrantFeaturedAppRight(
-              new SvcRules_GrantFeaturedAppRight(sv4PartyNew.toProtoPrimitive)
+              new DsoRules_GrantFeaturedAppRight(sv4PartyNew.toProtoPrimitive)
             )
           )
         actAndCheck(
@@ -472,7 +472,7 @@ class SvReonboardingIntegrationTest
             action,
             "url",
             "description",
-            sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           ),
         )(
           "vote request is observed by sv1-3",

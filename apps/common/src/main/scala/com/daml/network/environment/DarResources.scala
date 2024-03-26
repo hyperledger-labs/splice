@@ -15,11 +15,11 @@ object DarResources {
     Seq(cantonAmulet_current),
   )
 
-  val svcGovernance_0_1_0 = DarResource("svc-governance-0.1.0.dar")
-  val svcGovernance_current = DarResource("svc-governance-current.dar")
-  val svcGovernance = PackageResource(
-    svcGovernance_0_1_0,
-    Seq(svcGovernance_current),
+  val dsoGovernance_0_1_0 = DarResource("dso-governance-0.1.0.dar")
+  val dsoGovernance_current = DarResource("dso-governance-current.dar")
+  val dsoGovernance = PackageResource(
+    dsoGovernance_0_1_0,
+    Seq(dsoGovernance_current),
   )
 
   val cantonNameService_0_1_0 = DarResource("canton-name-service-0.1.0.dar")
@@ -70,7 +70,7 @@ object DarResources {
       DarResources.cantonAmulet,
       DarResources.cantonNameService,
       DarResources.splitwell,
-      DarResources.svcGovernance,
+      DarResources.dsoGovernance,
       DarResources.validatorLifecycle,
       DarResources.wallet,
       DarResources.walletPayments,

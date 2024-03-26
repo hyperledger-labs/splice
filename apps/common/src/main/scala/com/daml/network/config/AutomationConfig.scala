@@ -39,7 +39,7 @@ case class AutomationConfig(
     enableLeaderReplacementTrigger: Boolean = true,
     /** Only intended for testing. Allows disabling governance automation.
       */
-    enableSvcGovernance: Boolean = true,
+    enableDsoGovernance: Boolean = true,
     /** Only intended for testing. Allows disabling archival of closed rounds.
       */
     enableClosedRoundArchival: Boolean = true,

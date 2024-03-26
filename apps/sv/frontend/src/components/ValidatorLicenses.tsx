@@ -8,18 +8,18 @@ import TableRow from '@mui/material/TableRow';
 
 import { Party } from '@daml/types';
 
-import { useSvcInfos } from '../contexts/SvContext';
+import { useDsoInfos } from '../contexts/SvContext';
 import { useValidatorLicenses } from '../hooks/useValidatorLicenses';
 import { config } from '../utils';
 
 const ValidatorLicenses: React.FC = () => {
   const validatorLicensesQuery = useValidatorLicenses();
-  const svcInfosQuery = useSvcInfos();
-  if (validatorLicensesQuery.isLoading || svcInfosQuery.isLoading) {
+  const dsoInfosQuery = useDsoInfos();
+  if (validatorLicensesQuery.isLoading || dsoInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (validatorLicensesQuery.isError || svcInfosQuery.isError) {
+  if (validatorLicensesQuery.isError || dsoInfosQuery.isError) {
     return <p>Error, something went wrong.</p>;
   }
 
@@ -57,7 +57,7 @@ const ValidatorLicenses: React.FC = () => {
                   validator={license.payload.validator}
                   sponsor={license.payload.sponsor}
                   createdAt={new Date(license.createdAt)}
-                  sv={svcInfosQuery.data!.svPartyId}
+                  sv={dsoInfosQuery.data!.svPartyId}
                 />
               );
             })}

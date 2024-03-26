@@ -78,7 +78,7 @@ object CNNodeConfigTransforms {
             case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
               Some(
                 foundCollective.copy(
-                  svcPartyHint = s"${foundCollective.svcPartyHint}-$suffix"
+                  dsoPartyHint = s"${foundCollective.dsoPartyHint}-$suffix"
                 )
               )
             case Some(joinWithKey: SvOnboardingConfig.JoinWithKey) => Some(joinWithKey)
@@ -89,7 +89,7 @@ object CNNodeConfigTransforms {
       ),
       updateAllSvAppFoundCollectiveConfigs_(c =>
         c.copy(
-          svcPartyHint = s"${c.svcPartyHint}-$suffix"
+          dsoPartyHint = s"${c.dsoPartyHint}-$suffix"
         )
       ),
       updateAllScanAppConfigs_(c => c.copy(svUser = s"${c.svUser}-$suffix")),

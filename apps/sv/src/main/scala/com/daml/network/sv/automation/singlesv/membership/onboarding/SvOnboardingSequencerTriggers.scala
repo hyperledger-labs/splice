@@ -7,10 +7,10 @@ import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.automation.singlesv.membership.onboarding.SequencerOnboarding.SequencerToOnboard
 import com.daml.network.sv.automation.singlesv.membership.{
   SvTopologyStatePollingAndAssignedTrigger,
-  SvcRulesTopologyStateReconciler,
+  DsoRulesTopologyStateReconciler,
 }
-import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.store.SvSvcStore.SvcRulesWithMemberNodeStates
+import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.store.SvDsoStore.DsoRulesWithMemberNodeStates
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, PartyId, SequencerId}
@@ -23,17 +23,17 @@ import scala.jdk.OptionConverters.RichOptional
 
 class SequencerOnboarding(
     svParty: PartyId,
-    val svSvcStore: SvSvcStore,
+    val svDsoStore: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
     logger: TracedLogger,
-) extends SvcRulesTopologyStateReconciler[SequencerToOnboard] {
-  override def diffSvcRulesWithTopology(
-      svcRulesAndState: SvcRulesWithMemberNodeStates
+) extends DsoRulesTopologyStateReconciler[SequencerToOnboard] {
+  override def diffDsoRulesWithTopology(
+      dsoRulesAndState: DsoRulesWithMemberNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[SequencerToOnboard]] = {
-    val svcRules = svcRulesAndState.svcRules
-    participantAdminConnection.getSequencerDomainState(svcRules.domain).map {
+    val dsoRules = dsoRulesAndState.dsoRules
+    participantAdminConnection.getSequencerDomainState(dsoRules.domain).map {
       sequencerDomainState =>
-        val currentDomainConfigs = svcRulesAndState.currentDomainNodeConfigs()
+        val currentDomainConfigs = dsoRulesAndState.currentDomainNodeConfigs()
         val configuredSequencers =
           currentDomainConfigs
             .flatMap(_.sequencer.toScala)
@@ -52,13 +52,13 @@ class SequencerOnboarding(
         val sequencersToAdd =
           configuredSequencers
             .filterNot(sequencerDomainState.mapping.active.contains)
-            .map(SequencerToOnboard(svcRules.domain, _))
+            .map(SequencerToOnboard(dsoRules.domain, _))
         val thresholdToSet =
           CNThresholds.sequencerConnectionsSizeThreshold(configuredSequencers.size)
 
         if (sequencersToAdd.nonEmpty) {
           logger.info {
-            show"Planning to add sequencers $sequencersToAdd to match $svcRulesAndState"
+            show"Planning to add sequencers $sequencersToAdd to match $dsoRulesAndState"
           }
           sequencersToAdd
         } else if (thresholdToSet != sequencerDomainState.mapping.threshold) {
@@ -69,7 +69,7 @@ class SequencerOnboarding(
           )
           sequencerDomainState.mapping.active
             .take(1)
-            .map(SequencerToOnboard(svcRules.domain, _))
+            .map(SequencerToOnboard(dsoRules.domain, _))
         } else Seq()
     }
   }
@@ -107,11 +107,11 @@ object SequencerOnboarding {
 
 /** Onboards a new sequencer to the current global domain topology state.
   * The onboarding only happens if the following conditions are met:
-  * - the sequencer is configured in the domain config found in the SvcRules
+  * - the sequencer is configured in the domain config found in the DsoRules
   */
 class SvOnboardingSequencerTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,

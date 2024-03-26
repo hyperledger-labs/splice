@@ -38,9 +38,9 @@ class BftScanConnectionIntegrationTest
 
     // make sure both scans get registered
     eventually() {
-      val svcInfo = sv1Backend.getSvcInfo()
+      val dsoInfo = sv1Backend.getDsoInfo()
       val scans = for {
-        (_, nodeState) <- svcInfo.svNodeStates
+        (_, nodeState) <- dsoInfo.svNodeStates
         (_, domainNode) <- nodeState.payload.state.domainNodes.asScala
         scan <- domainNode.scan.toScala
       } yield scan

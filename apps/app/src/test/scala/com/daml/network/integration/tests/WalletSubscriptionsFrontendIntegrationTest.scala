@@ -30,7 +30,7 @@ class WalletSubscriptionsFrontendIntegrationTest
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val alicePartyId = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
-      val svcEntry = expectedSvcCns
+      val dsoEntry = expectedDsoCns
       createCnsEntry(aliceCnsExternalClient, aliceEntryName, aliceWalletClient)
       val cnsPaymentDue = LocalDate.now().plusDays(90)
       val aDate = LocalDate.now().plusDays(1)
@@ -66,8 +66,8 @@ class WalletSubscriptionsFrontendIntegrationTest
             val subscriptionRows = findAll(className("subscription-row")).toSeq
             subscriptionRows should have size 2
             matchSubscription(subscriptionRows.head)(
-              expectedReceiver = svcEntry,
-              expectedProvider = svcEntry,
+              expectedReceiver = dsoEntry,
+              expectedProvider = dsoEntry,
               expectedPrice = "1 USD per 90 days",
               expectedAmuletPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =
@@ -135,7 +135,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         walletAmuletToUsd(5),
       )
 
-      val svcEntry = expectedSvcCns
+      val dsoEntry = expectedDsoCns
       val cnsPaymentDue = LocalDate.now().plusDays(90)
       val newlyPurchasedName = perTestCaseName("new")
       val respond =
@@ -188,8 +188,8 @@ class WalletSubscriptionsFrontendIntegrationTest
             val subscriptionRows = findAll(className("subscription-row")).toSeq
             subscriptionRows should have size 2 // from createCnsEntry and just-accepted requestCnsEntry
             matchSubscription(subscriptionRows.last)(
-              expectedReceiver = svcEntry,
-              expectedProvider = svcEntry,
+              expectedReceiver = dsoEntry,
+              expectedProvider = dsoEntry,
               expectedPrice = "1 USD per 90 days",
               expectedAmuletPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =

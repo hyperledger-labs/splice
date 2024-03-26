@@ -53,7 +53,7 @@ abstract class DbCNNodeAppStore[TXE](
     )
 
   // Note: everything deriving from this class has a TxLog, but not all apps need to persist the original
-  // update history. For example, both the SV and Scan apps have a TxLog based on the SVC party, but we
+  // update history. For example, both the SV and Scan apps have a TxLog based on the DSO party, but we
   // only want one of them to be responsible for persisting the original update history.
   override lazy val updateHistory: Option[UpdateHistory] =
     if (storeUpdateHistory)

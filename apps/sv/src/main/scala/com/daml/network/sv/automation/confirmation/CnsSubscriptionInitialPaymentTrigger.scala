@@ -14,16 +14,16 @@ import com.daml.network.codegen.java.cn.cns.{
   CnsEntryContext_RejectEntryInitialPayment,
   CnsRules,
 }
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext
-import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_CnsEntryContext
+import com.daml.network.codegen.java.cn.dsorules.cnsentrycontext_actionrequiringconfirmation.{
   CNSRARC_CollectInitialEntryPayment,
   CNSRARC_RejectEntryInitialPayment,
 }
-import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.util.CnsUtil
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
@@ -35,7 +35,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class CnsSubscriptionInitialPaymentTrigger(
     override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
@@ -45,12 +45,12 @@ class CnsSubscriptionInitialPaymentTrigger(
       SubscriptionInitialPayment.ContractId,
       SubscriptionInitialPayment,
     ](
-      svcStore,
+      dsoStore,
       SubscriptionInitialPayment.COMPANION,
     ) {
 
-  private val svParty = svcStore.key.svParty
-  private val svcParty = svcStore.key.svcParty
+  private val svParty = dsoStore.key.svParty
+  private val dsoParty = dsoStore.key.dsoParty
 
   override def completeTask(
       subscriptionInitialPayment: AssignedContract[
@@ -59,11 +59,11 @@ class CnsSubscriptionInitialPaymentTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val AssignedContract(payment, _) = subscriptionInitialPayment
-    svcStore.lookupCnsEntryContext(subscriptionInitialPayment.contract.payload.reference).flatMap {
+    dsoStore.lookupCnsEntryContext(subscriptionInitialPayment.contract.payload.reference).flatMap {
       case Some(cnsContext) =>
         val entryName = cnsContext.payload.name
         for {
-          transferContextOpt <- svcStore.getSvcTransferContextForRound(payment.payload.round)
+          transferContextOpt <- dsoStore.getDsoTransferContextForRound(payment.payload.round)
           result <- transferContextOpt match {
             case Some(transferContext) =>
               def confirmToReject(reason: String) = confirmRejectPayment(
@@ -83,7 +83,7 @@ class CnsSubscriptionInitialPaymentTrigger(
               } else if (!CnsUtil.isValidEntryDescription(entryDescription)) {
                 confirmToReject(s"entry description ($entryDescription) is not valid")
               } else {
-                svcStore
+                dsoStore
                   .listInitialPaymentConfirmationByCnsName(
                     svParty,
                     entryName,
@@ -103,7 +103,7 @@ class CnsSubscriptionInitialPaymentTrigger(
                     }
                     // if there are existing accepted confirmation of other payment and with the same cns entry name, we will reject this payment.
                     if (otherPaymentAcceptedConfirmations.isEmpty)
-                      svcStore.lookupCnsEntryByName(entryName).flatMap {
+                      dsoStore.lookupCnsEntryByName(entryName).flatMap {
                         case None =>
                           // confirm to collect the payment and create the entry
                           confirmCollectPayment(
@@ -126,8 +126,8 @@ class CnsSubscriptionInitialPaymentTrigger(
                   }
               }
             case None =>
-              svcStore
-                .getSvcTransferContext()
+              dsoStore
+                .getDsoTransferContext()
                 .flatMap(
                   confirmRejectPayment(
                     cnsContext.contract.contractId,
@@ -187,8 +187,8 @@ class CnsSubscriptionInitialPaymentTrigger(
       entryName: String,
       transferContext: AppTransferContext,
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    svcRules <- svcStore.getSvcRules()
-    cnsRules <- svcStore.getCnsRules()
+    dsoRules <- dsoStore.getDsoRules()
+    cnsRules <- dsoStore.getCnsRules()
     action = cnsCollectInitialEntryPaymentAction(
       paymentCid,
       transferContext,
@@ -196,12 +196,12 @@ class CnsSubscriptionInitialPaymentTrigger(
       cnsContextCId,
     )
     // look up the confirmation for this payment created by this SV no matter if it is a acceptance or rejection
-    queryResult <- svcStore.lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(
+    queryResult <- dsoStore.lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(
       svParty,
       paymentCid,
     )
-    cmd = svcRules.exercise(
-      _.exerciseSvcRules_ConfirmAction(
+    cmd = dsoRules.exercise(
+      _.exerciseDsoRules_ConfirmAction(
         svParty.toProtoPrimitive,
         action,
       )
@@ -211,13 +211,13 @@ class CnsSubscriptionInitialPaymentTrigger(
         connection
           .submit(
             actAs = Seq(svParty),
-            readAs = Seq(svcParty),
+            readAs = Seq(dsoParty),
             update = cmd,
           )
           .withDedup(
             commandId = CNLedgerConnection.CommandId(
               "com.daml.network.sv.createCnsCollectInitialEntryPaymentConfirmation",
-              Seq(svParty, svcParty),
+              Seq(svParty, dsoParty),
               paymentCid.contractId,
             ),
             deduplicationOffset = offset,
@@ -243,8 +243,8 @@ class CnsSubscriptionInitialPaymentTrigger(
       reason: String,
       transferContext: AppTransferContext,
   )(implicit tc: TraceContext) = for {
-    svcRules <- svcStore.getSvcRules()
-    cnsRules <- svcStore.getCnsRules()
+    dsoRules <- dsoStore.getDsoRules()
+    cnsRules <- dsoStore.getCnsRules()
     action = cnsRejectEntryInitialPaymentAction(
       paymentCid,
       transferContext,
@@ -253,12 +253,12 @@ class CnsSubscriptionInitialPaymentTrigger(
     )
 
     // look up the rejection confirmation for this payment
-    queryResult <- svcStore.lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
+    queryResult <- dsoStore.lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
       svParty,
       paymentCid,
     )
-    cmd = svcRules.exercise(
-      _.exerciseSvcRules_ConfirmAction(
+    cmd = dsoRules.exercise(
+      _.exerciseDsoRules_ConfirmAction(
         svParty.toProtoPrimitive,
         action,
       )
@@ -268,13 +268,13 @@ class CnsSubscriptionInitialPaymentTrigger(
         connection
           .submit(
             actAs = Seq(svParty),
-            readAs = Seq(svcParty),
+            readAs = Seq(dsoParty),
             update = cmd,
           )
           .withDedup(
             commandId = CNLedgerConnection.CommandId(
               "com.daml.network.sv.createCnsRejectInitialEntryPaymentConfirmation",
-              Seq(svParty, svcParty),
+              Seq(svParty, dsoParty),
               paymentCid.contractId,
             ),
             deduplicationOffset = offset,

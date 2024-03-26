@@ -21,7 +21,7 @@ testUnclaimedRewards_noActivity : Script ()
 testUnclaimedRewards_noActivity = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
-  -- start issuing so the SVC has some amulets to invite users
+  -- start issuing so the DSO has some amulets to invite users
   runNextIssuance app
   runAmuletDepositBots app
 
@@ -34,48 +34,48 @@ testUnclaimedRewards_withCoupons = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
   -- bare-create all three kinds of rewards
-  appCoupon1 <- submitMulti [app.svc, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
-    svc = app.svc
+  appCoupon1 <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
     provider = provider1.primaryParty
     amount = 5.7
     round = Round 0
     featured = True
 
-  appCoupon2 <- submitMulti [app.svc, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
-    svc = app.svc
+  appCoupon2 <- submitMulti [app.dso, provider1.primaryParty] [] $ createCmd AppRewardCoupon with
+    dso = app.dso
     provider = provider1.primaryParty
     amount = 3.3
     round = Round 0
     featured = False
 
-  validatorCoupon1 <- submitMulti [app.svc, alice.primaryParty] [] $ createCmd ValidatorRewardCoupon with
-    svc = app.svc
+  validatorCoupon1 <- submitMulti [app.dso, alice.primaryParty] [] $ createCmd ValidatorRewardCoupon with
+    dso = app.dso
     user = alice.primaryParty
     amount = 2.3
     round = Round 0
 
-  validatorFaucet1 <- submitMulti [app.svc, alice.primaryParty] [] $ createCmd ValidatorFaucetCoupon with
-    svc = app.svc
+  validatorFaucet1 <- submitMulti [app.dso, alice.primaryParty] [] $ createCmd ValidatorFaucetCoupon with
+    dso = app.dso
     validator = alice.primaryParty
     round = Round 0
 
-  validatorFaucet2 <- submitMulti [app.svc, provider1Validator.primaryParty] [] $ createCmd ValidatorFaucetCoupon with
-    svc = app.svc
+  validatorFaucet2 <- submitMulti [app.dso, provider1Validator.primaryParty] [] $ createCmd ValidatorFaucetCoupon with
+    dso = app.dso
     validator = provider1Validator.primaryParty
     round = Round 0
 
-  svRewardCoupon1 <- submitMulti [app.svc, provider2.primaryParty] [] $ createCmd SvRewardCoupon with
-    svc = app.svc
+  svRewardCoupon1 <- submitMulti [app.dso, provider2.primaryParty] [] $ createCmd SvRewardCoupon with
+    dso = app.dso
     sv = provider2.primaryParty
     beneficiary = provider2.primaryParty
     round = Round 0
     weight = 10
 
-  -- -- start issuing so the SVC has some amulets to invite users
+  -- -- start issuing so the DSO has some amulets to invite users
   runNextIssuance app
   runAmuletDepositBots app
 
-  [(_, issuing)] <- query @IssuingMiningRound app.svc
+  [(_, issuing)] <- query @IssuingMiningRound app.dso
 
   -- check size of unclaimed reward issuance
   let allocatedRewards =
@@ -97,14 +97,14 @@ testUnclaimedRewards_withCoupons = do
   runNextIssuance app
 
   -- collect the reward coupons
-  [(closedRoundCid, _)] <- query @ClosedMiningRound app.svc
+  [(closedRoundCid, _)] <- query @ClosedMiningRound app.dso
   let collect = AmuletRules_ClaimExpiredRewards with
         closedRoundCid
         validatorRewardCouponCids = [validatorCoupon1]
         appCouponCids = [appCoupon1, appCoupon2]
         svRewardCouponCids = [svRewardCoupon1]
         optValidatorFaucetCouponCids = Some [validatorFaucet1, validatorFaucet2]
-  submitExerciseAmuletRulesByKey app [app.svc] [] collect
+  submitExerciseAmuletRulesByKey app [app.dso] [] collect
 
   -- check that the addition is done correctly
   let numIssuingRoundsToDate = 4.0
@@ -118,17 +118,17 @@ mergeAndCheckUnclaimedRewardAmount : AmuletApp -> Decimal -> Script ()
 mergeAndCheckUnclaimedRewardAmount app expectedAmount = do
   mergeUnclaimedRewards app
   -- check target amount
-  [(_, unclaimed)] <- query @UnclaimedReward app.svc
+  [(_, unclaimed)] <- query @UnclaimedReward app.dso
   unclaimed === UnclaimedReward with
-    svc = app.svc
+    dso = app.dso
     amount = expectedAmount
 
 
 -- | Merge all unclaimed reward contracts.
 mergeUnclaimedRewards : AmuletApp -> Script ()
 mergeUnclaimedRewards app  = do
-  unclaimedRewards <- query @UnclaimedReward app.svc
+  unclaimedRewards <- query @UnclaimedReward app.dso
   when (length unclaimedRewards > 1) $
-    void $ submitExerciseAmuletRulesByKey app [app.svc] []
+    void $ submitExerciseAmuletRulesByKey app [app.dso] []
       AmuletRules_MergeUnclaimedRewards with
         unclaimedRewardCids = map fst unclaimedRewards

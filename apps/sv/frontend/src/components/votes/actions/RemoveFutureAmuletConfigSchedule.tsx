@@ -5,9 +5,9 @@ import React from 'react';
 
 import { Stack, Typography } from '@mui/material';
 
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
-import { useSvcInfos } from '../../../contexts/SvContext';
+import { useDsoInfos } from '../../../contexts/SvContext';
 import { DropdownSchedules } from '../../../utils/DropdownSchedules';
 
 dayjs.extend(utc);
@@ -15,17 +15,17 @@ dayjs.extend(utc);
 const RemoveFutureAmuletConfigSchedule: React.FC<{
   chooseAction: (action: ActionRequiringConfirmation) => void;
 }> = ({ chooseAction }) => {
-  const svcInfosQuery = useSvcInfos();
+  const dsoInfosQuery = useDsoInfos();
 
-  if (svcInfosQuery.isLoading) {
+  if (dsoInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (svcInfosQuery.isError) {
-    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
+  if (dsoInfosQuery.isError) {
+    return <p>Error: {JSON.stringify(dsoInfosQuery.error)}</p>;
   }
 
-  if (!svcInfosQuery.data) {
+  if (!dsoInfosQuery.data) {
     return <p>undefined query data</p>;
   }
 
@@ -46,7 +46,7 @@ const RemoveFutureAmuletConfigSchedule: React.FC<{
     <Stack direction="column" mb={4} spacing={1}>
       <Typography variant="h6">Schedules</Typography>
       <DropdownSchedules
-        futureValues={svcInfosQuery.data.amuletRules.payload.configSchedule.futureValues}
+        futureValues={dsoInfosQuery.data.amuletRules.payload.configSchedule.futureValues}
         onChange={RemoveFutureAmuletConfigScheduleAction}
       />
     </Stack>

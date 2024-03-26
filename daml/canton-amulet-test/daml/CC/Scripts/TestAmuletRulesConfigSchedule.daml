@@ -50,51 +50,51 @@ testAddFutureAmuletConfigSchedule = do
         futureValues = [ (elevenDaysLater, amuletConfig3), (oneYearLater, amuletConfig2), (hundredYearsLater, amuletConfig3) ]
 
   -- a scheduled item in 1 year gets properly appended to empty futureValues and the old futureValue got pruned
-  submitMulti [app.svc] [app.svc] $
+  submitMulti [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_AddFutureAmuletConfigSchedule with
       newScheduleItem = (oneYearLater, amuletConfig2)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule1
 
   -- a scheduled item in 10 year gets properly appended to the current futureValues
   context <- getPaymentTransferContext app alice
-  submitMulti [app.svc] [app.svc] $
+  submitMulti [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_AddFutureAmuletConfigSchedule with
       newScheduleItem = (hundredYearsLater, amuletConfig3)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule2
 
   -- a scheduled item 13 hours ago fails to be added to the current futureValues
   context <- getPaymentTransferContext app alice
-  submitMultiMustFail [app.svc] [app.svc] $
+  submitMultiMustFail [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_AddFutureAmuletConfigSchedule with
       newScheduleItem = (tenHoursBefore, amuletConfig1)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule2
 
   -- a scheduled item planned at an already defined time fails to be added to the current futureValues
-  submitMultiMustFail [app.svc] [app.svc] $
+  submitMultiMustFail [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_AddFutureAmuletConfigSchedule with
       newScheduleItem = (hundredYearsLater, amuletConfig3)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule2
 
   -- a scheduled item in 13 hours gets properly prepended to the current futureValues
   context <- getPaymentTransferContext app alice
-  submitMulti [app.svc] [app.svc] $
+  submitMulti [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_AddFutureAmuletConfigSchedule with
       newScheduleItem = (thirteenHoursLater, amuletConfig1)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule3
 
   passTime (hours 20)
 
   -- 20 hours later: as a new schedule is inserted the whole schedule gets pruned properly
   context <- getPaymentTransferContext app alice
-  submitMulti [app.svc] [app.svc] $
+  submitMulti [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_AddFutureAmuletConfigSchedule with
       newScheduleItem = (elevenDaysLater, amuletConfig3)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule4
 
   return ()
@@ -124,25 +124,25 @@ testRemoveFutureAmuletConfigSchedule = do
         futureValues = []
 
   -- a scheduled item in 1 year gets properly appended to empty futureValues and the old futureValue got pruned
-  submitMulti [app.svc] [app.svc] $
+  submitMulti [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_AddFutureAmuletConfigSchedule with
       newScheduleItem = (oneYearLater, amuletConfig1)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule1
 
   -- a removal on an unmatched time does not succeed
   context <- getPaymentTransferContext app alice
-  submitMultiMustFail [app.svc] [app.svc] $
+  submitMultiMustFail [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_RemoveFutureAmuletConfigSchedule with
       scheduleTime = thirteenHoursLater
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule1
 
   -- a removal on a matched time succeeds
-  submitMulti [app.svc] [app.svc] $
+  submitMulti [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_RemoveFutureAmuletConfigSchedule with
       scheduleTime = oneYearLater
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule2
 
   return ()
@@ -173,25 +173,25 @@ testUpdateFutureAmuletConfigSchedule = do
         futureValues = [ (oneYearLater, amuletConfig2) ]
 
   -- a scheduled item in 1 year gets properly appended to empty futureValues and the old futureValue got pruned
-  submitMulti [app.svc] [app.svc] $
+  submitMulti [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_AddFutureAmuletConfigSchedule with
       newScheduleItem = (oneYearLater, amuletConfig1)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule1
 
   -- an update on an unmatched time does not succeed
   context <- getPaymentTransferContext app alice
-  submitMultiMustFail [app.svc] [app.svc] $
+  submitMultiMustFail [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_UpdateFutureAmuletConfigSchedule with
       scheduleItem = (thirteenHoursLater, amuletConfig1)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule1
 
   -- an update on a matched time succeeds
-  submitMulti [app.svc] [app.svc] $
+  submitMulti [app.dso] [app.dso] $
     exerciseCmd context.amuletRules AmuletRules_UpdateFutureAmuletConfigSchedule with
       scheduleItem = (oneYearLater, amuletConfig2)
-  Some (_, amuletRules) <- queryAmuletRulesByKey app.svc
+  Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   amuletRules.configSchedule === newSchedule2
 
   return ()

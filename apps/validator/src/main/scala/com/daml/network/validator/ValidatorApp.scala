@@ -533,15 +533,15 @@ class ValidatorApp(
       // must have their priority set as CommandPriority.High to ensure that they are not blocked by
       // the traffic balance service while the first top-up for the validator is yet to go through.
 
-      svcParty <- appInitStep("Get SVC party id") {
-        scanConnection.getSvcPartyIdWithRetries()
+      dsoParty <- appInitStep("Get DSO party id") {
+        scanConnection.getDsoPartyIdWithRetries()
       }
       participantId <- appInitStep("Get participant id") {
         participantAdminConnection.getParticipantId()
       }
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
-        svcParty = svcParty,
+        dsoParty = dsoParty,
         appManagerEnabled = config.appManager.isDefined,
       )
       store = ValidatorStore(

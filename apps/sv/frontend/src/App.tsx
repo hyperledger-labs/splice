@@ -17,9 +17,9 @@ import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
 import AmuletPrice from './routes/amuletPrice';
 import AuthCheck from './routes/authCheck';
+import Dso from './routes/dso';
 import Leader from './routes/leader';
 import Root from './routes/root';
-import Svc from './routes/svc';
 import ValidatorOnboarding from './routes/validatorOnboarding';
 import Voting from './routes/voting';
 import { config } from './utils';
@@ -62,8 +62,8 @@ const router = createBrowserRouter(
       }
     >
       <Route path="/" element={<Root />}>
-        <Route index element={<Svc />} />
-        <Route path="svc" element={<Svc />} />
+        <Route index element={<Dso />} />
+        <Route path="dso" element={<Dso />} />
         <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
         <Route path="cc-price" element={<AmuletPrice />} />
         <Route path="votes" element={<Voting />} />

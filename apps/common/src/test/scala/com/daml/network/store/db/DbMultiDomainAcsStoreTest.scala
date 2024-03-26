@@ -79,7 +79,7 @@ class DbMultiDomainAcsStoreTest
         migrationId = 0,
         participantId = mkParticipantId("DbMultiDomainAcsStoreTest"),
         filter = MultiDomainAcsStore.SimpleContractFilter(
-          svcParty,
+          dsoParty,
           templateFilters = Map(
             mkFilter(AppRewardCoupon.COMPANION)(c => !c.payload.featured)(BobbyTablesRowData(_))
           ),
@@ -97,7 +97,7 @@ class DbMultiDomainAcsStoreTest
     "preserves daml numeric values in the ACS" in {
       implicit val store = mkStore()
       val values = specialNumericValues()
-      val expected = values.map(appRewardCoupon(1, svcParty, false, _))
+      val expected = values.map(appRewardCoupon(1, dsoParty, false, _))
       for {
         _ <- acs()
         _ <- MonadUtil.sequentialTraverse(expected)(d1.create(_))
@@ -113,7 +113,7 @@ class DbMultiDomainAcsStoreTest
     "preserves daml numeric values in the TxLog" in {
       implicit val store = mkStore()
       val values = specialNumericValues()
-      val expected = values.map(appRewardCoupon(1, svcParty, false, _))
+      val expected = values.map(appRewardCoupon(1, dsoParty, false, _))
       for {
         _ <- acs()
         _ <- MonadUtil.sequentialTraverse(expected)(d1.create(_))
@@ -128,7 +128,7 @@ class DbMultiDomainAcsStoreTest
     DbMultiDomainAcsStore.StoreDescriptor(
       version = 1,
       name = "DbMultiDomainAcsStoreTest",
-      party = svcParty,
+      party = dsoParty,
       participant = participantId,
       key = Map(
         "id" -> id.toString

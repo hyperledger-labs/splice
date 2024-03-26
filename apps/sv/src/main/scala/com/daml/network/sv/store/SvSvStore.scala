@@ -77,7 +77,7 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       )
       .map(_.headOption map (_.contract))
 
-  private[this] def listLaggingSvcRulesFollowers(
+  private[this] def listLaggingDsoRulesFollowers(
       targetDomain: DomainId
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
@@ -85,11 +85,11 @@ trait SvSvStore extends CNNodeAppStoreWithoutHistory {
       templatesMovedByMyAutomation,
     )
 
-  final def listSvcRulesTransferFollowers[SrCid, Sr](
-      svcRules: AssignedContract[SrCid, Sr]
+  final def listDsoRulesTransferFollowers[SrCid, Sr](
+      dsoRules: AssignedContract[SrCid, Sr]
   )(implicit tc: TraceContext): Future[Seq[FollowTask[SrCid, Sr, ?, ?]]] =
-    listLaggingSvcRulesFollowers(svcRules.domain)
-      .map(_ map (FollowTask(svcRules, _)))
+    listLaggingDsoRulesFollowers(dsoRules.domain)
+      .map(_ map (FollowTask(dsoRules, _)))
 
   def key: SvStore.Key
 }

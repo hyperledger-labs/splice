@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Show the SVC health based on the SV status reports.",
+  "description": "Show the DSO health based on the SV status reports.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 1,

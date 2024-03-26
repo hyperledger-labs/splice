@@ -34,7 +34,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
 
-      val entryForCns = expectedSvcCns
+      val entryForCns = expectedDsoCns
 
       withFrontEnd("alice") { implicit webDriver =>
         createCnsEntry(

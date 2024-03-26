@@ -74,8 +74,8 @@ lazy val root = (project in file("."))
     `wallet-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
-    `svc-governance-daml`,
-    `svc-governance-test-daml`,
+    `dso-governance-daml`,
+    `dso-governance-test-daml`,
     `validator-lifecycle-daml`,
     `validator-lifecycle-test-daml`,
     `app-manager-daml`,
@@ -206,9 +206,9 @@ lazy val `canton-amulet-test-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `svc-governance-daml` =
+lazy val `dso-governance-daml` =
   project
-    .in(file("daml/svc-governance"))
+    .in(file("daml/dso-governance"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -220,9 +220,9 @@ lazy val `svc-governance-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `svc-governance-test-daml` =
+lazy val `dso-governance-test-daml` =
   project
-    .in(file("daml/svc-governance-test"))
+    .in(file("daml/dso-governance-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -230,7 +230,7 @@ lazy val `svc-governance-test-daml` =
         (`cn-util-daml` / Compile / damlBuild).value ++
           (`canton-amulet-test-daml` / Compile / damlBuild).value ++
           (`canton-name-service-test-daml` / Compile / damlBuild).value ++
-          (`svc-governance-daml` / Compile / damlBuild).value ++
+          (`dso-governance-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
@@ -354,7 +354,7 @@ lazy val `apps-common` =
       `canton-amulet-daml`,
       `canton-name-service-daml`,
       `splitwell-daml`,
-      `svc-governance-daml`,
+      `dso-governance-daml`,
       `validator-lifecycle-daml`,
       `wallet-daml`,
       `wallet-payments-daml`,
@@ -482,7 +482,7 @@ lazy val `apps-sv` =
       `apps-scan`,
       `apps-common-sv`,
       `validator-lifecycle-daml`,
-      `svc-governance-daml`,
+      `dso-governance-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(
@@ -512,7 +512,7 @@ lazy val `apps-scan` =
     .in(file("apps/scan"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
-      `svc-governance-daml`,
+      `dso-governance-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime),
@@ -561,7 +561,7 @@ lazy val `apps-common-frontend` = {
           (`wallet-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value ++
           (`canton-name-service-daml` / Compile / damlBuild).value ++
-          (`svc-governance-daml` / Compile / damlBuild).value ++
+          (`dso-governance-daml` / Compile / damlBuild).value ++
           (`splitwell-daml` / Compile / damlBuild).value ++
           (`validator-lifecycle-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
@@ -799,7 +799,7 @@ lazy val `apps-wallet` =
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
       `wallet-daml`,
-      `svc-governance-daml`,
+      `dso-governance-daml`,
     )
     .settings(
       BuildCommon.sharedAppSettings,
@@ -1082,7 +1082,7 @@ lazy val bundleTask = {
         (`wallet-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
-        (`svc-governance-daml` / Compile / damlBuild).value,
+        (`dso-governance-daml` / Compile / damlBuild).value,
         (`canton-name-service-daml` / Compile / damlBuild).value,
         (`wallet-payments-daml` / Compile / damlBuild).value,
         (`app-manager-daml` / Compile / damlBuild).value,

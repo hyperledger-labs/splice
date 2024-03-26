@@ -221,7 +221,7 @@ final class SplitwellAppClientReference(
   def requestGroup(id: String): splitwellCodegen.GroupRequest.ContractId = {
     val party = getUserPrimaryParty()
     val provider = getProviderPartyId()
-    val svc = scanClient.getSvcPartyId()
+    val dso = scanClient.getDsoPartyId()
     val (domain, rules) = getFavoredSplitwellRules()
     submitWithResult(
       actAs = Seq(party),
@@ -229,7 +229,7 @@ final class SplitwellAppClientReference(
       rules.contractId.exerciseSplitwellRules_RequestGroup(
         new splitwellCodegen.Group(
           party.toProtoPrimitive,
-          svc.toProtoPrimitive,
+          dso.toProtoPrimitive,
           Seq.empty.asJava,
           new splitwellCodegen.GroupId(id),
           provider.toProtoPrimitive,

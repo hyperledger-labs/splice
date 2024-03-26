@@ -74,7 +74,7 @@ class ReconcileSequencerConnectionsTrigger(
             // it's safe to just treat it as a transient exception and retry without logging warnings.
             throw Status.NOT_FOUND
               .withDescription(
-                "Svc Sequencer list from Scan is empty, not modifying sequencers connections. This can happen during initialization when domain time is lagging behind."
+                "Dso Sequencer list from Scan is empty, not modifying sequencers connections. This can happen during initialization when domain time is lagging behind."
               )
               .asRuntimeException()
           case Some(nonEmptyConnections) =>

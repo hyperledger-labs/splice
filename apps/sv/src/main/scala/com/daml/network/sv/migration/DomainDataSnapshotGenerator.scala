@@ -3,7 +3,7 @@ package com.daml.network.sv.migration
 import cats.syntax.traverse.*
 import com.daml.network.environment.{ParticipantAdminConnection, SequencerAdminConnection}
 import com.daml.network.migration.{AcsExporter, DarExporter}
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -16,7 +16,7 @@ class DomainDataSnapshotGenerator(
     participantAdminConnection: ParticipantAdminConnection,
     // TODO(#11099) Read everything from the participant connection once the genesis state API is available there.
     sequencerAdminConnection: Option[SequencerAdminConnection],
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     acsExporter: AcsExporter,
 ) {
 
@@ -29,7 +29,7 @@ class DomainDataSnapshotGenerator(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[DomainDataSnapshot] = for {
-    globalDomain <- svcStore.getSvcRules().map(_.domain)
+    globalDomain <- dsoStore.getDsoRules().map(_.domain)
     cantonTimestamp = CantonTimestamp.tryFromInstant(timestamp)
     topologySnapshot <- sequencerAdminConnection.traverse(_.getGenesisState(cantonTimestamp))
     vettedPackages <- sequencerAdminConnection.traverse(
@@ -39,7 +39,7 @@ class DomainDataSnapshotGenerator(
       .exportAcsAtTimestamp(
         globalDomain,
         timestamp,
-        partyId.fold(Seq(svcStore.key.svcParty, svcStore.key.svParty))(Seq(_))*
+        partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_))*
       )
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
@@ -53,7 +53,7 @@ class DomainDataSnapshotGenerator(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[DomainDataSnapshot] = for {
-    globalDomain <- svcStore.getSvcRules().map(_.domain)
+    globalDomain <- dsoStore.getDsoRules().map(_.domain)
     domainParamsStateTopology <- participantAdminConnection.getDomainParametersState(globalDomain)
     timestamp = CantonTimestamp.tryFromInstant(domainParamsStateTopology.base.validFrom)
     genesisState <- sequencerAdminConnection.traverse(

@@ -6,9 +6,9 @@ import com.daml.network.codegen.java.cn.cns.{
   CnsEntryContext,
   CnsEntryContext_CollectInitialEntryPayment,
 }
-import com.daml.network.codegen.java.cn.svcrules.Confirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CnsEntryContext
-import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
+import com.daml.network.codegen.java.cn.dsorules.Confirmation
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_CnsEntryContext
+import com.daml.network.codegen.java.cn.dsorules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionInitialPayment,
   SubscriptionRequest,
@@ -265,7 +265,7 @@ class WalletTimeBasedIntegrationTest
     "reject cns initial subscription payment due to expired round even if confirmed acceptance exists previously" in {
       implicit env =>
         def cnsSubscriptionInitialPaymentTrigger =
-          sv1Backend.svcAutomation.trigger[CnsSubscriptionInitialPaymentTrigger]
+          sv1Backend.dsoAutomation.trigger[CnsSubscriptionInitialPaymentTrigger]
 
         onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         clue("Alice gets some amulets") {
@@ -665,8 +665,8 @@ class WalletTimeBasedIntegrationTest
             aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 2
             sv1Backend.participantClient.ledger_api_extensions.acs
               .filterJava(amuletCodegen.AppRewardCoupon.COMPANION)(
-                svcParty,
-                _.data.provider == svcParty.toProtoPrimitive,
+                dsoParty,
+                _.data.provider == dsoParty.toProtoPrimitive,
               ) should have length 1
           })
         }
@@ -681,8 +681,8 @@ class WalletTimeBasedIntegrationTest
             aliceValidatorWalletClient.listValidatorRewardCoupons() should be(empty)
             sv1Backend.participantClient.ledger_api_extensions.acs
               .filterJava(amuletCodegen.AppRewardCoupon.COMPANION)(
-                svcParty,
-                _.data.provider == svcParty.toProtoPrimitive,
+                dsoParty,
+                _.data.provider == dsoParty.toProtoPrimitive,
               ) should be(empty)
           },
         )
@@ -730,16 +730,16 @@ class WalletTimeBasedIntegrationTest
       subscriptionRequestCid: SubscriptionRequest.ContractId
   )(implicit env: CNNodeTestConsoleEnvironment): Option[CnsEntryContext.ContractId] =
     aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(CnsEntryContext.COMPANION)(svcParty)
+      .filterJava(CnsEntryContext.COMPANION)(dsoParty)
       .find(_.data.reference == subscriptionRequestCid)
       .map(_.id)
 
   private def lookupCnsAcceptInitialPaymentConfirmation(
       cnsContextCid: CnsEntryContext.ContractId
   )(implicit env: CNNodeTestConsoleEnvironment): Option[Confirmation.ContractId] = {
-    val svParty = sv1Backend.getSvcInfo().svParty
+    val svParty = sv1Backend.getDsoInfo().svParty
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(Confirmation.COMPANION)(svcParty)
+      .filterJava(Confirmation.COMPANION)(dsoParty)
       .find(confirmation =>
         confirmation.data.action match {
           case cnsContextAction: ARC_CnsEntryContext =>
@@ -756,17 +756,17 @@ class WalletTimeBasedIntegrationTest
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
-    val svParty = sv1Backend.getSvcInfo().svParty
+    val svParty = sv1Backend.getDsoInfo().svParty
     val cnsRules = sv1ScanBackend.getCnsRules()
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(svParty),
-      readAs = Seq(svcParty),
+      readAs = Seq(dsoParty),
       optTimeout = None,
       commands = sv1Backend
-        .getSvcInfo()
-        .svcRules
+        .getDsoInfo()
+        .dsoRules
         .contractId
-        .exerciseSvcRules_ConfirmAction(
+        .exerciseDsoRules_ConfirmAction(
           svParty.toProtoPrimitive,
           new ARC_CnsEntryContext(
             lookupCnsContextCid(initialPayment.payload.reference).value,

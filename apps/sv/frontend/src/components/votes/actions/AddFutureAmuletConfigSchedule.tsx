@@ -11,7 +11,7 @@ import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker
 import { Tuple2 } from '@daml.js/5aee9b21b8e9a4c4975b5f4c4198e6e6e8469df49e2010820e792f393db870f4/lib/DA/Types';
 import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/CC/AmuletConfig';
 
-import { useSvcInfos } from '../../../contexts/SvContext';
+import { useDsoInfos } from '../../../contexts/SvContext';
 import { ActionFromForm } from '../VoteRequest';
 
 dayjs.extend(utc);
@@ -19,7 +19,7 @@ dayjs.extend(utc);
 const AddFutureAmuletConfigSchedule: React.FC<{
   chooseAction: (action: ActionFromForm) => void;
 }> = ({ chooseAction }) => {
-  const svcInfosQuery = useSvcInfos();
+  const dsoInfosQuery = useDsoInfos();
 
   const [date, setDate] = useState<Dayjs | null>(dayjs());
   // TODO (#10209): remove this intermediate state by lifting it to VoteRequest.tsx
@@ -48,21 +48,21 @@ const AddFutureAmuletConfigSchedule: React.FC<{
     }
   }, [date, configuration, chooseAction]);
 
-  if (svcInfosQuery.isLoading) {
+  if (dsoInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (svcInfosQuery.isError) {
-    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
+  if (dsoInfosQuery.isError) {
+    return <p>Error: {JSON.stringify(dsoInfosQuery.error)}</p>;
   }
 
-  if (!svcInfosQuery.data) {
+  if (!dsoInfosQuery.data) {
     return <p>undefined query data</p>;
   }
 
   if (configuration == null) {
     const now = dayjs();
-    const configSchedule = svcInfosQuery.data?.amuletRules.payload.configSchedule;
+    const configSchedule = dsoInfosQuery.data?.amuletRules.payload.configSchedule;
     const currentConfig = AmuletConfig(USD).encode(
       configSchedule.futureValues.reverse().find(schedule => dayjs(schedule._1).isBefore(now))
         ?._2 || configSchedule.initialValue

@@ -26,29 +26,29 @@ class ExpireIssuingMiningRoundTrigger(
       cc.round.IssuingMiningRound.ContractId,
       cc.round.IssuingMiningRound,
     ](
-      svTaskContext.svcStore.multiDomainAcsStore,
-      svTaskContext.svcStore.listExpiredIssuingMiningRounds,
+      svTaskContext.dsoStore.multiDomainAcsStore,
+      svTaskContext.dsoStore.listExpiredIssuingMiningRounds,
       cc.round.IssuingMiningRound.COMPANION,
     )
     with SvTaskBasedTrigger[Task] {
 
-  val store = svTaskContext.svcStore
+  val store = svTaskContext.dsoStore
 
   override protected def completeTaskAsLeader(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
     for {
-      svcRules <- store.getSvcRules()
+      dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      cmd = svcRules.exercise(
-        _.exerciseSvcRules_MiningRound_Close(
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_MiningRound_Close(
           amuletRules.contractId,
           round.contractId,
         )
       )
       cid <- svTaskContext.connection
-        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldResult()
     } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")

@@ -41,7 +41,7 @@ test = script do
       transferConfigUsd = amuletConfigUsd.transferConfig
       issuanceConfig0 = getValueAsOf issuingFor0 amuletConfigUsd.issuanceCurve
       issuanceConfig3 = getValueAsOf issuingFor3 amuletConfigUsd.issuanceCurve
-      openRound0 = OpenMiningRound with svc = app.svc; round = Round 0; amuletPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
+      openRound0 = OpenMiningRound with dso = app.dso; round = Round 0; amuletPrice; opensAt = t00_00; targetClosesAt = t05_00; issuingFor = issuingFor0; transferConfigUsd; issuanceConfig = issuanceConfig0; tickDuration
       openRound3 = openRound0 with round = Round 3; opensAt = t07_30 ; targetClosesAt = t12_30; issuanceConfig = issuanceConfig3
 
   -- Lock expires at T00:12:30
@@ -96,7 +96,7 @@ testLargeAmuletExpiry = script do
       expiringRound = Singleton $ addRelRound r (RelRound 2)
       issuingFor = minutes 5
       currentMiningRound = OpenMiningRound with
-        svc = app.svc
+        dso = app.dso
         round = Round 1
         amuletPrice = 1.0
         opensAt = now
@@ -126,8 +126,8 @@ testExpireLockedAmulet = do
   roundCid <- advanceRound app (Round 3)
 
   -- Lock is not yet expired
-  -- svc fails to expire the amulet
-  testChoiceFailed [app.svc] [app.svc] $
+  -- dso fails to expire the amulet
+  testChoiceFailed [app.dso] [app.dso] $
     exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
 
   -- Current round is 4
@@ -135,22 +135,22 @@ testExpireLockedAmulet = do
 
   -- Amulet is not yet expired
   -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the amulet expires
-  -- svc fails to expire the amulet
-  testChoiceFailed [app.svc] [app.svc] $
+  -- dso fails to expire the amulet
+  testChoiceFailed [app.dso] [app.dso] $
     exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
 
   -- Current round is 5
   roundCid <- advanceRound app (Round 5)
 
-  normalizedBalanceBeforeExpiry <- getNormalizedBalance app.svc
+  normalizedBalanceBeforeExpiry <- getNormalizedBalance app.dso
 
   -- Amulet is expired
   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
-  -- svc expires the amulet
-  expireSummary <- testChoice [app.svc] [app.svc] $
+  -- dso expires the amulet
+  expireSummary <- testChoice [app.dso] [app.dso] $
     exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
 
-  normalizedBalanceAfterExpiry <- getNormalizedBalance app.svc
+  normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
   expireSummary.changeToInitialAmountAsOfRoundZero === normalizedBalanceAfterExpiry - normalizedBalanceBeforeExpiry
   expireSummary.changeToHoldingFeesRate === - (lockedAmulet.amulet.amount.ratePerRound.rate)
 
@@ -179,34 +179,34 @@ testExpireAmulet = do
   latestActiveRoundCid <- advanceRound app (Round 3)
 
   -- 2 rounds before latest active round = 3 - 2 = 1 which is before round 3 when the amulet expires
-  -- svc fails to expire the amulet
-  testChoiceFailed [app.svc] [app.svc] $
+  -- dso fails to expire the amulet
+  testChoiceFailed [app.dso] [app.dso] $
     exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
 
   -- current latest active round is 4
   latestActiveRoundCid <- advanceRound app (Round 4)
 
   -- 2 rounds before current latest active round => 4 - 2 = 2 which is before round 3 when the amulet expires
-  -- svc fails to expire the amulet
-  testChoiceFailed [app.svc] [app.svc] $
+  -- dso fails to expire the amulet
+  testChoiceFailed [app.dso] [app.dso] $
     exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
 
   -- current latest active round is 5
   latestActiveRoundCid <- advanceRound app (Round 5)
 
-  normalizedBalanceBeforeExpiry <- getNormalizedBalance app.svc
+  normalizedBalanceBeforeExpiry <- getNormalizedBalance app.dso
 
   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
-  -- svc expires the amulet
-  expireSummary <- testChoice [app.svc] [app.svc] $
+  -- dso expires the amulet
+  expireSummary <- testChoice [app.dso] [app.dso] $
     exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
 
-  normalizedBalanceAfterExpiry <- getNormalizedBalance app.svc
+  normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
   expireSummary.changeToInitialAmountAsOfRoundZero === normalizedBalanceAfterExpiry - normalizedBalanceBeforeExpiry
   expireSummary.changeToHoldingFeesRate === - (amulet.amount.ratePerRound.rate)
 
   -- current active current mining round is 3, 4 and 5
-  allActiveOpenMiningRoundCids <- query @OpenMiningRound app.svc
+  allActiveOpenMiningRoundCids <- query @OpenMiningRound app.dso
   forA_ allActiveOpenMiningRoundCids $ \(_, openRound) -> do
     assert $ openRound.round.number >= 3 && openRound.round.number <= 5
 
@@ -220,7 +220,7 @@ advanceRound : AmuletApp -> Round -> Script (ContractId OpenMiningRound)
 advanceRound app expectedRound  = do
   runNextIssuance app
   (latestActiveRoundCid, _) <- getLatestActiveOpenRound app
-  Some(currentRound) <- queryContractId @OpenMiningRound app.svc latestActiveRoundCid
+  Some(currentRound) <- queryContractId @OpenMiningRound app.dso latestActiveRoundCid
   currentRound.round === expectedRound
   pure latestActiveRoundCid
 
@@ -258,7 +258,7 @@ getLockedAmuletCmd app owner lockHolder amount lockDuration = do
   (openRound, _) <- getLatestOpenRound app
   featuredAppRight <- getFeaturedAppRight app owner.primaryParty
 
-  (rules, _) <- fetchAmuletRulesByKey app.svc
+  (rules, _) <- fetchAmuletRulesByKey app.dso
   return $ exerciseCmd rules
     AmuletRules_Transfer with
       transfer, context = amuletTransferContext openRound featuredAppRight
@@ -266,11 +266,11 @@ getLockedAmuletCmd app owner lockHolder amount lockDuration = do
 getLockedAmulet : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedAmulet)
 getLockedAmulet app owner lockHolder amount lockDuration = do
   cmd <- getLockedAmuletCmd app owner lockHolder amount lockDuration
-  result <- submitMulti [owner.primaryParty, lockHolder] [app.svc] cmd
+  result <- submitMulti [owner.primaryParty, lockHolder] [app.dso] cmd
   let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
   pure lockedAmulet
 
 getLockedAmuletMustFail : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script ()
 getLockedAmuletMustFail app owner lockHolder amount lockDuration =  do
   cmd <- getLockedAmuletCmd app owner lockHolder amount lockDuration
-  submitMultiMustFail [owner.primaryParty, lockHolder] [app.svc] cmd
+  submitMultiMustFail [owner.primaryParty, lockHolder] [app.dso] cmd

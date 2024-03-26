@@ -18,8 +18,8 @@ class ExpiredSvOnboardingRequestTrigger(
       cn.svonboarding.SvOnboardingRequest.ContractId,
       cn.svonboarding.SvOnboardingRequest,
     ](
-      svTaskContext.svcStore.multiDomainAcsStore,
-      svTaskContext.svcStore.listExpiredSvOnboardingRequests,
+      svTaskContext.dsoStore.multiDomainAcsStore,
+      svTaskContext.dsoStore.listExpiredSvOnboardingRequests,
       cn.svonboarding.SvOnboardingRequest.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
@@ -33,18 +33,18 @@ class ExpiredSvOnboardingRequestTrigger(
     ]
   ]
 
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
-      svcRules <- store.getSvcRules()
-      cmd = svcRules.exercise(
-        _.exerciseSvcRules_ExpireSvOnboardingRequest(
+      dsoRules <- store.getDsoRules()
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_ExpireSvOnboardingRequest(
           co.work.contractId
         )
       )
       _ <- svTaskContext.connection
-        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldUnit()
     } yield TaskSuccess("archived expired SV onboarding contract")

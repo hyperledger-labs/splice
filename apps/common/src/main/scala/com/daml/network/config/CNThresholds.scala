@@ -1,6 +1,6 @@
 package com.daml.network.config
 
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.util.Contract
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}
@@ -45,14 +45,14 @@ object CNThresholds {
   }
 
   def requiredNumVotes(
-      svcRules: Contract.Has[SvcRules.ContractId, SvcRules]
+      dsoRules: Contract.Has[DsoRules.ContractId, DsoRules]
   ): Int = {
-    val memberNum = svcRules.payload.members.size
+    val memberNum = dsoRules.payload.members.size
     governanceThreshold(memberNum).value
   }
 
   private def governanceThreshold(memberNum: Int) = {
-    // as per `SvcRules` / `summarizeCollective`
+    // as per `DsoRules` / `summarizeCollective`
     val f = floor((memberNum - 1) / 3.0).toInt
     PositiveInt.tryCreate(ceil((memberNum + f + 1) / 2.0).toInt)
   }

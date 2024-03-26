@@ -7,11 +7,11 @@ import { scheduleLoadGenerator } from './scheduleLoadGenerator';
 async function auth0CacheAndInstallCluster(auth0Fetch: Auth0Fetch) {
   await auth0Fetch.loadAuth0Cache();
 
-  const svc = await installCluster(auth0Fetch);
+  const cluster = await installCluster(auth0Fetch);
 
   await auth0Fetch.saveAuth0Cache();
 
-  return svc;
+  return cluster;
 }
 
 async function main() {

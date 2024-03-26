@@ -51,7 +51,7 @@ class AutomationControlIntegrationTest
     // The current round, as seen by the SV1 participant
     def currentRoundOnLedger(): Long =
       sv1Backend.participantClient.ledger_api_extensions.acs
-        .filterJava(OpenMiningRound.COMPANION)(svcParty)
+        .filterJava(OpenMiningRound.COMPANION)(dsoParty)
         .map(_.data.round.number)
         .max
 

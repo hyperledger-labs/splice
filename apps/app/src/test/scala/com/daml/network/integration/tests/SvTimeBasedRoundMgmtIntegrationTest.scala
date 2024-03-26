@@ -16,11 +16,11 @@ class SvTimeBasedRoundMgmtIntegrationTest
     with ConfigScheduleUtil {
 
   "round management" in { implicit env =>
-    initSvc()
+    initDso()
 
     // Sync with background automation that onboards validator.
     eventually()({
-      val rounds = getSortedOpenMiningRounds(sv1Backend.participantClientWithAdminToken, svcParty)
+      val rounds = getSortedOpenMiningRounds(sv1Backend.participantClientWithAdminToken, dsoParty)
       rounds should have size 3
     })
 
@@ -29,7 +29,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     eventually()(
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
-        svcParty,
+        dsoParty,
       ) should have size 1
     )
     // next tick - round 1 closes.
@@ -37,7 +37,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     eventually()(
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
-        svcParty,
+        dsoParty,
       ) should have size 2
     )
     // next tick - round 2 closes.
@@ -45,7 +45,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     eventually()(
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
-        svcParty,
+        dsoParty,
       ) should have size 3
     )
 
@@ -59,7 +59,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
       val transactions =
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.transactions
           .treesJava(
-            Set(svcParty),
+            Set(dsoParty),
             completeAfter = Int.MaxValue,
             beginOffset = offsetBefore,
             endOffset = Some(
@@ -77,21 +77,21 @@ class SvTimeBasedRoundMgmtIntegrationTest
     eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
       getSortedIssuingRounds(
         sv1Backend.participantClientWithAdminToken,
-        svcParty,
+        dsoParty,
       ) should have size 3
     )
 
     clue("Wait until the closed round is archived") {
       eventually()(
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cc.round.ClosedMiningRound.COMPANION)(svcParty) should have size 0
+          .filterJava(cc.round.ClosedMiningRound.COMPANION)(dsoParty) should have size 0
       )
     }
 
   }
 
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
     val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
@@ -192,7 +192,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
   }
 
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
@@ -367,7 +367,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
   }
 
   "round management with very tightly scheduled config" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
     val config101 = mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 101)
@@ -421,7 +421,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
     advanceRoundsByOneTick
 
     // As the first advanceRoundsByOneTick above advances the time by exactly 160 seconds
-    // and this is when the svc automaotion exercise the svc choice to advance rounds,
+    // and this is when the dso automaotion exercise the dso choice to advance rounds,
     // a new open mining round is created at the time when config201 is the active config.
     // After that, the second advanceRoundsByOneTick advances the time by another 160 seconds
     // another new round is created with the config202 as it was the active config at that time.

@@ -18,11 +18,11 @@ import {
 } from '@mui/material';
 import Container from '@mui/material/Container';
 
-import { ActionRequiringConfirmation, VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { ActionRequiringConfirmation, VoteRequest } from '@daml.js/dso-governance/lib/CN/DsoRules';
 import { ContractId } from '@daml/types';
 
-import { useSvcInfos } from '../../contexts/SvContext';
-import { useListSvcRulesVoteRequests } from '../../hooks/useListVoteRequests';
+import { useDsoInfos } from '../../contexts/SvContext';
+import { useListDsoRulesVoteRequests } from '../../hooks/useListVoteRequests';
 import { useListVotes } from '../../hooks/useListVotes';
 import { config } from '../../utils';
 import { ListVoteRequestsFilterTable } from './VoteRequestFilterTable';
@@ -76,13 +76,13 @@ const ListVoteRequests: React.FC = () => {
     setValue(newValue);
   };
 
-  const listVoteRequestsQuery = useListSvcRulesVoteRequests();
+  const listVoteRequestsQuery = useListDsoRulesVoteRequests();
 
   const voteRequestIds = listVoteRequestsQuery.data
     ? listVoteRequestsQuery.data.map(v => v.payload.trackingCid || v.contractId)
     : [];
   const votesQuery = useListVotes(voteRequestIds);
-  const svcInfosQuery = useSvcInfos();
+  const dsoInfosQuery = useDsoInfos();
 
   const [voteRequestContractId, setVoteRequestContractId] = useState<
     ContractId<VoteRequest> | undefined
@@ -106,7 +106,7 @@ const ListVoteRequests: React.FC = () => {
     setVoteResultModalOpen(false);
   };
 
-  const svPartyId = svcInfosQuery.data?.svPartyId;
+  const svPartyId = dsoInfosQuery.data?.svPartyId;
 
   const alreadyVotedRequestIds = useMemo(() => {
     return svPartyId && votesQuery.data
@@ -114,11 +114,11 @@ const ListVoteRequests: React.FC = () => {
       : new Set();
   }, [votesQuery.data, svPartyId]);
 
-  if (listVoteRequestsQuery.isLoading || svcInfosQuery.isLoading || votesQuery.isLoading) {
+  if (listVoteRequestsQuery.isLoading || dsoInfosQuery.isLoading || votesQuery.isLoading) {
     return <Loading />;
   }
 
-  if (listVoteRequestsQuery.isError || svcInfosQuery.isError || votesQuery.isError) {
+  if (listVoteRequestsQuery.isError || dsoInfosQuery.isError || votesQuery.isError) {
     return <p>Error, something went wrong.</p>;
   }
 
@@ -142,20 +142,20 @@ const ListVoteRequests: React.FC = () => {
   );
 
   function getAction(action: ActionRequiringConfirmation) {
-    if (action.tag === 'ARC_SvcRules') {
-      const svcRulesAction = action.value.svcAction;
-      switch (svcRulesAction.tag) {
+    if (action.tag === 'ARC_DsoRules') {
+      const dsoRulesAction = action.value.dsoAction;
+      switch (dsoRulesAction.tag) {
         case 'SRARC_OffboardMember': {
-          return `${svcRulesAction.tag}`;
+          return `${dsoRulesAction.tag}`;
         }
         case 'SRARC_GrantFeaturedAppRight': {
-          return `${svcRulesAction.tag}`;
+          return `${dsoRulesAction.tag}`;
         }
         case 'SRARC_RevokeFeaturedAppRight': {
-          return `${svcRulesAction.tag}`;
+          return `${dsoRulesAction.tag}`;
         }
         case 'SRARC_SetConfig': {
-          return `${svcRulesAction.tag}`;
+          return `${dsoRulesAction.tag}`;
         }
       }
     } else if (action.tag === 'ARC_AmuletRules') {

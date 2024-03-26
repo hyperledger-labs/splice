@@ -16,7 +16,7 @@ import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens.*
 
-/** Runs through runbook but does so while spinning up a local SVC. */
+/** Runs through runbook but does so while spinning up a local DSO. */
 class LocalRunbookIntegrationTest
     extends CNNodeIntegrationTest
     with HasConsoleScriptRunner
@@ -56,9 +56,9 @@ class LocalRunbookIntegrationTest
   private def setupAndStartCanton() = {
     // Note: the Canton process started here uses ports that do not collide with ports 5xxx used
     // by the persistent Canton instance started by `./start-canton.sh`:
-    // - The local SVC node uses ports 9xxx (hardcoded in config files)
+    // - The local DSO node uses ports 9xxx (hardcoded in config files)
     // - The self-hosted validator uses ports 7xxx (set via CLI arguments below)
-    // Note: the amulet apps started implicitly through `environmentDefinition`, including all SVC-hosted amulet apps,
+    // Note: the amulet apps started implicitly through `environmentDefinition`, including all DSO-hosted amulet apps,
     // still use ports 5xxx. This is fine because we only start amulet apps for the duration of tests, and we never
     // run tests in parallel on the same machine.
     val process = startCanton(
@@ -98,7 +98,7 @@ class LocalRunbookIntegrationTest
         validatorPath / "validator.conf",
         // Config file template for onboarding self-hosted validator (original version from the runbook)
         validatorPath / "validator-onboarding-nosecret.conf",
-        // Config files for SVC-hosted apps (modified copies of deployed configs)
+        // Config files for DSO-hosted apps (modified copies of deployed configs)
         svAppPath / "app.conf",
         scanAppPath / "app.conf",
       )
@@ -120,12 +120,12 @@ class LocalRunbookIntegrationTest
       .withManualStart
       .withThisSetup(env => {
         setupAndStartCanton()
-        env.fullSvcApps.local.foreach(_.start())
-        env.fullSvcApps.local.foreach(_.waitForInitialization())
+        env.fullDsoApps.local.foreach(_.start())
+        env.fullDsoApps.local.foreach(_.waitForInitialization())
       })
   }
 
-  "run through runbook against local SVC" in { implicit env =>
+  "run through runbook against local DSO" in { implicit env =>
     runScript(validatorPath / "validator.sc")(env.environment)
     runScript(validatorPath / "tap-transfer-demo.sc")(env.environment)
   }

@@ -16,7 +16,7 @@ testAmuletBurn = do
 
   advanceToNextRoundChange app
 
-  -- -- start issuing so the SVC has some amulets to invite users
+  -- -- start issuing so the DSO has some amulets to invite users
   runNextIssuance app
   runAmuletDepositBots app
 
@@ -30,12 +30,12 @@ testAmuletBurn = do
 
   -- there are two open rounds, draw on these coupons
   drawOnAllValidatorFaucets app
-  coupons <- query @ValidatorFaucetCoupon app.svc
+  coupons <- query @ValidatorFaucetCoupon app.dso
   [3, 4] === map (._2.round.number) coupons
 
   runAmuletDepositBots app
 
-  -- svc transfers 20 amulet to user
+  -- dso transfers 20 amulet to user
   tap app user 20.0
   runAmuletDepositBots app
 
@@ -61,7 +61,7 @@ testAmuletBurn = do
   runAmuletDepositBots app
 
   -- finally rounds 3 and 4 were issuing and the amulet deposit bots consumed the coupons
-  coupons <- query @ValidatorFaucetCoupon app.svc
+  coupons <- query @ValidatorFaucetCoupon app.dso
   [] === map (._2.round.number) coupons
 
   -- crash the amulet price to burn more amulet than is issued

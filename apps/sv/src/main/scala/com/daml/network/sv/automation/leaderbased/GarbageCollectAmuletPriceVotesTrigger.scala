@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -23,30 +23,30 @@ class GarbageCollectAmuletPriceVotesTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      SvcRules.ContractId,
-      SvcRules,
+      DsoRules.ContractId,
+      DsoRules,
     ](
-      svTaskContext.svcStore,
-      SvcRules.COMPANION,
+      svTaskContext.dsoStore,
+      DsoRules.COMPANION,
     )
     with SvTaskBasedTrigger[AssignedContract[
-      SvcRules.ContractId,
-      SvcRules,
+      DsoRules.ContractId,
+      DsoRules,
     ]] {
-  type SvcRulesContract = AssignedContract[
-    SvcRules.ContractId,
-    SvcRules,
+  type DsoRulesContract = AssignedContract[
+    DsoRules.ContractId,
+    DsoRules,
   ]
 
-  val store = svTaskContext.svcStore
+  val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(
-      svcRules: SvcRulesContract
+      dsoRules: DsoRulesContract
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       amuletPriceVotes <- store.listAllAmuletPriceVotes()
       (memberVotes, nonMemberVotes) = amuletPriceVotes.partition(v =>
-        svcRules.payload.members.asScala.contains(v.payload.sv)
+        dsoRules.payload.members.asScala.contains(v.payload.sv)
       )
       nonMemberVoteCids = nonMemberVotes.map(_.contractId)
       memberDuplicatedVoteCids =
@@ -58,8 +58,8 @@ class GarbageCollectAmuletPriceVotesTrigger(
           .toSeq
       _ <-
         if (nonMemberVoteCids.nonEmpty || memberDuplicatedVoteCids.nonEmpty) {
-          val cmd = svcRules.exercise(
-            _.exerciseSvcRules_GarbageCollectAmuletPriceVotes(
+          val cmd = dsoRules.exercise(
+            _.exerciseDsoRules_GarbageCollectAmuletPriceVotes(
               nonMemberVoteCids.asJava,
               memberDuplicatedVoteCids.asJava,
             )
@@ -67,7 +67,7 @@ class GarbageCollectAmuletPriceVotesTrigger(
           svTaskContext.connection
             .submit(
               Seq(store.key.svParty),
-              Seq(store.key.svcParty),
+              Seq(store.key.dsoParty),
               cmd,
             )
             .noDedup

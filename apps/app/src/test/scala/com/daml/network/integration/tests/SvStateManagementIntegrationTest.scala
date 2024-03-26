@@ -3,27 +3,27 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cc.amuletconfig.{AmuletConfig, TransferConfig, USD}
 import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
-  ARC_SvcRules,
+  ARC_DsoRules,
 }
-import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_AddMember,
   SRARC_OffboardMember,
   SRARC_SetConfig,
 }
-import com.daml.network.codegen.java.cn.svcrules.voterequestoutcome.{
+import com.daml.network.codegen.java.cn.dsorules.voterequestoutcome.{
   VRO_Accepted,
   VRO_Expired,
   VRO_Rejected,
 }
-import com.daml.network.codegen.java.cn.svcrules.{
+import com.daml.network.codegen.java.cn.dsorules.{
   ActionRequiringConfirmation,
-  SvcRulesConfig,
-  SvcRules_AddMember,
-  SvcRules_OffboardMember,
-  SvcRules_SetConfig,
+  DsoRulesConfig,
+  DsoRules_AddMember,
+  DsoRules_OffboardMember,
+  DsoRules_SetConfig,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -39,17 +39,17 @@ import scala.jdk.OptionConverters.*
 
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
-  private def actionRequiring3VotesForEarlyClosing(member: String) = new ARC_SvcRules(
+  private def actionRequiring3VotesForEarlyClosing(member: String) = new ARC_DsoRules(
     new SRARC_OffboardMember(
-      new SvcRules_OffboardMember(
+      new DsoRules_OffboardMember(
         member
       )
     )
   )
 
-  private def actionRequiring4VotesForEarlyClosing() = new ARC_SvcRules(
+  private def actionRequiring4VotesForEarlyClosing() = new ARC_DsoRules(
     new SRARC_AddMember(
-      new SvcRules_AddMember(
+      new DsoRules_AddMember(
         "alice:1234",
         "Alice",
         1234L,
@@ -60,15 +60,15 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
   )
 
   "SVs can create a VoteRequest, vote on it and list them." in { implicit env =>
-    initSvc()
+    initDso()
     val (_, voteRequest) = actAndCheck(
       "sv1 creates a vote request",
       sv1Backend.createVoteRequest(
-        sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
-        actionRequiring3VotesForEarlyClosing(sv4Backend.getSvcInfo().svParty.toProtoPrimitive),
+        sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+        actionRequiring3VotesForEarlyClosing(sv4Backend.getDsoInfo().svParty.toProtoPrimitive),
         "url",
         "remove sv4",
-        sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+        sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
       ),
     )(
       "vote request has been created",
@@ -102,12 +102,12 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
   }
 
   "VoteRequest expires with no definitive outcome." in { implicit env =>
-    initSvc()
+    initDso()
     val (_, voteRequest) = actAndCheck(
       "sv1 creates a vote request that expires directly",
       sv1Backend.createVoteRequest(
-        sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
-        actionRequiring3VotesForEarlyClosing(sv4Backend.getSvcInfo().svParty.toProtoPrimitive),
+        sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
+        actionRequiring3VotesForEarlyClosing(sv4Backend.getDsoInfo().svParty.toProtoPrimitive),
         "url",
         "remove sv4",
         new RelTime(10_000_000L),
@@ -141,11 +141,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
   }
 
   "VoteRequest expires with a definitive outcome." in { implicit env =>
-    initSvc()
+    initDso()
     val (_, voteRequest) = actAndCheck(
       "sv1 creates a vote request that expires directly",
       sv1Backend.createVoteRequest(
-        sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+        sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
         actionRequiring4VotesForEarlyClosing(),
         "url",
         "add new member",
@@ -180,14 +180,14 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
   }
 
   "SVs can update their AmuletPriceVote contracts" in { implicit env =>
-    initSvc()
+    initDso()
     val svParties =
       Seq(("sv1", sv1Backend), ("sv2", sv2Backend), ("sv3", sv3Backend), ("sv4", sv4Backend)).map {
-        case (svName, sv) => svName -> sv.getSvcInfo().svParty
+        case (svName, sv) => svName -> sv.getDsoInfo().svParty
       }.toMap
 
     clue("initially only sv1 and sv2 have set the AmuletPriceVote") {
-      // sv1 because it's the SVC founder and sv2 because we configured it to do so
+      // sv1 because it's the DSO founder and sv2 because we configured it to do so
       eventually() {
         getAmuletPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
@@ -251,10 +251,10 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
   }
 
   "archive duplicated and non-member AmuletPriceVote contracts" in { implicit env =>
-    initSvc()
+    initDso()
     val svParties =
       Seq(("sv1", sv1Backend), ("sv2", sv2Backend), ("sv3", sv3Backend), ("sv4", sv4Backend)).map {
-        case (svName, sv) => svName -> sv.getSvcInfo().svParty
+        case (svName, sv) => svName -> sv.getDsoInfo().svParty
       }.toMap
 
     eventually() {
@@ -267,10 +267,10 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     }
 
     actAndCheck(
-      "remove sv3 on svcRules contract to trigger `GarbageCollectAmuletPriceVotesTrigger` to non member votes", {
-        val removeAction = new ARC_SvcRules(
+      "remove sv3 on dsoRules contract to trigger `GarbageCollectAmuletPriceVotesTrigger` to non member votes", {
+        val removeAction = new ARC_DsoRules(
           new SRARC_OffboardMember(
-            new SvcRules_OffboardMember(
+            new DsoRules_OffboardMember(
               svParties("sv3").toProtoPrimitive
             )
           )
@@ -280,11 +280,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           "Creating vote request",
           eventuallySucceeds() {
             sv1Backend.createVoteRequest(
-              sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
               removeAction,
               "url",
               "remove sv3",
-              sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
             )
           },
         )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -314,41 +314,41 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )
   }
 
-  "At least 3 SVs can vote on changing the SvcRules Configuration" in { implicit env =>
+  "At least 3 SVs can vote on changing the DsoRules Configuration" in { implicit env =>
     val newNumUnclaimedRewardsThreshold = 42
 
-    clue("Initialize SVC with 4 SVs") {
-      initSvc()
+    clue("Initialize DSO with 4 SVs") {
+      initDso()
       eventually() {
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 4
+        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 4
       }
     }
 
     val (_, (voteRequestCid, initialNumUnclaimedRewardsThreshold)) = actAndCheck(
-      "SV1 create a vote request for a new SvcRules Configuration", {
-        val newConfig = new SvcRulesConfig(
+      "SV1 create a vote request for a new DsoRules Configuration", {
+        val newConfig = new DsoRulesConfig(
           newNumUnclaimedRewardsThreshold,
-          sv1Backend.getSvcInfo().svcRules.payload.config.numMemberTrafficContractsThreshold,
-          sv1Backend.getSvcInfo().svcRules.payload.config.actionConfirmationTimeout,
-          sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingRequestTimeout,
-          sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingConfirmedTimeout,
-          sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
-          sv1Backend.getSvcInfo().svcRules.payload.config.leaderInactiveTimeout,
-          sv1Backend.getSvcInfo().svcRules.payload.config.domainNodeConfigLimits,
-          sv1Backend.getSvcInfo().svcRules.payload.config.maxTextLength,
-          sv1Backend.getSvcInfo().svcRules.payload.config.globalDomain,
-          sv1Backend.getSvcInfo().svcRules.payload.config.nextScheduledDomainUpgrade,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.numMemberTrafficContractsThreshold,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.actionConfirmationTimeout,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.svOnboardingRequestTimeout,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.svOnboardingConfirmedTimeout,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.leaderInactiveTimeout,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.domainNodeConfigLimits,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.maxTextLength,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.globalDomain,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.nextScheduledDomainUpgrade,
         )
 
         val action: ActionRequiringConfirmation =
-          new ARC_SvcRules(new SRARC_SetConfig(new SvcRules_SetConfig(newConfig)))
+          new ARC_DsoRules(new SRARC_SetConfig(new DsoRules_SetConfig(newConfig)))
 
         sv1Backend.createVoteRequest(
-          sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+          sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
           action,
           "url",
           "description",
-          sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
         )
       },
     )(
@@ -357,7 +357,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         svs.foreach { sv => sv.listVoteRequests() should not be empty }
         val head = sv1Backend.listVoteRequests().headOption.value.contractId
         sv1Backend.lookupVoteRequest(head).payload.votes should have size 1
-        (head, sv1Backend.getSvcInfo().svcRules.payload.config.numUnclaimedRewardsThreshold)
+        (head, sv1Backend.getDsoInfo().dsoRules.payload.config.numUnclaimedRewardsThreshold)
       },
     )
 
@@ -366,11 +366,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         sv2Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
-      "The majority did not vote yet, thus the trigger should not change the svcRules",
+      "The majority did not vote yet, thus the trigger should not change the dsoRules",
       _ => {
         sv2Backend
-          .getSvcInfo()
-          .svcRules
+          .getDsoInfo()
+          .dsoRules
           .payload
           .config
           .numUnclaimedRewardsThreshold shouldBe initialNumUnclaimedRewardsThreshold
@@ -382,11 +382,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         sv3Backend.castVote(voteRequestCid, false, "url", "description")
       },
     )(
-      "The majority has voted but without an acceptance majority, the trigger should not change the svcRules",
+      "The majority has voted but without an acceptance majority, the trigger should not change the dsoRules",
       _ => {
         sv3Backend
-          .getSvcInfo()
-          .svcRules
+          .getDsoInfo()
+          .dsoRules
           .payload
           .config
           .numUnclaimedRewardsThreshold shouldBe initialNumUnclaimedRewardsThreshold
@@ -398,11 +398,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         sv4Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
-      "The majority accepts, the trigger should change the svcRules accordingly",
+      "The majority accepts, the trigger should change the dsoRules accordingly",
       _ => {
         sv4Backend
-          .getSvcInfo()
-          .svcRules
+          .getDsoInfo()
+          .dsoRules
           .payload
           .config
           .numUnclaimedRewardsThreshold shouldBe newNumUnclaimedRewardsThreshold
@@ -411,17 +411,17 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
   }
 
   "At least 3 SVs can vote on changing the Amulet Configuration" in { implicit env =>
-    clue("Initialize SVC with 4 SVs") {
-      initSvc()
+    clue("Initialize DSO with 4 SVs") {
+      initDso()
       eventually() {
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 4
+        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 4
       }
     }
 
     val (_, (voteRequestCid, initialFutureValuesSize)) = actAndCheck(
       "SV1 create a vote request for a new Amulet Configuration (changing the transfer config)", {
 
-        val initialValue = sv1Backend.getSvcInfo().amuletRules.payload.configSchedule.initialValue
+        val initialValue = sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.initialValue
         val transferConfig = initialValue.transferConfig
         val newTransferConfig = new TransferConfig[USD](
           transferConfig.createFee,
@@ -454,11 +454,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           )
 
         sv1Backend.createVoteRequest(
-          sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+          sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
           action,
           "url",
           "description",
-          sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
         )
       },
     )(
@@ -467,7 +467,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         svs.foreach { sv => sv.listVoteRequests() should not be empty }
         val head = sv1Backend.listVoteRequests().headOption.value.contractId
         sv1Backend.lookupVoteRequest(head).payload.votes should have size 1
-        (head, sv1Backend.getSvcInfo().amuletRules.payload.configSchedule.futureValues.size())
+        (head, sv1Backend.getDsoInfo().amuletRules.payload.configSchedule.futureValues.size())
       },
     )
 
@@ -479,7 +479,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       "The majority did not vote yet, thus the trigger should not change the amulet config futureValues",
       _ => {
         sv2Backend
-          .getSvcInfo()
+          .getDsoInfo()
           .amuletRules
           .payload
           .configSchedule
@@ -496,7 +496,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       "The majority has voted but without an acceptance majority, the trigger should not change the amulet config futureValues",
       _ => {
         sv3Backend
-          .getSvcInfo()
+          .getDsoInfo()
           .amuletRules
           .payload
           .configSchedule
@@ -513,7 +513,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       "The majority accepts, the trigger should change the amulet config futureValues",
       _ => {
         sv4Backend
-          .getSvcInfo()
+          .getDsoInfo()
           .amuletRules
           .payload
           .configSchedule
@@ -533,7 +533,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         voteResult.request.votes.asScala.values
           .filter(_.accept)
           .map(_.sv) should contain theSameElementsAs Seq(sv1Backend, sv2Backend, sv4Backend).map(
-          _.getSvcInfo().svParty.toProtoPrimitive
+          _.getDsoInfo().svParty.toProtoPrimitive
         )
       }
     }
@@ -541,13 +541,13 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
   }
 
   "Vote requests expire" in { implicit env =>
-    clue("Initialize SVC with 2 SVs") {
+    clue("Initialize DSO with 2 SVs") {
       startAllSync(
         sv1Backend,
         sv2Backend,
       )
       eventually() {
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 2
+        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 2
       }
     }
     clue("Pausing vote request expiration automation") {
@@ -555,10 +555,10 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     }
     actAndCheck(
       "SV2 creates a vote request for removing SV1", {
-        val sv1Party = sv1Backend.getSvcInfo().svParty
-        val sv2Party = sv2Backend.getSvcInfo().svParty
-        val action: ActionRequiringConfirmation = new ARC_SvcRules(
-          new SRARC_OffboardMember(new SvcRules_OffboardMember(sv1Party.toProtoPrimitive))
+        val sv1Party = sv1Backend.getDsoInfo().svParty
+        val sv2Party = sv2Backend.getDsoInfo().svParty
+        val action: ActionRequiringConfirmation = new ARC_DsoRules(
+          new SRARC_OffboardMember(new DsoRules_OffboardMember(sv1Party.toProtoPrimitive))
         )
 
         sv2Backend.createVoteRequest(

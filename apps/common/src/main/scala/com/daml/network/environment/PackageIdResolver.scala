@@ -110,7 +110,7 @@ object PackageIdResolver {
             pkg match {
               case Package.CantonAmulet => DarResources.cantonAmulet
               case Package.CantonNameService => DarResources.cantonNameService
-              case Package.SvcGovernance => DarResources.svcGovernance
+              case Package.DsoGovernance => DarResources.dsoGovernance
               case Package.ValidatorLifecycle => DarResources.validatorLifecycle
               case Package.Wallet => DarResources.wallet
               case Package.WalletPayments => DarResources.walletPayments
@@ -182,7 +182,7 @@ object PackageIdResolver {
     val version = pkg match {
       case CantonAmulet => packageConfig.cantonAmulet
       case CantonNameService => packageConfig.cantonNameService
-      case SvcGovernance => packageConfig.svcGovernance
+      case DsoGovernance => packageConfig.dsoGovernance
       case ValidatorLifecycle => packageConfig.validatorLifecycle
       case Wallet => packageConfig.wallet
       case WalletPayments => packageConfig.walletPayments
@@ -199,10 +199,10 @@ object PackageIdResolver {
     "CC.ValidatorLicense" -> Package.CantonAmulet,
     "CC.Round" -> Package.CantonAmulet,
     "CN.Cns" -> Package.CantonNameService,
-    "CN.SvcBootstrap" -> Package.SvcGovernance,
-    "CN.SvcRules" -> Package.SvcGovernance,
-    "CN.SVC.AmuletPrice" -> Package.SvcGovernance,
-    "CN.SvOnboarding" -> Package.SvcGovernance,
+    "CN.DsoBootstrap" -> Package.DsoGovernance,
+    "CN.DsoRules" -> Package.DsoGovernance,
+    "CN.DSO.AmuletPrice" -> Package.DsoGovernance,
+    "CN.SvOnboarding" -> Package.DsoGovernance,
     "CN.ValidatorOnboarding" -> Package.ValidatorLifecycle,
     "CN.Wallet.Install" -> Package.Wallet,
     "CN.Wallet.TopUpState" -> Package.Wallet,
@@ -225,7 +225,7 @@ object PackageIdResolver {
   object Package {
     final case object CantonAmulet extends Package
     final case object CantonNameService extends Package
-    final case object SvcGovernance extends Package
+    final case object DsoGovernance extends Package
     final case object ValidatorLifecycle extends Package
     final case object Wallet extends Package
     final case object WalletPayments extends Package

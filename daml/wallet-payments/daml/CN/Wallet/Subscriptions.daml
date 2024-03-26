@@ -41,7 +41,7 @@ data SubscriptionData = SubscriptionData
     sender : Party -- ^ The party that pays.
     receiver : Party -- ^ The party that receives payment.
     provider : Party -- ^ The app provider.
-    svc : Party
+    dso : Party
     description : Text
   deriving (Show, Eq)
 
@@ -295,13 +295,13 @@ lockAndMakeChange
   : PaymentTransferContext -> SubscriptionData -> SubscriptionPayData -> [TransferInput] -> Time -> Party
   -> Update (ContractId LockedAmulet, Optional (ContractId Amulet), Decimal, Round)
 lockAndMakeChange context subscriptionData payData inputs now walletProvider = do
-  let SubscriptionData { sender; receiver; provider; svc } = subscriptionData
+  let SubscriptionData { sender; receiver; provider; dso } = subscriptionData
   let SubscriptionPayData { paymentAmount; .. } = payData
 
 
   contextRound <- exercise @OpenMiningRound context.context.openMiningRound (OpenMiningRound_Fetch sender)
 
-  targetAmount <- paymentAmountToCC svc contextRound paymentAmount
+  targetAmount <- paymentAmountToCC dso contextRound paymentAmount
 
   outputFees <- exerciseComputeFees context sender [mkTransferOutput receiver targetAmount]
   let lockAmount = targetAmount + sum outputFees

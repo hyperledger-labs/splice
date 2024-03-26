@@ -36,7 +36,7 @@ class ScanTxLogParser(
   private def parseTree(tree: TransactionTree, domainId: DomainId, root: TreeEvent)(implicit
       tc: TraceContext
   ): State = {
-    // TODO(#2930) add more checks on the nodes, at least that the SVC party is correct
+    // TODO(#2930) add more checks on the nodes, at least that the DSO party is correct
     root match {
       case exercised: ExercisedEvent =>
         exercised match {
@@ -140,7 +140,7 @@ class ScanTxLogParser(
       exercised: ExercisedEvent,
       domainId: DomainId,
   )(implicit tc: TraceContext) = {
-    // first child event is the initial subscription payment collected by SVC
+    // first child event is the initial subscription payment collected by DSO
     val paymentCollectionEvent =
       tree.getEventsById.get(exercised.getChildEventIds.get(0)) match {
         case e: ExercisedEvent => e
@@ -487,7 +487,7 @@ object ScanTxLogParser {
             .map(bc => BigDecimal(bc.changeToHoldingFeesRate))
             .sum,
           partyBalanceChanges = node.result.value.summary.balanceChanges.asScala.collect {
-            // filter out the change from the transfer to the SVC party
+            // filter out the change from the transfer to the DSO party
             case (party, bc) if party == validatorParty.toProtoPrimitive =>
               validatorParty -> PartyBalanceChange(
                 bc.changeToInitialAmountAsOfRoundZero,
@@ -518,9 +518,9 @@ object ScanTxLogParser {
         domainId: DomainId,
         stateFromPaymentCollection: State,
     ): State = {
-      // second child event is burning of transferred amulet by SVC
+      // second child event is burning of transferred amulet by DSO
       val amuletArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
-      // Adjust tx log entries for SVC since the amulet it receives is immediately burnt
+      // Adjust tx log entries for DSO since the amulet it receives is immediately burnt
       val stateFromBurntAmulet =
         State.fromAmuletArchiveEvent(tx, amuletArchiveEvent, domainId, Some(event.getEventId()))
       stateFromPaymentCollection.appended(stateFromBurntAmulet)

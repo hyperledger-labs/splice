@@ -2,8 +2,8 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_AmuletRules
-import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.integration.tests.AppUpgradeIntegrationTest.*
 
@@ -115,7 +115,7 @@ class AppUpgradeIntegrationTest
             p2pTransfer(
               bobValidatorWalletClient,
               sv1WalletClient,
-              sv1Client.getSvcInfo().svParty,
+              sv1Client.getDsoInfo().svParty,
               500_001,
             )
             sv1WalletClient.balance().unlockedQty should be > BigDecimal(490_000)
@@ -165,11 +165,11 @@ class AppUpgradeIntegrationTest
                 "Creating vote request",
                 eventuallySucceeds() {
                   sv1Backend.createVoteRequest(
-                    sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+                    sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
                     upgradeAction,
                     "url",
                     "description",
-                    sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+                    sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
                   )
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -190,7 +190,7 @@ class AppUpgradeIntegrationTest
           )(
             "observing AmuletRules with upgraded config",
             _ => {
-              val newAmuletRules = sv1Client.getSvcInfo().amuletRules
+              val newAmuletRules = sv1Client.getDsoInfo().amuletRules
               val configs =
                 (newAmuletRules.payload.configSchedule.initialValue :: newAmuletRules.payload.configSchedule.futureValues.asScala.toList
                   .map(_._2))
@@ -227,11 +227,11 @@ class AppUpgradeIntegrationTest
                 "Creating vote request",
                 eventuallySucceeds() {
                   sv1Backend.createVoteRequest(
-                    sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+                    sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
                     dummyUpgradeAction,
                     "url",
                     "description",
-                    sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+                    sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
                   )
                 },
               )("vote request has been created", _ => sv1Backend.listVoteRequests().loneElement)
@@ -251,7 +251,7 @@ class AppUpgradeIntegrationTest
           )(
             "observing AmuletRules with new package id",
             _ => {
-              val newAmuletRules = sv1Backend.getSvcInfo().amuletRules
+              val newAmuletRules = sv1Backend.getDsoInfo().amuletRules
               newAmuletRules.identifier.getPackageId shouldBe DarResources.cantonAmulet_current.packageId
             },
           )

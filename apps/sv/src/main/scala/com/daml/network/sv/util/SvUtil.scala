@@ -6,17 +6,17 @@ import com.daml.network.codegen.java.cn.cometbft.{
   CometBftConfigLimits,
   CometBftNodeConfig,
 }
-import com.daml.network.codegen.java.cn.svc.globaldomain.{
+import com.daml.network.codegen.java.cn.dso.globaldomain.{
   DomainConfig,
   DomainNodeConfig,
   DomainNodeConfigLimits,
   MediatorConfig,
   ScanConfig,
   SequencerConfig,
-  SvcGlobalDomainConfig,
+  DsoGlobalDomainConfig,
 }
-import com.daml.network.codegen.java.cn.svcrules.SvcRulesConfig
-import com.daml.network.codegen.java.cn.{cometbft, svc}
+import com.daml.network.codegen.java.cn.dsorules.DsoRulesConfig
+import com.daml.network.codegen.java.cn.{cometbft, dso}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.cometbft.CometBftNode
@@ -85,12 +85,12 @@ object SvUtil {
     List.empty.asJava,
   )
 
-  private def defaultSvcGlobalDomainConfig(domainId: DomainId) = new SvcGlobalDomainConfig(
+  private def defaultDsoGlobalDomainConfig(domainId: DomainId) = new DsoGlobalDomainConfig(
     // domains
     Map(
       domainId.toProtoPrimitive -> new DomainConfig(
-        svc.globaldomain.DomainState.DS_OPERATIONAL,
-        "TODO(#4900): share CometBFT genesis.json of founding SV node via SvcRules config.",
+        dso.globaldomain.DomainState.DS_OPERATIONAL,
+        "TODO(#4900): share CometBFT genesis.json of founding SV node via DsoRules config.",
         // TODO(M3-47): also share the Canton DomainId of the decentralized domain here
       )
     ).asJava,
@@ -190,7 +190,7 @@ object SvUtil {
     }
   }
 
-  def defaultSvcRulesConfig(domainId: DomainId): SvcRulesConfig = new SvcRulesConfig(
+  def defaultDsoRulesConfig(domainId: DomainId): DsoRulesConfig = new DsoRulesConfig(
     10, // numUnclaimedRewardsThreshold
     5, // numMemberTrafficContractsThreshold, arbitrarily set as 5 for now.
     new RelTime(TimeUnit.MINUTES.toMicros(5)), // actionConfirmationTimeout
@@ -200,7 +200,7 @@ object SvUtil {
     new RelTime(TimeUnit.SECONDS.toMicros(70)), // leaderInactiveTimeout
     defaultDomainNodeConfigLimits,
     1024, // maxTextLength
-    defaultSvcGlobalDomainConfig(domainId), // globalDomainConfig
+    defaultDsoGlobalDomainConfig(domainId), // globalDomainConfig
     Optional.empty(), // nextScheduledHardDomainMigration
   )
 

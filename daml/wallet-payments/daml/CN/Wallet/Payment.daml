@@ -37,20 +37,20 @@ data ReceiverCCAmount = ReceiverCCAmount
  deriving (Show, Eq, Ord)
 
 paymentAmountToCC : Party -> OpenMiningRound -> PaymentAmount -> Update Decimal
-paymentAmountToCC svc openMiningRound pq =
+paymentAmountToCC dso openMiningRound pq =
   case pq.currency of
     USD ->
       do
-        require "SVC matches" (openMiningRound.svc == svc)
+        require "DSO matches" (openMiningRound.dso == dso)
         pure (pq.amount / openMiningRound.amuletPrice)
     CC ->
       pure pq.amount
     ExtCurrency -> error "ExtCurrency: bare extension constructors are not allowed at runtime"
 
 receiverAmountToCCReceiverAmount : Party -> OpenMiningRound -> ReceiverAmount -> Update ReceiverCCAmount
-receiverAmountToCCReceiverAmount svc openMiningRound rq =
+receiverAmountToCCReceiverAmount dso openMiningRound rq =
   do
-    cc <- paymentAmountToCC svc openMiningRound rq.amount
+    cc <- paymentAmountToCC dso openMiningRound rq.amount
     pure ReceiverCCAmount with
       receiver = rq.receiver
       ccAmount = cc
@@ -63,7 +63,7 @@ template AppPaymentRequest
     sender : Party -- ^ The party that should pay.
     receiverAmounts : [ReceiverAmount] -- ^ Pairs of (party, amount) requesting to be paid.
     provider : Party -- ^ The app provider; receives usage rewards.
-    svc : Party -- ^ The issuer of CC that should be used to make the payment.
+    dso : Party -- ^ The issuer of CC that should be used to make the payment.
     expiresAt : Time -- ^ When the payment request expires.
     description : Text -- ^ Human readable description of the reason / good for which the payment is requested.
   where
@@ -92,7 +92,7 @@ template AppPaymentRequest
 
          -- Convert from USD to CC amounts
          ccReceiverAmounts <- forA receiverAmounts $ \rq ->
-           receiverAmountToCCReceiverAmount svc contextRound rq
+           receiverAmountToCCReceiverAmount dso contextRound rq
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
          outputFees <- exerciseComputeFees context sender (map mkReceiverOutput ccReceiverAmounts)
@@ -121,7 +121,7 @@ template AppPaymentRequest
          let round = result.round
          acceptedPayment <- create AcceptedAppPayment
            with
-             svc, provider, ccReceiverAmounts, sender, lockedAmulet, round, reference = self
+             dso, provider, ccReceiverAmounts, sender, lockedAmulet, round, reference = self
          return (acceptedPayment, result.senderChangeAmulet)
 
     choice AppPaymentRequest_Withdraw : ContractId TerminatedAppPayment
@@ -165,7 +165,7 @@ template AcceptedAppPayment
     sender : Party
     ccReceiverAmounts : [ReceiverCCAmount]
     provider : Party
-    svc : Party
+    dso : Party
     lockedAmulet : ContractId LockedAmulet
     round : Round -- ^ The round in which the locked amulet was created, added as an extra field so we can avoid ingesting locked amulets.
     reference : ContractId AppPaymentRequest -- ^ The contract id of the original payment request to correlate it. Note that the contract will no longer be active.

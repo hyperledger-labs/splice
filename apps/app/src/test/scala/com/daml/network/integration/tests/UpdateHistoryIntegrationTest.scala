@@ -179,7 +179,7 @@ class UpdateHistoryIntegrationTest
     )
 
     clue("Update history is consistent with update stream") {
-      // History for the SVC, read from SV1 (only contains transactions on the global domain)
+      // History for the DSO, read from SV1 (only contains transactions on the global domain)
       // Using eventually(), as we don't know when UpdateHistory has caught up with the updates
       eventually() {
         compareHistory(

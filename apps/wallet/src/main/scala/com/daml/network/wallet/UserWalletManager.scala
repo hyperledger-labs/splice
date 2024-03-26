@@ -162,7 +162,7 @@ class UserWalletManager(
       participantId: ParticipantId,
   ): (RetryProvider, UserWalletService) = {
     val key = UserWalletStore.Key(
-      svcParty = store.walletKey.svcParty,
+      dsoParty = store.walletKey.dsoParty,
       store.walletKey.validatorParty,
       endUserName,
       endUserParty,

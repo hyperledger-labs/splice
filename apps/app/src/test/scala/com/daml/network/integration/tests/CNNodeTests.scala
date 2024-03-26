@@ -239,14 +239,14 @@ object CNNodeTests {
       with LedgerApiExtensions
       with AppendedClues {
 
-    protected def initSvc()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-      env.fullSvcApps.local.foreach(_.start())
-      env.fullSvcApps.local.foreach(_.waitForInitialization())
+    protected def initDso()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+      env.fullDsoApps.local.foreach(_.start())
+      env.fullDsoApps.local.foreach(_.waitForInitialization())
     }
 
-    protected def initSvcWithSv1Only()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
-      env.minimalSvcApps.local.foreach(_.start())
-      env.minimalSvcApps.local.foreach(_.waitForInitialization())
+    protected def initDsoWithSv1Only()(implicit env: CNNodeTestConsoleEnvironment): Unit = {
+      env.minimalDsoApps.local.foreach(_.start())
+      env.minimalDsoApps.local.foreach(_.waitForInitialization())
     }
 
     def defaultTickDuration(implicit env: CNNodeTestConsoleEnvironment): NonNegativeFiniteDuration =

@@ -716,7 +716,7 @@ class UserWalletTxLogParser(
       transactionSubtype: TransferTransactionSubtype,
   )(implicit tc: TraceContext): Eval[State] = {
     import Eval.defer
-    // first child event is the subscription payment collected by SVC
+    // first child event is the subscription payment collected by DSO
     val paymentCollectionEvent =
       tree.getEventsById.get(exercised.getChildEventIds.get(0)) match {
         case e: ExercisedEvent => e
@@ -1113,7 +1113,7 @@ object UserWalletTxLogParser {
         event: ExercisedEvent,
     ): State = {
       val sender = node.argument.value.provider
-      // Hack to grab the SVC party-id from the balance changes, which list both sender and the SVC
+      // Hack to grab the DSO party-id from the balance changes, which list both sender and the DSO
       val receivers = node.result.value.summary.balanceChanges.keySet().asScala.toSeq.collect {
         case party if party != sender => PartyAndAmount(party, BigDecimal(0.0))
       }
@@ -1145,9 +1145,9 @@ object UserWalletTxLogParser {
         stateFromPaymentCollection: State,
         transactionSubtype: TransferTransactionSubtype,
     ): State = {
-      // second child event is burning of transferred amulet by SVC
+      // second child event is burning of transferred amulet by DSO
       val amuletArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
-      // Adjust tx log entries for SVC since the amulet it receives is immediately burnt
+      // Adjust tx log entries for DSO since the amulet it receives is immediately burnt
       val burntAmulet = getAmuletCreateEvent(tx, amuletArchiveEvent.getContractId)
       val stateFromBurntAmulet = State.fromBurntAmulet(burntAmulet)
 

@@ -5,7 +5,7 @@ Name Allocation
 
 Our deployment topologies require many servers representing nodes and apps to be deployed simultaneously.
 We use the following prefixes for their names:
-- svc: for the servers operated by the svc
+- dso: for the servers operated by the dso
 - alice: for servers operated by alice acting as a self-hosted validator operator
 - bob: for servers operated by bob acting as a self-hosted validator operator
 
@@ -78,7 +78,7 @@ all network indices must be odd numbers.
 - `02`: Participant, Admin API
 - `03`: Validator, Admin API
 - `04`: Wallet, Admin API
-- `05`: SVC, Admin API
+- `05`: DSO, Admin API
 - `06`: Domain manager, Admin API
 - `07`: Mediator, Admin API
 - `08`: Domain, Public API

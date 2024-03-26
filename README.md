@@ -862,7 +862,7 @@ encounter an error like the following, there might have been a problem
 with the running Canton instance so try restarting.
 
 ```
-ERROR c.d.n.e.CNNodeLedgerConnection$$anon$1:WalletIntegrationTest/SVC=svc-app - Failed to instantiate ledger client due to connection failure, exiting...
+ERROR c.d.n.e.CNNodeLedgerConnection$$anon$1:WalletIntegrationTest/DSO=dso-app - Failed to instantiate ledger client due to connection failure, exiting...
 ```
 
 NOTE: In case you run into an issue with tmux on macOS and tmux-256color terminfo (unknown terminal "tmux-256color"),

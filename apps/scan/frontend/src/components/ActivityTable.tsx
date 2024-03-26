@@ -8,7 +8,7 @@ import {
   RateDisplay,
   TitledTable,
 } from 'common-frontend';
-import { useGetSvcPartyId, useActivity } from 'common-frontend/scan-api';
+import { useGetDsoPartyId, useActivity } from 'common-frontend/scan-api';
 import { ListActivityResponseItem, SenderAmount, Transfer, AmuletAmount } from 'scan-openapi';
 
 import { Button, Stack, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
@@ -16,7 +16,7 @@ import Typography from '@mui/material/Typography';
 
 export const ActivityTable: React.FC = () => {
   const activityQuery = useActivity();
-  const svcPartyIdQuery = useGetSvcPartyId();
+  const dsoPartyIdQuery = useGetDsoPartyId();
   const hasNoActivities = (pagedActivities: ListActivityResponseItem[][]): boolean => {
     return (
       pagedActivities === undefined ||
@@ -24,8 +24,8 @@ export const ActivityTable: React.FC = () => {
       pagedActivities.every(p => p === undefined || p.length === 0)
     );
   };
-  const isLoading = activityQuery.isLoading || svcPartyIdQuery.isLoading;
-  const isError = activityQuery.isError || svcPartyIdQuery.isError;
+  const isLoading = activityQuery.isLoading || dsoPartyIdQuery.isLoading;
+  const isError = activityQuery.isError || dsoPartyIdQuery.isError;
 
   const pagedActivities = activityQuery.data ? activityQuery.data.pages : [];
   return (
@@ -55,7 +55,7 @@ export const ActivityTable: React.FC = () => {
               activities =>
                 activities &&
                 activities
-                  .flatMap(item => toActivities(item, svcPartyIdQuery.data))
+                  .flatMap(item => toActivities(item, dsoPartyIdQuery.data))
                   .map(activity => (
                     <ActivityRow
                       key={activity.eventId + activity.activityType}
@@ -115,7 +115,7 @@ interface ActivityView {
   eventId: string;
 }
 
-function toActivities(item: ListActivityResponseItem, svcPartyId: string): ActivityView[] {
+function toActivities(item: ListActivityResponseItem, dsoPartyId: string): ActivityView[] {
   function getActivity(item: ListActivityResponseItem): ActivityView {
     switch (item.activity_type) {
       case 'transfer':
@@ -159,13 +159,13 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
       activityType = 'Transfer';
     }
     if (selfTransfer) {
-      provider = svcPartyId;
+      provider = dsoPartyId;
     } else {
       provider = transfer.provider;
     }
     const nrReceivers = receivers.length;
     if (nrReceivers === 0) {
-      receiver = svcPartyId;
+      receiver = dsoPartyId;
     } else if (nrReceivers === 1) {
       receiver = receivers[0].party;
     } else {
@@ -225,8 +225,8 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
   function getActivityFromSvRewardCollected(svr: AmuletAmount): ActivityView {
     return {
       activityType: 'SV Reward Collected',
-      provider: svcPartyId,
-      sender: svcPartyId,
+      provider: dsoPartyId,
+      sender: dsoPartyId,
       receiver: svr.amulet_owner,
       feesBurnt: BigNumber(0),
       transferAmount: BigNumber(svr.amulet_amount),
@@ -253,8 +253,8 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
       activities.push({
         ...activity,
         activityType: 'App Reward Collected',
-        provider: svcPartyId,
-        sender: svcPartyId,
+        provider: dsoPartyId,
+        sender: dsoPartyId,
         receiver: receiver,
         transferAmount: appRewardAmount,
         feesBurnt: BigNumber(0),
@@ -265,8 +265,8 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
       activities.push({
         ...activity,
         activityType: 'Validator Reward Collected',
-        provider: svcPartyId,
-        sender: svcPartyId,
+        provider: dsoPartyId,
+        sender: dsoPartyId,
         receiver: receiver,
         transferAmount: validatorRewardAmount,
         feesBurnt: BigNumber(0),

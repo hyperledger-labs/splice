@@ -8,8 +8,8 @@ trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
 
   protected val cantonAmuletDarPath =
     "daml/canton-amulet/.daml/dist/canton-amulet-0.1.0.dar"
-  protected val svcGovernanceDarPath =
-    "daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar"
+  protected val dsoGovernanceDarPath =
+    "daml/dso-governance/.daml/dist/dso-governance-0.1.0.dar"
 
   override def environmentDefinition: CNNodeEnvironmentDefinition =
     CNNodeEnvironmentDefinition
@@ -17,7 +17,7 @@ trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
       .withManualStart
       .withAdditionalSetup(implicit env => {
         // Some tests rely on those DARs being present without starting the SV/validator app which usually upload these.
-        sv2Backend.participantClient.upload_dar_unless_exists(svcGovernanceDarPath)
+        sv2Backend.participantClient.upload_dar_unless_exists(dsoGovernanceDarPath)
         bobValidatorBackend.participantClient.upload_dar_unless_exists(cantonAmuletDarPath)
       })
 }

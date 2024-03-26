@@ -185,7 +185,7 @@ class TopupMemberTrafficTrigger(
               Seq(validator),
               Seq(validator),
               ValidatorTopUpState.create(
-                store.key.svcParty.toProtoPrimitive,
+                store.key.dsoParty.toProtoPrimitive,
                 validator.toProtoPrimitive,
                 participantId.toProtoPrimitive,
                 activeDomainId.toProtoPrimitive,

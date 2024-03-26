@@ -1074,8 +1074,8 @@ class WalletTxLogIntegrationTest
             logEntry.sender.value.amount shouldBe BigDecimal(0)
 
             inside(logEntry.receivers) { case Seq(receiver) =>
-              receiver.party shouldBe svcParty.toProtoPrimitive
-              // amulet received by svc is burnt
+              receiver.party shouldBe dsoParty.toProtoPrimitive
+              // amulet received by dso is burnt
               receiver.amount shouldBe BigDecimal(0)
             }
 
@@ -1099,8 +1099,8 @@ class WalletTxLogIntegrationTest
             logEntry.sender.value.amount shouldBe BigDecimal(0)
 
             inside(logEntry.receivers) { case Seq(receiver) =>
-              receiver.party shouldBe svcParty.toProtoPrimitive
-              // amulet received by svc is burnt
+              receiver.party shouldBe dsoParty.toProtoPrimitive
+              // amulet received by dso is burnt
               receiver.amount shouldBe BigDecimal(0)
             }
 

@@ -3,8 +3,8 @@ import useActivity from './useActivity';
 import useAmuletPrice, { useAmuletPriceFromOpenRounds } from './useAmuletPrice';
 import useGetAmuletRules from './useGetAmuletRules';
 import useGetCnsRules from './useGetCnsRules';
+import useGetDsoPartyId from './useGetDsoPartyId';
 import useGetRoundOfLatestData from './useGetRoundOfLatestData';
-import useGetSvcPartyId from './useGetSvcPartyId';
 import useGetTopValidatorsByPurchasedTraffic from './useGetTopValidatorsByPurchasedTraffic';
 import useGetTopValidatorsByValidatorFaucets from './useGetTopValidatorsByValidatorFaucets';
 import useGetTopValidatorsByValidatorRewards from './useGetTopValidatorsByValidatorRewards';
@@ -30,7 +30,7 @@ export {
   useGetAmuletRules,
   useGetCnsRules,
   useGetRoundOfLatestData,
-  useGetSvcPartyId,
+  useGetDsoPartyId,
   useGetTopValidatorsByValidatorRewards,
   useGetTopValidatorsByPurchasedTraffic,
   useGetTopValidatorsByValidatorFaucets,

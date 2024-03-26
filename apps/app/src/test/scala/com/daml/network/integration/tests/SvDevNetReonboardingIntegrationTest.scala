@@ -32,7 +32,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
       clue("SV3 and SV4 use different participants") {
         sv3Backend.participantClient.id should not be sv4Backend.participantClient.id
       }
-      clue("Initialize SVC with 3 SVs") {
+      clue("Initialize DSO with 3 SVs") {
         startAllSync(
           sv1ScanBackend,
           sv2ScanBackend,
@@ -48,7 +48,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
       def checkPartyToParticipantX(expected: Seq[ParticipantId]) = {
         eventually() {
           val mapping = sv1Backend.appState.participantAdminConnection
-            .getPartyToParticipant(globalDomainId, sv1Backend.getSvcInfo().svcParty)
+            .getPartyToParticipant(globalDomainId, sv1Backend.getDsoInfo().dsoParty)
             .futureValue
             .mapping
           mapping.threshold shouldBe PositiveInt.tryCreate(2)
@@ -62,7 +62,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
             sv1Backend.participantClient.topology.decentralized_namespaces
               .list(
                 filterStore = globalDomainId.filterString,
-                filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
+                filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
               )
           inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
             decentralizedNamespace.item.owners shouldBe expected
@@ -85,15 +85,15 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
 
       val sv3PartyId = eventually() {
         val members = sv1Backend
-          .getSvcInfo()
-          .svcRules
+          .getDsoInfo()
+          .dsoRules
           .payload
           .members
           .asScala
           .toMap
 
         members should have size 3
-        val sv3PartyId = sv3Backend.getSvcInfo().svParty
+        val sv3PartyId = sv3Backend.getDsoInfo().svParty
         inside(members.get(sv3PartyId.toProtoPrimitive)) { case Some(memberInfo) =>
           memberInfo.name shouldBe getSvName(3)
         }
@@ -120,7 +120,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
         "old SV from PartyToParticipantX is removed and sv3 is overwritten with different party id",
         _ => {
           val mapping = sv1Backend.appState.participantAdminConnection
-            .getPartyToParticipant(globalDomainId, sv1Backend.getSvcInfo().svcParty)
+            .getPartyToParticipant(globalDomainId, sv1Backend.getDsoInfo().dsoParty)
             .futureValue
             .mapping
           mapping.threshold shouldBe PositiveInt.tryCreate(2)
@@ -130,10 +130,10 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
             sv4Backend.participantClient.id,
           )
 
-          val newSv3PartyId = sv4Backend.getSvcInfo().svParty
+          val newSv3PartyId = sv4Backend.getDsoInfo().svParty
           val newMembers = sv1Backend
-            .getSvcInfo()
-            .svcRules
+            .getDsoInfo()
+            .dsoRules
             .payload
             .members
             .asScala

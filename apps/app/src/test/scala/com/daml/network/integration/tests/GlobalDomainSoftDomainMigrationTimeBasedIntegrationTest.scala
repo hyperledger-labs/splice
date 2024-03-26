@@ -11,7 +11,7 @@ import com.daml.network.automation.{AssignTrigger, TransferFollowTrigger}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{
   cns,
-  svcrules,
+  dsorules,
   svonboarding as so,
   validatoronboarding as vo,
   wallet as cnw,
@@ -28,7 +28,7 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.sv.automation.singlesv.{
   ReceiveSvRewardCouponTrigger,
   SubmitSvStatusReportTrigger,
-  SvcRulesTransferTrigger,
+  DsoRulesTransferTrigger,
 }
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
@@ -60,12 +60,12 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           (updateAllAutomationConfigs(c =>
             c.copy(
               // Need to disable triggers so workflows stay open
-              enableSvcGovernance = false,
+              enableDsoGovernance = false,
               enableClosedRoundArchival = false,
             )
           ) andThen updateAutomationConfig(ConfigurableApp.Sv)(
             _.withResumedTrigger[AssignTrigger]
-              .withResumedTrigger[SvcRulesTransferTrigger]
+              .withResumedTrigger[DsoRulesTransferTrigger]
               .withResumedTrigger[TransferFollowTrigger]
               // TODO(#10297): re-enable once that trigger is compatible with soft domain-migrations
               .withPausedTrigger[SubmitSvStatusReportTrigger]
@@ -100,7 +100,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
   private[this] val mostDistantPossibleExpiry = com.daml.lf.data.Time.Timestamp.MaxValue.toInstant
 
   "scheduled global domain upgrade happens" in { implicit env =>
-    initSvcWithSv1Only() withClue "spin up Svc"
+    initDsoWithSv1Only() withClue "spin up Dso"
     val sv1WalletUser = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
 
     val timeUntilNewRule = defaultTickDuration
@@ -111,13 +111,13 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       globalUpgradeDomain
     ) withClue "find the global-upgrade domain ID"
 
-    val sv1Party = sv1Backend.getSvcInfo().svParty
+    val sv1Party = sv1Backend.getDsoInfo().svParty
 
-    // host the svc party as it's stored in the domain stores only
+    // host the dso party as it's stored in the domain stores only
     sv1Backend.appState.participantAdminConnection
       .ensureInitialPartyToParticipant(
         TopologyStoreId.DomainStore(globalUpgradeId),
-        svcParty,
+        dsoParty,
         sv1Backend.participantClientWithAdminToken.id,
         sv1Party.uid.namespace.fingerprint,
       )
@@ -169,22 +169,22 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       }
     }
 
-    val svcRules = sv1Backend.getSvcInfo().svcRules
-    val svcRulesCid = svcRules.contractId
+    val dsoRules = sv1Backend.getDsoInfo().dsoRules
+    val dsoRulesCid = dsoRules.contractId
 
     def nonEmptyOnSv1[
         TCid <: ContractId[T],
         T <: Template,
     ](companion: Contract.Companion.Template[TCid, T]) =
       sv1Backend.participantClient.ledger_api_extensions.acs
-        .filterJava(companion)(svcParty)
+        .filterJava(companion)(dsoParty)
         .nonEmpty
 
-    def exerciseSvc[T](update: Update[T]) =
+    def exerciseDso[T](update: Update[T]) =
       sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
         .submitWithResult(
           userId = sv1Backend.config.ledgerApiUser,
-          actAs = Seq(svcParty, sv1Party),
+          actAs = Seq(dsoParty, sv1Party),
           readAs = Seq.empty,
           update = update,
           domainId = Some(previousGlobalId),
@@ -196,7 +196,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
     ](companion: Contract.Companion.Template[TCid, T])(payload: T): TCid = {
       val (created, _) = actAndCheck(
         s"create sample ${companion.TEMPLATE_ID.getEntityName}",
-        exerciseSvc(payload.create()),
+        exerciseDso(payload.create()),
       )(s"ensure ${companion.TEMPLATE_ID.getEntityName} is there", _ => nonEmptyOnSv1(companion))
       companion.toContractId(new ContractId(created.contractId.contractId))
     }
@@ -209,9 +209,9 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         "create VoteRequest",
         sv1Backend.createVoteRequest(
           sv1Party.toProtoPrimitive,
-          new svcrules.actionrequiringconfirmation.ARC_SvcRules(
-            new svcrules.svcrules_actionrequiringconfirmation.SRARC_AddMember(
-              new svcrules.SvcRules_AddMember(
+          new dsorules.actionrequiringconfirmation.ARC_DsoRules(
+            new dsorules.dsorules_actionrequiringconfirmation.SRARC_AddMember(
+              new dsorules.DsoRules_AddMember(
                 "alice",
                 "Alice",
                 SvUtil.DefaultFoundingNodeWeight,
@@ -222,7 +222,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           ),
           "url",
           "description",
-          sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
         ),
       )(
         "VoteRequest and Vote should be there",
@@ -234,33 +234,33 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       actAndCheck(
         "create sample ElectionRequest",
-        exerciseSvc(
-          svcRulesCid.exerciseSvcRules_RequestElection(
+        exerciseDso(
+          dsoRulesCid.exerciseDsoRules_RequestElection(
             sv1Party.toProtoPrimitive,
-            new svcrules.electionrequestreason.ERR_OtherReason("watch the request get migrated"),
+            new dsorules.electionrequestreason.ERR_OtherReason("watch the request get migrated"),
             Seq(sv1Party.toProtoPrimitive).asJava,
           )
         ),
-      )("ElectionRequest should be there", _ => nonEmptyOnSv1(svcrules.ElectionRequest.COMPANION))
+      )("ElectionRequest should be there", _ => nonEmptyOnSv1(dsorules.ElectionRequest.COMPANION))
 
       actAndCheck(
         "create sample Confirmation",
-        exerciseSvc(
-          svcRulesCid.exerciseSvcRules_ConfirmAction(
+        exerciseDso(
+          dsoRulesCid.exerciseDsoRules_ConfirmAction(
             sv1Party.toProtoPrimitive,
-            new svcrules.actionrequiringconfirmation.ARC_SvcRules(
-              new svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember(
-                new svcrules.SvcRules_OffboardMember("nonsense")
+            new dsorules.actionrequiringconfirmation.ARC_DsoRules(
+              new dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember(
+                new dsorules.DsoRules_OffboardMember("nonsense")
               )
             ),
           )
         ),
-      )("ensure Confirmation is there", _ => nonEmptyOnSv1(svcrules.Confirmation.COMPANION))
+      )("ensure Confirmation is there", _ => nonEmptyOnSv1(dsorules.Confirmation.COMPANION))
 
       actAndCheck(
         "create sample SvOnboardingRequest",
-        exerciseSvc(
-          svcRulesCid.exerciseSvcRules_StartSvOnboarding(
+        exerciseDso(
+          dsoRulesCid.exerciseDsoRules_StartSvOnboarding(
             "irrelevant name",
             sv1Party.toProtoPrimitive, // irrelevant party
             "PAR::sv::1220f3e2",
@@ -285,13 +285,13 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           SvUtil.DefaultFoundingNodeWeight,
           "PAR::sv::1220f3e2",
           "observing domain migration",
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           mostDistantPossibleExpiry,
         )
       )
     }
 
-    clue("create SVC-signed amulet contracts of various kinds") {
+    clue("create DSO-signed amulet contracts of various kinds") {
       val (oldestRound, newestRound) = {
         val rounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._1
         (rounds.headOption.value, rounds.lastOption.value)
@@ -299,7 +299,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       createSampleAndEnsurePresence(cc.round.IssuingMiningRound.COMPANION)(
         new cc.round.IssuingMiningRound(
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           dummyRound,
           dummyDecimal,
           dummyDecimal,
@@ -313,7 +313,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       createSampleAndEnsurePresence(cc.round.ClosedMiningRound.COMPANION)(
         new cc.round.ClosedMiningRound(
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           dummyRound,
           dummyDecimal,
           dummyDecimal,
@@ -325,14 +325,14 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       actAndCheck(
         "create sample FeaturedAppRight",
-        exerciseSvc(amuletRulesCid.exerciseAmuletRules_DevNet_FeatureApp(sv1Party.toProtoPrimitive)),
+        exerciseDso(amuletRulesCid.exerciseAmuletRules_DevNet_FeatureApp(sv1Party.toProtoPrimitive)),
       )(
         "ensure FeaturedAppRight is there",
         _ => nonEmptyOnSv1(cc.amulet.FeaturedAppRight.COMPANION),
       )
 
       createSampleAndEnsurePresence(cc.amulet.UnclaimedReward.COMPANION)(
-        new cc.amulet.UnclaimedReward(svcParty.toProtoPrimitive, dummyDecimal)
+        new cc.amulet.UnclaimedReward(dsoParty.toProtoPrimitive, dummyDecimal)
       )
     }
 
@@ -399,7 +399,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       .trigger[com.daml.network.sv.automation.leaderbased.ExpireRewardCouponsTrigger]
 
     val subscriptionRequestCid = clue("create user wallet contracts of various kinds") {
-      val svc = svcParty.toProtoPrimitive
+      val dso = dsoParty.toProtoPrimitive
       val validator = sv1ValidatorBackend.getValidatorPartyId()
       val provider = sv1WalletUser
       val maxTimestamp = com.daml.lf.data.Time.Timestamp.MaxValue.toInstant
@@ -408,7 +408,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       createSampleAndEnsurePresence(cc.amulet.AppRewardCoupon.COMPANION)(
         new cc.amulet.AppRewardCoupon(
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           provider.toProtoPrimitive,
           false,
           dummyDecimal,
@@ -419,7 +419,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         createSampleAndEnsurePresence(cc.amulet.LockedAmulet.COMPANION)(
           new cc.amulet.LockedAmulet(
             new cc.amulet.Amulet(
-              svcParty.toProtoPrimitive,
+              dsoParty.toProtoPrimitive,
               provider.toProtoPrimitive,
               new cc.fees.ExpiringAmount(
                 dummyDecimal,
@@ -440,7 +440,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       createSampleAndEnsurePresence(cc.amulet.ValidatorRewardCoupon.COMPANION)(
         new cc.amulet.ValidatorRewardCoupon(
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           validator.toProtoPrimitive,
           dummyDecimal,
           dummyRound,
@@ -449,7 +449,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       createSampleAndEnsurePresence(cc.validatorlicense.ValidatorFaucetCoupon.COMPANION)(
         new cc.validatorlicense.ValidatorFaucetCoupon(
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           validator.toProtoPrimitive,
           dummyRound,
         )
@@ -457,11 +457,11 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       createSampleAndEnsurePresence(cc.amulet.SvRewardCoupon.COMPANION)(
         new cc.amulet.SvRewardCoupon(
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           sv1Party.toProtoPrimitive,
           sv1Party.toProtoPrimitive,
           dummyRound,
-          svcRules.payload.members.get(sv1Party.toProtoPrimitive).svRewardWeight,
+          dsoRules.payload.members.get(sv1Party.toProtoPrimitive).svRewardWeight,
         )
       )
 
@@ -471,7 +471,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
             sv1WalletUser.toProtoPrimitive,
             java.util.List.of(),
             provider.toProtoPrimitive,
-            svc,
+            dso,
             maxTimestamp,
             "irrelevant description",
           )
@@ -482,7 +482,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           sv1WalletUser.toProtoPrimitive,
           java.util.List.of,
           provider.toProtoPrimitive,
-          svc,
+          dso,
           lockedAmuletCid,
           dummyRound,
           appPaymentRequestCid,
@@ -493,9 +493,9 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       val dummySubscriptionData = new cnw.subscriptions.SubscriptionData(
         sv1WalletUser.toProtoPrimitive,
-        svc,
+        dso,
         provider.toProtoPrimitive,
-        svc,
+        dso,
         "irrelevant description",
       )
 
@@ -517,9 +517,9 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       createSampleAndEnsurePresence(cnw.transferoffer.TransferOffer.COMPANION)(
         new cnw.transferoffer.TransferOffer(
-          svc,
+          dso,
           sv1WalletUser.toProtoPrimitive,
-          svc,
+          dso,
           dummyPaymentAmount,
           "irrelevant description",
           maxTimestamp,
@@ -529,9 +529,9 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       createSampleAndEnsurePresence(cnw.transferoffer.AcceptedTransferOffer.COMPANION)(
         new cnw.transferoffer.AcceptedTransferOffer(
-          svc,
+          dso,
           sv1WalletUser.toProtoPrimitive,
-          svc,
+          dso,
           dummyPaymentAmount,
           maxTimestamp,
           "irrelevant tracking id",
@@ -541,19 +541,19 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       subscriptionRequestCid
     }
 
-    clue("create SVC-signed CNS contracts of various kinds") {
+    clue("create DSO-signed CNS contracts of various kinds") {
       import com.daml.network.util.CNNodeUtil.defaultCnsConfig
 
-      val svc = svcParty.toProtoPrimitive
+      val dso = dsoParty.toProtoPrimitive
 
       createSampleAndEnsurePresence(cns.CnsRules.COMPANION)(
-        new cns.CnsRules(svc, defaultCnsConfig())
+        new cns.CnsRules(dso, defaultCnsConfig())
       )
 
       createSampleAndEnsurePresence(cns.CnsEntry.COMPANION)(
         new cns.CnsEntry(
-          svc,
-          svc,
+          dso,
+          dso,
           "irrelevant name",
           "urn:example.com",
           "irrelevant description",
@@ -563,8 +563,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       createSampleAndEnsurePresence(cns.CnsEntryContext.COMPANION)(
         new cns.CnsEntryContext(
-          svc,
-          svc,
+          dso,
+          dso,
           "irrelevant name",
           "urn:example.com",
           "irrelevant description",
@@ -575,17 +575,17 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
     advanceTime(timeToWaitForNewRule) withClue "advance time"
 
-    clue("see whether the svcrules moves") {
+    clue("see whether the dsorules moves") {
       eventually() {
-        val cid: String = svcRulesCid.contractId
+        val cid: String = dsoRulesCid.contractId
         sv1ValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .lookup_contract_domain(svcParty, Set(cid)) shouldBe Map(
+          .lookup_contract_domain(dsoParty, Set(cid)) shouldBe Map(
           cid -> globalUpgradeId
         )
       }
     }
 
-    clue("see whether amuletrules follows svcrules") {
+    clue("see whether amuletrules follows dsorules") {
       eventually() {
         sv1ScanBackend.getAmuletRules().state shouldBe Assigned(globalUpgradeId)
       }
@@ -598,7 +598,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         type TCid <: ContractId[Data]
       }
 
-    def c(fc: FilterableCompanion, queryParty: PartyId = svcParty) =
+    def c(fc: FilterableCompanion, queryParty: PartyId = dsoParty) =
       (fc, queryParty)
 
     def allContractsMigrated(rows: (FilterableCompanion, PartyId)*) = {
@@ -623,12 +623,12 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       }
     }
 
-    clue("see whether governance contracts follow svcrules") {
+    clue("see whether governance contracts follow dsorules") {
       import com.daml.network.sv.store.SvSvStore.templatesMovedByMyAutomation as templatesMovedBySvAutomation
       allContractsMigrated(
-        c(svcrules.VoteRequest.COMPANION),
-        c(svcrules.Confirmation.COMPANION),
-        c(svcrules.ElectionRequest.COMPANION),
+        c(dsorules.VoteRequest.COMPANION),
+        c(dsorules.Confirmation.COMPANION),
+        c(dsorules.ElectionRequest.COMPANION),
         c(so.SvOnboardingRequest.COMPANION),
         c(so.SvOnboardingConfirmed.COMPANION),
       )
@@ -640,11 +640,11 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
     advanceTime(tickDurationWithBuffer)
 
     clue(
-      "see whether amulet contracts signed only by SVC (in particular mining rounds) follow svcrules"
+      "see whether amulet contracts signed only by DSO (in particular mining rounds) follow dsorules"
     ) {
-      import com.daml.network.sv.store.SvSvcStore
+      import com.daml.network.sv.store.SvDsoStore
       allContractsMigrated(
-        SvSvcStore.amuletRulesFollowers
+        SvDsoStore.amuletRulesFollowers
           filterNot Set(
             cnw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
             cc.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
@@ -701,7 +701,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
           .submitWithResult(
             userId = sv1Backend.config.ledgerApiUser,
-            actAs = Seq(svcParty),
+            actAs = Seq(dsoParty),
             readAs = Seq.empty,
             update = start.contractId
               .exerciseAmuletRules_RemoveFutureAmuletConfigSchedule(config._1),
@@ -712,7 +712,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands
       .submitWithResult(
         userId = sv1Backend.config.ledgerApiUser,
-        actAs = Seq(svcParty),
+        actAs = Seq(dsoParty),
         readAs = Seq.empty,
         update = start.contractId.exerciseAmuletRules_AddFutureAmuletConfigSchedule(newSchedule),
         domainId = Some(start.domain),

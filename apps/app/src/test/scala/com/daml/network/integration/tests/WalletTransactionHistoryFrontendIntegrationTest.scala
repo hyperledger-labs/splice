@@ -58,7 +58,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         charlieWalletClient,
       )
 
-      val svcEntry = expectedSvcCns
+      val dsoEntry = expectedDsoCns
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
@@ -147,7 +147,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "CNS Entry Initial Payment Collected",
-              expectedPartyDescription = Some(s"$svcEntry $svcEntry"),
+              expectedPartyDescription = Some(s"$dsoEntry $dsoEntry"),
               expectedAmountCC = BigDecimal(0), // 0 USD
             )
             matchTransaction(lockForCns)(
@@ -182,11 +182,11 @@ class WalletTransactionHistoryFrontendIntegrationTest
           _ => {
             val txs = findAll(className("tx-row")).toSeq
             val sv1ValidatorParty = sv1WalletClient.userStatus().party
-            val svcParty = sv1ScanBackend.getSvcPartyId()
+            val dsoParty = sv1ScanBackend.getDsoPartyId()
             val sv1Name =
               sv1Backend
-                .getSvcInfo()
-                .svcRules
+                .getDsoInfo()
+                .dsoRules
                 .payload
                 .members
                 .asScala
@@ -199,7 +199,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedAction = "Sent",
                 expectedSubtype = "Extra Traffic Purchase",
                 expectedPartyDescription = Some(
-                  s"${expectedCns(svcParty, "dso.ans")} ${expectedCns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.ans")}"
+                  s"${expectedCns(dsoParty, "dso.ans")} ${expectedCns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.ans")}"
                 ),
                 expectedAmountCC = -trafficCostCc,
               )

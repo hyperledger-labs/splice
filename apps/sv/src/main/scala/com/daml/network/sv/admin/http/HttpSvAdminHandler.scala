@@ -23,7 +23,7 @@ import com.daml.network.sv.migration.{
   DomainMigrationDump,
   DomainNodeIdentities,
 }
-import com.daml.network.sv.store.{SvSvStore, SvSvcStore}
+import com.daml.network.sv.store.{SvSvStore, SvDsoStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
 import com.daml.network.util.{BackupDump, Codec, TemplateJsonDecoder}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -45,7 +45,7 @@ class HttpSvAdminHandler(
     config: SvAppBackendConfig,
     optDomainMigrationDumpConfig: Option[Path],
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-    svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+    dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
     cometBftClient: Option[CometBftClient],
     localDomainNode: Option[LocalDomainNode],
     participantAdminConnection: ParticipantAdminConnection,
@@ -66,7 +66,7 @@ class HttpSvAdminHandler(
 
   private val workflowId = this.getClass.getSimpleName
   private val svStore = svStoreWithIngestion.store
-  private val svcStore = svcStoreWithIngestion.store
+  private val dsoStore = dsoStoreWithIngestion.store
 
   def listOngoingValidatorOnboardings(
       respond: v0.SvAdminResource.ListOngoingValidatorOnboardingsResponse.type
@@ -89,7 +89,7 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.listValidatorLicenses") { _ => _ =>
       for {
-        validatorLicenses <- svcStore.listValidatorLicenses()
+        validatorLicenses <- dsoStore.listValidatorLicenses()
       } yield {
         definitions.ListValidatorLicensesResponse(
           validatorLicenses.map(_.toHttp).toVector
@@ -107,15 +107,15 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.prepareValidatorOnboarding") { _ => _ =>
       val secret = generateRandomOnboardingSecret()
       val expiresIn = NonNegativeFiniteDuration.ofSeconds(body.expiresIn.toLong)
-      svcStore
-        .getSvcRules()
-        .flatMap { svcRules =>
+      dsoStore
+        .getDsoRules()
+        .flatMap { dsoRules =>
           SvApp
             .prepareValidatorOnboarding(
               secret,
               expiresIn,
               svStoreWithIngestion,
-              svcRules.domain,
+              dsoRules.domain,
               clock,
               logger,
             )
@@ -137,7 +137,7 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.listAmuletPriceVotes") { _ => _ =>
       for {
-        amuletPriceVotes <- svcStore.listAmuletPriceVotes()
+        amuletPriceVotes <- dsoStore.listAmuletPriceVotes()
       } yield {
         definitions.ListAmuletPriceVotesResponse(
           amuletPriceVotes.map(_.toHttp).toVector
@@ -152,7 +152,7 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.listOpenMiningRounds") { _ => _ =>
       for {
-        openMiningRoundTriple <- svcStore.lookupOpenMiningRoundTriple()
+        openMiningRoundTriple <- dsoStore.lookupOpenMiningRoundTriple()
       } yield {
         definitions.ListOpenMiningRoundsResponse(
           (openMiningRoundTriple match {
@@ -175,7 +175,7 @@ class HttpSvAdminHandler(
       SvApp
         .updateAmuletPriceVote(
           amuletPrice,
-          svcStoreWithIngestion,
+          dsoStoreWithIngestion,
           logger,
         )
         .flatMap {
@@ -204,7 +204,7 @@ class HttpSvAdminHandler(
         .createElectionRequest(
           body.requester,
           body.ranking,
-          svcStoreWithIngestion,
+          dsoStoreWithIngestion,
         )
         .flatMap {
           case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
@@ -219,7 +219,7 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getElectionRequest") { _ => _ =>
       for {
-        electionRequests <- SvApp.getElectionRequest(svcStoreWithIngestion)
+        electionRequests <- SvApp.getElectionRequest(dsoStoreWithIngestion)
       } yield {
         definitions.GetElectionRequestResponse(
           electionRequests.map(_.toHttp).toVector
@@ -240,7 +240,7 @@ class HttpSvAdminHandler(
           body.url,
           body.description,
           body.expiration,
-          svcStoreWithIngestion,
+          dsoStoreWithIngestion,
         )
         .flatMap {
           case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
@@ -249,16 +249,16 @@ class HttpSvAdminHandler(
     }
   }
 
-  def listSvcRulesVoteRequests(
-      respond: v0.SvAdminResource.ListSvcRulesVoteRequestsResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListSvcRulesVoteRequestsResponse] = {
+  def listDsoRulesVoteRequests(
+      respond: v0.SvAdminResource.ListDsoRulesVoteRequestsResponse.type
+  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListDsoRulesVoteRequestsResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.listSvcRulesVoteRequests") { _ => _ =>
+    withSpan(s"$workflowId.listDsoRulesVoteRequests") { _ => _ =>
       for {
-        svcRulesVoteRequests <- svcStore.listVoteRequests()
+        dsoRulesVoteRequests <- dsoStore.listVoteRequests()
       } yield {
-        definitions.ListSvcRulesVoteRequestsResponse(
-          svcRulesVoteRequests.map(_.toHttp).toVector
+        definitions.ListDsoRulesVoteRequestsResponse(
+          dsoRulesVoteRequests.map(_.toHttp).toVector
         )
       }
     }
@@ -270,9 +270,9 @@ class HttpSvAdminHandler(
       body: definitions.ListVoteResultsRequest
   )(tuser: TracedUser): Future[v0.SvAdminResource.ListVoteRequestResultsResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.listSvcRulesVoteResults") { _ => _ =>
+    withSpan(s"$workflowId.listDsoRulesVoteResults") { _ => _ =>
       for {
-        voteResults <- svcStore.listVoteRequestResults(
+        voteResults <- dsoStore.listVoteRequestResults(
           body.actionName,
           body.executed,
           body.requester,
@@ -281,7 +281,7 @@ class HttpSvAdminHandler(
           PageLimit.tryCreate(body.limit.intValue),
         )
       } yield {
-        definitions.ListSvcRulesVoteResultsResponse(
+        definitions.ListDsoRulesVoteResultsResponse(
           voteResults
             .map(_.toJson)
             .map(json =>
@@ -295,22 +295,22 @@ class HttpSvAdminHandler(
     }
   }
 
-  def lookupSvcRulesVoteRequest(
-      respond: v0.SvAdminResource.LookupSvcRulesVoteRequestResponse.type
+  def lookupDsoRulesVoteRequest(
+      respond: v0.SvAdminResource.LookupDsoRulesVoteRequestResponse.type
   )(
       voteRequestContractId: String
-  )(tuser: TracedUser): Future[v0.SvAdminResource.LookupSvcRulesVoteRequestResponse] = {
+  )(tuser: TracedUser): Future[v0.SvAdminResource.LookupDsoRulesVoteRequestResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.lookupSvcRulesVoteRequest") { _ => _ =>
-      svcStore
+    withSpan(s"$workflowId.lookupDsoRulesVoteRequest") { _ => _ =>
+      dsoStore
         .lookupVoteRequest(
-          new cn.svcrules.VoteRequest.ContractId(voteRequestContractId)
+          new cn.dsorules.VoteRequest.ContractId(voteRequestContractId)
         )
         .flatMap {
           case Some(voteRequest) =>
             Future.successful(
-              v0.SvAdminResource.LookupSvcRulesVoteRequestResponse.OK(
-                definitions.LookupSvcRulesVoteRequestResponse(
+              v0.SvAdminResource.LookupDsoRulesVoteRequestResponse.OK(
+                definitions.LookupDsoRulesVoteRequestResponse(
                   voteRequest.toHttp
                 )
               )
@@ -332,11 +332,11 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.castVote") { _ => _ =>
       SvApp
         .castVote(
-          new cn.svcrules.VoteRequest.ContractId(body.voteRequestContractId),
+          new cn.dsorules.VoteRequest.ContractId(body.voteRequestContractId),
           body.isAccepted,
           body.reasonUrl,
           body.reasonDescription,
-          svcStoreWithIngestion,
+          dsoStoreWithIngestion,
           retryProvider,
           logger,
         )
@@ -355,12 +355,12 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.listVoteRequestsByTrackingCid") { _ => _ =>
       for {
-        svcRulesVotes <- svcStore.listVoteRequestsByTrackingCid(
-          body.voteRequestContractIds.map(new cn.svcrules.VoteRequest.ContractId(_))
+        dsoRulesVotes <- dsoStore.listVoteRequestsByTrackingCid(
+          body.voteRequestContractIds.map(new cn.dsorules.VoteRequest.ContractId(_))
         )
       } yield {
         definitions.ListVoteRequestByTrackingCidResponse(
-          svcRulesVotes.map(_.toHttp).toVector
+          dsoRulesVotes.map(_.toHttp).toVector
         )
       }
     }
@@ -422,7 +422,7 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.pauseGlobalDomain") { _ => _ =>
       for {
-        globalDomain <- svcStore.getSvcRules().map(_.domain)
+        globalDomain <- dsoStore.getDsoRules().map(_.domain)
         _ <- changeDomainRatePerParticipant(globalDomain, NonNegativeInt.zero)
       } yield v0.SvAdminResource.PauseGlobalDomainResponseOK
     }
@@ -434,7 +434,7 @@ class HttpSvAdminHandler(
     implicit val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.unpauseGlobalDomain") { _ => _ =>
       for {
-        globalDomain <- svcStore.getSvcRules().map(_.domain)
+        globalDomain <- dsoStore.getDsoRules().map(_.domain)
         _ <- changeDomainRatePerParticipant(
           globalDomain,
           DynamicDomainParameters.defaultConfirmationRequestsMaxRate,
@@ -450,8 +450,8 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.getDomainMigrationDump") { implicit tc => _ =>
       localDomainNode match {
         case Some(domainNode) =>
-          svcStore.getSvcRules().flatMap { svcRules =>
-            svcRules.payload.config.nextScheduledDomainUpgrade.toScala match {
+          dsoStore.getDsoRules().flatMap { dsoRules =>
+            dsoRules.payload.config.nextScheduledDomainUpgrade.toScala match {
               case Some(scheduled) =>
                 DomainMigrationDump
                   .getDomainMigrationDump(
@@ -459,7 +459,7 @@ class HttpSvAdminHandler(
                     participantAdminConnection,
                     domainNode,
                     loggerFactory,
-                    svcStore,
+                    dsoStore,
                     scheduled.migrationId,
                     domainDataSnapshotGenerator,
                   )
@@ -515,7 +515,7 @@ class HttpSvAdminHandler(
             .getDomainNodeIdentities(
               participantAdminConnection,
               domainNode,
-              svcStore,
+              dsoStore,
               config.domains.global.alias,
               loggerFactory,
             )
@@ -589,7 +589,7 @@ class HttpSvAdminHandler(
                     participantAdminConnection,
                     domainNode,
                     loggerFactory,
-                    svcStore,
+                    dsoStore,
                     request.migrationId,
                     domainDataSnapshotGenerator,
                   )

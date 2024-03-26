@@ -23,13 +23,13 @@ testTransferOffers = script do
   aliceInstall <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "alice"
-    svcParty = app.svc
+    dsoParty = app.dso
     validatorParty = aliceValidator.primaryParty
 
   bobInstall <- submitMulti [bob.primaryParty, bobValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
     endUserParty = bob.primaryParty
     endUserName = "bob"
-    svcParty = app.svc
+    dsoParty = app.dso
     validatorParty = bobValidator.primaryParty
 
   let createOffer amount description curTime trackingId = submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall
@@ -40,8 +40,8 @@ testTransferOffers = script do
           expiresAt = curTime `addRelTime` minutes 5
           trackingId = trackingId
 
--- TODO(#2957): remove read-as SVC.
-  let completeTransfer accepted amulet transferContext = submitMulti [aliceValidator.primaryParty] [alice.primaryParty, aliceValidator.primaryParty, app.svc] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
+-- TODO(#2957): remove read-as DSO.
+  let completeTransfer accepted amulet transferContext = submitMulti [aliceValidator.primaryParty] [alice.primaryParty, aliceValidator.primaryParty, app.dso] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
         inputs = [InputAmulet amulet]
         operations = [CO_CompleteAcceptedTransfer accepted]
         context = transferContext

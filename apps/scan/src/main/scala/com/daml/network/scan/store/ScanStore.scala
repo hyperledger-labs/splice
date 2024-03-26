@@ -44,7 +44,7 @@ object SortOrder {
 }
 final case class ScanInfo(publicUrl: String, memberName: String)
 
-/** Utility class grouping the two kinds of stores managed by the SvcApp. */
+/** Utility class grouping the two kinds of stores managed by the DsoApp. */
 trait ScanStore
     extends CNNodeAppStore[
       TxLogEntry
@@ -90,15 +90,15 @@ trait ScanStore
       )
     )
 
-  /** Returns all items extracted by `f` from the SvcRules ensuring that they're sorted by domainId,
+  /** Returns all items extracted by `f` from the DsoRules ensuring that they're sorted by domainId,
     * so that the order is deterministic.
     */
   def listFromSvNodeStates[T](
-      f: cn.svc.memberstate.SvNodeState => Vector[(String, T)]
+      f: cn.dso.memberstate.SvNodeState => Vector[(String, T)]
   )(implicit tc: TraceContext): Future[Vector[(String, Vector[T])]] = {
     for {
-      svcRules <- getSvcRules()
-      nodeStates <- Future.traverse(svcRules.payload.members.asScala.keys) { svPartyId =>
+      dsoRules <- getDsoRules()
+      nodeStates <- Future.traverse(dsoRules.payload.members.asScala.keys) { svPartyId =>
         getSvNodeState(PartyId.tryFromProtoPrimitive(svPartyId))
       }
     } yield {
@@ -108,7 +108,7 @@ trait ScanStore
     }
   }
 
-  def listSvcScans()(implicit tc: TraceContext): Future[Vector[(String, Vector[ScanInfo])]] = {
+  def listDsoScans()(implicit tc: TraceContext): Future[Vector[(String, Vector[ScanInfo])]] = {
     listFromSvNodeStates { nodeState =>
       for {
         (domainId, domainConfig) <- nodeState.state.domainNodes.asScala.toVector
@@ -138,17 +138,17 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[ContractWithState[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]]
 
-  def lookupSvcRules()(implicit
+  def lookupDsoRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]]]
+  ): Future[Option[ContractWithState[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]]]
 
-  private def getSvcRules()(implicit
+  private def getDsoRules()(implicit
       tc: TraceContext
-  ): Future[ContractWithState[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]] =
-    lookupSvcRules().map(
+  ): Future[ContractWithState[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]] =
+    lookupDsoRules().map(
       _.getOrElse(
         throw Status.NOT_FOUND
-          .withDescription("No active SvcRules contract")
+          .withDescription("No active DsoRules contract")
           .asRuntimeException()
       )
     )
@@ -247,13 +247,13 @@ trait ScanStore
   def lookupSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[
-    AssignedContract[cn.svc.memberstate.SvNodeState.ContractId, cn.svc.memberstate.SvNodeState]
+    AssignedContract[cn.dso.memberstate.SvNodeState.ContractId, cn.dso.memberstate.SvNodeState]
   ]]
 
   def getSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[
-    AssignedContract[cn.svc.memberstate.SvNodeState.ContractId, cn.svc.memberstate.SvNodeState]
+    AssignedContract[cn.dso.memberstate.SvNodeState.ContractId, cn.dso.memberstate.SvNodeState]
   ] =
     lookupSvNodeState(svPartyId).map(
       _.getOrElse(
@@ -267,11 +267,11 @@ trait ScanStore
 object ScanStore {
 
   case class Key(
-      /** The party-id of the SVC whose public data this scan is distributing. */
-      svcParty: PartyId
+      /** The party-id of the DSO whose public data this scan is distributing. */
+      dsoParty: PartyId
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
-      param("svcParty", _.svcParty)
+      param("dsoParty", _.dsoParty)
     )
   }
 
@@ -311,66 +311,66 @@ object ScanStore {
       domainMigrationId: Long,
   ): MultiDomainAcsStore.ContractFilter[ScanAcsStoreRowData] = {
     import MultiDomainAcsStore.mkFilter
-    val svc = key.svcParty.toProtoPrimitive
+    val dso = key.dsoParty.toProtoPrimitive
 
     MultiDomainAcsStore.SimpleContractFilter(
-      key.svcParty,
+      key.dsoParty,
       Map(
-        mkFilter(cc.amuletrules.AmuletRules.COMPANION)(co => co.payload.svc == svc)(
+        mkFilter(cc.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
           ScanAcsStoreRowData(_)
         ),
-        mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc)(ScanAcsStoreRowData(_)),
-        mkFilter(cn.svcrules.SvcRules.COMPANION)(co => co.payload.svc == svc)(
+        mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.dso == dso)(ScanAcsStoreRowData(_)),
+        mkFilter(cn.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso)(
           ScanAcsStoreRowData(_)
         ),
-        mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+        mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
             round = Some(contract.payload.round.number),
           )
         },
-        mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+        mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             round = Some(contract.payload.round.number),
           )
         },
-        mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc) { contract =>
+        mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.targetClosesAt)),
             round = Some(contract.payload.round.number),
           )
         },
-        mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc) {
+        mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.dso == dso) {
           contract =>
             ScanAcsStoreRowData(
               contract = contract,
               round = Some(contract.payload.round.number),
             )
         },
-        mkFilter(cc.amulet.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc) { contract =>
+        mkFilter(cc.amulet.FeaturedAppRight.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             featuredAppRightProvider =
               Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
           )
         },
-        mkFilter(cc.amulet.Amulet.COMPANION)(co => co.payload.svc == svc) { contract =>
+        mkFilter(cc.amulet.Amulet.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             amount = Some(contract.payload.amount.initialAmount),
           )
         },
-        mkFilter(cc.amulet.LockedAmulet.COMPANION)(co => co.payload.amulet.svc == svc) { contract =>
+        mkFilter(cc.amulet.LockedAmulet.COMPANION)(co => co.payload.amulet.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.lock.expiresAt)),
             amount = Some(contract.payload.amulet.amount.initialAmount),
           )
         },
-        mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc) { contract =>
+        mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             cnsEntryName = Some(contract.payload.name),
@@ -378,7 +378,7 @@ object ScanStore {
           )
         },
         mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt =>
-          vt.payload.svc == svc && vt.payload.migrationId == domainMigrationId
+          vt.payload.dso == dso && vt.payload.migrationId == domainMigrationId
         ) { contract =>
           ScanAcsStoreRowData(
             contract,
@@ -393,7 +393,7 @@ object ScanStore {
             totalTrafficPurchased = Some(contract.payload.totalPurchased),
           )
         },
-        mkFilter(cc.validatorlicense.ValidatorLicense.COMPANION)(co => co.payload.svc == svc) {
+        mkFilter(cc.validatorlicense.ValidatorLicense.COMPANION)(co => co.payload.dso == dso) {
           contract =>
             val roundsCollected = contract.payload.faucetState.map { faucetState =>
               faucetState.lastReceivedFor.number - faucetState.firstReceivedFor.number - faucetState.numCouponsMissed + 1L
@@ -403,7 +403,7 @@ object ScanStore {
               validatorLicenseRoundsCollected = Some(roundsCollected.orElse(0L)),
             )
         },
-        mkFilter(cn.svc.memberstate.SvNodeState.COMPANION)(co => co.payload.svc == svc) {
+        mkFilter(cn.dso.memberstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) {
           contract =>
             ScanAcsStoreRowData(
               contract,

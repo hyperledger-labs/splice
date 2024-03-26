@@ -6,7 +6,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svcrules.ElectionRequest
+import com.daml.network.codegen.java.cn.dsorules.ElectionRequest
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -27,7 +27,7 @@ class ExpireElectionRequestsTrigger(
       ElectionRequest.ContractId,
       ElectionRequest,
     ]] {
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -52,16 +52,16 @@ class ExpireElectionRequestsTrigger(
         ElectionRequest,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = for {
-    svcRules <- store.getSvcRules()
-    cmd = svcRules.exercise(
-      _.exerciseSvcRules_ArchiveOutdatedElectionRequest(
+    dsoRules <- store.getDsoRules()
+    cmd = dsoRules.exercise(
+      _.exerciseDsoRules_ArchiveOutdatedElectionRequest(
         task.contractId
       )
     )
     _ <- svTaskContext.connection
       .submit(
         Seq(store.key.svParty),
-        Seq(store.key.svcParty),
+        Seq(store.key.dsoParty),
         cmd,
       )
       .noDedup

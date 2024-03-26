@@ -94,7 +94,7 @@ private[onboarding] object SetupUtil {
               ) { scanConnection =>
                 scanConnection.getAcsSnapshot(partyId)
               },
-            Seq(DarResources.cantonAmulet.bootstrap, DarResources.svcGovernance.bootstrap),
+            Seq(DarResources.cantonAmulet.bootstrap, DarResources.dsoGovernance.bootstrap),
           )
         case None =>
           connection.ensureUserPrimaryPartyIsAllocated(
@@ -106,27 +106,27 @@ private[onboarding] object SetupUtil {
     }
   }
 
-  def ensureSvcPartyMetadataAnnotation(
+  def ensureDsoPartyMetadataAnnotation(
       connection: CNLedgerConnection,
       config: SvAppBackendConfig,
-      svcParty: PartyId,
+      dsoParty: PartyId,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
     connection.ensureUserMetadataAnnotation(
       config.ledgerApiUser,
-      BaseLedgerConnection.SVC_PARTY_USER_METADATA_KEY,
-      svcParty.toProtoPrimitive,
+      BaseLedgerConnection.DSO_PARTY_USER_METADATA_KEY,
+      dsoParty.toProtoPrimitive,
       RetryFor.WaitingOnInitDependency,
     )
 
-  def grantSvUserRightReadAsSvc(
+  def grantSvUserRightReadAsDso(
       connection: CNLedgerConnection,
       user: String,
-      svc: PartyId,
+      dso: PartyId,
   ): Future[Unit] = {
     connection.grantUserRights(
       user,
       Seq.empty,
-      Seq(svc),
+      Seq(dso),
     )
   }
 }

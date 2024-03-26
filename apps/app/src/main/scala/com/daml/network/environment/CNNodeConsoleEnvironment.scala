@@ -37,7 +37,7 @@ class CNNodeConsoleEnvironment(
       DarResources.validatorLifecycle.all ++
       DarResources.wallet.all ++
       DarResources.cantonAmulet.all ++
-      DarResources.svcGovernance.all
+      DarResources.dsoGovernance.all
   )
   implicit val actorSystem: ActorSystem = environment.actorSystem
   val templateDecoder = new ResourceTemplateDecoder(packageSignatures, environment.loggerFactory)
@@ -72,20 +72,20 @@ class CNNodeConsoleEnvironment(
   ] = {
     NodeReferences(
       mergeLocalCNNodeInstances(
-        fullSvcApps.local,
+        fullDsoApps.local,
         appsHostedByValidator.local,
         appsHostedByThirdParty.local,
       ),
       mergeRemoteCNNodeInstances(
-        fullSvcApps.remote,
+        fullDsoApps.remote,
         appsHostedByValidator.remote,
         appsHostedByThirdParty.remote,
       ),
     )
   }
 
-  /* Local apps that are (in the target deployment) operated by the SVC */
-  lazy val fullSvcApps = NodeReferences(
+  /* Local apps that are (in the target deployment) operated by the DSO */
+  lazy val fullDsoApps = NodeReferences(
     mergeLocalCNNodeInstances(
       svs.local,
       scans.local,
@@ -98,8 +98,8 @@ class CNNodeConsoleEnvironment(
     ),
   )
 
-  /* Local apps that are (in the target deployment) operated by the SVC with only Sv1 */
-  lazy val minimalSvcApps = NodeReferences(
+  /* Local apps that are (in the target deployment) operated by the DSO with only Sv1 */
+  lazy val minimalDsoApps = NodeReferences(
     mergeLocalCNNodeInstances(
       svs.local.filter(sv => sv.name == "sv1"),
       scans.local.filter(sv => sv.name == "sv1Scan"),
@@ -324,9 +324,9 @@ class CNNodeConsoleEnvironment(
           TopLevelValue(scan.name, helpText("scan app client", scan.name), scan, Seq("Scan"))
         )
         .toList :+ TopLevelValue(
-        "fullSvcApps",
-        helpText("All local apps hosted by the SVC" + genericNodeReferencesDoc, "fullSvcApps"),
-        fullSvcApps,
+        "fullDsoApps",
+        helpText("All local apps hosted by the DSO" + genericNodeReferencesDoc, "fullDsoApps"),
+        fullDsoApps,
         Seq("App References"),
       ) :+ TopLevelValue(
         "appsHostedByValidator",

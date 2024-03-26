@@ -2,7 +2,7 @@ package com.daml.network.integration.tests.runbook
 
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
-import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.SvcInfo
+import com.daml.network.sv.admin.api.client.commands.HttpSvAppClient.DsoInfo
 import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.duration.*
 
@@ -14,7 +14,7 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
       svUiUrl: String,
       svUsername: String,
       svPassword: String,
-      svInfo: Option[SvcInfo],
+      svInfo: Option[DsoInfo],
       votedSvParties: Seq[PartyId],
       isDevNet: Boolean,
       extraChecks: => Unit = (),
@@ -34,7 +34,7 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
         s"We see a table with correct info data about the SV",
         _ => {
           svInfo.foreach(si =>
-            inside(findAll(className("general-svc-value-name")).toSeq.take(2)) {
+            inside(findAll(className("general-dso-value-name")).toSeq.take(2)) {
               case Seq(svUser, svPartyId) =>
                 seleniumText(svUser) should matchText(si.svUser)
                 seleniumText(svPartyId) should matchText(si.svParty.toProtoPrimitive)
@@ -43,7 +43,7 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
         },
       )
 
-      actAndCheck("Go to general information tab", click on "navlink-svc")(
+      actAndCheck("Go to general information tab", click on "navlink-dso")(
         "button for domain status appears",
         _ => find(id("information-tab-canton-domain-status")) should not be empty,
       )

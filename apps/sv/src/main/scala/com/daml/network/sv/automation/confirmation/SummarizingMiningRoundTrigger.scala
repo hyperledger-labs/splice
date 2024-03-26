@@ -11,12 +11,12 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_MiningRound_StartIssuing
 import com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary
 import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
-import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_AmuletRules
-import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
+import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class SummarizingMiningRoundTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     connection: CNLedgerConnection,
 )(implicit
     ec: ExecutionContext,
@@ -42,7 +42,7 @@ class SummarizingMiningRoundTrigger(
     ) {
 
   private val svParty = store.key.svParty
-  private val svcParty = store.key.svcParty
+  private val dsoParty = store.key.dsoParty
 
   private def amuletRulesStartIssuingAction(
       miningRoundCid: SummarizingMiningRound.ContractId,
@@ -68,14 +68,14 @@ class SummarizingMiningRoundTrigger(
         summarizingRound.payload.round.number,
         summarizingRound.domain,
       )
-      svcRules <- store.getSvcRules()
+      dsoRules <- store.getDsoRules()
       action = amuletRulesStartIssuingAction(
         summarizingRound.contractId,
         rewards.summary,
       )
       queryResult <- store.lookupConfirmationByActionWithOffset(svParty, action)
-      cmd = svcRules.exercise(
-        _.exerciseSvcRules_ConfirmAction(
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_ConfirmAction(
           svParty.toProtoPrimitive,
           action,
         )
@@ -91,13 +91,13 @@ class SummarizingMiningRoundTrigger(
           connection
             .submit(
               actAs = Seq(svParty),
-              readAs = Seq(svcParty),
+              readAs = Seq(dsoParty),
               update = cmd,
             )
             .withDedup(
               commandId = CNLedgerConnection.CommandId(
                 "com.daml.network.sv.createMiningRoundStartIssuingConfirmation",
-                Seq(svParty, svcParty),
+                Seq(svParty, dsoParty),
                 summarizingRound.contractId.contractId,
               ),
               deduplicationOffset = offset,

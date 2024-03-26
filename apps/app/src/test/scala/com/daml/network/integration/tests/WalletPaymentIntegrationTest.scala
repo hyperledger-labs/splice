@@ -125,7 +125,7 @@ class WalletPaymentIntegrationTest
               )
             ).asJava,
             aliceUserParty.toProtoPrimitive,
-            svcParty.toProtoPrimitive,
+            dsoParty.toProtoPrimitive,
             r.payload.lockedAmulet,
             r.payload.round,
             cid,

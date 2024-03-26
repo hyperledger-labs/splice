@@ -11,7 +11,7 @@ import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
 import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.svcrules.*
+import com.daml.network.codegen.java.cn.dsorules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
@@ -26,7 +26,7 @@ import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.automation.{
   LeaderBasedAutomationService,
   SvSvAutomationService,
-  SvSvcAutomationService,
+  SvDsoAutomationService,
 }
 import com.daml.network.sv.cometbft.{
   CometBftClient,
@@ -40,8 +40,8 @@ import com.daml.network.sv.migration.{DomainDataSnapshotGenerator, DomainNodeIde
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
-import com.daml.network.sv.onboarding.sponsor.SvcPartyMigration
-import com.daml.network.sv.store.{SvSvcStore, SvSvStore}
+import com.daml.network.sv.onboarding.sponsor.DsoPartyMigration
+import com.daml.network.sv.store.{SvDsoStore, SvSvStore}
 import com.daml.network.sv.util.SvOnboardingToken
 import com.daml.network.util.{
   BackupDump,
@@ -116,7 +116,7 @@ class SvApp(
     .filter(_.enabled)
 
   override def packages: Seq[DarResource] =
-    super.packages ++ DarResources.svcGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.cantonNameService.all
+    super.packages ++ DarResources.dsoGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.cantonNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit tc: TraceContext): Future[Unit] = {
     val participantAdminConnection = new ParticipantAdminConnection(
@@ -271,15 +271,15 @@ class SvApp(
           loggerFactory,
           retryProvider,
         )
-      // Ensure SVC party, SvcRules, AmuletRules, Mediator, and Sequencer nodes are setup
+      // Ensure DSO party, DsoRules, AmuletRules, Mediator, and Sequencer nodes are setup
       // -------------------------------------------------------------------------------
       case (
         globalDomain,
-        svcPartyHosting,
+        dsoPartyHosting,
         svStore,
         svAutomation,
-        svcStore,
-        svcAutomation,
+        dsoStore,
+        dsoAutomation,
       ) <-
       // We branch here on the type of onboarding config, as bootstrapping
       // a fresh collective is fundamentally different from joining an existing collective
@@ -338,19 +338,19 @@ class SvApp(
 
       (_, _, isDevNet, _, _, _) <- (
         // TODO(#5141) Remove the comment about DAR uploads.
-        // We create the validator user only after the SVC party migration and DAR uploads have completed. This avoids two issues:
-        // 1. The ValidatorLicense has both the SVC and the SV as a stakeholder.
-        //    That can cause problems during the SVC party migration because the contract is imported there
+        // We create the validator user only after the DSO party migration and DAR uploads have completed. This avoids two issues:
+        // 1. The ValidatorLicense has both the DSO and the SV as a stakeholder.
+        //    That can cause problems during the DSO party migration because the contract is imported there
         //    but could also be imported through the stream of the SV party. By only creating the validator user here
         //    we ensure that the party migration has been completed before the contract is created.
         // 2. Concurrent DAR uploads currently break Canton's topology state management.
         appInitStep("Initialize validator") {
-          SvApp.initializeValidator(svcAutomation, config, retryProvider, logger)
+          SvApp.initializeValidator(dsoAutomation, config, retryProvider, logger)
         },
         // Ensure Daml-level invariants for the SV
         // ----------------------------------------
 
-        // At this point the complex setup of SVC party, sequencer, and mediators is done
+        // At this point the complex setup of DSO party, sequencer, and mediators is done
         // What remains is setting up some SV-level Daml state.
         appInitStep("Expect configured validator onboardings") {
           expectConfiguredValidatorOnboardings(
@@ -364,7 +364,7 @@ class SvApp(
             RetryFor.WaitingOnInitDependency,
             "get_amulet_rules",
             "get AmuletRules to determine if we are in a DevNet",
-            svcStore.getAmuletRules().map(amuletRules => amuletRules.payload.isDevNet),
+            dsoStore.getAmuletRules().map(amuletRules => amuletRules.payload.isDevNet),
             logger,
           )
         },
@@ -373,7 +373,7 @@ class SvApp(
             .map(
               ensureAmuletPriceVoteHasAmuletPrice(
                 _,
-                svcAutomation,
+                dsoAutomation,
                 logger,
               )
             )
@@ -383,7 +383,7 @@ class SvApp(
           SvApp.backupNodeIdentities(
             config,
             localDomainNode,
-            svcStore,
+            dsoStore,
             participantAdminConnection,
             clock,
             logger,
@@ -411,19 +411,19 @@ class SvApp(
       handler = new HttpSvHandler(
         config.ledgerApiUser,
         svAutomation,
-        svcAutomation,
+        dsoAutomation,
         isDevNet,
         config,
         clock,
         participantAdminConnection,
         localDomainNode,
         retryProvider,
-        new SvcPartyMigration(
+        new DsoPartyMigration(
           svAutomation,
-          svcAutomation,
+          dsoAutomation,
           participantAdminConnection,
           retryProvider,
-          svcPartyHosting,
+          dsoPartyHosting,
           loggerFactory,
         ),
         cometBftClient,
@@ -434,7 +434,7 @@ class SvApp(
         config,
         config.domainMigrationDumpPath,
         svAutomation,
-        svcAutomation,
+        dsoAutomation,
         cometBftClient,
         localDomainNode,
         participantAdminConnection,
@@ -447,7 +447,7 @@ class SvApp(
               )
               .sequencerAdminConnection
           ),
-          svcStore,
+          dsoStore,
           new AcsExporter(participantAdminConnection, retryProvider, loggerFactory),
         ),
         clock,
@@ -519,9 +519,9 @@ class SvApp(
         localDomainNode,
         storage,
         svStore,
-        svcStore,
+        dsoStore,
         svAutomation,
-        svcAutomation,
+        dsoAutomation,
         binding,
         logger,
         timeouts,
@@ -534,12 +534,12 @@ class SvApp(
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
   protected[this] override def automationServices(st: SvApp.State) =
-    Seq(LeaderBasedAutomationService, st.svAutomation, st.svcAutomation)
+    Seq(LeaderBasedAutomationService, st.svAutomation, st.dsoAutomation)
 
   private val darFilesToUploadDuringInit: Seq[UploadablePackage] =
     Seq(
       SvApp.amuletPackage,
-      SvApp.svcGovernancePackage,
+      SvApp.dsoGovernancePackage,
       SvApp.validatorLifecyclePackage,
     )
 
@@ -656,10 +656,10 @@ class SvApp(
 
   private def ensureAmuletPriceVoteHasAmuletPrice(
       defaultAmuletPriceVote: BigDecimal,
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
       logger: TracedLogger,
   )(implicit tc: TraceContext): Future[Either[String, Unit]] =
-    svcStoreWithIngestion.store.lookupAmuletPriceVoteByThisSv().flatMap {
+    dsoStoreWithIngestion.store.lookupAmuletPriceVoteByThisSv().flatMap {
       case Some(vote) if vote.payload.amuletPrice.toScala.isDefined =>
         logger.info(s"A amulet price vote with a defined amulet price already exists")
         Future.successful(Right(()))
@@ -671,7 +671,7 @@ class SvApp(
           SvApp
             .updateAmuletPriceVote(
               defaultAmuletPriceVote,
-              svcStoreWithIngestion,
+              dsoStoreWithIngestion,
               logger,
             ),
           logger,
@@ -685,9 +685,9 @@ object SvApp {
       localDomainNode: Option[LocalDomainNode],
       storage: Storage,
       svStore: SvSvStore,
-      svcStore: SvSvcStore,
+      dsoStore: SvDsoStore,
       svAutomation: SvSvAutomationService,
-      svcAutomation: SvSvcAutomationService,
+      dsoAutomation: SvDsoAutomationService,
       binding: Http.ServerBinding,
       logger: TracedLogger,
       timeouts: ProcessingTimeout,
@@ -697,7 +697,7 @@ object SvApp {
       extends FlagCloseableAsync
       with HasHealth {
     override def isHealthy: Boolean =
-      storage.isActive && svAutomation.isHealthy && svcAutomation.isHealthy
+      storage.isActive && svAutomation.isHealthy && dsoAutomation.isHealthy
 
     override def closeAsync(): Seq[AsyncOrSyncCloseable] =
       Seq(
@@ -715,9 +715,9 @@ object SvApp {
           participantAdminConnection.close(),
         ),
         SyncCloseable("sv automation", svAutomation.close()),
-        SyncCloseable("svc automation", svcAutomation.close()),
+        SyncCloseable("dso automation", dsoAutomation.close()),
         SyncCloseable("sv store", svStore.close()),
-        SyncCloseable("svc store", svcStore.close()),
+        SyncCloseable("dso store", dsoStore.close()),
         SyncCloseable("storage", storage.close()),
       )
   }
@@ -777,28 +777,28 @@ object SvApp {
 
   def updateAmuletPriceVote(
       desiredAmuletPrice: BigDecimal,
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
-    val svcStore = svcStoreWithIngestion.store
-    svcStore.lookupAmuletPriceVoteByThisSv().flatMap {
+    val dsoStore = dsoStoreWithIngestion.store
+    dsoStore.lookupAmuletPriceVoteByThisSv().flatMap {
       case Some(vote) if vote.payload.amuletPrice.toScala.contains(desiredAmuletPrice.bigDecimal) =>
         logger.info(s"Amulet price vote is already set to $desiredAmuletPrice")
         Future.successful(Right(()))
       case Some(vote) =>
         for {
-          svcRules <- svcStore.getSvcRules()
-          cmd = svcRules.exercise(
-            _.exerciseSvcRules_UpdateAmuletPriceVote(
-              svcStore.key.svParty.toProtoPrimitive,
+          dsoRules <- dsoStore.getDsoRules()
+          cmd = dsoRules.exercise(
+            _.exerciseDsoRules_UpdateAmuletPriceVote(
+              dsoStore.key.svParty.toProtoPrimitive,
               vote.contractId,
               desiredAmuletPrice.bigDecimal,
             )
           )
-          _ <- svcStoreWithIngestion.connection
+          _ <- dsoStoreWithIngestion.connection
             .submit(
-              actAs = Seq(svcStore.key.svParty),
-              readAs = Seq(svcStore.key.svcParty),
+              actAs = Seq(dsoStore.key.svParty),
+              readAs = Seq(dsoStore.key.dsoParty),
               update = cmd,
             )
             .noDedup
@@ -807,63 +807,63 @@ object SvApp {
       case None =>
         Future.successful(
           Left(
-            s"No cc price vote contract found for this SV. It is not expected as it should be created when the SV was added to SVC,"
+            s"No cc price vote contract found for this SV. It is not expected as it should be created when the SV was added to DSO,"
           )
         )
     }
   }
 
   def getElectionRequest(
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore]
+      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore]
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = {
-    val store = svcStoreWithIngestion.store
+    val store = dsoStoreWithIngestion.store
     for {
-      svcRules <- store.getSvcRules()
-    } yield store.listElectionRequests(svcRules)
+      dsoRules <- store.getDsoRules()
+    } yield store.listElectionRequests(dsoRules)
   }.flatten
 
   def createElectionRequest(
       requester: String,
       ranking: Seq[String],
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[Either[String, Unit]] = {
-    val store = svcStoreWithIngestion.store
+    val store = dsoStoreWithIngestion.store
     for {
-      svcRules <- store.getSvcRules()
+      dsoRules <- store.getDsoRules()
       queryResult <- store
         .lookupElectionRequestByRequesterWithOffset(
           PartyId.tryFromProtoPrimitive(requester),
-          svcRules.payload.epoch,
+          dsoRules.payload.epoch,
         )
       result <- queryResult match {
         case QueryResult(_, Some(_)) =>
           Future.successful(
             Left(
-              s"already voted in an election for epoch ${svcRules.payload.epoch} to replace inactive leader ${svcRules.payload.leader}"
+              s"already voted in an election for epoch ${dsoRules.payload.epoch} to replace inactive leader ${dsoRules.payload.leader}"
             )
           )
         case QueryResult(offset, None) =>
           val self = requester
-          val cmd = svcRules.exercise(
-            _.exerciseSvcRules_RequestElection(
+          val cmd = dsoRules.exercise(
+            _.exerciseDsoRules_RequestElection(
               self,
-              new cn.svcrules.electionrequestreason.ERR_LeaderUnavailable(
+              new cn.dsorules.electionrequestreason.ERR_LeaderUnavailable(
                 com.daml.ledger.javaapi.data.Unit.getInstance()
               ),
               ranking.asJava,
             )
           )
           for {
-            _ <- svcStoreWithIngestion.connection
+            _ <- dsoStoreWithIngestion.connection
               .submit(
                 actAs = Seq(store.key.svParty),
-                readAs = Seq(store.key.svcParty),
+                readAs = Seq(store.key.dsoParty),
                 cmd,
               )
               .withDedup(
@@ -871,9 +871,9 @@ object SvApp {
                   "com.daml.network.sv.requestElection",
                   Seq(
                     store.key.svParty,
-                    store.key.svcParty,
+                    store.key.dsoParty,
                   ),
-                  svcRules.payload.epoch.toString,
+                  dsoRules.payload.epoch.toString,
                 ),
                 deduplicationOffset = offset,
               )
@@ -889,7 +889,7 @@ object SvApp {
       reasonUrl: String,
       reasonDescription: String,
       expiration: Json,
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -904,10 +904,10 @@ object SvApp {
     val decodedAction = templateJsonDecoder.decodeValue(
       ActionRequiringConfirmation.valueDecoder(),
       ActionRequiringConfirmation._packageId,
-      "CN.SvcRules",
+      "CN.DsoRules",
       "ActionRequiringConfirmation",
     )(action)
-    svcStoreWithIngestion.store
+    dsoStoreWithIngestion.store
       .lookupVoteRequestByThisSvAndActionWithOffset(decodedAction)
       .flatMap {
         case QueryResult(_, Some(vote)) =>
@@ -916,27 +916,27 @@ object SvApp {
           )
         case QueryResult(offset, None) =>
           for {
-            svcRules <- svcStoreWithIngestion.store.getSvcRules()
+            dsoRules <- dsoStoreWithIngestion.store.getDsoRules()
             reason = new Reason(reasonUrl, reasonDescription)
-            request = new SvcRules_RequestVote(
+            request = new DsoRules_RequestVote(
               requester,
               decodedAction,
               reason,
               java.util.Optional.of(decodedExpiration),
             )
-            cmd = svcRules.exercise(_.exerciseSvcRules_RequestVote(request))
-            _ <- svcStoreWithIngestion.connection
+            cmd = dsoRules.exercise(_.exerciseDsoRules_RequestVote(request))
+            _ <- dsoStoreWithIngestion.connection
               .submit(
-                actAs = Seq(svcStoreWithIngestion.store.key.svParty),
-                readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+                actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
+                readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
                 cmd,
               )
               .withDedup(
                 commandId = CNLedgerConnection.CommandId(
                   "com.daml.network.sv.requestVote",
                   Seq(
-                    svcStoreWithIngestion.store.key.svcParty,
-                    svcStoreWithIngestion.store.key.svParty,
+                    dsoStoreWithIngestion.store.key.dsoParty,
+                    dsoStoreWithIngestion.store.key.svParty,
                   ),
                   action.toString,
                 ),
@@ -948,43 +948,43 @@ object SvApp {
   }
 
   def castVote(
-      trackingCid: cn.svcrules.VoteRequest.ContractId,
+      trackingCid: cn.dsorules.VoteRequest.ContractId,
       isAccepted: Boolean,
       reasonUrl: String,
       reasonDescription: String,
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[Either[String, cn.svcrules.VoteRequest.ContractId]] = {
-    svcStoreWithIngestion.store
+  ): Future[Either[String, cn.dsorules.VoteRequest.ContractId]] = {
+    dsoStoreWithIngestion.store
       .lookupVoteByThisSvAndVoteRequestWithOffset(trackingCid)
       .flatMap { case QueryResult(_, _) =>
         for {
-          svcRules <- svcStoreWithIngestion.store.getSvcRules()
+          dsoRules <- dsoStoreWithIngestion.store.getDsoRules()
           res <- retryProvider.retryForClientCalls(
             "castVote",
             "castVote",
             for {
-              resolvedVoteRequest <- svcStoreWithIngestion.store.getVoteRequest(trackingCid)
+              resolvedVoteRequest <- dsoStoreWithIngestion.store.getVoteRequest(trackingCid)
               resolvedCid = resolvedVoteRequest.contractId
               reason = new Reason(reasonUrl, reasonDescription)
-              cmd = svcRules.exercise(
-                _.exerciseSvcRules_CastVote(
+              cmd = dsoRules.exercise(
+                _.exerciseDsoRules_CastVote(
                   resolvedCid,
                   new Vote(
-                    svcStoreWithIngestion.store.key.svParty.toProtoPrimitive,
+                    dsoStoreWithIngestion.store.key.svParty.toProtoPrimitive,
                     isAccepted,
                     reason,
                   ),
                 )
               )
-              res <- svcStoreWithIngestion.connection
+              res <- dsoStoreWithIngestion.connection
                 .submit(
-                  actAs = Seq(svcStoreWithIngestion.store.key.svParty),
-                  readAs = Seq(svcStoreWithIngestion.store.key.svcParty),
+                  actAs = Seq(dsoStoreWithIngestion.store.key.svParty),
+                  readAs = Seq(dsoStoreWithIngestion.store.key.dsoParty),
                   update = cmd,
                 )
                 .noDedup
@@ -1043,17 +1043,17 @@ object SvApp {
             s"$candidateParty != ${token.candidateParty}",
           )
       _ <-
-        if (token.svcParty == svStore.key.svcParty) Right(())
-        else authFailure("wrong SVC party", s"${token.svcParty} != ${svStore.key.svcParty}")
+        if (token.dsoParty == svStore.key.dsoParty) Right(())
+        else authFailure("wrong DSO party", s"${token.dsoParty} != ${svStore.key.dsoParty}")
     } yield (token.candidateParty, token.candidateName, approvedSv.rewardWeightBps)
   }
 
-  private[sv] def isSvcMember(
+  private[sv] def isDsoMember(
       name: String,
       party: PartyId,
-      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
   ): Boolean =
-    svcRules.payload.members.asScala
+    dsoRules.payload.members.asScala
       .get(party.toProtoPrimitive)
       .exists(_.name == name)
 
@@ -1065,20 +1065,20 @@ object SvApp {
   private[sv] def validateCandidateSv(
       candidateParty: PartyId,
       candidateName: String,
-      svcRules: Contract.Has[SvcRules.ContractId, SvcRules],
+      dsoRules: Contract.Has[DsoRules.ContractId, DsoRules],
   ): Either[Status, Unit] = {
     for {
       _ <- Either.cond(
-        !SvApp.isSvcMemberParty(candidateParty, svcRules),
+        !SvApp.isDsoMemberParty(candidateParty, dsoRules),
         (),
         Status.ALREADY_EXISTS.withDescription(
           s"An SV with party ID $candidateParty already exists."
         ),
       )
       _ <-
-        if (!SvApp.isDevNet(svcRules)) {
+        if (!SvApp.isDevNet(dsoRules)) {
           SvApp
-            .getSvcPartyFromName(candidateName, svcRules)
+            .getDsoPartyFromName(candidateName, dsoRules)
             .toLeft(())
             .leftMap(partyId =>
               Status.ALREADY_EXISTS
@@ -1090,36 +1090,36 @@ object SvApp {
     } yield ()
   }
 
-  private[sv] def isSvcMemberParty(
+  private[sv] def isDsoMemberParty(
       party: PartyId,
-      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
-  ): Boolean = svcRules.payload.members.containsKey(party.toProtoPrimitive)
+      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+  ): Boolean = dsoRules.payload.members.containsKey(party.toProtoPrimitive)
 
-  private[sv] def isSvcMemberName(
+  private[sv] def isDsoMemberName(
       name: String,
-      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
-  ): Boolean = getSvcPartyFromName(name, svcRules).isDefined
+      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+  ): Boolean = getDsoPartyFromName(name, dsoRules).isDefined
 
-  private[sv] def getSvcPartyFromName(
+  private[sv] def getDsoPartyFromName(
       name: String,
-      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules],
+      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
   ): Option[String] = {
-    svcRules.payload.members.asScala.collectFirst {
+    dsoRules.payload.members.asScala.collectFirst {
       case (partyId, memberInfo) if memberInfo.name == name => partyId
     }
   }
 
   private[sv] def isDevNet(
-      svcRules: Contract.Has[cn.svcrules.SvcRules.ContractId, cn.svcrules.SvcRules]
-  ): Boolean = svcRules.payload.isDevNet
+      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]
+  ): Boolean = dsoRules.payload.isDevNet
 
   private def initializeValidator(
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
       config: SvAppBackendConfig,
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[Unit] = {
-    val store = svcStoreWithIngestion.store
+    val store = dsoStoreWithIngestion.store
     val svParty = store.key.svParty
     logger.debug("Receiving or creating validator license for SV party")
     for {
@@ -1128,7 +1128,7 @@ object SvApp {
         "create_validator_license",
         "Create validator license for SV party",
         for {
-          svcRules <- store.getSvcRules()
+          dsoRules <- store.getDsoRules()
           validatorLicense <- store.lookupValidatorLicenseWithOffset(
             svParty
           )
@@ -1138,23 +1138,23 @@ object SvApp {
               Future.unit
             case QueryResult(offset, None) =>
               logger.debug("Trying to create validator license for SV party")
-              val cmd = svcRules.exercise(
-                _.exerciseSvcRules_OnboardValidator(
+              val cmd = dsoRules.exercise(
+                _.exerciseDsoRules_OnboardValidator(
                   svParty.toProtoPrimitive,
                   svParty.toProtoPrimitive,
                 )
               )
-              svcStoreWithIngestion.connection
+              dsoStoreWithIngestion.connection
                 .submit(
                   actAs = Seq(svParty),
-                  readAs = Seq(store.key.svcParty),
+                  readAs = Seq(store.key.dsoParty),
                   cmd,
                 )
                 .withDedup(
                   commandId = CNLedgerConnection.CommandId(
                     "com.daml.network.sv.createSvValidatorLicense",
                     Seq(
-                      store.key.svcParty,
+                      store.key.dsoParty,
                       svParty,
                     ),
                     svParty.toProtoPrimitive,
@@ -1173,7 +1173,7 @@ object SvApp {
       // party as the primary one. We allocate the user here and don't just tweak the primary party of an externally allocated user.
       // That ensures the validator app won't try to allocate its own primary party because it waits first for the user to be created
       // and then checks if it has a primary party already.
-      _ <- svcStoreWithIngestion.connection.createUserWithPrimaryParty(
+      _ <- dsoStoreWithIngestion.connection.createUserWithPrimaryParty(
         config.validatorLedgerApiUser,
         svParty,
         Seq(User.Right.ParticipantAdmin.INSTANCE),
@@ -1184,7 +1184,7 @@ object SvApp {
   private def backupNodeIdentities(
       config: SvAppBackendConfig,
       localDomainNode: Option[LocalDomainNode],
-      svcStore: SvSvcStore,
+      dsoStore: SvDsoStore,
       participantAdminConnection: ParticipantAdminConnection,
       clock: Clock,
       logger: TracedLogger,
@@ -1204,7 +1204,7 @@ object SvApp {
           localDomainNode.getOrElse(
             sys.error("Cannot dump identities with no localDomainNode")
           ),
-          svcStore,
+          dsoStore,
           config.domains.global.alias,
           loggerFactory,
         )
@@ -1224,8 +1224,8 @@ object SvApp {
 
   val amuletPackage: UploadablePackage =
     UploadablePackage.fromResource(DarResources.cantonAmulet.bootstrap)
-  val svcGovernancePackage: UploadablePackage =
-    UploadablePackage.fromResource(DarResources.svcGovernance.bootstrap)
+  val dsoGovernancePackage: UploadablePackage =
+    UploadablePackage.fromResource(DarResources.dsoGovernance.bootstrap)
   val validatorLifecyclePackage: UploadablePackage =
     UploadablePackage.fromResource(DarResources.validatorLifecycle.bootstrap)
 }

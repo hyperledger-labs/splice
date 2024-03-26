@@ -7,8 +7,8 @@ import com.daml.network.sv.automation.singlesv.membership.SvNamespaceMembershipT
   NamespaceDiff,
   RemoveFromNamespace,
 }
-import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.store.SvSvcStore.SvcRulesWithMemberNodeStates
+import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.store.SvDsoStore.DsoRulesWithMemberNodeStates
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
@@ -22,50 +22,50 @@ import scala.jdk.CollectionConverters.CollectionHasAsScala
 
 private class NamespaceMembership(
     svParty: PartyId,
-    svcParty: PartyId,
+    dsoParty: PartyId,
     participantAdminConnection: ParticipantAdminConnection,
     logger: TracedLogger,
-    val svSvcStore: SvSvcStore,
-) extends SvcRulesTopologyStateReconciler[NamespaceDiff] {
+    val svDsoStore: SvDsoStore,
+) extends DsoRulesTopologyStateReconciler[NamespaceDiff] {
 
-  override def diffSvcRulesWithTopology(
-      svcRulesAndState: SvcRulesWithMemberNodeStates
+  override def diffDsoRulesWithTopology(
+      dsoRulesAndState: DsoRulesWithMemberNodeStates
   )(implicit tc: TraceContext, ec: ExecutionContext): Future[Seq[NamespaceDiff]] = {
-    val svcRules = svcRulesAndState.svcRules
+    val dsoRules = dsoRulesAndState.dsoRules
     participantAdminConnection
       .getDecentralizedNamespaceDefinition(
-        svcRules.domain,
-        svcParty.uid.namespace,
+        dsoRules.domain,
+        dsoParty.uid.namespace,
       )
       .map { decentralizedNamespace =>
-        val svcRulesMembers = svcRules.contract.payload.members
+        val dsoRulesMembers = dsoRules.contract.payload.members
           .keySet()
           .asScala
           .map(PartyId.tryFromProtoPrimitive)
           .toSeq
-        val namespaceAdditions = svcRulesMembers
-          .filter(svcMemberParty =>
-            !decentralizedNamespace.mapping.owners.contains(svcMemberParty.uid.namespace)
+        val namespaceAdditions = dsoRulesMembers
+          .filter(dsoMemberParty =>
+            !decentralizedNamespace.mapping.owners.contains(dsoMemberParty.uid.namespace)
           )
         // Parties are only hosted on participants with the same namespace which is also the namespace that is used in the decentralized namespace.
         // Therefore we remove the namespace from the decentralized namespace only if
         // a namespace is present in the offboardedMembers list and not present in the members list
-        val namespaceRemovals = svcRules.contract.payload.offboardedMembers
+        val namespaceRemovals = dsoRules.contract.payload.offboardedMembers
           .keySet()
           .asScala
           .map(PartyId.tryFromProtoPrimitive)
           .toSeq
-          .filter(svcMemberParty =>
+          .filter(dsoMemberParty =>
             decentralizedNamespace.mapping.owners
-              .contains(svcMemberParty.uid.namespace) && !svcRulesMembers
+              .contains(dsoMemberParty.uid.namespace) && !dsoRulesMembers
               .map(_.uid.namespace)
-              .contains(svcMemberParty.uid.namespace)
+              .contains(dsoMemberParty.uid.namespace)
           )
         namespaceAdditions.map[NamespaceDiff](
-          AddToNamespace(svcRules.domain, _)
+          AddToNamespace(dsoRules.domain, _)
         ) ++ namespaceRemovals
           .map[NamespaceDiff](
-            RemoveFromNamespace(svcRules.domain, _)
+            RemoveFromNamespace(dsoRules.domain, _)
           )
       }
   }
@@ -80,7 +80,7 @@ private class NamespaceMembership(
       participantAdminConnection
         .ensureDecentralizedNamespaceDefinitionProposalAccepted(
           domain,
-          svcParty.uid.namespace,
+          dsoParty.uid.namespace,
           partyId.uid.namespace,
           svParty.uid.namespace.fingerprint,
           // use lower retry number to just allow the trigger to retry instead of blocking
@@ -88,7 +88,7 @@ private class NamespaceMembership(
         )
         .map(_ =>
           TaskSuccess(
-            show"Party $partyId was add to the decentralized namespace ${svcParty.uid.namespace}"
+            show"Party $partyId was add to the decentralized namespace ${dsoParty.uid.namespace}"
           )
         )
     case RemoveFromNamespace(domain, partyId) =>
@@ -98,7 +98,7 @@ private class NamespaceMembership(
       participantAdminConnection
         .ensureDecentralizedNamespaceDefinitionRemovalProposal(
           domain,
-          svcParty.uid.namespace,
+          dsoParty.uid.namespace,
           partyId.uid.namespace,
           svParty.uid.namespace.fingerprint,
           // use lower retry number to just allow the trigger to retry instead of blocking
@@ -106,22 +106,22 @@ private class NamespaceMembership(
         )
         .map(_ =>
           TaskSuccess(
-            show"Party $partyId was removed from the decentralized namespace ${svcParty.uid.namespace}"
+            show"Party $partyId was removed from the decentralized namespace ${dsoParty.uid.namespace}"
           )
         )
   }
 
 }
 
-/** Trigger that checks the members of the SVC as defined by the SvcRules members property,
-  * with the members of the svc decentralized namespace as defined by the DecentralizedNamespaceDefinitionX,
+/** Trigger that checks the members of the DSO as defined by the DsoRules members property,
+  * with the members of the dso decentralized namespace as defined by the DecentralizedNamespaceDefinitionX,
   * and adds to the decentralized namespace any members that are missing.
   *
-  * Adding the sv to the decentralized namespace only after it's already part of the svc guarantees that party migration has finished
+  * Adding the sv to the decentralized namespace only after it's already part of the dso guarantees that party migration has finished
   */
 class SvNamespaceMembershipTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
@@ -134,7 +134,7 @@ class SvNamespaceMembershipTrigger(
 
   override val reconciler = new NamespaceMembership(
     store.key.svParty,
-    store.key.svcParty,
+    store.key.dsoParty,
     participantAdminConnection,
     logger,
     store,

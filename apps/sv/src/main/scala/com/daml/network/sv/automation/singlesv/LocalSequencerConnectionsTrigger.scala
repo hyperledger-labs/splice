@@ -1,10 +1,10 @@
 package com.daml.network.sv.automation.singlesv
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.codegen.java.cn.svc.globaldomain.SequencerConfig
+import com.daml.network.codegen.java.cn.dso.globaldomain.SequencerConfig
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
@@ -23,7 +23,7 @@ class LocalSequencerConnectionsTrigger(
     override protected val context: TriggerContext,
     participantAdminConnection: ParticipantAdminConnection,
     globalDomainAlias: DomainAlias,
-    store: SvSvcStore,
+    store: SvDsoStore,
     sequencerInternalConfig: ClientConfig,
     migrationId: Long,
 )(implicit
@@ -33,7 +33,7 @@ class LocalSequencerConnectionsTrigger(
   private val svParty = store.key.svParty
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      rulesAndState <- store.getSvcRulesWithSvNodeState(svParty)
+      rulesAndState <- store.getDsoRulesWithSvNodeState(svParty)
       // TODO(#4906): double-check that the right domain-ids are used in the right place to make this work with soft-domain migration
       domainId <- participantAdminConnection.getDomainId(globalDomainAlias)
       domainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
@@ -41,14 +41,14 @@ class LocalSequencerConnectionsTrigger(
         maxDomainTimeLag = context.config.pollingInterval,
       )
       globalDomainId <- store.getAmuletRulesDomain()(traceContext)
-      svcRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
+      dsoRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
         globalDomainId,
         domainTimeLb.timestamp.toInstant,
         migrationId,
       )
-      _ <- svcRulesActiveSequencerConfig.fold {
+      _ <- dsoRulesActiveSequencerConfig.fold {
         logger.debug(
-          show"Member info or sequencer info not (yet) published to SvcRules for our own party ${store.key.svParty}, skipping"
+          show"Member info or sequencer info not (yet) published to DsoRules for our own party ${store.key.svParty}, skipping"
         )
         Future.unit
       } { publishedSequencerInfo =>

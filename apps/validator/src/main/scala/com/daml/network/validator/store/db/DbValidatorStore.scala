@@ -53,7 +53,7 @@ class DbValidatorStore(
         participant = participantId,
         key = Map(
           "validatorParty" -> key.validatorParty.toProtoPrimitive,
-          "svcParty" -> key.svcParty.toProtoPrimitive,
+          "dsoParty" -> key.dsoParty.toProtoPrimitive,
         ),
       ),
       domainMigrationId,
@@ -66,7 +66,7 @@ class DbValidatorStore(
 
   override val walletKey = WalletStore.Key(
     key.validatorParty,
-    key.svcParty,
+    key.dsoParty,
   )
 
   override lazy val acsContractFilter = ValidatorStore.contractFilter(key, domainMigrationId)

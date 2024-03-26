@@ -191,7 +191,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
   /** Exclude any idle states that expired strictly before `unlessExpiredAsOf`.
     * This is '''not the same''' as a historical query, as it may also exclude
     * states that expired ''after'' that value.  The intent is to match the
-    * expiry behavior of `SvSvcStore#listExpiredCnsSubscriptions`, not to
+    * expiry behavior of `SvDsoStore#listExpiredCnsSubscriptions`, not to
     * provide a grace period for subscription payments.
     */
   protected[this] def listSubscriptionIdleStates(
@@ -542,8 +542,8 @@ object UserWalletStore {
   }
 
   case class Key(
-      /** The party-id of the SVC issuing CC managed by this end-user wallet. */
-      svcParty: PartyId,
+      /** The party-id of the DSO issuing CC managed by this end-user wallet. */
+      dsoParty: PartyId,
 
       /** The party-id of the wallet's validator */
       validatorParty: PartyId,
@@ -559,7 +559,7 @@ object UserWalletStore {
     override def pretty: Pretty[Key] = prettyOfClass(
       param("endUserName", _.endUserName.singleQuoted),
       param("endUserParty", _.endUserParty),
-      param("svcParty", _.svcParty),
+      param("dsoParty", _.dsoParty),
     )
   }
 
@@ -569,46 +569,46 @@ object UserWalletStore {
       domainMigrationId: Long,
   ): ContractFilter[UserWalletAcsStoreRowData] = {
     val endUser = key.endUserParty.toProtoPrimitive
-    val svc = key.svcParty.toProtoPrimitive
+    val dso = key.dsoParty.toProtoPrimitive
 
     SimpleContractFilter(
       key.endUserParty,
       Map(
         // Install
         mkFilter(installCodegen.WalletAppInstall.COMPANION)(co =>
-          co.payload.svcParty == svc &&
+          co.payload.dsoParty == dso &&
             co.payload.endUserParty == endUser
         )(UserWalletAcsStoreRowData(_)),
         // Amulets
         mkFilter(amuletCodegen.Amulet.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             co.payload.owner == endUser
         )(UserWalletAcsStoreRowData(_)),
         mkFilter(amuletCodegen.LockedAmulet.COMPANION)(co =>
-          co.payload.amulet.svc == svc &&
+          co.payload.amulet.dso == dso &&
             co.payload.amulet.owner == endUser
         )(UserWalletAcsStoreRowData(_)),
         // Rewards
         mkFilter(amuletCodegen.AppRewardCoupon.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             co.payload.provider == endUser
         )(co =>
           UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
         ),
         mkFilter(amuletCodegen.ValidatorRewardCoupon.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             co.payload.user == endUser
         )(co =>
           UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
         ),
         mkFilter(validatorCodegen.ValidatorFaucetCoupon.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             co.payload.validator == endUser
         )(co =>
           UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
         ),
         mkFilter(amuletCodegen.SvRewardCoupon.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             co.payload.beneficiary == endUser
         )(co =>
           UserWalletAcsStoreRowData(
@@ -620,12 +620,12 @@ object UserWalletStore {
         ),
         mkFilter(amuletCodegen.ValidatorRight.COMPANION)(co =>
           // All validator rights where the current user is the validator.
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             co.payload.validator == endUser
         )(UserWalletAcsStoreRowData(_)),
         // Transfer offers
         mkFilter(transferOffersCodegen.TransferOffer.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             (co.payload.sender == endUser ||
               co.payload.receiver == endUser)
         )(contract =>
@@ -635,7 +635,7 @@ object UserWalletStore {
           )
         ),
         mkFilter(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             (co.payload.sender == endUser ||
               co.payload.receiver == endUser)
         )(contract =>
@@ -648,7 +648,7 @@ object UserWalletStore {
         // as app payments the user is a receiver or a provider are handled by
         // the provider's app
         mkFilter(walletCodegen.AppPaymentRequest.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             co.payload.sender == endUser
         )(contract =>
           UserWalletAcsStoreRowData(
@@ -657,20 +657,20 @@ object UserWalletStore {
           )
         ),
         mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co =>
-          co.payload.svc == svc &&
+          co.payload.dso == dso &&
             co.payload.sender == endUser
         )(UserWalletAcsStoreRowData(_)),
         // Subscriptions
         mkFilter(subsCodegen.Subscription.COMPANION)(co =>
-          co.payload.subscriptionData.svc == svc &&
+          co.payload.subscriptionData.dso == dso &&
             co.payload.subscriptionData.sender == endUser
         )(UserWalletAcsStoreRowData(_)),
         mkFilter(subsCodegen.SubscriptionRequest.COMPANION)(co =>
-          co.payload.subscriptionData.svc == svc &&
+          co.payload.subscriptionData.dso == dso &&
             co.payload.subscriptionData.sender == endUser
         )(UserWalletAcsStoreRowData(_)),
         mkFilter(subsCodegen.SubscriptionIdleState.COMPANION)(co =>
-          co.payload.subscriptionData.svc == svc &&
+          co.payload.subscriptionData.dso == dso &&
             co.payload.subscriptionData.sender == endUser
         )(contract =>
           UserWalletAcsStoreRowData(
@@ -679,16 +679,16 @@ object UserWalletStore {
           )
         ),
         mkFilter(subsCodegen.SubscriptionInitialPayment.COMPANION)(co =>
-          co.payload.subscriptionData.svc == svc &&
+          co.payload.subscriptionData.dso == dso &&
             co.payload.subscriptionData.sender == endUser
         )(UserWalletAcsStoreRowData(_)),
         mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
-          co.payload.subscriptionData.svc == svc &&
+          co.payload.subscriptionData.dso == dso &&
             co.payload.subscriptionData.sender == endUser
         )(UserWalletAcsStoreRowData(_)),
         // Featured app right
         mkFilter(amuletCodegen.FeaturedAppRight.COMPANION)(co =>
-          co.payload.svc == svc && co.payload.provider == endUser
+          co.payload.dso == dso && co.payload.provider == endUser
         )(UserWalletAcsStoreRowData(_)),
         // CNS entry
         mkFilter(cnsCodegen.CnsEntry.COMPANION)(co => co.payload.user == endUser)(
@@ -699,7 +699,7 @@ object UserWalletStore {
         ),
         // Buy traffic requests
         mkFilter(trafficRequestCodegen.BuyTrafficRequest.COMPANION)(co =>
-          co.payload.svc == svc && co.payload.endUserParty == endUser && co.payload.migrationId == domainMigrationId
+          co.payload.dso == dso && co.payload.endUserParty == endUser && co.payload.migrationId == domainMigrationId
         )(contract =>
           UserWalletAcsStoreRowData(
             contract,

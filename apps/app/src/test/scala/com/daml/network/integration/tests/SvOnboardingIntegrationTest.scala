@@ -17,7 +17,7 @@ import scala.util.Random
 class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
 
   "fail registration with invalid tokens, succeed with a valid token" in { implicit env =>
-    initSvc()
+    initDso()
     sv1Backend.startSync()
 
     implicit val sys = env.actorSystem
@@ -101,9 +101,9 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
   }
 
   "Non-leader SVs can onboard new validators" in { implicit env =>
-    initSvc()
+    initDso()
     val sv = sv4Backend // not a leader
-    val svParty = sv.getSvcInfo().svParty
+    val svParty = sv.getDsoInfo().svParty
     sv.listOngoingValidatorOnboardings() should have length 0
     val secret = actAndCheck(
       "the sv operator prepares the onboarding", {
@@ -172,7 +172,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
   }
 
   "Validator candidates can self-service at the validator onboarding tap" in { implicit env =>
-    initSvc()
+    initDso()
     val sv = sv3Backend // a random sv
     sv.listOngoingValidatorOnboardings() should have length 0
     actAndCheck(
@@ -192,7 +192,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
   }
 
   "SVs expect onboardings when asked to" in { implicit env =>
-    initSvc()
+    initDso()
     clue("SV1 has created as many ValidatorOnboarding contracts as it's configured to.") {
       sv1Backend.listOngoingValidatorOnboardings() should have length 3
     }

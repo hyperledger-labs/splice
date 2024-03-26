@@ -2,7 +2,7 @@ import React from 'react';
 
 import { CardContent, Stack, Typography } from '@mui/material';
 
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
 import ActionView from './actions/views/ActionView';
 

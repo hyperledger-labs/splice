@@ -21,11 +21,11 @@ import {
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
 import { RelTime } from '@daml.js/b70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946/lib/DA/Time/Types';
-import { ActionRequiringConfirmation } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';
-import { useSvcInfos } from '../../contexts/SvContext';
-import { useListSvcRulesVoteRequests } from '../../hooks/useListVoteRequests';
+import { useDsoInfos } from '../../contexts/SvContext';
+import { useListDsoRulesVoteRequests } from '../../hooks/useListVoteRequests';
 import { config } from '../../utils';
 import { Alerting, AlertState } from '../../utils/Alerting';
 import {
@@ -39,7 +39,7 @@ import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import OffboardMember from './actions/OffboardMember';
 import RemoveFutureAmuletConfigSchedule from './actions/RemoveFutureAmuletConfigSchedule';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
-import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
+import SetDsoRulesConfig from './actions/SetDsoRulesConfig';
 import UpdateFutureAmuletConfigSchedule from './actions/UpdateFutureAmuletConfigSchedule';
 
 dayjs.extend(utc);
@@ -64,8 +64,8 @@ const VoteRequest: React.FC = () => {
   ] = useState<Dayjs | undefined>(undefined);
   const [alertMessage, setAlertMessage] = useState<AlertState>({});
 
-  const svcInfosQuery = useSvcInfos();
-  const listVoteRequestsQuery = useListSvcRulesVoteRequests();
+  const dsoInfosQuery = useDsoInfos();
+  const listVoteRequestsQuery = useListDsoRulesVoteRequests();
 
   function getDefaultExpiration(): Dayjs {
     switch (actionName) {
@@ -76,7 +76,7 @@ const VoteRequest: React.FC = () => {
       }
       default: {
         const microseconds =
-          parseInt(svcInfosQuery.data?.svcRules.payload.config.voteRequestTimeout.microseconds!) /
+          parseInt(dsoInfosQuery.data?.dsoRules.payload.config.voteRequestTimeout.microseconds!) /
           1000;
         return dayjs().add(Math.floor(microseconds), 'milliseconds');
       }
@@ -86,7 +86,7 @@ const VoteRequest: React.FC = () => {
   useEffect(() => {
     setExpiration(getDefaultExpiration);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [svcInfosQuery.isSuccess]);
+  }, [dsoInfosQuery.isSuccess]);
 
   useEffect(() => {
     setExpiration(getDefaultExpiration);
@@ -100,14 +100,14 @@ const VoteRequest: React.FC = () => {
     { name: 'Offboard Member', value: 'SRARC_OffboardMember' },
     { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
-    { name: 'Set SvcRules Configuration', value: 'SRARC_SetConfig' },
-    { name: 'Add SVC App Configuration Schedule', value: 'CRARC_AddFutureAmuletConfigSchedule' },
+    { name: 'Set DsoRules Configuration', value: 'SRARC_SetConfig' },
+    { name: 'Add DSO App Configuration Schedule', value: 'CRARC_AddFutureAmuletConfigSchedule' },
     {
-      name: 'Remove SVC App Configuration Schedule',
+      name: 'Remove DSO App Configuration Schedule',
       value: 'CRARC_RemoveFutureAmuletConfigSchedule',
     },
     {
-      name: 'Update SVC App Configuration Schedule',
+      name: 'Update DSO App Configuration Schedule',
       value: 'CRARC_UpdateFutureAmuletConfigSchedule',
     },
   ];
@@ -189,7 +189,7 @@ const VoteRequest: React.FC = () => {
   const { createVoteRequest } = useSvAdminClient();
   const createVoteRequestMutation = useMutation({
     mutationFn: async () => {
-      const requester = svcInfosQuery.data?.svPartyId!;
+      const requester = dsoInfosQuery.data?.svPartyId!;
 
       const duration: RelTime = {
         microseconds: BigInt(expiration!.diff(dayjs(), 'milliseconds') * 1000).toString(),
@@ -214,7 +214,7 @@ const VoteRequest: React.FC = () => {
 
     onError: error => {
       // TODO (#5491): show an error to the user.
-      console.error(`Failed to send vote request to svc`, error);
+      console.error(`Failed to send vote request to dso`, error);
     },
   });
 
@@ -253,7 +253,7 @@ const VoteRequest: React.FC = () => {
           {actionName === 'SRARC_RevokeFeaturedAppRight' && (
             <RevokeFeaturedAppRight chooseAction={chooseAction} />
           )}
-          {actionName === 'SRARC_SetConfig' && <SetSvcRulesConfig chooseAction={chooseAction} />}
+          {actionName === 'SRARC_SetConfig' && <SetDsoRulesConfig chooseAction={chooseAction} />}
           {actionName === 'CRARC_AddFutureAmuletConfigSchedule' && (
             <AddFutureAmuletConfigSchedule chooseAction={chooseAction} />
           )}

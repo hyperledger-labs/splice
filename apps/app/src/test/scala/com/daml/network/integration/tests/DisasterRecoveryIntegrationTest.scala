@@ -179,7 +179,7 @@ class DisasterRecoveryIntegrationTest
       (identities, timestampBeforeDisaster) => {
         val dump =
           sv2Backend
-            .getDomainDataSnapshot(timestampBeforeDisaster, Some(identities.head.svcPartyId))
+            .getDomainDataSnapshot(timestampBeforeDisaster, Some(identities.head.dsoPartyId))
         Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
           case (sv, ids) =>
             writeMigrationDumpFile(sv, ids, dump)

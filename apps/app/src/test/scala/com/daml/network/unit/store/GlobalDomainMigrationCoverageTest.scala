@@ -99,7 +99,7 @@ class GlobalDomainMigrationCoverageTest
 
 object GlobalDomainMigrationCoverageTest {
   import scan.store.ScanStore
-  import sv.store.{SvStore, SvSvStore, SvSvcStore}
+  import sv.store.{SvStore, SvSvStore, SvDsoStore}
   import validator.store.ValidatorStore
   import wallet.store.UserWalletStore
 
@@ -113,7 +113,7 @@ object GlobalDomainMigrationCoverageTest {
         ValidatorStore,
         ValidatorStore.contractFilter(
           ValidatorStore.Key(
-            svcParty = dummyParty,
+            dsoParty = dummyParty,
             validatorParty = dummyParty,
             appManagerEnabled = true,
           ),
@@ -122,9 +122,9 @@ object GlobalDomainMigrationCoverageTest {
         ValidatorStore.templatesMovedByMyAutomation(true),
       ),
       (
-        SvSvcStore,
-        SvSvcStore.contractFilter(dummyParty, domainMigrationId),
-        SvSvcStore.templatesMovedByMyAutomation,
+        SvDsoStore,
+        SvDsoStore.contractFilter(dummyParty, domainMigrationId),
+        SvDsoStore.templatesMovedByMyAutomation,
       ),
       (
         SvSvStore,
@@ -159,7 +159,7 @@ object GlobalDomainMigrationCoverageTest {
     import codegen.java.cn.wallet.buytrafficrequest as trafficRequestCodegen
     Seq(
       globaldomain.MemberTraffic.COMPANION ->
-        reason("tied to a specific domainId, never migrated", ScanStore, SvSvcStore),
+        reason("tied to a specific domainId, never migrated", ScanStore, SvDsoStore),
       topUpCodegen.ValidatorTopUpState.COMPANION ->
         reason("tied to a specific domainId, never migrated", ValidatorStore),
       trafficRequestCodegen.BuyTrafficRequest.COMPANION ->

@@ -587,6 +587,14 @@
   },
   {
     "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "dso",
+    "provider": "",
+    "type": "canton:network:dso"
+  },
+  {
+    "custom": false,
     "id": "organization/infra/infra.mock",
     "inputs": {
       "name": "organization/infra/infra.mock"
@@ -1935,14 +1943,6 @@
     "name": "sv-1",
     "provider": "",
     "type": "kubernetes:core/v1:Namespace"
-  },
-  {
-    "custom": false,
-    "id": "",
-    "inputs": {},
-    "name": "svc",
-    "provider": "",
-    "type": "canton:network:svc"
   },
   {
     "custom": true,

@@ -8,7 +8,7 @@ import CN.Util
 -- and be communicated to the candidate via a secure off-ledger channel.
 -- Once the candidate has set up his participants, he contacts the SV node via an API call
 -- and presents his secret, which triggers the SV node to add him as a validator
--- (as a separate on-ledger action for reducing coupling with the `svc-governance` contracts).
+-- (as a separate on-ledger action for reducing coupling with the `dso-governance` contracts).
 template ValidatorOnboarding with
     sv : Party                  -- ^ The SV node sponsoring this onboarding.
     candidateSecret : Text      -- ^ The unique secret given to the candidate.

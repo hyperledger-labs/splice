@@ -2,10 +2,10 @@ package com.daml.network.sv.automation.singlesv.membership.onboarding
 
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn.svcrules.SvcRules
+import com.daml.network.codegen.java.cn.dsorules.DsoRules
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.store.TimeQuery
@@ -19,19 +19,19 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.CollectionHasAsScala
 
-/** Trigger that promotes participants from observers to submitters for the SVC party.
+/** Trigger that promotes participants from observers to submitters for the DSO party.
   *
-  * New SV participants hosting the SVC party only receive Observation permission on behalf of the SVC party.
+  * New SV participants hosting the DSO party only receive Observation permission on behalf of the DSO party.
   * This trigger then promotes them to submitter status and respectively updates the Party to Participant threshold
-  * once the corresponding SV party has been onboarded to the SvcRules and the ACS offset has no locking state i.e.
-  * at least `mediatorReactionTimeout + confirmationResponseTimeout` domain time has elapsed since the participant was made an observer for the SVC Party.
+  * once the corresponding SV party has been onboarded to the DsoRules and the ACS offset has no locking state i.e.
+  * at least `mediatorReactionTimeout + confirmationResponseTimeout` domain time has elapsed since the participant was made an observer for the DSO Party.
   *
-  * Updating the threshold only after the SV party has been added to the SvcRules guarantees that
-  * its participant has reconnected to the domain and is ready to confirm transactions on behalf of the SVC party.
+  * Updating the threshold only after the SV party has been added to the DsoRules guarantees that
+  * its participant has reconnected to the domain and is ready to confirm transactions on behalf of the DSO party.
   */
 class SvOnboardingPromoteParticipantToSubmitterTrigger(
     override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
     withPromotionDelay: Boolean,
 )(implicit
@@ -41,8 +41,8 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       SvOnboardingPromoteParticipantToSubmitterTrigger.Task
     ] {
 
-  private val svcParty = svcStore.key.svcParty
-  private val svParty = svcStore.key.svParty
+  private val dsoParty = dsoStore.key.dsoParty
+  private val svParty = dsoStore.key.svParty
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
@@ -52,112 +52,112 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
         else "disabled"}"
     )
     for {
-      svcRules <- svcStore.getSvcRules()
-      svcHostingParticipants <- participantAdminConnection
-        .getPartyToParticipant(svcRules.domain, svcParty)
+      dsoRules <- dsoStore.getDsoRules()
+      dsoHostingParticipants <- participantAdminConnection
+        .getPartyToParticipant(dsoRules.domain, dsoParty)
         .map(_.mapping.participants)
       res <-
-        if (svcHostingParticipants.forall(_.permission == ParticipantPermission.Submission)) {
+        if (dsoHostingParticipants.forall(_.permission == ParticipantPermission.Submission)) {
           Future.successful(Seq.empty[SvOnboardingPromoteParticipantToSubmitterTrigger.Task])
         } else if (withPromotionDelay) {
-          retrieveTasksWithPromotionDelay(svcRules)
+          retrieveTasksWithPromotionDelay(dsoRules)
         } else {
-          retrieveTasksWithoutPromotionDelay(svcHostingParticipants, svcRules)
+          retrieveTasksWithoutPromotionDelay(dsoHostingParticipants, dsoRules)
         }
     } yield res
   }
 
   private def retrieveTasksWithoutPromotionDelay(
-      svcHostingParticipants: Seq[HostingParticipant],
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
+      dsoHostingParticipants: Seq[HostingParticipant],
+      dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvOnboardingPromoteParticipantToSubmitterTrigger.Task]] = {
     for {
-      svcMemberParticipants <- getSvcMemberParticipants(svcRules)
+      dsoMemberParticipants <- getDsoMemberParticipants(dsoRules)
     } yield {
-      val observingParticipantIds = svcHostingParticipants
+      val observingParticipantIds = dsoHostingParticipants
         .filter(_.permission == ParticipantPermission.Observation)
         .map(_.participantId)
-      val svcMemberParticipantIds = svcMemberParticipants.map(_.participantId)
+      val dsoMemberParticipantIds = dsoMemberParticipants.map(_.participantId)
       observingParticipantIds
-        .filter(participantId => svcMemberParticipantIds.contains(participantId))
+        .filter(participantId => dsoMemberParticipantIds.contains(participantId))
         .map(participantId =>
-          SvOnboardingPromoteParticipantToSubmitterTrigger.Task(svcRules.domain, participantId)
+          SvOnboardingPromoteParticipantToSubmitterTrigger.Task(dsoRules.domain, participantId)
         )
     }
   }
 
   private def retrieveTasksWithPromotionDelay(
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules]
+      dsoRules: AssignedContract[DsoRules.ContractId, DsoRules]
   )(implicit
       tc: TraceContext
   ): Future[Seq[SvOnboardingPromoteParticipantToSubmitterTrigger.Task]] = {
     for {
-      domainParametersState <- participantAdminConnection.getDomainParametersState(svcRules.domain)
+      domainParametersState <- participantAdminConnection.getDomainParametersState(dsoRules.domain)
       domainTimeLowerBound <-
         participantAdminConnection
           .getDomainTimeLowerBound(
-            svcRules.domain,
+            dsoRules.domain,
             maxDomainTimeLag = context.config.pollingInterval,
           )
-      svcHostingParticipants <- participantAdminConnection.listPartyToParticipant(
-        filterStore = svcRules.domain.filterString,
-        filterParty = svcParty.filterString,
+      dsoHostingParticipants <- participantAdminConnection.listPartyToParticipant(
+        filterStore = dsoRules.domain.filterString,
+        filterParty = dsoParty.filterString,
         proposals = AuthorizedState,
         timeQuery = TimeQuery.Range(None, None),
       )
-      svcMemberParticipants <- getSvcMemberParticipants(svcRules)
+      dsoMemberParticipants <- getDsoMemberParticipants(dsoRules)
     } yield {
-      val orderedSvcHostingParticipants = svcHostingParticipants
+      val orderedDsoHostingParticipants = dsoHostingParticipants
         .sortBy(
           _.base.validFrom
         ) // redundant sorting to ensure that the last mapping is the most recent one
       val domainParameters = domainParametersState.mapping.parameters
       val delay = domainParameters.mediatorReactionTimeout.duration
         .plus(domainParameters.confirmationResponseTimeout.duration)
-      val observingParticipantIds = orderedSvcHostingParticipants.lastOption match {
-        case Some(svcHosting) =>
-          svcHosting.mapping.participants
+      val observingParticipantIds = orderedDsoHostingParticipants.lastOption match {
+        case Some(dsoHosting) =>
+          dsoHosting.mapping.participants
             .filter(_.permission == ParticipantPermission.Observation)
             .map(_.participantId)
         case _ =>
           Seq.empty[ParticipantId]
       }
-      val svcMemberParticipantIds = svcMemberParticipants.map(_.participantId)
+      val dsoMemberParticipantIds = dsoMemberParticipants.map(_.participantId)
       observingParticipantIds
-        .filter(participantId => svcMemberParticipantIds.contains(participantId))
+        .filter(participantId => dsoMemberParticipantIds.contains(participantId))
         .filter(participantId =>
           // Find the first mapping that added the participant and count from there.
           // Note that this relies on the same participant not being readded which is given by our current onboarding procedures.
-          orderedSvcHostingParticipants.find(
+          orderedDsoHostingParticipants.find(
             _.mapping.participantIds.contains(participantId)
           ) match {
-            case Some(svcHosting) =>
+            case Some(dsoHosting) =>
               domainTimeLowerBound.timestamp.toInstant
-                .isAfter(svcHosting.base.validFrom.plus(delay))
+                .isAfter(dsoHosting.base.validFrom.plus(delay))
             case _ => false
           }
         )
         .map(participantId =>
           SvOnboardingPromoteParticipantToSubmitterTrigger
-            .Task(svcRules.domain, participantId)
+            .Task(dsoRules.domain, participantId)
         )
     }
   }
 
-  private def getSvcMemberParticipants(
-      svcRules: AssignedContract[SvcRules.ContractId, SvcRules]
+  private def getDsoMemberParticipants(
+      dsoRules: AssignedContract[DsoRules.ContractId, DsoRules]
   )(implicit tc: TraceContext) = {
-    val svcMembers = svcRules.contract.payload.members
+    val dsoMembers = dsoRules.contract.payload.members
       .keySet()
       .asScala
       .map(PartyId.tryFromProtoPrimitive)
       .toSeq
-    svcMembers
+    dsoMembers
       .parTraverse { svParty =>
         participantAdminConnection
-          .getPartyToParticipant(svcRules.domain, svParty)
+          .getPartyToParticipant(dsoRules.domain, svParty)
       }
       .map(_.flatMap(_.mapping.participants))
   }
@@ -166,19 +166,19 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       task: SvOnboardingPromoteParticipantToSubmitterTrigger.Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     logger.info(
-      s"Proposing participant ${task.participantId} be promoted to Submission rights for the SVC party, will wait for it to take effect."
+      s"Proposing participant ${task.participantId} be promoted to Submission rights for the DSO party, will wait for it to take effect."
     )
     participantAdminConnection
       .ensureHostingParticipantIsPromotedToSubmitter(
         task.domainId,
-        svcParty,
+        dsoParty,
         task.participantId,
         svParty.uid.namespace.fingerprint,
         RetryFor.ClientCalls,
       )
       .map(_ =>
         TaskSuccess(
-          show"Participant ${task.participantId} was promoted to Submission rights for the SVC party"
+          show"Participant ${task.participantId} was promoted to Submission rights for the DSO party"
         )
       )
   }
@@ -187,12 +187,12 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
       task: SvOnboardingPromoteParticipantToSubmitterTrigger.Task
   )(implicit tc: TraceContext): Future[Boolean] = {
     for {
-      svcRules <- svcStore.getSvcRules()
-      svcHostingParticipants <- participantAdminConnection
-        .getPartyToParticipant(svcRules.domain, svcParty)
+      dsoRules <- dsoStore.getDsoRules()
+      dsoHostingParticipants <- participantAdminConnection
+        .getPartyToParticipant(dsoRules.domain, dsoParty)
         .map(_.mapping.participants)
     } yield {
-      svcHostingParticipants
+      dsoHostingParticipants
         .contains(HostingParticipant(task.participantId, ParticipantPermission.Submission))
     }
   }

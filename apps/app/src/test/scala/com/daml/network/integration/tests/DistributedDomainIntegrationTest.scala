@@ -33,7 +33,7 @@ class DistributedDomainIntegrationTest
   private val globalDomain = DomainAlias.tryCreate("global")
 
   "SV onboarding on distributed domain" in { implicit env =>
-    initSvc()
+    initDso()
     clue("Sequencers are initialized") {
       sv1Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
       sv2Backend.sequencerNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
@@ -110,14 +110,14 @@ class DistributedDomainIntegrationTest
       sv4Backend.mediatorNodeStatus() should matchPattern { case NodeStatus.Success(_) => }
     }
 
-    clue("SVC party is bootstrapped as a decentralized namespace with SVs as owners") {
-      val svcParty = sv1Backend.getSvcInfo().svcParty
+    clue("DSO party is bootstrapped as a decentralized namespace with SVs as owners") {
+      val dsoParty = sv1Backend.getDsoInfo().dsoParty
       val domainId =
         sv1Backend.participantClient.domains.id_of(globalDomain)
       val decentralizedNamespaces = sv1Backend.participantClient.topology.decentralized_namespaces
         .list(
           filterStore = domainId.filterString,
-          filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
+          filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
         )
       inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
         decentralizedNamespace.item.owners shouldBe Seq(
@@ -159,6 +159,6 @@ class DistributedDomainIntegrationTest
   }
 
   "SVs can be onboarded a second time" in { implicit env =>
-    initSvc()
+    initDso()
   }
 }

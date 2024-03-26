@@ -3,7 +3,7 @@ import { Dayjs } from 'dayjs';
 import dayjs from 'dayjs';
 import utc from 'dayjs/plugin/utc';
 
-import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+import { VoteRequest } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
 dayjs.extend(utc);
 

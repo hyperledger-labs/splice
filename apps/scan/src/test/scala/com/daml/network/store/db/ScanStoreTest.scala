@@ -9,8 +9,8 @@ import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.validatorlicense.FaucetState
 import com.daml.network.codegen.java.cc.{amulet as amuletCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.cns.CnsEntry
-import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
-import com.daml.network.codegen.java.cn.svc.globaldomain as globaldomainCodegen
+import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, dsorules as dsorulesCodegen}
+import com.daml.network.codegen.java.cn.dso.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.history.{AmuletExpire, LockedAmuletExpireAmulet, Transfer}
@@ -66,7 +66,7 @@ abstract class ScanStoreTest
         val amuletAmount = 100.0
         // For aggregation to work correctly, all closed mining rounds for totals have to exist.
         val closedRounds = (0 to 3).map { round =>
-          closedMiningRound(svcParty, round = round.toLong)
+          closedMiningRound(dsoParty, round = round.toLong)
         }
         for {
           store <- mkStore()
@@ -110,7 +110,7 @@ abstract class ScanStoreTest
         val changeToInitialAmountAsOfRoundZero = -50.0
         // For aggregation to work correctly, all closed mining rounds for totals have to exist.
         val closedRounds = (0 to 3).map { round =>
-          closedMiningRound(svcParty, round = round.toLong)
+          closedMiningRound(dsoParty, round = round.toLong)
         }
 
         for {
@@ -154,7 +154,7 @@ abstract class ScanStoreTest
         val changeToInitialAmountAsOfRoundZero = -50.0
         // For aggregation to work correctly, all closed mining rounds for totals have to exist.
         val closedRounds = (0 to 3).map { round =>
-          closedMiningRound(svcParty, round = round.toLong)
+          closedMiningRound(dsoParty, round = round.toLong)
         }
 
         for {
@@ -197,7 +197,7 @@ abstract class ScanStoreTest
         val mintAmount = 100.0
         // For aggregation to work correctly, all closed mining rounds for totals have to exist.
         val closedRounds = (0 to 3).map { round =>
-          closedMiningRound(svcParty, round = round.toLong)
+          closedMiningRound(dsoParty, round = round.toLong)
         }
 
         for {
@@ -226,7 +226,7 @@ abstract class ScanStoreTest
         val amuletAmount = keptAmuletAmount + sentAmuletAmount
         val lastClosedRound = 3
         val closedRounds = (0 to lastClosedRound).map { round =>
-          closedMiningRound(svcParty, round = round.toLong)
+          closedMiningRound(dsoParty, round = round.toLong)
         }
 
         for {
@@ -335,7 +335,7 @@ abstract class ScanStoreTest
             store.multiDomainAcsStore
           )
           closedRounds = (0 to 7).map { round =>
-            closedMiningRound(svcParty, round = round.toLong)
+            closedMiningRound(dsoParty, round = round.toLong)
           }
           _ <- MonadUtil.sequentialTraverse(closedRounds) { closed =>
             dummyDomain.create(closed)(store.multiDomainAcsStore)
@@ -380,7 +380,7 @@ abstract class ScanStoreTest
           9.75,
         )
         val closedRounds = (0 to 1).map { round =>
-          closedMiningRound(svcParty, round = round.toLong)
+          closedMiningRound(dsoParty, round = round.toLong)
         }
 
         for {
@@ -429,7 +429,7 @@ abstract class ScanStoreTest
           33.3,
         )
         val closedRounds = (0 to 2).map { round =>
-          closedMiningRound(svcParty, round = round.toLong)
+          closedMiningRound(dsoParty, round = round.toLong)
         }
 
         for {
@@ -482,8 +482,8 @@ abstract class ScanStoreTest
     "getAmuletConfigForRound" should {
 
       "return the amulet OpenMiningRoundTxLogEntry for the round" in {
-        val wanted = openMiningRound(svcParty, round = 2, amuletPrice = 2.0)
-        val unwanted = openMiningRound(svcParty, round = 3, amuletPrice = 3.0)
+        val wanted = openMiningRound(dsoParty, round = 2, amuletPrice = 2.0)
+        val unwanted = openMiningRound(dsoParty, round = 3, amuletPrice = 3.0)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(wanted)(store.multiDomainAcsStore)
@@ -510,9 +510,9 @@ abstract class ScanStoreTest
 
       "return the latest closed round" in {
         val closedBefore = (0 until 2).map { round =>
-          closedMiningRound(svcParty, round = round.toLong)
+          closedMiningRound(dsoParty, round = round.toLong)
         }
-        val closed = closedMiningRound(svcParty, round = 2)
+        val closed = closedMiningRound(dsoParty, round = 2)
         for {
           store <- mkStore()
           closeTime = Instant.ofEpochSecond(1500)
@@ -533,7 +533,7 @@ abstract class ScanStoreTest
       }
 
       "fail if there's no closed round" in {
-        val open = openMiningRound(svcParty, round = 2, amuletPrice = 2.0)
+        val open = openMiningRound(dsoParty, round = 2, amuletPrice = 2.0)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
@@ -568,9 +568,9 @@ abstract class ScanStoreTest
         // 4
         (userParty(4), 4.0, 10000), // excluded
       )
-      val closed = closedMiningRound(svcParty, round = asOfEndOfRound)
+      val closed = closedMiningRound(dsoParty, round = asOfEndOfRound)
       val closedBefore = (0 until asOfEndOfRound.toInt).map { round =>
-        closedMiningRound(svcParty, round = round.toLong)
+        closedMiningRound(dsoParty, round = round.toLong)
       }
       for {
         store <- mkStore()
@@ -695,9 +695,9 @@ abstract class ScanStoreTest
           )(_),
         )
         val closedBefore = (0 until asOfEndOfRound.toInt).map { round =>
-          closedMiningRound(svcParty, round = round.toLong)
+          closedMiningRound(dsoParty, round = round.toLong)
         }
-        val closed = closedMiningRound(svcParty, round = asOfEndOfRound)
+        val closed = closedMiningRound(dsoParty, round = asOfEndOfRound)
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(closedBefore) { closed =>
@@ -788,15 +788,15 @@ abstract class ScanStoreTest
       }
     }
 
-    "lookupSvcRules" should {
-      "find the latest Svc rules" in {
-        val sr = svcRules(user1)
+    "lookupDsoRules" should {
+      "find the latest Dso rules" in {
+        val sr = dsoRules(user1)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(sr)(store.multiDomainAcsStore)
         } yield {
           store
-            .lookupSvcRules()
+            .lookupDsoRules()
             .futureValue
             .map(_.contract) should be(Some(sr))
         }
@@ -1023,7 +1023,7 @@ abstract class ScanStoreTest
   }
 
   protected def mkStore(
-      svcParty: PartyId = svcParty
+      dsoParty: PartyId = dsoParty
   ): Future[ScanStore]
 
   private lazy val user1 = userParty(1)
@@ -1187,7 +1187,7 @@ trait AmuletTransferUtil { self: StoreTest =>
     val memberTrafficCid = new MemberTraffic.ContractId(validContractId(round.toInt))
 
     val createdAmulet = amulet(provider, ccSpent, round, holdingFee)
-    val amuletCreateEvent = toCreatedEvent(createdAmulet, signatories = Seq(provider, svcParty))
+    val amuletCreateEvent = toCreatedEvent(createdAmulet, signatories = Seq(provider, dsoParty))
     val amuletArchiveEvent = exercisedEvent(
       createdAmulet.contractId.contractId,
       amuletCodegen.Amulet.TEMPLATE_ID,
@@ -1271,7 +1271,7 @@ trait AmuletTransferUtil { self: StoreTest =>
         )
           .toValue(_.toValue),
       ),
-      Seq(toCreatedEvent(amuletContract, signatories = Seq(receiver, svcParty))),
+      Seq(toCreatedEvent(amuletContract, signatories = Seq(receiver, dsoParty))),
       dummyDomain,
     )
   }
@@ -1301,7 +1301,7 @@ trait AmuletTransferUtil { self: StoreTest =>
 
   def amuletTemplate(amount: Double, owner: PartyId) = {
     new Amulet(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       owner.toProtoPrimitive,
       expiringAmount(amount),
     )
@@ -1313,20 +1313,20 @@ trait AmuletTransferUtil { self: StoreTest =>
     new cc.fees.RatePerRound(numeric(amount)),
   )
 
-  def svcRules(
+  def dsoRules(
       party: PartyId,
-      members: java.util.Map[String, svcrulesCodegen.MemberInfo] = Collections.emptyMap(),
+      members: java.util.Map[String, dsorulesCodegen.MemberInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
-    val templateId = svcrulesCodegen.SvcRules.TEMPLATE_ID
+    val templateId = dsorulesCodegen.DsoRules.TEMPLATE_ID
     val newDomainId = "new-domain-id"
-    val template = new svcrulesCodegen.SvcRules(
-      svcParty.toProtoPrimitive,
+    val template = new dsorulesCodegen.DsoRules(
+      dsoParty.toProtoPrimitive,
       epoch,
       members,
       Collections.emptyMap(),
       party.toProtoPrimitive,
-      new svcrulesCodegen.SvcRulesConfig(
+      new dsorulesCodegen.DsoRulesConfig(
         1,
         1,
         new RelTime(1),
@@ -1338,7 +1338,7 @@ trait AmuletTransferUtil { self: StoreTest =>
           new cometbftCodegen.CometBftConfigLimits(1, 1, 1, 1, 1)
         ),
         1,
-        new globaldomainCodegen.SvcGlobalDomainConfig(
+        new globaldomainCodegen.DsoGlobalDomainConfig(
           Collections.emptyMap(),
           newDomainId,
           newDomainId,
@@ -1350,7 +1350,7 @@ trait AmuletTransferUtil { self: StoreTest =>
     )
     contract(
       identifier = templateId,
-      contractId = new svcrulesCodegen.SvcRules.ContractId(nextCid()),
+      contractId = new dsorulesCodegen.DsoRules.ContractId(nextCid()),
       payload = template,
     )
   }
@@ -1358,7 +1358,7 @@ trait AmuletTransferUtil { self: StoreTest =>
   def cnsEntry(n: Int, name: String) = {
     val template = new CnsEntry(
       userParty(n).toProtoPrimitive,
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       name,
       s"https://example.com/$name",
       s"Test with $name",
@@ -1374,7 +1374,7 @@ trait AmuletTransferUtil { self: StoreTest =>
 
   def memberTraffic(member: Member, totalPurchased: Long) = {
     val template = new MemberTraffic(
-      svcParty.toProtoPrimitive,
+      dsoParty.toProtoPrimitive,
       member.toProtoPrimitive,
       dummyDomain.toProtoPrimitive,
       domainMigrationId,
@@ -1402,19 +1402,19 @@ class DbScanStoreTest
     with AcsTables {
 
   override protected def mkStore(
-      svcParty: PartyId
+      dsoParty: PartyId
   ): Future[ScanStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.cantonAmulet.all ++
           DarResources.cantonNameService.all ++
-          DarResources.svcGovernance.all
+          DarResources.dsoGovernance.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
     val store = new DbScanStore(
-      key = ScanStore.Key(svcParty),
+      key = ScanStore.Key(dsoParty),
       storage,
       // to allow aggregating from round zero without previous round aggregate
       isFounder = true,
@@ -1423,7 +1423,7 @@ class DbScanStoreTest
       // required to instantiate a DbScanStore, returns none not to affect this test.
       _ =>
         new ScanAggregatesReader() {
-          def readRoundAggregateFromSvc(round: Long)(implicit
+          def readRoundAggregateFromDso(round: Long)(implicit
               ec: ExecutionContext,
               traceContext: TraceContext,
           ): Future[Option[ScanAggregator.RoundAggregate]] = Future.successful(None)
@@ -1454,25 +1454,25 @@ class DbScanStoreTest
       // total 1001
       val first = validatorLicense(
         userParty(9001),
-        svcParty,
+        dsoParty,
         Some(new FaucetState(new Round(0), new Round(1000), 0L)),
       )
       // total 1000
       val almostFirst = validatorLicense(
         userParty(2),
-        svcParty,
+        dsoParty,
         Some(new FaucetState(new Round(0), new Round(1000), 1L)),
       )
       // total 681
       val third = validatorLicense(
         userParty(2),
-        svcParty,
+        dsoParty,
         Some(new FaucetState(new Round(700), new Round(1000), 20L)),
       )
       // total 2
       val outOfLimit = validatorLicense(
         userParty(6),
-        svcParty,
+        dsoParty,
         Some(new FaucetState(new Round(999), new Round(1000), 0L)),
       )
       for {

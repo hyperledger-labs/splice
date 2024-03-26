@@ -8,7 +8,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.SequencerAdminConnection
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.config.RequireTypes.NonNegativeLong
@@ -28,7 +28,7 @@ import scala.jdk.CollectionConverters.*
   */
 class ReconcileSequencerLimitWithMemberTrafficTrigger(
     override protected val context: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     sequencerAdminConnectionO: Option[SequencerAdminConnection],
     trafficBalanceReconciliationDelay: NonNegativeFiniteDuration,
 )(implicit
@@ -77,7 +77,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                 )
               case _ =>
                 store
-                  .getSvcRulesWithMemberNodeStates()
+                  .getDsoRulesWithMemberNodeStates()
                   .flatMap(rulesAndStates => {
                     if (rulesAndStates.activeSvParticipantAndMediatorIds().contains(memberId)) {
                       // SVs are granted unlimited traffic and do not need to purchase it via MemberTraffic contracts.
@@ -90,7 +90,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
                         )
                     } else {
                       val trafficLimitOffset =
-                        rulesAndStates.svcRules.payload.initialTrafficState.asScala
+                        rulesAndStates.dsoRules.payload.initialTrafficState.asScala
                           .get(memberId.toProtoPrimitive)
                           .fold(0L)(_.consumedTraffic)
                       reconcileExtraTrafficLimitForMember(memberId, domainId, trafficLimitOffset)

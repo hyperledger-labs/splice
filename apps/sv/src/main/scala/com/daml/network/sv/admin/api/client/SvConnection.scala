@@ -35,9 +35,9 @@ final class SvConnection private (
   ): Future[Unit] =
     runHttpCmd(config.url, HttpSvAppClient.StartSvOnboarding(token))
 
-  /** Ask the sponsoring SV to authorize hosting the SVC party at the candidate participant and to prepare the ACS snapshot.
+  /** Ask the sponsoring SV to authorize hosting the DSO party at the candidate participant and to prepare the ACS snapshot.
     */
-  def authorizeSvcPartyHosting(
+  def authorizeDsoPartyHosting(
       candidateParticipantId: ParticipantId,
       candidateParty: PartyId,
   )(implicit
@@ -72,15 +72,15 @@ final class SvConnection private (
       ),
     )
 
-  def getSvcInfo()(implicit
+  def getDsoInfo()(implicit
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
       ec: ExecutionContext,
       mat: Materializer,
-  ): Future[HttpSvAppClient.SvcInfo] =
+  ): Future[HttpSvAppClient.DsoInfo] =
     runHttpCmd(
       config.url,
-      HttpSvAppClient.GetSvcInfo,
+      HttpSvAppClient.GetDsoInfo,
     )
 }
 

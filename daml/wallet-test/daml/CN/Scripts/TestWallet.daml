@@ -30,7 +30,7 @@ createPaymentRequest app provider sender receiverAmounts = do
   submitMulti (sender :: provider :: map fst receiverAmounts) [] $ createCmd AppPaymentRequest with
     sender
     provider
-    svc = app.svc
+    dso = app.dso
     receiverAmounts = map (uncurry ReceiverAmount) receiverAmounts
     expiresAt = t `addRelTime` minutes 5
     description
@@ -42,8 +42,8 @@ createSingleReceiverPaymentRequest app provider sender receiver amount = do
 acceptPaymentRequest : AmuletApp -> AmuletUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId AppPaymentRequest -> ContractId Amulet -> Script (ContractId AcceptedAppPayment)
 acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transferRequest amulet = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
-  -- TODO(#2957): remove read-as SVC.
-  (accept, _change) <- submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
+  -- TODO(#2957): remove read-as DSO.
+  (accept, _change) <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [InputAmulet amulet]
     context
     walletProvider
@@ -59,14 +59,14 @@ collectAcceptedPaymentInRound app round provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContextForRound app provider round
   -- multi party submit to simplify test
-  submitMulti (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  submitMulti (signatory acceptedPayment) [app.dso] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
 
 collectAcceptedPaymentMustFail : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script ()
 collectAcceptedPaymentMustFail app provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContext app provider
   -- multi party submit to simplify test
-  _ <- submitMultiMustFail (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  _ <- submitMultiMustFail (signatory acceptedPayment) [app.dso] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
   pure ()
 
 checkAmuletPositions : AmuletUser -> [Decimal] -> Script ()
@@ -100,7 +100,7 @@ testSingleReceiverCCPaymentRequest = script do
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider1.primaryParty
-    svc = app.svc
+    dso = app.dso
     lockedAmulet = lockedAmuletCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = paymentAmount)
@@ -129,7 +129,7 @@ testExpiringCCPaymentRequest = script do
   install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "alice"
-    svcParty = app.svc
+    dsoParty = app.dso
     validatorParty = aliceValidator.primaryParty
 
   -- Try expiring too early
@@ -163,7 +163,7 @@ testSingleReceiverUSDPaymentRequest = script do
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider1.primaryParty
-    svc = app.svc
+    dso = app.dso
     lockedAmulet = lockedAmuletCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 60.0)
@@ -206,7 +206,7 @@ testCCPaymentRequest = script do
       (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 10.0)
       ]
     provider = provider1.primaryParty
-    svc = app.svc
+    dso = app.dso
     lockedAmulet = lockedAmulet
     round = lockedAmuletPayload.amulet.amount.createdAt
     reference = transferRequest
@@ -297,7 +297,7 @@ testUSDPaymentRequest = script do
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider1.primaryParty
-    svc = app.svc
+    dso = app.dso
     lockedAmulet = lockedAmuletCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 20.0),
@@ -325,7 +325,7 @@ testMixedPaymentRequest = script do
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider1.primaryParty
-    svc = app.svc
+    dso = app.dso
     lockedAmulet = lockedAmuletCid
     ccReceiverAmounts = [
       (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 10.0),
@@ -371,14 +371,14 @@ testTerminatedPayments = script do
 
   (paymentRequest, acceptedPayment) <- createAcceptedPayment
   context <- getAppTransferContext app alice
-  submitMulti [bob.primaryParty] [app.svc] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Reject context)
+  submitMulti [bob.primaryParty] [app.dso] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Reject context)
   assertTerminatedPayment alice.primaryParty paymentRequest
 
   (paymentRequest, acceptedPayment) <- createAcceptedPayment
   context <- getAppTransferContext app alice
   let tickDuration = defaultAmuletConfig.tickDuration
   passTime (tickDuration + tickDuration + seconds 1) -- pass one full round of time
-  submitMulti [alice.primaryParty, bob.primaryParty] [app.svc] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Expire context)
+  submitMulti [alice.primaryParty, bob.primaryParty] [app.dso] $ exerciseCmd acceptedPayment (AcceptedAppPayment_Expire context)
   assertTerminatedPayment alice.primaryParty paymentRequest
 
   pure ()
@@ -402,11 +402,11 @@ testSuccessfulBatchCCPaymentRequests = script do
   install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = endUserName
-    svcParty = app.svc
+    dsoParty = app.dso
     validatorParty = aliceValidator.primaryParty
 
   context <- getPaymentTransferContext app alice
-  executeBatchResult <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  executeBatchResult <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     context
     inputs = [InputAmulet amulet]
     operations = [CO_AppPayment transferRequest, CO_AppPayment transferRequest2]
@@ -423,7 +423,7 @@ testSuccessfulBatchCCPaymentRequests = script do
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     provider = provider1.primaryParty
-    svc = app.svc
+    dso = app.dso
     lockedAmulet = lockedAmuletCid
     ccReceiverAmounts = [
       ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 1.0 ]
@@ -437,7 +437,7 @@ testSuccessfulBatchCCPaymentRequests = script do
       (ReceiverCCAmount with receiver = alice.primaryParty, ccAmount = 2.0)
       ]
     provider = provider1.primaryParty
-    svc = app.svc
+    dso = app.dso
     lockedAmulet = lockedAmuletCid2
     round = lockedAmulet2.amulet.amount.createdAt
     reference = transferRequest2
@@ -454,7 +454,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
   install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
-    svcParty = app.svc
+    dsoParty = app.dso
     validatorParty = aliceValidator.primaryParty
 
   transferRequest3 <- createSingleReceiverPaymentRequest app
@@ -466,7 +466,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
       (alice.primaryParty, PaymentAmount 3.0 CC)]
   -- trying to fulfill the request for 10,000 CC will fail
   context <- getPaymentTransferContext app alice
-  ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
     context
@@ -486,7 +486,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
       (ReceiverCCAmount with receiver = alice.primaryParty, ccAmount = 3.0)
       ]
     provider = provider1.primaryParty
-    svc = app.svc
+    dso = app.dso
     lockedAmulet = lockedAmuletCid4
     round = lockedAmulet4.amulet.amount.createdAt
     reference = transferRequest4
@@ -507,13 +507,13 @@ testCO_MergeTransferInputs = script do
   install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
-    svcParty = app.svc
+    dsoParty = app.dso
     validatorParty = aliceValidator.primaryParty
 
 
   context <- getPaymentTransferContext app alice
 
-  ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet, InputAmulet amulet2]
     operations = [CO_MergeTransferInputs]
     context
@@ -535,7 +535,7 @@ testBuyMemberTraffic = script do
   (_, openRound) <- getLatestOpenRound app
 
   now <- getTime
-  [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.svc
+  [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.dso
   let globalDomainConfig = (CC.Schedule.getValueAsOf now amuletRules.configSchedule).globalDomain
   let domainId = globalDomainConfig.activeDomain
   let migrationId = 0
@@ -547,12 +547,12 @@ testBuyMemberTraffic = script do
   submit aliceValidator.primaryParty $ createCmd $ WalletAppInstall with
     endUserParty = aliceValidator.primaryParty
     endUserName = "alice_validator_wallet_user"
-    svcParty = app.svc
+    dsoParty = app.dso
     validatorParty = aliceValidator.primaryParty
 
   -- create initial validator top-up state contract
   topupStateCid <- submit aliceValidator.primaryParty $
-    createCmd (initialValidatorTopUpState app.svc aliceValidator.primaryParty testParticipantId domainId)
+    createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId domainId)
 
   -- test that buying less extra traffic than the configured min topup amount fails
   let minTopupAmount = globalDomainConfig.fees.minTopupAmount
@@ -563,7 +563,7 @@ testBuyMemberTraffic = script do
   -- test that providing an invalid global domain ID fails
   let invalidDomainId = domainId <> "_invalid"
   invalidTopupStateCid <- submit aliceValidator.primaryParty $
-    createCmd (initialValidatorTopUpState app.svc aliceValidator.primaryParty testParticipantId invalidDomainId)
+    createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId invalidDomainId)
   outcome <- executeAmuletOperation app aliceValidator $
     CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidDomainId migrationId (minutes 1) (Some invalidTopupStateCid)
   outcome === COO_Error (ITR_UnknownDomain invalidDomainId)
@@ -577,7 +577,7 @@ testBuyMemberTraffic = script do
   before === after
 
   -- validate the state of the member traffic contract
-  Some traffic1 <- queryContractId @MemberTraffic app.svc trafficCid1
+  Some traffic1 <- queryContractId @MemberTraffic app.dso trafficCid1
   (ccSpent, usdSpent) <- calculateDomainFees app minTopupAmount
   traffic1.totalPurchased === minTopupAmount
   traffic1.numPurchases === 1
@@ -590,12 +590,12 @@ testBuyMemberTraffic = script do
   topupState2.lastPurchasedAt === now
 
   -- check that no app reward coupons were issued to aliceValidator
-  [] <- query @AppRewardCoupon app.svc
+  [] <- query @AppRewardCoupon app.dso
 
   -- check that a single validator reward coupon was issued over the full purchase amount
   [(_, coupon)] <- query @ValidatorRewardCoupon aliceValidator.primaryParty
   coupon === ValidatorRewardCoupon with
-    svc = app.svc
+    dso = app.dso
     round = Round 2
     amount = ccSpent
     user = aliceValidator.primaryParty
@@ -609,10 +609,10 @@ testBuyMemberTraffic = script do
   passTime (minutes 1)
   COO_BuyMemberTraffic trafficCid2 <- executeAmuletOperation app aliceValidator $
     CO_BuyMemberTraffic minTopupAmount testParticipantId domainId migrationId (minutes 1) (Some topupStateCid2)
-  Some traffic2 <- queryContractId @MemberTraffic app.svc trafficCid2
+  Some traffic2 <- queryContractId @MemberTraffic app.dso trafficCid2
 
   -- check the app reward coupons once more
-  [] <- query @AppRewardCoupon app.svc
+  [] <- query @AppRewardCoupon app.dso
 
   -- Test that third-party top-ups work
 
@@ -625,7 +625,7 @@ testBuyMemberTraffic = script do
   submit provider1Validator.primaryParty $ createCmd $ WalletAppInstall with
     endUserParty = provider1Validator.primaryParty
     endUserName = "provider1_validator_wallet_user"
-    svcParty = app.svc
+    dsoParty = app.dso
     validatorParty = provider1Validator.primaryParty
   _ <- tap app provider1Validator 10.0
 
@@ -634,7 +634,7 @@ testBuyMemberTraffic = script do
     CO_BuyMemberTraffic (minTopupAmount + 1) testParticipantId domainId migrationId (minutes 1) None
 
   -- validate the state of the member traffic contract
-  Some providerTraffic <- queryContractId @MemberTraffic app.svc providerTrafficCid
+  Some providerTraffic <- queryContractId @MemberTraffic app.dso providerTrafficCid
   let totalPurchased = minTopupAmount + 1
   (ccSpent, usdSpent) <- calculateDomainFees app totalPurchased
   providerTraffic.totalPurchased === totalPurchased
@@ -656,7 +656,7 @@ testBuyMemberTraffic = script do
   provider2Install <- submitMulti [provider2.primaryParty, provider2Validator.primaryParty] [] $ createCmd $ WalletAppInstall with
       endUserParty = provider2.primaryParty
       endUserName = "provider2_wallet_user"
-      svcParty = app.svc
+      dsoParty = app.dso
       validatorParty = provider2Validator.primaryParty
   _ <- tap app provider2 10.0
 
@@ -683,7 +683,7 @@ testBuyMemberTraffic = script do
   request2 <- createTrafficRequest minTopupAmount testParticipantId domainId "request2" (now `addRelTime` minutes 1)
   COO_CompleteBuyTrafficRequest (requestTrafficCid, trackingInfo) <- executeAmuletOperation app provider2 $
     CO_CompleteBuyTrafficRequest request2
-  Some requestedTraffic <- queryContractId @MemberTraffic app.svc requestTrafficCid
+  Some requestedTraffic <- queryContractId @MemberTraffic app.dso requestTrafficCid
   requestedTraffic.totalPurchased === minTopupAmount
   requestedTraffic.memberId === testParticipantId
   requestedTraffic.domainId === domainId
@@ -702,10 +702,10 @@ testBuyMemberTraffic = script do
 
   -- Merging traffic contracts
 
-  -- test that the SVC can merge multiple member traffic contracts
+  -- test that the DSO can merge multiple member traffic contracts
   let trafficCids = [trafficCid1, trafficCid2, providerTrafficCid, requestTrafficCid]
-  submit app.svc $ exerciseCmd amuletRulesCid AmuletRules_MergeMemberTrafficContracts with trafficCids
-  [(mergedTrafficCid, mergedTraffic)] <- queryFilter @MemberTraffic app.svc (\t -> t.memberId == testParticipantId)
+  submit app.dso $ exerciseCmd amuletRulesCid AmuletRules_MergeMemberTrafficContracts with trafficCids
+  [(mergedTrafficCid, mergedTraffic)] <- queryFilter @MemberTraffic app.dso (\t -> t.memberId == testParticipantId)
   assert $ notElem mergedTrafficCid trafficCids
   mergedTraffic.totalPurchased === 4 * minTopupAmount + 1
   mergedTraffic.numPurchases === 4
@@ -713,7 +713,7 @@ testBuyMemberTraffic = script do
   mergedTraffic.ccSpent === traffic1.ccSpent + traffic2.ccSpent + providerTraffic.ccSpent + requestedTraffic.ccSpent
 
   -- at least 1 contract must be provided to merge
-  submitMustFail app.svc $ exerciseCmd amuletRulesCid AmuletRules_MergeMemberTrafficContracts with
+  submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_MergeMemberTrafficContracts with
     trafficCids = []
 
   pure ()
@@ -733,7 +733,7 @@ testInsufficientFundsBatchSubscriptions = script do
   install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
-    svcParty = app.svc
+    dsoParty = app.dso
     validatorParty = validator
 
   let payData = SubscriptionPayData with
@@ -745,15 +745,15 @@ testInsufficientFundsBatchSubscriptions = script do
         sender = alice.primaryParty
         receiver = pizzeria.primaryParty
         provider = provider.primaryParty
-        svc = app.svc
+        dso = app.dso
         description = "test subscription"
 
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
 
   context <- getPaymentTransferContext app alice
   amulet <- tap  app alice 5.0
-  -- TODO(#2957): remove read-as SVC.
-  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  -- TODO(#2957): remove read-as DSO.
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -761,8 +761,8 @@ testInsufficientFundsBatchSubscriptions = script do
   outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
 
   amulet <- tap app alice 15.0
-  -- TODO(#2957): remove read-as SVC.
-  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  -- TODO(#2957): remove read-as DSO.
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -778,16 +778,16 @@ testInsufficientFundsBatchSubscriptions = script do
   context <- getPaymentTransferContext app alice
 
   amulet <- tap app alice 5.0
-  -- TODO(#2957): remove read-as SVC.
-  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  -- TODO(#2957): remove read-as DSO.
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
   outcomes === [COO_Error (ITR_InsufficientFunds (5.17))]
 
   amulet <- tap app alice 15.0
-  -- TODO(#2957): remove read-as SVC.
-  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.svc] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  -- TODO(#2957): remove read-as DSO.
+  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
@@ -809,8 +809,8 @@ executeAmuletOperation app user op = do
   [(installCid, install)] <- queryFilter @WalletAppInstall user.primaryParty (\i -> i.endUserParty == user.primaryParty)
   context <- getPaymentTransferContext app user
   amulets <- queryFilter @Amulet user.primaryParty (\amulet -> amulet.owner == user.primaryParty)
-  -- TODO(#2957): remove read-as SVC.
-  result <- submitMulti [install.validatorParty] [install.endUserParty, install.validatorParty, app.svc] $
+  -- TODO(#2957): remove read-as DSO.
+  result <- submitMulti [install.validatorParty] [install.endUserParty, install.validatorParty, app.dso] $
     exerciseCmd installCid WalletAppInstall_ExecuteBatch with
       inputs = [InputAmulet amulet._1 | amulet <- amulets]
       operations = [op]
@@ -821,7 +821,7 @@ executeAmuletOperation app user op = do
 calculateDomainFees : AmuletApp -> Int -> Script (Decimal, Decimal)
 calculateDomainFees app trafficAmount = do
   now <- getTime
-  [(_, amuletRules)] <- query @AmuletRules app.svc
+  [(_, amuletRules)] <- query @AmuletRules app.dso
   let globalDomainConfig = (CC.Schedule.getValueAsOf now amuletRules.configSchedule).globalDomain
   let extraTrafficPrice = globalDomainConfig.fees.extraTrafficPrice
   (_, openRound) <- getLatestOpenRound app

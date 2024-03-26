@@ -2,9 +2,9 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.amulet.Amulet
 import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.svcrules.SvcRules_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.cn.dsorules.DsoRules_ConfirmSvOnboarding
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
@@ -38,7 +38,7 @@ class SvOnboardingAddlIntegrationTest
       )
 
   "SVs can onboard new SVs" in { implicit env =>
-    clue("Initialize SVC with 3 SVs") {
+    clue("Initialize DSO with 3 SVs") {
       startAllSync(
         sv1ScanBackend,
         sv2ScanBackend,
@@ -49,7 +49,7 @@ class SvOnboardingAddlIntegrationTest
         sv2ValidatorBackend,
         sv3ValidatorBackend,
       )
-      sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
+      sv1Backend.getDsoInfo().dsoRules.payload.members should have size 3
     }
     clue("Stop SV2 so that SV4 can't gather enough confirmations just yet") {
       sv2Backend.stop()
@@ -60,8 +60,8 @@ class SvOnboardingAddlIntegrationTest
       sv4ValidatorBackend.start()
       sv4Backend.start()
     }
-    val sv1Party = sv1Backend.getSvcInfo().svParty
-    // We are not using sv4.getSvcInfo() to get sv4's party id
+    val sv1Party = sv1Backend.getDsoInfo().svParty
+    // We are not using sv4.getDsoInfo() to get sv4's party id
     // because the SvApp is not completely initialized yet and hence the http service is not available.
     val sv4Party = eventually() {
       sv4Backend.participantClient.ledger_api.users
@@ -76,14 +76,14 @@ class SvOnboardingAddlIntegrationTest
           // The onboarding is requested by SV4 during SvApp init.
           inside(
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty)
+              .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty)
           ) {
             case Seq(svOnboarding) => {
               svOnboarding.data.candidateName shouldBe getSvName(4)
               svOnboarding.data.candidateParty shouldBe sv4Party.toProtoPrimitive
               svOnboarding.data.candidateParticipantId shouldBe sv4Backend.participantClient.id.toProtoPrimitive
               svOnboarding.data.sponsor shouldBe sv1Party.toProtoPrimitive
-              svOnboarding.data.svc shouldBe svcParty.toProtoPrimitive
+              svOnboarding.data.dso shouldBe dsoParty.toProtoPrimitive
               // if this check fails:
               // make sure that the values (especially the key) are in sync with sv1's and sv4's config files
               SvOnboardingToken
@@ -93,7 +93,7 @@ class SvOnboardingAddlIntegrationTest
                 "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEZMNsDJr1uTwMTIIlzUZpUexTLqVGMsD7cR4Y8sqYYFYhldVMeHG5zSubf+p+WZbLEyMUCT5nBCCBh0oiUY9crA==",
                 sv4Party,
                 sv4Backend.participantClient.id,
-                svcParty,
+                dsoParty,
               )
               (svOnboarding.data.token, svOnboarding.id)
             }
@@ -103,7 +103,7 @@ class SvOnboardingAddlIntegrationTest
     clue("Attempting to start an onboarding multiple times has no effect") {
       sv1Backend.startSvOnboarding(token)
       sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) should have length 1
+        .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) should have length 1
     }
     clue(
       "SVs that haven't approved a candidate refuse to create a `SvOnboarding` contract for it."
@@ -116,20 +116,20 @@ class SvOnboardingAddlIntegrationTest
     clue("All online and approving SVs confirm SV4's onboarding") {
       eventually() {
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svcrules.Confirmation.COMPANION)(svcParty)
+          .filterJava(cn.dsorules.Confirmation.COMPANION)(dsoParty)
           .filter(_.data.action match {
-            case a: ARC_SvcRules =>
-              a.svcAction match {
+            case a: ARC_DsoRules =>
+              a.dsoAction match {
                 case confirm: SRARC_ConfirmSvOnboarding =>
-                  confirm.svcRules_ConfirmSvOnboardingValue.newMemberName == getSvName(4)
+                  confirm.dsoRules_ConfirmSvOnboardingValue.newMemberName == getSvName(4)
                 case _ => false
               }
             case _ => false
           }) should have length 1
       }
       sv1Backend
-        .getSvcInfo()
-        .svcRules
+        .getDsoInfo()
+        .dsoRules
         .payload
         .members
         .keySet should not contain sv4Party.toProtoPrimitive
@@ -152,8 +152,8 @@ class SvOnboardingAddlIntegrationTest
       "SV4's onboarding gathers suffcient confirmations and is completed",
       { _ =>
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty
-        sv1Backend.getSvcInfo().svcRules.payload.members.keySet should contain(
+          .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) shouldBe empty
+        sv1Backend.getDsoInfo().dsoRules.payload.members.keySet should contain(
           sv4Party.toProtoPrimitive
         )
       },
@@ -162,7 +162,7 @@ class SvOnboardingAddlIntegrationTest
       eventually()(inside(sv1Backend.getSvOnboardingStatus(sv4Party)) {
         case status: SvOnboardingStatus.Completed => {
           status.name shouldBe getSvName(4)
-          status.svcRulesCid shouldBe sv1Backend.getSvcInfo().svcRules.contractId
+          status.dsoRulesCid shouldBe sv1Backend.getDsoInfo().dsoRules.contractId
           sv1Backend.getSvOnboardingStatus(getSvName(4)) shouldBe sv1Backend
             .getSvOnboardingStatus(
               sv4Party
@@ -175,10 +175,10 @@ class SvOnboardingAddlIntegrationTest
 
     // we need to wait for a minute due to non sv validator only connect to sequencers after initialization + sequencerAvailabilityDelay which is is 60s
     eventually(timeUntilSuccess = 1.minutes, maxPollInterval = 1.second) {
-      val sv1NodeStates = sv1Backend.getSvcInfo().svNodeStates
+      val sv1NodeStates = sv1Backend.getDsoInfo().svNodeStates
 
       forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { svBackend =>
-        val svParty = svBackend.getSvcInfo().svParty
+        val svParty = svBackend.getDsoInfo().svParty
         val globalDomain = svBackend.config.domains.global.alias
         val sequencerConnections = svBackend.participantClient.domains
           .config(globalDomain)
@@ -206,7 +206,7 @@ class SvOnboardingAddlIntegrationTest
         }
 
         clue("published sequencer information can be seen via scan") {
-          inside(sv1ScanBackend.listSvcSequencers()) { case Seq(domainSequencers) =>
+          inside(sv1ScanBackend.listDsoSequencers()) { case Seq(domainSequencers) =>
             domainSequencers.sequencers should have size 4
             domainSequencers.sequencers.find(s =>
               s.svName == nodeState.svName && s.url == localSequencerUrl.toString
@@ -221,9 +221,9 @@ class SvOnboardingAddlIntegrationTest
   "SV onboarding status is reported correctly for `unknown` and `confirmed` states" in {
     implicit env =>
       // only 1 SV => slightly faster test
-      clue("Initialize SVC with 1 SV") {
+      clue("Initialize DSO with 1 SV") {
         startAllSync(sv1ScanBackend, sv1Backend)
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 1
+        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 1
       }
       // SV two’s party hasn't been allocated at this point because the SV app isn't running so we allocate it here.
       val (sv2Party, _) = actAndCheck(
@@ -251,9 +251,9 @@ class SvOnboardingAddlIntegrationTest
           val confirmingSvs = getConfirmingSvs(Seq(sv1Backend))
           confirmActionByAllMembers(
             confirmingSvs,
-            new ARC_SvcRules(
+            new ARC_DsoRules(
               new SRARC_ConfirmSvOnboarding(
-                new SvcRules_ConfirmSvOnboarding(
+                new DsoRules_ConfirmSvOnboarding(
                   sv2Party.toProtoPrimitive,
                   getSvName(2),
                   "PAR::sv2::1220f3e2",
@@ -281,7 +281,7 @@ class SvOnboardingAddlIntegrationTest
 
   "The election request succeeds if one SV is onboarded in the middle of an election request" in {
     implicit env =>
-      clue("Initialize SVC with 2 SVs") {
+      clue("Initialize DSO with 2 SVs") {
         startAllSync(
           sv1ScanBackend,
           sv2ScanBackend,
@@ -290,11 +290,11 @@ class SvOnboardingAddlIntegrationTest
           sv1ValidatorBackend,
           sv2ValidatorBackend,
         )
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 2
+        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 2
       }
 
-      val currentLeader = sv1Backend.getSvcInfo().svParty.toProtoPrimitive
-      val newLeader = sv2Backend.getSvcInfo().svParty.toProtoPrimitive
+      val currentLeader = sv1Backend.getDsoInfo().svParty.toProtoPrimitive
+      val newLeader = sv2Backend.getDsoInfo().svParty.toProtoPrimitive
       val newRanking: Vector[String] = Seq(newLeader, currentLeader).toVector
 
       // note that the new leader has to vote for himself to prove readiness
@@ -306,7 +306,7 @@ class SvOnboardingAddlIntegrationTest
       )(
         "the epoch stays the same",
         _ => {
-          sv1Backend.getSvcInfo().svcRules.payload.leader shouldBe currentLeader
+          sv1Backend.getDsoInfo().dsoRules.payload.leader shouldBe currentLeader
         },
       )
 
@@ -315,27 +315,27 @@ class SvOnboardingAddlIntegrationTest
           sv3Backend,
           sv3ValidatorBackend,
         )
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
-        sv1Backend.getSvcInfo().svcRules.payload.epoch shouldBe 0
+        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 3
+        sv1Backend.getDsoInfo().dsoRules.payload.epoch shouldBe 0
       }
 
       loggerFactory.assertEventuallyLogsSeq(SuppressionRule.Level(Level.INFO))(
         actAndCheck(
           "sv3 creates a new election request for epoch 1", {
-            val sv3 = sv3Backend.getSvcInfo().svParty.toProtoPrimitive
+            val sv3 = sv3Backend.getDsoInfo().svParty.toProtoPrimitive
             sv3Backend
               .createElectionRequest(sv3, newRanking.appended(sv3))
           },
         )(
           "the epoch increased and sv2 is the new leader",
           _ => {
-            sv1Backend.getSvcInfo().svcRules.payload.epoch shouldBe 1
-            sv1Backend.getSvcInfo().svcRules.payload.leader shouldBe newLeader
+            sv1Backend.getDsoInfo().dsoRules.payload.epoch shouldBe 1
+            sv1Backend.getDsoInfo().dsoRules.payload.leader shouldBe newLeader
           },
         ),
         logEntries => {
           val noticedLbRestarts = logEntries collect {
-            case logEntry if logEntry.message startsWith "Noticed an SvcRules epoch change" =>
+            case logEntry if logEntry.message startsWith "Noticed an DsoRules epoch change" =>
               raw"\bSV=(.+?)\b".r.findFirstMatchIn(logEntry.loggerName).value.group(1)
           }
           noticedLbRestarts should contain theSameElementsAs Seq("sv1", "sv2", "sv3")
@@ -343,20 +343,20 @@ class SvOnboardingAddlIntegrationTest
       )
   }
 
-  "fail to submit command with actAs = svc if there are more than 1 SV onboarded" in {
+  "fail to submit command with actAs = dso if there are more than 1 SV onboarded" in {
     implicit env =>
       startAllSync(
         sv1ScanBackend,
         sv1Backend,
         sv1ValidatorBackend,
       )
-      sv1Backend.getSvcInfo().svcRules.payload.members should have size 1
+      sv1Backend.getDsoInfo().dsoRules.payload.members should have size 1
 
       val sv1UserId = sv1WalletClient.config.ledgerApiUser
       val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
       val amuletAmount = BigDecimal(42)
 
-      clue("create a amulet with actAs = SVC") {
+      clue("create a amulet with actAs = DSO") {
         loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(
           () => {
             val amuletCid = createAmulet(
@@ -390,12 +390,12 @@ class SvOnboardingAddlIntegrationTest
         sv2Backend,
         sv2ValidatorBackend,
       )
-      sv1Backend.getSvcInfo().svcRules.payload.members should have size 2
+      sv1Backend.getDsoInfo().dsoRules.payload.members should have size 2
 
       inside(
         sv1Backend.participantClientWithAdminToken.topology.party_to_participant_mappings.list(
           domain = globalDomainId,
-          filterParty = svcParty.toProtoPrimitive,
+          filterParty = dsoParty.toProtoPrimitive,
         )
       ) { case Seq(mapping) =>
         inside(mapping.item.participants) { case Seq(sv1Participant, sv2Participant) =>
@@ -405,7 +405,7 @@ class SvOnboardingAddlIntegrationTest
           sv2Participant.permission shouldBe ParticipantPermission.Submission
         }
       }
-      clue("create a amulet again with actAs = SVC") {
+      clue("create a amulet again with actAs = DSO") {
         assertThrowsAndLogsCommandFailures(
           createAmulet(
             sv1ValidatorBackend.participantClientWithAdminToken,

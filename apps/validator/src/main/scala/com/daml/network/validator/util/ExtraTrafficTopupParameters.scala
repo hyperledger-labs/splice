@@ -8,7 +8,7 @@ import scala.math.BigDecimal.RoundingMode
 
 /** Parameters used by the top-up automation to buy extra traffic for the validator.
   *
-  * These values are computed taking into account both the global domain fees configuration published by the SVC
+  * These values are computed taking into account both the global domain fees configuration published by the DSO
   * as well as the local configuration of the validator app done by the validator operator using the
   * constructor defined in the companion object for this class.
   *

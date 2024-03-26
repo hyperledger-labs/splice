@@ -20,19 +20,19 @@ class ExpiredAmuletTrigger(
       cc.amulet.Amulet.ContractId,
       cc.amulet.Amulet,
     ](
-      svTaskContext.svcStore.multiDomainAcsStore,
-      svTaskContext.svcStore.listExpiredAmulets,
+      svTaskContext.dsoStore.multiDomainAcsStore,
+      svTaskContext.dsoStore.listExpiredAmulets,
       cc.amulet.Amulet.COMPANION,
     )
     with SvTaskBasedTrigger[Task] {
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
       latestOpenMiningRound <- store.getLatestActiveOpenMiningRound()
-      svcRules <- store.getSvcRules()
-      cmd = svcRules.exercise(
-        _.exerciseSvcRules_Amulet_Expire(
+      dsoRules <- store.getDsoRules()
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_Amulet_Expire(
           co.work.contractId,
           new cc.amulet.Amulet_Expire(
             latestOpenMiningRound.contractId
@@ -42,7 +42,7 @@ class ExpiredAmuletTrigger(
       _ <- svTaskContext.connection
         .submit(
           Seq(store.key.svParty),
-          Seq(store.key.svcParty),
+          Seq(store.key.dsoParty),
           update = cmd,
         )
         .noDedup

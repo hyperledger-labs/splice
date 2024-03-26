@@ -42,7 +42,7 @@ trait CachingScanConnection extends ScanConnection {
   // and also nuke everything when we get an error that we're trying to downgrade.
   amuletLedgerClient.registerContractDowngradeErrorCallback(() => signalOutdatedCache())
 
-  /** We cache the AmuletRules contract, but it may be come outdated if, e.g., the SVC updates the config schedule.
+  /** We cache the AmuletRules contract, but it may be come outdated if, e.g., the DSO updates the config schedule.
     * The inactive-contracts error message that the ledger returns does not specify the template-id, thus we need
     * to check for each inactive-contract we receive from the ledger that the failure was not caused by an outdated cache
     * of the AmuletRules.

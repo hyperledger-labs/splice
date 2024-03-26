@@ -3,8 +3,8 @@ package com.daml.network.console
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
-import com.daml.network.codegen.java.cn.svc.amuletprice as cp
-import com.daml.network.codegen.java.cn.svcrules.{
+import com.daml.network.codegen.java.cn.dso.amuletprice as cp
+import com.daml.network.codegen.java.cn.dsorules.{
   ActionRequiringConfirmation,
   VoteRequest,
   VoteRequestResult,
@@ -15,7 +15,7 @@ import com.daml.network.environment.{CNNodeConsoleEnvironment, CNNodeStatus}
 import com.daml.network.http.v0.definitions
 import com.daml.network.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
-import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvSvcAutomationService}
+import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.migration.{DomainDataSnapshot, DomainNodeIdentities}
 import com.daml.network.util.Contract
@@ -63,9 +63,9 @@ abstract class SvAppReference(
       httpCommand(HttpSvAppClient.DevNetOnboardValidatorPrepare())
     }
 
-  def getSvcInfo(): HttpSvAppClient.SvcInfo =
+  def getDsoInfo(): HttpSvAppClient.DsoInfo =
     consoleEnvironment.run {
-      httpCommand(HttpSvAppClient.GetSvcInfo)
+      httpCommand(HttpSvAppClient.GetDsoInfo)
     }
 
   @Help.Summary("Get the CometBFT node status")
@@ -283,19 +283,19 @@ class SvAppBackendReference(
   def appState: SvApp.State = _appState[SvApp.State, SvApp]
 
   @Help.Summary(
-    "Returns the current leader based automation. Do not keep references to the result, as this automation gets replaced whenever the SVC leader changes."
+    "Returns the current leader based automation. Do not keep references to the result, as this automation gets replaced whenever the DSO leader changes."
   )
   def leaderBasedAutomation: LeaderBasedAutomationService = {
-    appState.svcAutomation.restartLeaderBasedAutomationTrigger.epochState
+    appState.dsoAutomation.restartLeaderBasedAutomationTrigger.epochState
       .getOrElse(throw new RuntimeException("LeaderBasedAutomation is not fully started up"))
       .leaderBasedAutomation
   }
 
   @Help.Summary(
-    "Returns the current SVC automation."
+    "Returns the current DSO automation."
   )
-  def svcAutomation: SvSvcAutomationService = {
-    appState.svcAutomation
+  def dsoAutomation: SvDsoAutomationService = {
+    appState.dsoAutomation
   }
 
   @Help.Summary("Return SV app config")

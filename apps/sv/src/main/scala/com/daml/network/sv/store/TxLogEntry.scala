@@ -1,10 +1,10 @@
 package com.daml.network.sv.store
 
-import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
   ARC_CnsEntryContext,
   ARC_AmuletRules,
-  ARC_SvcRules,
+  ARC_DsoRules,
 }
 import com.daml.network.store.StoreErrors
 import com.daml.network.store.TxLogStore.TxLogEntryTypeMappers
@@ -51,8 +51,8 @@ object TxLogEntry extends StoreErrors {
       action: ActionRequiringConfirmation
   ): String = {
     action match {
-      case arcSvcRules: ARC_SvcRules =>
-        arcSvcRules.svcAction.getClass.getSimpleName
+      case arcDsoRules: ARC_DsoRules =>
+        arcDsoRules.dsoAction.getClass.getSimpleName
       case arcAmuletRules: ARC_AmuletRules =>
         arcAmuletRules.amuletRulesAction.getClass.getSimpleName
       case arcCnsEntryContext: ARC_CnsEntryContext =>
@@ -65,15 +65,15 @@ object TxLogEntry extends StoreErrors {
 
     protected implicit val voteRequestResultType: TypeMapper[
       com.google.protobuf.struct.Struct,
-      com.daml.network.codegen.java.cn.svcrules.VoteRequestResult,
+      com.daml.network.codegen.java.cn.dsorules.VoteRequestResult,
     ] =
       TypeMapper[
         com.google.protobuf.struct.Struct,
-        com.daml.network.codegen.java.cn.svcrules.VoteRequestResult,
+        com.daml.network.codegen.java.cn.dsorules.VoteRequestResult,
       ](x => {
         val javaProto = com.google.protobuf.struct.Struct.toJavaProto(x)
         val string = com.google.protobuf.util.JsonFormat.printer().print(javaProto)
-        com.daml.network.codegen.java.cn.svcrules.VoteRequestResult.fromJson(string)
+        com.daml.network.codegen.java.cn.dsorules.VoteRequestResult.fromJson(string)
       })(x => {
         val string = x.toJson
         val builder = com.google.protobuf.Struct.newBuilder()

@@ -42,14 +42,14 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
   SvRewardCollected,
   Transfer,
 }
-import com.daml.network.scan.svc.SvcCnsResolver
+import com.daml.network.scan.dso.DsoCnsResolver
 import com.daml.network.store.PageLimit
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 class HttpScanHandler(
     participantAdminConnection: ParticipantAdminConnection,
     store: ScanStore,
-    svcCnsResolver: SvcCnsResolver,
+    dsoCnsResolver: DsoCnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -60,12 +60,12 @@ class HttpScanHandler(
     with NamedLogging {
   private val workflowId = this.getClass.getSimpleName
 
-  def getSvcPartyId(
-      response: v0.ScanResource.GetSvcPartyIdResponse.type
-  )()(extracted: TraceContext): Future[v0.ScanResource.GetSvcPartyIdResponse] = {
+  def getDsoPartyId(
+      response: v0.ScanResource.GetDsoPartyIdResponse.type
+  )()(extracted: TraceContext): Future[v0.ScanResource.GetDsoPartyIdResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getSvcPartyId") { _ => _ =>
-      Future.successful(definitions.GetSvcPartyIdResponse(store.key.svcParty.toProtoPrimitive))
+    withSpan(s"$workflowId.getDsoPartyId") { _ => _ =>
+      Future.successful(definitions.GetDsoPartyIdResponse(store.key.dsoParty.toProtoPrimitive))
     }
   }
 
@@ -106,7 +106,7 @@ class HttpScanHandler(
 
   /** We choose the smallest-tickDuration of all non-closed rounds as the TTL.
     * Using this policy, clients will always know about any newly-created rounds before their `opensAt`.
-    * See the SVC round automation design document for details, but in short, this is safe because
+    * See the DSO round automation design document for details, but in short, this is safe because
     * the minimum-duration between the creation and effective 'opening' of a round is always >= 1 tick.
     */
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
@@ -505,18 +505,18 @@ class HttpScanHandler(
   }
 
   // TODO: (#7809) Add caching for sequencers per domain
-  override def listSvcSequencers(
-      respond: v0.ScanResource.ListSvcSequencersResponse.type
-  )()(extracted: TraceContext): Future[v0.ScanResource.ListSvcSequencersResponse] = {
+  override def listDsoSequencers(
+      respond: v0.ScanResource.ListDsoSequencersResponse.type
+  )()(extracted: TraceContext): Future[v0.ScanResource.ListDsoSequencersResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.listSvcSequencers") { _ => _ =>
+    withSpan(s"$workflowId.listDsoSequencers") { _ => _ =>
       store
         .listFromSvNodeStates { nodeState =>
           for {
             (domainId, domainConfig) <- nodeState.state.domainNodes.asScala.toVector
             sequencer <- domainConfig.sequencer.toScala
             availableAfter <- sequencer.availableAfter.toScala
-          } yield domainId -> definitions.SvcSequencer(
+          } yield domainId -> definitions.DsoSequencer(
             sequencer.migrationId,
             sequencer.sequencerId,
             sequencer.url,
@@ -525,22 +525,22 @@ class HttpScanHandler(
           )
         }
         .map(list =>
-          definitions.ListSvcSequencersResponse(list.map { case (domainId, scans) =>
+          definitions.ListDsoSequencersResponse(list.map { case (domainId, scans) =>
             definitions.DomainSequencers(domainId, scans.toVector)
           })
         )
     }
   }
 
-  override def listSvcScans(
-      respond: ScanResource.ListSvcScansResponse.type
-  )()(extracted: TraceContext): Future[ScanResource.ListSvcScansResponse] = {
+  override def listDsoScans(
+      respond: ScanResource.ListDsoScansResponse.type
+  )()(extracted: TraceContext): Future[ScanResource.ListDsoScansResponse] = {
     implicit val tc: TraceContext = extracted
-    withSpan(s"$workflowId.listSvcScans") { _ => _ =>
+    withSpan(s"$workflowId.listDsoScans") { _ => _ =>
       store
-        .listSvcScans()
+        .listDsoScans()
         .map(list =>
-          definitions.ListSvcScansResponse(list.map { case (domainId, scans) =>
+          definitions.ListDsoScansResponse(list.map { case (domainId, scans) =>
             definitions.DomainScans(
               domainId,
               scans.map(s => definitions.ScanInfo(s.publicUrl, s.memberName)).toVector,
@@ -641,22 +641,22 @@ class HttpScanHandler(
             Some(java.time.OffsetDateTime.ofInstant(contract.payload.expiresAt, ZoneOffset.UTC)),
           )
         }
-        sizeToAppendSvcEntries = pageSize - entries.size
+        sizeToAppendDsoEntries = pageSize - entries.size
         appended <-
-          if (sizeToAppendSvcEntries > 0) {
-            getSvcEntriesFromSvcRules(namePrefix).map { svcEntries =>
-              entries ++ svcEntries.take(sizeToAppendSvcEntries)
+          if (sizeToAppendDsoEntries > 0) {
+            getDsoEntriesFromDsoRules(namePrefix).map { dsoEntries =>
+              entries ++ dsoEntries.take(sizeToAppendDsoEntries)
             }
           } else Future.successful(entries)
       } yield definitions.ListEntriesResponse(appended.toVector)
     }
   }
 
-  private def getSvcEntriesFromSvcRules(namePrefix: Option[String])(implicit tc: TraceContext) =
-    store.lookupSvcRules().map { svcRulesOpt =>
-      svcRulesOpt.toList.flatMap { svcRules =>
-        svcCnsResolver
-          .listEntries(svcRules.contract, namePrefix)
+  private def getDsoEntriesFromDsoRules(namePrefix: Option[String])(implicit tc: TraceContext) =
+    store.lookupDsoRules().map { dsoRulesOpt =>
+      dsoRulesOpt.toList.flatMap { dsoRules =>
+        dsoCnsResolver
+          .listEntries(dsoRules.contract, namePrefix)
           .map(_.toHttp)
       }
     }
@@ -666,13 +666,13 @@ class HttpScanHandler(
   )(extracted: TraceContext): Future[ScanResource.LookupCnsEntryByNameResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupEntryByName") { _ => _ =>
-      store.lookupSvcRules().flatMap {
-        case Some(svcRules) =>
-          svcCnsResolver.lookupEntryByName(svcRules.contract, name) match {
-            case Some(svcCnsEntry) =>
+      store.lookupDsoRules().flatMap {
+        case Some(dsoRules) =>
+          dsoCnsResolver.lookupEntryByName(dsoRules.contract, name) match {
+            case Some(dsoCnsEntry) =>
               Future.successful(
                 v0.ScanResource.LookupCnsEntryByNameResponse
-                  .OK(definitions.LookupEntryByNameResponse(svcCnsEntry.toHttp))
+                  .OK(definitions.LookupEntryByNameResponse(dsoCnsEntry.toHttp))
               )
             case None =>
               store.lookupEntryByName(name).map {
@@ -701,7 +701,7 @@ class HttpScanHandler(
         case None =>
           Future.successful(
             v0.ScanResource.LookupCnsEntryByNameResponse.NotFound(
-              definitions.ErrorResponse(s"No SvcRules contract found")
+              definitions.ErrorResponse(s"No DsoRules contract found")
             )
           )
       }
@@ -714,13 +714,13 @@ class HttpScanHandler(
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupEntryByParty") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
-      store.lookupSvcRules().flatMap {
-        case Some(svcRules) =>
-          svcCnsResolver.lookupEntryByParty(svcRules.contract, partyId) match {
-            case Some(svcCnsEntry) =>
+      store.lookupDsoRules().flatMap {
+        case Some(dsoRules) =>
+          dsoCnsResolver.lookupEntryByParty(dsoRules.contract, partyId) match {
+            case Some(dsoCnsEntry) =>
               Future.successful(
                 v0.ScanResource.LookupCnsEntryByPartyResponse
-                  .OK(definitions.LookupEntryByPartyResponse(svcCnsEntry.toHttp))
+                  .OK(definitions.LookupEntryByPartyResponse(dsoCnsEntry.toHttp))
               )
             case None =>
               store
@@ -755,7 +755,7 @@ class HttpScanHandler(
         case None =>
           Future.successful(
             v0.ScanResource.LookupCnsEntryByPartyResponse.NotFound(
-              definitions.ErrorResponse(s"No SvcRules contract found")
+              definitions.ErrorResponse(s"No DsoRules contract found")
             )
           )
       }
@@ -795,14 +795,14 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAcsSnapshot") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
       for {
-        // The SVC party is a stakeholder on all "important" contracts, in particular, all amulet holdings and CNS entries
-        // so filtering an SVC snapshot to contracts another party is also a stakeholder on provides a sufficient snapshot
+        // The DSO party is a stakeholder on all "important" contracts, in particular, all amulet holdings and CNS entries
+        // so filtering an DSO snapshot to contracts another party is also a stakeholder on provides a sufficient snapshot
         // for that party to recover.
-        // It does however lose third-party application data that the SVC party is not a stakeholder on. Supporting that requires
+        // It does however lose third-party application data that the DSO party is not a stakeholder on. Supporting that requires
         // that users backup their own ACS.
-        // As the SVC party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
+        // As the DSO party is hosted on all SVs, an arbitrary scan instance can be chosen for the ACS snapshot.
         // BFT reads are usually not required since ACS commitments act as a check that the ACS was correct.
-        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(Set(store.key.svcParty))
+        acsSnapshot <- participantAdminConnection.downloadAcsSnapshot(Set(store.key.dsoParty))
       } yield {
         val filteredAcsSnapshot =
           filterAcsSnapshot(acsSnapshot, partyId)
@@ -953,10 +953,10 @@ class HttpScanHandler(
   )()(extracted: TraceContext): Future[ScanResource.GetMigrationScheduleResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.getMigrationSchedule") { _ => _ =>
-      OptionT(store.lookupSvcRules())
+      OptionT(store.lookupDsoRules())
         .map(_.payload)
-        .subflatMap { svcRules =>
-          svcRules.config.nextScheduledDomainUpgrade.toScala.map { nextUpgrade =>
+        .subflatMap { dsoRules =>
+          dsoRules.config.nextScheduledDomainUpgrade.toScala.map { nextUpgrade =>
             definitions.MigrationSchedule(
               java.time.OffsetDateTime
                 .ofInstant(nextUpgrade.time, ZoneOffset.UTC),

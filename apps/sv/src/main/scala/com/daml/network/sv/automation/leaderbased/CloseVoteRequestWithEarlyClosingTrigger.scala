@@ -6,9 +6,9 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
-import com.daml.network.codegen.java.cn.svcrules.VoteRequest
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.cn.dsorules.VoteRequest
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -26,12 +26,12 @@ class CloseVoteRequestWithEarlyClosingTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[VoteRequest.ContractId, VoteRequest](
-      svTaskContext.svcStore,
+      svTaskContext.dsoStore,
       VoteRequest.COMPANION,
     )
     with SvTaskBasedTrigger[AssignedContract[VoteRequest.ContractId, VoteRequest]] {
 
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(
       voteRequestContract: AssignedContract[VoteRequest.ContractId, VoteRequest]
@@ -52,15 +52,15 @@ class CloseVoteRequestWithEarlyClosingTrigger(
           )
         else {
           for {
-            svcRules <- store.getSvcRules()
+            dsoRules <- store.getDsoRules()
             votes = voteRequestContract.payload.votes.values().asScala
-            defaultRequiredNumVotesForEarlyClosing = svcRules.payload.members.size()
+            defaultRequiredNumVotesForEarlyClosing = dsoRules.payload.members.size()
             requiredNumVotesForEarlyClosing = voteRequestContract.payload.action match {
-              case arcSvcRules: ARC_SvcRules =>
-                arcSvcRules.svcAction match {
+              case arcDsoRules: ARC_DsoRules =>
+                arcDsoRules.dsoAction match {
                   case action: SRARC_OffboardMember =>
                     if (
-                      votes.map(_.sv).toSeq.contains(action.svcRules_OffboardMemberValue.member)
+                      votes.map(_.sv).toSeq.contains(action.dsoRules_OffboardMemberValue.member)
                     ) {
                       defaultRequiredNumVotesForEarlyClosing
                     } else {
@@ -75,8 +75,8 @@ class CloseVoteRequestWithEarlyClosingTrigger(
                 for {
                   amuletRules <- store.getAmuletRules()
                   amuletRulesId = amuletRules.contractId
-                  cmd = svcRules.exercise(
-                    _.exerciseSvcRules_CloseVoteRequest(
+                  cmd = dsoRules.exercise(
+                    _.exerciseDsoRules_CloseVoteRequest(
                       currentRequestCid,
                       java.util.Optional.of(amuletRulesId),
                     )
@@ -84,7 +84,7 @@ class CloseVoteRequestWithEarlyClosingTrigger(
                   _ <- svTaskContext.connection
                     .submit(
                       Seq(store.key.svParty),
-                      Seq(store.key.svcParty),
+                      Seq(store.key.dsoParty),
                       cmd,
                     )
                     .noDedup

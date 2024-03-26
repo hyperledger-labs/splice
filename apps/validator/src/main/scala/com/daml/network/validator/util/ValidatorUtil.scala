@@ -27,7 +27,7 @@ private[validator] object ValidatorUtil {
       validatorServiceParty: PartyId,
       endUserParty: PartyId,
       endUserName: String,
-      svcParty: PartyId,
+      dsoParty: PartyId,
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       domainId: DomainId,
       retryProvider: RetryProvider,
@@ -39,7 +39,7 @@ private[validator] object ValidatorUtil {
   ): Future[Unit] = {
     val store = storeWithIngestion.store
     logger.debug(
-      s"Installing wallet for endUserName:$endUserName, endUserParty=$endUserParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
+      s"Installing wallet for endUserName:$endUserName, endUserParty=$endUserParty, validatorServiceParty=$validatorServiceParty, dsoParty=$dsoParty"
     )
     for {
       _ <- retryProvider.retryForClientCalls(
@@ -52,7 +52,7 @@ private[validator] object ValidatorUtil {
                 actAs = Seq(validatorServiceParty, endUserParty),
                 readAs = Seq.empty,
                 new walletCodegen.WalletAppInstall(
-                  svcParty.toProtoPrimitive,
+                  dsoParty.toProtoPrimitive,
                   validatorServiceParty.toProtoPrimitive,
                   endUserName,
                   endUserParty.toProtoPrimitive,
@@ -116,7 +116,7 @@ private[validator] object ValidatorUtil {
         endUserParty = userPartyId,
         endUserName = endUserName,
         validatorServiceParty = store.key.validatorParty,
-        svcParty = store.key.svcParty,
+        dsoParty = store.key.dsoParty,
         storeWithIngestion = storeWithIngestion,
         domainId = domainId,
         retryProvider = retryProvider,
@@ -127,7 +127,7 @@ private[validator] object ValidatorUtil {
       _ <- CNNodeUtil.createValidatorRight(
         user = userPartyId,
         validator = store.key.validatorParty,
-        svc = store.key.svcParty,
+        dso = store.key.dsoParty,
         connection = storeWithIngestion.connection,
         lookupValidatorRightByParty =
           storeWithIngestion.store.lookupValidatorRightByPartyWithOffset,

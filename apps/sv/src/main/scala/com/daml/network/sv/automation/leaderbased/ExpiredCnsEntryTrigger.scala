@@ -19,8 +19,8 @@ class ExpiredCnsEntryTrigger(
       cn.cns.CnsEntry.ContractId,
       cn.cns.CnsEntry,
     ](
-      svTaskContext.svcStore.multiDomainAcsStore,
-      svTaskContext.svcStore.listExpiredCnsEntries,
+      svTaskContext.dsoStore.multiDomainAcsStore,
+      svTaskContext.dsoStore.listExpiredCnsEntries,
       cn.cns.CnsEntry.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
@@ -34,19 +34,19 @@ class ExpiredCnsEntryTrigger(
     ]
   ]
 
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(co: Task)(implicit tc: TraceContext): Future[TaskOutcome] =
     for {
-      svcRules <- store.getSvcRules()
-      cmd = svcRules.exercise(
-        _.exerciseSvcRules_ExpireCnsEntry(
+      dsoRules <- store.getDsoRules()
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_ExpireCnsEntry(
           co.work.contractId,
-          new CnsEntry_Expire(store.key.svcParty.toProtoPrimitive),
+          new CnsEntry_Expire(store.key.dsoParty.toProtoPrimitive),
         )
       )
       _ <- svTaskContext.connection
-        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldUnit()
     } yield TaskSuccess("archived expired CNS entry")

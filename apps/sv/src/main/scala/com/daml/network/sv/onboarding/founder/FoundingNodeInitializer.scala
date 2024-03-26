@@ -13,18 +13,18 @@ import com.daml.network.environment.*
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.automation.{SvSvAutomationService, SvSvcAutomationService}
+import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{
   DomainNodeReconciler,
   NodeInitializerUtil,
   SetupUtil,
-  SvcPartyHosting,
+  DsoPartyHosting,
 }
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
-import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
+import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{AssignedContract, TemplateJsonDecoder, UploadablePackage}
 import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultAmuletConfig}
@@ -96,11 +96,11 @@ class FoundingNodeInitializer(
   ): Future[
     (
         DomainId,
-        SvcPartyHosting,
+        DsoPartyHosting,
         SvSvStore,
         SvSvAutomationService,
-        SvSvcStore,
-        SvSvcAutomationService,
+        SvDsoStore,
+        SvDsoAutomationService,
     )
   ] = {
     val initConnection = ledgerClient.readOnlyConnection(
@@ -123,8 +123,8 @@ class FoundingNodeInitializer(
         RetryFor.WaitingOnInitDependency,
       )
       _ = logger.info("Participant connected to domain")
-      (svcParty, svParty, _) <- (
-        setupSvcParty(domainId, initConnection, namespace),
+      (dsoParty, svParty, _) <- (
+        setupDsoParty(domainId, initConnection, namespace),
         SetupUtil.setupSvParty(
           initConnection,
           config,
@@ -138,80 +138,80 @@ class FoundingNodeInitializer(
           RetryFor.WaitingOnInitDependency,
         ),
       ).tupled
-      storeKey = SvStore.Key(svParty, svcParty)
+      storeKey = SvStore.Key(svParty, dsoParty)
       svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
-      svcStore = newSvcStore(svStore.key, config.domainMigrationId, participantId)
+      dsoStore = newDsoStore(svStore.key, config.domainMigrationId, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
-        svcStore,
+        dsoStore,
         ledgerClient,
       )
       (_, globalDomain) <- (
-        SetupUtil.ensureSvcPartyMetadataAnnotation(svAutomation.connection, config, svcParty),
+        SetupUtil.ensureDsoPartyMetadataAnnotation(svAutomation.connection, config, dsoParty),
         svStore.domains.waitForDomainConnection(config.domains.global.alias),
       ).tupled
-      svcPartyHosting = newSvcPartyHosting(storeKey)
-      // NOTE: we assume that SVC party, cometBft node, sequencer, and mediator nodes are initialized as
-      // part of deployment and the running of bootstrap scripts. Here we just check that the SVC party
+      dsoPartyHosting = newDsoPartyHosting(storeKey)
+      // NOTE: we assume that DSO party, cometBft node, sequencer, and mediator nodes are initialized as
+      // part of deployment and the running of bootstrap scripts. Here we just check that the DSO party
       // is allocated, as a stand-in for all of these actions.
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
-        "svc_party_allocation",
-        show"SVC party $svcParty is allocated on participant $participantId and domain $globalDomain",
+        "dso_party_allocation",
+        show"DSO party $dsoParty is allocated on participant $participantId and domain $globalDomain",
         for {
-          svcPartyIsAuthorized <- svcPartyHosting.isSvcPartyAuthorizedOn(
+          dsoPartyIsAuthorized <- dsoPartyHosting.isDsoPartyAuthorizedOn(
             globalDomain,
             participantId,
           )
         } yield {
-          if (svcPartyIsAuthorized) ()
+          if (dsoPartyIsAuthorized) ()
           else
             throw Status.FAILED_PRECONDITION
               .withDescription(
-                s"SVC party is allocated on participant $participantId and domain $globalDomain"
+                s"DSO party is allocated on participant $participantId and domain $globalDomain"
               )
               .asRuntimeException()
         },
         logger,
       )
 
-      svcAutomation = newSvSvcAutomationService(
+      dsoAutomation = newSvDsoAutomationService(
         svStore,
-        svcStore,
+        dsoStore,
         Some(localDomainNode),
       )
-      _ <- svcStore.domains.waitForDomainConnection(config.domains.global.alias)
-      withSvcStore = new WithSvcStore(svcAutomation, globalDomain)
+      _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
+      withDsoStore = new WithDsoStore(dsoAutomation, globalDomain)
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
-        "bootstrap_svc_rules",
-        show"the SvcRules and AmuletRules are bootstrapped",
-        svcStore.lookupSvcRules().map(_.isDefined), {
-          withSvcStore.foundCollective()
+        "bootstrap_dso_rules",
+        show"the DsoRules and AmuletRules are bootstrapped",
+        dsoStore.lookupDsoRules().map(_.isDefined), {
+          withDsoStore.foundCollective()
         },
         logger,
       )
-      // Only start the triggers once SvcRules and AmuletRules have been bootstrapped
-      _ = svcAutomation.registerPostOnboardingTriggers()
-      // The previous foundCollective step will set the domain node config if SvcRules is not yet bootstrapped.
-      // This is for the case that SvcRules is already bootstrapped but setting the domain node config is required,
-      // for example if the founding SV node restarted after bootstrapping the SvcRules.
+      // Only start the triggers once DsoRules and AmuletRules have been bootstrapped
+      _ = dsoAutomation.registerPostOnboardingTriggers()
+      // The previous foundCollective step will set the domain node config if DsoRules is not yet bootstrapped.
+      // This is for the case that DsoRules is already bootstrapped but setting the domain node config is required,
+      // for example if the founding SV node restarted after bootstrapping the DsoRules.
       // We only set the domain sequencer config if the existing one is different here.
-      _ <- withSvcStore.reconcileSequencerConfigIfRequired(
+      _ <- withDsoStore.reconcileSequencerConfigIfRequired(
         Some(localDomainNode),
         config.domainMigrationId,
       )
     } yield (
       globalDomain,
-      svcPartyHosting,
+      dsoPartyHosting,
       svStore,
       svAutomation,
-      svcStore,
-      svcAutomation,
+      dsoStore,
+      dsoAutomation,
     )
   }
 
-  private def setupSvcParty(
+  private def setupDsoParty(
       domain: DomainId,
       connection: BaseLedgerConnection,
       namespace: Namespace,
@@ -219,19 +219,19 @@ class FoundingNodeInitializer(
       tc: TraceContext
   ): Future[PartyId] =
     for {
-      svc <- connection.ensurePartyAllocated(
+      dso <- connection.ensurePartyAllocated(
         TopologyStoreId.DomainStore(domain),
-        foundingConfig.svcPartyHint,
+        foundingConfig.dsoPartyHint,
         Some(namespace),
         participantAdminConnection,
       )
       // this is idempotent
       _ <- connection.grantUserRights(
         config.ledgerApiUser,
-        Seq(svc),
+        Seq(dso),
         Seq.empty,
       )
-    } yield svc
+    } yield dso
 
   private def initialTrafficControlParameters: TrafficControlParameters = {
     TrafficControlParameters(
@@ -365,33 +365,33 @@ class FoundingNodeInitializer(
     }
   }
 
-  /** A private class to share the svcStoreWithIngestion and the global domain-id
+  /** A private class to share the dsoStoreWithIngestion and the global domain-id
     * across setup methods.
     */
-  private class WithSvcStore(
-      svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
+  private class WithDsoStore(
+      dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
       domainId: DomainId,
   ) {
 
-    private val svcStore = svcStoreWithIngestion.store
-    private val svcParty = svcStore.key.svcParty
-    private val svParty = svcStore.key.svParty
+    private val dsoStore = dsoStoreWithIngestion.store
+    private val dsoParty = dsoStore.key.dsoParty
+    private val svParty = dsoStore.key.svParty
     private val domainNodeReconciler = new DomainNodeReconciler(
-      svcStore,
-      svcStoreWithIngestion.connection,
+      dsoStore,
+      dsoStoreWithIngestion.connection,
       clock = clock,
       retryProvider = retryProvider,
       logger = logger,
     )
 
-    /** The one and only entry-point: found a fresh collective, given a properly allocated SVC party */
+    /** The one and only entry-point: found a fresh collective, given a properly allocated DSO party */
     def foundCollective()(implicit
         tc: TraceContext
     ): Future[Unit] = retryProvider.retry(
       RetryFor.WaitingOnInitDependency,
-      "bootstrap_svc",
-      "bootstrapping SVC",
-      bootstrapSvc(),
+      "bootstrap_dso",
+      "bootstrapping DSO",
+      bootstrapDso(),
       logger,
     )
 
@@ -409,18 +409,18 @@ class FoundingNodeInitializer(
       )
     }
 
-    // Create SvcRules and AmuletRules and open the first mining round
-    private def bootstrapSvc()(implicit
+    // Create DsoRules and AmuletRules and open the first mining round
+    private def bootstrapDso()(implicit
         tc: TraceContext
     ): Future[Unit] = {
-      val svcRulesConfig = SvUtil.defaultSvcRulesConfig(domainId)
+      val dsoRulesConfig = SvUtil.defaultDsoRulesConfig(domainId)
       for {
-        (participantId, mediatorId, trafficStateForAllMembers, amuletRules, svcRules) <- (
+        (participantId, mediatorId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
           localDomainNode.mediatorAdminConnection.getMediatorId,
           localDomainNode.sequencerAdminConnection.listSequencerTrafficControlState(),
-          svcStore.lookupAmuletRules(),
-          svcStore.lookupSvcRulesWithOffset(),
+          dsoStore.lookupAmuletRules(),
+          dsoStore.lookupDsoRulesWithOffset(),
         ).tupled
         _ <- (
           participantAdminConnection.ensureTrafficControlState(
@@ -436,12 +436,12 @@ class FoundingNodeInitializer(
             participantId.uid.namespace.fingerprint,
           ),
         ).tupled
-        _ <- svcRules match {
+        _ <- dsoRules match {
           case QueryResult(offset, None) =>
             amuletRules match {
               case Some(amuletRules) =>
                 sys.error(
-                  "A AmuletRules contract was found but no SvcRules contract exists. " +
+                  "A AmuletRules contract was found but no DsoRules contract exists. " +
                     show"This should never happen.\nAmuletRules: $amuletRules"
                 )
               case None =>
@@ -465,14 +465,14 @@ class FoundingNodeInitializer(
                   )
                   _ = logger
                     .info(
-                      s"Bootstrapping SVC as $svcParty and BFT nodes $founderDomainNodes"
+                      s"Bootstrapping DSO as $dsoParty and BFT nodes $founderDomainNodes"
                     )
-                  _ <- svcStoreWithIngestion.connection
+                  _ <- dsoStoreWithIngestion.connection
                     .submit(
-                      actAs = Seq(svcParty),
+                      actAs = Seq(dsoParty),
                       readAs = Seq.empty,
-                      new cn.svcbootstrap.SvcBootstrap(
-                        svcParty.toProtoPrimitive,
+                      new cn.dsobootstrap.DsoBootstrap(
+                        dsoParty.toProtoPrimitive,
                         svParty.toProtoPrimitive,
                         foundingConfig.name,
                         foundingConfig.founderSvRewardWeightBps,
@@ -493,47 +493,47 @@ class FoundingNodeInitializer(
                           foundingConfig.initialCnsConfig.entryLifetime,
                           foundingConfig.initialCnsConfig.entryFee,
                         ),
-                        svcRulesConfig,
+                        dsoRulesConfig,
                         trafficStateForAllMembers
                           .map(m =>
-                            m.member.toProtoPrimitive -> new cn.svcrules.TrafficState(
+                            m.member.toProtoPrimitive -> new cn.dsorules.TrafficState(
                               m.extraTrafficConsumed.value
                             )
                           )
                           .toMap
                           .asJava,
                         foundingConfig.isDevNet,
-                      ).createAnd.exerciseSvcBootstrap_Bootstrap,
+                      ).createAnd.exerciseDsoBootstrap_Bootstrap,
                     )
                     .withDedup(
                       commandId = CNLedgerConnection
-                        .CommandId("com.daml.network.svc.executeSvcBootstrap", Seq()),
+                        .CommandId("com.daml.network.dso.executeDsoBootstrap", Seq()),
                       deduplicationOffset = offset,
                     )
                     .withDomainId(domainId)
                     .yieldUnit()
                 } yield ()
             }
-          case QueryResult(_, Some(AssignedContract(svcRules, _))) =>
+          case QueryResult(_, Some(AssignedContract(dsoRules, _))) =>
             amuletRules match {
               case Some(amuletRules) =>
-                if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
+                if (dsoRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
                   logger.info(
-                    "AmuletRules and SvcRules already exist and founding party is an SVC member; doing nothing." +
-                      show"\nAmuletRules: $amuletRules\nSvcRules: $svcRules"
+                    "AmuletRules and DsoRules already exist and founding party is an DSO member; doing nothing." +
+                      show"\nAmuletRules: $amuletRules\nDsoRules: $dsoRules"
                   )
                   Future.successful(())
                 } else {
                   sys.error(
-                    "AmuletRules and SvcRules already exist but party tasked with founding the SVC isn't member." +
+                    "AmuletRules and DsoRules already exist but party tasked with founding the DSO isn't member." +
                       "Is more than one SV app configured to `found-collective`?" +
-                      show"\nAmuletRules: $amuletRules\nSvcRules: $svcRules"
+                      show"\nAmuletRules: $amuletRules\nDsoRules: $dsoRules"
                   )
                 }
               case None =>
                 sys.error(
-                  "An SvcRules contract was found but no AmuletRules contract exists. " +
-                    show"This should never happen.\nSvcRules: $svcRules"
+                  "An DsoRules contract was found but no AmuletRules contract exists. " +
+                    show"This should never happen.\nDsoRules: $dsoRules"
                 )
             }
         }

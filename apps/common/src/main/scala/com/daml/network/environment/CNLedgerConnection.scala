@@ -462,16 +462,16 @@ class BaseLedgerConnection(
   }
 
   // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
-  def getSvcPartyFromUserMetadata(userId: String)(implicit
+  def getDsoPartyFromUserMetadata(userId: String)(implicit
       traceContext: TraceContext
   ): Future[PartyId] =
-    waitForUserMetadata(userId, SVC_PARTY_USER_METADATA_KEY).map(
+    waitForUserMetadata(userId, DSO_PARTY_USER_METADATA_KEY).map(
       PartyId.tryFromProtoPrimitive(_)
     )
 
   // Note that this will only work for apps that run as the SV user, i.e., the sv app, directory and scan.
-  def lookupSvcPartyFromUserMetadata(userId: String): Future[Option[PartyId]] =
-    lookupUserMetadata(userId, SVC_PARTY_USER_METADATA_KEY).map(
+  def lookupDsoPartyFromUserMetadata(userId: String): Future[Option[PartyId]] =
+    lookupUserMetadata(userId, DSO_PARTY_USER_METADATA_KEY).map(
       _.map(PartyId.tryFromProtoPrimitive(_))
     )
 
@@ -979,7 +979,7 @@ class CNLedgerConnection(
 
 object BaseLedgerConnection {
 
-  val SVC_PARTY_USER_METADATA_KEY: String = "sv.app.network.canton.global/svc_party"
+  val DSO_PARTY_USER_METADATA_KEY: String = "sv.app.network.canton.global/dso_party"
 
   val INITIAL_ACS_IMPORT_METADATA_KEY: String = "network.canton.global/initial_acs_import"
 

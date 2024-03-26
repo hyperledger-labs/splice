@@ -117,7 +117,7 @@ class ValidatorReonboardingIntegrationTest
       .withManualStart
 
   "re-onboard validator" in { implicit env =>
-    initSvcWithSv1Only()
+    initDsoWithSv1Only()
     aliceValidatorBackend.startSync()
     val aliceValidatorWalletParty =
       PartyId.tryFromProtoPrimitive(aliceValidatorWalletClient.userStatus().party)

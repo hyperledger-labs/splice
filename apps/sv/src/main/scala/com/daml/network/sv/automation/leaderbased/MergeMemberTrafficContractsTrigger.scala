@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cn.svcrules.SvcRules_MergeMemberTrafficContracts
+import com.daml.network.codegen.java.cn.dsorules.DsoRules_MergeMemberTrafficContracts
 import com.daml.network.store.PageLimit
 import com.daml.network.util.{AssignedContract, Contract}
 import com.digitalasset.canton.topology.{DomainId, Member}
@@ -26,12 +26,12 @@ class MergeMemberTrafficContractsTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[MemberTraffic.ContractId, MemberTraffic](
-      svTaskContext.svcStore,
+      svTaskContext.dsoStore,
       MemberTraffic.COMPANION,
     )
     with SvTaskBasedTrigger[AssignedContract[MemberTraffic.ContractId, MemberTraffic]] {
 
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(
       memberTraffic: AssignedContract[MemberTraffic.ContractId, MemberTraffic]
@@ -45,8 +45,8 @@ class MergeMemberTrafficContractsTrigger(
         },
         memberId => {
           for {
-            svcRules <- store.getSvcRules()
-            threshold = svcRules.payload.config.numMemberTrafficContractsThreshold
+            dsoRules <- store.getDsoRules()
+            threshold = dsoRules.payload.config.numMemberTrafficContractsThreshold
             domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
             memberTraffics <- store.listMemberTrafficContracts(
               memberId,
@@ -73,19 +73,19 @@ class MergeMemberTrafficContractsTrigger(
       memberTraffics: Seq[Contract[MemberTraffic.ContractId, MemberTraffic]],
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svcRules <- store.getSvcRules()
+      dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      arg = new SvcRules_MergeMemberTrafficContracts(
+      arg = new DsoRules_MergeMemberTrafficContracts(
         amuletRules.contractId,
         memberTraffics.map(_.contractId).asJava,
       )
-      cmd = svcRules.exercise(_.exerciseSvcRules_MergeMemberTrafficContracts(arg))
+      cmd = dsoRules.exercise(_.exerciseDsoRules_MergeMemberTrafficContracts(arg))
       outcome <- svTaskContext.connection
-        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldResult()
     } yield TaskSuccess(
-      s"Merged ${memberTraffics.length} member traffic contracts for member $memberId on domain ${svcRules.domain} " +
+      s"Merged ${memberTraffics.length} member traffic contracts for member $memberId on domain ${dsoRules.domain} " +
         s"into contract ${outcome.exerciseResult.contractId}"
     )
   }

@@ -35,7 +35,7 @@ testSetup = script do
 
   tap app alice 42.0
 
-  let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc "test subscription"
+  let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
 
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
   pure (app, Users with .., subscriptionRequestCid)
@@ -54,7 +54,7 @@ testSubscription = script do
   submitMulti [alice.primaryParty] [validator] $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
   assertTerminatedSubscription alice.primaryParty subscriptionRequestCid
   -- ...and retry
-  let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc "test subscription"
+  let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
 
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
@@ -67,7 +67,7 @@ testSubscription = script do
   assertTerminatedSubscription alice.primaryParty subscriptionRequestCid
 
   -- ..and retry
-  let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc "test subscription"
+  let subscriptionData = SubscriptionData alice.primaryParty pizzeria.primaryParty provider.primaryParty app.dso "test subscription"
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData testPayData)
   initialPaymentCid <- acceptSubscriptionRequestAndMakePayment app alice validator None subscriptionRequestCid
 
@@ -151,7 +151,7 @@ testUSDSubscription = script do
         sender = alice.primaryParty
         receiver = pizzeria.primaryParty
         provider = provider.primaryParty
-        svc = app.svc
+        dso = app.dso
         description = "test subscription"
   advanceToIssuanceWithPrice app 2.0
 
@@ -248,8 +248,8 @@ acceptSubscriptionRequestAndMakePayment
 acceptSubscriptionRequestAndMakePayment app sender walletProvider providerFeaturedAppRight request = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getAmuletInputs sender.primaryParty
-  -- TODO(#2957): remove read-as SVC.
-  fmap fst $ submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
+  -- TODO(#2957): remove read-as DSO.
+  fmap fst $ submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
     inputs
     context
     walletProvider
@@ -261,8 +261,8 @@ makeSubscriptionPayment
 makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   inputs <- getAmuletInputs sender.primaryParty
-  -- TODO(#2957): remove read-as SVC.
-  fmap fst $ submitMulti [sender.primaryParty, walletProvider] [app.svc] $ exerciseCmd state SubscriptionIdleState_MakePayment with
+  -- TODO(#2957): remove read-as DSO.
+  fmap fst $ submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs
     context
     walletProvider

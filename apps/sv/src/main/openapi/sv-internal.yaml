@@ -245,14 +245,14 @@ paths:
     get:
       tags: [ sv ]
       x-jvm-package: sv_admin
-      operationId: "listSvcRulesVoteRequests"
+      operationId: "listDsoRulesVoteRequests"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListSvcRulesVoteRequestsResponse"
+                "$ref": "#/components/schemas/ListDsoRulesVoteRequestsResponse"
   /v0/admin/sv/voteresults:
     post:
       tags: [ sv ]
@@ -270,12 +270,12 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListSvcRulesVoteResultsResponse"
+                "$ref": "#/components/schemas/ListDsoRulesVoteResultsResponse"
   /v0/admin/sv/voterequests/{vote_request_contract_id}:
     get:
       tags: [ sv ]
       x-jvm-package: sv_admin
-      operationId: "lookupSvcRulesVoteRequest"
+      operationId: "lookupDsoRulesVoteRequest"
       parameters:
         - name: "vote_request_contract_id"
           in: "path"
@@ -294,7 +294,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/LookupSvcRulesVoteRequestResponse"
+                "$ref": "#/components/schemas/LookupDsoRulesVoteRequestResponse"
   /v0/admin/sv/electionrequests/create:
     post:
       tags: [sv]
@@ -546,18 +546,18 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
         "501":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/501"
-  /v0/svc:
+  /v0/dso:
     get:
       tags: [sv]
       x-jvm-package: sv
-      operationId: "getSvcInfo"
+      operationId: "getDsoInfo"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetSvcInfoResponse"
+                "$ref": "#/components/schemas/GetDsoInfoResponse"
 components:
   schemas:
     ListOngoingValidatorOnboardingsResponse:
@@ -753,9 +753,9 @@ components:
     ListVotesResponse:
       type: object
       required:
-        - svc_rules_votes
+        - dso_rules_votes
       properties:
-        svc_rules_votes:
+        dso_rules_votes:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
@@ -770,32 +770,32 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
-    ListSvcRulesVoteRequestsResponse:
+    ListDsoRulesVoteRequestsResponse:
       type: object
       required:
-        - svc_rules_vote_requests
+        - dso_rules_vote_requests
       properties:
-        svc_rules_vote_requests:
+        dso_rules_vote_requests:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
-    ListSvcRulesVoteResultsResponse:
+    ListDsoRulesVoteResultsResponse:
       type: object
       required:
-        - svc_rules_vote_results
+        - dso_rules_vote_results
       properties:
-        svc_rules_vote_results:
+        dso_rules_vote_results:
           type: array
           items:
             type: object
 
-    LookupSvcRulesVoteRequestResponse:
+    LookupDsoRulesVoteRequestResponse:
       type: object
       required:
-        - svc_rules_vote_request
+        - dso_rules_vote_request
       properties:
-        svc_rules_vote_request:
+        dso_rules_vote_request:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
     CastVoteRequest:
@@ -916,7 +916,7 @@ components:
               type: string
             contract_id:
               type: string
-              description: ContractId of the SvcRules contract
+              description: ContractId of the DsoRules contract
     SvOnboardingStateUnknown:
       allOf:
         - "$ref": "#/components/schemas/BaseSvOnboardingState"
@@ -1010,16 +1010,16 @@ components:
         sequencer_snapshot:
           type: string
 
-    GetSvcInfoResponse:
+    GetDsoInfoResponse:
       type: object
       required:
         - sv_user
         - sv_party_id
-        - svc_party_id
+        - dso_party_id
         - voting_threshold
         - latest_mining_round
         - amulet_rules
-        - svc_rules
+        - dso_rules
         - sv_node_states
       properties:
         # User representing the SV
@@ -1028,8 +1028,8 @@ components:
         # Party representing the SV
         sv_party_id:
           type: string
-        # Party representing the whole SVC
-        svc_party_id:
+        # Party representing the whole DSO
+        dso_party_id:
           type: string
         # Threshold required to pass vote requests
         voting_threshold:
@@ -1037,13 +1037,13 @@ components:
         # Contract ID of the OpenMiningRound contract of the latest Mining Round
         latest_mining_round:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # Contract ID of the AmuletRules contract associated with the SVC
+        # Contract ID of the AmuletRules contract associated with the DSO
         amulet_rules:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # Contract IDs of the SvcRules contract associated with the SVC
-        svc_rules:
+        # Contract IDs of the DsoRules contract associated with the DSO
+        dso_rules:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # States the SVC members' nodes
+        # States the DSO members' nodes
         sv_node_states:
           type: array
           items:
@@ -1092,7 +1092,7 @@ components:
       type: object
       required:
         - sv_party_id
-        - svc_party_id
+        - dso_party_id
         - domain_alias
         - domain_id
         - participant
@@ -1101,7 +1101,7 @@ components:
       properties:
         sv_party_id:
           type: string
-        svc_party_id:
+        dso_party_id:
           type: string
         domain_alias:
           type: string
@@ -1130,7 +1130,7 @@ components:
           type: string
         acs_snapshot:
           description: |
-            base64 encoded string of acs snapshot for the requested party id, or for the svc and sv parties by default
+            base64 encoded string of acs snapshot for the requested party id, or for the dso and sv parties by default
           type: string
         dars:
           type: array

@@ -92,7 +92,7 @@ class SvTimeBasedRewardCouponIntegrationTest
 
       // prevent other coupons from being received so that we can verify when the previous ones have been claimed.
       Seq(sv1Backend, sv4Backend).foreach { sv =>
-        sv.svcAutomation
+        sv.dsoAutomation
           .trigger[ReceiveSvRewardCouponTrigger]
           .pause()
           .futureValue
@@ -109,7 +109,7 @@ class SvTimeBasedRewardCouponIntegrationTest
 
       val eachSvGetInRound0 =
         computeSvRewardInRound0(defaultIssuanceCurve.initialValue, defaultTickDuration, svs.size)
-      val sv1Party = sv1Backend.getSvcInfo().svParty
+      val sv1Party = sv1Backend.getDsoInfo().svParty
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
       val expectedAliceAmount = eachSvGetInRound0.multiply(new java.math.BigDecimal("0.3333"))
 

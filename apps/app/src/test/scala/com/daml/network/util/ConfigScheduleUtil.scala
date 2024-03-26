@@ -7,9 +7,9 @@ import com.daml.network.codegen.java.cc.amuletrules.{
 }
 import com.daml.network.codegen.java.cc.amuletconfig.{AmuletConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
-import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_AmuletRules
-import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.{
   CRARC_AddFutureAmuletConfigSchedule,
   CRARC_RemoveFutureAmuletConfigSchedule,
 }
@@ -89,7 +89,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
   ): Unit = {
     // clean all futureValues
     sv1Backend
-      .getSvcInfo()
+      .getDsoInfo()
       .amuletRules
       .payload
       .configSchedule
@@ -118,8 +118,8 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
   def votingFlow(action: ActionRequiringConfirmation)(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
-    val svcRules = sv1Backend.getSvcInfo().svcRules
-    val sv1Party = sv1Backend.getSvcInfo().svParty
+    val dsoRules = sv1Backend.getDsoInfo().dsoRules
+    val sv1Party = sv1Backend.getDsoInfo().svParty
 
     val voteRequestCid = clue("request vote for config schedule change") {
       val (_, voteRequestCid) = actAndCheck(
@@ -129,7 +129,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
             action,
             "url",
             "description",
-            sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           )
         },
       )(
@@ -151,7 +151,7 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
             case sv: SvAppBackendReference =>
               if (
                 sv.is_running && sv.name != "sv1" && voteCount < CNThresholds
-                  .requiredNumVotes(svcRules)
+                  .requiredNumVotes(dsoRules)
               ) {
                 eventually() {
                   sv.listVoteRequests()

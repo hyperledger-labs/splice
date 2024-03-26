@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.automation.singlesv.membership.onboarding.SvOnboardingMediatorProposalTrigger.MediatorToOnboard
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.util.MemberIdUtil
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.topology.{DomainId, MediatorId, SequencerId}
@@ -22,31 +22,31 @@ import scala.jdk.OptionConverters.RichOptional
 
 /** Onboards a new mediator to the current global domain topology state.
   * The onboarding only happens if the following conditions are met:
-  * - the mediator is configured in the domain config found in the SvcRules
+  * - the mediator is configured in the domain config found in the DsoRules
   * - the sequencer configured alongside the mediator is already part of the topology state.
   *      This is required for the mediator to be able to read from an existing sequencer counter.
   *      This also requires that the sequencer is bootstrapped at exactly the topology transaction that added it.
-  * - to speed up our onboarding, as we know the sequencer and mediator get added to the svc rules at the same time, but the sequencer will
+  * - to speed up our onboarding, as we know the sequencer and mediator get added to the dso rules at the same time, but the sequencer will
   *   be the first to be added to the topology state, we start the task without waiting for the sequencer to be added to the topology state,
   *   and wait for the sequencer in the task run itself
   */
 class SvOnboardingMediatorProposalTrigger(
     override protected val context: TriggerContext,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
 )(implicit
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PollingParallelTaskExecutionTrigger[MediatorToOnboard] {
 
-  private val svParty = svcStore.key.svParty
+  private val svParty = dsoStore.key.svParty
 
   override protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[MediatorToOnboard]] = {
     for {
-      rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
-      domainId = rulesAndStates.svcRules.domain
+      rulesAndStates <- dsoStore.getDsoRulesWithMemberNodeStates()
+      domainId = rulesAndStates.dsoRules.domain
       currentMediatorState <- participantAdminConnection.getMediatorDomainState(domainId)
     } yield {
       val currentDomainConfigs = rulesAndStates.currentDomainNodeConfigs()

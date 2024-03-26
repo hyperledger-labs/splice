@@ -62,7 +62,7 @@ class DbUserWalletStore(
           "endUserName" -> key.endUserName,
           "endUserParty" -> key.endUserParty.toProtoPrimitive,
           "validatorParty" -> key.validatorParty.toProtoPrimitive,
-          "svcParty" -> key.svcParty.toProtoPrimitive,
+          "dsoParty" -> key.dsoParty.toProtoPrimitive,
         ),
       ),
       domainMigrationId,

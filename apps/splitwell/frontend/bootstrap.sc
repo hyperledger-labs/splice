@@ -8,7 +8,7 @@ import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.duration._
 
-println("Waiting for SVC initialization...")
+println("Waiting for DSO initialization...")
 // We need to do this at the beginning, otherwise later commands can fail because AmuletRules is locked.n
 Seq(sv1, sv2, sv3, sv4).foreach(
   _.waitForInitialization(NonNegativeDuration.tryFromDuration(5.minute))

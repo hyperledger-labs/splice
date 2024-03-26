@@ -10,7 +10,7 @@ import { useGroupInvites, useJoinGroup, useRequestGroup } from '../hooks';
 import { SplitwellRulesMap } from '../utils/installs';
 
 interface GroupSetupProps {
-  svc: string;
+  dso: string;
   provider: string;
   party: string;
   domainId: string;
@@ -39,7 +39,7 @@ type GroupInviteInput = GroupInviteInputGood | GroupInviteInputNoParse | GroupIn
 const GroupSetup: React.FC<GroupSetupProps> = ({
   party,
   provider,
-  svc,
+  dso,
   domainId,
   newGroupRules,
   rulesMap,
@@ -50,7 +50,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({
     failure: 'empty invite text field',
     originalText: '',
   });
-  const requestGroup = useRequestGroup(party, provider, svc, domainId, newGroupRules);
+  const requestGroup = useRequestGroup(party, provider, dso, domainId, newGroupRules);
   const onCreateGroup = async () => {
     await requestGroup.mutate(groupId);
   };

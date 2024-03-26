@@ -181,7 +181,7 @@ template GroupRequest
 template Group
   with
     owner : Party
-    svc : Party
+    dso : Party
     members : [Party]
     id: GroupId
     provider : Party -- In non-provider centric model: provider = owner
@@ -224,7 +224,7 @@ template Group
          require "receiver is a member" (fmap (\x -> x.receiver) receiverAmounts `subset` groupMembers this)
          now <- getTime
          paymentRequest <- create AppPaymentRequest with
-           sender, provider, svc
+           sender, provider, dso
            receiverAmounts = map (\rq -> ReceiverAmount rq.receiver (PaymentAmount rq.ccAmount CC)) receiverAmounts
            description = "Transfer from " <> show sender <> " to " <> show (map (.receiver) receiverAmounts)
            expiresAt = now `addRelTime` acceptDuration
@@ -290,12 +290,12 @@ template TransferInProgress
          exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
          openMiningRound <- exercise @OpenMiningRound transferContext.openMiningRound (OpenMiningRound_Fetch group.provider)
-         -- TODO(#9464): we should check that the 'SVC' party matches here!
+         -- TODO(#9464): we should check that the 'DSO' party matches here!
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender
                provider = group.provider
                ccReceiverAmounts = receiverAmounts
-               svc = group.svc
+               dso = group.dso
                lockedAmulet = acceptedPayment.lockedAmulet
                round = openMiningRound.round
                reference

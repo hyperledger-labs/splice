@@ -8,7 +8,7 @@ import { DataGrid, GridEventListener, GridRenderCellParams, GridRowParams } from
 import {
   ActionRequiringConfirmation,
   VoteRequest,
-} from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+} from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 import { ContractId } from '@daml/types';
 
 interface ListVoteRequestsTableProps {

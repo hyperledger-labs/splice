@@ -20,7 +20,7 @@ private object JsonProtocol {
       "key" -> Json.fromString(t.candidateKey),
       "party" -> Json.fromString(t.candidateParty.toProtoPrimitive),
       "participantId" -> Json.fromString(t.candidateParticipantId.toProtoPrimitive),
-      "svc" -> Json.fromString(t.svcParty.toProtoPrimitive),
+      "dso" -> Json.fromString(t.dsoParty.toProtoPrimitive),
     )
 
   implicit val SvOnboardingTokenDecoder: Decoder[SvOnboardingToken] = { c =>
@@ -31,8 +31,8 @@ private object JsonProtocol {
       key <- c.downField("key").as[String]
       party <- c.downField("party").as[PartyId]
       participantId <- c.downField("participantId").as[ParticipantId]
-      svc <- c.downField("svc").as[PartyId]
-    } yield new SvOnboardingToken(name, key, party, participantId, svc)
+      dso <- c.downField("dso").as[PartyId]
+    } yield new SvOnboardingToken(name, key, party, participantId, dso)
   }
 
   private[this] def codecDecoder[Dec](codec: CodecCompanion[Dec])(implicit
@@ -47,7 +47,7 @@ case class SvOnboardingToken(
     candidateKey: String,
     candidateParty: PartyId,
     candidateParticipantId: ParticipantId,
-    svcParty: PartyId,
+    dsoParty: PartyId,
 ) {
   def signAndEncode(privateKey: ECPrivateKey): Either[String, String] = for {
     publicKey <- SvUtil.parsePublicKey(candidateKey)

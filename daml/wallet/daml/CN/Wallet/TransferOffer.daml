@@ -13,7 +13,7 @@ template TransferOffer
   with
     sender : Party
     receiver : Party
-    svc : Party
+    dso : Party
     amount : PaymentAmount
     description : Text
     expiresAt : Time
@@ -67,7 +67,7 @@ template AcceptedTransferOffer
   with
     sender : Party
     receiver : Party
-    svc : Party
+    dso : Party
     amount : PaymentAmount
     expiresAt : Time
     trackingId : Text
@@ -85,7 +85,7 @@ template AcceptedTransferOffer
         now <- getTime
         require "Offer has not expired" (now < expiresAt)
         contextRound <- exercise @OpenMiningRound transferContext.context.openMiningRound (OpenMiningRound_Fetch sender)
-        ccAmount <- paymentAmountToCC svc contextRound amount
+        ccAmount <- paymentAmountToCC dso contextRound amount
         let
           transfer = Transfer with
             sender

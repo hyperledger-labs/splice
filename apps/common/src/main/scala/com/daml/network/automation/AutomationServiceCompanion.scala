@@ -8,7 +8,7 @@ abstract class AutomationServiceCompanion {
     * [[AutomationService#registerTrigger]] will warn if a trigger isn't present
     * in this list.  This list should be exhaustive if either the automation
     * service is dynamically created (e.g. UserWallet), or registered triggers
-    * may happen on a delay (e.g. SvSvc offboarding).
+    * may happen on a delay (e.g. SvDso offboarding).
     */
   protected[this] def expectedTriggerClasses: Seq[TriggerClass]
 

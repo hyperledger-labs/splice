@@ -57,7 +57,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
   )(implicit env: CNNodeTestConsoleEnvironment): Long = {
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(MemberTraffic.COMPANION)(
-        sv1Backend.getSvcInfo().svcParty,
+        sv1Backend.getDsoInfo().dsoParty,
         co => co.data.domainId == domainId.toProtoPrimitive && co.data.memberId == memberId.toProtoPrimitive,
       )
       .map(_.data.totalPurchased.toLong)
@@ -74,7 +74,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       case Seq() =>
         val validatorParty = validatorApp.getValidatorPartyId()
         val topupStateCreationCmd = ValidatorTopUpState.create(
-          svcParty.toProtoPrimitive,
+          dsoParty.toProtoPrimitive,
           validatorParty.toProtoPrimitive,
           memberId.toProtoPrimitive,
           domainId.toProtoPrimitive,

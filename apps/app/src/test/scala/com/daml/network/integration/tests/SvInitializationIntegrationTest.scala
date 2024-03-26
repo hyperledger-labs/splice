@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.network.codegen.java.cn.svc.memberstate.SvStatusReport
+import com.daml.network.codegen.java.cn.dso.memberstate.SvStatusReport
 import com.daml.network.config.CNNodeConfigTransforms.updateAllSvAppConfigs_
 import com.daml.network.console.{
   ScanAppBackendReference,
@@ -29,7 +29,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       )
 
   "start and restart cleanly" in { implicit env =>
-    initSvc()
+    initDso()
     sv1Backend.stop()
     sv1Backend.startSync()
   }
@@ -58,7 +58,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
   }
 
   "connect to all domains during initialization" in { implicit env =>
-    initSvc()
+    initDso()
     sv4Backend.stop()
 
     val globalDomainId = inside(sv4Backend.participantClient.domains.list_connected()) {
@@ -83,7 +83,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
   // A test to make debugging bootstrap problems easier
   "SV apps can start one by one" in { implicit env =>
     import env.executionContext
-    clue("Starting SVC app and SV1 app") {
+    clue("Starting DSO app and SV1 app") {
       startAllSync(sv1ScanBackend, sv1ValidatorBackend, sv1Backend)
     }
 
@@ -118,7 +118,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       connection
         .ensureDecentralizedNamespaceDefinitionProposalAccepted(
           globalDomainId,
-          svcParty.uid.namespace,
+          dsoParty.uid.namespace,
           sv1SequencerId.uid.namespace,
           id.namespace.fingerprint,
           RetryFor.WaitingOnInitDependency,
@@ -131,10 +131,10 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     try {
       startSv(4, sv4Backend, sv4ValidatorBackend)
 
-      clue("All SVs have reported their Scan URLs in SVC rules") {
+      clue("All SVs have reported their Scan URLs in DSO rules") {
         eventually() {
           val rulesAndState =
-            sv1Backend.appState.svcStore.getSvcRulesWithMemberNodeStates().futureValue
+            sv1Backend.appState.dsoStore.getDsoRulesWithMemberNodeStates().futureValue
           rulesAndState.svNodeStates.values
             .flatMap(_.payload.state.domainNodes.get(globalDomainId.toProtoPrimitive).scan.toScala)
             // onle sv1 and sv2 have scan apps
@@ -157,7 +157,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         connection
           .ensureDecentralizedNamespaceDefinitionRemovalProposal(
             globalDomainId,
-            svcParty.uid.namespace,
+            dsoParty.uid.namespace,
             sv1SequencerId.uid.namespace,
             id.namespace.fingerprint,
             RetryFor.WaitingOnInitDependency,
@@ -168,21 +168,21 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     }
   }
 
-  "The SVC is bootstrapped correctly" in { implicit env =>
-    initSvc()
-    val svcRules = clue("An SvcRules contract exists") {
-      sv1Backend.getSvcInfo()
+  "The DSO is bootstrapped correctly" in { implicit env =>
+    initDso()
+    val dsoRules = clue("An DsoRules contract exists") {
+      sv1Backend.getDsoInfo()
     }
     val svParties = clue("We have four sv parties and their apps are online") {
-      svs.map(_.getSvcInfo().svParty.toProtoPrimitive)
+      svs.map(_.getDsoInfo().svParty.toProtoPrimitive)
     }
     val svPartiesSet = svParties.toSet
-    clue("The four SV apps are all SVC members and there are no other SVC members") {
-      sv1Backend.getSvcInfo().svcRules.payload.members.keySet() should equal(svParties.toSet.asJava)
+    clue("The four SV apps are all DSO members and there are no other DSO members") {
+      sv1Backend.getDsoInfo().dsoRules.payload.members.keySet() should equal(svParties.toSet.asJava)
     }
     clue("The founding SV app (sv1) is the first leader") {
-      sv1Backend.getSvcInfo().svcRules.payload.leader should equal(
-        svcRules.svParty.toProtoPrimitive
+      sv1Backend.getDsoInfo().dsoRules.payload.leader should equal(
+        dsoRules.svParty.toProtoPrimitive
       )
     }
     clue("initial open mining rounds are created") {
@@ -198,7 +198,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         participantAdminConnection
           .getDecentralizedNamespaceDefinition(
             globalDomainId,
-            svcParty.uid.namespace,
+            dsoParty.uid.namespace,
           )
           .futureValue
           .mapping
@@ -214,23 +214,23 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)
         participantAdminConnection
-          .getPartyToParticipant(globalDomainId, svcParty)
+          .getPartyToParticipant(globalDomainId, dsoParty)
           .futureValue
           .mapping
           .threshold
           .value shouldBe 3
       }
     }
-    clue("SV participants have submission rights on behalf of the SVC party") {
+    clue("SV participants have submission rights on behalf of the DSO party") {
       eventually() {
         val participantAdminConnection = sv1Backend.appState.participantAdminConnection
-        val svcHostingParticipants = participantAdminConnection
-          .getPartyToParticipant(globalDomainId, svcParty)
+        val dsoHostingParticipants = participantAdminConnection
+          .getPartyToParticipant(globalDomainId, dsoParty)
           .futureValue
           .mapping
           .participants
-        svcHostingParticipants should have length 4
-        svcHostingParticipants.foreach(_.permission shouldBe ParticipantPermission.Submission)
+        dsoHostingParticipants should have length 4
+        dsoHostingParticipants.foreach(_.permission shouldBe ParticipantPermission.Submission)
       }
     }
     clue("Each SV is submitting status reports") {
@@ -238,7 +238,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         clue(s"The SV status reports are visible to ${backend.config.svPartyHint}") {
           eventually() {
             val svReports = backend.participantClient.ledger_api_extensions.acs
-              .filterJava(SvStatusReport.COMPANION)(svcParty, c => c.data.status.isPresent)
+              .filterJava(SvStatusReport.COMPANION)(dsoParty, c => c.data.status.isPresent)
             inside(svReports)(reports => {
               reports.map(r => r.data.sv).toSet should equal(svPartiesSet)
             })

@@ -1,14 +1,14 @@
 package com.daml.network.sv.automation.singlesv
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.codegen.java.cn.svc.memberstate.SvStatus
+import com.daml.network.codegen.java.cn.dso.memberstate.SvStatus
 import com.daml.network.environment.{
   CNLedgerConnection,
   MediatorAdminConnection,
   ParticipantAdminConnection,
 }
 import com.daml.network.sv.cometbft.CometBftNode
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
@@ -17,11 +17,11 @@ import cats.syntax.traverse.*
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.digitalasset.canton.data.CantonTimestamp
 
-/** A trigger that regularly submits the status report of the SV to the SVC. */
+/** A trigger that regularly submits the status report of the SV to the DSO. */
 class SubmitSvStatusReportTrigger(
     svAppConfig: SvAppBackendConfig,
     baseContext: TriggerContext,
-    store: SvSvcStore,
+    store: SvDsoStore,
     ledgerApiConnection: CNLedgerConnection,
     cometBft: Option[CometBftNode],
     mediatorAdminConnection: Option[MediatorAdminConnection],
@@ -40,19 +40,19 @@ class SubmitSvStatusReportTrigger(
     val svParty = store.key.svParty
     logger.debug(s"Attempting to submit on-ledger SvStatus report...")
     for {
-      svcRules <- store.getSvcRules()
+      dsoRules <- store.getDsoRules()
       statusReport <- store.getSvStatusReport(store.key.svParty)
       openMiningRounds <- store.getOpenMiningRoundTriple()
       cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
       // TODO(#10297): make this code work properly with multiple mediators in the case of soft-domain migration
       mediatorDomainTimeLb <- mediatorAdminConnection.traverse(
         _.getDomainTimeLowerBound(
-          svcRules.domain,
+          dsoRules.domain,
           maxDomainTimeLag = context.config.pollingInterval,
         )
       )
       participantDomainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
-        svcRules.domain,
+        dsoRules.domain,
         maxDomainTimeLag = context.config.pollingInterval,
       )
       now = context.clock.now
@@ -65,15 +65,15 @@ class SubmitSvStatusReportTrigger(
         participantDomainTimeLb.timestamp.toInstant,
         openMiningRounds.newest.payload.round,
       )
-      cmd = svcRules.exercise(
-        _.exerciseSvcRules_SubmitStatusReport(
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_SubmitStatusReport(
           svParty.toProtoPrimitive,
           statusReport.contractId,
           status,
         )
       )
       _ <- ledgerApiConnection
-        .submit(Seq(svParty), Seq(store.key.svcParty), cmd)
+        .submit(Seq(svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldUnit()
       _ = logger.debug(s"Completed submitting on-ledger SvStatus report.")

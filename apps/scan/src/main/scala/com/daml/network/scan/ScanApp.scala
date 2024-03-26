@@ -26,7 +26,7 @@ import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.db.{ScanAggregatesReader, ScanAggregatesReaderContext}
-import com.daml.network.scan.svc.SvcCnsResolver
+import com.daml.network.scan.dso.DsoCnsResolver
 import com.daml.network.store.PageLimit
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -77,22 +77,22 @@ class ScanApp(
     ) {
 
   override def packages =
-    super.packages ++ DarResources.cantonNameService.all ++ DarResources.svcGovernance.all
+    super.packages ++ DarResources.cantonNameService.all ++ DarResources.dsoGovernance.all
 
   override def initialize(
       ledgerClient: CNLedgerClient,
-      // We don't care about the primary party in scan as that points to the SV party while we need the SVC party
+      // We don't care about the primary party in scan as that points to the SV party while we need the DSO party
       // which we read below.
       serviceUserPrimaryParty: PartyId,
   )(implicit tc: TraceContext): Future[ScanApp.State] = {
     for {
-      svcParty <- appInitStep("Get SVC party from user metadata") {
+      dsoParty <- appInitStep("Get DSO party from user metadata") {
         ledgerClient
           .readOnlyConnection(
             this.getClass.getSimpleName,
             loggerFactory,
           )
-          .getSvcPartyFromUserMetadata(config.svUser)
+          .getDsoPartyFromUserMetadata(config.svUser)
       }
       scanAggregatesReaderContext = new ScanAggregatesReaderContext(
         clock,
@@ -115,7 +115,7 @@ class ScanApp(
         participantAdminConnection.getParticipantId()
       }
       store = ScanStore(
-        key = ScanStore.Key(svcParty = svcParty),
+        key = ScanStore.Key(dsoParty = dsoParty),
         storage,
         isFounder = config.isFounder,
         loggerFactory,
@@ -159,11 +159,11 @@ class ScanApp(
           logger,
         )
       }
-      svcCnsResolver = new SvcCnsResolver(svcParty)
+      dsoCnsResolver = new DsoCnsResolver(dsoParty)
       internalHandler = new HttpScanHandler(
         participantAdminConnection,
         store,
-        svcCnsResolver,
+        dsoCnsResolver,
         config.miningRoundsCacheTimeToLiveOverride,
         loggerFactory,
       )

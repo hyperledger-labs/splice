@@ -1,21 +1,21 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_ConfirmSvOnboarding,
   SRARC_SetConfig,
 }
-import com.daml.network.codegen.java.cn.svcrules.{
+import com.daml.network.codegen.java.cn.dsorules.{
   ActionRequiringConfirmation,
-  SvcRulesConfig,
-  SvcRules_ConfirmSvOnboarding,
-  SvcRules_SetConfig,
+  DsoRulesConfig,
+  DsoRules_ConfirmSvOnboarding,
+  DsoRules_SetConfig,
 }
 import com.daml.network.console.CNNodeAppBackendReference
 import com.daml.network.sv.automation.confirmation.SvOnboardingRequestTrigger
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.cn.svcrules
+import com.daml.network.codegen.java.cn.dsorules
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.TriggerTestUtil
@@ -31,7 +31,7 @@ class SvTimeBasedOnboardingIntegrationTest
     implicit env =>
       implicit val ec = env.executionContext
       def activeSvBackends = Seq(sv1Backend, sv2Backend, sv3Backend)
-      clue("Initialize SVC with 3 SVs") {
+      clue("Initialize DSO with 3 SVs") {
         startAllSync(
           Seq[CNNodeAppBackendReference](sv1ScanBackend, sv2ScanBackend) ++
             activeSvBackends ++
@@ -41,14 +41,14 @@ class SvTimeBasedOnboardingIntegrationTest
               sv3ValidatorBackend,
             ): _*
         )
-        sv1Backend.getSvcInfo().svcRules.payload.members should have size 3
+        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 3
       }
 
       clue(
         "expire stale `SvOnboardingRequest` contracts."
       ) {
         val sv2and3OnboardingRequestTriggers =
-          Seq(sv2Backend, sv3Backend).map(_.svcAutomation.trigger[SvOnboardingRequestTrigger])
+          Seq(sv2Backend, sv3Backend).map(_.dsoAutomation.trigger[SvOnboardingRequestTrigger])
 
         sv2and3OnboardingRequestTriggers.traverse(_.pause()).futureValue
         // We now need 2 confirmations to execute an action, but only sv1 will confirm to onboard sv4.
@@ -61,7 +61,7 @@ class SvTimeBasedOnboardingIntegrationTest
             // The onboarding is requested by SV4 during SvApp init.
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(
-                svcParty
+                dsoParty
               ) should have length 1
           )
         }
@@ -72,7 +72,7 @@ class SvTimeBasedOnboardingIntegrationTest
           "The `SvOnboardingRequest` contract expires and is archived",
           _ =>
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(svcParty) shouldBe empty,
+              .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) shouldBe empty,
         )
       }
 
@@ -85,9 +85,9 @@ class SvTimeBasedOnboardingIntegrationTest
             val confirmingSvs = getConfirmingSvs(Seq(sv1Backend, sv2Backend, sv3Backend))
             confirmActionByAllMembers(
               confirmingSvs,
-              new svcrules.actionrequiringconfirmation.ARC_SvcRules(
+              new dsorules.actionrequiringconfirmation.ARC_DsoRules(
                 new SRARC_ConfirmSvOnboarding(
-                  new SvcRules_ConfirmSvOnboarding(
+                  new DsoRules_ConfirmSvOnboarding(
                     svYParty.toProtoPrimitive,
                     "new random party",
                     "PAR::sv::1220f3e2",
@@ -103,7 +103,7 @@ class SvTimeBasedOnboardingIntegrationTest
           _ =>
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(
-                svcParty,
+                dsoParty,
                 _.data.svParty == svYParty.toProtoPrimitive,
               ) should have length 1,
         )
@@ -115,7 +115,7 @@ class SvTimeBasedOnboardingIntegrationTest
           _ =>
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
               .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(
-                svcParty,
+                dsoParty,
                 _.data.svParty == svYParty.toProtoPrimitive,
               ) shouldBe empty,
         )
@@ -132,7 +132,7 @@ class SvTimeBasedOnboardingIntegrationTest
           actAndCheck(
             "create a new `ValidatorOnboarding` contract", {
               val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
-                sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+                sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
                 testCandidateSecret,
                 sv1Backend.participantClientWithAdminToken.ledger_api.time
                   .get()
@@ -141,7 +141,7 @@ class SvTimeBasedOnboardingIntegrationTest
               ).create.commands.asScala.toSeq
 
               sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
-                actAs = Seq(sv1Backend.getSvcInfo().svParty),
+                actAs = Seq(sv1Backend.getDsoInfo().svParty),
                 optTimeout = None,
                 commands = validatorOnboarding,
               )
@@ -169,29 +169,29 @@ class SvTimeBasedOnboardingIntegrationTest
       clue("archive expired `VoteRequest` contracts") {
         actAndCheck(
           "sv1 creates a new vote request", {
-            val newConfig = new SvcRulesConfig(
-              sv1Backend.getSvcInfo().svcRules.payload.config.numUnclaimedRewardsThreshold,
-              sv1Backend.getSvcInfo().svcRules.payload.config.numMemberTrafficContractsThreshold,
-              sv1Backend.getSvcInfo().svcRules.payload.config.actionConfirmationTimeout,
-              sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingRequestTimeout,
-              sv1Backend.getSvcInfo().svcRules.payload.config.svOnboardingConfirmedTimeout,
-              sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
-              sv1Backend.getSvcInfo().svcRules.payload.config.leaderInactiveTimeout,
-              sv1Backend.getSvcInfo().svcRules.payload.config.domainNodeConfigLimits,
-              sv1Backend.getSvcInfo().svcRules.payload.config.maxTextLength,
-              sv1Backend.getSvcInfo().svcRules.payload.config.globalDomain,
-              sv1Backend.getSvcInfo().svcRules.payload.config.nextScheduledDomainUpgrade,
+            val newConfig = new DsoRulesConfig(
+              sv1Backend.getDsoInfo().dsoRules.payload.config.numUnclaimedRewardsThreshold,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.numMemberTrafficContractsThreshold,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.actionConfirmationTimeout,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.svOnboardingRequestTimeout,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.svOnboardingConfirmedTimeout,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.leaderInactiveTimeout,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.domainNodeConfigLimits,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.maxTextLength,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.globalDomain,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.nextScheduledDomainUpgrade,
             )
 
             val action: ActionRequiringConfirmation =
-              new ARC_SvcRules(new SRARC_SetConfig(new SvcRules_SetConfig(newConfig)))
+              new ARC_DsoRules(new SRARC_SetConfig(new DsoRules_SetConfig(newConfig)))
 
             sv1Backend.createVoteRequest(
-              sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+              sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
               action,
               "url",
               "description",
-              sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+              sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
             )
           },
         )(

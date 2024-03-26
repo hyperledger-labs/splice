@@ -614,7 +614,7 @@ For configuring your sv app, please modify the file ``cn-node-0.1.0-SNAPSHOT/exa
 - If you would like to redistribute all or part of the SV rewards with other parties, you can fill up the `extraBeneficiaries` section with the desired parties and the percentage of the reward that corresponds to them.
   Note that the party you register must be known on the network for the reward coupon issuance to succeed.
   Furthermore, that party must be hosted on a validator node for its wallet to collect the SV reward coupons. That collection will happen automatically if the wallet is running.
-  If it is not running during the time that the reward coupon can be collected, the corresponding reward is marked as unclaimed, and stored in an SVC-wide unclaimed reward pool.
+  If it is not running during the time that the reward coupon can be collected, the corresponding reward is marked as unclaimed, and stored in an DSO-wide unclaimed reward pool.
   The `extraBeneficiaries` can be changed with just a restart of the SV app.
 
 If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-upgrades>`, you will also need to set ``migrating`` to ``true`` in your ``sv-values.yaml``:
@@ -624,9 +624,9 @@ If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
-Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVC members. The bundled artifacts consist of the lists of recommended values as follows:
+Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer DSO members. The bundled artifacts consist of the lists of recommended values as follows:
 
-- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-test.yaml`` - the list of currently SVC-approved identities for `TestNet`
+- ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-test.yaml`` - the list of currently DSO-approved identities for `TestNet`
 - ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-dev.yaml`` - the list of partners currently experimenting with onboarding SV nodes on `DevNet`. Note that this is a less strict list at the moment, and includes identities for e.g. Digital-Asset support employees.
 
 Please identify the file out of the above corresponding to the network to which you are connecting, and after reviewing the file, set its path in an environment variable ``SV-IDENTITIES-FILE`` to be used below.
@@ -899,7 +899,7 @@ Once logged in one should see a page with some SV collective information.
   :alt: After logged in into the sv UI
 
 The SV UI presents also some useful debug information for the CometBFT node. To see it, click on the "CometBFT Debug Info" tab.
-If your CometBFT is configured correctly, and it has connectivity to all other nodes, you should see ``n_peers`` that is equal to the size of the SVC, excluding your own node,
+If your CometBFT is configured correctly, and it has connectivity to all other nodes, you should see ``n_peers`` that is equal to the size of the DSO, excluding your own node,
 and you should see all peer SV members listed as peers (their human-friendly names will be listed in the ``moniker`` fields).
 
 .. _sv-ui-global-domain:

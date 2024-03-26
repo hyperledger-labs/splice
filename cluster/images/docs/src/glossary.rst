@@ -38,7 +38,7 @@ Glossary
       * currency issued by super validator collective
       * used for domain fees
       * fees in USD
-      * coins accrue holding fees that pay for the coin's usage of SVC storage space
+      * coins accrue holding fees that pay for the coin's usage of DSO storage space
       * all cc transactions are public
       * supports locked coins that can be unlocked by lock holder
       * support transfers single sender, multi-receiver transfers

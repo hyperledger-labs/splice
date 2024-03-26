@@ -4,7 +4,7 @@ import cats.Show.Shown
 import cats.implicits.toTraverseOps
 import com.daml.network.codegen.java.cn as daml
 import com.daml.network.sv.config.CometBftConfig
-import com.daml.network.sv.store.SvSvcStore.SvcRulesWithMemberNodeStates
+import com.daml.network.sv.store.SvDsoStore.DsoRulesWithMemberNodeStates
 import com.digitalasset.canton.drivers as proto
 import com.digitalasset.canton.drivers.cometbft.{
   NetworkConfigChangeRequest,
@@ -35,14 +35,14 @@ class CometBftNode(
   import com.daml.network.sv.cometbft.CometBftNode.*
 
   /** Reconcile the CometBFT network config seen by this node with the target configuration specified
-    * in the `SvcRules` contract.
+    * in the `DsoRules` contract.
     *
     * @param owningSvNode: the identifier of the SvNode that owns and manages this CometBFT node.
     * This method is idempotent and safe to retry.
     */
   def reconcileNetworkConfig(
       owningSvNode: String,
-      target: SvcRulesWithMemberNodeStates,
+      target: DsoRulesWithMemberNodeStates,
   )(implicit tc: TraceContext): Future[Unit] = {
     // TODO(#4925): select the governance key to use for submitting the change requests comparing the KMS (Canton ;-)) against the configured state
     val ourGovernanceKey = {
@@ -51,7 +51,7 @@ class CometBftNode(
         CometBftRequestSigner.GenesisFingerprint,
       )
     }
-    val domainId = target.svcRules.domain
+    val domainId = target.dsoRules.domain
     val targetNodeStates = target.svNodeStates.values.map(_.payload).toSeq
     val keepsOurOwnGovernanceKey = targetNodeStates
       .find(state => state.svName == owningSvNode)
@@ -89,7 +89,7 @@ class CometBftNode(
               actualConfig,
               targetNodeStates,
               networkConfigChanges.requests,
-              target.svcRules.domain,
+              target.dsoRules.domain,
             )
             val ourKeyIsRegistered = actualConfig.svNodeConfigStates
               .get(owningSvNode)
@@ -201,12 +201,12 @@ object CometBftNode {
   }
 
   /** Compute the set of change requests that, when applied, make the current network config
-    * match the target config specified by the `SvcRules` contract provided that target config doesn't lock us out.
+    * match the target config specified by the `DsoRules` contract provided that target config doesn't lock us out.
     */
   def diffNetworkConfig(
       owningSvNode: String,
       signingKeyId: String,
-      targetNodeStates: Seq[daml.svc.memberstate.SvNodeState],
+      targetNodeStates: Seq[daml.dso.memberstate.SvNodeState],
       currentNetworkConfig: proto.cometbft.GetNetworkConfigResponse,
       domainId: DomainId,
       logger: TracedLogger,
@@ -352,7 +352,7 @@ object CometBftNode {
     )
 
   private def memberNodeStatesToNetworkConfig(
-      memberNodeStates: Seq[daml.svc.memberstate.SvNodeState],
+      memberNodeStates: Seq[daml.dso.memberstate.SvNodeState],
       domainId: DomainId,
   ): immutable.Map[String, proto.cometbft.SvNodeConfig] =
     memberNodeStates
@@ -363,7 +363,7 @@ object CometBftNode {
       )
       .toMap
   private def extractDomainNodeConfig(
-      nodeState: daml.svc.memberstate.SvNodeState,
+      nodeState: daml.dso.memberstate.SvNodeState,
       domainId: DomainId,
   ) = {
     // TODO(#4901): reconcile all configured CometBFT networks
@@ -375,7 +375,7 @@ object CometBftNode {
   @SuppressWarnings(Array("org.wartremover.warts.Product"))
   private case class NetworkDiffSummary(
       actualConfig: proto.cometbft.GetNetworkConfigResponse,
-      memberNodeStates: Seq[daml.svc.memberstate.SvNodeState],
+      memberNodeStates: Seq[daml.dso.memberstate.SvNodeState],
       changes: Seq[proto.cometbft.NetworkConfigChangeRequest],
       domainId: DomainId,
   ) extends PrettyPrinting {

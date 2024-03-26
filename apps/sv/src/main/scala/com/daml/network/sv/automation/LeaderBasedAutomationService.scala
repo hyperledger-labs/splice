@@ -33,7 +33,7 @@ class LeaderBasedAutomationService(
   def start(): Unit = {
     registerTrigger(new AdvanceOpenMiningRoundTrigger(triggerContext, svTaskContext))
     registerTrigger(new CompletedSvOnboardingTrigger(triggerContext, svTaskContext))
-    if (config.automation.enableSvcGovernance) {
+    if (config.automation.enableDsoGovernance) {
       registerTrigger(new ExecuteConfirmedActionTrigger(triggerContext, svTaskContext))
       registerTrigger(new CloseVoteRequestWithEarlyClosingTrigger(triggerContext, svTaskContext))
     }

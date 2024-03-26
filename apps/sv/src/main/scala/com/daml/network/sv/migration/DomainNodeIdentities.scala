@@ -4,7 +4,7 @@ import com.daml.network.environment.{ParticipantAdminConnection, TopologyAdminCo
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.{NodeIdentitiesDump, NodeIdentitiesStore}
 import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.Codec
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -15,7 +15,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 case class DomainNodeIdentities(
     svPartyId: PartyId,
-    svcPartyId: PartyId,
+    dsoPartyId: PartyId,
     domainAlias: DomainAlias,
     domainId: DomainId,
     participant: NodeIdentitiesDump,
@@ -24,7 +24,7 @@ case class DomainNodeIdentities(
 ) {
   def toHttp(): http.DomainNodeIdentities = http.DomainNodeIdentities(
     svPartyId.toProtoPrimitive,
-    svcPartyId.toProtoPrimitive,
+    dsoPartyId.toProtoPrimitive,
     domainAlias.toProtoPrimitive,
     domainId.toProtoPrimitive,
     participant.toHttp,
@@ -38,7 +38,7 @@ object DomainNodeIdentities {
       src: http.DomainNodeIdentities
   ): Either[String, DomainNodeIdentities] = for {
     svPartyId <- Codec.decode(Codec.Party)(src.svPartyId)
-    svcPartyId <- Codec.decode(Codec.Party)(src.svcPartyId)
+    dsoPartyId <- Codec.decode(Codec.Party)(src.dsoPartyId)
     domainAlias <- DomainAlias.create(src.domainAlias)
     domainId <- Codec.decode(Codec.DomainId)(src.domainId)
     participant <- NodeIdentitiesDump.fromHttp(
@@ -56,7 +56,7 @@ object DomainNodeIdentities {
   } yield {
     DomainNodeIdentities(
       svPartyId,
-      svcPartyId,
+      dsoPartyId,
       domainAlias,
       domainId,
       participant,
@@ -68,7 +68,7 @@ object DomainNodeIdentities {
   def getDomainNodeIdentities(
       participantAdminConnection: ParticipantAdminConnection,
       domainNode: LocalDomainNode,
-      svcStore: SvSvcStore,
+      dsoStore: SvDsoStore,
       domainAlias: DomainAlias,
       loggerFactory: NamedLoggerFactory,
   )(implicit ec: ExecutionContext, tc: TraceContext): Future[DomainNodeIdentities] = {
@@ -80,13 +80,13 @@ object DomainNodeIdentities {
       ).getNodeIdentitiesDump()
 
     for {
-      globalDomain <- svcStore.getSvcRules().map(_.domain)
+      globalDomain <- dsoStore.getDsoRules().map(_.domain)
       participant <- getNodeIdentitiesDump(participantAdminConnection)
       sequencer <- getNodeIdentitiesDump(domainNode.sequencerAdminConnection)
       mediator <- getNodeIdentitiesDump(domainNode.mediatorAdminConnection)
     } yield DomainNodeIdentities(
-      svcStore.key.svParty,
-      svcStore.key.svcParty,
+      dsoStore.key.svParty,
+      dsoStore.key.dsoParty,
       domainAlias,
       globalDomain,
       participant,

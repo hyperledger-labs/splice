@@ -14,38 +14,38 @@ import {
 import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/CC/AmuletConfig';
 import {
   ActionRequiringConfirmation,
-  SvcRulesConfig,
-} from '@daml.js/svc-governance/lib/CN/SvcRules/module';
+  DsoRulesConfig,
+} from '@daml.js/dso-governance/lib/CN/DsoRules/module';
 
-import { useSvcInfos } from '../../../../contexts/SvContext';
+import { useDsoInfos } from '../../../../contexts/SvContext';
 
 const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action }) => {
-  const svcInfosQuery = useSvcInfos();
+  const dsoInfosQuery = useDsoInfos();
 
-  if (svcInfosQuery.isLoading) {
+  if (dsoInfosQuery.isLoading) {
     return <Loading />;
   }
 
-  if (svcInfosQuery.isError) {
-    return <p>Error: {JSON.stringify(svcInfosQuery.error)}</p>;
+  if (dsoInfosQuery.isError) {
+    return <p>Error: {JSON.stringify(dsoInfosQuery.error)}</p>;
   }
 
-  if (!svcInfosQuery.data) {
+  if (!dsoInfosQuery.data) {
     return <p>no VoteRequest contractId is specified</p>;
   }
 
   const actionType = action.tag;
 
-  if (action.tag === 'ARC_SvcRules') {
-    const svcAction = action.value.svcAction;
-    switch (svcAction.tag) {
+  if (action.tag === 'ARC_DsoRules') {
+    const dsoAction = action.value.dsoAction;
+    switch (dsoAction.tag) {
       case 'SRARC_OffboardMember': {
         return (
           <ActionValueTable
             actionType={actionType}
-            actionName={svcAction.tag}
+            actionName={dsoAction.tag}
             valuesMap={{
-              Member: <PartyId partyId={svcAction.value.member} />,
+              Member: <PartyId partyId={dsoAction.value.member} />,
             }}
           />
         );
@@ -54,9 +54,9 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
         return (
           <ActionValueTable
             actionType={actionType}
-            actionName={svcAction.tag}
+            actionName={dsoAction.tag}
             valuesMap={{
-              Provider: <PartyId partyId={svcAction.value.provider} />,
+              Provider: <PartyId partyId={dsoAction.value.provider} />,
             }}
           />
         );
@@ -65,9 +65,9 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
         return (
           <ActionValueTable
             actionType={actionType}
-            actionName={svcAction.tag}
+            actionName={dsoAction.tag}
             valuesMap={{
-              FeatureAppRightCid: <PartyId partyId={svcAction.value.rightCid} />,
+              FeatureAppRightCid: <PartyId partyId={dsoAction.value.rightCid} />,
             }}
           />
         );
@@ -76,9 +76,9 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
         return (
           <ActionValueTable
             actionType={actionType}
-            actionName={svcAction.tag}
+            actionName={dsoAction.tag}
             valuesMap={{
-              NewConfig: <PrettyJsonPrint data={svcAction.value.newConfig} />,
+              NewConfig: <PrettyJsonPrint data={dsoAction.value.newConfig} />,
             }}
           />
         );
@@ -113,7 +113,7 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
               ScheduleItem: (
                 <PrettyJsonPrint
                   data={
-                    svcInfosQuery.data?.amuletRules.payload.configSchedule.futureValues.find(
+                    dsoInfosQuery.data?.amuletRules.payload.configSchedule.futureValues.find(
                       e => e._1 === amuletRulesAction.value.scheduleTime
                     )?._2
                   }
@@ -189,7 +189,7 @@ const ActionValueTable: React.FC<{
 };
 
 const PrettyJsonPrint: React.FC<{
-  data?: SvcRulesConfig | AmuletConfig<USD> | string;
+  data?: DsoRulesConfig | AmuletConfig<USD> | string;
 }> = ({ data }) => {
   return (
     <pre

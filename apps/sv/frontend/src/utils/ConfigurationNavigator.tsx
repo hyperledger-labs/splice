@@ -32,8 +32,8 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
     data?.futureValues!
   );
 
-  async function setDecodedInitialComponent(svcRulesConfig: Record<string, JSONValue>) {
-    const decodedConfig = AmuletConfig(USD).decoder.runWithException(svcRulesConfig);
+  async function setDecodedInitialComponent(dsoRulesConfig: Record<string, JSONValue>) {
+    const decodedConfig = AmuletConfig(USD).decoder.runWithException(dsoRulesConfig);
     setInitialComponent(decodedConfig);
     onChange({ initialValue: initialComponent, futureValues: components });
   }

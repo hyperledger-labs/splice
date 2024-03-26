@@ -504,7 +504,7 @@ Here are a few strategies and techniques that can be useful for speeding up the 
 
 Once you have successfully recovered from a `TestNet` or `DevNet` deployment failure,
 please make sure that our SV partners are informed about your resolution as well,
-via a message on the [#svc-ops](https://daholdings.slack.com/archives/C05E70BCSDA) Slack channel.
+via a message on the [#dso-ops](https://daholdings.slack.com/archives/C05E70BCSDA) Slack channel.
 Also consider initiating the writing of a [postmortem](https://drive.google.com/drive/folders/10xogcO7_y_gYdEfbUkQLamD8-PTwPmqW) about what happened.
 
 #### Testing deploy-devnet and deploy-testnet changes
@@ -1326,7 +1326,7 @@ via the `participantAdminUserNameFrom` value on the helm chart.
 
 Here is how the admin user name of a typical SV participant is configured.
 Using this user, the SV app later takes care of allocating the SV party, the SV validator user and,
-if the SV is the SVC founder, also the SVC party.
+if the SV is the DSO founder, also the DSO party.
 
 ```yaml
 participantAdminUserNameFrom:
@@ -1393,7 +1393,7 @@ To bring the deployment down, run:
 When deploying a cluster, it is possible to enable additional SVs beyond the typical 1-4, for the purpose of
 creating and testing larger networks. Currently a max value of `9` is supported.
 
-To enable these additional SVs, set `SVC_SIZE=<num>` for that cluster's env configuration, then `cncluster apply`.
+To enable these additional SVs, set `DSO_SIZE=<num>` for that cluster's env configuration, then `cncluster apply`.
 
 Note that the keys for the extra SVs need to be present in the Google Cloud project that the cluster is running in. Currently the keys are only uploaded to `da-cn-scratchnet`.
 
@@ -1504,7 +1504,7 @@ The following steps assume that:
    For more fine-grained control, you can append `core`, `sv` or `validator` to the command to tell it to change only one of these things,
    followed by `pulumi up` parameters such as `--yes --skip-preview`.
 1. [Check that the new domain is healthy and sound](#new-domain-readiness-checks).
-   Communicate the result of your check to the rest of the SVC to conclude the migration.
+   Communicate the result of your check to the rest of the DSO to conclude the migration.
 1. [Patch](patching-healthchecks-against-a-deployed-cluster) our health checks
    so that the `migration_id` parameter on the triggered `preflight_check`, `preflight_sv_check` and `preflight_validator_check` jobs
    is set to reflect the expected migration ID after completing the migration.
@@ -1520,7 +1520,7 @@ In addition to inquiring about the status of partners on [Slack](https://daholdi
 here is a hacky oneliner to see if our partners's new sequencers and CometBFT nodes are reachable (before the actual migration has taken place):
 
 ```
-curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/svc | jq '.svc_rules.payload.members | .[] | .[1].domainNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
+curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.members | .[] | .[1].domainNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
 ```
 
 This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and that the hostname for the CometBFT node either doesn't matter (because it's all the same IP) or they are Daml Hub...
@@ -1614,10 +1614,10 @@ You can also access sequencer and mediator:
 
 ### App APIs without authentication
 
-Just use `curl`! For example, here is how to get the current SVC members (as per the `SvcRules`) from SV1 on DevNet:
+Just use `curl`! For example, here is how to get the current DSO members (as per the `DsoRules`) from SV1 on DevNet:
 
 ```
-curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/svc | jq '.svc_rules.payload.members'
+curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.members'
 ```
 
 ### App APIs with authentication
@@ -1804,10 +1804,10 @@ and browse to it
 [here](https://console.cloud.google.com/storage/browser/_details/da-cn-data-dumps/test-preview/sv-1/participant_identities_2023-07-13T01:26:08.288478Z.json;tab=live_object?project=da-cn-devnet)
 
 Furthermore, in a TestNet style deployment our founding SV node (SV-1) is also configured to regularly produce dumps of the contents of its ACS store
-for the `svc` party. These dumps are stored using the same service account and target location as the participant identities dumps. For
+for the `dso` party. These dumps are stored using the same service account and target location as the participant identities dumps. For
 example, one of the companion ACS dumps for the above participant identities dumps is
 ```
-da-cn-data-dumps/test-preview/sv-1/svc_acs_dump_2023-07-13T02:55:07.211333Z.json
+da-cn-data-dumps/test-preview/sv-1/dso_acs_dump_2023-07-13T02:55:07.211333Z.json
 ```
 Note that only founding nodes support generating ACS dumps.
 

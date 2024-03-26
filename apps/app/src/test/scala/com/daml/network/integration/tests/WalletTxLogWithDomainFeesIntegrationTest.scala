@@ -70,7 +70,7 @@ class WalletTxLogWithDomainFeesIntegrationTest
             sv1WalletClient,
             Seq[CheckTxHistoryFn](
               { case logEntry: TransferTxLogEntry =>
-                // Payment of domain fees by validator to SVC
+                // Payment of domain fees by validator to DSO
                 logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.ExtraTrafficPurchase.toProto
                 logEntry.sender.value.party shouldBe sv1ValidatorBackend
                   .getValidatorPartyId()
@@ -81,8 +81,8 @@ class WalletTxLogWithDomainFeesIntegrationTest
                   -totalCostCc,
                 )
                 inside(logEntry.receivers) { case Seq(receiver) =>
-                  receiver.party shouldBe svcParty.toProtoPrimitive
-                  // domain fees paid is immediately burnt by SVC
+                  receiver.party shouldBe dsoParty.toProtoPrimitive
+                  // domain fees paid is immediately burnt by DSO
                   receiver.amount shouldBe 0
                 }
               },
@@ -109,7 +109,7 @@ class WalletTxLogWithDomainFeesIntegrationTest
             aliceValidatorWalletClient,
             Seq[CheckTxHistoryFn](
               { case logEntry: TransferTxLogEntry =>
-                // Payment of domain fees by validator to SVC
+                // Payment of domain fees by validator to DSO
                 logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.ExtraTrafficPurchase.toProto
                 logEntry.sender.value.party shouldBe aliceValidatorBackend
                   .getValidatorPartyId()
@@ -120,8 +120,8 @@ class WalletTxLogWithDomainFeesIntegrationTest
                   -totalCostCc,
                 )
                 inside(logEntry.receivers) { case Seq(receiver) =>
-                  receiver.party shouldBe svcParty.toProtoPrimitive
-                  // domain fees paid is immediately burnt by SVC
+                  receiver.party shouldBe dsoParty.toProtoPrimitive
+                  // domain fees paid is immediately burnt by DSO
                   receiver.amount shouldBe 0
                 }
               },

@@ -139,14 +139,14 @@ class DbSvSvStoreTest
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
         DarResources.cantonAmulet.all ++
           DarResources.validatorLifecycle.all ++
-          DarResources.svcGovernance.all ++
-          DarResources.svcGovernance.all
+          DarResources.dsoGovernance.all ++
+          DarResources.dsoGovernance.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 
     val store = new DbSvSvStore(
-      SvStore.Key(storeSvParty, svcParty),
+      SvStore.Key(storeSvParty, dsoParty),
       storage,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),

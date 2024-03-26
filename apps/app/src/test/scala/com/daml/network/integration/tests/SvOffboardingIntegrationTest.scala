@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.svcrules.*
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
-import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.cn.dsorules.*
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -69,7 +69,7 @@ class SvOffboardingIntegrationTest
       ),
       "mediator-offboarding",
     )() {
-      clue("Initialize SVC with 4 SVs") {
+      clue("Initialize DSO with 4 SVs") {
         startAllSync(
           sv1ScanBackend,
           sv2ScanBackend,
@@ -87,17 +87,17 @@ class SvOffboardingIntegrationTest
       val (_, voteRequestCid4) = actAndCheck(
         "SV1 create a vote request to remove sv4", {
           val action: ActionRequiringConfirmation =
-            new ARC_SvcRules(
+            new ARC_DsoRules(
               new SRARC_OffboardMember(
-                new SvcRules_OffboardMember(sv4Backend.getSvcInfo().svParty.toProtoPrimitive)
+                new DsoRules_OffboardMember(sv4Backend.getDsoInfo().svParty.toProtoPrimitive)
               )
             )
           sv1Backend.createVoteRequest(
-            sv1Backend.getSvcInfo().svParty.toProtoPrimitive,
+            sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
             action,
             "url",
             "description",
-            sv1Backend.getSvcInfo().svcRules.payload.config.voteRequestTimeout,
+            sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           )
         },
       )(
@@ -118,7 +118,7 @@ class SvOffboardingIntegrationTest
       )(
         "The majority has voted but without an acceptance majority, the trigger should not remove sv4",
         _ => {
-          sv3Backend.getSvcInfo().svcRules.payload.members should have size 4
+          sv3Backend.getDsoInfo().dsoRules.payload.members should have size 4
         },
       )
 
@@ -127,23 +127,23 @@ class SvOffboardingIntegrationTest
           sv3Backend.castVote(voteRequestCid4, true, "url", "description")
         },
       )(
-        "The majority voted yet, thus the trigger should remove the svc party hosting for sv4",
+        "The majority voted yet, thus the trigger should remove the dso party hosting for sv4",
         _ => {
-          sv3Backend.getSvcInfo().svcRules.payload.members should have size 3
+          sv3Backend.getDsoInfo().dsoRules.payload.members should have size 3
           suppressFailedClues(loggerFactory) {
             clue("Check partyToParticipant offboarding") {
               val mapping = sv3Backend.appState.participantAdminConnection
-                .getPartyToParticipant(globalDomainId, sv3Backend.getSvcInfo().svcParty)
+                .getPartyToParticipant(globalDomainId, sv3Backend.getDsoInfo().dsoParty)
                 .futureValue
                 .mapping
               mapping.threshold shouldBe PositiveInt.tryCreate(2)
               mapping.participants.map(_.participantId.uid.namespace) should not contain sv4Backend
-                .getSvcInfo()
+                .getDsoInfo()
                 .svParty
                 .uid
                 .namespace
-              sv3Backend.getSvcInfo().svcRules.payload.offboardedMembers.keySet() should contain(
-                sv4Backend.getSvcInfo().svParty.toProtoPrimitive
+              sv3Backend.getDsoInfo().dsoRules.payload.offboardedMembers.keySet() should contain(
+                sv4Backend.getDsoInfo().svParty.toProtoPrimitive
               )
             }
 
@@ -152,7 +152,7 @@ class SvOffboardingIntegrationTest
                 sv1Backend.participantClient.topology.decentralized_namespaces
                   .list(
                     filterStore = globalDomainId.filterString,
-                    filterNamespace = svcParty.uid.namespace.toProtoPrimitive,
+                    filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
                   )
               inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
                 decentralizedNamespace.item.owners shouldBe Seq(
@@ -177,7 +177,7 @@ class SvOffboardingIntegrationTest
 
               mediators.size shouldBe 3
               mediators shouldBe sv3Backend
-                .getSvcInfo()
+                .getDsoInfo()
                 .svNodeStates
                 .values
                 .flatMap(_.payload.state.domainNodes.values().asScala)
@@ -209,7 +209,7 @@ class SvOffboardingIntegrationTest
 
               sequencers.size shouldBe 3
               sequencers shouldBe sv3Backend
-                .getSvcInfo()
+                .getDsoInfo()
                 .svNodeStates
                 .values
                 .flatMap(_.payload.state.domainNodes.values().asScala)

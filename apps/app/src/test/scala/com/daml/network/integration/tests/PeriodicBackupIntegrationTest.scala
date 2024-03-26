@@ -47,7 +47,7 @@ abstract class PeriodicBackupIntegrationTestBase[T <: BackupDumpConfig]
 
   "founding SV and alice's validator" should {
     "produce backup dumps in the background" in { implicit env =>
-      initSvcWithSv1Only()
+      initDsoWithSv1Only()
       val participantIdentitiesLogLineRegex =
         "Wrote node identities dump.*at path: (.*\\.json)".r
       clue("start alice's validator and observe participant identities dump being produced ")(

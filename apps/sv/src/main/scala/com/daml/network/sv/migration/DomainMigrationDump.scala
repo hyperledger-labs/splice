@@ -5,7 +5,7 @@ import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.migration.DomainNodeIdentities.getDomainNodeIdentities
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
@@ -60,7 +60,7 @@ object DomainMigrationDump {
       participantAdminConnection: ParticipantAdminConnection,
       domainNode: LocalDomainNode,
       loggerFactory: NamedLoggerFactory,
-      svcStore: SvSvcStore,
+      dsoStore: SvDsoStore,
       migrationId: Long,
       domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
   )(implicit
@@ -71,7 +71,7 @@ object DomainMigrationDump {
       identities <- getDomainNodeIdentities(
         participantAdminConnection,
         domainNode,
-        svcStore,
+        dsoStore,
         domainAlias,
         loggerFactory,
       )

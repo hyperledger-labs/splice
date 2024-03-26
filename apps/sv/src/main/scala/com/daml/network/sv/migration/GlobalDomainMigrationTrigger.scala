@@ -6,7 +6,7 @@ import com.daml.network.environment.{ParticipantAdminConnection, SequencerAdminC
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.migration.{AcsExporter, DomainMigrationTrigger}
 import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.store.SvSvcStore
+import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.topology.DomainId
@@ -24,7 +24,7 @@ final class GlobalDomainMigrationTrigger(
     override protected val context: TriggerContext,
     domainAlias: DomainAlias,
     localDomainNode: LocalDomainNode,
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     protected val participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection0: SequencerAdminConnection,
     protected val dumpPath: Path,
@@ -38,7 +38,7 @@ final class GlobalDomainMigrationTrigger(
   val domainDataSnapshotGenerator = new DomainDataSnapshotGenerator(
     participantAdminConnection,
     sequencerAdminConnection,
-    svcStore,
+    dsoStore,
     new AcsExporter(participantAdminConnection, context.retryProvider, loggerFactory),
   )
 
@@ -46,15 +46,15 @@ final class GlobalDomainMigrationTrigger(
       tc: TraceContext
   ): OptionT[Future, DomainMigrationTrigger.ScheduledMigration] = {
     for {
-      svcRules <- OptionT(svcStore.lookupSvcRules())
+      dsoRules <- OptionT(dsoStore.lookupDsoRules())
       schedule <- OptionT.fromOption[Future](
-        svcRules.contract.payload.config.nextScheduledDomainUpgrade.toScala
+        dsoRules.contract.payload.config.nextScheduledDomainUpgrade.toScala
       )
     } yield DomainMigrationTrigger.ScheduledMigration(schedule.time, schedule.migrationId)
   }
 
   override protected def getDomainId()(implicit tc: TraceContext): Future[DomainId] = {
-    svcStore.getSvcRules().map(_.domain)
+    dsoStore.getDsoRules().map(_.domain)
   }
 
   override protected def existingDumpFileMigrationId(dump: DomainMigrationDump): Long =
@@ -92,7 +92,7 @@ final class GlobalDomainMigrationTrigger(
         participantAdminConnection,
         localDomainNode,
         loggerFactory,
-        svcStore,
+        dsoStore,
         migrationId,
         domainDataSnapshotGenerator,
       )

@@ -7,8 +7,8 @@ import com.daml.network.codegen.java.cn.cometbft.{
   GovernanceKeyConfig,
   SequencingKeyConfig,
 }
-import com.daml.network.codegen.java.cn.svc.globaldomain.DomainNodeConfig
-import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
+import com.daml.network.codegen.java.cn.dso.globaldomain.DomainNodeConfig
+import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
 import com.digitalasset.canton.{BaseTest, drivers as proto}
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfigChange
 import com.digitalasset.canton.topology.DomainId
@@ -23,7 +23,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
   private val owningSvNodeNr = 1
   private val owningSvNodeId = mkSvNodeId(owningSvNodeNr)
   private val chainId = "dummy-chain-id"
-  private val dummySvcDomainId = DomainId.tryFromString("domain1::domain")
+  private val dummyDsoDomainId = DomainId.tryFromString("domain1::domain")
 
   private def mkCometBftNodeName(svNodeNr: Int) = "cometBftNode" + svNodeNr.toString
 
@@ -93,12 +93,12 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
     members.map { case (svNodeNr, validatorKey) =>
       val svParty = "svNodeParty" + svNodeNr.toString
       new SvNodeState(
-        "svc",
+        "dso",
         svParty,
         mkSvNodeId(svNodeNr),
-        new daml.svc.memberstate.NodeState(
+        new daml.dso.memberstate.NodeState(
           Map(
-            dummySvcDomainId.toProtoPrimitive -> new DomainNodeConfig(
+            dummyDsoDomainId.toProtoPrimitive -> new DomainNodeConfig(
               new CometBftConfig(
                 Map(
                   mkCometBftNodeName(svNodeNr) -> new CometBftNodeConfig(
@@ -152,7 +152,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
           targetConfig.map((nodeNr, _)).toList ++ Seq(10 -> "key-10", 11 -> "key-11")
         ),
         networkConfig,
-        dummySvcDomainId,
+        dummyDsoDomainId,
         logger,
       )
       .requests
@@ -324,7 +324,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
             Seq(10 -> "key-10")
           ),
           networkConfig,
-          dummySvcDomainId,
+          dummyDsoDomainId,
           logger,
         )
         .requests

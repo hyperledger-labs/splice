@@ -38,9 +38,9 @@ abstract class ScanAppReference(
 
   override def basePath = "/api/scan"
 
-  def getSvcPartyId(): PartyId =
+  def getDsoPartyId(): PartyId =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetSvcPartyId(List()))
+      httpCommand(HttpScanAppClient.GetDsoPartyId(List()))
     }
 
   @Help.Summary(
@@ -262,12 +262,12 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    "List the SVC sequencers"
+    "List the DSO sequencers"
   )
-  def listSvcSequencers(): Seq[HttpScanAppClient.DomainSequencers] =
+  def listDsoSequencers(): Seq[HttpScanAppClient.DomainSequencers] =
     consoleEnvironment.run {
       httpCommand(
-        HttpScanAppClient.ListSvcSequencers()
+        HttpScanAppClient.ListDsoSequencers()
       )
     }
 

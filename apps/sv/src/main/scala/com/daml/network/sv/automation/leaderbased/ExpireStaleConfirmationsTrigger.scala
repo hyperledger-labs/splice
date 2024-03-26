@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.svcrules.Confirmation
+import com.daml.network.codegen.java.cn.dsorules.Confirmation
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -26,26 +26,26 @@ class ExpireStaleConfirmationsTrigger(
       Confirmation.ContractId,
       Confirmation,
     ](
-      svTaskContext.svcStore.multiDomainAcsStore,
-      svTaskContext.svcStore.listStaleConfirmations,
+      svTaskContext.dsoStore.multiDomainAcsStore,
+      svTaskContext.dsoStore.listStaleConfirmations,
       Confirmation.COMPANION,
     )
     with SvTaskBasedTrigger[Task] {
 
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   override def completeTaskAsLeader(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svcRules <- store.getSvcRules()
-      cmd = svcRules.exercise(
-        _.exerciseSvcRules_ExpireStaleConfirmation(
+      dsoRules <- store.getDsoRules()
+      cmd = dsoRules.exercise(
+        _.exerciseDsoRules_ExpireStaleConfirmation(
           task.work.contractId
         )
       )
       _ <- svTaskContext.connection
-        .submit(Seq(store.key.svParty), Seq(store.key.svcParty), cmd)
+        .submit(Seq(store.key.svParty), Seq(store.key.dsoParty), cmd)
         .noDedup
         .yieldResult()
     } yield TaskSuccess(

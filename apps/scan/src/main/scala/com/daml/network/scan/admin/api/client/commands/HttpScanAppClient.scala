@@ -62,19 +62,19 @@ object HttpScanAppClient {
       externalHttp.ScanClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
-  case class GetSvcPartyId(headers: List[HttpHeader])
-      extends InternalBaseCommand[http.GetSvcPartyIdResponse, PartyId] {
+  case class GetDsoPartyId(headers: List[HttpHeader])
+      extends InternalBaseCommand[http.GetDsoPartyIdResponse, PartyId] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetSvcPartyIdResponse] =
-      client.getSvcPartyId(headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetDsoPartyIdResponse] =
+      client.getDsoPartyId(headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetSvcPartyIdResponse.OK(response) =>
-      Codec.decode(Codec.Party)(response.svcPartyId)
+    ) = { case http.GetDsoPartyIdResponse.OK(response) =>
+      Codec.decode(Codec.Party)(response.dsoPartyId)
     }
   }
 
@@ -594,9 +594,9 @@ object HttpScanAppClient {
     }
   }
 
-  case class ListSvcSequencers()
+  case class ListDsoSequencers()
       extends InternalBaseCommand[
-        http.ListSvcSequencersResponse,
+        http.ListDsoSequencersResponse,
         Seq[DomainSequencers],
       ] {
 
@@ -606,18 +606,18 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.ListSvcSequencersResponse] =
-      client.listSvcSequencers(headers)
+    ], http.ListDsoSequencersResponse] =
+      client.listDsoSequencers(headers)
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.ListSvcSequencersResponse.OK(response) =>
+      case http.ListDsoSequencersResponse.OK(response) =>
         response.domainSequencers.traverse { domain =>
           // TODO (#9309): malicious scans can make these decoding fail
           Codec.decode(Codec.DomainId)(domain.domainId).flatMap { domainId =>
             domain.sequencers
               .traverse { s =>
                 Codec.decode(Codec.Sequencer)(s.id).map { sequencerId =>
-                  SvcSequencer(
+                  DsoSequencer(
                     s.migrationId,
                     sequencerId,
                     s.url,
@@ -634,9 +634,9 @@ object HttpScanAppClient {
     }
   }
 
-  final case class DomainSequencers(domainId: DomainId, sequencers: Seq[SvcSequencer])
+  final case class DomainSequencers(domainId: DomainId, sequencers: Seq[DsoSequencer])
 
-  final case class SvcSequencer(
+  final case class DsoSequencer(
       migrationId: Long,
       id: SequencerId,
       url: String,
@@ -644,9 +644,9 @@ object HttpScanAppClient {
       availableAfter: Instant,
   )
 
-  case class ListSvcScans()
+  case class ListDsoScans()
       extends InternalBaseCommand[
-        http.ListSvcScansResponse,
+        http.ListDsoScansResponse,
         Seq[DomainScans],
       ] {
 
@@ -656,11 +656,11 @@ object HttpScanAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.ListSvcScansResponse] =
-      client.listSvcScans(headers)
+    ], http.ListDsoScansResponse] =
+      client.listDsoScans(headers)
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.ListSvcScansResponse.OK(response) =>
+      case http.ListDsoScansResponse.OK(response) =>
         response.scans.traverse { domain =>
           // TODO (#9309): malicious scans can make this decoding fail
           Codec.decode(Codec.DomainId)(domain.domainId).map { domainId =>
@@ -668,7 +668,7 @@ object HttpScanAppClient {
             val (malformed, scanList) =
               domain.scans.partitionMap(scan =>
                 Try(Uri(scan.publicUrl)).toEither
-                  .bimap(scan.publicUrl -> _, url => SvcScan(url, scan.svName))
+                  .bimap(scan.publicUrl -> _, url => DsoScan(url, scan.svName))
               )
             DomainScans(domainId, scanList, malformed.toMap)
           }
@@ -677,11 +677,11 @@ object HttpScanAppClient {
   }
   final case class DomainScans(
       domainId: DomainId,
-      scans: Seq[SvcScan],
+      scans: Seq[DsoScan],
       malformed: Map[String, Throwable],
   )
 
-  final case class SvcScan(publicUrl: Uri, svName: String)
+  final case class DsoScan(publicUrl: Uri, svName: String)
 
   case class ListTransactions(
       pageEndEventId: Option[String],

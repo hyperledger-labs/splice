@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc.amulet.UnclaimedReward
-import com.daml.network.codegen.java.cn.svcrules.SvcRules_MergeUnclaimedRewards
+import com.daml.network.codegen.java.cn.dsorules.DsoRules_MergeUnclaimedRewards
 import com.daml.network.store.PageLimit
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*
@@ -27,14 +27,14 @@ class MergeUnclaimedRewardsTrigger(
 ) extends PollingParallelTaskExecutionTrigger[MergeUnclaimedRewardsTask]
     with SvTaskBasedTrigger[MergeUnclaimedRewardsTask] {
 
-  private val store = svTaskContext.svcStore
+  private val store = svTaskContext.dsoStore
 
   protected def retrieveTasks()(implicit
       tc: TraceContext
   ): Future[Seq[MergeUnclaimedRewardsTask]] =
     for {
-      svcRules <- store.getSvcRules()
-      threshold = svcRules.payload.config.numUnclaimedRewardsThreshold
+      dsoRules <- store.getDsoRules()
+      threshold = dsoRules.payload.config.numUnclaimedRewardsThreshold
       limit = PageLimit.tryCreate(threshold.toInt * 2)
       unclaimedRewards <- store.listUnclaimedRewards(limit)
     } yield
@@ -56,18 +56,18 @@ class MergeUnclaimedRewardsTrigger(
       unclaimedRewardsTask: MergeUnclaimedRewardsTask
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      svcRules <- store.getSvcRules()
+      dsoRules <- store.getDsoRules()
       amuletRules <- store.getAmuletRules()
-      arg = new SvcRules_MergeUnclaimedRewards(
+      arg = new DsoRules_MergeUnclaimedRewards(
         amuletRules.contractId,
         unclaimedRewardsTask.contracts.map(_.contractId).asJava,
       )
-      cmd = svcRules.exercise(_.exerciseSvcRules_MergeUnclaimedRewards(arg))
+      cmd = dsoRules.exercise(_.exerciseDsoRules_MergeUnclaimedRewards(arg))
       res <- for {
         outcome <- svTaskContext.connection
           .submit(
             Seq(store.key.svParty),
-            Seq(store.key.svcParty),
+            Seq(store.key.dsoParty),
             cmd,
           )
           .noDedup

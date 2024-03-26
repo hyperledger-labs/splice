@@ -3,7 +3,7 @@ import { useSvClient } from 'common-frontend';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { AmuletRules } from '@daml.js/canton-amulet/lib/CC/AmuletRules';
-import { ElectionRequest, SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules';
+import { ElectionRequest, DsoRules } from '@daml.js/dso-governance/lib/CN/DsoRules';
 
 import { useSvAdminClient } from './SvAdminServiceContext';
 
@@ -11,27 +11,27 @@ type SvUiState =
   | {
       svUser: string;
       svPartyId: string;
-      svcPartyId: string;
+      dsoPartyId: string;
       votingThreshold: bigint;
       amuletRules: Contract<AmuletRules>;
-      svcRules: Contract<SvcRules>;
+      dsoRules: Contract<DsoRules>;
     }
   | undefined;
 
-export const useSvcInfos = (): UseQueryResult<SvUiState> => {
-  const { getSvcInfo } = useSvClient();
+export const useDsoInfos = (): UseQueryResult<SvUiState> => {
+  const { getDsoInfo } = useSvClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
-    queryKey: ['getSvcInfo', SvcRules, AmuletRules],
+    queryKey: ['getDsoInfo', DsoRules, AmuletRules],
     queryFn: async () => {
-      const resp = await getSvcInfo();
+      const resp = await getDsoInfo();
       return {
         svUser: resp.sv_user,
         svPartyId: resp.sv_party_id,
-        svcPartyId: resp.svc_party_id,
+        dsoPartyId: resp.dso_party_id,
         votingThreshold: resp.voting_threshold,
         amuletRules: Contract.decodeOpenAPI(resp.amulet_rules, AmuletRules),
-        svcRules: Contract.decodeOpenAPI(resp.svc_rules, SvcRules),
+        dsoRules: Contract.decodeOpenAPI(resp.dso_rules, DsoRules),
       };
     },
   });

@@ -20,7 +20,7 @@ arbiterPaymentAmount = 1.0
 
 template Escrow
   with
-    svc : Party
+    dso : Party
     arbiter : Party
     p : Party
   where
@@ -32,7 +32,7 @@ template Escrow
         paymentAmulet : ContractId Amulet
         transferContext : AppTransferContext
       controller p
-      do LockedAmulet{lock,amulet=locked} <- fetchButArchiveLater (ForOwner with svc; owner = p) lockedAmulet -- archived as part of unlocking
+      do LockedAmulet{lock,amulet=locked} <- fetchButArchiveLater (ForOwner with dso; owner = p) lockedAmulet -- archived as part of unlocking
          require "lock holder matches locked amulet " ([arbiter] == lock.holders)
          AmuletCreateSummary cid _ _ <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
          let transfer = Transfer with
@@ -65,8 +65,8 @@ test = do
   runNextIssuance app
   runAmuletDepositBots app
 
-  alice <- setupUser app "alice" app.svc
-  arbiter <- setupUser app "arbiter" app.svc
+  alice <- setupUser app "alice" app.dso
+  arbiter <- setupUser app "arbiter" app.dso
   featureApp app arbiter
 
   -- retrieve the config
@@ -77,7 +77,7 @@ test = do
 
   tap app alice 1500.0
 
-  escrow <- submitUser arbiter.userId $ createCmd (Escrow app.svc arbiter.primaryParty alice.primaryParty)
+  escrow <- submitUser arbiter.userId $ createCmd (Escrow app.dso arbiter.primaryParty alice.primaryParty)
 
   t0 <- getTime
   (_, c0) <- getLatestOpenRound app
@@ -86,9 +86,9 @@ test = do
   lockTo1 app alice arbiter.primaryParty lockedAmuletAmount (days 90)
 
   -- check rewards that are issued for the locking tx
-  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 2)
+  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 2)
   appRewardCoupon === AppRewardCoupon with
-    svc = app.svc
+    dso = app.dso
     provider = alice.primaryParty
     featured = False
     amount = transferConfig.createFee.fee + transferConfig.lockHolderFee.fee
@@ -103,9 +103,9 @@ test = do
   let refreshAmuletAmount = 5.0
   pay app alice alice.primaryParty refreshAmuletAmount
   -- check reward issued by this payment
-  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 40002)
+  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 40002)
   appRewardCoupon === AppRewardCoupon with
-    svc = app.svc
+    dso = app.dso
     provider = alice.primaryParty
     featured = False
     amount = transferConfig.createFee.fee
@@ -119,10 +119,10 @@ test = do
 
   (_, c2) <- getLatestOpenRound app
 
-  prevAmuletCids <- map fst <$> query @Amulet app.svc
-  prevLockedAmuletCids <- map fst <$> query @LockedAmulet app.svc
+  prevAmuletCids <- map fst <$> query @Amulet app.dso
+  prevLockedAmuletCids <- map fst <$> query @LockedAmulet app.dso
 
-  normalizedBalanceBeforeTransfer <- getNormalizedBalance app.svc
+  normalizedBalanceBeforeTransfer <- getNormalizedBalance app.dso
 
   transferContext <- getAppTransferContext app arbiter
   result <- submitUser alice.userId $ exerciseCmd escrow Refresh with
@@ -130,7 +130,7 @@ test = do
     paymentAmulet
     transferContext
 
-  normalizedBalanceAfterTransfer <- getNormalizedBalance app.svc
+  normalizedBalanceAfterTransfer <- getNormalizedBalance app.dso
 
   let lockedAmuletFee = transferConfig.createFee.fee + transferConfig.lockHolderFee.fee
       transferredAmuletFee =
@@ -169,8 +169,8 @@ test = do
   totalBalanceChange.changeToHoldingFeesRate  === outputAmuletHoldingFees - inputAmuletHoldingFees
   totalBalanceChange.changeToInitialAmountAsOfRoundZero  === normalizedBalanceAfterTransfer - normalizedBalanceBeforeTransfer
 
-  allAmulets <- query @Amulet app.svc
-  allLockedAmulets <- query @LockedAmulet app.svc
+  allAmulets <- query @Amulet app.dso
+  allLockedAmulets <- query @LockedAmulet app.dso
   let newAmulets = map snd $ filter (\(cid, _) -> cid `notElem` prevAmuletCids) allAmulets
       newLockedAmulets = map snd $ filter (\(cid, _) -> cid `notElem` prevLockedAmuletCids) allLockedAmulets
   length newAmulets === 2
@@ -184,25 +184,25 @@ test = do
       holders = [arbiter.primaryParty]
       expiresAt = t0 `addRelTime` days 180
     amulet = Amulet with
-      svc = app.svc
+      dso = app.dso
       owner = alice.primaryParty
       amount = expiringAmount transferConfig.holdingFee 1000.25 c2.round
   change === Amulet with
-    svc = app.svc
+    dso = app.dso
     owner = alice.primaryParty
     amount = expiringAmount transferConfig.holdingFee senderChangeAmount c2.round
 
   payment === Amulet with
-    svc = app.svc
+    dso = app.dso
     owner = arbiter.primaryParty
     amount =
       let amount = arbiterPaymentAmount - transferredAmuletFee
       in expiringAmount transferConfig.holdingFee amount c2.round
 
   -- check app reward issued by the escrow refresh
-  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 50002)
+  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 50002)
   appRewardCoupon === AppRewardCoupon with
-    svc = app.svc
+    dso = app.dso
     provider = arbiter.primaryParty
     featured = True
     amount =
@@ -216,9 +216,9 @@ test = do
   let reimbursementAmount = 0.5
   pay app arbiter alice.primaryParty reimbursementAmount
 
-  [(_, appReward)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 50003)
+  [(_, appReward)] <- queryFilter @AppRewardCoupon app.dso (\reward -> reward.round.number == 50003)
   appReward === AppRewardCoupon with
-    svc = app.svc
+    dso = app.dso
     provider = arbiter.primaryParty
     featured = True
     amount =

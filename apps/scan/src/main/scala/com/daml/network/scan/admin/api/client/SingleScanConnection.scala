@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import com.digitalasset.canton.data.CantonTimestamp
 
 /** Connection to the admin API of CC Scan. This is used by other apps
-  * to query for the SVC party id.
+  * to query for the DSO party id.
   */
 class SingleScanConnection private[client] (
     private[client] val config: ScanAppClientConfig,
@@ -48,22 +48,22 @@ class SingleScanConnection private[client] (
     with HasUrl {
   def url = config.adminApi.url
 
-  // cached SVC reference. Never changes.
-  private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)
+  // cached DSO reference. Never changes.
+  private val dsoRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)
 
-  /** Query for the SVC party id. This caches the result internally so
+  /** Query for the DSO party id. This caches the result internally so
     * clients can call this repeatedly without having to implement caching themselves.
     */
-  override def getSvcPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] = {
-    val prev = svcRef.get()
+  override def getDsoPartyId()(implicit ec: ExecutionContext, tc: TraceContext): Future[PartyId] = {
+    val prev = dsoRef.get()
     prev match {
       case Some(partyId) => Future.successful(partyId)
       case None =>
         for {
-          partyId <- runHttpCmd(config.adminApi.url, HttpScanAppClient.GetSvcPartyId(List()))
+          partyId <- runHttpCmd(config.adminApi.url, HttpScanAppClient.GetDsoPartyId(List()))
         } yield {
           // The party id never changes so we don’t need to worry about concurrent setters writing different values.
-          svcRef.set(Some(partyId))
+          dsoRef.set(Some(partyId))
           partyId
         }
     }
@@ -180,21 +180,21 @@ class SingleScanConnection private[client] (
     runHttpCmd(config.adminApi.url, HttpScanAppClient.LookupFeaturedAppRight(providerPartyId))
   }
 
-  override def listSvcSequencers()(implicit
+  override def listDsoSequencers()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainSequencers]] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.ListSvcSequencers(),
+      HttpScanAppClient.ListDsoSequencers(),
     )
   }
 
-  override def listSvcScans()(implicit
+  override def listDsoScans()(implicit
       tc: TraceContext
   ): Future[Seq[HttpScanAppClient.DomainScans]] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.ListSvcScans(),
+      HttpScanAppClient.ListDsoScans(),
     ).map(_.map { scans =>
       if (scans.malformed.nonEmpty) {
         logger.warn(

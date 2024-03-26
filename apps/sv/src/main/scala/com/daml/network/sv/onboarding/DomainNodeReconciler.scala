@@ -1,6 +1,6 @@
 package com.daml.network.sv.onboarding
 
-import com.daml.network.codegen.java.cn.svc.globaldomain.{
+import com.daml.network.codegen.java.cn.dso.globaldomain.{
   DomainNodeConfig,
   MediatorConfig,
   SequencerConfig,
@@ -8,8 +8,8 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
 import com.daml.network.environment.{CNLedgerConnection, RetryFor, RetryProvider}
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
-import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.sv.store.SvSvcStore.SvcRulesWithSvNodeState
+import com.daml.network.sv.store.SvDsoStore
+import com.daml.network.sv.store.SvDsoStore.DsoRulesWithSvNodeState
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.sv.util.SvUtil.{LocalMediatorConfig, LocalSequencerConfig}
 import com.daml.network.util.PrettyInstances.*
@@ -24,24 +24,24 @@ import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.{RichOption, RichOptional}
 
 class DomainNodeReconciler(
-    svcStore: SvSvcStore,
+    dsoStore: SvDsoStore,
     connection: CNLedgerConnection,
     clock: Clock,
     retryProvider: RetryProvider,
     logger: TracedLogger,
 ) {
 
-  private val svParty = svcStore.key.svParty
-  private val svcParty = svcStore.key.svcParty
+  private val svParty = dsoStore.key.svParty
+  private val dsoParty = dsoStore.key.dsoParty
 
   private def setConfig(
       domainId: DomainId,
-      rulesAndState: SvcRulesWithSvNodeState,
+      rulesAndState: DsoRulesWithSvNodeState,
       nodeConfig: DomainNodeConfig,
   )(implicit tc: TraceContext) = {
     logger.info(show"Setting domain node config to $nodeConfig")
-    val cmd = rulesAndState.svcRules.exercise(
-      _.exerciseSvcRules_SetDomainNodeConfig(
+    val cmd = rulesAndState.dsoRules.exercise(
+      _.exerciseDsoRules_SetDomainNodeConfig(
         svParty.toProtoPrimitive,
         domainId.toProtoPrimitive,
         nodeConfig,
@@ -49,7 +49,7 @@ class DomainNodeReconciler(
       )
     )
     connection
-      .submit(Seq(svParty), Seq(svcParty), cmd)
+      .submit(Seq(svParty), Seq(dsoParty), cmd)
       .noDedup
       .yieldResult()
   }
@@ -66,7 +66,7 @@ class DomainNodeReconciler(
     def setConfigIfRequired() = for {
       localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode, migrationId)
       localMediatorConfig <- SvUtil.getMediatorConfig(localDomainNode)
-      rulesAndState <- svcStore.getSvcRulesWithSvNodeState(svParty)
+      rulesAndState <- dsoStore.getDsoRulesWithSvNodeState(svParty)
       nodeState = rulesAndState.svNodeState.payload
       // TODO(#4901): do not use default, but reconcile all configured domains
       domainNodeConfig = nodeState.state.domainNodes.asScala.get(domainId.toProtoPrimitive)
