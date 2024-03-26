@@ -10,6 +10,11 @@ Release Notes
 
 * Added ANS name resolution (formally known as CNS) for ``dso.ans`` to the DSO party and ``<sv-name>.sv.ans`` to all SV members parties.
 
+* CometBFT pruning duration has been increased to 30 days. No configuration changes are required.
+
+* Sequencer pruning period has been adjusted to 30 days and pruning interval has been reduced to 1 hour.
+  Adjust ``sequencerPruningConfig.pruningInterval`` and ``sequencerPruningConfig.retentionPeriod`` in your ``sv-values.yaml`` to match the example ``sv-values.yaml``.
+
 
 2024-03-25
 ----------

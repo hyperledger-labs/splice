@@ -35,8 +35,8 @@ domain:
   sequencerAvailabilityDelay: "60 seconds"
   sequencerPruningConfig:
     enabled: true
-    pruningInterval: "3 days"
-    retentionPeriod: "28 days"
+    pruningInterval: "1 hour"
+    retentionPeriod: "30 days"
 
 # Please make the ``scan`` service `publicUrl` accessible for other validators to read from, and set the URL below to your Scan service.
 # Make sure your cluster's ingress is correctly configured for Scan and can be accessed through the provided URL.
