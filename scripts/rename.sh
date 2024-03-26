@@ -392,7 +392,7 @@ function subcmd_coin_amulet() {
 
 # TODO(#11111): complete this part of the script
 
-subcommand_whitelist[internal_cns_amulet]='Rename: cns to ans'
+subcommand_whitelist[internal_cns_ans]='Rename: cns to ans'
 
 function subcmd_internal_cns_ans() {
   assert_clean_working_dir
