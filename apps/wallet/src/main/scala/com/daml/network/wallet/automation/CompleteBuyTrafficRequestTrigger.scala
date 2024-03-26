@@ -7,8 +7,8 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.amuletrules.invalidtransferreason
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.CO_CompleteBuyTrafficRequest
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_CompleteBuyTrafficRequest
+import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
 }

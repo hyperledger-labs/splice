@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import BigNumber from 'bignumber.js';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer/module';
+import { TransferOffer } from '@daml.js/wallet/lib/Splice/Wallet/TransferOffer/module';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 

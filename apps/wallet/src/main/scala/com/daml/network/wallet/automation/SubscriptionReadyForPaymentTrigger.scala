@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.wallet.{
   install as installCodegen,
   subscriptions as subsCodegen,
 }

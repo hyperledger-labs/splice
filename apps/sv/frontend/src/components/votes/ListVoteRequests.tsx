@@ -18,7 +18,10 @@ import {
 } from '@mui/material';
 import Container from '@mui/material/Container';
 
-import { ActionRequiringConfirmation, VoteRequest } from '@daml.js/dso-governance/lib/CN/DsoRules';
+import {
+  ActionRequiringConfirmation,
+  VoteRequest,
+} from '@daml.js/dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 
 import { useDsoInfos } from '../../contexts/SvContext';

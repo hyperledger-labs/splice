@@ -10,7 +10,7 @@ set -euo pipefail
 # However the grep-based code below is nice and simple, which is why we're using it for now.
 
 ignored_files=(
-  'daml/splice-util/daml/CN/Util.daml'
+  'daml/splice-util/daml/Splice/Util.daml'
   'canton/')
 
 # TODO(#9466): also check for naked `Xyz_Fetch` choices
@@ -29,7 +29,7 @@ if "${command[@]}" | "${ignore_comments[@]}" &> /dev/null ; then
   echo ""
   "${command[@]}" | "${ignore_comments[@]}"
   echo ""
-  echo "Please replace them with one of the alternatives in CN.ChoiceUtil:"
+  echo "Please replace them with one of the alternatives in Splice.ChoiceUtil:"
   echo "- for fetch: fetchAndArchive, fetchReferenceData, or if really required, fetchButArchiveLater"
   echo "- for archive: fetchAndArchive, or if really required, potentiallyUnsafeArchive"
   exit 1

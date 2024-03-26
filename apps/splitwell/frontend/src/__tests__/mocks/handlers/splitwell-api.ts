@@ -12,7 +12,7 @@ import {
   ListSplitwellRulesResponse,
 } from 'splitwell-openapi';
 
-import { Group, SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { Group, SplitwellRules } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
 import {
   alicePartyId,
@@ -49,7 +49,7 @@ export const buildSplitwellMock = (splitwellUrl: string): RestHandler[] => [
           {
             contract: {
               template_id:
-                'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:CN.Splitwell:SplitwellRules',
+                'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:Splice.Splitwell:SplitwellRules',
               contract_id:
                 '00f2402e664650fdb4f40e42f79facd0e007c344743c67b69da3705a2c171dbb26ca021220345fc60e560266dbba9f2544d07b0292539275995020153ccca14c5076df9a55',
               payload: SplitwellRules.encode({
@@ -97,7 +97,7 @@ export const buildSplitwellMock = (splitwellUrl: string): RestHandler[] => [
           {
             contract: {
               template_id:
-                'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:CN.Splitwell:Group',
+                'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:Splice.Splitwell:Group',
               contract_id:
                 '00857d7d5500196ffed47bc83b2d709a5b841c8724a6c03c9024ed3fb16054a5b0ca0212204f5987937925504ea6ea64c731b6637fc9d184760c1266eab55b02c9399d23f8',
               payload: Group.encode({

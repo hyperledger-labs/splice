@@ -7,7 +7,7 @@ import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2Bearer
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.splice
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 
@@ -148,7 +148,7 @@ class SvOnboardingIntegrationTest extends SvIntegrationTestBase {
       _ => {
         inside(
           sv.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(cn.validatoronboarding.UsedSecret.COMPANION)(svParty)
+            .filterJava(splice.validatoronboarding.UsedSecret.COMPANION)(svParty)
         ) {
           case Seq(usedSecret) => {
             usedSecret.data.secret shouldBe secret

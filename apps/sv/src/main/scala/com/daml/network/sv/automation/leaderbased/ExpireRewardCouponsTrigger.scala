@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.splice.amuletrules.{
   AmuletRules,
   AmuletRules_ClaimExpiredRewards,
 }
-import com.daml.network.codegen.java.cn.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.sv.store.ExpiredRewardCouponsBatch
 import com.daml.network.util.{AssignedContract, Contract}
 import com.daml.network.util.PrettyInstances.*

@@ -8,9 +8,12 @@ import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.validatorlicense.FaucetState
 import com.daml.network.codegen.java.splice.{amulet as amuletCodegen, round as roundCodegen}
-import com.daml.network.codegen.java.cn.ans.AnsEntry
-import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, dsorules as dsorulesCodegen}
-import com.daml.network.codegen.java.cn.dso.globaldomain as globaldomainCodegen
+import com.daml.network.codegen.java.splice.ans.AnsEntry
+import com.daml.network.codegen.java.splice.{
+  cometbft as cometbftCodegen,
+  dsorules as dsorulesCodegen,
+}
+import com.daml.network.codegen.java.splice.dso.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.history.{AmuletExpire, LockedAmuletExpireAmulet, Transfer}

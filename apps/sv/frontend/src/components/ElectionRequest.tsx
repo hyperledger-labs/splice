@@ -7,7 +7,7 @@ import { Button, Stack, Table, TableBody, Typography } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 
-import { ElectionRequest } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
+import { ElectionRequest } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 import { useElectionContext, useDsoInfos } from '../contexts/SvContext';

@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { usePrimaryParty } from 'common-frontend';
 import { AssignedContract, PollingStrategy } from 'common-frontend-utils';
 
-import { SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { SplitwellRules } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
 import { useSplitwellClient } from '../../contexts/SplitwellServiceContext';
 

@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.dso.globaldomain.DomainNodeConfig
+import com.daml.network.codegen.java.splice.dso.globaldomain.DomainNodeConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.topology.SequencerId

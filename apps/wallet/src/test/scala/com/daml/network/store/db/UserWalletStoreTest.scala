@@ -6,15 +6,15 @@ import com.daml.network.codegen.java.splice.{
   round as roundCodegen,
 }
 import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
   payment as paymentCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.codegen.java.cn.ans as ansCodegen
-import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
+import com.daml.network.codegen.java.splice.ans as ansCodegen
+import com.daml.network.codegen.java.splice.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.wallet.store.{
   BalanceChangeTxLogEntry,

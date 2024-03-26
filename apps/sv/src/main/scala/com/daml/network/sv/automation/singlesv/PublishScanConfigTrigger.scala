@@ -7,9 +7,9 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn as daml
-import com.daml.network.codegen.java.cn.cometbft.CometBftConfig
-import com.daml.network.codegen.java.cn.dso.globaldomain.{MediatorConfig, SequencerConfig}
+import com.daml.network.codegen.java.splice as daml
+import com.daml.network.codegen.java.splice.cometbft.CometBftConfig
+import com.daml.network.codegen.java.splice.dso.globaldomain.{MediatorConfig, SequencerConfig}
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection

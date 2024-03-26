@@ -2,7 +2,7 @@ package com.daml.network.sv.automation.singlesv.membership.onboarding
 
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType.AuthorizedState
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.store.SvDsoStore

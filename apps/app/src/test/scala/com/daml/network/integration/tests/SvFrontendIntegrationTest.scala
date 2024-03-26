@@ -18,8 +18,8 @@ import scala.concurrent.duration.DurationInt
 import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.splice.amuletconfig.AmuletConfig
-import com.daml.network.codegen.java.cn.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
-import com.daml.network.codegen.java.cn.wallet.payment.Currency
+import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
+import com.daml.network.codegen.java.splice.wallet.payment.Currency
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
 
 import java.util.Optional

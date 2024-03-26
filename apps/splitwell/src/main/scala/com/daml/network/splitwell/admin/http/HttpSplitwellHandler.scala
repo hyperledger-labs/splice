@@ -1,6 +1,6 @@
 package com.daml.network.splitwell.admin.http
 
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient.SplitwellDomains
 import com.daml.network.http.v0.{definitions, splitwell as v0}

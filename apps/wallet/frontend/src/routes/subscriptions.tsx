@@ -24,7 +24,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { SubscriptionPayData } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
+import { SubscriptionPayData } from '@daml.js/wallet-payments/lib/Splice/Wallet/Subscriptions';
 import { Party } from '@daml/types';
 
 import BftAnsEntry from '../components/BftAnsEntry';

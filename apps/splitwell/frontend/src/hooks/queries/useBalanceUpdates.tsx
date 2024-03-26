@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract } from 'common-frontend-utils';
 import { PollingStrategy } from 'common-frontend-utils';
 
-import { BalanceUpdate, Group } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { BalanceUpdate, Group } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
 import { useSplitwellClient } from '../../contexts/SplitwellServiceContext';
 

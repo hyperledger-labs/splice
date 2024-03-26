@@ -9,12 +9,12 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.amuletrules.AppTransferContext
-import com.daml.network.codegen.java.cn.ans.{
+import com.daml.network.codegen.java.splice.ans.{
   AnsEntry,
   AnsEntryContext,
   AnsEntryContext_CollectEntryRenewalPayment,
 }
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionPayment
+import com.daml.network.codegen.java.splice.wallet.subscriptions.SubscriptionPayment
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status

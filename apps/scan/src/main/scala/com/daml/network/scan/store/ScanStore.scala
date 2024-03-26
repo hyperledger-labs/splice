@@ -2,7 +2,6 @@ package com.daml.network.scan.store
 
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
@@ -98,7 +97,7 @@ trait ScanStore
     * so that the order is deterministic.
     */
   def listFromSvNodeStates[T](
-      f: cn.dso.memberstate.SvNodeState => Vector[(String, T)]
+      f: splice.dso.memberstate.SvNodeState => Vector[(String, T)]
   )(implicit tc: TraceContext): Future[Vector[(String, Vector[T])]] = {
     for {
       dsoRules <- getDsoRules()
@@ -140,15 +139,17 @@ trait ScanStore
 
   def lookupAnsRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[cn.ans.AnsRules.ContractId, cn.ans.AnsRules]]]
+  ): Future[Option[ContractWithState[splice.ans.AnsRules.ContractId, splice.ans.AnsRules]]]
 
   def lookupDsoRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]]]
+  ): Future[
+    Option[ContractWithState[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]]
+  ]
 
   private def getDsoRules()(implicit
       tc: TraceContext
-  ): Future[ContractWithState[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]] =
+  ): Future[ContractWithState[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]] =
     lookupDsoRules().map(
       _.getOrElse(
         throw Status.NOT_FOUND
@@ -222,17 +223,17 @@ trait ScanStore
   def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[ContractWithState[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]
+    Seq[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
 
   def lookupEntryByParty(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
-    Option[ContractWithState[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]
+    Option[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
 
   def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
-    Option[ContractWithState[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]
+    Option[ContractWithState[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]
   ]
 
   def listTransactions(
@@ -254,13 +255,19 @@ trait ScanStore
   def lookupSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[
-    AssignedContract[cn.dso.memberstate.SvNodeState.ContractId, cn.dso.memberstate.SvNodeState]
+    AssignedContract[
+      splice.dso.memberstate.SvNodeState.ContractId,
+      splice.dso.memberstate.SvNodeState,
+    ]
   ]]
 
   def getSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[
-    AssignedContract[cn.dso.memberstate.SvNodeState.ContractId, cn.dso.memberstate.SvNodeState]
+    AssignedContract[
+      splice.dso.memberstate.SvNodeState.ContractId,
+      splice.dso.memberstate.SvNodeState,
+    ]
   ] =
     lookupSvNodeState(svPartyId).map(
       _.getOrElse(
@@ -326,8 +333,10 @@ object ScanStore {
         mkFilter(splice.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
           ScanAcsStoreRowData(_)
         ),
-        mkFilter(cn.ans.AnsRules.COMPANION)(co => co.payload.dso == dso)(ScanAcsStoreRowData(_)),
-        mkFilter(cn.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso)(
+        mkFilter(splice.ans.AnsRules.COMPANION)(co => co.payload.dso == dso)(
+          ScanAcsStoreRowData(_)
+        ),
+        mkFilter(splice.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso)(
           ScanAcsStoreRowData(_)
         ),
         mkFilter(splice.round.OpenMiningRound.COMPANION)(co => co.payload.dso == dso) { contract =>
@@ -383,7 +392,7 @@ object ScanStore {
               amount = Some(contract.payload.amulet.amount.initialAmount),
             )
         },
-        mkFilter(cn.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
+        mkFilter(splice.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             ansEntryName = Some(contract.payload.name),
@@ -416,7 +425,7 @@ object ScanStore {
               validatorLicenseRoundsCollected = Some(roundsCollected.orElse(0L)),
             )
         },
-        mkFilter(cn.dso.memberstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) {
+        mkFilter(splice.dso.memberstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) {
           contract =>
             ScanAcsStoreRowData(
               contract,

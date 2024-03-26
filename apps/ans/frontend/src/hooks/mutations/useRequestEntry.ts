@@ -1,7 +1,7 @@
 import { UseMutationResult, useMutation } from '@tanstack/react-query';
 import { CreateAnsEntryRequest } from 'ans-external-openapi';
 
-import { SubscriptionRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
+import { SubscriptionRequest } from '@daml.js/wallet-payments/lib/Splice/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
 import { useExternalAnsClient } from '../../context/ValidatorServiceContext';

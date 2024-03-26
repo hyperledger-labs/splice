@@ -2,7 +2,7 @@ package com.daml.network.validator.store
 
 import org.apache.pekko.http.scaladsl.model.Uri
 import cats.syntax.either.*
-import com.daml.network.codegen.java.cn.appmanager.store as codegen
+import com.daml.network.codegen.java.splice.appmanager.store as codegen
 import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.http.v0.definitions
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain

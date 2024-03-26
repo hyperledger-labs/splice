@@ -7,9 +7,9 @@ import com.daml.network.codegen.java.splice.amuletrules.{
 }
 import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import com.daml.network.codegen.java.splice.schedule.Schedule
-import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
-import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.{
   CRARC_AddFutureAmuletConfigSchedule,
   CRARC_RemoveFutureAmuletConfigSchedule,
 }

@@ -9,9 +9,9 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_MiningRound_Archive
 import com.daml.network.codegen.java.splice.round.ClosedMiningRound
-import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
-import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
+import com.daml.network.codegen.java.splice.dsorules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult

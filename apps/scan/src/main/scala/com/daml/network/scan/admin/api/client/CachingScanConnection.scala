@@ -2,7 +2,7 @@ package com.daml.network.scan.admin.api.client
 
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.ans.AnsRules
+import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.environment.CNLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection.{
   CachedAnsRules,

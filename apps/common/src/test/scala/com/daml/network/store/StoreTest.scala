@@ -22,9 +22,9 @@ import com.daml.network.codegen.java.splice.{
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.cn.ans as ansCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
-import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
+import com.daml.network.codegen.java.splice.ans as ansCodegen
+import com.daml.network.codegen.java.splice.wallet.subscriptions as subCodegen
+import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
 import com.daml.network.environment.ledger.api.{
   ActiveContract,
   IncompleteReassignmentEvent,
@@ -43,7 +43,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
-import com.daml.network.codegen.java.cn.dso.memberstate.{MemberRewardState, RewardState}
+import com.daml.network.codegen.java.splice.dso.memberstate.{MemberRewardState, RewardState}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.history.{AppRewardCreate, AmuletCreate}
 import com.daml.network.store.MultiDomainAcsStore.HasIngestionSink

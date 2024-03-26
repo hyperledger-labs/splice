@@ -28,7 +28,7 @@ import {
 } from 'sv-openapi';
 
 import { RelTime } from '@daml.js/b70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946/lib/DA/Time/Types';
-import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
 
 const SvAdminContext = React.createContext<SvAdminClient | undefined>(undefined);
 

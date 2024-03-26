@@ -102,8 +102,8 @@ object PackageIdResolver {
         modulePackages.get(templateId.moduleName) match {
           case None =>
             templateId.moduleName match {
-              case "CN.Splitwell" => DarResources.splitwell
-              case "CN.AppManager.Store" => DarResources.appManager
+              case "Splice.Splitwell" => DarResources.splitwell
+              case "Splice.AppManager.Store" => DarResources.appManager
               case _ => throw new IllegalArgumentException(s"Unknown template $templateId")
             }
           case Some(pkg) =>
@@ -198,17 +198,17 @@ object PackageIdResolver {
     "Splice.GlobalDomain" -> Package.CantonAmulet,
     "Splice.ValidatorLicense" -> Package.CantonAmulet,
     "Splice.Round" -> Package.CantonAmulet,
-    "CN.Ans" -> Package.CantonNameService,
-    "CN.DsoBootstrap" -> Package.DsoGovernance,
-    "CN.DsoRules" -> Package.DsoGovernance,
-    "CN.DSO.AmuletPrice" -> Package.DsoGovernance,
-    "CN.SvOnboarding" -> Package.DsoGovernance,
-    "CN.ValidatorOnboarding" -> Package.ValidatorLifecycle,
-    "CN.Wallet.Install" -> Package.Wallet,
-    "CN.Wallet.TopUpState" -> Package.Wallet,
-    "CN.Wallet.TransferOffer" -> Package.Wallet,
-    "CN.Wallet.Payment" -> Package.WalletPayments,
-    "CN.Wallet.Subscriptions" -> Package.WalletPayments,
+    "Splice.Ans" -> Package.CantonNameService,
+    "Splice.DsoBootstrap" -> Package.DsoGovernance,
+    "Splice.DsoRules" -> Package.DsoGovernance,
+    "Splice.DSO.AmuletPrice" -> Package.DsoGovernance,
+    "Splice.SvOnboarding" -> Package.DsoGovernance,
+    "Splice.ValidatorOnboarding" -> Package.ValidatorLifecycle,
+    "Splice.Wallet.Install" -> Package.Wallet,
+    "Splice.Wallet.TopUpState" -> Package.Wallet,
+    "Splice.Wallet.TransferOffer" -> Package.Wallet,
+    "Splice.Wallet.Payment" -> Package.WalletPayments,
+    "Splice.Wallet.Subscriptions" -> Package.WalletPayments,
   )
 
   sealed abstract class Package extends Product with Serializable {

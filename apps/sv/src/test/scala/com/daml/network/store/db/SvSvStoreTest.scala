@@ -1,7 +1,7 @@
 package com.daml.network.store.db
 
-import com.daml.network.codegen.java.cn.validatoronboarding as vo
-import com.daml.network.codegen.java.cn.validatoronboarding.UsedSecret
+import com.daml.network.codegen.java.splice.validatoronboarding as vo
+import com.daml.network.codegen.java.splice.validatoronboarding.UsedSecret
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest

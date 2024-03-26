@@ -5,11 +5,11 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
-import com.daml.network.codegen.java.cn.ans.{AnsEntry, AnsRules}
+import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
-import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
-import com.daml.network.codegen.java.cn.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.dso.memberstate.SvNodeState
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.SortOrder.{Ascending, Descending}

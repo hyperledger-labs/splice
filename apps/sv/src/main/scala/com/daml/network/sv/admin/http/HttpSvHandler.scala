@@ -3,9 +3,9 @@ package com.daml.network.sv.admin.http
 import cats.data.{EitherT, OptionT}
 import cats.syntax.applicative.*
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.cn.dsorules.DsoRules
-import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
-import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingRequest
+import com.daml.network.codegen.java.splice.validatoronboarding.ValidatorOnboarding
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult

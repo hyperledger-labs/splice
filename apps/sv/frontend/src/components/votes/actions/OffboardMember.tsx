@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 
 import { FormControl, NativeSelect, Stack, Typography } from '@mui/material';
 
-import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
 
 import { useDsoInfos } from '../../../contexts/SvContext';
 

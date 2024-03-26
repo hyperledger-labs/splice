@@ -3,10 +3,10 @@ package com.daml.network.util
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.codegen.java.splice.issuance.IssuanceConfig
-import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
-import com.daml.network.codegen.java.cn.dsorules.{
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
+import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DomainUpgradeSchedule,
   DsoRulesConfig,
@@ -174,7 +174,7 @@ trait SvTestUtil extends CNNodeTestCommon {
   )(implicit env: CNNodeTestConsoleEnvironment): TransactionTree = {
     eventuallySucceeds() {
       val dsoRulesCid = participantClient.ledger_api_extensions.acs
-        .filterJava(cn.dsorules.DsoRules.COMPANION)(dsoParty)
+        .filterJava(splice.dsorules.DsoRules.COMPANION)(dsoParty)
         .head
         .id
       participantClient.ledger_api_extensions.commands

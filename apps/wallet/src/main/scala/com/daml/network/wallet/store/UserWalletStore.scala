@@ -10,8 +10,8 @@ import com.daml.network.codegen.java.splice.{
   round as roundCodegen,
   validatorlicense as validatorCodegen,
 }
-import com.daml.network.codegen.java.cn.ans as ansCodegen
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.ans as ansCodegen
+import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
   payment as walletCodegen,

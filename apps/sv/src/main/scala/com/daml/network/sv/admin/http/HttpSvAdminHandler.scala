@@ -3,7 +3,7 @@ package com.daml.network.sv.admin.http
 import cats.implicits.catsSyntaxApplicativeId
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{
   CNNodeStatus,
   MediatorAdminConnection,
@@ -304,7 +304,7 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.lookupDsoRulesVoteRequest") { _ => _ =>
       dsoStore
         .lookupVoteRequest(
-          new cn.dsorules.VoteRequest.ContractId(voteRequestContractId)
+          new splice.dsorules.VoteRequest.ContractId(voteRequestContractId)
         )
         .flatMap {
           case Some(voteRequest) =>
@@ -332,7 +332,7 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.castVote") { _ => _ =>
       SvApp
         .castVote(
-          new cn.dsorules.VoteRequest.ContractId(body.voteRequestContractId),
+          new splice.dsorules.VoteRequest.ContractId(body.voteRequestContractId),
           body.isAccepted,
           body.reasonUrl,
           body.reasonDescription,
@@ -356,7 +356,7 @@ class HttpSvAdminHandler(
     withSpan(s"$workflowId.listVoteRequestsByTrackingCid") { _ => _ =>
       for {
         dsoRulesVotes <- dsoStore.listVoteRequestsByTrackingCid(
-          body.voteRequestContractIds.map(new cn.dsorules.VoteRequest.ContractId(_))
+          body.voteRequestContractIds.map(new splice.dsorules.VoteRequest.ContractId(_))
         )
       } yield {
         definitions.ListVoteRequestByTrackingCidResponse(

@@ -1,12 +1,12 @@
 package com.daml.network.sv.util
 
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.cn.cometbft.{
+import com.daml.network.codegen.java.splice.cometbft.{
   CometBftConfig,
   CometBftConfigLimits,
   CometBftNodeConfig,
 }
-import com.daml.network.codegen.java.cn.dso.globaldomain.{
+import com.daml.network.codegen.java.splice.dso.globaldomain.{
   DomainConfig,
   DomainNodeConfig,
   DomainNodeConfigLimits,
@@ -15,8 +15,8 @@ import com.daml.network.codegen.java.cn.dso.globaldomain.{
   SequencerConfig,
   DsoGlobalDomainConfig,
 }
-import com.daml.network.codegen.java.cn.dsorules.DsoRulesConfig
-import com.daml.network.codegen.java.cn.{cometbft, dso}
+import com.daml.network.codegen.java.splice.dsorules.DsoRulesConfig
+import com.daml.network.codegen.java.splice.{cometbft, dso}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.cometbft.CometBftNode

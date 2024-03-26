@@ -15,7 +15,7 @@ import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/Splice/AmuletConfi
 import {
   ActionRequiringConfirmation,
   DsoRulesConfig,
-} from '@daml.js/dso-governance/lib/CN/DsoRules/module';
+} from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
 
 import { useDsoInfos } from '../../../../contexts/SvContext';
 

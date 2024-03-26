@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.util.AssignedContract

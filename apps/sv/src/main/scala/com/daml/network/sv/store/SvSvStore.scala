@@ -3,8 +3,8 @@ package com.daml.network.sv.store
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
-import com.daml.network.codegen.java.cn.validatoronboarding.ValidatorOnboarding
-import com.daml.network.codegen.java.cn.{svonboarding as so, validatoronboarding as vo}
+import com.daml.network.codegen.java.splice.validatoronboarding.ValidatorOnboarding
+import com.daml.network.codegen.java.splice.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}

@@ -18,13 +18,13 @@ import com.daml.network.codegen.java.splice.amuletrules.{
 }
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.COO_MergeTransferInputs
-import com.daml.network.codegen.java.cn.wallet.install.{
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_MergeTransferInputs
+import com.daml.network.codegen.java.splice.wallet.install.{
   ExecuteBatchResult,
   WalletAppInstall,
   amuletoperation,
 }
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
   payment as walletCodegen,

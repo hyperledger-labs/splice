@@ -3,7 +3,7 @@ package com.daml.network.sv.automation.singlesv.membership
 import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.ledger.javaapi.data.codegen.ContractCompanion
 import com.daml.network.automation.{SourceBasedTrigger, TaskOutcome, TaskSuccess, TriggerContext}
-import com.daml.network.codegen.java.cn.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.sv.automation.singlesv.membership.SvTopologyStatePollingAndAssignedTrigger.{
   StreamedAssignedContract,
   TaskTrigger,

@@ -10,12 +10,12 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.amuletrules.invalidtransferreason
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.wallet.{
   install as installCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.CO_CompleteAcceptedTransfer
-import com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_CompleteAcceptedTransfer
+import com.daml.network.codegen.java.splice.wallet.transferoffer.AcceptedTransferOffer
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.store.UserWalletStore

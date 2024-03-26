@@ -1,7 +1,7 @@
 import { UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Contract } from 'common-frontend-utils';
 
-import { GroupId, SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { GroupId, SplitwellRules } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
 import { useSplitwellLedgerApiClient } from '../../contexts/SplitwellLedgerApiContext';
 import { getGroups } from '../queries/useGroups';

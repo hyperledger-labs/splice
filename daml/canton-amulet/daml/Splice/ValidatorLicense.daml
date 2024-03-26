@@ -4,7 +4,7 @@ import DA.Action (void)
 
 import Splice.Round
 import Splice.Types
-import CN.Util
+import Splice.Util
 
 data FaucetState = FaucetState with
     firstReceivedFor : Round -- ^ The first round for which a coupon was received.

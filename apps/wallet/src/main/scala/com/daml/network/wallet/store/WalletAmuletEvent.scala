@@ -4,14 +4,14 @@ import com.daml.ledger.javaapi.data.{DamlOptional, Value}
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.amuletrules as amuletrulesCodegen
 import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
   payment as paymentCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferCodegen,
 }
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionPayment
+import com.daml.network.codegen.java.splice.wallet.subscriptions.SubscriptionPayment
 import com.daml.network.codegen.java.da.types as daTypes
 import com.daml.network.util.ExerciseNodeCompanion
 

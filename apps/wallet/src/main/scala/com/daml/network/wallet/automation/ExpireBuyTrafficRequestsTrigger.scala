@@ -1,7 +1,7 @@
 package com.daml.network.wallet.automation
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn.wallet.buytrafficrequest as trafficRequestCodegen
+import com.daml.network.codegen.java.splice.wallet.buytrafficrequest as trafficRequestCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.store.UserWalletStore

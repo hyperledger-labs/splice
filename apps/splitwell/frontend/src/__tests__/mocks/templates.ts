@@ -5,11 +5,11 @@ import {
   BalanceUpdate,
   BalanceUpdateType,
   GroupInvite,
-} from '@daml.js/splitwell/lib/CN/Splitwell';
+} from '@daml.js/splitwell/lib/Splice/Splitwell';
 
 export const makeGroupInvite = (provider: string, owner: string, groupName: string): Contract => ({
   template_id:
-    'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:CN.Splitwell:GroupInvite',
+    'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:Splice.Splitwell:GroupInvite',
   contract_id:
     '008a4f445f23361cf92ffd48bf8556429921060a40c7169dc11c5a28717d7750e3ca021220bcce6356513ce1790a1c525f5e7709be50336235d2c08be698a581a4e2bc2c6d',
   payload: GroupInvite.encode({
@@ -37,7 +37,7 @@ export const makeAcceptedGroupInvite = (
   groupName: string
 ): Contract => ({
   template_id:
-    'e1d9f49e8143e1cc8a105fabea49506924df3a6d7f497bd89e0334ebbdc4be80:CN.Splitwell:AcceptedGroupInvite',
+    'e1d9f49e8143e1cc8a105fabea49506924df3a6d7f497bd89e0334ebbdc4be80:Splice.Splitwell:AcceptedGroupInvite',
   contract_id:
     '009b07644e1035fe72b4af0ad627e678c4af667ee7b8c44aa10c7f98fd7f89b165ca021220b9deaf4a8a931a689c191bbf08136ffbdceb9d6b7926f9b9daf06682743d8f8e',
   payload: AcceptedGroupInvite.encode({
@@ -62,7 +62,7 @@ export const makeBalanceUpdate = (
   contractId: string
 ): Contract => ({
   template_id:
-    'e1d9f49e8143e1cc8a105fabea49506924df3a6d7f497bd89e0334ebbdc4be80:CN.Splitwell:BalanceUpdate',
+    'e1d9f49e8143e1cc8a105fabea49506924df3a6d7f497bd89e0334ebbdc4be80:Splice.Splitwell:BalanceUpdate',
   contract_id: contractId,
   payload: BalanceUpdate.encode({
     group: {

@@ -10,7 +10,7 @@ import cats.implicits.{
   toTraverseOps,
 }
 import cats.syntax.foldable.*
-import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingConfirmed
+import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType

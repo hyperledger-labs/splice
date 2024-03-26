@@ -1,10 +1,10 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.amulet.Amulet
-import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.dsorules.DsoRules_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.dsorules.DsoRules_ConfirmSvOnboarding
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
@@ -76,7 +76,7 @@ class SvOnboardingAddlIntegrationTest
           // The onboarding is requested by SV4 during SvApp init.
           inside(
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty)
+              .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty)
           ) {
             case Seq(svOnboarding) => {
               svOnboarding.data.candidateName shouldBe getSvName(4)
@@ -103,7 +103,9 @@ class SvOnboardingAddlIntegrationTest
     clue("Attempting to start an onboarding multiple times has no effect") {
       sv1Backend.startSvOnboarding(token)
       sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-        .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) should have length 1
+        .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(
+          dsoParty
+        ) should have length 1
     }
     clue(
       "SVs that haven't approved a candidate refuse to create a `SvOnboarding` contract for it."
@@ -116,7 +118,7 @@ class SvOnboardingAddlIntegrationTest
     clue("All online and approving SVs confirm SV4's onboarding") {
       eventually() {
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.dsorules.Confirmation.COMPANION)(dsoParty)
+          .filterJava(splice.dsorules.Confirmation.COMPANION)(dsoParty)
           .filter(_.data.action match {
             case a: ARC_DsoRules =>
               a.dsoAction match {
@@ -152,7 +154,7 @@ class SvOnboardingAddlIntegrationTest
       "SV4's onboarding gathers suffcient confirmations and is completed",
       { _ =>
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) shouldBe empty
+          .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) shouldBe empty
         sv1Backend.getDsoInfo().dsoRules.payload.members.keySet should contain(
           sv4Party.toProtoPrimitive
         )

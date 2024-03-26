@@ -6,8 +6,8 @@ import com.daml.network.codegen.java.splice.{
   amuletrules as amuletrulesCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
-import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
+import com.daml.network.codegen.java.splice.wallet.{
   install as walletCodegen,
   topupstate as topUpCodegen,
 }

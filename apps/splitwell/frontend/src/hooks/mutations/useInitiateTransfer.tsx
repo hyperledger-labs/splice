@@ -1,11 +1,11 @@
 import { UseMutationResult, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Contract } from 'common-frontend-utils';
 
-import { GroupId, SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { GroupId, SplitwellRules } from '@daml.js/splitwell/lib/Splice/Splitwell';
 import {
   AppPaymentRequest,
   ReceiverCCAmount,
-} from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+} from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
 import { useSplitwellLedgerApiClient } from '../../contexts/SplitwellLedgerApiContext';

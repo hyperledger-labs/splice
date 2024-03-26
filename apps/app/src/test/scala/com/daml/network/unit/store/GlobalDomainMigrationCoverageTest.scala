@@ -155,8 +155,8 @@ object GlobalDomainMigrationCoverageTest {
 
   private val knownNotHandled = {
     import codegen.java.splice.globaldomain
-    import codegen.java.cn.wallet.topupstate as topUpCodegen
-    import codegen.java.cn.wallet.buytrafficrequest as trafficRequestCodegen
+    import codegen.java.splice.wallet.topupstate as topUpCodegen
+    import codegen.java.splice.wallet.buytrafficrequest as trafficRequestCodegen
     Seq(
       globaldomain.MemberTraffic.COMPANION ->
         reason("tied to a specific domainId, never migrated", ScanStore, SvDsoStore),

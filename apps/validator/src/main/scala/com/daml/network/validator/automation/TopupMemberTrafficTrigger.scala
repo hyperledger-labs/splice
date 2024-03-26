@@ -1,12 +1,12 @@
 package com.daml.network.validator.automation
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.CO_BuyMemberTraffic
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.{
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_BuyMemberTraffic
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.{
   COO_BuyMemberTraffic,
   COO_Error,
 }
-import com.daml.network.codegen.java.cn.wallet.topupstate.ValidatorTopUpState
+import com.daml.network.codegen.java.splice.wallet.topupstate.ValidatorTopUpState
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.environment.{

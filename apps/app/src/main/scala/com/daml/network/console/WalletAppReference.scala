@@ -3,7 +3,7 @@ package com.daml.network.console
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,

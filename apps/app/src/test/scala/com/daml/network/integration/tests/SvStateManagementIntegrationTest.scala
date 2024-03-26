@@ -3,22 +3,22 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, TransferConfig, USD}
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_AddMember,
   SRARC_OffboardMember,
   SRARC_SetConfig,
 }
-import com.daml.network.codegen.java.cn.dsorules.voterequestoutcome.{
+import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.{
   VRO_Accepted,
   VRO_Expired,
   VRO_Rejected,
 }
-import com.daml.network.codegen.java.cn.dsorules.{
+import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRulesConfig,
   DsoRules_AddMember,

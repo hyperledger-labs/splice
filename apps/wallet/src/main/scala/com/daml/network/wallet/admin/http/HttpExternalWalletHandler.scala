@@ -2,8 +2,8 @@ package com.daml.network.wallet.admin.http
 
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
-import com.daml.network.codegen.java.cn.wallet.transferoffer as transferOffersCodegen
+import com.daml.network.codegen.java.splice.wallet.payment.{Currency, PaymentAmount}
+import com.daml.network.codegen.java.splice.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.http.v0.external.wallet.WalletResource as r0

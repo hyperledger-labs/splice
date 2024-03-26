@@ -13,11 +13,11 @@ import {
   GroupId,
   GroupInvite,
   SplitwellRules,
-} from '@daml.js/splitwell/lib/CN/Splitwell';
+} from '@daml.js/splitwell/lib/Splice/Splitwell';
 import {
   AppPaymentRequest,
   ReceiverCCAmount,
-} from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+} from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
 import Ledger, { LedgerOptions } from '@daml/ledger';
 import { ContractId } from '@daml/types';
 

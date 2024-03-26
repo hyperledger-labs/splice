@@ -1,6 +1,6 @@
 package com.daml.network.config
 
-import com.daml.network.codegen.java.cn.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.util.Contract
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.topology.transaction.{HostingParticipant, ParticipantPermission}

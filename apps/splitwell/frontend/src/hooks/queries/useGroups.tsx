@@ -1,7 +1,7 @@
 import { QueryClient, UseQueryResult, useQuery } from '@tanstack/react-query';
 import { AssignedContract, PollingStrategy } from 'common-frontend-utils';
 
-import { Group } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { Group } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
 import { useSplitwellClient } from '../../contexts/SplitwellServiceContext';
 

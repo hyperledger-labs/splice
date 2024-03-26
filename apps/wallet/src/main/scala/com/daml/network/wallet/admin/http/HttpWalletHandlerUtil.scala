@@ -13,7 +13,7 @@ import com.digitalasset.canton.logging.NamedLogging
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.Status
-import com.daml.network.codegen.java.cn.wallet.install as installCodegen
+import com.daml.network.codegen.java.splice.wallet.install as installCodegen
 import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.{ExecutionContext, Future}
 import io.opentelemetry.api.trace.Tracer

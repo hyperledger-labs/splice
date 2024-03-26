@@ -6,7 +6,7 @@ import qualified DA.Map as Map
 import DA.Time
 import Daml.Script
 
-import CN.Util
+import Splice.Util
 import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Expiry

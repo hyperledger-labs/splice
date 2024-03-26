@@ -8,8 +8,8 @@ import { ArrowCircleLeftOutlined } from '@mui/icons-material';
 import { Box, Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
-import { Currency } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
-import { TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer/module';
+import { Currency } from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
+import { TransferOffer } from '@daml.js/wallet/lib/Splice/Wallet/TransferOffer/module';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { usePrimaryParty, useTransferOffers } from '../hooks';

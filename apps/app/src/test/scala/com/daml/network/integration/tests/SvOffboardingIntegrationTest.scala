@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.dsorules.*
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.splice.dsorules.*
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
 import com.daml.network.environment.CNNodeEnvironmentImpl

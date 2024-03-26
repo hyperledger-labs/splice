@@ -7,9 +7,9 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn as daml
-import com.daml.network.codegen.java.cn.cometbft.SequencingKeyConfig
-import com.daml.network.codegen.java.cn.dso.globaldomain.{
+import com.daml.network.codegen.java.splice as daml
+import com.daml.network.codegen.java.splice.cometbft.SequencingKeyConfig
+import com.daml.network.codegen.java.splice.dso.globaldomain.{
   MediatorConfig,
   ScanConfig,
   SequencerConfig,

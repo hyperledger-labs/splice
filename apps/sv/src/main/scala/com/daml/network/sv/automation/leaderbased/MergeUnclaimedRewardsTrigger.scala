@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.amulet.UnclaimedReward
-import com.daml.network.codegen.java.cn.dsorules.DsoRules_MergeUnclaimedRewards
+import com.daml.network.codegen.java.splice.dsorules.DsoRules_MergeUnclaimedRewards
 import com.daml.network.store.PageLimit
 import com.daml.network.util.Contract
 import com.daml.network.util.PrettyInstances.*

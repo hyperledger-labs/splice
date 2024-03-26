@@ -11,7 +11,7 @@ import com.daml.network.automation.{
   UnassignTrigger,
 }
 import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
+import com.daml.network.codegen.java.splice.{splitwell as splitwellCodegen}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{
   CNLedgerClient,
@@ -146,7 +146,7 @@ object SplitwellAutomationService extends AutomationServiceCompanion {
       packageConfig: splice.amuletconfig.PackageConfig,
       template: QualifiedName,
   ): Option[String] =
-    Option.when(template.moduleName == "CN.Splitwell") {
+    Option.when(template.moduleName == "Splice.Splitwell") {
       val walletVersion = PackageIdResolver.readPackageVersion(
         packageConfig,
         PackageIdResolver.Package.WalletPayments,

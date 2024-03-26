@@ -1,6 +1,6 @@
 import { RestHandler, rest } from 'msw';
 
-import { GroupRequest } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { GroupRequest } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
 import { alicePartyId, groupName, splitwellProviderPartyId } from '../constants';
 
@@ -40,7 +40,7 @@ export const buildJsonApiMock = (jsonApiUrl: string): RestHandler[] => [
                 }),
                 signatories: [alicePartyId, splitwellProviderPartyId],
                 templateId:
-                  'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:CN.Splitwell:GroupRequest',
+                  'cbca8a4f8d6170f38cd7a5c9cc0371cc3ccb4fb5bf5daf0702aa2c3849ac6bde:Splice.Splitwell:GroupRequest',
               },
             },
           ],

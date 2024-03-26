@@ -9,7 +9,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 }
 import com.daml.network.automation.{AssignTrigger, TransferFollowTrigger}
 import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.cn.{
+import com.daml.network.codegen.java.splice.{
   ans,
   dsorules,
   svonboarding as so,
@@ -341,7 +341,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
     // TODO (#8386) revert 8315's da0c91c29abf for directory stubs
 
     clue("create app-manager contracts of various kinds") {
-      import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
+      import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
       import com.daml.network.http.v0.definitions as httpdefs
       import io.circe.syntax.*
       val validator = sv1ValidatorBackend.getValidatorPartyId()

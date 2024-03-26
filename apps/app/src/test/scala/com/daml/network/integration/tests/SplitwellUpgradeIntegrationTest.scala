@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
 import cats.syntax.either.*
-import com.daml.network.codegen.java.cn.{splitwell as splitwellCodegen}
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.splice.{splitwell as splitwellCodegen}
+import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.SplitwellAppClientReference
 import com.daml.network.environment.CNNodeEnvironmentImpl

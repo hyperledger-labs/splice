@@ -14,13 +14,16 @@ import com.daml.network.codegen.java.splice.validatorlicense.{
   ValidatorFaucetCoupon,
   ValidatorLicense,
 }
-import com.daml.network.codegen.java.cn.ans.{AnsEntry, AnsEntryContext}
-import com.daml.network.codegen.java.cn.dso.amuletprice.AmuletPriceVote
-import com.daml.network.codegen.java.cn.dso.memberstate.{MemberRewardState, SvNodeState}
-import com.daml.network.codegen.java.cn.dso.memberstate.SvStatusReport
-import com.daml.network.codegen.java.cn.dsorules.*
-import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
-import com.daml.network.codegen.java.cn.wallet.subscriptions.{
+import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsEntryContext}
+import com.daml.network.codegen.java.splice.dso.amuletprice.AmuletPriceVote
+import com.daml.network.codegen.java.splice.dso.memberstate.{MemberRewardState, SvNodeState}
+import com.daml.network.codegen.java.splice.dso.memberstate.SvStatusReport
+import com.daml.network.codegen.java.splice.dsorules.*
+import com.daml.network.codegen.java.splice.svonboarding.{
+  SvOnboardingConfirmed,
+  SvOnboardingRequest,
+}
+import com.daml.network.codegen.java.splice.wallet.subscriptions.{
   SubscriptionIdleState,
   SubscriptionInitialPayment,
   SubscriptionRequest,

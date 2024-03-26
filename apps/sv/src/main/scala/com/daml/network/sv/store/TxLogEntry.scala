@@ -1,7 +1,7 @@
 package com.daml.network.sv.store
 
-import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AnsEntryContext,
   ARC_AmuletRules,
   ARC_DsoRules,
@@ -65,15 +65,15 @@ object TxLogEntry extends StoreErrors {
 
     protected implicit val voteRequestResultType: TypeMapper[
       com.google.protobuf.struct.Struct,
-      com.daml.network.codegen.java.cn.dsorules.VoteRequestResult,
+      com.daml.network.codegen.java.splice.dsorules.VoteRequestResult,
     ] =
       TypeMapper[
         com.google.protobuf.struct.Struct,
-        com.daml.network.codegen.java.cn.dsorules.VoteRequestResult,
+        com.daml.network.codegen.java.splice.dsorules.VoteRequestResult,
       ](x => {
         val javaProto = com.google.protobuf.struct.Struct.toJavaProto(x)
         val string = com.google.protobuf.util.JsonFormat.printer().print(javaProto)
-        com.daml.network.codegen.java.cn.dsorules.VoteRequestResult.fromJson(string)
+        com.daml.network.codegen.java.splice.dsorules.VoteRequestResult.fromJson(string)
       })(x => {
         val string = x.toJson
         val builder = com.google.protobuf.Struct.newBuilder()

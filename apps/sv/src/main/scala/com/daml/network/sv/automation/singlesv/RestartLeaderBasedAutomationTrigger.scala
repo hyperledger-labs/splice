@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{CNLedgerConnection, RetryProvider}
 import com.daml.network.util.AssignedContract
 import com.daml.network.sv.automation.LeaderBasedAutomationService
@@ -39,15 +39,15 @@ class RestartLeaderBasedAutomationTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      cn.dsorules.DsoRules.ContractId,
-      cn.dsorules.DsoRules,
+      splice.dsorules.DsoRules.ContractId,
+      splice.dsorules.DsoRules,
     ](
       store,
-      cn.dsorules.DsoRules.COMPANION,
+      splice.dsorules.DsoRules.COMPANION,
     ) {
   type DsoRulesContract = AssignedContract[
-    cn.dsorules.DsoRules.ContractId,
-    cn.dsorules.DsoRules,
+    splice.dsorules.DsoRules.ContractId,
+    splice.dsorules.DsoRules,
   ]
 
   @volatile

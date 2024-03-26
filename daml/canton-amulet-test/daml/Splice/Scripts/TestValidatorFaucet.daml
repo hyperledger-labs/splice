@@ -8,7 +8,7 @@ import Daml.Script
 import Splice.Amulet
 import Splice.Scripts.Util
 import Splice.ValidatorLicense
-import CN.Util
+import Splice.Util
 
 test_ValidatorFaucet: Script ()
 test_ValidatorFaucet = do

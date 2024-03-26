@@ -17,7 +17,7 @@ import { Box, Tab, Table, TableBody, TableRow, Tabs, Typography } from '@mui/mat
 import TableCell from '@mui/material/TableCell';
 
 import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules';
-import { DsoRules } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
+import { DsoRules } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
 
 import { useDsoInfos } from '../contexts/SvContext';
 import { useCometBftDebug } from '../hooks/useCometBftDebug';

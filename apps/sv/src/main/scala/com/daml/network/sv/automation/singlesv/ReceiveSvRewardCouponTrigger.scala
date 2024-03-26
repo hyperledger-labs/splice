@@ -7,8 +7,8 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.dso.memberstate.MemberRewardState
-import com.daml.network.codegen.java.cn.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.dso.memberstate.MemberRewardState
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvDsoStore

@@ -5,9 +5,9 @@ import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFa
 import com.digitalasset.canton.topology.DomainId
 
 import java.time.Instant
-import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
-import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
-import com.daml.network.codegen.java.cn.wallet.topupstate as topUpCodegen
+import com.daml.network.codegen.java.splice.appmanager.store as appManagerCodegen
+import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
+import com.daml.network.codegen.java.splice.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
 import com.daml.network.util.{AssignedContract, ResourceTemplateDecoder, TemplateJsonDecoder}

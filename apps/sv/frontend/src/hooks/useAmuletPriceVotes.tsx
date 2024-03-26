@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { AmuletPriceVote } from '@daml.js/dso-governance/lib/CN/DSO/AmuletPrice';
+import { AmuletPriceVote } from '@daml.js/dso-governance/lib/Splice/DSO/AmuletPrice';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 // TODO(#7675) - do we need this model?

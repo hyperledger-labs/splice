@@ -2,7 +2,7 @@ import * as jtv from '@mojotech/json-type-validation';
 import { GetDsoInfoResponse } from 'sv-openapi';
 
 import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules';
-import { DsoRules } from '@daml.js/dso-governance/lib/CN/DsoRules/module';
+import { DsoRules } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
 
 // Static constants for mock values
 
@@ -111,7 +111,7 @@ export const dsoInfo: GetDsoInfoResponse = {
   },
   dso_rules: {
     template_id:
-      'b71a4deb943e8f7f27bb7a384c1b8da8a88f5cd40f92d5b1b56b97f1cb379f27:CN.DsoRules:DsoRules',
+      'b71a4deb943e8f7f27bb7a384c1b8da8a88f5cd40f92d5b1b56b97f1cb379f27:Splice.DsoRules:DsoRules',
     contract_id:
       '00cb5ebc4580a0806e202a295fff32ac769d4a1ba969c0d83773ae98dc4ff9c246ca021220d0f926a6d088171f7f38abbee000b9e3e6d098d76632e1374e34c8d43b702519',
     payload: {

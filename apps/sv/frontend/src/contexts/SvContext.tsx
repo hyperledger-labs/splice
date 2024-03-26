@@ -3,7 +3,7 @@ import { useSvClient } from 'common-frontend';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules';
-import { ElectionRequest, DsoRules } from '@daml.js/dso-governance/lib/CN/DsoRules';
+import { ElectionRequest, DsoRules } from '@daml.js/dso-governance/lib/Splice/DsoRules';
 
 import { useSvAdminClient } from './SvAdminServiceContext';
 

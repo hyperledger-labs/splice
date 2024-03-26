@@ -6,7 +6,7 @@ import Splice.AmuletConfig
 import Splice.Types
 import Splice.Issuance
 
-import CN.Util
+import Splice.Util
 
 import DA.Time
 

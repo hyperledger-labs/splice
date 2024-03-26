@@ -6,7 +6,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.dsorules.ElectionRequest
+import com.daml.network.codegen.java.splice.dsorules.ElectionRequest
 import com.daml.network.util.Contract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer

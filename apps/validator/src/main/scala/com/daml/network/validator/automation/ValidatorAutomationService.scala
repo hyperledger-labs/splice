@@ -204,7 +204,7 @@ object ValidatorAutomationService extends AutomationServiceCompanion {
   private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     template.moduleName match {
       // App manager storage is participant local so we can freely choose the package id.
-      case "CN.AppManager.Store" => Some(DarResources.appManager.bootstrap.packageId)
+      case "Splice.AppManager.Store" => Some(DarResources.appManager.bootstrap.packageId)
       // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
       case "Splice.AmuletImport" => Some(DarResources.cantonAmulet.bootstrap.packageId)

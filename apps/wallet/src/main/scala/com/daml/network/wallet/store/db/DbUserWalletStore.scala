@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.splice.wallet.subscriptions as subsCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult

@@ -6,7 +6,7 @@ import DA.Time
 
 import Splice.Schedule
 
-import CN.Util (require)
+import Splice.Util (require)
 
 
 -- issuance curve

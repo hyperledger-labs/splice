@@ -4,7 +4,7 @@ import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpRespon
 import org.apache.pekko.stream.Materializer
 import cats.implicits.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.splitwell as http
 import com.daml.network.store.MultiDomainAcsStore.ContractState

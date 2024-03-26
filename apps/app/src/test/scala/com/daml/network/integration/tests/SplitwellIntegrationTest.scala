@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
 import com.digitalasset.canton.DomainAlias
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{

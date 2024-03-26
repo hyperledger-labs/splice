@@ -1,12 +1,12 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_ConfirmSvOnboarding,
   SRARC_SetConfig,
 }
-import com.daml.network.codegen.java.cn.dsorules.{
+import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRulesConfig,
   DsoRules_ConfirmSvOnboarding,
@@ -15,7 +15,7 @@ import com.daml.network.codegen.java.cn.dsorules.{
 import com.daml.network.console.CNNodeAppBackendReference
 import com.daml.network.sv.automation.confirmation.SvOnboardingRequestTrigger
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.cn.dsorules
+import com.daml.network.codegen.java.splice.dsorules
 import com.daml.network.sv.automation.singlesv.ExpireValidatorOnboardingTrigger
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.TriggerTestUtil
@@ -60,7 +60,7 @@ class SvTimeBasedOnboardingIntegrationTest
           eventually()(
             // The onboarding is requested by SV4 during SvApp init.
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(
+              .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(
                 dsoParty
               ) should have length 1
           )
@@ -72,7 +72,9 @@ class SvTimeBasedOnboardingIntegrationTest
           "The `SvOnboardingRequest` contract expires and is archived",
           _ =>
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) shouldBe empty,
+              .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(
+                dsoParty
+              ) shouldBe empty,
         )
       }
 
@@ -102,7 +104,7 @@ class SvTimeBasedOnboardingIntegrationTest
           "SvY's `SvOnboardingConfirmed` contract is created'",
           _ =>
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(
+              .filterJava(splice.svonboarding.SvOnboardingConfirmed.COMPANION)(
                 dsoParty,
                 _.data.svParty == svYParty.toProtoPrimitive,
               ) should have length 1,
@@ -114,7 +116,7 @@ class SvTimeBasedOnboardingIntegrationTest
           "The `SvOnboardingConfirmed` contract expires and is archived",
           _ =>
             sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-              .filterJava(cn.svonboarding.SvOnboardingConfirmed.COMPANION)(
+              .filterJava(splice.svonboarding.SvOnboardingConfirmed.COMPANION)(
                 dsoParty,
                 _.data.svParty == svYParty.toProtoPrimitive,
               ) shouldBe empty,
@@ -131,7 +133,7 @@ class SvTimeBasedOnboardingIntegrationTest
           val testCandidateSecret = Random.alphanumeric.take(10).mkString
           actAndCheck(
             "create a new `ValidatorOnboarding` contract", {
-              val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
+              val validatorOnboarding = new splice.validatoronboarding.ValidatorOnboarding(
                 sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
                 testCandidateSecret,
                 sv1Backend.participantClientWithAdminToken.ledger_api.time

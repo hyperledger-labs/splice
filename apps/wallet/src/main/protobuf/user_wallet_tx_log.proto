@@ -74,12 +74,12 @@ message NotificationTxLogEntry {
 }
 
 message TransferOfferStatusCreated {
-  string contract_id = 1; // com.daml.network.codegen.java.cn.wallet.transferoffer.TransferOffer.ContractId
+  string contract_id = 1; // com.daml.network.codegen.java.splice.wallet.transferoffer.TransferOffer.ContractId
   string transaction_id = 2;
 }
 
 message TransferOfferStatusAccepted {
-  string contract_id = 1; // com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer.ContractId
+  string contract_id = 1; // com.daml.network.codegen.java.splice.wallet.transferoffer.AcceptedTransferOffer.ContractId
   string transaction_id = 2;
 }
 

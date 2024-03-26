@@ -9,7 +9,7 @@ import Splice.Fees
 import Splice.Round
 import Splice.Types
 
-import CN.Util
+import Splice.Util
 
 data AmuletExpireSummary = AmuletExpireSummary with
   owner : Party

@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.ans as codegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
+import com.daml.network.codegen.java.splice.ans as codegen
+import com.daml.network.codegen.java.splice.wallet.subscriptions as subCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl

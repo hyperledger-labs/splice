@@ -3,7 +3,6 @@ package com.daml.network.util
 import com.daml.ledger.javaapi.data.Unit as DamlUnit
 import com.daml.lf.data.Numeric
 import com.daml.lf.data.Ref.PackageVersion
-import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.amulet.Amulet
@@ -270,7 +269,7 @@ object CNNodeUtil {
       renewalDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
       entryLifetime: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(90),
       entryFee: Double = 1.0,
-  ): cn.ans.AnsRulesConfig = new cn.ans.AnsRulesConfig(
+  ): splice.ans.AnsRulesConfig = new splice.ans.AnsRulesConfig(
     // renewalDuration
     new RelTime(
       TimeUnit.NANOSECONDS.toMicros(renewalDuration.duration.toNanos)

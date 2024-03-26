@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.{splice, cn}
+import com.daml.network.codegen.java.splice
 import com.daml.network.console.CNParticipantClientReference
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
 import com.daml.network.util.WalletTestUtil
@@ -29,7 +29,7 @@ class SvDsoPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
           sv.config.ledgerApiUser,
           actAs = Seq(svParty),
           readAs = Seq.empty,
-          update = new cn.validatoronboarding.ValidatorOnboarding(
+          update = new splice.validatoronboarding.ValidatorOnboarding(
             svParty.toProtoPrimitive,
             "test",
             env.environment.clock.now.toInstant.plusSeconds(3600),

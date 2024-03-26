@@ -6,13 +6,13 @@ import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.splice.amulet.{Amulet, LockedAmulet}
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
-import com.daml.network.codegen.java.cn.wallet.install.{
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
+import com.daml.network.codegen.java.splice.wallet.install.{
   AmuletOperationOutcome,
   amuletoperation,
   amuletoperationoutcome,
 }
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.wallet.{
   install as installCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,

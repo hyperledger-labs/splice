@@ -12,23 +12,23 @@ import com.daml.network.codegen.java.splice.amuletrules.{
 }
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.validatorlicense as vl
-import com.daml.network.codegen.java.cn.dso.amuletprice as cp
-import com.daml.network.codegen.java.cn.dso.memberstate.MemberRewardState
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dso.amuletprice as cp
+import com.daml.network.codegen.java.splice.dso.memberstate.MemberRewardState
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.dsorules.{
+import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_ConfirmSvOnboarding,
   VoteRequest,
   VoteRequestResult,
 }
-import com.daml.network.codegen.java.cn.svonboarding as so
-import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
-import com.daml.network.codegen.java.{splice, cn}
+import com.daml.network.codegen.java.splice.svonboarding as so
+import com.daml.network.codegen.java.splice.wallet.subscriptions as sub
+import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.*
@@ -80,10 +80,10 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
 
   def lookupDsoRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
-      AssignedContract[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]
+      AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]
     ]]
   ] = multiDomainAcsStore
-    .findAnyContractWithOffset(cn.dsorules.DsoRules.COMPANION)
+    .findAnyContractWithOffset(splice.dsorules.DsoRules.COMPANION)
     .map(_.map(_.flatMap(_.toAssignedContract)))
 
   def listVoteRequestResults(
@@ -99,16 +99,18 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
 
   def lookupDsoRules()(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]]] =
+  ): Future[
+    Option[AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]]
+  ] =
     lookupDsoRulesWithOffset().map(_.value)
 
   def getDsoRulesWithOffset()(implicit tc: TraceContext): Future[QueryResult[
-    AssignedContract[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]
+    AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]
   ]] = lookupDsoRulesWithOffset().map(_.sequence getOrElse (throw noActiveDsoRules))
 
   def getDsoRules()(implicit
       tc: TraceContext
-  ): Future[AssignedContract[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]] =
+  ): Future[AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]] =
     lookupDsoRules().map(_.getOrElse(throw noActiveDsoRules))
 
   def getDsoRulesWithMemberNodeStates()(implicit
@@ -139,13 +141,19 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   def lookupSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[Option[
-    AssignedContract[cn.dso.memberstate.SvNodeState.ContractId, cn.dso.memberstate.SvNodeState]
+    AssignedContract[
+      splice.dso.memberstate.SvNodeState.ContractId,
+      splice.dso.memberstate.SvNodeState,
+    ]
   ]]
 
   def getSvNodeState(svPartyId: PartyId)(implicit
       tc: TraceContext
   ): Future[
-    AssignedContract[cn.dso.memberstate.SvNodeState.ContractId, cn.dso.memberstate.SvNodeState]
+    AssignedContract[
+      splice.dso.memberstate.SvNodeState.ContractId,
+      splice.dso.memberstate.SvNodeState,
+    ]
   ] =
     lookupSvNodeState(svPartyId).map(
       _.getOrElse(
@@ -159,8 +167,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       tc: TraceContext
   ): Future[Option[
     AssignedContract[
-      cn.dso.memberstate.SvStatusReport.ContractId,
-      cn.dso.memberstate.SvStatusReport,
+      splice.dso.memberstate.SvStatusReport.ContractId,
+      splice.dso.memberstate.SvStatusReport,
     ]
   ]]
 
@@ -168,8 +176,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       tc: TraceContext
   ): Future[
     AssignedContract[
-      cn.dso.memberstate.SvStatusReport.ContractId,
-      cn.dso.memberstate.SvStatusReport,
+      splice.dso.memberstate.SvStatusReport.ContractId,
+      splice.dso.memberstate.SvStatusReport,
     ]
   ] =
     lookupSvStatusReport(svPartyId).map(
@@ -223,22 +231,22 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   }
 
   def lookupAnsRulesWithOffset()(implicit tc: TraceContext): Future[
-    QueryResult[Option[AssignedContract[cn.ans.AnsRules.ContractId, cn.ans.AnsRules]]]
+    QueryResult[Option[AssignedContract[splice.ans.AnsRules.ContractId, splice.ans.AnsRules]]]
   ] = {
     for {
       result <- multiDomainAcsStore
-        .findAnyContractWithOffset(cn.ans.AnsRules.COMPANION)
+        .findAnyContractWithOffset(splice.ans.AnsRules.COMPANION)
     } yield result.map(_.flatMap(_.toAssignedContract))
   }
 
   def lookupAnsRules()(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[cn.ans.AnsRules.ContractId, cn.ans.AnsRules]]] =
+  ): Future[Option[AssignedContract[splice.ans.AnsRules.ContractId, splice.ans.AnsRules]]] =
     lookupAnsRulesWithOffset().map(_.value)
 
   def getAnsRules()(implicit
       tc: TraceContext
-  ): Future[Contract[cn.ans.AnsRules.ContractId, cn.ans.AnsRules]] =
+  ): Future[Contract[splice.ans.AnsRules.ContractId, splice.ans.AnsRules]] =
     lookupAnsRules().map(
       _.map(_.contract).getOrElse(
         throw Status.NOT_FOUND.withDescription("No active AnsRules contract").asRuntimeException()
@@ -321,11 +329,11 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest.COMPANION)(_.voteBefore)
 
   def listConfirmations(
-      action: cn.dsorules.ActionRequiringConfirmation,
+      action: splice.dsorules.ActionRequiringConfirmation,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation]]]
+  ): Future[Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]]
 
   def listAppRewardCouponsOnDomain(
       round: Long,
@@ -582,7 +590,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       action: ActionRequiringConfirmation,
   )(implicit tc: TraceContext): Future[
     QueryResult[Option[
-      Contract[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation]
+      Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]
     ]]
   ]
 
@@ -592,7 +600,9 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   )(implicit
       tc: TraceContext
   ): Future[
-    QueryResult[Option[Contract[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation]]]
+    QueryResult[
+      Option[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+    ]
   ]
 
   def lookupAnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
@@ -601,7 +611,9 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   )(implicit
       tc: TraceContext
   ): Future[
-    QueryResult[Option[Contract[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation]]]
+    QueryResult[
+      Option[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+    ]
   ]
 
   def lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset(
@@ -610,7 +622,9 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   )(implicit
       tc: TraceContext
   ): Future[
-    QueryResult[Option[Contract[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation]]]
+    QueryResult[
+      Option[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+    ]
   ]
 
   def lookupSvOnboardingRequestByTokenWithOffset(
@@ -644,10 +658,10 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     )
 
   def listExpiredAnsEntries: ListExpiredContracts[
-    cn.ans.AnsEntry.ContractId,
-    cn.ans.AnsEntry,
+    splice.ans.AnsEntry.ContractId,
+    splice.ans.AnsEntry,
   ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(cn.ans.AnsEntry.COMPANION)(
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.ans.AnsEntry.COMPANION)(
       _.expiresAt
     )
 
@@ -681,7 +695,9 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation]]] = {
+  ): Future[
+    Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
+  ] = {
     val expectedAction = new ARC_DsoRules(
       new SRARC_ConfirmSvOnboarding(
         new DsoRules_ConfirmSvOnboarding(
@@ -697,7 +713,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   }
 
   def listSvOnboardingRequestsByDsoMembers(
-      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+      dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
@@ -735,9 +751,11 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     )
 
   /** List stale confirmations past their expiresAt */
-  def listStaleConfirmations
-      : ListExpiredContracts[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(cn.dsorules.Confirmation.COMPANION)(
+  def listStaleConfirmations: ListExpiredContracts[
+    splice.dsorules.Confirmation.ContractId,
+    splice.dsorules.Confirmation,
+  ] =
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(splice.dsorules.Confirmation.COMPANION)(
       _.expiresAt
     )
 
@@ -745,11 +763,14 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   final def listAllAmuletPriceVotes(
       limit: Limit = Limit.DefaultLimit
   )(implicit tc: TraceContext): Future[
-    Seq[Contract[cn.dso.amuletprice.AmuletPriceVote.ContractId, cn.dso.amuletprice.AmuletPriceVote]]
+    Seq[Contract[
+      splice.dso.amuletprice.AmuletPriceVote.ContractId,
+      splice.dso.amuletprice.AmuletPriceVote,
+    ]]
   ] =
     for {
       votes <- multiDomainAcsStore.listContracts(
-        cn.dso.amuletprice.AmuletPriceVote.COMPANION,
+        splice.dso.amuletprice.AmuletPriceVote.COMPANION,
         limit,
       )
     } yield votes map (_.contract)
@@ -758,7 +779,10 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   def listMemberAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[Contract[cn.dso.amuletprice.AmuletPriceVote.ContractId, cn.dso.amuletprice.AmuletPriceVote]]
+    Seq[Contract[
+      splice.dso.amuletprice.AmuletPriceVote.ContractId,
+      splice.dso.amuletprice.AmuletPriceVote,
+    ]]
   ]
 
   protected def lookupSvOnboardingRequestByCandidatePartyWithOffset(
@@ -786,32 +810,35 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   def listAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[Contract[cn.dso.amuletprice.AmuletPriceVote.ContractId, cn.dso.amuletprice.AmuletPriceVote]]
+    Seq[Contract[
+      splice.dso.amuletprice.AmuletPriceVote.ContractId,
+      splice.dso.amuletprice.AmuletPriceVote,
+    ]]
   ] =
     multiDomainAcsStore
-      .listContracts(cn.dso.amuletprice.AmuletPriceVote.COMPANION, limit)
+      .listContracts(splice.dso.amuletprice.AmuletPriceVote.COMPANION, limit)
       .map(_ map (_.contract))
 
   def listVoteRequests(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
-    Seq[Contract[cn.dsorules.VoteRequest.ContractId, cn.dsorules.VoteRequest]]
+    Seq[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]]
   ] =
     multiDomainAcsStore
-      .listContracts(cn.dsorules.VoteRequest.COMPANION, limit)
+      .listContracts(splice.dsorules.VoteRequest.COMPANION, limit)
       .map(_ map (_.contract))
 
   def lookupVoteByThisSvAndVoteRequestWithOffset(
-      voteRequestCid: cn.dsorules.VoteRequest.ContractId
+      voteRequestCid: splice.dsorules.VoteRequest.ContractId
   )(implicit
       tc: TraceContext
-  ): Future[QueryResult[Option[cn.dsorules.Vote]]]
+  ): Future[QueryResult[Option[splice.dsorules.Vote]]]
 
-  def lookupVoteRequest(contractId: cn.dsorules.VoteRequest.ContractId)(implicit
+  def lookupVoteRequest(contractId: splice.dsorules.VoteRequest.ContractId)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[cn.dsorules.VoteRequest.ContractId, cn.dsorules.VoteRequest]]]
+  ): Future[Option[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]]]
 
-  def getVoteRequest(contractId: cn.dsorules.VoteRequest.ContractId)(implicit
+  def getVoteRequest(contractId: splice.dsorules.VoteRequest.ContractId)(implicit
       tc: TraceContext
-  ): Future[Contract[cn.dsorules.VoteRequest.ContractId, cn.dsorules.VoteRequest]] =
+  ): Future[Contract[splice.dsorules.VoteRequest.ContractId, splice.dsorules.VoteRequest]] =
     lookupVoteRequest(contractId).map(
       _.getOrElse(
         throw Status.NOT_FOUND
@@ -821,7 +848,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     )
 
   def listVoteRequestsByTrackingCid(
-      voteRequestCids: Seq[cn.dsorules.VoteRequest.ContractId],
+      voteRequestCids: Seq[splice.dsorules.VoteRequest.ContractId],
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
@@ -852,10 +879,10 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   ]
 
   def listElectionRequests(
-      dsoRules: AssignedContract[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[
-    Seq[Contract[cn.dsorules.ElectionRequest.ContractId, cn.dsorules.ElectionRequest]]
+    Seq[Contract[splice.dsorules.ElectionRequest.ContractId, splice.dsorules.ElectionRequest]]
   ]
 
   def lookupElectionRequestByRequesterWithOffset(
@@ -863,7 +890,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       epoch: Long,
   )(implicit tc: TraceContext): Future[
     QueryResult[Option[
-      Contract[cn.dsorules.ElectionRequest.ContractId, cn.dsorules.ElectionRequest]
+      Contract[splice.dsorules.ElectionRequest.ContractId, splice.dsorules.ElectionRequest]
     ]]
   ]
 
@@ -871,8 +898,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       epoch: Long,
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[Contract[
-    cn.dsorules.ElectionRequest.ContractId,
-    cn.dsorules.ElectionRequest,
+    splice.dsorules.ElectionRequest.ContractId,
+    splice.dsorules.ElectionRequest,
   ]]]
 
   private[this] def listLaggingDsoRulesFollowers(
@@ -889,7 +916,9 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
 
   final def listDsoRulesTransferFollowers()(implicit
       tc: TraceContext
-  ): Future[Seq[FollowTask[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules, _, _]]] = {
+  ): Future[
+    Seq[FollowTask[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules, _, _]]
+  ] = {
     lookupDsoRules().flatMap(_.map { dsoRules =>
       listLaggingDsoRulesFollowers(dsoRules.domain)
         .map(_ map (FollowTask(dsoRules, _)))
@@ -912,22 +941,23 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   }
 
   def lookupAnsEntryByNameWithOffset(name: String)(implicit tc: TraceContext): Future[
-    QueryResult[Option[AssignedContract[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]]
+    QueryResult[Option[AssignedContract[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]]
   ]
 
   def lookupAnsEntryByName(
       name: String
   )(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]] =
+  ): Future[Option[AssignedContract[splice.ans.AnsEntry.ContractId, splice.ans.AnsEntry]]] =
     lookupAnsEntryByNameWithOffset(name).map(_.value)
 
-  final def lookupAnsEntryContext(contractId: cn.ans.AnsEntryContext.ContractId)(implicit
+  final def lookupAnsEntryContext(contractId: splice.ans.AnsEntryContext.ContractId)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[cn.ans.AnsEntryContext.ContractId, cn.ans.AnsEntryContext]]] = for {
-    cws <- multiDomainAcsStore
-      .lookupContractById(cn.ans.AnsEntryContext.COMPANION)(contractId)
-  } yield cws map (_.contract)
+  ): Future[Option[Contract[splice.ans.AnsEntryContext.ContractId, splice.ans.AnsEntryContext]]] =
+    for {
+      cws <- multiDomainAcsStore
+        .lookupContractById(splice.ans.AnsEntryContext.COMPANION)(contractId)
+    } yield cws map (_.contract)
 
   def lookupSubscriptionInitialPaymentWithOffset(
       paymentCid: sub.SubscriptionInitialPayment.ContractId
@@ -948,7 +978,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       name: String,
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[
-    Seq[Contract[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation]]
+    Seq[Contract[splice.dsorules.Confirmation.ContractId, splice.dsorules.Confirmation]]
   ]
 
   def lookupFeaturedAppRightWithOffset(
@@ -1002,8 +1032,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   def lookupAnsEntryContext(
       reference: sub.SubscriptionRequest.ContractId
   )(implicit tc: TraceContext): Future[Option[ContractWithState[
-    cn.ans.AnsEntryContext.ContractId,
-    cn.ans.AnsEntryContext,
+    splice.ans.AnsEntryContext.ContractId,
+    splice.ans.AnsEntryContext,
   ]]]
 }
 
@@ -1036,7 +1066,7 @@ object SvDsoStore {
   }
 
   private val dsoRulesFollowers: Seq[ConstrainedTemplate] = {
-    import com.daml.network.codegen.java.cn.dsorules
+    import com.daml.network.codegen.java.splice.dsorules
     Seq[ConstrainedTemplate](
       // AmuletRules is specially handled so should *not* be listed here, even
       // though it follows DsoRules
@@ -1045,9 +1075,9 @@ object SvDsoStore {
       dsorules.ElectionRequest.COMPANION,
       so.SvOnboardingRequest.COMPANION,
       so.SvOnboardingConfirmed.COMPANION,
-      cn.dso.memberstate.SvStatusReport.COMPANION,
-      cn.dso.memberstate.SvNodeState.COMPANION,
-      cn.dso.memberstate.MemberRewardState.COMPANION,
+      splice.dso.memberstate.SvStatusReport.COMPANION,
+      splice.dso.memberstate.SvNodeState.COMPANION,
+      splice.dso.memberstate.MemberRewardState.COMPANION,
     )
   }
 
@@ -1059,17 +1089,17 @@ object SvDsoStore {
     splice.amulet.FeaturedAppRight.COMPANION,
     splice.amulet.UnclaimedReward.COMPANION,
     splice.validatorlicense.ValidatorLicense.COMPANION,
-    cn.ans.AnsEntry.COMPANION,
-    cn.ans.AnsEntryContext.COMPANION,
-    cn.ans.AnsRules.COMPANION,
-    cn.dso.amuletprice.AmuletPriceVote.COMPANION,
-    cn.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
+    splice.ans.AnsEntry.COMPANION,
+    splice.ans.AnsEntryContext.COMPANION,
+    splice.ans.AnsRules.COMPANION,
+    splice.dso.amuletprice.AmuletPriceVote.COMPANION,
+    splice.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
   )
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
     (dsoRulesFollowers ++ amuletRulesFollowers) ++ Seq[ConstrainedTemplate](
       // AmuletRules and DsoRules are specially handled, so not listed in followers
-      cn.dsorules.DsoRules.COMPANION,
+      splice.dsorules.DsoRules.COMPANION,
       splice.amuletrules.AmuletRules.COMPANION,
     )
 
@@ -1082,29 +1112,29 @@ object SvDsoStore {
     val dso = dsoParty.toProtoPrimitive
 
     val dsoFilters = Map[PackageQualifiedName, TemplateFilter[?, ?, DsoAcsStoreRowData]](
-      mkFilter(cn.dso.amuletprice.AmuletPriceVote.COMPANION)(co => co.payload.dso == dso) {
+      mkFilter(splice.dso.amuletprice.AmuletPriceVote.COMPANION)(co => co.payload.dso == dso) {
         contract =>
           DsoAcsStoreRowData(
             contract,
             voter = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
           )
       },
-      mkFilter(cn.dsorules.Confirmation.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.dsorules.Confirmation.COMPANION)(co => co.payload.dso == dso) { contract =>
         val (
           actionAnsEntryContextCid,
           actionAnsEntryContextPaymentId,
           actionAnsEntryContextArcType,
         ) =
           contract.payload.action match {
-            case arcAnsEntryContext: cn.dsorules.actionrequiringconfirmation.ARC_AnsEntryContext =>
+            case arcAnsEntryContext: splice.dsorules.actionrequiringconfirmation.ARC_AnsEntryContext =>
               arcAnsEntryContext.ansEntryContextAction match {
-                case action: cn.dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_CollectInitialEntryPayment =>
+                case action: splice.dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_CollectInitialEntryPayment =>
                   (
                     Some(arcAnsEntryContext.ansEntryContextCid),
                     Some(action.ansEntryContext_CollectInitialEntryPaymentValue.paymentCid),
                     Some("ANSRARC_CollectInitialEntryPayment"),
                   )
-                case action: cn.dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_RejectEntryInitialPayment =>
+                case action: splice.dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_RejectEntryInitialPayment =>
                   (
                     Some(arcAnsEntryContext.ansEntryContextCid),
                     Some(action.ansEntryContext_RejectEntryInitialPaymentValue.paymentCid),
@@ -1126,14 +1156,14 @@ object SvDsoStore {
           actionAnsEntryContextArcType = actionAnsEntryContextArcType,
         )
       },
-      mkFilter(cn.dsorules.ElectionRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.dsorules.ElectionRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           requester = Some(PartyId.tryFromProtoPrimitive(contract.payload.requester)),
           electionRequestEpoch = Some(contract.payload.epoch),
         )
       },
-      mkFilter(cn.dsorules.VoteRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.dsorules.VoteRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.voteBefore)),
@@ -1144,23 +1174,24 @@ object SvDsoStore {
             Some(contract.payload.trackingCid.toScala.getOrElse(contract.contractId)),
         )
       },
-      mkFilter(cn.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso)(
+      mkFilter(splice.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso)(
         DsoAcsStoreRowData(_)
       ),
-      mkFilter(cn.dso.memberstate.SvStatusReport.COMPANION)(co => co.payload.dso == dso) {
+      mkFilter(splice.dso.memberstate.SvStatusReport.COMPANION)(co => co.payload.dso == dso) {
         contract =>
           DsoAcsStoreRowData(
             contract,
             svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
           )
       },
-      mkFilter(cn.dso.memberstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) { contract =>
-        DsoAcsStoreRowData(
-          contract,
-          svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
-        )
+      mkFilter(splice.dso.memberstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) {
+        contract =>
+          DsoAcsStoreRowData(
+            contract,
+            svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
+          )
       },
-      mkFilter(cn.dso.memberstate.MemberRewardState.COMPANION)(co => co.payload.dso == dso) {
+      mkFilter(splice.dso.memberstate.MemberRewardState.COMPANION)(co => co.payload.dso == dso) {
         contract =>
           DsoAcsStoreRowData(
             contract,
@@ -1292,15 +1323,15 @@ object SvDsoStore {
           totalTrafficPurchased = Some(contract.payload.totalPurchased),
         )
       },
-      mkFilter(cn.ans.AnsRules.COMPANION)(co => co.payload.dso == dso)(DsoAcsStoreRowData(_)),
-      mkFilter(cn.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.ans.AnsRules.COMPANION)(co => co.payload.dso == dso)(DsoAcsStoreRowData(_)),
+      mkFilter(splice.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
           ansEntryName = Some(contract.payload.name),
         )
       },
-      mkFilter(cn.ans.AnsEntryContext.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(splice.ans.AnsEntryContext.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           ansEntryName = Some(contract.payload.name),
@@ -1393,8 +1424,8 @@ object SvDsoStore {
         sub.SubscriptionIdleState,
       ],
       context: Contract[
-        cn.ans.AnsEntryContext.ContractId,
-        cn.ans.AnsEntryContext,
+        splice.ans.AnsEntryContext.ContractId,
+        splice.ans.AnsEntryContext,
       ],
   ) extends PrettyPrinting {
 
@@ -1406,10 +1437,10 @@ object SvDsoStore {
     Status.NOT_FOUND.withDescription("No active DsoRules contract").asRuntimeException()
 
   case class DsoRulesWithMemberNodeStates(
-      dsoRules: AssignedContract[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       svNodeStates: Map[
         PartyId,
-        Contract[cn.dso.memberstate.SvNodeState.ContractId, cn.dso.memberstate.SvNodeState],
+        Contract[splice.dso.memberstate.SvNodeState.ContractId, splice.dso.memberstate.SvNodeState],
       ],
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
@@ -1419,7 +1450,7 @@ object SvDsoStore {
         param("svNodeStates", _.svNodeStates),
       )
 
-    def currentDomainNodeConfigs(): Seq[cn.dso.globaldomain.DomainNodeConfig] = {
+    def currentDomainNodeConfigs(): Seq[splice.dso.globaldomain.DomainNodeConfig] = {
       // TODO(#4906): make its callers work with soft-domain migration
       svNodeStates.values
         .flatMap(_.payload.state.domainNodes.asScala.get(dsoRules.domain.toProtoPrimitive))
@@ -1464,11 +1495,11 @@ object SvDsoStore {
   }
 
   case class DsoRulesWithSvNodeState(
-      dsoRules: AssignedContract[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       svParty: PartyId,
       svNodeState: Contract[
-        cn.dso.memberstate.SvNodeState.ContractId,
-        cn.dso.memberstate.SvNodeState,
+        splice.dso.memberstate.SvNodeState.ContractId,
+        splice.dso.memberstate.SvNodeState,
       ],
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
@@ -1484,18 +1515,18 @@ object SvDsoStore {
     )(implicit tc: TraceContext, ec: ExecutionContext): Future[Boolean] =
       for {
         // TODO(#4906): check whether we also need to compare the domain-id to detect staleness
-        checkDsoRules <- store.lookupContractById(cn.dsorules.DsoRules.COMPANION)(
+        checkDsoRules <- store.lookupContractById(splice.dsorules.DsoRules.COMPANION)(
           dsoRules.contractId
         )
         checkSvNodeState <- store
-          .lookupContractById(cn.dso.memberstate.SvNodeState.COMPANION)(svNodeState.contractId)
+          .lookupContractById(splice.dso.memberstate.SvNodeState.COMPANION)(svNodeState.contractId)
       } yield checkDsoRules.isEmpty || checkSvNodeState.isEmpty
 
     def lookupSequencerConfigFor(
         globalDomainId: DomainId,
         domainTimeLowerBound: Instant,
         migrationId: Long,
-    ): Option[cn.dso.globaldomain.SequencerConfig] = {
+    ): Option[splice.dso.globaldomain.SequencerConfig] = {
       for {
         domainNodeConfig <- svNodeState.payload.state.domainNodes.asScala
           .get(globalDomainId.toProtoPrimitive)

@@ -6,9 +6,12 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
-import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
-import com.daml.network.codegen.java.cn.dsorules.DsoRules
-import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
+import com.daml.network.codegen.java.splice.dso.memberstate.SvNodeState
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.svonboarding.{
+  SvOnboardingConfirmed,
+  SvOnboardingRequest,
+}
 import com.daml.network.environment.RetryProvider.QuietNonRetryableException
 import com.daml.network.http.v0.{definitions, sv as http}
 import com.daml.network.sv.http.SvHttpClient.BaseCommand

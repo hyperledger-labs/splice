@@ -6,14 +6,14 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
-import com.daml.network.codegen.java.cn.dsorules.{
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules,
   DsoRules_ConfirmSvOnboarding,
 }
-import com.daml.network.codegen.java.cn.svonboarding.SvOnboardingRequest
+import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingRequest
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult

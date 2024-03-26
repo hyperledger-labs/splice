@@ -3,8 +3,8 @@ package com.daml.network.console
 import org.apache.pekko.actor.ActorSystem
 import com.daml.ledger.api.v2.CommandsOuterClass
 import com.daml.ledger.javaapi.data.codegen.Update
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.console.LedgerApiExtensions.*

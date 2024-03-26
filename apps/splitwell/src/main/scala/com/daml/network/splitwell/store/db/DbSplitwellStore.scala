@@ -2,8 +2,8 @@ package com.daml.network.splitwell.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.TransferFollowTrigger
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.SplitwellStore

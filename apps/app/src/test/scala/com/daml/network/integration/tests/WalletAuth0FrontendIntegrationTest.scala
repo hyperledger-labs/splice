@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
 import com.daml.network.auth.AuthConfig.Rs256
-import com.daml.network.codegen.java.cn.wallet.payment.Currency
+import com.daml.network.codegen.java.splice.wallet.payment.Currency
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}

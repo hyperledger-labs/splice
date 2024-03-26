@@ -7,7 +7,7 @@ import cats.implicits.{
 }
 import cats.syntax.functorFilter.*
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.*
 import com.daml.network.store.CNNodeAppStoreWithIngestion
@@ -471,7 +471,7 @@ class FoundingNodeInitializer(
                     .submit(
                       actAs = Seq(dsoParty),
                       readAs = Seq.empty,
-                      new cn.dsobootstrap.DsoBootstrap(
+                      new splice.dsobootstrap.DsoBootstrap(
                         dsoParty.toProtoPrimitive,
                         svParty.toProtoPrimitive,
                         foundingConfig.name,
@@ -496,7 +496,7 @@ class FoundingNodeInitializer(
                         dsoRulesConfig,
                         trafficStateForAllMembers
                           .map(m =>
-                            m.member.toProtoPrimitive -> new cn.dsorules.TrafficState(
+                            m.member.toProtoPrimitive -> new splice.dsorules.TrafficState(
                               m.extraTrafficConsumed.value
                             )
                           )

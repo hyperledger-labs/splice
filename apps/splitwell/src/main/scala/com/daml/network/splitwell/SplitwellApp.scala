@@ -8,7 +8,7 @@ import cats.syntax.traverse.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.{
   CNLedgerClient,

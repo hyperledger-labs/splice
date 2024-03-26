@@ -21,7 +21,7 @@ import {
   TextField,
 } from '@mui/material';
 
-import { VoteRequest } from '@daml.js/dso-governance/lib/CN/DsoRules';
+import { VoteRequest } from '@daml.js/dso-governance/lib/Splice/DsoRules';
 import { ContractId } from '@daml/types';
 
 import { useSvAdminClient } from '../../contexts/SvAdminServiceContext';

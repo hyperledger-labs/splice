@@ -2,7 +2,7 @@ package com.daml.network.sv.cometbft
 
 import cats.Show.Shown
 import cats.implicits.toTraverseOps
-import com.daml.network.codegen.java.cn as daml
+import com.daml.network.codegen.java.splice as daml
 import com.daml.network.sv.config.CometBftConfig
 import com.daml.network.sv.store.SvDsoStore.DsoRulesWithMemberNodeStates
 import com.digitalasset.canton.drivers as proto

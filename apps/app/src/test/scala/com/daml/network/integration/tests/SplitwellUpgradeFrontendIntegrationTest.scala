@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.codegen.java.cn.splitwell as splitwellCodegen
+import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment

@@ -1,7 +1,7 @@
 package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.splice
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvDsoStore
@@ -51,7 +51,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
   /** Handle leader failure by voting for a new leader
     */
   final protected def voteForNewLeader(
-      dsoRules: AssignedContract[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+      dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       currentLeader: String,
   )(implicit
       tc: TraceContext
@@ -76,7 +76,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
           val cmd = dsoRules.exercise(
             _.exerciseDsoRules_RequestElection(
               self,
-              new cn.dsorules.electionrequestreason.ERR_LeaderUnavailable(
+              new splice.dsorules.electionrequestreason.ERR_LeaderUnavailable(
                 com.daml.ledger.javaapi.data.Unit.getInstance()
               ),
               ranking.asJava,

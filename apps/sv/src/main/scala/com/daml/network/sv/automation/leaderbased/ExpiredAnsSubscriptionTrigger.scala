@@ -5,9 +5,9 @@ import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSucce
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.codegen.java.cn.ans as ansCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionIdleState_ExpireSubscription
+import com.daml.network.codegen.java.splice.ans as ansCodegen
+import com.daml.network.codegen.java.splice.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.splice.wallet.subscriptions.SubscriptionIdleState_ExpireSubscription
 import com.daml.network.store.PageLimit
 import com.daml.network.sv.store.SvDsoStore
 

@@ -4,8 +4,8 @@ import org.apache.pekko.http.scaladsl.model.{HttpHeader, HttpRequest, HttpRespon
 import org.apache.pekko.stream.Materializer
 import cats.data.EitherT
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cn.ans as codegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionRequest
+import com.daml.network.codegen.java.splice.ans as codegen
+import com.daml.network.codegen.java.splice.wallet.subscriptions.SubscriptionRequest
 import com.daml.network.http.v0.definitions
 import com.daml.network.http.v0.external.ans as externalHttp
 import com.daml.network.util.{Codec, TemplateJsonDecoder}

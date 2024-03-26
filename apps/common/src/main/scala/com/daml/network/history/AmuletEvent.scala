@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.round.{ClosedMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.ans as ansCodegen
+import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, QualifiedName}
 
 case class Transfer(

@@ -23,8 +23,8 @@ import {
   Typography,
 } from '@mui/material';
 
-import * as payment from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
-import { Currency, ReceiverAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import * as payment from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
+import { Currency, ReceiverAmount } from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
 import BftAnsEntry from '../components/BftAnsEntry';

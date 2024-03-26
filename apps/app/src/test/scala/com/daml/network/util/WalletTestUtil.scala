@@ -3,8 +3,8 @@ package com.daml.network.util
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.fees as feesCodegen
-import com.daml.network.codegen.java.cn.ans as ansCodegen
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.ans as ansCodegen
+import com.daml.network.codegen.java.splice.wallet.{
   install as walletInstallCodegen,
   payment as paymentCodegen,
   subscriptions as subsCodegen,

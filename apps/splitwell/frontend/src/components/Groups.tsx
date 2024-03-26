@@ -30,8 +30,8 @@ import {
   BalanceUpdate,
   Group as CodegenGroup,
   SplitwellRules,
-} from '@daml.js/splitwell/lib/CN/Splitwell';
-import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+} from '@daml.js/splitwell/lib/Splice/Splitwell';
+import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
 
 import {
   useAcceptedInvites,

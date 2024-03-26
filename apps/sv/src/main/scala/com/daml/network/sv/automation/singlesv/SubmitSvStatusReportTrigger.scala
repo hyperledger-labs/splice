@@ -1,7 +1,7 @@
 package com.daml.network.sv.automation.singlesv
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.codegen.java.cn.dso.memberstate.SvStatus
+import com.daml.network.codegen.java.splice.dso.memberstate.SvStatus
 import com.daml.network.environment.{
   CNLedgerConnection,
   MediatorAdminConnection,

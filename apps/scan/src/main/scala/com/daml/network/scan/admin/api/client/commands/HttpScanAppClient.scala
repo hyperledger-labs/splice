@@ -19,8 +19,8 @@ import com.daml.network.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import com.daml.network.codegen.java.cn.ans as ansCodegen
-import com.daml.network.codegen.java.cn.ans.AnsRules
+import com.daml.network.codegen.java.splice.ans as ansCodegen
+import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
 import com.daml.network.scan.store.db.ScanAggregator

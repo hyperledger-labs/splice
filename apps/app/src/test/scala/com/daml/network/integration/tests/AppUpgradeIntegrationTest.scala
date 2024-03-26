@@ -2,9 +2,9 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AmuletRules
-import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
+import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.integration.tests.AppUpgradeIntegrationTest.*
 
 import com.daml.network.integration.CNNodeEnvironmentDefinition

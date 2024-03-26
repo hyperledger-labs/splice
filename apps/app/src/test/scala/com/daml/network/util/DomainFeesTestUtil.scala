@@ -5,14 +5,14 @@ import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.cn.wallet.buytrafficrequest.BuyTrafficRequest
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.CO_BuyMemberTraffic
-import com.daml.network.codegen.java.cn.wallet.install.{
+import com.daml.network.codegen.java.splice.wallet.buytrafficrequest.BuyTrafficRequest
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.CO_BuyMemberTraffic
+import com.daml.network.codegen.java.splice.wallet.install.{
   AmuletOperation,
   AmuletOperationOutcome,
   WalletAppInstall,
 }
-import com.daml.network.codegen.java.cn.wallet.topupstate.ValidatorTopUpState
+import com.daml.network.codegen.java.splice.wallet.topupstate.ValidatorTopUpState
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.integration.tests.CNNodeTests.{

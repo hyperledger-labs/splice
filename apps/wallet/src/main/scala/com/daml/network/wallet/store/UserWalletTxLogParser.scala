@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.splice.amuletrules.invalidtransferreason.{
   ITR_Other,
   ITR_UnknownDomain,
 }
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.{
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.{
   CO_AppPayment,
   CO_BuyMemberTraffic,
   CO_CompleteAcceptedTransfer,
@@ -24,12 +24,12 @@ import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.{
   CO_Tap,
   ExtAmuletOperation,
 }
-import com.daml.network.codegen.java.cn.wallet.install.{AmuletOperation, AmuletOperationOutcome}
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.{
+import com.daml.network.codegen.java.splice.wallet.install.{AmuletOperation, AmuletOperationOutcome}
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,
 }
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   transferoffer as transferCodegen,
 }

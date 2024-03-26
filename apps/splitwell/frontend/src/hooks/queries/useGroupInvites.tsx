@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { sameAssignedContracts } from 'common-frontend';
 import { AssignedContract, PollingStrategy } from 'common-frontend-utils';
 
-import { GroupInvite } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { GroupInvite } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
 import { useSplitwellClient } from '../../contexts/SplitwellServiceContext';
 

@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.{AppTransferContext, AmuletRules}
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.ans.AnsRules
+import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.environment.{
   CNLedgerClient,
   HttpAppConnection,

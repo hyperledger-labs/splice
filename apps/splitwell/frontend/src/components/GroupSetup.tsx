@@ -4,7 +4,7 @@ import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';
 
-import { GroupInvite, SplitwellRules } from '@daml.js/splitwell/lib/CN/Splitwell';
+import { GroupInvite, SplitwellRules } from '@daml.js/splitwell/lib/Splice/Splitwell';
 
 import { useGroupInvites, useJoinGroup, useRequestGroup } from '../hooks';
 import { SplitwellRulesMap } from '../utils/installs';

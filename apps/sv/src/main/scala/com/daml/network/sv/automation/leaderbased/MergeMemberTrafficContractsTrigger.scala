@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
-import com.daml.network.codegen.java.cn.dsorules.DsoRules_MergeMemberTrafficContracts
+import com.daml.network.codegen.java.splice.dsorules.DsoRules_MergeMemberTrafficContracts
 import com.daml.network.store.PageLimit
 import com.daml.network.util.{AssignedContract, Contract}
 import com.digitalasset.canton.topology.{DomainId, Member}

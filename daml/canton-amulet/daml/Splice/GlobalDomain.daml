@@ -5,7 +5,7 @@ import qualified DA.Set as Set
 import DA.Time
 
 import Splice.Types
-import CN.Util
+import Splice.Util
 
 
 -- Global domain configuration

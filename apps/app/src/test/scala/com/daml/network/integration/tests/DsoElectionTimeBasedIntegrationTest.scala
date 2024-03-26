@@ -1,10 +1,10 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
-import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.dsorules.DsoRules_OffboardMember
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.dsorules.DsoRules_OffboardMember
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestWithEarlyClosingTrigger
 import com.daml.network.sv.util.SvUtil
@@ -34,7 +34,7 @@ class DsoElectionTimeBasedIntegrationTest
         )
         val dsoRulesBeforeElection =
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(cn.dsorules.DsoRules.COMPANION)(dsoParty)
+            .filterJava(splice.dsorules.DsoRules.COMPANION)(dsoParty)
             .head
             .data
         dsoRulesBeforeElection.members should have size 4
@@ -59,7 +59,7 @@ class DsoElectionTimeBasedIntegrationTest
         "Verify that election requests is created",
         _ => {
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(cn.dsorules.ElectionRequest.COMPANION)(
+            .filterJava(splice.dsorules.ElectionRequest.COMPANION)(
               dsoParty,
               { co => co.data.requester == sv1Party.toProtoPrimitive },
             ) should have size 1
@@ -130,7 +130,7 @@ class DsoElectionTimeBasedIntegrationTest
         advanceTime(pollingIntervalDuration)
         eventually() {
           sv2Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(cn.dsorules.ElectionRequest.COMPANION)(
+            .filterJava(splice.dsorules.ElectionRequest.COMPANION)(
               dsoParty,
               { co => co.data.requester == sv1Party.toProtoPrimitive },
             ) shouldBe empty
@@ -151,7 +151,7 @@ class DsoElectionTimeBasedIntegrationTest
       )
       val dsoRulesBeforeElection =
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(cn.dsorules.DsoRules.COMPANION)(dsoParty)
+          .filterJava(splice.dsorules.DsoRules.COMPANION)(dsoParty)
           .head
           .data
       dsoRulesBeforeElection.members should have size 4
@@ -228,7 +228,7 @@ class DsoElectionTimeBasedIntegrationTest
         )
         val dsoRulesAfterElection =
           sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(cn.dsorules.DsoRules.COMPANION)(dsoParty)
+            .filterJava(splice.dsorules.DsoRules.COMPANION)(dsoParty)
             .head
             .data
         dsoRulesAfterElection.epoch shouldBe dsoRulesBeforeElection.epoch + 1

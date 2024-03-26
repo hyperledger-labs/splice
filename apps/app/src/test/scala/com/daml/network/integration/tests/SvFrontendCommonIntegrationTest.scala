@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.dsorules.VoteRequest
+import com.daml.network.codegen.java.splice.dsorules.VoteRequest
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.util.FrontendLoginUtil
 import org.openqa.selenium.{By, Keys}

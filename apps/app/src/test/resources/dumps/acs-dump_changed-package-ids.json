@@ -546,7 +546,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CN.Ans:AnsEntry",
+      "template_id": "deadbeef001:Splice.Ans:AnsEntry",
       "contract_id": "00e55014b4748e8576ad6bcd232cbda79efeeff5b07459e0d004ddcb6a5c435886ca0212204541cbf643c4ef169e33f3b2326b8326eb2a3d0d918b0e687363b07aeea1ef86",
       "payload": {
         "name": "alice.unverified.ans",
@@ -560,7 +560,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CN.Ans:AnsEntryContext",
+      "template_id": "deadbeef001:Splice.Ans:AnsEntryContext",
       "contract_id": "00a3aadc4a878bdab6693a1eaff09f68c3909a45cd20ef5b8ab29846d0d46a9a0eca0212205f006be6e8474bf3187b5e0f8a89d03734741510071136a06efc00390c07a64e",
       "payload": {
         "reference": "004f2bdfe3bb511a7a8c11b2342c24e4060e4bd4b0e2b66a92d8373f8d801aaa08ca02122057b846862c91e0a489a1974a0f29ce292ed1a27584c6c862eb0c21ecdba0348c",
@@ -574,7 +574,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CN.Ans:AnsRules",
+      "template_id": "deadbeef001:Splice.Ans:AnsRules",
       "contract_id": "00b8662d1e8f8021fc78e5ebd5641c307a81c81e8f01ea4f62b04fc49a2d0035f1ca0212209697dcd3cae5d613ff5e949d074353e9f6ab33bdeafa84993e628514cf7a9b93",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -592,7 +592,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CN.DSO.AmuletPrice:AmuletPriceVote",
+      "template_id": "deadbeef001:Splice.DSO.AmuletPrice:AmuletPriceVote",
       "contract_id": "00d2bcf8af8932506f3b9e93eff17567558b8613c8804f7f36989e37dd1f49a437ca021220a8d3c0ebc404b8a99eaeb24b3f36e64269a02186eab815468759588d906e025e",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -604,7 +604,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CN.DsoRules:DsoRules",
+      "template_id": "deadbeef001:Splice.DsoRules:DsoRules",
       "contract_id": "00e14ec6d8c6f8df9e2a4ebb2e74afe9fbc1db78e89f2332d434c2f10cf5ec42e8ca021220e268684f645e6b34b8e5911bdf96189b5f96021453fb64e6746076843b5deb38",
       "payload": {
         "epoch": "0",
@@ -704,7 +704,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CN.Wallet.Subscriptions:SubscriptionIdleState",
+      "template_id": "deadbeef001:Splice.Wallet.Subscriptions:SubscriptionIdleState",
       "contract_id": "001d4e7ffcd08dd65621ec7541d2c72560cad4d002f84fab9aa2700f4b8af7613bca021220a313c51fd4f4de8ccd7d3ae89b1722b408c5cea187a75e85b49eea8448168cb8",
       "payload": {
         "reference": "004f2bdfe3bb511a7a8c11b2342c24e4060e4bd4b0e2b66a92d8373f8d801aaa08ca02122057b846862c91e0a489a1974a0f29ce292ed1a27584c6c862eb0c21ecdba0348c",

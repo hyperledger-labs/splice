@@ -10,7 +10,7 @@ import com.daml.network.automation.{
   UnassignTrigger,
 }
 import AutomationServiceCompanion.{TriggerClass, aTrigger}
-import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
+import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.*
 import com.daml.network.scan.admin.api.client.BftScanConnection

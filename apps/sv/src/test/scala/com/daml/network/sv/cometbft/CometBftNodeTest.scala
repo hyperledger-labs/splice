@@ -1,14 +1,14 @@
 package com.daml.network.sv.cometbft
 
-import com.daml.network.codegen.java.cn as daml
-import com.daml.network.codegen.java.cn.cometbft.{
+import com.daml.network.codegen.java.splice as daml
+import com.daml.network.codegen.java.splice.cometbft.{
   CometBftConfig,
   CometBftNodeConfig,
   GovernanceKeyConfig,
   SequencingKeyConfig,
 }
-import com.daml.network.codegen.java.cn.dso.globaldomain.DomainNodeConfig
-import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
+import com.daml.network.codegen.java.splice.dso.globaldomain.DomainNodeConfig
+import com.daml.network.codegen.java.splice.dso.memberstate.SvNodeState
 import com.digitalasset.canton.{BaseTest, drivers as proto}
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfigChange
 import com.digitalasset.canton.topology.DomainId

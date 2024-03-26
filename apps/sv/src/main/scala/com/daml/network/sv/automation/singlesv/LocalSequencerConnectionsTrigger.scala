@@ -1,7 +1,7 @@
 package com.daml.network.sv.automation.singlesv
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.codegen.java.cn.dso.globaldomain.SequencerConfig
+import com.daml.network.codegen.java.splice.dso.globaldomain.SequencerConfig
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.store.SvDsoStore

@@ -18,15 +18,18 @@ import {
   WalletApi,
 } from 'wallet-openapi';
 
-import * as payment from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
-import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import * as payment from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
+import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
 import {
   Subscription,
   SubscriptionIdleState,
   SubscriptionPayment,
   SubscriptionRequest,
-} from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
-import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
+} from '@daml.js/wallet-payments/lib/Splice/Wallet/Subscriptions';
+import {
+  AcceptedTransferOffer,
+  TransferOffer,
+} from '@daml.js/wallet/lib/Splice/Wallet/TransferOffer';
 
 import {
   BalanceChange,

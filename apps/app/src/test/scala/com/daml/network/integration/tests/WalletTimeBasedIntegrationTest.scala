@@ -2,14 +2,14 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.amuletrules.AppTransferContext
-import com.daml.network.codegen.java.cn.ans.{
+import com.daml.network.codegen.java.splice.ans.{
   AnsEntryContext,
   AnsEntryContext_CollectInitialEntryPayment,
 }
-import com.daml.network.codegen.java.cn.dsorules.Confirmation
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AnsEntryContext
-import com.daml.network.codegen.java.cn.dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_CollectInitialEntryPayment
-import com.daml.network.codegen.java.cn.wallet.subscriptions.{
+import com.daml.network.codegen.java.splice.dsorules.Confirmation
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AnsEntryContext
+import com.daml.network.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_CollectInitialEntryPayment
+import com.daml.network.codegen.java.splice.wallet.subscriptions.{
   SubscriptionInitialPayment,
   SubscriptionRequest,
 }

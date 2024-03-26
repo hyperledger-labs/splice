@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.network.codegen.java.cn.dso.memberstate.SvStatusReport
+import com.daml.network.codegen.java.splice.dso.memberstate.SvStatusReport
 import com.daml.network.config.CNNodeConfigTransforms.updateAllSvAppConfigs_
 import com.daml.network.console.{
   ScanAppBackendReference,

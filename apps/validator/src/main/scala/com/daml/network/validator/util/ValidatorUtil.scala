@@ -1,6 +1,6 @@
 package com.daml.network.validator.util
 
-import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
+import com.daml.network.codegen.java.splice.wallet.install as walletCodegen
 import com.daml.network.environment.{
   BaseLedgerConnection,
   CNLedgerConnection,

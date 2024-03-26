@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.splice.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import com.daml.network.codegen.java.cn.ans.AnsRules
+import com.daml.network.codegen.java.splice.ans.AnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions

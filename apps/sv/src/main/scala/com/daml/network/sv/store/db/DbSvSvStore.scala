@@ -1,6 +1,6 @@
 package com.daml.network.sv.store.db
 
-import com.daml.network.codegen.java.cn.validatoronboarding.{UsedSecret, ValidatorOnboarding}
+import com.daml.network.codegen.java.splice.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor

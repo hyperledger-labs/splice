@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests.runbook
 
-import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
+import com.daml.network.codegen.java.splice.dso.memberstate.SvNodeState
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{

@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { AnsRules } from '@daml.js/ans/lib/CN/Ans/';
+import { AnsRules } from '@daml.js/ans/lib/Splice/Ans/';
 
 import { useScanClient } from './ScanClientContext';
 

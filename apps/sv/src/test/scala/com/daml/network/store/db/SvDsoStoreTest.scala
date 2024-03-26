@@ -10,32 +10,35 @@ import com.daml.network.codegen.java.splice.amuletrules.{
 import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.cn.ans.*
-import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
-import com.daml.network.codegen.java.cn.dso.globaldomain.{
+import com.daml.network.codegen.java.splice.ans.*
+import com.daml.network.codegen.java.splice.cometbft.CometBftConfigLimits
+import com.daml.network.codegen.java.splice.dso.globaldomain.{
   DomainNodeConfigLimits,
   DsoGlobalDomainConfig,
 }
-import com.daml.network.codegen.java.cn.dsorules.*
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.*
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AnsEntryContext,
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import com.daml.network.codegen.java.cn.dsorules.ansentrycontext_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
   ANSRARC_CollectInitialEntryPayment,
   ANSRARC_RejectEntryInitialPayment,
 }
-import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
-import com.daml.network.codegen.java.cn.dsorules.electionrequestreason.ERR_OtherReason
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
+import com.daml.network.codegen.java.splice.dsorules.electionrequestreason.ERR_OtherReason
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
   SRARC_AddMember,
   SRARC_OffboardMember,
 }
-import com.daml.network.codegen.java.cn.dsorules.voterequestoutcome.VRO_Accepted
-import com.daml.network.codegen.java.cn.svonboarding.{SvOnboardingConfirmed, SvOnboardingRequest}
-import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentAmount}
-import com.daml.network.codegen.java.cn.wallet.subscriptions.{
+import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.VRO_Accepted
+import com.daml.network.codegen.java.splice.svonboarding.{
+  SvOnboardingConfirmed,
+  SvOnboardingRequest,
+}
+import com.daml.network.codegen.java.splice.wallet.payment.{Currency, PaymentAmount}
+import com.daml.network.codegen.java.splice.wallet.subscriptions.{
   Subscription,
   SubscriptionData,
   SubscriptionIdleState,

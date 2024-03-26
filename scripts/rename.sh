@@ -518,6 +518,36 @@ function subcmd_cc_module_splice() {
 }
 
 
+subcommand_whitelist[cn_module_splice]='Rename: CN Module prefix to Splice'
+function subcmd_cn_module_splice() {
+  assert_clean_working_dir
+
+  rename "CN. to Splice."  \
+    "'CN\.///Splice.'" \
+    "" \
+    ""
+
+  rename "CN/ to Splice/"  \
+    "'CN/|||Splice/'" \
+    "" \
+    "-s '|||'"
+
+  rename "codegen.java.cc to codegen.java.splice"  \
+    "'codegen\.java\.cn///codegen.java.splice'" \
+    "" \
+    ""
+
+  rename "codegen.java.cc to codegen.java.splice"  \
+    "'codegen\.java\.\{splice, cn\}///codegen.java.splice'" \
+    "" \
+    ""
+
+  rename "cn. to splice."  \
+    "'cn\.///splice.'" \
+    "" \
+    ""
+}
+
 ### Splice packages
 
 # TODO(#11111): complete this part of the script

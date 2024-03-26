@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.dsorules.*
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.*
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.*
+import com.daml.network.codegen.java.splice.dsorules.*
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.*
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.*
 import com.daml.network.config.{
   CNDbConfig,
   CNNodeConfigTransforms,

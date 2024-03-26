@@ -34,7 +34,7 @@ class AcsJdbcTypesTest extends AsyncWordSpec with AcsJdbcTypes with BaseTest wit
         Offset(Bytes.assertFromString("ff00aa")),
         "bf196cb0db2637fd30850500c50984c3b2dc23c2f89b42d9a673c5dcad3649a2",
         QualifiedName(
-          "CN.Directory",
+          "Splice.Directory",
           "DirectoryEntry",
         ),
         DomainId.tryFromString(

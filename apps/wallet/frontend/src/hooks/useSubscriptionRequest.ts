@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { SubscriptionRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
+import { SubscriptionRequest } from '@daml.js/wallet-payments/lib/Splice/Wallet/Subscriptions';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 

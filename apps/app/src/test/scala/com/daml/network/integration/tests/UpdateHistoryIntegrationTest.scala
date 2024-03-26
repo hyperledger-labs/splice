@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.ledger.api.v2.TraceContextOuterClass
 import com.daml.ledger.api.v2.participant_offset.ParticipantOffset
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
 import com.daml.network.console.CNParticipantClientReference

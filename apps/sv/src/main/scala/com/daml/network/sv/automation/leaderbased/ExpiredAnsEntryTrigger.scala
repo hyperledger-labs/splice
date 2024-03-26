@@ -1,8 +1,8 @@
 package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.ans.AnsEntry_Expire
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.ans.AnsEntry_Expire
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -16,21 +16,21 @@ class ExpiredAnsEntryTrigger(
     override val ec: ExecutionContext,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
-      cn.ans.AnsEntry.ContractId,
-      cn.ans.AnsEntry,
+      splice.ans.AnsEntry.ContractId,
+      splice.ans.AnsEntry,
     ](
       svTaskContext.dsoStore.multiDomainAcsStore,
       svTaskContext.dsoStore.listExpiredAnsEntries,
-      cn.ans.AnsEntry.COMPANION,
+      splice.ans.AnsEntry.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-      cn.ans.AnsEntry.ContractId,
-      cn.ans.AnsEntry,
+      splice.ans.AnsEntry.ContractId,
+      splice.ans.AnsEntry,
     ]]] {
   type Task = ScheduledTaskTrigger.ReadyTask[
     AssignedContract[
-      cn.ans.AnsEntry.ContractId,
-      cn.ans.AnsEntry,
+      splice.ans.AnsEntry.ContractId,
+      splice.ans.AnsEntry,
     ]
   ]
 

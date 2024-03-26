@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.dsorules.ElectionRequest
+import com.daml.network.codegen.java.splice.dsorules.ElectionRequest
 import com.daml.network.config.CNThresholds
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.sv.store.SvDsoStore

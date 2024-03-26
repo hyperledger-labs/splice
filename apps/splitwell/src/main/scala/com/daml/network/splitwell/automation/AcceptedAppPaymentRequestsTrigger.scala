@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TaskSuccess,
 }
 import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.store.SplitwellStore

@@ -5,8 +5,8 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.lf.data.Time
 import com.daml.network.codegen.java.splice.amulet.AppRewardCoupon
-import com.daml.network.codegen.java.cn.splitwell.*
-import com.daml.network.codegen.java.cn.wallet.payment.AppPaymentRequest
+import com.daml.network.codegen.java.splice.splitwell.*
+import com.daml.network.codegen.java.splice.wallet.payment.AppPaymentRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.ledger.api.ReassignmentEvent
 import com.daml.network.store.db.{AcsRowData, IndexColumnValue}

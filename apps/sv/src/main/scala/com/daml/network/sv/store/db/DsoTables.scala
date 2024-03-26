@@ -1,9 +1,9 @@
 package com.daml.network.sv.store.db
 
 import com.daml.lf.data.Time.Timestamp
-import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.dsorules.VoteRequest
-import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.dsorules.VoteRequest
+import com.daml.network.codegen.java.splice.wallet.subscriptions as sub
 import com.daml.network.store.{Executed, StoreErrors, VoteRequestOutcome}
 import com.daml.network.store.db.{AcsRowData, AcsTables, IndexColumnValue, TxLogRowData}
 import com.daml.network.sv.store.{ErrorTxLogEntry, TxLogEntry, VoteRequestTxLogEntry}
@@ -44,7 +44,7 @@ object DsoTables extends AcsTables with NamedLogging {
       importCrateReceiver: Option[PartyId] = None,
       memberTrafficMember: Option[Member] = None,
       ansEntryName: Option[String] = None,
-      actionAnsEntryContextCid: Option[cn.ans.AnsEntryContext.ContractId] = None,
+      actionAnsEntryContextCid: Option[splice.ans.AnsEntryContext.ContractId] = None,
       actionAnsEntryContextPaymentId: Option[sub.SubscriptionInitialPayment.ContractId] = None,
       actionAnsEntryContextArcType: Option[String] = None,
       subscriptionReferenceContractId: Option[sub.SubscriptionRequest.ContractId] = None,

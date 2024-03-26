@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.splice.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
-import com.daml.network.codegen.java.cn.ans as ansCodegen
+import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState

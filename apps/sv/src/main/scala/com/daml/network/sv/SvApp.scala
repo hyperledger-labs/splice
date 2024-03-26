@@ -10,8 +10,8 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.admin.api.TraceContextDirectives.withTraceContext
 import com.daml.network.admin.http.{HttpAdminHandler, HttpErrorHandler}
 import com.daml.network.auth.{AdminAuthExtractor, AuthConfig, HMACVerifier, RSAVerifier}
-import com.daml.network.codegen.java.cn
-import com.daml.network.codegen.java.cn.dsorules.*
+import com.daml.network.codegen.java.splice
+import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.SharedCNNodeAppParameters
 import com.daml.network.environment.*
@@ -733,7 +733,7 @@ object SvApp {
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     val svStore = svStoreWithIngestion.store
     val svParty = svStore.key.svParty
-    val validatorOnboarding = new cn.validatoronboarding.ValidatorOnboarding(
+    val validatorOnboarding = new splice.validatoronboarding.ValidatorOnboarding(
       svParty.toProtoPrimitive,
       secret,
       (clock.now + expiresIn.toInternal).toInstant,
@@ -853,7 +853,7 @@ object SvApp {
           val cmd = dsoRules.exercise(
             _.exerciseDsoRules_RequestElection(
               self,
-              new cn.dsorules.electionrequestreason.ERR_LeaderUnavailable(
+              new splice.dsorules.electionrequestreason.ERR_LeaderUnavailable(
                 com.daml.ledger.javaapi.data.Unit.getInstance()
               ),
               ranking.asJava,
@@ -904,7 +904,7 @@ object SvApp {
     val decodedAction = templateJsonDecoder.decodeValue(
       ActionRequiringConfirmation.valueDecoder(),
       ActionRequiringConfirmation._packageId,
-      "CN.DsoRules",
+      "Splice.DsoRules",
       "ActionRequiringConfirmation",
     )(action)
     dsoStoreWithIngestion.store
@@ -948,7 +948,7 @@ object SvApp {
   }
 
   def castVote(
-      trackingCid: cn.dsorules.VoteRequest.ContractId,
+      trackingCid: splice.dsorules.VoteRequest.ContractId,
       isAccepted: Boolean,
       reasonUrl: String,
       reasonDescription: String,
@@ -958,7 +958,7 @@ object SvApp {
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[Either[String, cn.dsorules.VoteRequest.ContractId]] = {
+  ): Future[Either[String, splice.dsorules.VoteRequest.ContractId]] = {
     dsoStoreWithIngestion.store
       .lookupVoteByThisSvAndVoteRequestWithOffset(trackingCid)
       .flatMap { case QueryResult(_, _) =>
@@ -1051,7 +1051,7 @@ object SvApp {
   private[sv] def isDsoMember(
       name: String,
       party: PartyId,
-      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+      dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   ): Boolean =
     dsoRules.payload.members.asScala
       .get(party.toProtoPrimitive)
@@ -1092,17 +1092,17 @@ object SvApp {
 
   private[sv] def isDsoMemberParty(
       party: PartyId,
-      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+      dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   ): Boolean = dsoRules.payload.members.containsKey(party.toProtoPrimitive)
 
   private[sv] def isDsoMemberName(
       name: String,
-      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+      dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   ): Boolean = getDsoPartyFromName(name, dsoRules).isDefined
 
   private[sv] def getDsoPartyFromName(
       name: String,
-      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules],
+      dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   ): Option[String] = {
     dsoRules.payload.members.asScala.collectFirst {
       case (partyId, memberInfo) if memberInfo.name == name => partyId
@@ -1110,7 +1110,7 @@ object SvApp {
   }
 
   private[sv] def isDevNet(
-      dsoRules: Contract.Has[cn.dsorules.DsoRules.ContractId, cn.dsorules.DsoRules]
+      dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules]
   ): Boolean = dsoRules.payload.isDevNet
 
   private def initializeValidator(

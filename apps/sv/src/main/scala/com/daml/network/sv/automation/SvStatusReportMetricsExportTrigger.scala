@@ -9,7 +9,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cn.dso.memberstate.SvStatusReport
+import com.daml.network.codegen.java.splice.dso.memberstate.SvStatusReport
 import com.daml.network.environment.CNMetrics
 import com.daml.network.sv.automation.SvStatusReportMetricsExportTrigger.SvStatusMetrics
 import com.daml.network.sv.store.SvDsoStore

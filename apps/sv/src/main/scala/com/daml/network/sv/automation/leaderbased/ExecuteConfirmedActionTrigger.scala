@@ -8,21 +8,21 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.round.{ClosedMiningRound, SummarizingMiningRound}
-import com.daml.network.codegen.java.cn.dsorules.Confirmation
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.Confirmation
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AnsEntryContext,
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import com.daml.network.codegen.java.cn.dsorules.ansentrycontext_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
   ANSRARC_CollectInitialEntryPayment,
   ANSRARC_RejectEntryInitialPayment,
 }
-import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.{
   CRARC_MiningRound_Archive,
   CRARC_MiningRound_StartIssuing,
 }
-import com.daml.network.codegen.java.cn.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.config.CNThresholds
 import com.daml.network.sv.SvApp.{isDevNet, isDsoMemberName, isDsoMemberParty}
 import com.daml.network.util.AssignedContract

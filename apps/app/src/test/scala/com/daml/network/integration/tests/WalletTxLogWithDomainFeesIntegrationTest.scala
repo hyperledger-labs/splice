@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.COO_Error
+import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_Error
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
 import com.daml.network.integration.CNNodeEnvironmentDefinition

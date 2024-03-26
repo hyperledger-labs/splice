@@ -1,7 +1,7 @@
 package com.daml.network.scan.dso
 
 import com.daml.network.util.Contract
-import com.daml.network.codegen.java.cn.dsorules.DsoRules
+import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.scan.dso.DsoAnsResolver.{DsoAnsEntry, dsoAnsName, svAnsNameSuffix}
 import com.digitalasset.canton.topology.PartyId

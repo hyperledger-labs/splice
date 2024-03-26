@@ -1,7 +1,7 @@
 package com.daml.network.sv.automation.leaderbased
 
 import com.daml.network.automation.*
-import com.daml.network.codegen.java.cn
+import com.daml.network.codegen.java.splice
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -15,21 +15,21 @@ class ExpiredSvOnboardingRequestTrigger(
     override val ec: ExecutionContext,
     tracer: Tracer,
 ) extends MultiDomainExpiredContractTrigger.Template[
-      cn.svonboarding.SvOnboardingRequest.ContractId,
-      cn.svonboarding.SvOnboardingRequest,
+      splice.svonboarding.SvOnboardingRequest.ContractId,
+      splice.svonboarding.SvOnboardingRequest,
     ](
       svTaskContext.dsoStore.multiDomainAcsStore,
       svTaskContext.dsoStore.listExpiredSvOnboardingRequests,
-      cn.svonboarding.SvOnboardingRequest.COMPANION,
+      splice.svonboarding.SvOnboardingRequest.COMPANION,
     )
     with SvTaskBasedTrigger[ScheduledTaskTrigger.ReadyTask[AssignedContract[
-      cn.svonboarding.SvOnboardingRequest.ContractId,
-      cn.svonboarding.SvOnboardingRequest,
+      splice.svonboarding.SvOnboardingRequest.ContractId,
+      splice.svonboarding.SvOnboardingRequest,
     ]]] {
   type Task = ScheduledTaskTrigger.ReadyTask[
     AssignedContract[
-      cn.svonboarding.SvOnboardingRequest.ContractId,
-      cn.svonboarding.SvOnboardingRequest,
+      splice.svonboarding.SvOnboardingRequest.ContractId,
+      splice.svonboarding.SvOnboardingRequest,
     ]
   ]
 

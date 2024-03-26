@@ -380,7 +380,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
   private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     template.moduleName match {
       // DsoBootstrap is how we create AmuletRules in the first place so we cannot infer the package id for that from AmuletRules.
-      case "CN.DsoBootstrap" =>
+      case "Splice.DsoBootstrap" =>
         Some(DarResources.dsoGovernance.bootstrap.packageId)
       // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.

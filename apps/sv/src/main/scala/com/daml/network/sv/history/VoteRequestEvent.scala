@@ -1,7 +1,7 @@
 package com.daml.network.sv.history
 
 import com.daml.ledger.javaapi.data.Value
-import com.daml.network.codegen.java.cn.dsorules.{
+import com.daml.network.codegen.java.splice.dsorules.{
   DsoRules,
   DsoRules_CloseVoteRequest,
   VoteRequestResult,

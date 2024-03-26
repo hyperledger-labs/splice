@@ -3,11 +3,11 @@ package com.daml.network.sv.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.*
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import com.daml.network.codegen.java.cn.dsorules.{
+import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_CloseVoteRequest,
   VoteRequestResult,

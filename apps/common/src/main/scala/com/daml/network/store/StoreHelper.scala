@@ -1,7 +1,7 @@
 package com.daml.network.store
 
-import com.daml.network.codegen.java.cn.dsorules.VoteRequestOutcome as VRO
-import com.daml.network.codegen.java.cn.dsorules.voterequestoutcome.VRO_Accepted
+import com.daml.network.codegen.java.splice.dsorules.VoteRequestOutcome as VRO
+import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.VRO_Accepted
 
 import java.time.Instant
 

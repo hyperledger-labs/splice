@@ -20,7 +20,7 @@ import {
   ActionRequiringConfirmation,
   Vote,
   VoteRequestResult,
-} from '@daml.js/dso-governance/lib/CN/DsoRules/module';
+} from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
 
 import { useListVoteRequestResult } from '../../hooks/useListVoteRequests';
 

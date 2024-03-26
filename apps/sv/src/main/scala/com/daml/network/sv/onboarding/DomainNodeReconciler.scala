@@ -1,6 +1,6 @@
 package com.daml.network.sv.onboarding
 
-import com.daml.network.codegen.java.cn.dso.globaldomain.{
+import com.daml.network.codegen.java.splice.dso.globaldomain.{
   DomainNodeConfig,
   MediatorConfig,
   SequencerConfig,

@@ -8,19 +8,19 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.amuletrules.AppTransferContext
-import com.daml.network.codegen.java.cn.ans.{
+import com.daml.network.codegen.java.splice.ans.{
   AnsEntryContext,
   AnsEntryContext_CollectInitialEntryPayment,
   AnsEntryContext_RejectEntryInitialPayment,
   AnsRules,
 }
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AnsEntryContext
-import com.daml.network.codegen.java.cn.dsorules.ansentrycontext_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AnsEntryContext
+import com.daml.network.codegen.java.splice.dsorules.ansentrycontext_actionrequiringconfirmation.{
   ANSRARC_CollectInitialEntryPayment,
   ANSRARC_RejectEntryInitialPayment,
 }
-import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.wallet.subscriptions.SubscriptionInitialPayment
+import com.daml.network.codegen.java.splice.dsorules.ActionRequiringConfirmation
+import com.daml.network.codegen.java.splice.wallet.subscriptions.SubscriptionInitialPayment
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvDsoStore
