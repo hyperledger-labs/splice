@@ -15,11 +15,11 @@ import Splice.DsoRules
 -- | A template for bootstrapping the collective and AmuletRules.
 template DsoBootstrap with
     dso : Party
-    founderParty : Party -- ^ the founding SV
-    founderName : Text -- ^ human-readable name of the founding SV
-    founderRewardWeight : Int -- ^ the weight of the founding SV in the reward distribution
-    founderParticipantId : Text -- ^ the id of the participant of the founding SV
-    founderDomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
+    sv1Party : Party -- ^ the SV that bootstraps the network
+    sv1Name : Text -- ^ human-readable name of SV1
+    sv1RewardWeight : Int -- ^ the weight of SV1 in the reward distribution
+    sv1ParticipantId : Text -- ^ the id of the participant of the SV that bootstraps the synchronizer
+    sv1DomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
     round0Duration : RelTime
     amuletConfig : AmuletConfig USD
     amuletPrice : Decimal
@@ -29,12 +29,12 @@ template DsoBootstrap with
     isDevNet : Bool
   where
     signatory dso
-    observer founderParty
+    observer sv1Party
 
     choice DsoBootstrap_Bootstrap : ()
       controller dso
       do
-        -- create amulet-rules and the initial price vote of the founding member
+        -- create amulet-rules and the initial price vote of SV1
         amuletRulesCid <- create AmuletRules with
           dso
           configSchedule = Schedule with
@@ -48,28 +48,28 @@ template DsoBootstrap with
         exercise amuletRulesCid AmuletRules_Bootstrap_Rounds with
           round0Duration
           amuletPrice
-        -- create the DSO rules with the founding member as the sole member
-        let founderMemberInfo = MemberInfo with
-              name = founderName
+        -- create the DSO rules with the SV1 as the sole member
+        let sv1MemberInfo = MemberInfo with
+              name = sv1Name
               joinedAsOfRound = Round 0
-              svRewardWeight = founderRewardWeight
-              participantId = founderParticipantId
+              svRewardWeight = sv1RewardWeight
+              participantId = sv1ParticipantId
         let dsoRules = DsoRules with
               dso
               epoch = 0
-              members = Map.fromList [(founderParty, founderMemberInfo)]
+              members = Map.fromList [(sv1Party, sv1MemberInfo)]
               offboardedMembers = Map.empty
-              leader = founderParty
+              leader = sv1Party
               config
               initialTrafficState
               isDevNet
         create dsoRules
-        -- create initial per-member and per-operator contracts for founder
+        -- create initial per-member and per-operator contracts for sv1
         let addMemberChoiceArgs = DsoRules_AddMember with
-              newMemberParty = founderParty
-              newMemberName = founderName
-              newMemberParticipantId = founderParticipantId
+              newMemberParty = sv1Party
+              newMemberName = sv1Name
+              newMemberParticipantId = sv1ParticipantId
               joinedAsOfRound = Round 0
-              newMemberRewardWeight = founderRewardWeight
+              newMemberRewardWeight = sv1RewardWeight
         createPerMemberContracts dsoRules addMemberChoiceArgs
-        createPerSvPartyContracts dso founderParty founderName founderDomainNodes (Some amuletPrice)
+        createPerSvPartyContracts dso sv1Party sv1Name sv1DomainNodes (Some amuletPrice)

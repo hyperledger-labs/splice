@@ -275,7 +275,7 @@ template DsoRules with
     offboardedMembers : Map.Map Party OffboardedMemberInfo
     leader : Party
     config : DsoRulesConfig
-    initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of DSO founding. Used for testing, empty in prod.
+    initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of synchronizer bootstrapping. Used for testing, empty in prod.
     isDevNet : Bool
   where
     ensure

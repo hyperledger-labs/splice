@@ -41,17 +41,13 @@ initDevNetCollective = initCollective True
 
 initCollective : Bool -> Script (AmuletApp, Party, (Party, Party, Party, Party))
 initCollective isDevNet = do
-  -- allocate users for the four founding members
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
-  -- the founding SV allocates the collective party as part of its initialization
   dso <- allocateParty "DSO"
 
-  -- We expect the founding node to create a proper single-node domain that can then be used
-  -- for driving all Daml workflows
   let initialDomainConfig = DomainConfig with
         state = DS_Operational
-        cometBftGenesisJson = "<genesis-json-injected-by-founding-member>"
+        cometBftGenesisJson = "<genesis-json>"
   let initialDsoGlobalDomainConfig =  DsoGlobalDomainConfig with
         domains = Map.fromList [("domain-id", initialDomainConfig)]
         lastDomainId = "domain-id"
@@ -77,11 +73,11 @@ initCollective isDevNet = do
   submit dso $ createAndExerciseCmd
     DsoBootstrap with
       dso
-      founderParty = sv1
-      founderName = "sv1"
-      founderRewardWeight = 10 * bpsMultiplier -- Tier 1 SVs get weight 10, and weights are recorded in basis-points, i.e., 1/10000ths
-      founderParticipantId = "sv1-participant-id"
-      founderDomainNodes = Map.fromList
+      sv1Party = sv1
+      sv1Name = "sv1"
+      sv1RewardWeight = 10 * bpsMultiplier -- Tier 1 SVs get weight 10, and weights are recorded in basis-points, i.e., 1/10000ths
+      sv1ParticipantId = "sv1-participant-id"
+      sv1DomainNodes = Map.fromList
         -- NOTE: the Canton domain and CometBft keys and config need to be allocated before bootstrapping the DsoRules
         -- as we need a working domain to create and exercise Daml contracts.
         [("domain-id",  DomainNodeConfig with
