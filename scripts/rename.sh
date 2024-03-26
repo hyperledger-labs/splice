@@ -42,7 +42,7 @@ function run_and_commit() {
     git reset -- "$rename_script"
 
     # Commit the changes
-    git commit -m "$description" -m "CMD: $cmd"
+    git commit --no-verify -m "$description" -m "CMD: $cmd"
   else
     echo "Skipping commit, as there were no changes."
   fi
@@ -58,7 +58,7 @@ function run_and_store_output() {
   output=$(eval "echo 'OUPTUT: BEGIN' && $cmd && echo 'OUTPUT: END'")
 
   # Store in an empty commit
-  git commit --allow-empty -m "$description" -m "CMD: $cmd" -m "$output"
+  git commit --no-verify --allow-empty -m "$description" -m "CMD: $cmd" -m "$output"
 }
 
 function assert_clean_working_dir() {
@@ -174,7 +174,8 @@ NO_API=$(exclude_all "${api_files[@]}")
 function rename() {
   local description=$1
   local pattern=$2
-  local extra_excludes=$3
+  local extra_includes=$3
+  local extra_excludes=$4
 
   # Build the excludes in reverse order, exploiting the idempotency of the renames when applying them
   local SPECIAL="$extra_excludes $NO_PROTECTED $NO_LOCKS $NO_CANTON"
@@ -189,14 +190,14 @@ function rename() {
   local DAML="-i 'daml/**' $SPECIAL"
 
   # We are not adjusting lock files, as they are regenerated in the cleanup step
-  run_and_commit "renaming $description: daml files"      "gsr $DAML      -f $pattern"
-  run_and_commit "renaming $description: app files"       "gsr $APP       -f $pattern"
-  run_and_commit "renaming $description: api files"       "gsr $API       -f $pattern"
-  run_and_commit "renaming $description: frontend files"  "gsr $FRONTEND  -f $pattern"
-  run_and_commit "renaming $description: cluster files"   "gsr $CLUSTER   -f $pattern"
-  run_and_commit "renaming $description: crypto files"    "gsr $CRYPTO    -f $pattern"
-  run_and_commit "renaming $description: doc files"       "gsr $DOCS      -f $pattern"
-  run_and_commit "renaming $description: special files"   "gsr $SPECIAL   -f $pattern"
+  run_and_commit "renaming $description: daml files"      "gsr $extra_includes $DAML      -f $pattern"
+  run_and_commit "renaming $description: app files"       "gsr $extra_includes $APP       -f $pattern"
+  run_and_commit "renaming $description: api files"       "gsr $extra_includes $API       -f $pattern"
+  run_and_commit "renaming $description: frontend files"  "gsr $extra_includes $FRONTEND  -f $pattern"
+  run_and_commit "renaming $description: cluster files"   "gsr $extra_includes $CLUSTER   -f $pattern"
+  run_and_commit "renaming $description: crypto files"    "gsr $extra_includes $CRYPTO    -f $pattern"
+  run_and_commit "renaming $description: doc files"       "gsr $extra_includes $DOCS      -f $pattern"
+  run_and_commit "renaming $description: special files"   "gsr $extra_includes $SPECIAL   -f $pattern"
 
 }
 
@@ -242,7 +243,7 @@ function subcmd_internal_cleanup() {
   run_and_commit "cleanup: format .ts files" "sbt --client npmFix"
   run_and_commit "cleanup: regenerate pulumi expected.json files" "make cluster/pulumi/update-expected"
 
-  git commit --allow-empty -m"Mark this renaming change as a [breaking] change."
+  git commit --no-verify --allow-empty -m"Mark this renaming change as a [breaking] change."
 }
 
 ### SVC
@@ -270,19 +271,28 @@ function subcmd_internal_svc_dso_rename() {
   # We rename these usages separately.
   rename "svc to dso (for occurences other than 'svc.')" \
     "'(?<!(clouddns-dns01-solver-))(?<!(kubectl get ))(?<!(kubectl edit ))(\b|(?<=[_]))svc(?![.])(\b|(?=([A-Z_]|rules|bootstrap)))///dso'" \
+    "" \
+    "$NO_K8S"
+
+  rename "svc.ts to dso.ts" \
+    "'svc\.ts///dso.ts'" \
+    "" \
     "$NO_K8S"
 
   # We ignore the $ suffix as that's used for string interpolation to build URLs in .scala files
-  rename "svc. to dso. (in *.scala files)" \
+  rename "svc. to dso. (in *.scala files and selected typescript)" \
     "'\bsvc\.(?![\\\$])///dso.'" \
-    "-i '*.scala'"
+    "-i '*.scala' -i cluster/pulumi/canton-network/src/dso.ts -i cluster/pulumi/canton-network/src/installCluster.ts" \
+    ""
 
   # The pg|gw|Gw ignores are for k8s service names
   rename "Svc to Dso" \
     "'(?<!(pg|gw|Gw))(\b|(?<=([a-z_])))Svc(\b|(?=([A-Z_])))///Dso'" \
+    "" \
     ""
   rename "SVC to DSO" \
     "'\bSVC(\b|(?=([_]|Rules)))///DSO'" \
+    "" \
     ""
 }
 
@@ -321,9 +331,11 @@ function subcmd_internal_coin_amulet_rename() {
   # Fix two accidental typos that are in our codebase
   rename "coinCointractId to coinContractId" \
     "'\bcoinCointractId\b///coinContractId'" \
+    "" \
     ""
   rename "coints to amulets" \
     "'\bcoints\b///amulets'" \
+    "" \
     ""
 
   # We do not change the rst files on our docs, as they do not contain URLs that need changing (manully verified)
@@ -334,15 +346,18 @@ function subcmd_internal_coin_amulet_rename() {
   # manually once the time is ripe.
   rename "coin to amulet" \
     "'(?<!([Cc]anton ))(\b|(?<=[_-]))coin(\b|(?=([A-Z0-9_-]|rules|operation|s\b|s[A-Z0-9_]|config\b|price\b)))///amulet'" \
+    ""
     "$IGNORE_DOCS_RST"
   rename "createdcoin to createdamulet" \
     "'\bcreatedcoin\b///createdamulet'" \
+    "" \
     "$IGNORE_DOCS_RST"
 
   # We keep '[Cc]anton Coin' mentions as they are mostly in user facing docs, which we need to adjust
   # manually once the time is ripe.
   rename "Coin to Amulet" \
     "'(?<!([Cc]anton ))(\b|(?<=([a-z0-9_])))Coin(\b|(?=([A-Z0-9_]|s[A-Z0-9_]|s\b)))///Amulet'" \
+    "" \
     ""
 
   # Ensure our Daml code does not mention Canton Coin
@@ -385,12 +400,15 @@ function subcmd_internal_cns_ans() {
   # Rename cns and CNS
   rename "cns to ans" \
     "'\bcns\b///ans'" \
+    "" \
     ""
   rename "Cns to Ans" \
     "'\bCns\b///Ans'" \
+    "" \
     ""
   rename "CNS to ANS" \
     "'\bCNS\b///ANS'" \
+    "" \
     ""
 }
 
@@ -418,9 +436,11 @@ function subcmd_cc_app_and_user() {
   # Rename cns and CNS
   rename "CCApp to AmuletApp" \
     "'\bCCApp\b///AmuletApp'" \
+    "" \
     ""
   rename "CCUser to AmuletUser" \
     "'\bCCUser\b///AmuletUser'" \
+    "" \
     ""
 }
 
