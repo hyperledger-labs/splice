@@ -134,6 +134,7 @@ special_files=(
   '*.ignore.txt'
   '.envrc.*'
   'scripts/**'
+  'build.sbt'
   'build-tools/**'
   'project/**'
   '*.sh'
@@ -449,18 +450,47 @@ function subcmd_cc_app_and_user() {
 
 # TODO(#11111): complete this part of the script
 
-subcommand_whitelist[internal_splice_splitwell]='Rename: Daml splitwell package to splice-splitwell'
+function rename_daml_package() {
+  local old=$1
+  local new=$2
 
-function subcmd_internal_split_splitwell() {
   assert_clean_working_dir
 
-  # daml/splitwell
-  # splitwell-daml
-  # splitwell-0.1.0
-  # splitwell-0.2.0
-  # splitwell[a-zA-Z-]+dar
-  # @daml.js/splitwell
-  # no usage of gsr 'splitwell-(?!(0.1.0|0.2.0))[0-9.]+///foo'
+  local rename_pattern="'(?<![-])\b$old\b(?![-][a-zA-Z])///$new'"
+  run_and_commit "rename $old to $new in daml/ directory" "gsr -i 'daml/**/*.yaml' -f $rename_pattern"
+
+  # More conservative renames outside of the daml/ directory
+  rename "daml/$old" \
+    "'(?<=daml/)$old\b(?![-])///$new'" \
+    "" \
+    ""
+  rename "daml.js/$old" \
+    "'(?<=daml.js/)$old\b(?![-][a-zA-Z])///$new'" \
+    "" \
+    ""
+  rename "$old .dar files" \
+    "'(?<![-])\b$old(?=-[a-zA-Z0-9.]+[.]dar)///$new'" \
+    "" \
+    ""
+  rename "$old-daml" \
+    "'(?<![-])\b$old(?=-daml)///$new'" \
+    "" \
+    ""
+}
+
+subcommand_whitelist[cn_util_package]='Rename: Daml package cn-util to splice-util'
+function subcmd_cn_util_package() {
+  rename_daml_package 'cn-util' 'splice-util'
+}
+
+subcommand_whitelist[wallet_package]='Rename: Daml package wallet to splice-wallet'
+function subcmd_wallet_package() {
+  rename_daml_package 'wallet' 'splice-wallet'
+  rename_daml_package 'wallet-test' 'splice-wallet-test'
+
+  # subcmd_internal_cleanup
+
+  # commit_occurrences "(?<![-])\bwallet\b(?![-])"
 }
 
 ################################
