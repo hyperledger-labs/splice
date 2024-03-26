@@ -10,7 +10,7 @@ set -euo pipefail
 # However the grep-based code below is nice and simple, which is why we're using it for now.
 
 ignored_files=(
-  'daml/cn-util/daml/CN/Util.daml'
+  'daml/splice-util/daml/CN/Util.daml'
   'canton/')
 
 # TODO(#9466): also check for naked `Xyz_Fetch` choices

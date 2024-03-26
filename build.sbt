@@ -64,7 +64,7 @@ lazy val root = (project in file("."))
     `apps-app`,
     `apps-wallet`,
     `apps-frontends`,
-    `cn-util-daml`,
+    `splice-util-daml`,
     `canton-amulet-daml`,
     `canton-amulet-test-daml`,
     `canton-name-service-daml`,
@@ -176,9 +176,9 @@ lazy val `tools` = project
 
 // Shared non-template/non-interface code
 // used across our DARs.
-lazy val `cn-util-daml` =
+lazy val `splice-util-daml` =
   project
-    .in(file("daml/cn-util"))
+    .in(file("daml/splice-util"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings
@@ -191,7 +191,7 @@ lazy val `canton-amulet-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`cn-util-daml` / Compile / damlBuild).value,
+        (`splice-util-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -213,7 +213,7 @@ lazy val `dso-governance-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`cn-util-daml` / Compile / damlBuild).value ++
+        (`splice-util-daml` / Compile / damlBuild).value ++
           (`canton-amulet-daml` / Compile / damlBuild).value ++
           (`canton-name-service-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value,
@@ -227,7 +227,7 @@ lazy val `dso-governance-test-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`cn-util-daml` / Compile / damlBuild).value ++
+        (`splice-util-daml` / Compile / damlBuild).value ++
           (`canton-amulet-test-daml` / Compile / damlBuild).value ++
           (`canton-name-service-test-daml` / Compile / damlBuild).value ++
           (`dso-governance-daml` / Compile / damlBuild).value ++
@@ -241,7 +241,7 @@ lazy val `validator-lifecycle-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`cn-util-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-util-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -251,7 +251,7 @@ lazy val `validator-lifecycle-test-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`cn-util-daml` / Compile / damlBuild).value ++ (`validator-lifecycle-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-util-daml` / Compile / damlBuild).value ++ (`validator-lifecycle-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -264,7 +264,7 @@ lazy val `wallet-payments-daml` =
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`cn-util-daml` / Compile / damlBuild).value ++
+        (`splice-util-daml` / Compile / damlBuild).value ++
           (`canton-amulet-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
@@ -1087,7 +1087,7 @@ lazy val bundleTask = {
         (`wallet-payments-daml` / Compile / damlBuild).value,
         (`app-manager-daml` / Compile / damlBuild).value,
         (`validator-lifecycle-daml` / Compile / damlBuild).value,
-        (`cn-util-daml` / Compile / damlBuild).value,
+        (`splice-util-daml` / Compile / damlBuild).value,
       )
     val args: Seq[String] =
       license ++ examples ++ testResources ++ transformConfig ++ webUis.flatMap({

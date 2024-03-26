@@ -11,7 +11,7 @@ data-dependencies:
 - ../canton-amulet-test/.daml/dist/canton-amulet-test-0.1.0.dar
 - ../canton-name-service/.daml/dist/canton-name-service-0.1.0.dar
 - ../canton-name-service-test/.daml/dist/canton-name-service-test-0.1.0.dar
-- ../cn-util/.daml/dist/cn-util-0.1.0.dar
+- ../splice-util/.daml/dist/splice-util-0.1.0.dar
 - ../dso-governance/.daml/dist/dso-governance-0.1.0.dar
 - ../wallet-payments/.daml/dist/wallet-payments-0.1.0.dar
 build-options:
