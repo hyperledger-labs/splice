@@ -75,10 +75,11 @@ export const sequencerResources: { resources?: k8s.types.input.core.v1.ResourceR
     ? {
         resources: {
           limits: {
+            cpu: '4',
             memory: '6Gi',
           },
           requests: {
-            cpu: '2',
+            cpu: '3',
             memory: '4Gi',
           },
         },

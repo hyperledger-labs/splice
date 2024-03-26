@@ -1223,6 +1223,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": "4",
             "memory": "32Gi"
           },
           "requests": {
@@ -1875,6 +1876,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": "4",
             "memory": "32Gi"
           },
           "requests": {
@@ -2817,6 +2819,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": "4",
             "memory": "32Gi"
           },
           "requests": {
@@ -3728,6 +3731,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": "4",
             "memory": "32Gi"
           },
           "requests": {
@@ -4639,6 +4643,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": "4",
             "memory": "32Gi"
           },
           "requests": {
@@ -5331,6 +5336,7 @@
         },
         "resources": {
           "limits": {
+            "cpu": "4",
             "memory": "32Gi"
           },
           "requests": {
