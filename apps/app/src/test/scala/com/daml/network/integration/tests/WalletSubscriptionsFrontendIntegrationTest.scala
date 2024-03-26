@@ -30,9 +30,9 @@ class WalletSubscriptionsFrontendIntegrationTest
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val alicePartyId = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
-      val dsoEntry = expectedDsoCns
-      createCnsEntry(aliceCnsExternalClient, aliceEntryName, aliceWalletClient)
-      val cnsPaymentDue = LocalDate.now().plusDays(90)
+      val dsoEntry = expectedDsoAns
+      createAnsEntry(aliceAnsExternalClient, aliceEntryName, aliceWalletClient)
+      val ansPaymentDue = LocalDate.now().plusDays(90)
       val aDate = LocalDate.now().plusDays(1)
       val selfSubscriptionDescription = "A recurring thing"
       createSelfSubscription(
@@ -45,8 +45,8 @@ class WalletSubscriptionsFrontendIntegrationTest
       )
 
       def matchSecondSubscription(row: Element) = matchSubscription(row)(
-        expectedReceiver = expectedCns(alicePartyId, aliceEntryName),
-        expectedProvider = expectedCns(alicePartyId, aliceEntryName),
+        expectedReceiver = expectedAns(alicePartyId, aliceEntryName),
+        expectedProvider = expectedAns(alicePartyId, aliceEntryName),
         expectedPrice = "42 CC per 1 day",
         expectedAmuletPrice = "84 USD @ 0.5CC/USD",
         expectedPaymentDate = s"${aDate.getMonthValue}/${aDate.getDayOfMonth}/${aDate.getYear}",
@@ -71,9 +71,9 @@ class WalletSubscriptionsFrontendIntegrationTest
               expectedPrice = "1 USD per 90 days",
               expectedAmuletPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =
-                s"${cnsPaymentDue.getMonthValue}/${cnsPaymentDue.getDayOfMonth}/${cnsPaymentDue.getYear}",
+                s"${ansPaymentDue.getMonthValue}/${ansPaymentDue.getDayOfMonth}/${ansPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"CNS entry: \"$aliceEntryName\"",
+              expectedDescription = s"ANS entry: \"$aliceEntryName\"",
             )
             matchSecondSubscription(subscriptionRows(1))
             subscriptionRows
@@ -128,18 +128,18 @@ class WalletSubscriptionsFrontendIntegrationTest
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName1 = perTestCaseName("alice")
-      createCnsEntry(
-        aliceCnsExternalClient,
+      createAnsEntry(
+        aliceAnsExternalClient,
         aliceEntryName1,
         aliceWalletClient,
         walletAmuletToUsd(5),
       )
 
-      val dsoEntry = expectedDsoCns
-      val cnsPaymentDue = LocalDate.now().plusDays(90)
+      val dsoEntry = expectedDsoAns
+      val ansPaymentDue = LocalDate.now().plusDays(90)
       val newlyPurchasedName = perTestCaseName("new")
       val respond =
-        requestCnsEntry(aliceCnsExternalClient, newlyPurchasedName)
+        requestAnsEntry(aliceAnsExternalClient, newlyPurchasedName)
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
@@ -156,12 +156,12 @@ class WalletSubscriptionsFrontendIntegrationTest
 
             find(className("available-balance"))
               .valueOrFail("Balance is not shown")
-              // from the original `createCnsEntry`
+              // from the original `createAnsEntry`
               .text should matchText("Total Available Balance: 4.4475 CC / 8.895 USD")
 
             find(className("sub-request-description"))
               .valueOrFail("Description is not shown")
-              .text should matchText(s"CNS entry: \"$newlyPurchasedName\"")
+              .text should matchText(s"ANS entry: \"$newlyPurchasedName\"")
 
             find(className("sub-request-price"))
               .valueOrFail("Price is not shown")
@@ -186,16 +186,16 @@ class WalletSubscriptionsFrontendIntegrationTest
           "Alice sees the new subscription in the list",
           _ => {
             val subscriptionRows = findAll(className("subscription-row")).toSeq
-            subscriptionRows should have size 2 // from createCnsEntry and just-accepted requestCnsEntry
+            subscriptionRows should have size 2 // from createAnsEntry and just-accepted requestAnsEntry
             matchSubscription(subscriptionRows.last)(
               expectedReceiver = dsoEntry,
               expectedProvider = dsoEntry,
               expectedPrice = "1 USD per 90 days",
               expectedAmuletPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =
-                s"${cnsPaymentDue.getMonthValue}/${cnsPaymentDue.getDayOfMonth}/${cnsPaymentDue.getYear}",
+                s"${ansPaymentDue.getMonthValue}/${ansPaymentDue.getDayOfMonth}/${ansPaymentDue.getYear}",
               expectedButtonEnabled = true,
-              expectedDescription = s"CNS entry: \"$newlyPurchasedName\"",
+              expectedDescription = s"ANS entry: \"$newlyPurchasedName\"",
             )
           },
         )

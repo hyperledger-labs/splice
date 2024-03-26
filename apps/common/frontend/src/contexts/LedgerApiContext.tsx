@@ -5,7 +5,7 @@ import React, { useContext } from 'react';
 import Ledger, { CommandMeta, CreateEvent, DisclosedContract, LedgerOptions } from '@daml/ledger';
 import { Choice, ContractId, Template, TemplateOrInterface } from '@daml/types';
 
-const CNS_LEDGER_NAME = 'cns-ledger';
+const ANS_LEDGER_NAME = 'ans-ledger';
 
 export abstract class PackageIdResolver {
   protected getQualifiedName(templateId: string): string {
@@ -49,7 +49,7 @@ export class LedgerApiClient {
   }
   async getPrimaryParty(): Promise<string> {
     const user = await callWithLogging(
-      CNS_LEDGER_NAME,
+      ANS_LEDGER_NAME,
       'getUser',
       userId => this.ledger.getUser(userId),
       this.userId

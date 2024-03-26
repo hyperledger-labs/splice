@@ -4,7 +4,7 @@ import org.apache.pekko.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.{CNStorageFactory, SharedCNNodeAppParameters}
+import com.daml.network.config.{ANStorageFactory, SharedCNNodeAppParameters}
 import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.splitwell.config.SplitwellAppBackendConfig
 import com.daml.network.splitwell.metrics.SplitwellAppMetrics
@@ -106,7 +106,7 @@ object SplitwellAppBootstrap {
           testingConfigInternal,
           clock,
           splitwellMetrics,
-          new CNStorageFactory(splitwellConfig.storage),
+          new ANStorageFactory(splitwellConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

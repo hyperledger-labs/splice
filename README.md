@@ -1285,7 +1285,7 @@ infrastructure stack for the cluster with `cncluster infra_up`.
 Because we do not have script for creating and deleting Google Cloud
 projects, we have no automatic deletion of SA keys for the DNS
 account. This must be done manually when deleting a project through
-`cnsluter uninstall_dns01_key`.
+`cncluster uninstall_dns01_key`.
 
 To the keys currently allocated, you can go to  https://console.cloud.google.com/iam-admin/serviceaccounts/details/111557570113518692244/keys?project=da-gcp-canton-domain.
 

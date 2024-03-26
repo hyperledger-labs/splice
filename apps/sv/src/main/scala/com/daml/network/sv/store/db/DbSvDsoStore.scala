@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.cc.amulet.*
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
-import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext}
+import com.daml.network.codegen.java.cn.ans.{AnsEntry, AnsEntryContext}
 import com.daml.network.codegen.java.cn.dso.amuletprice.AmuletPriceVote
 import com.daml.network.codegen.java.cn.dso.memberstate.{MemberRewardState, SvNodeState}
 import com.daml.network.codegen.java.cn.dso.memberstate.SvStatusReport
@@ -108,10 +108,10 @@ class DbSvDsoStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def listExpiredCnsSubscriptions(
+  override def listExpiredAnsSubscriptions(
       now: CantonTimestamp,
       limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[SvDsoStore.IdleCnsSubscription]] = waitUntilAcsIngested {
+  )(implicit tc: TraceContext): Future[Seq[SvDsoStore.IdleAnsSubscription]] = waitUntilAcsIngested {
     for {
       joinedRows <- storage
         .query(
@@ -148,19 +148,19 @@ class DbSvDsoStore(
               SubscriptionIdleState.COMPANION.TEMPLATE_ID
             )}
                 and      ctx.template_id_qualified_name = ${QualifiedName(
-              CnsEntryContext.COMPANION.TEMPLATE_ID
+              AnsEntryContext.COMPANION.TEMPLATE_ID
             )}
                 and      idle.subscription_next_payment_due_at < $now
               order by idle.subscription_next_payment_due_at
               limit    ${sqlLimit(limit)}
           """.as[(SelectFromAcsTableResult, SelectFromAcsTableResult)],
-          "listExpiredCnsSubscriptions",
+          "listExpiredAnsSubscriptions",
         )
-    } yield applyLimit("listExpiredCnsSubscriptions", limit, joinedRows).map {
+    } yield applyLimit("listExpiredAnsSubscriptions", limit, joinedRows).map {
       case (idleRow, ctxRow) =>
         val idleContract = contractFromRow(SubscriptionIdleState.COMPANION)(idleRow)
-        val ctxContract = contractFromRow(CnsEntryContext.COMPANION)(ctxRow)
-        SvDsoStore.IdleCnsSubscription(idleContract, ctxContract)
+        val ctxContract = contractFromRow(AnsEntryContext.COMPANION)(ctxRow)
+        SvDsoStore.IdleAnsSubscription(idleContract, ctxContract)
     }
   }
 
@@ -480,7 +480,7 @@ class DbSvDsoStore(
     )).getOrRaise(offsetExpectedError())
   }
 
-  override def lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(
+  override def lookupAnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
       paymentId: SubscriptionInitialPayment.ContractId,
   )(implicit
@@ -500,14 +500,14 @@ class DbSvDsoStore(
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                     and confirmer = $confirmer
-                    and action_cns_entry_context_payment_id = $paymentId
-                    and action_cns_entry_context_arc_type = ${lengthLimited(
-                DsoTables.CnsActionTypeCollectInitialEntryPayment
+                    and action_ans_entry_context_payment_id = $paymentId
+                    and action_ans_entry_context_arc_type = ${lengthLimited(
+                DsoTables.AnsActionTypeCollectInitialEntryPayment
               )}
                       """,
             orderLimit = sql"limit 1",
           ).headOption,
-          "lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset",
+          "lookupAnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
@@ -515,7 +515,7 @@ class DbSvDsoStore(
     )).getOrRaise(offsetExpectedError())
   }
 
-  override def lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
+  override def lookupAnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
       paymentId: SubscriptionInitialPayment.ContractId,
   )(implicit
@@ -535,14 +535,14 @@ class DbSvDsoStore(
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                     and confirmer = $confirmer
-                    and action_cns_entry_context_payment_id = $paymentId
-                    and action_cns_entry_context_arc_type = ${lengthLimited(
-                DsoTables.CnsActionTypeRejectEntryInitialPayment
+                    and action_ans_entry_context_payment_id = $paymentId
+                    and action_ans_entry_context_arc_type = ${lengthLimited(
+                DsoTables.AnsActionTypeRejectEntryInitialPayment
               )}
                       """,
             orderLimit = sql"limit 1",
           ).headOption,
-          "lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset",
+          "lookupAnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
@@ -550,7 +550,7 @@ class DbSvDsoStore(
     )).getOrRaise(offsetExpectedError())
   }
 
-  override def lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(
+  override def lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
       paymentId: SubscriptionInitialPayment.ContractId,
   )(implicit
@@ -570,11 +570,11 @@ class DbSvDsoStore(
             where = sql"""
                         template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                     and confirmer = $confirmer
-                    and action_cns_entry_context_payment_id = $paymentId
+                    and action_ans_entry_context_payment_id = $paymentId
                       """,
             orderLimit = sql"limit 1",
           ).headOption,
-          "lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset",
+          "lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset",
         )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
@@ -582,7 +582,7 @@ class DbSvDsoStore(
     )).getOrRaise(offsetExpectedError())
   }
 
-  override def listInitialPaymentConfirmationByCnsName(
+  override def listInitialPaymentConfirmationByAnsName(
       confirmer: PartyId,
       name: String,
       limit: Limit = Limit.DefaultLimit,
@@ -597,20 +597,20 @@ class DbSvDsoStore(
               domainMigrationId,
               where = sql"""template_id_qualified_name = ${QualifiedName(Confirmation.TEMPLATE_ID)}
                        and confirmer = $confirmer
-                       and action_cns_entry_context_cid IN (
+                       and action_ans_entry_context_cid IN (
                          select contract_id
                          from #${DsoTables.acsTableName}
                          where store_id = $storeId
                            and migration_id = $domainMigrationId
                            and template_id_qualified_name = ${QualifiedName(
-                  CnsEntryContext.TEMPLATE_ID
+                  AnsEntryContext.TEMPLATE_ID
                 )}
-                           and cns_entry_name = ${lengthLimited(name)})""",
+                           and ans_entry_name = ${lengthLimited(name)})""",
               orderLimit = sql"""limit ${sqlLimit(limit)}""",
             ),
-            "listInitialPaymentConfirmationByCnsName",
+            "listInitialPaymentConfirmationByAnsName",
           )
-        limited = applyLimit("listInitialPaymentConfirmationByCnsName", limit, result)
+        limited = applyLimit("listInitialPaymentConfirmationByAnsName", limit, result)
       } yield limited.map(contractFromRow(Confirmation.COMPANION)(_))
     }
 
@@ -1095,10 +1095,10 @@ class DbSvDsoStore(
     } yield limited.map(contractFromRow(ElectionRequest.COMPANION)(_))
   }
 
-  override def lookupCnsEntryByNameWithOffset(
+  override def lookupAnsEntryByNameWithOffset(
       name: String
   )(implicit tc: TraceContext): Future[
-    MultiDomainAcsStore.QueryResult[Option[AssignedContract[CnsEntry.ContractId, CnsEntry]]]
+    MultiDomainAcsStore.QueryResult[Option[AssignedContract[AnsEntry.ContractId, AnsEntry]]]
   ] = waitUntilAcsIngested {
     for {
       resultWithOffset <- storage
@@ -1107,16 +1107,16 @@ class DbSvDsoStore(
             DsoTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(CnsEntry.TEMPLATE_ID)}
-                    and cns_entry_name = ${lengthLimited(name)}
+            where = sql"""template_id_qualified_name = ${QualifiedName(AnsEntry.TEMPLATE_ID)}
+                    and ans_entry_name = ${lengthLimited(name)}
                     and assigned_domain is not null""",
             orderLimit = sql"limit 1",
           ).headOption,
-          "lookupCnsEntryByNameWithOffset",
+          "lookupAnsEntryByNameWithOffset",
         )
         .getOrRaise(offsetExpectedError())
       assigned = resultWithOffset.row.map(
-        assignedContractFromRow(CnsEntry.COMPANION)(_)
+        assignedContractFromRow(AnsEntry.COMPANION)(_)
       )
     } yield MultiDomainAcsStore.QueryResult(
       resultWithOffset.offset,
@@ -1242,9 +1242,9 @@ class DbSvDsoStore(
     } yield recentVoteResults
   }
 
-  override def lookupCnsEntryContext(reference: SubscriptionRequest.ContractId)(implicit
+  override def lookupAnsEntryContext(reference: SubscriptionRequest.ContractId)(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[CnsEntryContext.ContractId, CnsEntryContext]]] =
+  ): Future[Option[ContractWithState[AnsEntryContext.ContractId, AnsEntryContext]]] =
     waitUntilAcsIngested {
       for {
         row <- storage
@@ -1254,14 +1254,14 @@ class DbSvDsoStore(
               storeId,
               domainMigrationId,
               where = sql"""
-               template_id_qualified_name = ${QualifiedName(CnsEntryContext.COMPANION.TEMPLATE_ID)}
+               template_id_qualified_name = ${QualifiedName(AnsEntryContext.COMPANION.TEMPLATE_ID)}
            and subscription_reference_contract_id = $reference""",
               orderLimit = sql"""limit 1""",
             ).headOption,
-            "lookupCnsEntryContext",
+            "lookupAnsEntryContext",
           )
           .value
-      } yield row.map(contractWithStateFromRow(CnsEntryContext.COMPANION)(_))
+      } yield row.map(contractWithStateFromRow(AnsEntryContext.COMPANION)(_))
     }
 
   def lookupSvNodeState(svPartyId: PartyId)(implicit

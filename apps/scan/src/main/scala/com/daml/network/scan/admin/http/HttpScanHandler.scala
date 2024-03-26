@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.cc.round.{
   OpenMiningRound,
   SummarizingMiningRound,
 }
-import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.ans as ansCodegen
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.{definitions, scan as v0}
 import com.daml.network.http.v0.definitions.MaybeCachedContractWithState
@@ -42,14 +42,14 @@ import com.daml.network.http.v0.definitions.TransactionHistoryResponseItem.Trans
   SvRewardCollected,
   Transfer,
 }
-import com.daml.network.scan.dso.DsoCnsResolver
+import com.daml.network.scan.dso.DsoAnsResolver
 import com.daml.network.store.PageLimit
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
 class HttpScanHandler(
     participantAdminConnection: ParticipantAdminConnection,
     store: ScanStore,
-    dsoCnsResolver: DsoCnsResolver,
+    dsoAnsResolver: DsoAnsResolver,
     miningRoundsCacheTimeToLiveOverride: Option[NonNegativeFiniteDuration],
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -194,33 +194,33 @@ class HttpScanHandler(
     }
   }
 
-  def getCnsRules(
-      response: v0.ScanResource.GetCnsRulesResponse.type
+  def getAnsRules(
+      response: v0.ScanResource.GetAnsRulesResponse.type
   )(
-      body: com.daml.network.http.v0.definitions.GetCnsRulesRequest
-  )(extracted: TraceContext): Future[v0.ScanResource.GetCnsRulesResponse] = {
+      body: com.daml.network.http.v0.definitions.GetAnsRulesRequest
+  )(extracted: TraceContext): Future[v0.ScanResource.GetAnsRulesResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getCnsRules") { _ => _ =>
+    withSpan(s"$workflowId.getAnsRules") { _ => _ =>
       for {
-        cnsRulesO <- store.lookupCnsRules()
-        cnsRules = cnsRulesO getOrElse {
-          throw new NoSuchElementException("found no cnsrules instance")
+        ansRulesO <- store.lookupAnsRules()
+        ansRules = ansRulesO getOrElse {
+          throw new NoSuchElementException("found no ansrules instance")
         }
       } yield {
         val response = MaybeCachedContractWithState(
-          body.cachedCnsRulesContractId match {
-            case Some(cachedContractId) if cachedContractId == cnsRules.contractId.contractId =>
+          body.cachedAnsRulesContractId match {
+            case Some(cachedContractId) if cachedContractId == ansRules.contractId.contractId =>
               logger.debug(
-                show"Not sending ${PrettyContractId(cnsCodegen.CnsRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
+                show"Not sending ${PrettyContractId(ansCodegen.AnsRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
               )
               None
             case Some(_) | None =>
-              Some(cnsRules.contract.toHttp)
+              Some(ansRules.contract.toHttp)
           },
-          domainId = cnsRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
+          domainId = ansRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
         )
-        definitions.GetCnsRulesResponse(
-          cnsRulesUpdate = response
+        definitions.GetAnsRulesResponse(
+          ansRulesUpdate = response
         )
       }
     }
@@ -622,17 +622,17 @@ class HttpScanHandler(
     }
   }
 
-  override def listCnsEntries(
-      respond: ScanResource.ListCnsEntriesResponse.type
+  override def listAnsEntries(
+      respond: ScanResource.ListAnsEntriesResponse.type
   )(namePrefix: Option[String], pageSize: Int)(
       extracted: TraceContext
-  ): Future[ScanResource.ListCnsEntriesResponse] = {
+  ): Future[ScanResource.ListAnsEntriesResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.listEntries") { _ => _ =>
       for {
         entryContracts <- store.listEntries(namePrefix.getOrElse(""), PageLimit.tryCreate(pageSize))
         entries = entryContracts.map { contract =>
-          definitions.CnsEntry(
+          definitions.AnsEntry(
             Some(contract.contractId.contractId),
             contract.payload.user,
             contract.payload.name,
@@ -655,31 +655,31 @@ class HttpScanHandler(
   private def getDsoEntriesFromDsoRules(namePrefix: Option[String])(implicit tc: TraceContext) =
     store.lookupDsoRules().map { dsoRulesOpt =>
       dsoRulesOpt.toList.flatMap { dsoRules =>
-        dsoCnsResolver
+        dsoAnsResolver
           .listEntries(dsoRules.contract, namePrefix)
           .map(_.toHttp)
       }
     }
 
-  override def lookupCnsEntryByName(respond: ScanResource.LookupCnsEntryByNameResponse.type)(
+  override def lookupAnsEntryByName(respond: ScanResource.LookupAnsEntryByNameResponse.type)(
       name: String
-  )(extracted: TraceContext): Future[ScanResource.LookupCnsEntryByNameResponse] = {
+  )(extracted: TraceContext): Future[ScanResource.LookupAnsEntryByNameResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupEntryByName") { _ => _ =>
       store.lookupDsoRules().flatMap {
         case Some(dsoRules) =>
-          dsoCnsResolver.lookupEntryByName(dsoRules.contract, name) match {
-            case Some(dsoCnsEntry) =>
+          dsoAnsResolver.lookupEntryByName(dsoRules.contract, name) match {
+            case Some(dsoAnsEntry) =>
               Future.successful(
-                v0.ScanResource.LookupCnsEntryByNameResponse
-                  .OK(definitions.LookupEntryByNameResponse(dsoCnsEntry.toHttp))
+                v0.ScanResource.LookupAnsEntryByNameResponse
+                  .OK(definitions.LookupEntryByNameResponse(dsoAnsEntry.toHttp))
               )
             case None =>
               store.lookupEntryByName(name).map {
                 case Some(entry) =>
-                  v0.ScanResource.LookupCnsEntryByNameResponse.OK(
+                  v0.ScanResource.LookupAnsEntryByNameResponse.OK(
                     definitions.LookupEntryByNameResponse(
-                      definitions.CnsEntry(
+                      definitions.AnsEntry(
                         Some(entry.contractId.contractId),
                         entry.payload.user,
                         entry.payload.name,
@@ -693,14 +693,14 @@ class HttpScanHandler(
                     )
                   )
                 case None =>
-                  v0.ScanResource.LookupCnsEntryByNameResponse.NotFound(
-                    definitions.ErrorResponse(s"No cns entry found for name: $name")
+                  v0.ScanResource.LookupAnsEntryByNameResponse.NotFound(
+                    definitions.ErrorResponse(s"No ans entry found for name: $name")
                   )
               }
           }
         case None =>
           Future.successful(
-            v0.ScanResource.LookupCnsEntryByNameResponse.NotFound(
+            v0.ScanResource.LookupAnsEntryByNameResponse.NotFound(
               definitions.ErrorResponse(s"No DsoRules contract found")
             )
           )
@@ -708,19 +708,19 @@ class HttpScanHandler(
     }
   }
 
-  override def lookupCnsEntryByParty(respond: ScanResource.LookupCnsEntryByPartyResponse.type)(
+  override def lookupAnsEntryByParty(respond: ScanResource.LookupAnsEntryByPartyResponse.type)(
       party: String
-  )(extracted: TraceContext): Future[ScanResource.LookupCnsEntryByPartyResponse] = {
+  )(extracted: TraceContext): Future[ScanResource.LookupAnsEntryByPartyResponse] = {
     implicit val tc = extracted
     withSpan(s"$workflowId.lookupEntryByParty") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
       store.lookupDsoRules().flatMap {
         case Some(dsoRules) =>
-          dsoCnsResolver.lookupEntryByParty(dsoRules.contract, partyId) match {
-            case Some(dsoCnsEntry) =>
+          dsoAnsResolver.lookupEntryByParty(dsoRules.contract, partyId) match {
+            case Some(dsoAnsEntry) =>
               Future.successful(
-                v0.ScanResource.LookupCnsEntryByPartyResponse
-                  .OK(definitions.LookupEntryByPartyResponse(dsoCnsEntry.toHttp))
+                v0.ScanResource.LookupAnsEntryByPartyResponse
+                  .OK(definitions.LookupEntryByPartyResponse(dsoAnsEntry.toHttp))
               )
             case None =>
               store
@@ -728,9 +728,9 @@ class HttpScanHandler(
                 .flatMap {
                   case Some(entry) =>
                     Future.successful(
-                      v0.ScanResource.LookupCnsEntryByPartyResponse.OK(
+                      v0.ScanResource.LookupAnsEntryByPartyResponse.OK(
                         definitions.LookupEntryByPartyResponse(
-                          definitions.CnsEntry(
+                          definitions.AnsEntry(
                             Some(entry.contractId.contractId),
                             entry.payload.user,
                             entry.payload.name,
@@ -746,15 +746,15 @@ class HttpScanHandler(
                     )
                   case None =>
                     Future.successful(
-                      v0.ScanResource.LookupCnsEntryByPartyResponse.NotFound(
-                        definitions.ErrorResponse(s"No cns entry found for party: $party")
+                      v0.ScanResource.LookupAnsEntryByPartyResponse.NotFound(
+                        definitions.ErrorResponse(s"No ans entry found for party: $party")
                       )
                     )
                 }
           }
         case None =>
           Future.successful(
-            v0.ScanResource.LookupCnsEntryByPartyResponse.NotFound(
+            v0.ScanResource.LookupAnsEntryByPartyResponse.NotFound(
               definitions.ErrorResponse(s"No DsoRules contract found")
             )
           )
@@ -795,7 +795,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAcsSnapshot") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
       for {
-        // The DSO party is a stakeholder on all "important" contracts, in particular, all amulet holdings and CNS entries
+        // The DSO party is a stakeholder on all "important" contracts, in particular, all amulet holdings and ANS entries
         // so filtering an DSO snapshot to contracts another party is also a stakeholder on provides a sufficient snapshot
         // for that party to recover.
         // It does however lose third-party application data that the DSO party is not a stakeholder on. Supporting that requires

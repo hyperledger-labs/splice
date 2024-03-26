@@ -25,32 +25,32 @@ async function main() {
     namespaceToUiToClientId: {
       validator1: {
         wallet: 'validator1-wallet-ui-client-id',
-        cns: 'validator1-cns-ui-client-id',
+        ans: 'validator1-ans-ui-client-id',
         splitwell: 'validator1-splitwell-ui-client-id',
       },
       splitwell: {
         wallet: 'splitwell-wallet-ui-client-id',
-        cns: 'splitwell-cns-ui-client-id',
+        ans: 'splitwell-ans-ui-client-id',
         splitwell: 'splitwell-splitwell-ui-client-id',
       },
       'sv-1': {
         wallet: 'sv-1-wallet-ui-client-id',
-        cns: 'sv-1-cns-ui-client-id',
+        ans: 'sv-1-ans-ui-client-id',
         sv: 'sv-1-sv-ui-client-id',
       },
       'sv-2': {
         wallet: 'sv-2-wallet-ui-client-id',
-        cns: 'sv-2-cns-ui-client-id',
+        ans: 'sv-2-ans-ui-client-id',
         sv: 'sv-2-sv-ui-client-id',
       },
       'sv-3': {
         wallet: 'sv-3-wallet-ui-client-id',
-        cns: 'sv-3-cns-ui-client-id',
+        ans: 'sv-3-ans-ui-client-id',
         sv: 'sv-3-sv-ui-client-id',
       },
       'sv-4': {
         wallet: 'sv-4-wallet-ui-client-id',
-        cns: 'sv-4-cns-ui-client-id',
+        ans: 'sv-4-ans-ui-client-id',
         sv: 'sv-4-sv-ui-client-id',
       },
     },

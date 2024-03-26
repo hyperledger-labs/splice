@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.ans.AnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.CNNodeConsoleEnvironment
 import com.daml.network.http.v0.definitions
@@ -82,40 +82,40 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    "Returns the CnsRules."
+    "Returns the AnsRules."
   )
-  def getCnsRules(): ContractWithState[CnsRules.ContractId, CnsRules] =
+  def getAnsRules(): ContractWithState[AnsRules.ContractId, AnsRules] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetCnsRules(None))
+      httpCommand(HttpScanAppClient.GetAnsRules(None))
     }
 
-  @Help.Summary("List cns entries")
+  @Help.Summary("List ans entries")
   @Help.Description(
-    "Lists all cns entries whose name is prefixed with the given prefix, up to a given number of entries"
+    "Lists all ans entries whose name is prefixed with the given prefix, up to a given number of entries"
   )
   def listEntries(
       namePrefix: String,
       pageSize: Int,
-  ): Seq[definitions.CnsEntry] =
+  ): Seq[definitions.AnsEntry] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.ListCnsEntries(Some(namePrefix), pageSize))
+      httpCommand(HttpScanAppClient.ListAnsEntries(Some(namePrefix), pageSize))
     }
 
-  @Help.Summary("Lookup a cns entry by the party that registered it")
+  @Help.Summary("Lookup a ans entry by the party that registered it")
   def lookupEntryByParty(
       party: PartyId
-  ): Option[definitions.CnsEntry] =
+  ): Option[definitions.AnsEntry] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.LookupCnsEntryByParty(party))
+      httpCommand(HttpScanAppClient.LookupAnsEntryByParty(party))
     }
 
-  @Help.Summary("Lookup a cns entry by its name")
+  @Help.Summary("Lookup a ans entry by its name")
   def lookupEntryByName(
       name: String
-  ): definitions.CnsEntry =
+  ): definitions.AnsEntry =
     consoleEnvironment
       .run {
-        httpCommand(HttpScanAppClient.LookupCnsEntryByName(name))
+        httpCommand(HttpScanAppClient.LookupAnsEntryByName(name))
           .flatMap(optContract =>
             ConsoleCommandResult.fromEither(optContract.toRight(s"Entry with name $name not found"))
           )

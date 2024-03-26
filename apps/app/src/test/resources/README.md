@@ -83,7 +83,7 @@ all network indices must be odd numbers.
 - `07`: Mediator, Admin API
 - `08`: Domain, Public API
 - `09`: Domain, Admin API
-- `11`: CNS user, Admin API
+- `11`: ANS user, Admin API
 - `12`: Scan, Admin API
 - `13`: Splitwell, Admin API
 - `14`: SV, Public API + Admin API

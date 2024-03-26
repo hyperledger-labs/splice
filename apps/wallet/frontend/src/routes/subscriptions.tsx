@@ -27,7 +27,7 @@ import {
 import { SubscriptionPayData } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { Party } from '@daml/types';
 
-import BftCnsEntry from '../components/BftCnsEntry';
+import BftAnsEntry from '../components/BftAnsEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useSubscriptions } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
@@ -101,7 +101,7 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
   return (
     <TableRow className="subscription-row">
       <TableCell variant="party">
-        <BftCnsEntry
+        <BftAnsEntry
           className="sub-receiver"
           partyId={subscription.subscription.payload.subscriptionData.receiver}
         />
@@ -144,7 +144,7 @@ const Service: React.FC<{ provider: Party; description: string }> = ({ provider,
       <Typography variant="h6" className="sub-description">
         {description}
       </Typography>
-      <BftCnsEntry partyId={provider} variant="caption" className="sub-provider" />
+      <BftAnsEntry partyId={provider} variant="caption" className="sub-provider" />
     </Stack>
   );
 };

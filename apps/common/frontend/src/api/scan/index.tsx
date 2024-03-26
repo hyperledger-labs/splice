@@ -2,19 +2,19 @@ import { ScanClientProvider, useScanClient } from './ScanClientContext';
 import useActivity from './useActivity';
 import useAmuletPrice, { useAmuletPriceFromOpenRounds } from './useAmuletPrice';
 import useGetAmuletRules from './useGetAmuletRules';
-import useGetCnsRules from './useGetCnsRules';
+import useGetAnsRules from './useGetAnsRules';
 import useGetDsoPartyId from './useGetDsoPartyId';
 import useGetRoundOfLatestData from './useGetRoundOfLatestData';
 import useGetTopValidatorsByPurchasedTraffic from './useGetTopValidatorsByPurchasedTraffic';
 import useGetTopValidatorsByValidatorFaucets from './useGetTopValidatorsByValidatorFaucets';
 import useGetTopValidatorsByValidatorRewards from './useGetTopValidatorsByValidatorRewards';
-import useListCnsEntries, { useListCnsEntriesFromResponse } from './useListCnsEntries';
-import useLookupCnsEntryByName, {
-  useLookupCnsEntryByNameFromResponse,
-} from './useLookupCnsEntryByName';
-import useLookupCnsEntryByParty, {
-  useLookupCnsEntryByPartyFromResponse,
-} from './useLookupCnsEntryByParty';
+import useListAnsEntries, { useListAnsEntriesFromResponse } from './useListAnsEntries';
+import useLookupAnsEntryByName, {
+  useLookupAnsEntryByNameFromResponse,
+} from './useLookupAnsEntryByName';
+import useLookupAnsEntryByParty, {
+  useLookupAnsEntryByPartyFromResponse,
+} from './useLookupAnsEntryByParty';
 import useLookupFeaturedAppRight, {
   useLookupFeaturedAppRightBuilder,
 } from './useLookupFeaturedAppRight';
@@ -28,7 +28,7 @@ export {
   useAmuletPrice,
   useAmuletPriceFromOpenRounds,
   useGetAmuletRules,
-  useGetCnsRules,
+  useGetAnsRules,
   useGetRoundOfLatestData,
   useGetDsoPartyId,
   useGetTopValidatorsByValidatorRewards,
@@ -40,10 +40,10 @@ export {
   useTopAppProviders,
   useTotalAmuletBalance,
   useTotalRewards,
-  useListCnsEntries,
-  useListCnsEntriesFromResponse,
-  useLookupCnsEntryByName,
-  useLookupCnsEntryByNameFromResponse,
-  useLookupCnsEntryByParty,
-  useLookupCnsEntryByPartyFromResponse,
+  useListAnsEntries,
+  useListAnsEntriesFromResponse,
+  useLookupAnsEntryByName,
+  useLookupAnsEntryByNameFromResponse,
+  useLookupAnsEntryByParty,
+  useLookupAnsEntryByPartyFromResponse,
 };

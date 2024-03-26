@@ -52,13 +52,13 @@ class WalletTransactionHistoryFrontendIntegrationTest
 
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val charlieEntryName = perTestCaseName("charlie")
-      createCnsEntry(
-        charlieCnsExternalClient,
+      createAnsEntry(
+        charlieAnsExternalClient,
         charlieEntryName,
         charlieWalletClient,
       )
 
-      val dsoEntry = expectedDsoCns
+      val dsoEntry = expectedDsoAns
 
       withFrontEnd("alice") { implicit webDriver =>
         actAndCheck(
@@ -76,8 +76,8 @@ class WalletTransactionHistoryFrontendIntegrationTest
         val (_, txs) = actAndCheck(
           "Transactions are done", {
             // alice's directory - also taps 5 CC
-            createCnsEntry(
-              aliceCnsExternalClient,
+            createAnsEntry(
+              aliceAnsExternalClient,
               aliceEntryName,
               aliceWalletClient,
               tapAmount = 5 * amuletPrice,
@@ -115,7 +115,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         )
 
         inside(txs) {
-          case otp +: sent +: received +: cnsCreation +: lockForCns +: balanceChange +: Nil =>
+          case otp +: sent +: received +: ansCreation +: lockForAns +: balanceChange +: Nil =>
             matchTransaction(otp)(
               amuletPrice = 2,
               expectedAction = "Sent",
@@ -128,7 +128,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAction = "Sent",
               expectedSubtype = "P2P Payment Completed",
               expectedPartyDescription = Some(
-                s"${expectedCns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
+                s"${expectedAns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
               ),
               expectedAmountCC = BigDecimal("-1.18"),
             )
@@ -137,20 +137,20 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAction = "Received",
               expectedSubtype = "P2P Payment Completed",
               expectedPartyDescription = Some(
-                s"${expectedCns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
+                s"${expectedAns(charlieUserParty, charlieEntryName)} $aliceValidatorParty"
               ),
               expectedAmountCC = BigDecimal("1.07"),
             )
             // Note: this transfer has no effect on the balance of the sender:
             // the input for the app payment is a locked amulet that was unlocked in the same transaction.
-            matchTransaction(cnsCreation)(
+            matchTransaction(ansCreation)(
               amuletPrice = 2,
               expectedAction = "Sent",
-              expectedSubtype = "CNS Entry Initial Payment Collected",
+              expectedSubtype = "ANS Entry Initial Payment Collected",
               expectedPartyDescription = Some(s"$dsoEntry $dsoEntry"),
               expectedAmountCC = BigDecimal(0), // 0 USD
             )
-            matchTransaction(lockForCns)(
+            matchTransaction(lockForAns)(
               amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "Subscription Initial Payment Accepted",
@@ -199,7 +199,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedAction = "Sent",
                 expectedSubtype = "Extra Traffic Purchase",
                 expectedPartyDescription = Some(
-                  s"${expectedCns(dsoParty, "dso.ans")} ${expectedCns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.ans")}"
+                  s"${expectedAns(dsoParty, "dso.ans")} ${expectedAns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.ans")}"
                 ),
                 expectedAmountCC = -trafficCostCc,
               )
@@ -233,12 +233,12 @@ class WalletTransactionHistoryFrontendIntegrationTest
           },
         )
 
-        createCnsEntry(
-          aliceCnsExternalClient,
+        createAnsEntry(
+          aliceAnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
         )
-        createCnsEntry(bobCnsExternalClient, bobEntryName, bobWalletClient)
+        createAnsEntry(bobAnsExternalClient, bobEntryName, bobWalletClient)
 
         aliceWalletClient.tap(500)
 

@@ -72,7 +72,7 @@ case class CNNodeConfig(
     scanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
     appManagerAppClients: Map[InstanceName, AppManagerAppClientConfig] = Map.empty,
-    cnsAppExternalClients: Map[InstanceName, CnsAppExternalClientConfig] = Map.empty,
+    ansAppExternalClients: Map[InstanceName, AnsAppExternalClientConfig] = Map.empty,
     splitwellApps: Map[InstanceName, SplitwellAppBackendConfig] = Map.empty,
     splitwellAppClients: Map[InstanceName, SplitwellAppClientConfig] = Map.empty,
     // TODO(#736): we want to remove all of the configurations options below:
@@ -411,8 +411,8 @@ object CNNodeConfig {
       deriveReader[SvBootstrapDumpConfig]
     implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
       new FieldCoproductHint[SvOnboardingConfig]("type")
-    implicit val initialCnsConfigReader: ConfigReader[InitialCnsConfig] =
-      deriveReader[InitialCnsConfig]
+    implicit val initialAnsConfigReader: ConfigReader[InitialAnsConfig] =
+      deriveReader[InitialAnsConfig]
     implicit val trafficControlConfigReader: ConfigReader[TrafficControlConfig] =
       deriveReader[TrafficControlConfig]
     implicit val svOnboardingFoundCollectiveReader
@@ -535,8 +535,8 @@ object CNNodeConfig {
       deriveReader[WalletAppClientConfig]
     implicit val AppManagerAppClientConfigReader: ConfigReader[AppManagerAppClientConfig] =
       deriveReader[AppManagerAppClientConfig]
-    implicit val cnsExternalClientConfigReader: ConfigReader[CnsAppExternalClientConfig] =
-      deriveReader[CnsAppExternalClientConfig]
+    implicit val ansExternalClientConfigReader: ConfigReader[AnsAppExternalClientConfig] =
+      deriveReader[AnsAppExternalClientConfig]
     implicit val splitwellDomainsReader: ConfigReader[SplitwellDomains] =
       deriveReader[SplitwellDomains]
     implicit val splitwellDomainConfigReader: ConfigReader[SplitwellDomainConfig] =
@@ -657,8 +657,8 @@ object CNNodeConfig {
       deriveWriter[SvBootstrapDumpConfig]
     implicit val svOnboardingConfigHint: FieldCoproductHint[SvOnboardingConfig] =
       new FieldCoproductHint[SvOnboardingConfig]("type")
-    implicit val initialCnsConfigWriter: ConfigWriter[InitialCnsConfig] =
-      deriveWriter[InitialCnsConfig]
+    implicit val initialAnsConfigWriter: ConfigWriter[InitialAnsConfig] =
+      deriveWriter[InitialAnsConfig]
     implicit val trafficControlConfigWriter: ConfigWriter[TrafficControlConfig] =
       deriveWriter[TrafficControlConfig]
     implicit val svOnboardingFoundCollectiveWriter
@@ -758,8 +758,8 @@ object CNNodeConfig {
       deriveWriter[WalletAppClientConfig]
     implicit val AppManagerAppClientConfigWriter: ConfigWriter[AppManagerAppClientConfig] =
       deriveWriter[AppManagerAppClientConfig]
-    implicit val cnsExternalClientConfigWriter: ConfigWriter[CnsAppExternalClientConfig] =
-      deriveWriter[CnsAppExternalClientConfig]
+    implicit val ansExternalClientConfigWriter: ConfigWriter[AnsAppExternalClientConfig] =
+      deriveWriter[AnsAppExternalClientConfig]
     implicit val splitwellDomains: ConfigWriter[SplitwellDomains] =
       deriveWriter[SplitwellDomains]
     implicit val splitwellDomainConfigWriter: ConfigWriter[SplitwellDomainConfig] =

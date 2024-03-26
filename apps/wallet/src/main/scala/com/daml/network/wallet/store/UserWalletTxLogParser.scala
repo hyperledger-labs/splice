@@ -34,8 +34,8 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferCodegen,
 }
 import com.daml.network.history.{
-  CnsRules_CollectEntryRenewalPayment,
-  CnsRules_CollectInitialEntryPayment,
+  AnsRules_CollectEntryRenewalPayment,
+  AnsRules_CollectInitialEntryPayment,
   AmuletArchive,
   AmuletCreate,
   AmuletExpire,
@@ -628,19 +628,19 @@ class UserWalletTxLogParser(
             now(State.fromBuyMemberTraffic(node, tree, exercised))
 
           // ------------------------------------------------------------------
-          // Canton name service subscription payment collection
+          // Amulet name service subscription payment collection
           // ------------------------------------------------------------------
 
-          case CnsRules_CollectInitialEntryPayment(_) =>
-            fromCnsEntryPaymentCollection(
+          case AnsRules_CollectInitialEntryPayment(_) =>
+            fromAnsEntryPaymentCollection(
               tree,
               exercised,
               domainId,
               TransferTransactionSubtype.InitialEntryPaymentCollection,
             )
 
-          case CnsRules_CollectEntryRenewalPayment(_) =>
-            fromCnsEntryPaymentCollection(
+          case AnsRules_CollectEntryRenewalPayment(_) =>
+            fromAnsEntryPaymentCollection(
               tree,
               exercised,
               domainId,
@@ -709,7 +709,7 @@ class UserWalletTxLogParser(
   override def error(offset: String, eventId: String, domainId: DomainId): Option[TxLogEntry] =
     Some(UnknownTxLogEntry(eventId))
 
-  private def fromCnsEntryPaymentCollection(
+  private def fromAnsEntryPaymentCollection(
       tree: TransactionTree,
       exercised: ExercisedEvent,
       domainId: DomainId,

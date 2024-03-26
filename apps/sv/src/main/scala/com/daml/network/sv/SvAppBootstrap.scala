@@ -4,7 +4,7 @@ import org.apache.pekko.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.{CNStorageFactory, SharedCNNodeAppParameters}
+import com.daml.network.config.{ANStorageFactory, SharedCNNodeAppParameters}
 import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.metrics.SvAppMetrics
@@ -106,7 +106,7 @@ object SvAppBootstrap {
           testingConfigInternal,
           clock,
           svMetrics,
-          new CNStorageFactory(svConfig.storage),
+          new ANStorageFactory(svConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

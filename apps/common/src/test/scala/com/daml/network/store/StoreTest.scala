@@ -22,7 +22,7 @@ import com.daml.network.codegen.java.cc.{
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.ans as ansCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.environment.ledger.api.{
@@ -113,12 +113,12 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  protected def cnsRules() = {
-    val templateId = cnsCodegen.CnsRules.TEMPLATE_ID
+  protected def ansRules() = {
+    val templateId = ansCodegen.AnsRules.TEMPLATE_ID
 
-    val template = new cnsCodegen.CnsRules(
+    val template = new ansCodegen.AnsRules(
       dsoParty.toProtoPrimitive,
-      new cnsCodegen.CnsRulesConfig(
+      new ansCodegen.AnsRulesConfig(
         new RelTime(1_000_000),
         new RelTime(1_000_000),
         new java.math.BigDecimal(1.0).setScale(10),
@@ -126,7 +126,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
     contract(
       identifier = templateId,
-      contractId = new cnsCodegen.CnsRules.ContractId(nextCid()),
+      contractId = new ansCodegen.AnsRules.ContractId(nextCid()),
       payload = template,
     )
   }

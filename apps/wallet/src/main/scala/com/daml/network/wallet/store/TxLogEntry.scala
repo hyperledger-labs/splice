@@ -3,8 +3,8 @@ package com.daml.network.wallet.store
 import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.history.{
-  CnsRules_CollectEntryRenewalPayment,
-  CnsRules_CollectInitialEntryPayment,
+  AnsRules_CollectEntryRenewalPayment,
+  AnsRules_CollectInitialEntryPayment,
   AmuletExpire,
   AmuletRules_BuyMemberTraffic,
   LockedAmuletExpireAmulet,
@@ -434,9 +434,9 @@ object TxLogEntry extends StoreErrors {
     case object ExtraTrafficPurchase
         extends TransferTransactionSubtype(AmuletRules_BuyMemberTraffic)
     case object InitialEntryPaymentCollection
-        extends TransferTransactionSubtype(CnsRules_CollectInitialEntryPayment)
+        extends TransferTransactionSubtype(AnsRules_CollectInitialEntryPayment)
     case object EntryRenewalPaymentCollection
-        extends TransferTransactionSubtype(CnsRules_CollectEntryRenewalPayment)
+        extends TransferTransactionSubtype(AnsRules_CollectEntryRenewalPayment)
     case object Transfer extends TransferTransactionSubtype(com.daml.network.history.Transfer)
 
     val values: Map[String, TransferTransactionSubtype] = Set[TransferTransactionSubtype](

@@ -1,10 +1,10 @@
 daml/app-manager/.daml/dist/app-manager-0.1.0.dar ae8a5a65404610283c84b403ea985e6b62077ff3269ad19e818e5e1651346525
 daml/canton-amulet-test/.daml/dist/canton-amulet-test-0.1.0.dar e05ffff6b644fcf8c8b0cdefa1ef146cd6b251986526772db24b6179205fafa5
 daml/canton-amulet/.daml/dist/canton-amulet-0.1.0.dar d81fd0ac19ec617da1f167c858025080354b8105bd5975f7c462859ee2771255
-daml/canton-name-service-test/.daml/dist/canton-name-service-test-0.1.0.dar 61b11217849c87e4a2679471184b492cf730f28db9a65b16d03ac1f93c574086
-daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar d66310e460205926a97545a1f4f03d6e697a741e81840ccac37024cdda5ab284
-daml/dso-governance-test/.daml/dist/dso-governance-test-0.1.0.dar e751fbc1d36b72bab4201603581a7f01cc88515273b9749bcf6d53307b9bced1
-daml/dso-governance/.daml/dist/dso-governance-0.1.0.dar 929cbc17cd30d71922318403336331c05baf297382d26382a33835f905e6c67f
+daml/canton-name-service-test/.daml/dist/canton-name-service-test-0.1.0.dar 9e6864708e8bab6fde9cab4583e309ee57d7d82bad15f34e2001afad031c8a87
+daml/canton-name-service/.daml/dist/canton-name-service-0.1.0.dar 75578107b741c007935faa1b1cdde3a5965e2f98d8ce5021d5c55f1f2af405c3
+daml/dso-governance-test/.daml/dist/dso-governance-test-0.1.0.dar 75340534ad1acece737de1aee80affcc5a260006a1f4cf82b9b15d2a0b38eda2
+daml/dso-governance/.daml/dist/dso-governance-0.1.0.dar bbc3d6e6e5ae1ed6773e2304d7fae33e1631dafd53f4af5008512b88a40deaaf
 daml/splice-util/.daml/dist/splice-util-0.1.0.dar 03aef886ae6b0ba4451b82edba47f180b2fea2e3fb03aab84e3259ab152973c4
 daml/splitwell-test/.daml/dist/splitwell-test-0.1.0.dar 8cafcad4707d13e5d31cbe0b1fef7d82b3875dd64d2904a669229c7311d45fba
 daml/splitwell/.daml/dist/splitwell-0.1.0.dar cc1288ce1e5e8270f6e07bded3ef0827a4b782e3d78a33f0c1f4f4e22efffc54

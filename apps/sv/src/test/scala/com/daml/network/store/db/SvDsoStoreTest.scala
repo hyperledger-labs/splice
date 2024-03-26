@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.amuletrules.{
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cn.cns.*
+import com.daml.network.codegen.java.cn.ans.*
 import com.daml.network.codegen.java.cn.cometbft.CometBftConfigLimits
 import com.daml.network.codegen.java.cn.dso.globaldomain.{
   DomainNodeConfigLimits,
@@ -18,13 +18,13 @@ import com.daml.network.codegen.java.cn.dso.globaldomain.{
 }
 import com.daml.network.codegen.java.cn.dsorules.*
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
-  ARC_CnsEntryContext,
+  ARC_AnsEntryContext,
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import com.daml.network.codegen.java.cn.dsorules.cnsentrycontext_actionrequiringconfirmation.{
-  CNSRARC_CollectInitialEntryPayment,
-  CNSRARC_RejectEntryInitialPayment,
+import com.daml.network.codegen.java.cn.dsorules.ansentrycontext_actionrequiringconfirmation.{
+  ANSRARC_CollectInitialEntryPayment,
+  ANSRARC_RejectEntryInitialPayment,
 }
 import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.dsorules.electionrequestreason.ERR_OtherReason
@@ -50,7 +50,7 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
 import com.daml.network.sv.history.DsoRulesCloseVoteRequest
 import com.daml.network.sv.store.db.DbSvDsoStore
-import com.daml.network.sv.store.SvDsoStore.IdleCnsSubscription
+import com.daml.network.sv.store.SvDsoStore.IdleAnsSubscription
 import com.daml.network.sv.store.{SvStore, SvDsoStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
@@ -115,8 +115,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
     lookupTests("lookupDsoRulesWithOffset")(dsoRules())(_.lookupDsoRulesWithOffset())
     lookupTests("lookupAmuletRulesWithOffset")(amuletRules())(_.lookupAmuletRulesWithOffset())
-    lookupTests("lookupCnsRulesWithOffset")(cnsRules())(
-      _.lookupCnsRulesWithOffset()
+    lookupTests("lookupAnsRulesWithOffset")(ansRules())(
+      _.lookupAnsRulesWithOffset()
     )
     lookupTests("lookupConfirmationByActionWithOffset")(
       create = confirmation(1, addUser666Action),
@@ -173,11 +173,11 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )(
       _.lookupElectionRequestByRequesterWithOffset(userParty(1), epoch = 1)
     )
-    lookupTests("lookupCnsEntryByNameWithOffset")(
-      create = cnsEntry(userParty(1), "good"),
-      noise = Seq(cnsEntry(userParty(2), "bad")),
+    lookupTests("lookupAnsEntryByNameWithOffset")(
+      create = ansEntry(userParty(1), "good"),
+      noise = Seq(ansEntry(userParty(2), "bad")),
     )(
-      _.lookupCnsEntryByNameWithOffset("good")
+      _.lookupAnsEntryByNameWithOffset("good")
     )
     def paymentId(n: Int) = new SubscriptionInitialPayment.ContractId(validContractId(n))
     def newReferenceId = new SubscriptionRequest.ContractId(nextCid())
@@ -602,15 +602,15 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset" should {
+    "lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset" should {
 
       "find the confirmation by the initial payment id" in {
         val acceptedConfirmations =
           (1 to 2).map(n =>
             confirmation(
               n,
-              cnsEntryContextPaymentAction(
-                cnsEntryContext(n, s"name$n").contractId,
+              ansEntryContextPaymentAction(
+                ansEntryContext(n, s"name$n").contractId,
                 isAccepted = true,
                 new SubscriptionInitialPayment.ContractId(validContractId(n)),
               ),
@@ -621,8 +621,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           (3 to 4).map(n =>
             confirmation(
               n,
-              cnsEntryContextPaymentAction(
-                cnsEntryContext(n, s"name$n").contractId,
+              ansEntryContextPaymentAction(
+                ansEntryContext(n, s"name$n").contractId,
                 isAccepted = false,
                 new SubscriptionInitialPayment.ContractId(validContractId(n)),
               ),
@@ -648,13 +648,13 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
           results <- lookupConfirmations(
-            store.lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(storeSvParty, _)
+            store.lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset(storeSvParty, _)
           )
           acceptedResults <- lookupConfirmations(
-            store.lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(storeSvParty, _)
+            store.lookupAnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(storeSvParty, _)
           )
           rejectedResults <- lookupConfirmations(
-            store.lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(storeSvParty, _)
+            store.lookupAnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(storeSvParty, _)
           )
         } yield {
           results should be((acceptedConfirmations ++ rejectedConfirmations).map(Some(_)))
@@ -791,7 +791,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listExpiredCnsSubscriptions" should {
+    "listExpiredAnsSubscriptions" should {
 
       "return all entries where subscription_next_payment_due_at < now" in {
         for {
@@ -803,7 +803,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
             .map(n => n -> Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(n * 1000L)))
             .map { case (n, nextPaymentDueAt) =>
               val contextContract =
-                cnsEntryContext(n, n.toString)
+                ansEntryContext(n, n.toString)
               val idleStateContract =
                 subscriptionIdleState(
                   n,
@@ -826,11 +826,11 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           val expected = data
             .take(3)
             .map { case (ctxContract, idleContract) =>
-              IdleCnsSubscription(idleContract, ctxContract)
+              IdleAnsSubscription(idleContract, ctxContract)
             }
             .reverse
           store
-            .listExpiredCnsSubscriptions(CantonTimestamp.now(), limit = PageLimit.tryCreate(3))
+            .listExpiredAnsSubscriptions(CantonTimestamp.now(), limit = PageLimit.tryCreate(3))
             .futureValue should be(expected)
         }
       }
@@ -883,21 +883,21 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       }
     }
 
-    "listInitialPaymentConfirmationByCnsName" should {
+    "listInitialPaymentConfirmationByAnsName" should {
 
-      "find the confirmation by the cns name" in {
-        val goodCnsName = cnsEntryContext(1, "good")
+      "find the confirmation by the ans name" in {
+        val goodAnsName = ansEntryContext(1, "good")
         val goodConfirmations =
-          (1 to 3).map(n => confirmation(n, cnsEntryContextPaymentAction(goodCnsName.contractId)))
-        val badCnsName = cnsEntryContext(2, "bad")
+          (1 to 3).map(n => confirmation(n, ansEntryContextPaymentAction(goodAnsName.contractId)))
+        val badAnsName = ansEntryContext(2, "bad")
         val badConfirmations =
-          (4 to 6).map(n => confirmation(n, cnsEntryContextPaymentAction(badCnsName.contractId)))
+          (4 to 6).map(n => confirmation(n, ansEntryContextPaymentAction(badAnsName.contractId)))
         val unrelatedConfirmations = (7 to 9).map(n => confirmation(n, addUser666Action))
 
         for {
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(
-            Seq(goodCnsName, badCnsName)
+            Seq(goodAnsName, badAnsName)
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
@@ -906,7 +906,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listInitialPaymentConfirmationByCnsName(
+          result <- store.listInitialPaymentConfirmationByAnsName(
             storeSvParty,
             "good",
           )
@@ -994,8 +994,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     new SRARC_OffboardMember(new DsoRules_OffboardMember(userParty(666).toProtoPrimitive))
   )
 
-  private def cnsEntryContextPaymentAction(
-      contextCid: CnsEntryContext.ContractId,
+  private def ansEntryContextPaymentAction(
+      contextCid: AnsEntryContext.ContractId,
       isAccepted: Boolean = true,
       paymentId: SubscriptionInitialPayment.ContractId =
         new SubscriptionInitialPayment.ContractId(validContractId(1)),
@@ -1005,22 +1005,22 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
       new cc.round.OpenMiningRound.ContractId(validContractId(1)),
       Optional.empty(),
     )
-    new ARC_CnsEntryContext(
+    new ARC_AnsEntryContext(
       contextCid,
       if (isAccepted)
-        new CNSRARC_CollectInitialEntryPayment(
-          new CnsEntryContext_CollectInitialEntryPayment(
+        new ANSRARC_CollectInitialEntryPayment(
+          new AnsEntryContext_CollectInitialEntryPayment(
             paymentId,
             appTransferContext,
-            new CnsRules.ContractId(validContractId(1)),
+            new AnsRules.ContractId(validContractId(1)),
           )
         )
       else
-        new CNSRARC_RejectEntryInitialPayment(
-          new CnsEntryContext_RejectEntryInitialPayment(
+        new ANSRARC_RejectEntryInitialPayment(
+          new AnsEntryContext_RejectEntryInitialPayment(
             paymentId,
             appTransferContext,
-            new CnsRules.ContractId(validContractId(1)),
+            new AnsRules.ContractId(validContractId(1)),
           )
         ),
     )
@@ -1135,8 +1135,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def cnsEntry(user: PartyId, name: String) = {
-    val template = new CnsEntry(
+  private def ansEntry(user: PartyId, name: String) = {
+    val template = new AnsEntry(
       user.toProtoPrimitive,
       dsoParty.toProtoPrimitive,
       name,
@@ -1146,14 +1146,14 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      CnsEntry.TEMPLATE_ID,
-      new CnsEntry.ContractId(nextCid()),
+      AnsEntry.TEMPLATE_ID,
+      new AnsEntry.ContractId(nextCid()),
       template,
     )
   }
 
-  private def cnsEntryContext(n: Int, name: String) = {
-    val template = new CnsEntryContext(
+  private def ansEntryContext(n: Int, name: String) = {
+    val template = new AnsEntryContext(
       dsoParty.toProtoPrimitive,
       userParty(n).toProtoPrimitive,
       name,
@@ -1163,8 +1163,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
 
     contract(
-      CnsEntryContext.TEMPLATE_ID,
-      new CnsEntryContext.ContractId(validContractId(n, "cc")),
+      AnsEntryContext.TEMPLATE_ID,
+      new AnsEntryContext.ContractId(validContractId(n, "cc")),
       template,
     )
   }

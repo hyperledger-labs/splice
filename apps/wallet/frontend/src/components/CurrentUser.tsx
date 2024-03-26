@@ -9,10 +9,10 @@ export const CurrentUser: React.FC = () => {
   const currentUser = useCurrentUser();
 
   if (currentUser.state === 'onboarded') {
-    if (currentUser.cnsEntry) {
-      return <Typography id="logged-in-user">{currentUser.cnsEntry}</Typography>;
+    if (currentUser.ansEntry) {
+      return <Typography id="logged-in-user">{currentUser.ansEntry}</Typography>;
     } else {
-      // show no user details after login if user has no cns entry
+      // show no user details after login if user has no ans entry
       return <PartyId partyId={currentUser.primaryParty} id="logged-in-user" />;
     }
   } else {

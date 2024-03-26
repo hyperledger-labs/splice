@@ -10,7 +10,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.network.automation.{AssignTrigger, TransferFollowTrigger}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cn.{
-  cns,
+  ans,
   dsorules,
   svonboarding as so,
   validatoronboarding as vo,
@@ -541,17 +541,17 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       subscriptionRequestCid
     }
 
-    clue("create DSO-signed CNS contracts of various kinds") {
-      import com.daml.network.util.CNNodeUtil.defaultCnsConfig
+    clue("create DSO-signed ANS contracts of various kinds") {
+      import com.daml.network.util.CNNodeUtil.defaultAnsConfig
 
       val dso = dsoParty.toProtoPrimitive
 
-      createSampleAndEnsurePresence(cns.CnsRules.COMPANION)(
-        new cns.CnsRules(dso, defaultCnsConfig())
+      createSampleAndEnsurePresence(ans.AnsRules.COMPANION)(
+        new ans.AnsRules(dso, defaultAnsConfig())
       )
 
-      createSampleAndEnsurePresence(cns.CnsEntry.COMPANION)(
-        new cns.CnsEntry(
+      createSampleAndEnsurePresence(ans.AnsEntry.COMPANION)(
+        new ans.AnsEntry(
           dso,
           dso,
           "irrelevant name",
@@ -561,8 +561,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         )
       )
 
-      createSampleAndEnsurePresence(cns.CnsEntryContext.COMPANION)(
-        new cns.CnsEntryContext(
+      createSampleAndEnsurePresence(ans.AnsEntryContext.COMPANION)(
+        new ans.AnsEntryContext(
           dso,
           dso,
           "irrelevant name",

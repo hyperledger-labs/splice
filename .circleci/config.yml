@@ -389,8 +389,8 @@ commands:
           paths:
             - ./apps/common/frontend/target
             - ./apps/common/frontend/utils/target
-            - ./apps/cns/frontend/build
-            - ./apps/cns/frontend/target
+            - ./apps/ans/frontend/build
+            - ./apps/ans/frontend/target
             - ./apps/scan/frontend/build
             - ./apps/scan/frontend/target
             - ./apps/sv/frontend/build

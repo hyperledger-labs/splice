@@ -19,8 +19,8 @@ import com.daml.network.codegen.java.cc.round.{
   IssuingMiningRound,
   OpenMiningRound,
 }
-import com.daml.network.codegen.java.cn.cns as cnsCodegen
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.ans as ansCodegen
+import com.daml.network.codegen.java.cn.ans.AnsRules
 import com.daml.network.http.v0.{definitions, scan as http}
 import com.daml.network.http.v0.external.scan as externalHttp
 import com.daml.network.scan.store.db.ScanAggregator
@@ -195,22 +195,22 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetCnsRules(
-      cachedCnsRules: Option[ContractWithState[CnsRules.ContractId, CnsRules]]
+  case class GetAnsRules(
+      cachedAnsRules: Option[ContractWithState[AnsRules.ContractId, AnsRules]]
   ) extends InternalBaseCommand[
-        http.GetCnsRulesResponse,
-        ContractWithState[CnsRules.ContractId, CnsRules],
+        http.GetAnsRulesResponse,
+        ContractWithState[AnsRules.ContractId, AnsRules],
       ] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCnsRulesResponse] = {
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAnsRulesResponse] = {
       import MultiDomainAcsStore.ContractState.*
-      client.getCnsRules(
-        definitions.GetCnsRulesRequest(
-          cachedCnsRules.map(_.contractId.contractId),
-          cachedCnsRules.flatMap(_.state match {
+      client.getAnsRules(
+        definitions.GetAnsRulesRequest(
+          cachedAnsRules.map(_.contractId.contractId),
+          cachedAnsRules.flatMap(_.state match {
             case Assigned(domain) => Some(domain.toProtoPrimitive)
             case InFlight => None
           }),
@@ -220,13 +220,13 @@ object HttpScanAppClient {
     }
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.GetCnsRulesResponse.OK(response) =>
+      case http.GetAnsRulesResponse.OK(response) =>
         for {
-          cnsRules <- ContractWithState.handleMaybeCached(cnsCodegen.CnsRules.COMPANION)(
-            cachedCnsRules,
-            response.cnsRulesUpdate,
+          ansRules <- ContractWithState.handleMaybeCached(ansCodegen.AnsRules.COMPANION)(
+            cachedAnsRules,
+            response.ansRulesUpdate,
           )
-        } yield cnsRules
+        } yield ansRules
     }
   }
 
@@ -293,55 +293,55 @@ object HttpScanAppClient {
     }
   }
 
-  case class ListCnsEntries(
+  case class ListAnsEntries(
       namePrefix: Option[String],
       pageSize: Int,
-  ) extends InternalBaseCommand[http.ListCnsEntriesResponse, Seq[definitions.CnsEntry]] {
+  ) extends InternalBaseCommand[http.ListAnsEntriesResponse, Seq[definitions.AnsEntry]] {
 
     def submitRequest(client: Client, headers: List[HttpHeader]) =
-      client.listCnsEntries(namePrefix, pageSize, headers = headers)
+      client.listAnsEntries(namePrefix, pageSize, headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.ListCnsEntriesResponse.OK(response) =>
+    ) = { case http.ListAnsEntriesResponse.OK(response) =>
       Right(response.entries)
     }
   }
 
-  case class LookupCnsEntryByParty(
+  case class LookupAnsEntryByParty(
       party: PartyId
-  ) extends InternalBaseCommand[http.LookupCnsEntryByPartyResponse, Option[definitions.CnsEntry]] {
+  ) extends InternalBaseCommand[http.LookupAnsEntryByPartyResponse, Option[definitions.AnsEntry]] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ) = client.lookupCnsEntryByParty(party.toProtoPrimitive, headers)
+    ) = client.lookupAnsEntryByParty(party.toProtoPrimitive, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = {
-      case http.LookupCnsEntryByPartyResponse.OK(response) =>
+      case http.LookupAnsEntryByPartyResponse.OK(response) =>
         Right(Some(response.entry))
-      case http.LookupCnsEntryByPartyResponse.NotFound(_) =>
+      case http.LookupAnsEntryByPartyResponse.NotFound(_) =>
         Right(None)
     }
   }
 
-  case class LookupCnsEntryByName(
+  case class LookupAnsEntryByName(
       name: String
-  ) extends InternalBaseCommand[http.LookupCnsEntryByNameResponse, Option[definitions.CnsEntry]] {
+  ) extends InternalBaseCommand[http.LookupAnsEntryByNameResponse, Option[definitions.AnsEntry]] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ) = client.lookupCnsEntryByName(name, headers)
+    ) = client.lookupAnsEntryByName(name, headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = {
-      case http.LookupCnsEntryByNameResponse.OK(response) =>
+      case http.LookupAnsEntryByNameResponse.OK(response) =>
         Right(Some(response.entry))
-      case http.LookupCnsEntryByNameResponse.NotFound(_) =>
+      case http.LookupAnsEntryByNameResponse.NotFound(_) =>
         Right(None)
     }
   }

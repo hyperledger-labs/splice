@@ -162,7 +162,7 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
   val bobWalletUIPort = 3001
   val charlieWalletUIPort = 3002
 
-  val aliceCnsUIPort = 3100
+  val aliceAnsUIPort = 3100
 
   val sv1UIPort = 3211
   val sv2UIPort = 3212
@@ -654,13 +654,13 @@ trait FrontendTestCommon extends CNNodeTestCommon with WebBrowser with CustomMat
     }
   }
 
-  protected def setCnsField(textField: TextField, input: String, expectedPartyId: String) = {
+  protected def setAnsField(textField: TextField, input: String, expectedPartyId: String) = {
     textField.underlying.sendKeys(input)
-    // We need to wait for the query against the cns service to finish.
-    waitForCnsField(textField, expectedPartyId)
+    // We need to wait for the query against the ans service to finish.
+    waitForAnsField(textField, expectedPartyId)
   }
 
-  protected def waitForCnsField(textField: TextField, expectedPartyId: String) = {
+  protected def waitForAnsField(textField: TextField, expectedPartyId: String) = {
     eventually() {
       textField.attribute("data-resolved-party-id") shouldBe Some(expectedPartyId)
     }

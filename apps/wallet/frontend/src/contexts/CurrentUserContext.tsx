@@ -5,10 +5,10 @@ import { createContext, useContext, useState } from 'react';
 import { Party } from '@daml/types';
 
 import { usePrimaryParty } from '../hooks';
-import useLookupCnsEntryByParty from '../hooks/scan-proxy/useLookupCnsEntryByParty';
+import useLookupAnsEntryByParty from '../hooks/scan-proxy/useLookupAnsEntryByParty';
 
 type CurrentUser =
-  | { state: 'onboarded'; primaryParty: Party; cnsEntry: string | undefined }
+  | { state: 'onboarded'; primaryParty: Party; ansEntry: string | undefined }
   | { state: 'not_onboarded' };
 
 const CurrentUserContext: React.Context<CurrentUser> = createContext<CurrentUser>({
@@ -19,19 +19,19 @@ export const CurrentUserProvider: React.FC<React.PropsWithChildren> = ({ childre
   const primaryPartyId = usePrimaryParty();
 
   const [currentUser, setCurrentUser] = useState<CurrentUser>({ state: 'not_onboarded' });
-  const { data: cnsEntry } = useLookupCnsEntryByParty(primaryPartyId);
-  const cnsEntryName = cnsEntry?.name;
+  const { data: ansEntry } = useLookupAnsEntryByParty(primaryPartyId);
+  const ansEntryName = ansEntry?.name;
 
   useQuery({
     refetchInterval: PollingStrategy.NONE,
-    queryKey: ['lookupEntryByParty', primaryPartyId, cnsEntry, cnsEntryName],
+    queryKey: ['lookupEntryByParty', primaryPartyId, ansEntry, ansEntryName],
     queryFn: async () => {
       setCurrentUser({
         state: 'onboarded',
-        cnsEntry: cnsEntryName,
+        ansEntry: ansEntryName,
         primaryParty: primaryPartyId!,
       });
-      return cnsEntry;
+      return ansEntry;
     },
     enabled: !!primaryPartyId,
   });

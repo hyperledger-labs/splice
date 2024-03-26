@@ -17,7 +17,7 @@ images := \
 	validator-app \
 	splitwell-app \
 	\
-	cns-web-ui \
+	ans-web-ui \
 	splitwell-web-ui \
 	\
 	docs \

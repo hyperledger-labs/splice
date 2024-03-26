@@ -27,7 +27,7 @@ import { Party } from '@daml/types';
 import { usePrimaryParty, useTransactions } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { Transaction, TransactionSubtype } from '../models/models';
-import BftCnsEntry from './BftCnsEntry';
+import BftAnsEntry from './BftAnsEntry';
 
 const TransactionHistory: React.FC = () => {
   const txQuery = useTransactions();
@@ -282,13 +282,13 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // SubscriptionExpired
       text = 'Subscription Expired';
       break;
-    case 'CnsRules_CollectInitialEntryPayment':
-      // CnsEntryInitialPaymentCollected
-      text = 'CNS Entry Initial Payment Collected';
+    case 'AnsRules_CollectInitialEntryPayment':
+      // AnsEntryInitialPaymentCollected
+      text = 'ANS Entry Initial Payment Collected';
       break;
-    case 'CnsRules_CollectEntryRenewalPayment':
-      // CnsEntryRenewalPaymentCollected
-      text = 'CNS Entry Renewal Payment Collected';
+    case 'AnsRules_CollectEntryRenewalPayment':
+      // AnsEntryRenewalPaymentCollected
+      text = 'ANS Entry Renewal Payment Collected';
       break;
     default:
       console.warn('Unknown Transaction Subtype', subtype);
@@ -318,11 +318,11 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
     );
   } else if (transaction.senderId !== primaryPartyId) {
     senderOrReceiver = (
-      <BftCnsEntry className="sender-or-receiver" partyId={transaction.senderId} variant="body1" />
+      <BftAnsEntry className="sender-or-receiver" partyId={transaction.senderId} variant="body1" />
     );
   } else if (transaction.receivers.length === 1) {
     senderOrReceiver = (
-      <BftCnsEntry
+      <BftAnsEntry
         className="sender-or-receiver"
         partyId={transaction.receivers[0].party}
         variant="body1"
@@ -345,7 +345,7 @@ const SenderReceiverInfo: React.FC<{ transaction: Transaction }> = ({ transactio
       {senderOrReceiver}
       <Stack direction="row" alignItems="center" spacing={1}>
         <Typography variant="caption">via </Typography>
-        <BftCnsEntry className="provider-id" partyId={transaction.providerId} variant="caption" />
+        <BftAnsEntry className="provider-id" partyId={transaction.providerId} variant="caption" />
       </Stack>
     </Stack>
   );

@@ -2,7 +2,7 @@ package com.daml.network.sv.store
 
 import com.daml.network.codegen.java.cn.dsorules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
-  ARC_CnsEntryContext,
+  ARC_AnsEntryContext,
   ARC_AmuletRules,
   ARC_DsoRules,
 }
@@ -55,8 +55,8 @@ object TxLogEntry extends StoreErrors {
         arcDsoRules.dsoAction.getClass.getSimpleName
       case arcAmuletRules: ARC_AmuletRules =>
         arcAmuletRules.amuletRulesAction.getClass.getSimpleName
-      case arcCnsEntryContext: ARC_CnsEntryContext =>
-        arcCnsEntryContext.cnsEntryContextAction.getClass.getSimpleName
+      case arcAnsEntryContext: ARC_AnsEntryContext =>
+        arcAnsEntryContext.ansEntryContextAction.getClass.getSimpleName
       case _ => ""
     }
   }

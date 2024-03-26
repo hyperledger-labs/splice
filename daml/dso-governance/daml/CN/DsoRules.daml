@@ -21,7 +21,7 @@ import CN.Wallet.Subscriptions
 import CC.GlobalDomain (MemberTraffic)
 
 import qualified CN.CometBft as CometBft
-import CN.Cns
+import CN.Ans
 import CN.SvOnboarding
 import CN.DSO.AmuletPrice
 import CN.DSO.GlobalDomain
@@ -64,9 +64,9 @@ data ActionRequiringConfirmation
       dsoAction : DsoRules_ActionRequiringConfirmation
   | ARC_AmuletRules with
       amuletRulesAction : AmuletRules_ActionRequiringConfirmation
-  | ARC_CnsEntryContext with
-      cnsEntryContextCid : ContractId CnsEntryContext
-      cnsEntryContextAction : CnsEntryContext_ActionRequiringConfirmation
+  | ARC_AnsEntryContext with
+      ansEntryContextCid : ContractId AnsEntryContext
+      ansEntryContextAction : AnsEntryContext_ActionRequiringConfirmation
   | ExtActionRequiringConformation with
       dummyUnitField : ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
@@ -101,11 +101,11 @@ data DsoRules_ActionRequiringConfirmation
     -- ^ Voted action to change the `DsoRulesConfig`. Not idempotent.
   deriving (Eq, Show)
 
-data CnsEntryContext_ActionRequiringConfirmation
-  = CNSRARC_CollectInitialEntryPayment CnsEntryContext_CollectInitialEntryPayment
-    -- ^ Automated action to collect initial payment of an cns entry.
-  | CNSRARC_RejectEntryInitialPayment CnsEntryContext_RejectEntryInitialPayment
-    -- ^ Automated action to reject initial payment of an cns entry.
+data AnsEntryContext_ActionRequiringConfirmation
+  = ANSRARC_CollectInitialEntryPayment AnsEntryContext_CollectInitialEntryPayment
+    -- ^ Automated action to collect initial payment of an ans entry.
+  | ANSRARC_RejectEntryInitialPayment AnsEntryContext_RejectEntryInitialPayment
+    -- ^ Automated action to reject initial payment of an ans entry.
   deriving (Eq, Show)
 
 -- | Information about members relevant to collective governance.
@@ -838,45 +838,45 @@ template DsoRules with
         return (result.summarizingRoundCid, result.openRoundCid)
 
 
-    -- CNS entry and payment management driven directly by the leader
+    -- ANS entry and payment management driven directly by the leader
     -----------------------------------------------
 
-    nonconsuming choice DsoRules_CollectEntryRenewalPayment : (ContractId CnsEntry, ContractId SubscriptionIdleState)
+    nonconsuming choice DsoRules_CollectEntryRenewalPayment : (ContractId AnsEntry, ContractId SubscriptionIdleState)
       with
-        cnsEntryContextCid : ContractId CnsEntryContext
-        choiceArg : CnsEntryContext_CollectEntryRenewalPayment
+        ansEntryContextCid : ContractId AnsEntryContext
+        choiceArg : AnsEntryContext_CollectEntryRenewalPayment
       controller leader
       do
-        summary <- exercise cnsEntryContextCid choiceArg
+        summary <- exercise ansEntryContextCid choiceArg
         return (summary.entryCid, summary.subscriptionStateCid)
 
-    nonconsuming choice DsoRules_ExpireCnsEntry : ()
+    nonconsuming choice DsoRules_ExpireAnsEntry : ()
       with
-        cnsEntryCid : ContractId CnsEntry
-        choiceArg : CnsEntry_Expire
+        ansEntryCid : ContractId AnsEntry
+        choiceArg : AnsEntry_Expire
       controller leader
       do
-        exercise cnsEntryCid choiceArg
+        exercise ansEntryCid choiceArg
         pure ()
 
     nonconsuming choice DsoRules_ExpireSubscription : ()
       with
-        cnsEntryContextCid : ContractId CnsEntryContext
+        ansEntryContextCid : ContractId AnsEntryContext
         subscriptionIdleStateCid: ContractId SubscriptionIdleState
         choiceArg : SubscriptionIdleState_ExpireSubscription
       controller leader
       do
         aborted <- exercise subscriptionIdleStateCid choiceArg
-        exercise cnsEntryContextCid (CnsEntryContext_Terminate dso aborted)
+        exercise ansEntryContextCid (AnsEntryContext_Terminate dso aborted)
         pure ()
 
     nonconsuming choice DsoRules_TerminateSubscription : ()
       with
-        cnsEntryContextCid : ContractId CnsEntryContext
+        ansEntryContextCid : ContractId AnsEntryContext
         terminatedSubscriptionCid : ContractId TerminatedSubscription
       controller leader
       do
-        exercise cnsEntryContextCid (CnsEntryContext_Terminate dso terminatedSubscriptionCid)
+        exercise ansEntryContextCid (AnsEntryContext_Terminate dso terminatedSubscriptionCid)
         pure ()
 
 
@@ -1037,10 +1037,10 @@ executeActionRequiringConfirmation dsoRulesCid amuletRulesCid act = case act of
       SRARC_GrantFeaturedAppRight choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_RevokeFeaturedAppRight choiceArg -> void $ exercise dsoRulesCid choiceArg
       SRARC_SetConfig choiceArg -> void $ exercise dsoRulesCid choiceArg
-  ARC_CnsEntryContext with .. ->
-    case cnsEntryContextAction of
-      CNSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
-      CNSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise cnsEntryContextCid choiceArg
+  ARC_AnsEntryContext with .. ->
+    case ansEntryContextAction of
+      ANSRARC_CollectInitialEntryPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
+      ANSRARC_RejectEntryInitialPayment choiceArg -> void $ exercise ansEntryContextCid choiceArg
   ExtActionRequiringConformation _dummyUnitField -> pure ()
 
 -- Functions implementing instant-runoff voting
@@ -1140,7 +1140,7 @@ actionRequiringConfirmationEffectiveAt action =
         CRARC_MiningRound_Archive _ -> None
         CRARC_MiningRound_StartIssuing _ -> None
     ARC_DsoRules with .. -> None
-    ARC_CnsEntryContext with .. -> None
+    ARC_AnsEntryContext with .. -> None
     ExtActionRequiringConformation _dummyUnitField ->
       error "Encountered unexpected ExtActionRequiringConformation at runtime"
 

@@ -5,7 +5,7 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.validator.config.AppManagerAppClientConfig
-import com.daml.network.validator.config.CnsAppExternalClientConfig
+import com.daml.network.validator.config.AnsAppExternalClientConfig
 import com.daml.network.validator.config.ValidatorAppClientConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
@@ -115,7 +115,7 @@ class CNNodeConsoleEnvironment(
   /* Local apps that are (in the target deployment) operated by a self-hosted validator */
   lazy val appsHostedByValidator = NodeReferences(
     validators.local,
-    mergeRemoteCNNodeInstances(validators.remote, wallets, externalCns),
+    mergeRemoteCNNodeInstances(validators.remote, wallets, externalAns),
   )
 
   /* Local apps that are (in the target deployment) operated by a third party */
@@ -158,9 +158,9 @@ class CNNodeConsoleEnvironment(
   lazy val appManagers: Seq[AppManagerAppClientReference] =
     environment.config.appManagerAppClients.toSeq.map(createAppManagerAppClientReference)
 
-  lazy val externalCns: Seq[CnsExternalAppClientReference] =
-    environment.config.cnsAppExternalClients.toSeq
-      .map(createCnsExternalAppClientReference)
+  lazy val externalAns: Seq[AnsExternalAppClientReference] =
+    environment.config.ansAppExternalClients.toSeq
+      .map(createAnsExternalAppClientReference)
 
   lazy val splitwells: NodeReferences[
     SplitwellAppReference,
@@ -206,13 +206,13 @@ class CNNodeConsoleEnvironment(
   ): AppManagerAppClientReference =
     new AppManagerAppClientReference(this, conf._1.unwrap, conf._2)
 
-  private def createCnsExternalAppClientReference(
+  private def createAnsExternalAppClientReference(
       conf: (
           InstanceName,
-          CnsAppExternalClientConfig,
+          AnsAppExternalClientConfig,
       )
-  ): CnsExternalAppClientReference =
-    new CnsExternalAppClientReference(this, conf._1.unwrap, conf._2)
+  ): AnsExternalAppClientReference =
+    new AnsExternalAppClientReference(this, conf._1.unwrap, conf._2)
 
   private def createSplitwellReference(name: String): SplitwellAppBackendReference =
     new SplitwellAppBackendReference(this, name)
@@ -282,20 +282,20 @@ class CNNodeConsoleEnvironment(
         appManagers,
         Seq("App References"),
       ) :++
-      externalCns.map(v =>
+      externalAns.map(v =>
         TopLevelValue(
           v.name,
-          helpText("cns app clients", v.name),
+          helpText("ans app clients", v.name),
           v,
           Seq("App References"),
         )
       ) :+ TopLevelValue(
-        "cnsClients",
+        "ansClients",
         helpText(
-          "All cns app client instances" + genericNodeReferencesDoc,
-          "cns app clients",
+          "All ans app client instances" + genericNodeReferencesDoc,
+          "ans app clients",
         ),
-        externalCns,
+        externalAns,
         Seq("App References"),
       ) :++ splitwells.local.map(v =>
         TopLevelValue(v.name, helpText("local splitwell app", v.name), v, Seq("App References"))

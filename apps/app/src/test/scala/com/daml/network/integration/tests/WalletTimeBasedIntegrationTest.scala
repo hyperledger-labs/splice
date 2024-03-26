@@ -2,13 +2,13 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cc.amuletrules.AppTransferContext
-import com.daml.network.codegen.java.cn.cns.{
-  CnsEntryContext,
-  CnsEntryContext_CollectInitialEntryPayment,
+import com.daml.network.codegen.java.cn.ans.{
+  AnsEntryContext,
+  AnsEntryContext_CollectInitialEntryPayment,
 }
 import com.daml.network.codegen.java.cn.dsorules.Confirmation
-import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_CnsEntryContext
-import com.daml.network.codegen.java.cn.dsorules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment
+import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.ARC_AnsEntryContext
+import com.daml.network.codegen.java.cn.dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_CollectInitialEntryPayment
 import com.daml.network.codegen.java.cn.wallet.subscriptions.{
   SubscriptionInitialPayment,
   SubscriptionRequest,
@@ -21,9 +21,9 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.sv.automation.confirmation.CnsSubscriptionInitialPaymentTrigger
+import com.daml.network.sv.automation.confirmation.AnsSubscriptionInitialPaymentTrigger
 import com.daml.network.sv.automation.leaderbased.{
-  CnsSubscriptionRenewalPaymentTrigger,
+  AnsSubscriptionRenewalPaymentTrigger,
   ExpiredAmuletTrigger,
   ExpiredLockedAmuletTrigger,
 }
@@ -53,9 +53,9 @@ class WalletTimeBasedIntegrationTest
     with TriggerTestUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
-  private val testEntryName = "mycoolentry.unverified.cns"
-  private val testEntryUrl = "https://cns-dir-url.com"
-  private val testEntryDescription = "Sample CNS Entry Description"
+  private val testEntryName = "mycoolentry.unverified.ans"
+  private val testEntryUrl = "https://ans-dir-url.com"
+  private val testEntryDescription = "Sample ANS Entry Description"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -198,9 +198,9 @@ class WalletTimeBasedIntegrationTest
           for ((name, i) <- List("alice1", "alice2", "alice3").map(perTestCaseName).zipWithIndex) {
 
             val (_, requestId) = actAndCheck(
-              "Request CNS entry", {
-                aliceCnsExternalClient
-                  .createCnsEntry(name, testEntryUrl, testEntryDescription)
+              "Request ANS entry", {
+                aliceAnsExternalClient
+                  .createAnsEntry(name, testEntryUrl, testEntryDescription)
               },
             )(
               "the corresponding subscription request is created",
@@ -227,10 +227,10 @@ class WalletTimeBasedIntegrationTest
         },
         cancelAllSubscriptions(aliceWalletClient),
       ) {
-        val cnsSubscriptionRenewalPaymentTrigger =
-          sv1Backend.leaderBasedAutomation.trigger[CnsSubscriptionRenewalPaymentTrigger]
+        val ansSubscriptionRenewalPaymentTrigger =
+          sv1Backend.leaderBasedAutomation.trigger[AnsSubscriptionRenewalPaymentTrigger]
         setTriggersWithin(
-          triggersToPauseAtStart = Seq(cnsSubscriptionRenewalPaymentTrigger),
+          triggersToPauseAtStart = Seq(ansSubscriptionRenewalPaymentTrigger),
           triggersToResumeAtStart = Seq.empty,
         ) {
           actAndCheck(
@@ -262,10 +262,10 @@ class WalletTimeBasedIntegrationTest
       }
     }
 
-    "reject cns initial subscription payment due to expired round even if confirmed acceptance exists previously" in {
+    "reject ans initial subscription payment due to expired round even if confirmed acceptance exists previously" in {
       implicit env =>
-        def cnsSubscriptionInitialPaymentTrigger =
-          sv1Backend.dsoAutomation.trigger[CnsSubscriptionInitialPaymentTrigger]
+        def ansSubscriptionInitialPaymentTrigger =
+          sv1Backend.dsoAutomation.trigger[AnsSubscriptionInitialPaymentTrigger]
 
         onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         clue("Alice gets some amulets") {
@@ -273,9 +273,9 @@ class WalletTimeBasedIntegrationTest
         }
         val entryName = "alice"
         val (_, requestId) = actAndCheck(
-          "Request CNS entry", {
-            aliceCnsExternalClient
-              .createCnsEntry(perTestCaseName(entryName), testEntryUrl, testEntryDescription)
+          "Request ANS entry", {
+            aliceAnsExternalClient
+              .createAnsEntry(perTestCaseName(entryName), testEntryUrl, testEntryDescription)
           },
         )(
           "the corresponding subscription request is created",
@@ -286,8 +286,8 @@ class WalletTimeBasedIntegrationTest
           },
         )
 
-        // pause cnsSubscriptionInitialPaymentTrigger so payment is not accepted
-        cnsSubscriptionInitialPaymentTrigger.pause().futureValue
+        // pause ansSubscriptionInitialPaymentTrigger so payment is not accepted
+        ansSubscriptionInitialPaymentTrigger.pause().futureValue
 
         val (_, initialPayment) = actAndCheck(
           "Accept subscription request", {
@@ -330,8 +330,8 @@ class WalletTimeBasedIntegrationTest
           transferContext.featuredAppRight,
         )
         actAndCheck(
-          "Create a confirmation of accepting the cns initial payment with a closed round.", {
-            createCnsAcceptInitialPaymentConfirmation(
+          "Create a confirmation of accepting the ans initial payment with a closed round.", {
+            createAnsAcceptInitialPaymentConfirmation(
               initialPayment,
               transferContextWithClosedRound,
             )
@@ -339,8 +339,8 @@ class WalletTimeBasedIntegrationTest
         )(
           "The confirmation is created",
           _ => {
-            lookupCnsAcceptInitialPaymentConfirmation(
-              lookupCnsContextCid(initialPayment.payload.reference).value
+            lookupAnsAcceptInitialPaymentConfirmation(
+              lookupAnsContextCid(initialPayment.payload.reference).value
             )
           },
         )
@@ -348,8 +348,8 @@ class WalletTimeBasedIntegrationTest
         loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
           {
             actAndCheck(
-              "Resume cnsSubscriptionInitialPaymentTrigger to check if it should accept payment", {
-                cnsSubscriptionInitialPaymentTrigger.resume()
+              "Resume ansSubscriptionInitialPaymentTrigger to check if it should accept payment", {
+                ansSubscriptionInitialPaymentTrigger.resume()
               },
             )(
               "The payment is rejected due to the round for collecting payment is no longer active",
@@ -639,8 +639,8 @@ class WalletTimeBasedIntegrationTest
         Range(1, 8).foreach(_ => advanceRoundsByOneTick)
       }
 
-      val respond = clue("Alice requests a CNS entry") {
-        aliceCnsExternalClient.createCnsEntry(
+      val respond = clue("Alice requests a ANS entry") {
+        aliceAnsExternalClient.createAnsEntry(
           testEntryName,
           testEntryUrl,
           testEntryDescription,
@@ -688,7 +688,7 @@ class WalletTimeBasedIntegrationTest
         )
 
         actAndCheck(
-          "Advance time until CNS entry is up for renewal", {
+          "Advance time until ANS entry is up for renewal", {
             // We time the advances so that automation doesn't trigger before payments can be made.
             // TODO (#7609): consider replacing with stopping and starting triggers
             advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(17)))
@@ -726,38 +726,38 @@ class WalletTimeBasedIntegrationTest
     }
   }
 
-  private def lookupCnsContextCid(
+  private def lookupAnsContextCid(
       subscriptionRequestCid: SubscriptionRequest.ContractId
-  )(implicit env: CNNodeTestConsoleEnvironment): Option[CnsEntryContext.ContractId] =
+  )(implicit env: CNNodeTestConsoleEnvironment): Option[AnsEntryContext.ContractId] =
     aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(CnsEntryContext.COMPANION)(dsoParty)
+      .filterJava(AnsEntryContext.COMPANION)(dsoParty)
       .find(_.data.reference == subscriptionRequestCid)
       .map(_.id)
 
-  private def lookupCnsAcceptInitialPaymentConfirmation(
-      cnsContextCid: CnsEntryContext.ContractId
+  private def lookupAnsAcceptInitialPaymentConfirmation(
+      ansContextCid: AnsEntryContext.ContractId
   )(implicit env: CNNodeTestConsoleEnvironment): Option[Confirmation.ContractId] = {
     val svParty = sv1Backend.getDsoInfo().svParty
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(Confirmation.COMPANION)(dsoParty)
       .find(confirmation =>
         confirmation.data.action match {
-          case cnsContextAction: ARC_CnsEntryContext =>
-            cnsContextAction.cnsEntryContextCid == cnsContextCid && confirmation.data.confirmer == svParty.toProtoPrimitive
+          case ansContextAction: ARC_AnsEntryContext =>
+            ansContextAction.ansEntryContextCid == ansContextCid && confirmation.data.confirmer == svParty.toProtoPrimitive
           case _ => false
         }
       )
       .map(_.id)
   }
 
-  private def createCnsAcceptInitialPaymentConfirmation(
+  private def createAnsAcceptInitialPaymentConfirmation(
       initialPayment: Contract[SubscriptionInitialPayment.ContractId, SubscriptionInitialPayment],
       transferContext: AppTransferContext,
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
     val svParty = sv1Backend.getDsoInfo().svParty
-    val cnsRules = sv1ScanBackend.getCnsRules()
+    val ansRules = sv1ScanBackend.getAnsRules()
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       actAs = Seq(svParty),
       readAs = Seq(dsoParty),
@@ -768,13 +768,13 @@ class WalletTimeBasedIntegrationTest
         .contractId
         .exerciseDsoRules_ConfirmAction(
           svParty.toProtoPrimitive,
-          new ARC_CnsEntryContext(
-            lookupCnsContextCid(initialPayment.payload.reference).value,
-            new CNSRARC_CollectInitialEntryPayment(
-              new CnsEntryContext_CollectInitialEntryPayment(
+          new ARC_AnsEntryContext(
+            lookupAnsContextCid(initialPayment.payload.reference).value,
+            new ANSRARC_CollectInitialEntryPayment(
+              new AnsEntryContext_CollectInitialEntryPayment(
                 initialPayment.contractId,
                 transferContext,
-                cnsRules.contractId,
+                ansRules.contractId,
               )
             ),
           ),

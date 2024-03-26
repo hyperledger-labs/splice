@@ -1,7 +1,7 @@
 import AmountDisplay from './AmountDisplay';
+import AnsEntry, { AnsEntryDisplay, AnsEntryProps } from './AnsEntry';
+import AnsField, { BaseAnsField, AnsFieldProps, UserInput } from './AnsField';
 import AuthProvider from './AuthProvider';
-import CnsEntry, { CnsEntryDisplay, CnsEntryProps } from './CnsEntry';
-import CnsField, { BaseCnsField, CnsFieldProps, UserInput } from './CnsField';
 import CopyableTypography from './CopyableTypography';
 import Copyright from './Copyright';
 import DateDisplay from './DateDisplay';
@@ -22,12 +22,12 @@ import { TransferButton, SubscriptionButton } from './WalletButtons';
 export {
   AmountDisplay,
   AuthProvider,
-  CnsEntry,
-  CnsEntryDisplay,
-  CnsEntryProps,
-  CnsField,
-  BaseCnsField,
-  CnsFieldProps,
+  AnsEntry,
+  AnsEntryDisplay,
+  AnsEntryProps,
+  AnsField,
+  BaseAnsField,
+  AnsFieldProps,
   UserInput,
   CopyableTypography,
   Copyright,

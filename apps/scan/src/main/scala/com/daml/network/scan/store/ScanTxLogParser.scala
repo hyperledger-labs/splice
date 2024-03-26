@@ -66,10 +66,10 @@ class ScanTxLogParser(
             State.fromAmuletExpireSummary(exercised, domainId, node.result.value)
           case LockedAmuletUnlock(_) =>
             State.empty
-          case CnsRules_CollectInitialEntryPayment(_) =>
-            fromCnsEntryPaymentCollection(tree, exercised, domainId)
-          case CnsRules_CollectEntryRenewalPayment(_) =>
-            fromCnsEntryPaymentCollection(tree, exercised, domainId)
+          case AnsRules_CollectInitialEntryPayment(_) =>
+            fromAnsEntryPaymentCollection(tree, exercised, domainId)
+          case AnsRules_CollectEntryRenewalPayment(_) =>
+            fromAnsEntryPaymentCollection(tree, exercised, domainId)
           case AmuletArchive(_) =>
             throw new RuntimeException(
               s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
@@ -135,7 +135,7 @@ class ScanTxLogParser(
       )
     )
 
-  private def fromCnsEntryPaymentCollection(
+  private def fromAnsEntryPaymentCollection(
       tree: TransactionTree,
       exercised: ExercisedEvent,
       domainId: DomainId,

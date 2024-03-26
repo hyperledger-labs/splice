@@ -66,7 +66,7 @@ template Subscription
       do create TerminatedSubscription with ..
 
 -- | An aborted subscription. Subscriptions should usually be archived together with
--- the context contract of the app that makes the subscription, e.g., CnsEntryContext.
+-- the context contract of the app that makes the subscription, e.g., AnsEntryContext.
 -- To achieve that, we don't archive subscriptions directly but instead create TerminatedSubscription contracts
 -- that are then archived as part of the surrounding workflows.
 template TerminatedSubscription

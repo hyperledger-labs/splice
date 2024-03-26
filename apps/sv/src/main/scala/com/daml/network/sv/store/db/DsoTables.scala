@@ -14,8 +14,8 @@ import io.circe.Json
 
 object DsoTables extends AcsTables with NamedLogging {
 
-  final val CnsActionTypeCollectInitialEntryPayment = "CNSRARC_CollectInitialEntryPayment"
-  final val CnsActionTypeRejectEntryInitialPayment = "CNSRARC_RejectEntryInitialPayment"
+  final val AnsActionTypeCollectInitialEntryPayment = "ANSRARC_CollectInitialEntryPayment"
+  final val AnsActionTypeRejectEntryInitialPayment = "ANSRARC_RejectEntryInitialPayment"
 
   override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
 
@@ -43,10 +43,10 @@ object DsoTables extends AcsTables with NamedLogging {
       electionRequestEpoch: Option[Long] = None,
       importCrateReceiver: Option[PartyId] = None,
       memberTrafficMember: Option[Member] = None,
-      cnsEntryName: Option[String] = None,
-      actionCnsEntryContextCid: Option[cn.cns.CnsEntryContext.ContractId] = None,
-      actionCnsEntryContextPaymentId: Option[sub.SubscriptionInitialPayment.ContractId] = None,
-      actionCnsEntryContextArcType: Option[String] = None,
+      ansEntryName: Option[String] = None,
+      actionAnsEntryContextCid: Option[cn.ans.AnsEntryContext.ContractId] = None,
+      actionAnsEntryContextPaymentId: Option[sub.SubscriptionInitialPayment.ContractId] = None,
+      actionAnsEntryContextArcType: Option[String] = None,
       subscriptionReferenceContractId: Option[sub.SubscriptionRequest.ContractId] = None,
       subscriptionNextPaymentDueAt: Option[Timestamp] = None,
       featuredAppRightProvider: Option[PartyId] = None,
@@ -75,10 +75,10 @@ object DsoTables extends AcsTables with NamedLogging {
       "election_request_epoch" -> electionRequestEpoch,
       "import_crate_receiver" -> importCrateReceiver,
       "member_traffic_member" -> memberTrafficMember,
-      "cns_entry_name" -> cnsEntryName.map(lengthLimited),
-      "action_cns_entry_context_cid" -> actionCnsEntryContextCid,
-      "action_cns_entry_context_payment_id" -> actionCnsEntryContextPaymentId,
-      "action_cns_entry_context_arc_type" -> actionCnsEntryContextArcType.map(lengthLimited),
+      "ans_entry_name" -> ansEntryName.map(lengthLimited),
+      "action_ans_entry_context_cid" -> actionAnsEntryContextCid,
+      "action_ans_entry_context_payment_id" -> actionAnsEntryContextPaymentId,
+      "action_ans_entry_context_arc_type" -> actionAnsEntryContextArcType.map(lengthLimited),
       "subscription_reference_contract_id" -> subscriptionReferenceContractId,
       "subscription_next_payment_due_at" -> subscriptionNextPaymentDueAt,
       "featured_app_right_provider" -> featuredAppRightProvider,

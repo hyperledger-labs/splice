@@ -63,7 +63,7 @@ class BftScanConnectionIntegrationTest
     )
 
     eventuallySucceeds() {
-      aliceCnsExternalClient.listCnsEntries()
+      aliceAnsExternalClient.listAnsEntries()
     }
   }
 }

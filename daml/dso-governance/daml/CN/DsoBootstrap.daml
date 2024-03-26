@@ -8,7 +8,7 @@ import CC.AmuletRules
 import CC.Schedule
 import CC.Types
 
-import CN.Cns
+import CN.Ans
 import CN.DSO.GlobalDomain
 import CN.DsoRules
 
@@ -23,7 +23,7 @@ template DsoBootstrap with
     round0Duration : RelTime
     amuletConfig : AmuletConfig USD
     amuletPrice : Decimal
-    cnsRulesConfig: CnsRulesConfig
+    ansRulesConfig: AnsRulesConfig
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState
     isDevNet : Bool
@@ -41,9 +41,9 @@ template DsoBootstrap with
             initialValue = amuletConfig
             futureValues = []
           isDevNet
-        _ <- create CnsRules with
+        _ <- create AnsRules with
           dso
-          config = cnsRulesConfig
+          config = ansRulesConfig
         -- bootstrap rounds
         exercise amuletRulesCid AmuletRules_Bootstrap_Rounds with
           round0Duration

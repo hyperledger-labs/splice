@@ -4,7 +4,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, Value}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.ans as ansCodegen
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, QualifiedName}
 
 case class Transfer(
@@ -135,32 +135,32 @@ object AmuletRules_BuyMemberTraffic extends ExerciseNodeCompanion {
   override def resToValue(res: Res): Value = res.toValue
 }
 
-object CnsRules_CollectInitialEntryPayment extends ExerciseNodeCompanion {
-  override type Tpl = cnsCodegen.CnsRules
-  override type Arg = cnsCodegen.CnsRules_CollectInitialEntryPayment
-  override type Res = cnsCodegen.CnsRules_CollectInitialEntryPaymentResult
-  override val choice = cnsCodegen.CnsRules.CHOICE_CnsRules_CollectInitialEntryPayment
-  override val template = cnsCodegen.CnsRules.COMPANION
-  override val argDecoder = cnsCodegen.CnsRules_CollectInitialEntryPayment.valueDecoder()
+object AnsRules_CollectInitialEntryPayment extends ExerciseNodeCompanion {
+  override type Tpl = ansCodegen.AnsRules
+  override type Arg = ansCodegen.AnsRules_CollectInitialEntryPayment
+  override type Res = ansCodegen.AnsRules_CollectInitialEntryPaymentResult
+  override val choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectInitialEntryPayment
+  override val template = ansCodegen.AnsRules.COMPANION
+  override val argDecoder = ansCodegen.AnsRules_CollectInitialEntryPayment.valueDecoder()
 
   override def argToValue(arg: Arg): Value = arg.toValue
 
-  override val resDecoder = cnsCodegen.CnsRules_CollectInitialEntryPaymentResult.valueDecoder
+  override val resDecoder = ansCodegen.AnsRules_CollectInitialEntryPaymentResult.valueDecoder
 
   override def resToValue(res: Res): Value = res.toValue
 }
 
-object CnsRules_CollectEntryRenewalPayment extends ExerciseNodeCompanion {
-  override type Tpl = cnsCodegen.CnsRules
-  override type Arg = cnsCodegen.CnsRules_CollectEntryRenewalPayment
-  override type Res = cnsCodegen.CnsRules_CollectEntryRenewalPaymentResult
-  override val choice = cnsCodegen.CnsRules.CHOICE_CnsRules_CollectEntryRenewalPayment
-  override val template = cnsCodegen.CnsRules.COMPANION
-  override val argDecoder = cnsCodegen.CnsRules_CollectEntryRenewalPayment.valueDecoder()
+object AnsRules_CollectEntryRenewalPayment extends ExerciseNodeCompanion {
+  override type Tpl = ansCodegen.AnsRules
+  override type Arg = ansCodegen.AnsRules_CollectEntryRenewalPayment
+  override type Res = ansCodegen.AnsRules_CollectEntryRenewalPaymentResult
+  override val choice = ansCodegen.AnsRules.CHOICE_AnsRules_CollectEntryRenewalPayment
+  override val template = ansCodegen.AnsRules.COMPANION
+  override val argDecoder = ansCodegen.AnsRules_CollectEntryRenewalPayment.valueDecoder()
 
   override def argToValue(arg: Arg): Value = arg.toValue
 
-  override val resDecoder = cnsCodegen.CnsRules_CollectEntryRenewalPaymentResult.valueDecoder
+  override val resDecoder = ansCodegen.AnsRules_CollectEntryRenewalPaymentResult.valueDecoder
 
   override def resToValue(res: Res): Value = res.toValue
 }

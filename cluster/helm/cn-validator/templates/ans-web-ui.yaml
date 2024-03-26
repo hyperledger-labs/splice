@@ -1,0 +1,74 @@
+{{- $ansWebUiLabel := "ans-web-ui" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: {{ $ansWebUiLabel }}
+    migration: {{ .Values.migration.id | quote }}
+  name: {{ $ansWebUiLabel }}
+  namespace: {{ .Release.Namespace }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: {{ $ansWebUiLabel }}
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: {{ $ansWebUiLabel }}
+        migration: {{ .Values.migration.id | quote }}
+    spec:
+      containers:
+      - name: ans-web-ui
+        image: "{{ .Values.imageRepo }}/ans-web-ui:{{ (.Values.cluster).imageTag }}"
+        imagePullPolicy: Always
+        env:
+        - name: CN_APP_ANS_UI_AUTH_CLIENT_ID
+          valueFrom:
+            secretKeyRef:
+              key: client-id
+              name: cn-app-ans-ui-auth
+              optional: false
+        - name: CN_APP_ANS_UI_AUTH_URL
+          valueFrom:
+            secretKeyRef:
+              key: url
+              name: cn-app-ans-ui-auth
+              optional: false
+        - name: CN_APP_ANS_UI_AUTH_AUDIENCE
+          value: {{ (.Values.auth).audience | default "https://canton.network.global" | quote }}
+        - name: CN_APP_ANS_UI_CLUSTER
+          value: {{ .Values.clusterUrl | quote }}
+        ports:
+        - containerPort: 80
+          name: http
+          protocol: TCP
+        resources:
+          limits:
+            cpu: 1
+            memory: 1536Mi
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $ansWebUiLabel }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    migration: {{ .Values.migration.id | quote }}
+spec:
+  selector:
+    app: {{ $ansWebUiLabel }}
+  ports:
+  - name: http
+    port: 80
+    protocol: TCP

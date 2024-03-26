@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.cc.amuletrules.{AppTransferContext, AmuletRules}
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.ans.AnsRules
 import com.daml.network.environment.{
   CNLedgerClient,
   HttpAppConnection,
@@ -61,11 +61,11 @@ trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseable
       tc: TraceContext,
   ): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]]
 
-  def getCnsRules()(implicit
+  def getAnsRules()(implicit
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
-  ): Future[ContractWithState[CnsRules.ContractId, CnsRules]]
+  ): Future[ContractWithState[AnsRules.ContractId, AnsRules]]
 
   def getOpenAndIssuingMiningRounds()(implicit
       ec: ExecutionContext,
@@ -243,9 +243,9 @@ object ScanConnection {
       )
   }
 
-  private[client] case class CachedCnsRules(
+  private[client] case class CachedAnsRules(
       cacheValidUntil: CantonTimestamp,
-      cnsRules: ContractWithState[CnsRules.ContractId, CnsRules],
+      ansRules: ContractWithState[AnsRules.ContractId, AnsRules],
   ) {
     def validAsOf(now: CantonTimestamp, amuletRules: ContractWithState[?, AmuletRules]): Boolean =
       now.isBefore(cacheValidUntil) && amuletRules.state.fold(

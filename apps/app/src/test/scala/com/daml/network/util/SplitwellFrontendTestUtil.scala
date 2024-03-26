@@ -4,7 +4,7 @@ import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
 import com.daml.network.integration.tests.FrontendTestCommon
 import com.digitalasset.canton.topology.PartyId
 
-trait SplitwellFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
+trait SplitwellFrontendTestUtil extends CNNodeTestCommon with AnsTestUtil {
   this: CommonCNNodeAppInstanceReferences & FrontendTestCommon =>
 
   def addTeamLunch(quantity: Double)(implicit webDriver: WebDriverType) = {
@@ -30,7 +30,7 @@ trait SplitwellFrontendTestUtil extends CNNodeTestCommon with CnsTestUtil {
       field.underlying.click()
       reactTextInput(field).value = quantity.toString
     }
-    setCnsField(
+    setAnsField(
       reactTextInput(find(className("transfer-receiver-field")).value),
       receiver,
       receiverPartyId.toProtoPrimitive,

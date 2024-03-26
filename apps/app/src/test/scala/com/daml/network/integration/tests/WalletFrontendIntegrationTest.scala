@@ -193,14 +193,14 @@ class WalletFrontendIntegrationTest
 
     }
 
-    "show logged in CNS name" in { implicit env =>
+    "show logged in ANS name" in { implicit env =>
       // Create directory entry for alice
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val entryName = perTestCaseName("alice")
 
-      createCnsEntry(
-        aliceCnsExternalClient,
+      createAnsEntry(
+        aliceAnsExternalClient,
         entryName,
         aliceWalletClient,
       )
@@ -214,7 +214,7 @@ class WalletFrontendIntegrationTest
             browseToAliceWallet(aliceDamlUser)
           },
         )(
-          "Alice sees her CNS entry name",
+          "Alice sees her ANS entry name",
           _ => {
             seleniumText(find(id("logged-in-user"))) should matchText(entryName)
           },

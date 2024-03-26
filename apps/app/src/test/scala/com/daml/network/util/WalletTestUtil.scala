@@ -3,7 +3,7 @@ package com.daml.network.util
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
-import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.ans as ansCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as walletInstallCodegen,
   payment as paymentCodegen,
@@ -16,7 +16,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.scan.dso.DsoCnsResolver
+import com.daml.network.scan.dso.DsoAnsResolver
 import com.daml.network.store.MultiDomainAcsStore.ContractState
 import com.daml.network.util.WalletTestUtil.{DynamicUserRefs, StaticUserRefs}
 import com.daml.network.wallet.store.TxLogEntry
@@ -31,7 +31,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.util.control.NonFatal
 
-trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
+trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   this: CommonCNNodeAppInstanceReferences =>
 
   val exactly = (x: BigDecimal) => (x, x)
@@ -427,22 +427,22 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       disclosedContracts = Seq.empty,
     )
   }
-  protected def expectedDsoCns(implicit env: CNNodeTestConsoleEnvironment): String = {
-    expectedCns(dsoParty, DsoCnsResolver.dsoCnsName)
+  protected def expectedDsoAns(implicit env: CNNodeTestConsoleEnvironment): String = {
+    expectedAns(dsoParty, DsoAnsResolver.dsoAnsName)
   }
 
-  protected def createCnsEntry(
-      cnsExternalApp: CnsExternalAppReference,
+  protected def createAnsEntry(
+      ansExternalApp: AnsExternalAppReference,
       entryName: String,
       wallet: WalletAppClientReference,
       tapAmount: BigDecimal = 5.0,
-      entryUrl: String = "https://cns-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
+      entryUrl: String = "https://ans-dir-url.com",
+      entryDescription: String = "Sample ANS Entry Description",
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
-    requestCnsEntry(
-      cnsExternalApp,
+    requestAnsEntry(
+      ansExternalApp,
       entryName,
       entryUrl,
       entryDescription,
@@ -454,10 +454,10 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     wallet.acceptSubscriptionRequest(
       wallet.listSubscriptionRequests().head.contractId
     )
-    waitForCnsEntry(entryName)
+    waitForAnsEntry(entryName)
   }
 
-  private def waitForCnsEntry(name: String)(implicit
+  private def waitForAnsEntry(name: String)(implicit
       env: CNNodeTestConsoleEnvironment
   ) = {
     eventuallySucceeds(40.seconds) {
@@ -465,15 +465,15 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     }
   }
 
-  protected def requestCnsEntry(
-      cnsExternalApp: CnsExternalAppReference,
+  protected def requestAnsEntry(
+      ansExternalApp: AnsExternalAppReference,
       entryName: String,
-      entryUrl: String = "https://cns-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
+      entryUrl: String = "https://ans-dir-url.com",
+      entryDescription: String = "Sample ANS Entry Description",
   ) = {
     // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
     retryCommandSubmission(
-      cnsExternalApp.createCnsEntry(entryName, entryUrl, entryDescription)
+      ansExternalApp.createAnsEntry(entryName, entryUrl, entryDescription)
     )
   }
 
@@ -746,24 +746,24 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     }
   }
 
-  protected def requestCnsEntry(
+  protected def requestAnsEntry(
       participantClientWithAdminToken: CNParticipantClientReference,
       entryName: String,
       userId: String,
       userParty: PartyId,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val entryUrl = "https://cns-dir-url.com"
-    val entryDescription = "Sample CNS Entry Description"
-    val cnsRules = sv1ScanBackend.getCnsRules()
-    val update = cnsRules.contractId.exerciseCnsRules_RequestEntry(
+    val entryUrl = "https://ans-dir-url.com"
+    val entryDescription = "Sample ANS Entry Description"
+    val ansRules = sv1ScanBackend.getAnsRules()
+    val update = ansRules.contractId.exerciseAnsRules_RequestEntry(
       entryName,
       entryUrl,
       entryDescription,
       userParty.toProtoPrimitive,
     )
-    val disclosure = DisclosedContracts(cnsRules)
+    val disclosure = DisclosedContracts(ansRules)
 
-    clue("request a cns entry from cnsRules contract") {
+    clue("request a ans entry from ansRules contract") {
       val result = participantClientWithAdminToken.ledger_api_extensions.commands.submitWithResult(
         userId = userId,
         actAs = Seq(userParty),
@@ -773,7 +773,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         disclosedContracts = disclosure.toLedgerApiDisclosedContracts,
       )
       (
-        cnsCodegen.CnsEntryContext.COMPANION.toContractId(result.exerciseResult.entryCid),
+        ansCodegen.AnsEntryContext.COMPANION.toContractId(result.exerciseResult.entryCid),
         subsCodegen.SubscriptionRequest.COMPANION.toContractId(result.exerciseResult.requestCid),
       )
     }
@@ -998,12 +998,12 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   protected def requestEntry(
       refs: DynamicUserRefs,
       entryName: String,
-      entryUrl: String = "https://cns-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
+      entryUrl: String = "https://ans-dir-url.com",
+      entryDescription: String = "Sample ANS Entry Description",
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    val cnsRules = sv1ScanBackend.getCnsRules()
+    val ansRules = sv1ScanBackend.getAnsRules()
 
-    val cmd = cnsRules.contractId.exerciseCnsRules_RequestEntry(
+    val cmd = ansRules.contractId.exerciseAnsRules_RequestEntry(
       entryName,
       entryUrl,
       entryDescription,
@@ -1015,7 +1015,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         actAs = Seq(refs.userParty),
         readAs = Seq.empty,
         update = cmd,
-        disclosedContracts = DisclosedContracts(cnsRules).toLedgerApiDisclosedContracts,
+        disclosedContracts = DisclosedContracts(ansRules).toLedgerApiDisclosedContracts,
       )
       .exerciseResult
       .requestCid
@@ -1024,10 +1024,10 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   protected def requestAndPayForEntry(
       refs: DynamicUserRefs,
       entryName: String,
-      entryUrl: String = "https://cns-dir-url.com",
-      entryDescription: String = "Sample CNS Entry Description",
+      entryUrl: String = "https://ans-dir-url.com",
+      entryDescription: String = "Sample ANS Entry Description",
   )(implicit env: CNNodeTestConsoleEnvironment) = {
-    // for paying the cns entry initial payment.
+    // for paying the ans entry initial payment.
     refs.wallet.tap(5.0)
 
     val subscriptionRequest = requestEntry(refs, entryName, entryUrl, entryDescription)

@@ -142,7 +142,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
   ) = {
     click on "navlink-transfer"
     click on "create-offer-receiver"
-    setCnsField(
+    setAnsField(
       textField("create-offer-receiver"),
       receiver.toProtoPrimitive,
       receiver.toProtoPrimitive,

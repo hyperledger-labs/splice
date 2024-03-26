@@ -13,7 +13,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.automation.ScanAggregationTrigger
 import com.daml.network.scan.store.db.ScanAggregator
 import com.daml.network.util.*
-import com.daml.network.util.CNNodeUtil.defaultCnsConfig
+import com.daml.network.util.CNNodeUtil.defaultAnsConfig
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import scala.jdk.CollectionConverters.*
@@ -411,8 +411,8 @@ class ScanTimeBasedIntegrationTest
     }
   }
 
-  "return CnsRules contract and config" in { implicit env =>
-    val cnsRules = sv1ScanBackend.getCnsRules()
-    cnsRules.payload.config shouldBe defaultCnsConfig()
+  "return AnsRules contract and config" in { implicit env =>
+    val ansRules = sv1ScanBackend.getAnsRules()
+    ansRules.payload.config shouldBe defaultAnsConfig()
   }
 }

@@ -11,7 +11,7 @@ import com.daml.network.environment.*
 import com.daml.network.http.v0.app_manager.AppManagerResource
 import com.daml.network.http.v0.app_manager_admin.AppManagerAdminResource
 import com.daml.network.http.v0.app_manager_public.AppManagerPublicResource
-import com.daml.network.http.v0.external.cns.CnsResource
+import com.daml.network.http.v0.external.ans.AnsResource
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.external.wallet.WalletResource as ExternalWalletResource
 import com.daml.network.http.v0.json_api_public.JsonApiPublicResource
@@ -694,8 +694,8 @@ class ValidatorApp(
         )
       )
 
-      cnsExternalHandler = walletManagerOpt.map(walletManager =>
-        new HttpExternalCnsHandler(
+      ansExternalHandler = walletManagerOpt.map(walletManager =>
+        new HttpExternalAnsHandler(
           walletManager,
           scanConnection,
           loggerFactory,
@@ -827,10 +827,10 @@ class ValidatorApp(
                     walletHandler,
                     AuthExtractor(verifier, loggerFactory, "canton network wallet realm"),
                   )
-                } ++ cnsExternalHandler.toList.map { cnsHandler =>
-                  CnsResource.routes(
-                    cnsHandler,
-                    AuthExtractor(verifier, loggerFactory, "canton network cns realm"),
+                } ++ ansExternalHandler.toList.map { ansHandler =>
+                  AnsResource.routes(
+                    ansHandler,
+                    AuthExtractor(verifier, loggerFactory, "canton network ans realm"),
                   )
                 } ++
                   appManagerHandlersO.toList.flatMap {

@@ -1,0 +1,42 @@
+package com.daml.network.util
+
+import com.digitalasset.canton.util.ShowUtil.*
+import com.daml.network.console.{AnsExternalAppReference, WalletAppClientReference}
+import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
+import com.digitalasset.canton.topology.PartyId
+
+trait AnsEntryTestUtil extends CNNodeTestCommon with AnsTestUtil {
+  this: CommonCNNodeAppInstanceReferences =>
+  def initialiseAnsEntry(
+      userName: String,
+      userParty: PartyId,
+      ansExternalApp: AnsExternalAppReference,
+      wallet: WalletAppClientReference,
+  ): Unit = {
+    val (_, reqId) = actAndCheck(
+      show"Request ANS entry ${userName.singleQuoted} for $userParty",
+      ansExternalApp.createAnsEntry(
+        userName,
+        "https://ans-dir-url.com",
+        "Sample ANS Entry Description",
+      ),
+    )(
+      "There is exactly one subscription request",
+      _ => {
+        inside(wallet.listSubscriptionRequests()) { case Seq(req) =>
+          req.contractId
+        }
+      },
+    )
+
+    actAndCheck(
+      "Tap and accept subscription request", {
+        wallet.tap(5.0)
+        wallet.acceptSubscriptionRequest(reqId)
+      },
+    )(
+      "There are no subscription request left",
+      _ => wallet.listSubscriptionRequests() should have length 0,
+    )
+  }
+}

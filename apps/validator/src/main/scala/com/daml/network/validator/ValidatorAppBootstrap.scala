@@ -4,7 +4,7 @@ import org.apache.pekko.actor.ActorSystem
 import cats.data.EitherT
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.config.{CNStorageFactory, SharedCNNodeAppParameters}
+import com.daml.network.config.{ANStorageFactory, SharedCNNodeAppParameters}
 import com.daml.network.environment.CNNodeBootstrapBase
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
@@ -106,7 +106,7 @@ object ValidatorAppBootstrap {
           testingConfigInternal,
           clock,
           validatorMetrics,
-          new CNStorageFactory(validatorConfig.storage),
+          new ANStorageFactory(validatorConfig.storage),
           loggerFactory,
           futureSupervisor,
           configuredOpenTelemetry,

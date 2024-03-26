@@ -28,15 +28,15 @@ spec:
             host: wallet-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
 {{- end }}
-{{- if .Values.ingress.cns }}
+{{- if .Values.ingress.ans }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: cns-{{ (.Values.cluster).svNamespace }}
+  name: ans-{{ (.Values.cluster).svNamespace }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "cns.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "ans.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -55,6 +55,6 @@ spec:
         - destination:
             port:
               number: 80
-            host: cns-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: ans-web-ui.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
 {{- end }}

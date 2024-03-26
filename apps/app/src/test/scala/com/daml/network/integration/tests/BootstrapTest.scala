@@ -34,7 +34,7 @@ class BootstrapTest extends CNNodeIntegrationTest with HasConsoleScriptRunner {
       .addConfigTransform((_, config) => CNNodeConfigTransforms.reducePollingInterval(config))
 
   "Bootstrap script should pass" in { implicit env =>
-    // the script logs errors when a CNS name check fails but then recovers from this
+    // the script logs errors when a ANS name check fails but then recovers from this
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
       {
         clue("It should pass one time...") {

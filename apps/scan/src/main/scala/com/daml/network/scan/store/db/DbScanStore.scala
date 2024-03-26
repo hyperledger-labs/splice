@@ -5,7 +5,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
-import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
+import com.daml.network.codegen.java.cn.ans.{AnsEntry, AnsRules}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.cn.dso.memberstate.SvNodeState
@@ -161,9 +161,9 @@ class DbScanStore(
       } yield contractWithState
     }
 
-  override def lookupCnsRules()(implicit
+  override def lookupAnsRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[CnsRules.ContractId, CnsRules]]] =
+  ): Future[Option[ContractWithState[AnsRules.ContractId, AnsRules]]] =
     waitUntilAcsIngested {
       for {
         row <- storage
@@ -172,14 +172,14 @@ class DbScanStore(
               ScanTables.acsTableName,
               storeId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(CnsRules.TEMPLATE_ID)}""",
+              where = sql"""template_id_qualified_name = ${QualifiedName(AnsRules.TEMPLATE_ID)}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
-            "lookupCnsRules",
+            "lookupAnsRules",
           )
           .value
         contractWithState = row.map(
-          contractWithStateFromRow(CnsRules.COMPANION)(_)
+          contractWithStateFromRow(AnsRules.COMPANION)(_)
         )
       } yield contractWithState
     }
@@ -210,7 +210,7 @@ class DbScanStore(
   override def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[ContractWithState[CnsEntry.ContractId, CnsEntry]]
+    Seq[ContractWithState[AnsEntry.ContractId, AnsEntry]]
   ] = waitUntilAcsIngested {
     val limitedPrefix = lengthLimited(namePrefix)
     for {
@@ -222,25 +222,25 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                CnsEntry.COMPANION.TEMPLATE_ID
-              )} and cns_entry_name ^@ $limitedPrefix
+                AnsEntry.COMPANION.TEMPLATE_ID
+              )} and ans_entry_name ^@ $limitedPrefix
             """,
             orderLimit = sql"""
-                order by cns_entry_name
+                order by ans_entry_name
                 limit ${sqlLimit(limit)}
             """,
           ),
           "listEntries",
         )
     } yield applyLimit("listEntries", limit, rows).map(
-      contractWithStateFromRow(CnsEntry.COMPANION)(_)
+      contractWithStateFromRow(AnsEntry.COMPANION)(_)
     )
   }
 
   override def lookupEntryByParty(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
-    Option[ContractWithState[CnsEntry.ContractId, CnsEntry]]
+    Option[ContractWithState[AnsEntry.ContractId, AnsEntry]]
   ] = waitUntilAcsIngested {
     (for {
       row <- storage
@@ -251,23 +251,23 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
                 template_id_qualified_name = ${QualifiedName(
-                CnsEntry.COMPANION.TEMPLATE_ID
+                AnsEntry.COMPANION.TEMPLATE_ID
               )}
-                and cns_entry_owner = $partyId
-                and cns_entry_name >= ''
+                and ans_entry_owner = $partyId
+                and ans_entry_name >= ''
             """,
             orderLimit = sql"""
-                order by cns_entry_name
+                order by ans_entry_name
                 limit 1
             """,
           ).headOption,
           "lookupEntryByParty",
         )
-    } yield contractWithStateFromRow(CnsEntry.COMPANION)(row)).value
+    } yield contractWithStateFromRow(AnsEntry.COMPANION)(row)).value
   }
 
   override def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
-    Option[ContractWithState[CnsEntry.ContractId, CnsEntry]]
+    Option[ContractWithState[AnsEntry.ContractId, AnsEntry]]
   ] = waitUntilAcsIngested {
     (for {
       row <- storage
@@ -278,15 +278,15 @@ class DbScanStore(
             domainMigrationId,
             where = sql"""
               template_id_qualified_name = ${QualifiedName(
-                CnsEntry.COMPANION.TEMPLATE_ID
+                AnsEntry.COMPANION.TEMPLATE_ID
               )}
-              and cns_entry_name = ${lengthLimited(name)}
+              and ans_entry_name = ${lengthLimited(name)}
                  """,
             orderLimit = sql"limit 1",
           ).headOption,
           "lookupEntryByName",
         )
-    } yield contractWithStateFromRow(CnsEntry.COMPANION)(row)).value
+    } yield contractWithStateFromRow(AnsEntry.COMPANION)(row)).value
   }
 
   override def listTransactions(

@@ -27,7 +27,7 @@ import CN.DsoBootstrap
 import CN.DSO.AmuletPrice
 import CN.DSO.GlobalDomain
 import CN.DSO.MemberState
-import CN.Scripts.CnsRulesParameters
+import CN.Scripts.AnsRulesParameters
 
 -- | Multiplier for the SV weights, which are recorded in basis-points, i.e., 1/10000ths
 bpsMultiplier : Int
@@ -70,7 +70,7 @@ initCollective isDevNet = do
         globalDomain = initialDsoGlobalDomainConfig
         nextScheduledDomainUpgrade = None
   let amuletConfig = defaultAmuletConfig
-  let cnsRulesConfig = defaultCnsRulesConfig
+  let ansRulesConfig = defaultAnsRulesConfig
 
   now <- getTime
   -- have sv1 bootstrap the collective
@@ -103,7 +103,7 @@ initCollective isDevNet = do
       amuletConfig
       amuletPrice = 1.0
       round0Duration = hours 24
-      cnsRulesConfig
+      ansRulesConfig
       config
       initialTrafficState = Map.empty
       isDevNet

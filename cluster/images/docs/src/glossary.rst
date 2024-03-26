@@ -61,14 +61,14 @@ Glossary
       * provides UI for managing peer-to-peer transfers
         between two users
 
-    Canton Name Service (sometimes also called directory service)
+    Amulet Name Service (sometimes also called directory service)
 
       * allows parties to buy a globally unique, human readable name for a time period mapped to their party (similar to DNS)
       * allows each party to declare one of their entries as the primary
         entry which is used to provide a human readable name to their party
         (similar to reverse DNS)
       * provides APIs for resolution in both directions that can be used by
-        other apps (e.g., the wallet) to display and accept CNS names instead of party ids
+        other apps (e.g., the wallet) to display and accept ANS names instead of party ids
 
 
     Splitwell

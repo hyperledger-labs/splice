@@ -446,8 +446,8 @@ lazy val `apps-validator` =
         openApiSpec = "validator-internal.yaml",
       ),
       BuildCommon.TS.openApiSettings(
-        npmName = "cns-external-openapi",
-        openApiSpec = "cns-external.yaml",
+        npmName = "ans-external-openapi",
+        openApiSpec = "ans-external.yaml",
         directory = "external-openapi-ts-client",
       ),
       BuildCommon.TS.openApiSettings(
@@ -456,7 +456,7 @@ lazy val `apps-validator` =
         directory = "scan-proxy-openapi-ts-client",
       ),
       Compile / guardrailTasks :=
-        List("validator-internal", "json-api-proxy-internal", "cns-external", "scan-proxy").flatMap(
+        List("validator-internal", "json-api-proxy-internal", "ans-external", "scan-proxy").flatMap(
           api =>
             List(
               ScalaServer(
@@ -759,13 +759,13 @@ lazy val `apps-splitwell-frontend` = {
     )
 }
 
-lazy val `apps-cns-frontend` = {
+lazy val `apps-ans-frontend` = {
   project
-    .in(file("apps/cns/frontend"))
+    .in(file("apps/ans/frontend"))
     .dependsOn(`apps-common-frontend`)
     .settings(
       commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
-      frontendWorkspace := "cns-frontend",
+      frontendWorkspace := "ans-frontend",
       sharedFrontendSettings,
     )
 }
@@ -785,7 +785,7 @@ lazy val `apps-frontends` = {
   project.aggregate(
     `apps-common-frontend`,
     `apps-wallet-frontend`,
-    `apps-cns-frontend`,
+    `apps-ans-frontend`,
     `apps-sv-frontend`,
     `apps-scan-frontend`,
     `apps-splitwell-frontend`,
@@ -1071,7 +1071,7 @@ lazy val bundleTask = {
     val webUis =
       Seq(
         ((`apps-wallet-frontend` / bundle).value, "wallet"),
-        ((`apps-cns-frontend` / bundle).value, "cns"),
+        ((`apps-ans-frontend` / bundle).value, "ans"),
         ((`apps-sv-frontend` / bundle).value, "sv"),
         ((`apps-scan-frontend` / bundle).value, "scan"),
         ((`apps-splitwell-frontend` / bundle).value, "splitwell"),

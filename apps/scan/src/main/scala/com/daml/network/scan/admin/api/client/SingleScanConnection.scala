@@ -4,7 +4,7 @@ import cats.data.OptionT
 import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.ans.AnsRules
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
 import com.daml.network.http.v0.definitions.MigrationSchedule
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
@@ -88,49 +88,49 @@ class SingleScanConnection private[client] (
     )
   }
 
-  override def getCnsRules()(implicit
+  override def getAnsRules()(implicit
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
-  ): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = {
-    getCnsRules(None)
+  ): Future[ContractWithState[AnsRules.ContractId, AnsRules]] = {
+    getAnsRules(None)
   }
 
-  def getCnsRules(cachedCnsRules: Option[ContractWithState[CnsRules.ContractId, CnsRules]])(implicit
+  def getAnsRules(cachedAnsRules: Option[ContractWithState[AnsRules.ContractId, AnsRules]])(implicit
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
-  ): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = {
+  ): Future[ContractWithState[AnsRules.ContractId, AnsRules]] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.GetCnsRules(cachedCnsRules),
+      HttpScanAppClient.GetAnsRules(cachedAnsRules),
     )
   }
 
-  def lookupCnsEntryByParty(
+  def lookupAnsEntryByParty(
       id: PartyId
-  )(implicit tc: TraceContext): Future[Option[com.daml.network.http.v0.definitions.CnsEntry]] = {
+  )(implicit tc: TraceContext): Future[Option[com.daml.network.http.v0.definitions.AnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.LookupCnsEntryByParty(id),
+      HttpScanAppClient.LookupAnsEntryByParty(id),
     )
   }
 
-  def lookupCnsEntryByName(
+  def lookupAnsEntryByName(
       name: String
-  )(implicit tc: TraceContext): Future[Option[com.daml.network.http.v0.definitions.CnsEntry]] = {
+  )(implicit tc: TraceContext): Future[Option[com.daml.network.http.v0.definitions.AnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.LookupCnsEntryByName(name),
+      HttpScanAppClient.LookupAnsEntryByName(name),
     )
   }
 
-  def listCnsEntries(namePrefix: Option[String], pageSize: Int)(implicit
+  def listAnsEntries(namePrefix: Option[String], pageSize: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[com.daml.network.http.v0.definitions.CnsEntry]] = {
+  ): Future[Seq[com.daml.network.http.v0.definitions.AnsEntry]] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.ListCnsEntries(namePrefix, pageSize),
+      HttpScanAppClient.ListAnsEntries(namePrefix, pageSize),
     )
   }
 
@@ -411,12 +411,12 @@ class CachedScanConnection private[client] (
       HttpScanAppClient.GetAmuletRules(cachedAmuletRules),
     )
 
-  override protected def runGetCnsRules(
-      cachedCnsRules: Option[ContractWithState[CnsRules.ContractId, CnsRules]]
-  )(implicit tc: TraceContext): Future[ContractWithState[CnsRules.ContractId, CnsRules]] =
+  override protected def runGetAnsRules(
+      cachedAnsRules: Option[ContractWithState[AnsRules.ContractId, AnsRules]]
+  )(implicit tc: TraceContext): Future[ContractWithState[AnsRules.ContractId, AnsRules]] =
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.GetCnsRules(cachedCnsRules),
+      HttpScanAppClient.GetAnsRules(cachedAnsRules),
     )
 
   override protected def runGetOpenAndIssuingMiningRounds(

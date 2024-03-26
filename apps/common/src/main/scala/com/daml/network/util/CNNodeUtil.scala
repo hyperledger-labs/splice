@@ -261,11 +261,11 @@ object CNNodeUtil {
     readPackageConfig(),
   )
 
-  def defaultCnsConfig(
+  def defaultAnsConfig(
       renewalDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
       entryLifetime: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(90),
       entryFee: Double = 1.0,
-  ): cn.cns.CnsRulesConfig = new cn.cns.CnsRulesConfig(
+  ): cn.ans.AnsRulesConfig = new cn.ans.AnsRulesConfig(
     // renewalDuration
     new RelTime(
       TimeUnit.NANOSECONDS.toMicros(renewalDuration.duration.toNanos)

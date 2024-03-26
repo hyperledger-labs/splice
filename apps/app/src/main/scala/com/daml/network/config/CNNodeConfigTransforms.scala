@@ -15,7 +15,7 @@ import com.daml.network.sv.config.*
 import com.daml.network.validator.config.{
   AppManagerAppClientConfig,
   AppManagerConfig,
-  CnsAppExternalClientConfig,
+  AnsAppExternalClientConfig,
   ValidatorAppBackendConfig,
 }
 import com.daml.network.wallet.config.WalletAppClientConfig
@@ -115,7 +115,7 @@ object CNNodeConfigTransforms {
       updateAllRemoteSplitwellAppConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
-      updateAllCnsAppExternalClientConfigs_(c =>
+      updateAllAnsAppExternalClientConfigs_(c =>
         c.copy(ledgerApiUser = s"${c.ledgerApiUser}-$suffix")
       ),
     )
@@ -186,7 +186,7 @@ object CNNodeConfigTransforms {
   }
 
   type CnAppConfigTransform[A] = A => A
-  type CnsExternalClientConfigReader = CnAppConfigTransform[CnsAppExternalClientConfig]
+  type AnsExternalClientConfigReader = CnAppConfigTransform[AnsAppExternalClientConfig]
   type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
   type AppManagerAppClientTransform = CnAppConfigTransform[AppManagerAppClientConfig]
@@ -215,10 +215,10 @@ object CNNodeConfigTransforms {
       (name, update(config))
     })
 
-  def updateAllCnsAppExternalClientConfigs_(
-      update: CnsExternalClientConfigReader
+  def updateAllAnsAppExternalClientConfigs_(
+      update: AnsExternalClientConfigReader
   ): CNNodeConfigTransform =
-    _.focus(_.cnsAppExternalClients).modify(_.map { case (name, config) =>
+    _.focus(_.ansAppExternalClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
@@ -668,7 +668,7 @@ object CNNodeConfigTransforms {
       }
     )
 
-  def modifyAllCNStorageConfigs(
+  def modifyAllANStorageConfigs(
       storageConfigModifier: (
           String,
           CNDbConfig,

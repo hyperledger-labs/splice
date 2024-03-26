@@ -16,7 +16,7 @@ import { usePrimaryParty, useTransferOffers } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { WalletTransferOffer } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
-import BftCnsEntry from './BftCnsEntry';
+import BftAnsEntry from './BftAnsEntry';
 
 export const TransferOffers: React.FC = () => {
   const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
@@ -108,7 +108,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         <ArrowCircleLeftOutlined fontSize="large" />
         <Stack direction="row" alignItems="center">
           <Stack direction="column">
-            <BftCnsEntry
+            <BftAnsEntry
               partyId={offer.senderId}
               variant="h5"
               className={'transfer-offer-sender'}

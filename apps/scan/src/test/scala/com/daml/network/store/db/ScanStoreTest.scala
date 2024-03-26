@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.validatorlicense.FaucetState
 import com.daml.network.codegen.java.cc.{amulet as amuletCodegen, round as roundCodegen}
-import com.daml.network.codegen.java.cn.cns.CnsEntry
+import com.daml.network.codegen.java.cn.ans.AnsEntry
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, dsorules as dsorulesCodegen}
 import com.daml.network.codegen.java.cn.dso.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -773,15 +773,15 @@ abstract class ScanStoreTest
 
     }
 
-    "lookupCnsRules" should {
-      "find the latest CNS rules" in {
-        val cr = cnsRules()
+    "lookupAnsRules" should {
+      "find the latest ANS rules" in {
+        val cr = ansRules()
         for {
           store <- mkStore()
           _ <- dummyDomain.create(cr)(store.multiDomainAcsStore)
         } yield {
           store
-            .lookupCnsRules()
+            .lookupAnsRules()
             .futureValue
             .map(_.contract) should be(Some(cr))
         }
@@ -825,9 +825,9 @@ abstract class ScanStoreTest
       "list entries with prefix" in {
         for {
           store <- mkStore()
-          unwantedContract = cnsEntry(1, "unwanted")
-          wantedContract = cnsEntry(2, "wanted")
-          wantedContract2 = cnsEntry(3, "wanted2")
+          unwantedContract = ansEntry(1, "unwanted")
+          wantedContract = ansEntry(2, "wanted")
+          wantedContract2 = ansEntry(3, "wanted2")
           _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(wantedContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(wantedContract2)(store.multiDomainAcsStore)
@@ -857,8 +857,8 @@ abstract class ScanStoreTest
       "return the entry with the exact name" in {
         for {
           store <- mkStore()
-          unwantedContract = cnsEntry(1, "unwanted")
-          wantedContract = cnsEntry(2, "wanted")
+          unwantedContract = ansEntry(1, "unwanted")
+          wantedContract = ansEntry(2, "wanted")
           _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(wantedContract)(store.multiDomainAcsStore)
           expectedResult = Some(ContractWithState(wantedContract, Assigned(dummyDomain)))
@@ -874,9 +874,9 @@ abstract class ScanStoreTest
       "return the first lexicographical entry of the user" in {
         for {
           store <- mkStore()
-          unwantedContract = cnsEntry(1, "unwanted")
-          bContract = cnsEntry(2, "b")
-          aContract = cnsEntry(2, "a")
+          unwantedContract = ansEntry(1, "unwanted")
+          bContract = ansEntry(2, "b")
+          aContract = ansEntry(2, "a")
           _ <- dummyDomain.create(unwantedContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(bContract)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(aContract)(store.multiDomainAcsStore)
@@ -1355,8 +1355,8 @@ trait AmuletTransferUtil { self: StoreTest =>
     )
   }
 
-  def cnsEntry(n: Int, name: String) = {
-    val template = new CnsEntry(
+  def ansEntry(n: Int, name: String) = {
+    val template = new AnsEntry(
       userParty(n).toProtoPrimitive,
       dsoParty.toProtoPrimitive,
       name,
@@ -1366,8 +1366,8 @@ trait AmuletTransferUtil { self: StoreTest =>
     )
 
     contract(
-      CnsEntry.TEMPLATE_ID,
-      new CnsEntry.ContractId(nextCid()),
+      AnsEntry.TEMPLATE_ID,
+      new AnsEntry.ContractId(nextCid()),
       template,
     )
   }

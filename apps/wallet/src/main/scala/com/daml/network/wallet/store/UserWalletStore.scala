@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.{
   round as roundCodegen,
   validatorlicense as validatorCodegen,
 }
-import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.ans as ansCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
@@ -191,7 +191,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
   /** Exclude any idle states that expired strictly before `unlessExpiredAsOf`.
     * This is '''not the same''' as a historical query, as it may also exclude
     * states that expired ''after'' that value.  The intent is to match the
-    * expiry behavior of `SvDsoStore#listExpiredCnsSubscriptions`, not to
+    * expiry behavior of `SvDsoStore#listExpiredAnsSubscriptions`, not to
     * provide a grace period for subscription payments.
     */
   protected[this] def listSubscriptionIdleStates(
@@ -325,13 +325,13 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       limit: PageLimit,
   )(implicit lc: TraceContext): Future[Seq[TxLogEntry.TransactionHistoryTxLogEntry]]
 
-  def listCnsEntries(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
+  def listAnsEntries(now: CantonTimestamp, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[UserWalletStore.CnsEntryWithPayData]
+    Seq[UserWalletStore.AnsEntryWithPayData]
   ] = {
     import UserWalletStore.{
-      CnsEntryWithPayData,
+      AnsEntryWithPayData,
       EntryWithSubscriptionContext,
       SubscriptionIdleState,
       SubscriptionPayData,
@@ -340,11 +340,11 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
     for {
       // NOTE: entries and entry contexts are sometimes out of sync so we just filter out entries in such cases
       entries <- multiDomainAcsStore.listContracts(
-        cnsCodegen.CnsEntry.COMPANION,
+        ansCodegen.AnsEntry.COMPANION,
         limit,
       )
       entryContexts <- multiDomainAcsStore.listContracts(
-        cnsCodegen.CnsEntryContext.COMPANION,
+        ansCodegen.AnsEntryContext.COMPANION,
         limit,
       )
       subscriptions <- listSubscriptions(now, limit)
@@ -383,7 +383,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
         subRefToPayData
           .get(es.subscriptionReference)
           .map(subPayData =>
-            CnsEntryWithPayData(
+            AnsEntryWithPayData(
               contractId = es.entry.contractId,
               expiresAt = es.entry.payload.expiresAt,
               entryName = es.entry.payload.name,
@@ -480,8 +480,8 @@ object UserWalletStore {
       subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
       payData: subsCodegen.SubscriptionPayData,
   )
-  final case class CnsEntryWithPayData(
-      contractId: cnsCodegen.CnsEntry.ContractId,
+  final case class AnsEntryWithPayData(
+      contractId: ansCodegen.AnsEntry.ContractId,
       expiresAt: Instant,
       entryName: String,
       amount: java.math.BigDecimal,
@@ -490,7 +490,7 @@ object UserWalletStore {
       paymentDuration: RelTime,
   )
   final case class EntryWithSubscriptionContext(
-      entry: Contract[cnsCodegen.CnsEntry.ContractId, cnsCodegen.CnsEntry],
+      entry: Contract[ansCodegen.AnsEntry.ContractId, ansCodegen.AnsEntry],
       subscriptionReference: subsCodegen.SubscriptionRequest.ContractId,
   )
 
@@ -690,11 +690,11 @@ object UserWalletStore {
         mkFilter(amuletCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.dso == dso && co.payload.provider == endUser
         )(UserWalletAcsStoreRowData(_)),
-        // CNS entry
-        mkFilter(cnsCodegen.CnsEntry.COMPANION)(co => co.payload.user == endUser)(
+        // ANS entry
+        mkFilter(ansCodegen.AnsEntry.COMPANION)(co => co.payload.user == endUser)(
           UserWalletAcsStoreRowData(_)
         ),
-        mkFilter(cnsCodegen.CnsEntryContext.COMPANION)(co => co.payload.user == endUser)(
+        mkFilter(ansCodegen.AnsEntryContext.COMPANION)(co => co.payload.user == endUser)(
           UserWalletAcsStoreRowData(_)
         ),
         // Buy traffic requests

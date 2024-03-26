@@ -74,8 +74,8 @@ class WalletFrontendTimeBasedIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val entryName = perTestCaseName("alice")
 
-      createCnsEntry(
-        aliceCnsExternalClient,
+      createAnsEntry(
+        aliceAnsExternalClient,
         entryName,
         aliceWalletClient,
       )
@@ -93,7 +93,7 @@ class WalletFrontendTimeBasedIntegrationTest
       }
     }
 
-    "show party id after login if user has no cns entry" in { implicit env =>
+    "show party id after login if user has no ans entry" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
 
       val alicePartyId = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)

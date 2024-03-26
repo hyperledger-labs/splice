@@ -39,7 +39,7 @@ object CNDbConfig {
 }
 
 // Copy of canton's CommunityStorageFactory that is not tied to CommunityStorageConfig
-class CNStorageFactory(val config: CNDbConfig) extends StorageFactory {
+class ANStorageFactory(val config: CNDbConfig) extends StorageFactory {
   override def create(
       connectionPoolForParticipant: Boolean,
       logQueryCost: Option[QueryCostMonitoringConfig],

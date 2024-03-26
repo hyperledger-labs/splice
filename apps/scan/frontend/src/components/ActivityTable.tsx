@@ -2,7 +2,7 @@ import * as React from 'react';
 import BigNumber from 'bignumber.js';
 import {
   AmountDisplay,
-  CnsEntry,
+  AnsEntry,
   ErrorDisplay,
   Loading,
   RateDisplay,
@@ -289,10 +289,10 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
         </Typography>
       </TableCell>
       <TableCell>
-        <CnsEntry partyId={activity.provider} />
+        <AnsEntry partyId={activity.provider} />
       </TableCell>
       <TableCell>
-        <CnsEntry partyId={activity.sender} />
+        <AnsEntry partyId={activity.sender} />
       </TableCell>
       <TableCell>
         {(() => {
@@ -304,7 +304,7 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
                 </Typography>
               );
             default:
-              return <CnsEntry className="receiver" partyId={activity.receiver} />;
+              return <AnsEntry className="receiver" partyId={activity.receiver} />;
           }
         })()}
       </TableCell>

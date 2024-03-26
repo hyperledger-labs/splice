@@ -1,6 +1,6 @@
 import com.daml.lf.value.Value.ContractId
 import com.daml.network.codegen.java.cn.{splitwell => splitwellCodegen}
-import com.daml.network.console.{CnsExternalAppClientReference, WalletAppClientReference}
+import com.daml.network.console.{AnsExternalAppClientReference, WalletAppClientReference}
 import com.daml.network.console.LedgerApiExtensions._
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.CommandFailure
@@ -33,26 +33,26 @@ val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.ledgerApiUser
 val bobUserParty = bobValidator.onboardUser(bobWallet.config.ledgerApiUser)
 val charlieUserParty = charlieValidator.onboardUser(charlieWallet.config.ledgerApiUser)
 
-println("Ensuring that CNS entries are allocated correctly...")
-def ensureCnsEntry(
+println("Ensuring that ANS entries are allocated correctly...")
+def ensureAnsEntry(
     user: PartyId,
     name: String,
     url: String,
     description: String,
-    cns: CnsExternalAppClientReference,
+    ans: AnsExternalAppClientReference,
     wallet: WalletAppClientReference,
 ) {
   try {
     val nameUser = sv1Scan.lookupEntryByName(name).user
     if (nameUser == user.toProtoPrimitive) {
-      println(s"CNS name \"$name\" already allocated to \"$user\". Doing nothing.")
+      println(s"ANS name \"$name\" already allocated to \"$user\". Doing nothing.")
     } else {
-      sys.error(s"CNS name \"$name\" allocated to \"$nameUser\". Can't allocate to \"$user\".")
+      sys.error(s"ANS name \"$name\" allocated to \"$nameUser\". Can't allocate to \"$user\".")
     }
   } catch {
     case e: CommandFailure => {
-      println(s"Requesting CNS name \"$name\" for user \"$user\".")
-      cns.createCnsEntry(name, url, description)
+      println(s"Requesting ANS name \"$name\" for user \"$user\".")
+      ans.createAnsEntry(name, url, description)
       println("Waiting for wallet initialization to complete")
       wallet.waitForInitialization()
       println("Wallet initialization complete, tapping amulet")
@@ -64,28 +64,28 @@ def ensureCnsEntry(
     }
   }
 }
-ensureCnsEntry(
+ensureAnsEntry(
   aliceUserParty,
-  "alice.unverified.cns",
-  "https://alice-url.cns.com",
+  "alice.unverified.ans",
+  "https://alice-url.ans.com",
   "",
-  aliceCns,
+  aliceAns,
   aliceWallet,
 )
-ensureCnsEntry(
+ensureAnsEntry(
   bobUserParty,
-  "bob.unverified.cns",
-  "https://bob-url.cns.com",
+  "bob.unverified.ans",
+  "https://bob-url.ans.com",
   "",
-  bobCns,
+  bobAns,
   bobWallet,
 )
-ensureCnsEntry(
+ensureAnsEntry(
   charlieUserParty,
-  "charlie.unverified.cns",
-  "https://charlie-url.cns.com",
+  "charlie.unverified.ans",
+  "https://charlie-url.ans.com",
   "",
-  charlieCns,
+  charlieAns,
   charlieWallet,
 )
 

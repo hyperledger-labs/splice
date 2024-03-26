@@ -33,10 +33,10 @@ class WalletTransfersFrontendIntegrationTest
     "create a p2p transfer" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val aliceCnsName = perTestCaseName("alice")
+      val aliceAnsName = perTestCaseName("alice")
 
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val bobCnsName = perTestCaseName("bob")
+      val bobAnsName = perTestCaseName("bob")
 
       val cc = BigDecimal(10)
       val transferAmount = BigDecimal(3.5)
@@ -45,13 +45,13 @@ class WalletTransfersFrontendIntegrationTest
       // setup alice and bob
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      createCnsEntry(
-        aliceCnsExternalClient,
-        aliceCnsName,
+      createAnsEntry(
+        aliceAnsExternalClient,
+        aliceAnsName,
         aliceWalletClient,
         cc,
       )
-      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc)
+      createAnsEntry(bobAnsExternalClient, bobAnsName, bobWalletClient, cc)
 
       bobWalletClient.listTransferOffers() shouldBe empty
 
@@ -98,7 +98,7 @@ class WalletTransfersFrontendIntegrationTest
             inside(offerCards) { case Seq(offerCard) =>
               seleniumText(
                 offerCard.childElement(className("transfer-offer-sender"))
-              ) should matchText(expectedCns(aliceUserParty, aliceCnsName))
+              ) should matchText(expectedAns(aliceUserParty, aliceAnsName))
 
               offerCard.childElement(className("transfer-offer-cc-amount")).text should matchText(
                 s"+ $transferAmount CC"
@@ -118,11 +118,11 @@ class WalletTransfersFrontendIntegrationTest
     "show a list of transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val aliceCnsName = perTestCaseName("alice")
+      val aliceAnsName = perTestCaseName("alice")
 
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val bobCnsName = perTestCaseName("bob")
-      val bobCnsDisplay = expectedCns(bobUserParty, bobCnsName)
+      val bobAnsName = perTestCaseName("bob")
+      val bobAnsDisplay = expectedAns(bobUserParty, bobAnsName)
 
       val transferExpiry = CantonTimestamp.now().plusSeconds(100)
 
@@ -133,12 +133,12 @@ class WalletTransfersFrontendIntegrationTest
 
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      createCnsEntry(
-        aliceCnsExternalClient,
-        aliceCnsName,
+      createAnsEntry(
+        aliceAnsExternalClient,
+        aliceAnsName,
         aliceWalletClient,
       )
-      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient)
+      createAnsEntry(bobAnsExternalClient, bobAnsName, bobWalletClient)
 
       actAndCheck(
         " Bob creates transfer offer to alice",
@@ -164,7 +164,7 @@ class WalletTransfersFrontendIntegrationTest
           inside(offerCards) { case Seq(offerCard) =>
             seleniumText(
               offerCard.childElement(className("transfer-offer-sender"))
-            ) should matchText(bobCnsDisplay)
+            ) should matchText(bobAnsDisplay)
 
             offerCard.childElement(className("transfer-offer-expiry")).text should matchText(
               s"Expires $expectedExpiry"
@@ -186,21 +186,21 @@ class WalletTransfersFrontendIntegrationTest
 
     "not show transfer offers I created" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
-      val aliceCnsName = perTestCaseName("alice")
+      val aliceAnsName = perTestCaseName("alice")
 
       val bobUserParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      val bobCnsName = perTestCaseName("bob")
+      val bobAnsName = perTestCaseName("bob")
 
       val transferExpiry = CantonTimestamp.now().plusSeconds(100)
 
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      createCnsEntry(
-        aliceCnsExternalClient,
-        aliceCnsName,
+      createAnsEntry(
+        aliceAnsExternalClient,
+        aliceAnsName,
         aliceWalletClient,
       )
-      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient)
+      createAnsEntry(bobAnsExternalClient, bobAnsName, bobWalletClient)
 
       actAndCheck(
         "Alice creates transfer offer to bob",
@@ -229,9 +229,9 @@ class WalletTransfersFrontendIntegrationTest
     "allow accepting transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val aliceCnsName = perTestCaseName("alice")
+      val aliceAnsName = perTestCaseName("alice")
 
-      val bobCnsName = perTestCaseName("bob")
+      val bobAnsName = perTestCaseName("bob")
 
       val cc = BigDecimal(10)
       val transferAmount = BigDecimal(3)
@@ -239,13 +239,13 @@ class WalletTransfersFrontendIntegrationTest
       // setup alice and bob
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      createCnsEntry(
-        aliceCnsExternalClient,
-        aliceCnsName,
+      createAnsEntry(
+        aliceAnsExternalClient,
+        aliceAnsName,
         aliceWalletClient,
         cc * amuletPrice,
       )
-      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc * amuletPrice)
+      createAnsEntry(bobAnsExternalClient, bobAnsName, bobWalletClient, cc * amuletPrice)
 
       // transfer from bob to alice
       actAndCheck(
@@ -284,9 +284,9 @@ class WalletTransfersFrontendIntegrationTest
     "allow rejecting transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      val aliceCnsName = perTestCaseName("alice")
+      val aliceAnsName = perTestCaseName("alice")
 
-      val bobCnsName = perTestCaseName("bob")
+      val bobAnsName = perTestCaseName("bob")
 
       val cc = BigDecimal(10)
       val transferAmount = BigDecimal(3)
@@ -294,13 +294,13 @@ class WalletTransfersFrontendIntegrationTest
       // setup alice and bob
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       onboardWalletUser(bobWalletClient, bobValidatorBackend)
-      createCnsEntry(
-        aliceCnsExternalClient,
-        aliceCnsName,
+      createAnsEntry(
+        aliceAnsExternalClient,
+        aliceAnsName,
         aliceWalletClient,
         cc * amuletPrice,
       )
-      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc * amuletPrice)
+      createAnsEntry(bobAnsExternalClient, bobAnsName, bobWalletClient, cc * amuletPrice)
 
       // transfer from bob to alice
       actAndCheck(

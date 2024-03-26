@@ -79,18 +79,18 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-cns-ui-auth",
+        "name": "cn-app-ans-ui-auth",
         "namespace": "sv"
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "cns-client-id",
+          "client-id": "ans-client-id",
           "url": "https://auth0Domain"
         }
       }
     },
-    "name": "auth0-ui-secret-sv-cns",
+    "name": "auth0-ui-secret-sv-ans",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -154,7 +154,7 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": false,
+          "ans": false,
           "globalDomain": {
             "migrationId": "0"
           },

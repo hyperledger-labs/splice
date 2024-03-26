@@ -4,7 +4,7 @@ import {
   Auth0Client,
   BackupConfig,
   ChartValues,
-  cnsUiSecret,
+  ansUiSecret,
   envFlag,
   exactNamespace,
   ExactNamespace,
@@ -163,7 +163,7 @@ export async function installNode(
         },
         ingress: {
           wallet: false,
-          cns: false,
+          ans: false,
           scan: false,
           sequencer: true,
           sv: false,
@@ -462,9 +462,9 @@ async function installSvAndValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const cnsUiClientId = svNameSpaceAuth0Clients['cns'];
-  if (!cnsUiClientId) {
-    throw new Error('No CNS ui client id in auth0 config');
+  const ansUiClientId = svNameSpaceAuth0Clients['ans'];
+  if (!ansUiClientId) {
+    throw new Error('No ANS ui client id in auth0 config');
   }
 
   const validator = installCNRunbookHelmChart(
@@ -476,7 +476,7 @@ async function installSvAndValidator(
     imagePullDeps
       .concat([sv, participant])
       .concat([svValidatorAppSecret, svValidatorUISecret])
-      .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
+      .concat([ansUiSecret(xns, auth0Client, ansUiClientId)])
       .concat(backupConfigSecret ? [backupConfigSecret] : [])
       .concat([appsPg])
   );

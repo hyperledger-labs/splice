@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.codegen.java.cn.cns as cnsCodegen
+import com.daml.network.codegen.java.cn.ans as ansCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.wallet.store.{
@@ -829,7 +829,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       }
     }
 
-    "listCnsEntries" should {
+    "listAnsEntries" should {
       "return correct results" in {
         val payData = subscriptionPayData()
         for {
@@ -841,12 +841,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             time(1),
           )
           subscriptionRequest1 = subscription1.payload.reference
-          cnsEntryContext1 = cnsEntryContext(
+          ansEntryContext1 = ansEntryContext(
             user1,
             "user1",
             subscriptionRequest1,
           )
-          cnsEntry1 = cnsEntry(
+          ansEntry1 = ansEntry(
             user1,
             "user1",
             provider1,
@@ -858,21 +858,21 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             store1.multiDomainAcsStore
           )
           _ <- dummyDomain.create(
-            cnsEntryContext1,
+            ansEntryContext1,
             createdEventSignatories = Seq(user1, provider1),
           )(
             store1.multiDomainAcsStore
           )
-          _ <- dummyDomain.create(cnsEntry1, createdEventSignatories = Seq(user1, provider1))(
+          _ <- dummyDomain.create(ansEntry1, createdEventSignatories = Seq(user1, provider1))(
             store1.multiDomainAcsStore
           )
         } yield {
-          val actual = store1.listCnsEntries(time(0)).futureValue
+          val actual = store1.listAnsEntries(time(0)).futureValue
           val expected = Seq(
-            UserWalletStore.CnsEntryWithPayData(
-              contractId = cnsEntry1.contractId,
-              expiresAt = cnsEntry1.payload.expiresAt,
-              entryName = cnsEntry1.payload.name,
+            UserWalletStore.AnsEntryWithPayData(
+              contractId = ansEntry1.contractId,
+              expiresAt = ansEntry1.payload.expiresAt,
+              entryName = ansEntry1.payload.name,
               amount = state1.payload.payData.paymentAmount.amount,
               currency = state1.payload.payData.paymentAmount.currency,
               paymentInterval = state1.payload.payData.paymentInterval,
@@ -1156,15 +1156,15 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  protected def cnsEntry(
+  protected def ansEntry(
       user: PartyId,
       name: String,
       provider: PartyId = providerParty(0),
-      entryUrl: String = "https://cns-entry-url.com",
+      entryUrl: String = "https://ans-entry-url.com",
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = cnsCodegen.CnsEntry.TEMPLATE_ID
-    val template = new cnsCodegen.CnsEntry(
+    val templateId = ansCodegen.AnsEntry.TEMPLATE_ID
+    val template = new ansCodegen.AnsEntry(
       user.toProtoPrimitive,
       provider.toProtoPrimitive,
       name,
@@ -1174,20 +1174,20 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
     contract(
       identifier = templateId,
-      contractId = new cnsCodegen.CnsEntry.ContractId(nextCid()),
+      contractId = new ansCodegen.AnsEntry.ContractId(nextCid()),
       payload = template,
     )
   }
 
-  protected def cnsEntryContext(
+  protected def ansEntryContext(
       user: PartyId,
       name: String,
       subscriptionRequest: subsCodegen.SubscriptionRequest.ContractId,
-      entryUrl: String = "https://cns-entry-url.com",
+      entryUrl: String = "https://ans-entry-url.com",
       entryDescription: String = "Sample fake description",
   ) = {
-    val templateId = cnsCodegen.CnsEntryContext.TEMPLATE_ID
-    val template = new cnsCodegen.CnsEntryContext(
+    val templateId = ansCodegen.AnsEntryContext.TEMPLATE_ID
+    val template = new ansCodegen.AnsEntryContext(
       dsoParty.toProtoPrimitive,
       user.toProtoPrimitive,
       name,
@@ -1197,7 +1197,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
     contract(
       identifier = templateId,
-      contractId = new cnsCodegen.CnsEntryContext.ContractId(nextCid()),
+      contractId = new ansCodegen.AnsEntryContext.ContractId(nextCid()),
       payload = template,
     )
   }

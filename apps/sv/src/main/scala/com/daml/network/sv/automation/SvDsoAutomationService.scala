@@ -142,7 +142,7 @@ class SvDsoAutomationService(
       )
     )
     registerTrigger(
-      new CnsSubscriptionInitialPaymentTrigger(triggerContext, dsoStore, connection)
+      new AnsSubscriptionInitialPaymentTrigger(triggerContext, dsoStore, connection)
     )
     registerTrigger(
       new SvPackageVettingTrigger(
@@ -402,7 +402,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[DsoRulesTransferTrigger],
       aTrigger[AssignTrigger],
       aTrigger[TransferFollowTrigger],
-      aTrigger[CnsSubscriptionInitialPaymentTrigger],
+      aTrigger[AnsSubscriptionInitialPaymentTrigger],
       aTrigger[SvPackageVettingTrigger],
       aTrigger[SvOffboardingPartyToParticipantProposalTrigger],
       aTrigger[SvOffboardingMediatorTrigger],

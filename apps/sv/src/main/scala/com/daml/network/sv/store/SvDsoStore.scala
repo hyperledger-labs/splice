@@ -220,26 +220,26 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     )
   }
 
-  def lookupCnsRulesWithOffset()(implicit tc: TraceContext): Future[
-    QueryResult[Option[AssignedContract[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]]
+  def lookupAnsRulesWithOffset()(implicit tc: TraceContext): Future[
+    QueryResult[Option[AssignedContract[cn.ans.AnsRules.ContractId, cn.ans.AnsRules]]]
   ] = {
     for {
       result <- multiDomainAcsStore
-        .findAnyContractWithOffset(cn.cns.CnsRules.COMPANION)
+        .findAnyContractWithOffset(cn.ans.AnsRules.COMPANION)
     } yield result.map(_.flatMap(_.toAssignedContract))
   }
 
-  def lookupCnsRules()(implicit
+  def lookupAnsRules()(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]] =
-    lookupCnsRulesWithOffset().map(_.value)
+  ): Future[Option[AssignedContract[cn.ans.AnsRules.ContractId, cn.ans.AnsRules]]] =
+    lookupAnsRulesWithOffset().map(_.value)
 
-  def getCnsRules()(implicit
+  def getAnsRules()(implicit
       tc: TraceContext
-  ): Future[Contract[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]] =
-    lookupCnsRules().map(
+  ): Future[Contract[cn.ans.AnsRules.ContractId, cn.ans.AnsRules]] =
+    lookupAnsRules().map(
       _.map(_.contract).getOrElse(
-        throw Status.NOT_FOUND.withDescription("No active CnsRules contract").asRuntimeException()
+        throw Status.NOT_FOUND.withDescription("No active AnsRules contract").asRuntimeException()
       )
     )
 
@@ -582,7 +582,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     ]]
   ]
 
-  def lookupCnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(
+  def lookupAnsAcceptedInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
       paymentId: sub.SubscriptionInitialPayment.ContractId,
   )(implicit
@@ -591,7 +591,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     QueryResult[Option[Contract[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation]]]
   ]
 
-  def lookupCnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
+  def lookupAnsRejectedInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
       paymentId: sub.SubscriptionInitialPayment.ContractId,
   )(implicit
@@ -600,7 +600,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     QueryResult[Option[Contract[cn.dsorules.Confirmation.ContractId, cn.dsorules.Confirmation]]]
   ]
 
-  def lookupCnsInitialPaymentConfirmationByPaymentIdWithOffset(
+  def lookupAnsInitialPaymentConfirmationByPaymentIdWithOffset(
       confirmer: PartyId,
       paymentId: sub.SubscriptionInitialPayment.ContractId,
   )(implicit
@@ -639,18 +639,18 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       _.expiresAt
     )
 
-  def listExpiredCnsEntries: ListExpiredContracts[
-    cn.cns.CnsEntry.ContractId,
-    cn.cns.CnsEntry,
+  def listExpiredAnsEntries: ListExpiredContracts[
+    cn.ans.AnsEntry.ContractId,
+    cn.ans.AnsEntry,
   ] =
-    multiDomainAcsStore.listExpiredFromPayloadExpiry(cn.cns.CnsEntry.COMPANION)(
+    multiDomainAcsStore.listExpiredFromPayloadExpiry(cn.ans.AnsEntry.COMPANION)(
       _.expiresAt
     )
 
-  def listExpiredCnsSubscriptions(
+  def listExpiredAnsSubscriptions(
       now: CantonTimestamp,
       limit: Limit = Limit.DefaultLimit,
-  )(implicit tc: TraceContext): Future[Seq[SvDsoStore.IdleCnsSubscription]]
+  )(implicit tc: TraceContext): Future[Seq[SvDsoStore.IdleAnsSubscription]]
 
   def listSvOnboardingConfirmed(
       limit: Limit = Limit.DefaultLimit
@@ -907,22 +907,22 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     }.getOrElse(Future successful Seq.empty))
   }
 
-  def lookupCnsEntryByNameWithOffset(name: String)(implicit tc: TraceContext): Future[
-    QueryResult[Option[AssignedContract[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]]
+  def lookupAnsEntryByNameWithOffset(name: String)(implicit tc: TraceContext): Future[
+    QueryResult[Option[AssignedContract[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]]
   ]
 
-  def lookupCnsEntryByName(
+  def lookupAnsEntryByName(
       name: String
   )(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]] =
-    lookupCnsEntryByNameWithOffset(name).map(_.value)
+  ): Future[Option[AssignedContract[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]] =
+    lookupAnsEntryByNameWithOffset(name).map(_.value)
 
-  final def lookupCnsEntryContext(contractId: cn.cns.CnsEntryContext.ContractId)(implicit
+  final def lookupAnsEntryContext(contractId: cn.ans.AnsEntryContext.ContractId)(implicit
       tc: TraceContext
-  ): Future[Option[Contract[cn.cns.CnsEntryContext.ContractId, cn.cns.CnsEntryContext]]] = for {
+  ): Future[Option[Contract[cn.ans.AnsEntryContext.ContractId, cn.ans.AnsEntryContext]]] = for {
     cws <- multiDomainAcsStore
-      .lookupContractById(cn.cns.CnsEntryContext.COMPANION)(contractId)
+      .lookupContractById(cn.ans.AnsEntryContext.COMPANION)(contractId)
   } yield cws map (_.contract)
 
   def lookupSubscriptionInitialPaymentWithOffset(
@@ -939,7 +939,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     AssignedContract[sub.SubscriptionInitialPayment.ContractId, sub.SubscriptionInitialPayment]
   ]] = lookupSubscriptionInitialPaymentWithOffset(paymentCid).map(_.value)
 
-  def listInitialPaymentConfirmationByCnsName(
+  def listInitialPaymentConfirmationByAnsName(
       confirmer: PartyId,
       name: String,
       limit: Limit = Limit.DefaultLimit,
@@ -991,11 +991,11 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     }
   }
 
-  def lookupCnsEntryContext(
+  def lookupAnsEntryContext(
       reference: sub.SubscriptionRequest.ContractId
   )(implicit tc: TraceContext): Future[Option[ContractWithState[
-    cn.cns.CnsEntryContext.ContractId,
-    cn.cns.CnsEntryContext,
+    cn.ans.AnsEntryContext.ContractId,
+    cn.ans.AnsEntryContext,
   ]]]
 }
 
@@ -1051,9 +1051,9 @@ object SvDsoStore {
     cc.amulet.FeaturedAppRight.COMPANION,
     cc.amulet.UnclaimedReward.COMPANION,
     cc.validatorlicense.ValidatorLicense.COMPANION,
-    cn.cns.CnsEntry.COMPANION,
-    cn.cns.CnsEntryContext.COMPANION,
-    cn.cns.CnsRules.COMPANION,
+    cn.ans.AnsEntry.COMPANION,
+    cn.ans.AnsEntryContext.COMPANION,
+    cn.ans.AnsRules.COMPANION,
     cn.dso.amuletprice.AmuletPriceVote.COMPANION,
     cn.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
   )
@@ -1083,24 +1083,24 @@ object SvDsoStore {
       },
       mkFilter(cn.dsorules.Confirmation.COMPANION)(co => co.payload.dso == dso) { contract =>
         val (
-          actionCnsEntryContextCid,
-          actionCnsEntryContextPaymentId,
-          actionCnsEntryContextArcType,
+          actionAnsEntryContextCid,
+          actionAnsEntryContextPaymentId,
+          actionAnsEntryContextArcType,
         ) =
           contract.payload.action match {
-            case arcCnsEntryContext: cn.dsorules.actionrequiringconfirmation.ARC_CnsEntryContext =>
-              arcCnsEntryContext.cnsEntryContextAction match {
-                case action: cn.dsorules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_CollectInitialEntryPayment =>
+            case arcAnsEntryContext: cn.dsorules.actionrequiringconfirmation.ARC_AnsEntryContext =>
+              arcAnsEntryContext.ansEntryContextAction match {
+                case action: cn.dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_CollectInitialEntryPayment =>
                   (
-                    Some(arcCnsEntryContext.cnsEntryContextCid),
-                    Some(action.cnsEntryContext_CollectInitialEntryPaymentValue.paymentCid),
-                    Some("CNSRARC_CollectInitialEntryPayment"),
+                    Some(arcAnsEntryContext.ansEntryContextCid),
+                    Some(action.ansEntryContext_CollectInitialEntryPaymentValue.paymentCid),
+                    Some("ANSRARC_CollectInitialEntryPayment"),
                   )
-                case action: cn.dsorules.cnsentrycontext_actionrequiringconfirmation.CNSRARC_RejectEntryInitialPayment =>
+                case action: cn.dsorules.ansentrycontext_actionrequiringconfirmation.ANSRARC_RejectEntryInitialPayment =>
                   (
-                    Some(arcCnsEntryContext.cnsEntryContextCid),
-                    Some(action.cnsEntryContext_RejectEntryInitialPaymentValue.paymentCid),
-                    Some("CNSRARC_RejectEntryInitialPayment"),
+                    Some(arcAnsEntryContext.ansEntryContextCid),
+                    Some(action.ansEntryContext_RejectEntryInitialPaymentValue.paymentCid),
+                    Some("ANSRARC_RejectEntryInitialPayment"),
                   )
                 case _ =>
                   (None, None, None)
@@ -1113,9 +1113,9 @@ object SvDsoStore {
           actionRequiringConfirmation =
             Some(AcsJdbcTypes.payloadJsonFromDefinedDataType(contract.payload.action)),
           confirmer = Some(PartyId.tryFromProtoPrimitive(contract.payload.confirmer)),
-          actionCnsEntryContextCid = actionCnsEntryContextCid,
-          actionCnsEntryContextPaymentId = actionCnsEntryContextPaymentId,
-          actionCnsEntryContextArcType = actionCnsEntryContextArcType,
+          actionAnsEntryContextCid = actionAnsEntryContextCid,
+          actionAnsEntryContextPaymentId = actionAnsEntryContextPaymentId,
+          actionAnsEntryContextArcType = actionAnsEntryContextArcType,
         )
       },
       mkFilter(cn.dsorules.ElectionRequest.COMPANION)(co => co.payload.dso == dso) { contract =>
@@ -1280,18 +1280,18 @@ object SvDsoStore {
           totalTrafficPurchased = Some(contract.payload.totalPurchased),
         )
       },
-      mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.dso == dso)(DsoAcsStoreRowData(_)),
-      mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(cn.ans.AnsRules.COMPANION)(co => co.payload.dso == dso)(DsoAcsStoreRowData(_)),
+      mkFilter(cn.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
           contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.expiresAt)),
-          cnsEntryName = Some(contract.payload.name),
+          ansEntryName = Some(contract.payload.name),
         )
       },
-      mkFilter(cn.cns.CnsEntryContext.COMPANION)(co => co.payload.dso == dso) { contract =>
+      mkFilter(cn.ans.AnsEntryContext.COMPANION)(co => co.payload.dso == dso) { contract =>
         DsoAcsStoreRowData(
           contract,
-          cnsEntryName = Some(contract.payload.name),
+          ansEntryName = Some(contract.payload.name),
           subscriptionReferenceContractId = Some(contract.payload.reference),
         )
       },
@@ -1375,14 +1375,14 @@ object SvDsoStore {
     def toSeq: Seq[OpenMiningRoundContract] = Seq(oldest, middle, newest)
   }
 
-  case class IdleCnsSubscription(
+  case class IdleAnsSubscription(
       state: Contract[
         sub.SubscriptionIdleState.ContractId,
         sub.SubscriptionIdleState,
       ],
       context: Contract[
-        cn.cns.CnsEntryContext.ContractId,
-        cn.cns.CnsEntryContext,
+        cn.ans.AnsEntryContext.ContractId,
+        cn.ans.AnsEntryContext,
       ],
   ) extends PrettyPrinting {
 

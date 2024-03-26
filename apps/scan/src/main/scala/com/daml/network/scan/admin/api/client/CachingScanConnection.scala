@@ -2,10 +2,10 @@ package com.daml.network.scan.admin.api.client
 
 import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.ans.AnsRules
 import com.daml.network.environment.CNLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection.{
-  CachedCnsRules,
+  CachedAnsRules,
   CachedAmuletRules,
   CachedMiningRounds,
 }
@@ -29,7 +29,7 @@ trait CachingScanConnection extends ScanConnection {
   private val amuletRulesCache: AtomicReference[Option[CachedAmuletRules]] =
     new AtomicReference(None)
 
-  private val cnsRulesCache: AtomicReference[Option[CachedCnsRules]] =
+  private val ansRulesCache: AtomicReference[Option[CachedAnsRules]] =
     new AtomicReference(None)
 
   private val cachedRounds: AtomicReference[CachedMiningRounds] =
@@ -109,40 +109,40 @@ trait CachingScanConnection extends ScanConnection {
       cachedAmuletRules: Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]
   )(implicit tc: TraceContext): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]]
 
-  override def getCnsRules()(implicit
+  override def getAnsRules()(implicit
       ec: ExecutionContext,
       mat: Materializer,
       tc: TraceContext,
-  ): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = {
+  ): Future[ContractWithState[AnsRules.ContractId, AnsRules]] = {
     val now = clock.now
     getAmuletRulesWithState().flatMap { amuletRules =>
-      cnsRulesCache.get() match {
-        case Some(ccr @ CachedCnsRules(_, cnsRules)) if ccr.validAsOf(now, amuletRules) =>
-          Future.successful(cnsRules)
+      ansRulesCache.get() match {
+        case Some(ccr @ CachedAnsRules(_, ansRules)) if ccr.validAsOf(now, amuletRules) =>
+          Future.successful(ansRules)
         case cacheO =>
           logger.debug(
-            s"cnsRules cache is empty or outdated, retrieving CnsRules from CC scan."
+            s"ansRules cache is empty or outdated, retrieving AnsRules from CC scan."
           )
           for {
-            cnsRules <- runGetCnsRules(cacheO.map(_.cnsRules))
+            ansRules <- runGetAnsRules(cacheO.map(_.ansRules))
           } yield {
-            cnsRulesCache.set(
+            ansRulesCache.set(
               Some(
-                CachedCnsRules(
+                CachedAnsRules(
                   now.add(amuletRulesCacheTimeToLive.asJava),
-                  cnsRules,
+                  ansRules,
                 )
               )
             )
-            cnsRules
+            ansRules
           }
       }
     }
   }
 
-  protected def runGetCnsRules(
-      cachedCnsRules: Option[ContractWithState[CnsRules.ContractId, CnsRules]]
-  )(implicit tc: TraceContext): Future[ContractWithState[CnsRules.ContractId, CnsRules]]
+  protected def runGetAnsRules(
+      cachedAnsRules: Option[ContractWithState[AnsRules.ContractId, AnsRules]]
+  )(implicit tc: TraceContext): Future[ContractWithState[AnsRules.ContractId, AnsRules]]
 
   override def getOpenAndIssuingMiningRounds()(implicit
       ec: ExecutionContext,

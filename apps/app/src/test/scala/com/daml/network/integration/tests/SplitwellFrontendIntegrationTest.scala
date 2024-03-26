@@ -5,7 +5,7 @@ import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{
-  CnsEntryTestUtil,
+  AnsEntryTestUtil,
   FrontendLoginUtil,
   SplitwellFrontendTestUtil,
   WalletTestUtil,
@@ -21,7 +21,7 @@ class SplitwellFrontendIntegrationTest
       "bobSplitwell",
       "charlieSplitwell",
     )
-    with CnsEntryTestUtil
+    with AnsEntryTestUtil
     with WalletTestUtil
     with SplitwellFrontendTestUtil
     with FrontendLoginUtil {
@@ -195,20 +195,20 @@ class SplitwellFrontendIntegrationTest
 
       val aliceEntryName = perTestCaseName("alice")
       val bobEntryName = perTestCaseName("bob")
-      initialiseCnsEntry(
+      initialiseAnsEntry(
         aliceEntryName,
         aliceUserParty,
-        aliceCnsExternalClient,
+        aliceAnsExternalClient,
         aliceWalletClient,
       )
-      initialiseCnsEntry(
+      initialiseAnsEntry(
         bobEntryName,
         bobUserParty,
-        bobCnsExternalClient,
+        bobAnsExternalClient,
         bobWalletClient,
       )
-      val aliceCns = expectedCns(aliceUserParty, aliceEntryName)
-      val bobCns = expectedCns(bobUserParty, bobEntryName)
+      val aliceAns = expectedAns(aliceUserParty, aliceEntryName)
+      val bobAns = expectedAns(bobUserParty, bobEntryName)
       bobWalletClient.tap(walletAmuletToUsd(510))
 
       val invite = withFrontEnd("aliceSplitwell") { implicit webDriver =>
@@ -238,28 +238,28 @@ class SplitwellFrontendIntegrationTest
         eventually(scaled(5 seconds)) {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
             matchRow(
-              Seq("cns-entry", "balances-table-amount"),
-              Seq(aliceCns, "0.0000000000"),
+              Seq("ans-entry", "balances-table-amount"),
+              Seq(aliceAns, "0.0000000000"),
             )(row)
           }
           inside(findAll(className("balance-updates-list-item")).toSeq.sortBy(_.text)) {
             case Seq(row1, row2) =>
               matchRow(
-                Seq("cns-entry", "description"),
-                Seq(aliceCns, "paid 1000.0 CC for Team lunch"),
+                Seq("ans-entry", "description"),
+                Seq(aliceAns, "paid 1000.0 CC for Team lunch"),
               )(row1)
 
               matchRow(
                 Seq("sender", "description", "receiver"),
-                Seq(bobCns, "sent 500.0 CC to", aliceCns),
+                Seq(bobAns, "sent 500.0 CC to", aliceAns),
               )(row2)
           }
         }
       }
 
-      val expectedAliceAmount = walletUsdToAmulet(5 /*cns tap*/ - 1 /*cns fee*/ ) + 500 /*from bob*/
+      val expectedAliceAmount = walletUsdToAmulet(5 /*ans tap*/ - 1 /*ans fee*/ ) + 500 /*from bob*/
       val expectedBobAmount =
-        walletUsdToAmulet(5 /*cns tap*/ - 1.105 /*cns fee*/ ) + 510 /*tap*/ - 500 /*to alice*/
+        walletUsdToAmulet(5 /*ans tap*/ - 1.105 /*ans fee*/ ) + 510 /*tap*/ - 500 /*to alice*/
       eventually() {
         // Check final amounts in the wallets
         checkWallet(

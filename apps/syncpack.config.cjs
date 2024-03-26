@@ -12,7 +12,7 @@ module.exports = {
       packages: ["**"],
       dependencies: [
         "@daml.js/canton-amulet",
-        "@daml.js/cns",
+        "@daml.js/ans",
         "@daml.js/wallet",
         "@daml.js/wallet-payments",
       ],

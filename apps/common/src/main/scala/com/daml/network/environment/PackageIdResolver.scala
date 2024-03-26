@@ -198,7 +198,7 @@ object PackageIdResolver {
     "CC.GlobalDomain" -> Package.CantonAmulet,
     "CC.ValidatorLicense" -> Package.CantonAmulet,
     "CC.Round" -> Package.CantonAmulet,
-    "CN.Cns" -> Package.CantonNameService,
+    "CN.Ans" -> Package.CantonNameService,
     "CN.DsoBootstrap" -> Package.DsoGovernance,
     "CN.DsoRules" -> Package.DsoGovernance,
     "CN.DSO.AmuletPrice" -> Package.DsoGovernance,

@@ -56,8 +56,8 @@ function cnAuth0(clusterBasename: string) {
   const validator1UiApp = newUiApp(
     'validator1UiApp',
     'Validator1 UI',
-    'Used for the Wallet, CNS and Splitwell UIs for the standalone Validator1',
-    ['wallet', 'cns', 'splitwell'],
+    'Used for the Wallet, ANS and Splitwell UIs for the standalone Validator1',
+    ['wallet', 'ans', 'splitwell'],
     'validator1',
     clusterBasename,
     provider
@@ -65,8 +65,8 @@ function cnAuth0(clusterBasename: string) {
   const splitwellUiApp = newUiApp(
     'SplitwellUiApp',
     'Splitwell UI',
-    'Used for the Wallet, CNS and Splitwell UIs for the Splitwell validator',
-    ['wallet', 'cns', 'splitwell'],
+    'Used for the Wallet, ANS and Splitwell UIs for the Splitwell validator',
+    ['wallet', 'ans', 'splitwell'],
     'splitwell',
     clusterBasename,
     provider
@@ -76,8 +76,8 @@ function cnAuth0(clusterBasename: string) {
     const uiApp = newUiApp(
       `sv${sv}UiApp`,
       `SV${sv} UI`,
-      `Used for the Wallet, CNS and SV UIs for SV${sv}`,
-      ['wallet', 'cns', 'sv'],
+      `Used for the Wallet, ANS and SV UIs for SV${sv}`,
+      ['wallet', 'ans', 'sv'],
       `sv-${sv}.svc`,
       clusterBasename,
       provider
@@ -143,12 +143,12 @@ function cnAuth0(clusterBasename: string) {
         namespaceToUiToClientId: {
           validator1: {
             wallet: validator1UiId,
-            cns: validator1UiId,
+            ans: validator1UiId,
             splitwell: validator1UiId,
           },
           splitwell: {
             wallet: splitwellUiId,
-            cns: splitwellUiId,
+            ans: splitwellUiId,
             splitwell: splitwellUiId,
           },
           ...svUiIds.reduce(
@@ -156,7 +156,7 @@ function cnAuth0(clusterBasename: string) {
               ...o,
               [`sv-${idx + 1}`]: {
                 wallet: key,
-                cns: key,
+                ans: key,
                 sv: key,
               },
             }),
@@ -187,11 +187,11 @@ function svRunbookAuth0(clusterBasename: string) {
     clusterBasename,
     provider
   );
-  const cnsUiApp = newUiApp(
-    'SvCnsUi',
-    'CNS UI',
-    'Used for the CNS UI for the SV runbook',
-    ['cns'],
+  const ansUiApp = newUiApp(
+    'SvAnsUi',
+    'ANS UI',
+    'Used for the ANS UI for the SV runbook',
+    ['ans'],
     'sv.svc',
     clusterBasename,
     provider
@@ -207,8 +207,8 @@ function svRunbookAuth0(clusterBasename: string) {
   );
 
   return pulumi
-    .all([walletUiApp.id, cnsUiApp.id, svUiApp.id])
-    .apply(([walletUiAppId, cnsUiAppId, svUiAppId]) => {
+    .all([walletUiApp.id, ansUiApp.id, svUiApp.id])
+    .apply(([walletUiAppId, ansUiAppId, svUiAppId]) => {
       return {
         appToClientId: {
           sv: 'bUfFRpl2tEfZBB7wzIo9iRNGTj8wMeIn',
@@ -219,7 +219,7 @@ function svRunbookAuth0(clusterBasename: string) {
           sv: {
             wallet: walletUiAppId,
             sv: svUiAppId,
-            cns: cnsUiAppId,
+            ans: ansUiAppId,
           },
         },
 
@@ -263,17 +263,17 @@ function validatorRunbookAuth0(clusterBasename: string) {
     clusterBasename,
     provider
   );
-  const cnsUiApp = newUiApp(
-    'validatorCnsUi',
-    'CNS UI',
-    'Used for the CNS UI for the validator runbook',
-    ['cns'],
+  const ansUiApp = newUiApp(
+    'validatorAnsUi',
+    'ANS UI',
+    'Used for the ANS UI for the validator runbook',
+    ['ans'],
     'validator',
     clusterBasename,
     provider
   );
 
-  return pulumi.all([walletUiApp.id, cnsUiApp.id]).apply(([walletUiAppId, cnsUiAppId]) => {
+  return pulumi.all([walletUiApp.id, ansUiApp.id]).apply(([walletUiAppId, ansUiAppId]) => {
     return {
       appToClientId: {
         validator: 'cznBUeB70fnpfjaq9TzblwiwjkVyvh5z',
@@ -282,7 +282,7 @@ function validatorRunbookAuth0(clusterBasename: string) {
       namespaceToUiToClientId: {
         validator: {
           wallet: walletUiAppId,
-          cns: cnsUiAppId,
+          ans: ansUiAppId,
         },
       },
 

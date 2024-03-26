@@ -546,12 +546,12 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CN.Cns:CnsEntry",
+      "template_id": "deadbeef001:CN.Ans:AnsEntry",
       "contract_id": "00e55014b4748e8576ad6bcd232cbda79efeeff5b07459e0d004ddcb6a5c435886ca0212204541cbf643c4ef169e33f3b2326b8326eb2a3d0d918b0e687363b07aeea1ef86",
       "payload": {
-        "name": "alice.unverified.cns",
-        "url": "https://cns-dir-url.com",
-        "description": "Sample CNS Entry Description",
+        "name": "alice.unverified.ans",
+        "url": "https://ans-dir-url.com",
+        "description": "Sample ANS Entry Description",
         "expiresAt": "1970-04-01T00:02:40Z",
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "user": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250"
@@ -560,13 +560,13 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CN.Cns:CnsEntryContext",
+      "template_id": "deadbeef001:CN.Ans:AnsEntryContext",
       "contract_id": "00a3aadc4a878bdab6693a1eaff09f68c3909a45cd20ef5b8ab29846d0d46a9a0eca0212205f006be6e8474bf3187b5e0f8a89d03734741510071136a06efc00390c07a64e",
       "payload": {
         "reference": "004f2bdfe3bb511a7a8c11b2342c24e4060e4bd4b0e2b66a92d8373f8d801aaa08ca02122057b846862c91e0a489a1974a0f29ce292ed1a27584c6c862eb0c21ecdba0348c",
-        "name": "alice.unverified.cns",
-        "url": "https://cns-dir-url.com",
-        "description": "Sample CNS Entry Description",
+        "name": "alice.unverified.ans",
+        "url": "https://ans-dir-url.com",
+        "description": "Sample ANS Entry Description",
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "user": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250"
       },
@@ -574,7 +574,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CN.Cns:CnsRules",
+      "template_id": "deadbeef001:CN.Ans:AnsRules",
       "contract_id": "00b8662d1e8f8021fc78e5ebd5641c307a81c81e8f01ea4f62b04fc49a2d0035f1ca0212209697dcd3cae5d613ff5e949d074353e9f6ab33bdeafa84993e628514cf7a9b93",
       "payload": {
         "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -724,7 +724,7 @@
         "nextPaymentDueAt": "1970-04-01T00:02:40Z",
         "subscriptionData": {
           "provider": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
-          "description": "CNS entry: \"alice.unverified.cns\"",
+          "description": "ANS entry: \"alice.unverified.ans\"",
           "receiver": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
           "sender": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
           "dso": "dso-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"

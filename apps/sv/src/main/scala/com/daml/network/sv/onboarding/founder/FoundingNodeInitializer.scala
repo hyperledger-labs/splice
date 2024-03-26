@@ -27,7 +27,7 @@ import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapT
 import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{AssignedContract, TemplateJsonDecoder, UploadablePackage}
-import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultAmuletConfig}
+import com.daml.network.util.CNNodeUtil.{defaultAnsConfig, defaultAmuletConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -488,10 +488,10 @@ class FoundingNodeInitializer(
                         ),
                         amuletConfig,
                         foundingConfig.initialAmuletPrice.bigDecimal,
-                        defaultCnsConfig(
-                          foundingConfig.initialCnsConfig.renewalDuration,
-                          foundingConfig.initialCnsConfig.entryLifetime,
-                          foundingConfig.initialCnsConfig.entryFee,
+                        defaultAnsConfig(
+                          foundingConfig.initialAnsConfig.renewalDuration,
+                          foundingConfig.initialAnsConfig.entryLifetime,
+                          foundingConfig.initialAnsConfig.entryFee,
                         ),
                         dsoRulesConfig,
                         trafficStateForAllMembers

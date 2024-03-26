@@ -75,24 +75,24 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetAmuletRulesResponse"
-  /v0/cns-rules:
+  /v0/ans-rules:
     post:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "getCnsRules"
+      operationId: "getAnsRules"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/GetCnsRulesRequest"
+              "$ref": "#/components/schemas/GetAnsRulesRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetCnsRulesResponse"
+                "$ref": "#/components/schemas/GetAnsRulesResponse"
   /v0/featured-apps:
     get:
       tags: [scan]
@@ -412,11 +412,11 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /v0/cns-entries:
+  /v0/ans-entries:
     get:
       tags: [ scan ]
       x-jvm-package: scan
-      operationId: "listCnsEntries"
+      operationId: "listAnsEntries"
       parameters:
         - name: "name_prefix"
           in: "query"
@@ -435,11 +435,11 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListEntriesResponse"
-  /v0/cns-entries/by-party/{party}:
+  /v0/ans-entries/by-party/{party}:
     get:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "lookupCnsEntryByParty"
+      operationId: "lookupAnsEntryByParty"
       parameters:
         - name: "party"
           in: "path"
@@ -455,11 +455,11 @@ paths:
                 "$ref": "#/components/schemas/LookupEntryByPartyResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /v0/cns-entries/by-name/{name}:
+  /v0/ans-entries/by-name/{name}:
     get:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "lookupCnsEntryByName"
+      operationId: "lookupAnsEntryByName"
       parameters:
         - name: "name"
           in: "path"
@@ -631,19 +631,19 @@ components:
         amulet_rules_update:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
       required: ["amulet_rules_update"]
-    GetCnsRulesRequest:
+    GetAnsRulesRequest:
       type: object
       properties:
-        cached_cns_rules_contract_id:
+        cached_ans_rules_contract_id:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
-        cached_cns_rules_domain_id:
+        cached_ans_rules_domain_id:
           type: string
-    GetCnsRulesResponse:
+    GetAnsRulesResponse:
       type: object
       properties:
-        cns_rules_update:
+        ans_rules_update:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
-      required: ["cns_rules_update"]
+      required: ["ans_rules_update"]
     ListFeaturedAppRightsResponse:
       type: object
       required: ["featured_apps"]
@@ -1194,19 +1194,19 @@ components:
         entries:
           type: array
           items:
-            "$ref": "#/components/schemas/CnsEntry"
+            "$ref": "#/components/schemas/AnsEntry"
     LookupEntryByPartyResponse:
       type: object
       required: [ "entry" ]
       properties:
         entry:
-          "$ref": "#/components/schemas/CnsEntry"
+          "$ref": "#/components/schemas/AnsEntry"
     LookupEntryByNameResponse:
       type: object
       required: [ "entry" ]
       properties:
         entry:
-          "$ref": "#/components/schemas/CnsEntry"
+          "$ref": "#/components/schemas/AnsEntry"
     GetAcsSnapshotResponse:
       type: object
       required: [ "acs_snapshot" ]
@@ -1214,7 +1214,7 @@ components:
         acs_snapshot:
           description: base64-encoded ACS snapshot for the intersection of the DSO party and the requested party’s ACS
           type: string
-    CnsEntry:
+    AnsEntry:
       type: object
       required: [ "user", "name", "url", "description" ]
       properties:

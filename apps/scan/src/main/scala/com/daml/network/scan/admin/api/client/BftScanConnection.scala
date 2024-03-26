@@ -6,11 +6,11 @@ import com.daml.network.admin.http.HttpErrorWithHttpCode
 import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.codegen.java.cn.cns.CnsRules
+import com.daml.network.codegen.java.cn.ans.AnsRules
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.PackageIdResolver.HasAmuletRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
-import com.daml.network.http.v0.definitions.{CnsEntry, MigrationSchedule}
+import com.daml.network.http.v0.definitions.{AnsEntry, MigrationSchedule}
 import com.daml.network.scan.admin.api.client.BftScanConnection.{
   ConsensusNotReached,
   ConsensusNotReachedRetryable,
@@ -101,26 +101,26 @@ class BftScanConnection(
       _.getAmuletRulesWithState(cachedAmuletRules)
     )
 
-  override protected def runGetCnsRules(
-      cachedCnsRules: Option[ContractWithState[CnsRules.ContractId, CnsRules]]
-  )(implicit tc: TraceContext): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = bftCall(
-    _.getCnsRules(cachedCnsRules)
+  override protected def runGetAnsRules(
+      cachedAnsRules: Option[ContractWithState[AnsRules.ContractId, AnsRules]]
+  )(implicit tc: TraceContext): Future[ContractWithState[AnsRules.ContractId, AnsRules]] = bftCall(
+    _.getAnsRules(cachedAnsRules)
   )
 
-  def lookupCnsEntryByParty(id: PartyId)(implicit
+  def lookupAnsEntryByParty(id: PartyId)(implicit
       tc: TraceContext
-  ): Future[Option[CnsEntry]] =
-    bftCall(_.lookupCnsEntryByParty(id))
+  ): Future[Option[AnsEntry]] =
+    bftCall(_.lookupAnsEntryByParty(id))
 
-  def lookupCnsEntryByName(name: String)(implicit
+  def lookupAnsEntryByName(name: String)(implicit
       tc: TraceContext
-  ): Future[Option[CnsEntry]] =
-    bftCall(_.lookupCnsEntryByName(name))
+  ): Future[Option[AnsEntry]] =
+    bftCall(_.lookupAnsEntryByName(name))
 
-  def listCnsEntries(namePrefix: Option[String], pageSize: Int)(implicit
+  def listAnsEntries(namePrefix: Option[String], pageSize: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[CnsEntry]] =
-    bftCall(_.listCnsEntries(namePrefix, pageSize))
+  ): Future[Seq[AnsEntry]] =
+    bftCall(_.listAnsEntries(namePrefix, pageSize))
 
   override protected def runGetOpenAndIssuingMiningRounds(
       cachedOpenRounds: Seq[ContractWithState[OpenMiningRound.ContractId, OpenMiningRound]],

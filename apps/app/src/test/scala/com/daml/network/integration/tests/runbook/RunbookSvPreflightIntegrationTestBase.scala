@@ -5,7 +5,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTestWithSharedEnvironment
 import com.daml.network.util.{
-  CnsFrontendTestUtil,
+  AnsFrontendTestUtil,
   FrontendLoginUtil,
   SvTestUtil,
   WalletFrontendTestUtil,
@@ -23,7 +23,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
     with SvUiIntegrationTestUtil
     with FrontendLoginUtil
     with WalletFrontendTestUtil
-    with CnsFrontendTestUtil
+    with AnsFrontendTestUtil
     with SvTestUtil {
 
   override lazy val resetRequiredTopologyState: Boolean = false
@@ -241,17 +241,17 @@ abstract class RunbookSvPreflightIntegrationTestBase
     }
   }
 
-  "The CNS UI is working" in { implicit env =>
-    val cnsUrl = s"https://cns.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+  "The ANS UI is working" in { implicit env =>
+    val ansUrl = s"https://ans.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
-    val cnsName = s"da-test-${Random.alphanumeric.take(10).mkString.toLowerCase}.unverified.cns"
+    val ansName = s"da-test-${Random.alphanumeric.take(10).mkString.toLowerCase}.unverified.ans"
 
     withFrontEnd("sv") { implicit webDriver =>
       def login(): Unit = {
         actAndCheck(
-          s"Logging in to CNS at $cnsUrl", {
+          s"Logging in to ANS at $ansUrl", {
             completeAuth0LoginWithAuthorization(
-              cnsUrl,
+              ansUrl,
               svUsername,
               svPassword,
               () => find(id("logout-button")) should not be empty,
@@ -266,17 +266,17 @@ abstract class RunbookSvPreflightIntegrationTestBase
 
       }
       if (isDevNet) { // SV missing CC in NonDevNet
-        reserveCnsNameFor(
+        reserveAnsNameFor(
           () => login(),
-          cnsName,
+          ansName,
           "1.0000000000",
           "USD",
           "90 days",
         )
-        clue(s"Reserved CNS name can be looked up via scan") {
+        clue(s"Reserved ANS name can be looked up via scan") {
           val svScanClient = scancl("svTestScan")
           eventuallySucceeds(3.minutes) {
-            svScanClient.lookupEntryByName(cnsName)
+            svScanClient.lookupEntryByName(ansName)
           }
         }
       }

@@ -49,11 +49,11 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetAmuletRulesProxyResponse"
-  /v0/cns-entries/by-party/{party}:
+  /v0/ans-entries/by-party/{party}:
     get:
       tags: [ scan-proxy ]
       x-jvm-package: scanproxy
-      operationId: "lookupCnsEntryByParty"
+      operationId: "lookupAnsEntryByParty"
       parameters:
         - name: "party"
           in: "path"
@@ -69,11 +69,11 @@ paths:
                 "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/LookupEntryByPartyResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
-  /v0/cns-entries:
+  /v0/ans-entries:
     get:
       tags: [ scan-proxy ]
       x-jvm-package: scanproxy
-      operationId: "listCnsEntries"
+      operationId: "listAnsEntries"
       parameters:
         - name: "name_prefix"
           in: "query"
@@ -92,11 +92,11 @@ paths:
             application/json:
               schema:
                 "$ref": "../../../../scan/src/main/openapi/scan-internal.yaml#/components/schemas/ListEntriesResponse"
-  /v0/cns-entries/by-name/{name}:
+  /v0/ans-entries/by-name/{name}:
     get:
       tags: [ scan-proxy ]
       x-jvm-package: scanproxy
-      operationId: "lookupCnsEntryByName"
+      operationId: "lookupAnsEntryByName"
       parameters:
         - name: "name"
           in: "path"

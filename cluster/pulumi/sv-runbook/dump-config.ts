@@ -21,7 +21,7 @@ async function main() {
     namespaceToUiToClientId: {
       sv: {
         wallet: 'wallet-client-id',
-        cns: 'cns-client-id',
+        ans: 'ans-client-id',
         sv: 'sv-client-id',
       },
     },

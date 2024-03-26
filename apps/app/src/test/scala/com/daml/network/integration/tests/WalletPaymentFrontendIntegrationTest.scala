@@ -42,8 +42,8 @@ class WalletPaymentFrontendIntegrationTest
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
-        createCnsEntry(
-          aliceCnsExternalClient,
+        createAnsEntry(
+          aliceAnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -51,8 +51,8 @@ class WalletPaymentFrontendIntegrationTest
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
-        createCnsEntry(
-          charlieCnsExternalClient,
+        createAnsEntry(
+          charlieAnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -82,8 +82,8 @@ class WalletPaymentFrontendIntegrationTest
               matchSinglePaymentInfo(id("confirm-payment").element)(
                 expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedSendAmount = "1.5" -> Currency.CC,
-                expectedReceiver = expectedCns(charlieUserParty, charlieEntryName),
-                expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
+                expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
+                expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 1.5,
                 expectedComputeText = "3 USD @ 0.5 CC/USD",
                 expectedDescription = description,
@@ -108,7 +108,7 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-1.5"),
-                provider = expectedCns(aliceUserParty, aliceEntryName),
+                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("0"),
@@ -123,8 +123,8 @@ class WalletPaymentFrontendIntegrationTest
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
-        createCnsEntry(
-          aliceCnsExternalClient,
+        createAnsEntry(
+          aliceAnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -132,8 +132,8 @@ class WalletPaymentFrontendIntegrationTest
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
-        createCnsEntry(
-          charlieCnsExternalClient,
+        createAnsEntry(
+          charlieAnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -163,8 +163,8 @@ class WalletPaymentFrontendIntegrationTest
               matchSinglePaymentInfo(id("confirm-payment").element)(
                 expectedBalance = (4.4475, 8.895), // from the self-directory creation
                 expectedSendAmount = "5.5" -> Currency.USD,
-                expectedReceiver = expectedCns(charlieUserParty, charlieEntryName),
-                expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
+                expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
+                expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.75,
                 expectedComputeText = "5.5 USD @ 2 USD/CC",
                 expectedDescription = description,
@@ -189,7 +189,7 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-2.75"),
-                provider = expectedCns(aliceUserParty, aliceEntryName),
+                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("0"),
@@ -208,8 +208,8 @@ class WalletPaymentFrontendIntegrationTest
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
-        createCnsEntry(
-          aliceCnsExternalClient,
+        createAnsEntry(
+          aliceAnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -217,8 +217,8 @@ class WalletPaymentFrontendIntegrationTest
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
-        createCnsEntry(
-          charlieCnsExternalClient,
+        createAnsEntry(
+          charlieAnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -252,7 +252,7 @@ class WalletPaymentFrontendIntegrationTest
                   (aliceUserParty, aliceEntryName, "1.5 CC", "3 USD"),
                   (charlieUserParty, charlieEntryName, "2.5 CC", "5 USD"),
                 ),
-                expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
+                expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 4.0,
                 expectedComputeText = "8 USD @ 0.5 CC/USD",
                 expectedDescription = description,
@@ -277,7 +277,7 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-4"),
-                provider = expectedCns(aliceUserParty, aliceEntryName),
+                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("1.5"), // that's what Alice receives
@@ -292,8 +292,8 @@ class WalletPaymentFrontendIntegrationTest
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
-        createCnsEntry(
-          aliceCnsExternalClient,
+        createAnsEntry(
+          aliceAnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -301,8 +301,8 @@ class WalletPaymentFrontendIntegrationTest
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
-        createCnsEntry(
-          charlieCnsExternalClient,
+        createAnsEntry(
+          charlieAnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -336,7 +336,7 @@ class WalletPaymentFrontendIntegrationTest
                   (aliceUserParty, aliceEntryName, "1.5 USD", "0.75 CC"),
                   (charlieUserParty, charlieEntryName, "2.5 USD", "1.25 CC"),
                 ),
-                expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
+                expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.0,
                 expectedComputeText = "4 USD @ 2 USD/CC",
                 expectedDescription = description,
@@ -361,7 +361,7 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-2"),
-                provider = expectedCns(aliceUserParty, aliceEntryName),
+                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("0.75"), // that's what Alice receives
@@ -376,8 +376,8 @@ class WalletPaymentFrontendIntegrationTest
         val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
         val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         val aliceEntryName = perTestCaseName("alice")
-        createCnsEntry(
-          aliceCnsExternalClient,
+        createAnsEntry(
+          aliceAnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -385,8 +385,8 @@ class WalletPaymentFrontendIntegrationTest
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
         val charlieEntryName = perTestCaseName("charlie")
-        createCnsEntry(
-          charlieCnsExternalClient,
+        createAnsEntry(
+          charlieAnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
           tapAmount = 5 * amuletPrice,
@@ -420,7 +420,7 @@ class WalletPaymentFrontendIntegrationTest
                   (aliceUserParty, aliceEntryName, "1.5 CC", "3 USD"),
                   (charlieUserParty, charlieEntryName, "2.5 USD", "1.25 CC"),
                 ),
-                expectedProvider = expectedCns(aliceUserParty, aliceEntryName),
+                expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.75,
                 expectedComputeText = "5.5 USD @ 0.5 CC/USD",
                 expectedDescription = description,
@@ -445,7 +445,7 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchLockAndTransfer(
                 expectedLockedAmount = BigDecimal("-2.75"),
-                provider = expectedCns(aliceUserParty, aliceEntryName),
+                provider = expectedAns(aliceUserParty, aliceEntryName),
                 charlieUserParty,
                 charlieEntryName,
                 BigDecimal("1.5"), // that's what Alice receives
@@ -526,7 +526,7 @@ class WalletPaymentFrontendIntegrationTest
       case (partyId, expectedReceiver, expectedAmount, expectedConvertedAmount) =>
         val row = element.childElement(id(s"${partyId.toProtoPrimitive}-payment-row"))
         seleniumText(row.childElement(className("receiver-entry"))) should matchText(
-          expectedCns(partyId, expectedReceiver)
+          expectedAns(partyId, expectedReceiver)
         )
         row.childElement(className("receiver-amount")).text should matchText(expectedAmount)
         row.childElement(className("receiver-amount-converted")).text should matchText(
@@ -594,7 +594,7 @@ class WalletPaymentFrontendIntegrationTest
         amuletPrice,
         "Sent",
         "App Payment Collected",
-        Some(s"${expectedCns(receiverPartyId, expectedEntryName)} $provider"),
+        Some(s"${expectedAns(receiverPartyId, expectedEntryName)} $provider"),
         balanceChangeForSender,
       )
     }

@@ -327,11 +327,11 @@ create table scan_acs_store
     -- the provider partyid of a FeaturedAppRight contract
     featured_app_right_provider text,
 
-    -- the name of the cns entry
-    cns_entry_name              text,
+    -- the name of the ans entry
+    ans_entry_name              text,
 
-    -- party-id of the directory user that owns a cns entry contract
-    cns_entry_owner             text,
+    -- party-id of the directory user that owns a ans entry contract
+    ans_entry_owner             text,
 
     -- the member id in a MemberTraffic
     member_traffic_member         text,
@@ -364,15 +364,15 @@ create index scan_acs_store_sid_mid_tid_farp
     on scan_acs_store (store_id, migration_id, template_id_qualified_name, featured_app_right_provider)
     where featured_app_right_provider is not null;
 
--- retrieve cns entries by name
+-- retrieve ans entries by name
 create index scan_acs_store_sid_mid_den_tpo
-    on scan_acs_store (store_id, migration_id, cns_entry_name text_pattern_ops)
-    where cns_entry_name is not null;
+    on scan_acs_store (store_id, migration_id, ans_entry_name text_pattern_ops)
+    where ans_entry_name is not null;
 
--- retrieve the cns entries owned by a particular party paged by name
+-- retrieve the ans entries owned by a particular party paged by name
 create index scan_acs_store_sid_mid_deo_den
-    on scan_acs_store (store_id, migration_id, cns_entry_owner, cns_entry_name)
-    where cns_entry_owner is not null and cns_entry_name is not null;
+    on scan_acs_store (store_id, migration_id, ans_entry_owner, ans_entry_name)
+    where ans_entry_owner is not null and ans_entry_name is not null;
 
 -- retrieve total traffic purchased per member
 create index scan_acs_store_sid_mid_tid_mtm
@@ -643,21 +643,21 @@ create table dso_acs_store
     -- the member id in a MemberTraffic
     member_traffic_member         text,
 
-    -- The entry name in CnsEntry and CnsEntryContext
-    cns_entry_name                text,
+    -- The entry name in AnsEntry and AnsEntryContext
+    ans_entry_name                text,
 
-    -- the cnsEntryContextCid of a Confirmation contract:
-    -- - if the action is of type ARC_CnsEntryContext
-    -- - if the above's cnsEntryContextAction is of either type CNSRARC_CollectInitialEntryPayment or CNSRARC_RejectEntryInitialPayment
-    action_cns_entry_context_cid  text,
+    -- the ansEntryContextCid of a Confirmation contract:
+    -- - if the action is of type ARC_AnsEntryContext
+    -- - if the above's ansEntryContextAction is of either type ANSRARC_CollectInitialEntryPayment or ANSRARC_RejectEntryInitialPayment
+    action_ans_entry_context_cid  text,
 
-    -- the paymentCid of the cnsEntryContextAction from Confirmation contract:
-    -- - if the action is of type ARC_CnsEntryContext
-    -- - if the above's cnsEntryContextAction is of either type CNSRARC_CollectInitialEntryPayment or CNSRARC_RejectEntryInitialPayment
-    action_cns_entry_context_payment_id  text,
+    -- the paymentCid of the ansEntryContextAction from Confirmation contract:
+    -- - if the action is of type ARC_AnsEntryContext
+    -- - if the above's ansEntryContextAction is of either type ANSRARC_CollectInitialEntryPayment or ANSRARC_RejectEntryInitialPayment
+    action_ans_entry_context_payment_id  text,
 
-    -- the cnsEntryContextAction type of a Confirmation contract
-    action_cns_entry_context_arc_type    text,
+    -- the ansEntryContextAction type of a Confirmation contract
+    action_ans_entry_context_arc_type    text,
 
     -- the contract-id of a subscription's context contract
     -- used for a DB-level join of subscriptions and their context contracts
@@ -749,12 +749,12 @@ create index dso_acs_store_sid_mid_tid_mtm
     where member_traffic_member is not null;
 
 create index dso_acs_store_sid_mid_tid_cen
-    on dso_acs_store (store_id, migration_id, template_id_qualified_name, cns_entry_name)
-    where cns_entry_name is not null;
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, ans_entry_name)
+    where ans_entry_name is not null;
 
 create index dso_acs_store_sid_mid_tid_acecc
-    on dso_acs_store (store_id, migration_id, template_id_qualified_name, action_cns_entry_context_cid)
-    where action_cns_entry_context_cid is not null;
+    on dso_acs_store (store_id, migration_id, template_id_qualified_name, action_ans_entry_context_cid)
+    where action_ans_entry_context_cid is not null;
 
 create index dso_acs_store_sid_mid_tid_sccid
     on dso_acs_store (store_id, migration_id, template_id_qualified_name, subscription_reference_contract_id)

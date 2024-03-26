@@ -1,5 +1,5 @@
 import {
-  CnsEntry as CnsEntryComponent,
+  AnsEntry as AnsEntryComponent,
   ErrorBoundary,
   useUserState,
   usePrimaryParty,
@@ -24,7 +24,7 @@ const Root: React.FC = () => {
               CN Splitwell
               {primaryPartyId && (
                 <div id="logged-in-user" data-selenium-text={primaryPartyId}>
-                  <CnsEntryComponent partyId={primaryPartyId} />
+                  <AnsEntryComponent partyId={primaryPartyId} />
                 </div>
               )}
             </Typography>

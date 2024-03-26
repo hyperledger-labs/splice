@@ -204,18 +204,18 @@ Open ``web-uis/wallet/config.js`` and change all occurrences of ``TARGET_CLUSTER
     :start-after: BEGIN_WALLET_CLUSTER_BACKEND_CONFIG
     :end-before: END_WALLET_CLUSTER_BACKEND_CONFIG
 
-Configuring the CNS UI
+Configuring the ANS UI
 ----------------------
 
-The CNS UI is distributed as static files that connect to the validator backend that we started in the previous section.
+The ANS UI is distributed as static files that connect to the validator backend that we started in the previous section.
 It also connects to the Scan service in the cluster.
 
-Before we can deploy the CNS UI, we need to configure the URL of the Scan service.
-Open ``web-uis/cns/config.js`` and change ``TARGET_CLUSTER`` in the Scan URL to |cn_cluster_literal|:
+Before we can deploy the ANS UI, we need to configure the URL of the Scan service.
+Open ``web-uis/ans/config.js`` and change ``TARGET_CLUSTER`` in the Scan URL to |cn_cluster_literal|:
 
-.. literalinclude:: ../../../../../apps/cns/frontend/public/config.js
-    :start-after: BEGIN_CNS_CLUSTER_BACKEND_CONFIG
-    :end-before: END_CNS_CLUSTER_BACKEND_CONFIG
+.. literalinclude:: ../../../../../apps/ans/frontend/public/config.js
+    :start-after: BEGIN_ANS_CLUSTER_BACKEND_CONFIG
+    :end-before: END_ANS_CLUSTER_BACKEND_CONFIG
 
 
 .. _splitwell-user:
@@ -235,7 +235,7 @@ are running the validator (the one using "validator.conf"), and type:
 
    @ validatorApp.participantClient.upload_dar_unless_exists("dars/splitwell-0.1.0.dar")
 
-As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal| like you did earlier for the CNS and wallet UIs:
+As the last step before you can start the frontend, open ``web-uis/splitwell/config.js`` and change ``TARGET_CLUSTER`` to |cn_cluster_literal| like you did earlier for the ANS and wallet UIs:
 
 .. literalinclude:: ../../../../../apps/splitwell/frontend/public/config.js
     :start-after: BEGIN_SPLITWELL_CLUSTER_BACKEND_CONFIG
@@ -251,7 +251,7 @@ ask the application provider.
 Hosting the UIs
 ---------------
 
-Lastly, we have to host the frontend files for the wallet UI, the CNS UI and the splitwell UI.
+Lastly, we have to host the frontend files for the wallet UI, the ANS UI and the splitwell UI.
 We're going to use a standard NGINX Docker container to host all the frontends.
 If you don't have Docker installed, please install it now by following the `Docker installation documentation <https://docs.docker.com/get-docker/>`_.
 Please make sure to install version 20.10.0 or higher on Linux,which supports ``host.docker.internal``.
@@ -266,7 +266,7 @@ On Windows or Mac you can omit the ``--add-host=host.docker.internal:host-gatewa
 
 The Wallet UI is now accessible at http://wallet.localhost:3000, where you can login as alice and see your coin holdings.
 
-The CNS UI should be accessible at http://cns.localhost:3000.
+The ANS UI should be accessible at http://ans.localhost:3000.
 
 You can login there using the same method you used for the wallet (either username if using the default insecure test
 authentication, or through Auth0 if configured).
@@ -279,11 +279,11 @@ On Linux, you can try the following command to update the firewall rules if you'
 After this change please restart the docker container.
 
 After logging in for the first time, you will have no registered entries.
-Insert a cns entry name of your choice, e.g. "alice.cns" in the "Request new entry" field, and click "Request Entry".
-You will be redirected to your wallet to confirm the Canton Coin payment for your CNS entry (a subscription-based payment).
-Once confirmed, you will be redirected back to the CNS UI, and should see your new entry listed.
+Insert a ans entry name of your choice, e.g. "alice.ans" in the "Request new entry" field, and click "Request Entry".
+You will be redirected to your wallet to confirm the Canton Coin payment for your ANS entry (a subscription-based payment).
+Once confirmed, you will be redirected back to the ANS UI, and should see your new entry listed.
 
-If you navigate back to your wallet (refresh the page if it was left open from before) - in the top left corner, under the "CC Wallet" title, you should see that your party ID is now being resolved to your new cns entry name.
+If you navigate back to your wallet (refresh the page if it was left open from before) - in the top left corner, under the "CC Wallet" title, you should see that your party ID is now being resolved to your new ans entry name.
 
 The Splitwell UI is now accessible at http://splitwell.localhost:3000. You can now log in and start creating groups and split payments with
 other users on the Canton Network. Note that you need to onboard your
@@ -332,7 +332,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
        - "Allowed Web Origins"
        - "Allowed Origins (CORS)"
     e. Save your application settings
-6. Create an Auth0 Application for the CNS web UI. Repeat the steps used for creating the wallet web UI, this time calling your application "CNS web UI", and replacing the URL determined in step c with that of the CNS UI (if you've been following this runbook guide, it will be ``http://cns.localhost:3000``)
+6. Create an Auth0 Application for the ANS web UI. Repeat the steps used for creating the wallet web UI, this time calling your application "ANS web UI", and replacing the URL determined in step c with that of the ANS UI (if you've been following this runbook guide, it will be ``http://ans.localhost:3000``)
 
 7. Configure your system that will be running Canton, your wallet and validator app backends with the following variables:
 
@@ -394,8 +394,8 @@ NETWORK_AUTH_DOMAIN_URL               The "Domain" of your tenant (at the top of
 NETWORK_AUTH_WALLET_UI_CLIENT_ID      The "Client ID" of your "Wallet web UI" application (at the top of the application's settings page)
 ====================================  =====
 
-12. Repeat step 11 for the CNS UI configuration, at
-    ``web-uis/cns/config.js``.  The final section ``auth``
+12. Repeat step 11 for the ANS UI configuration, at
+    ``web-uis/ans/config.js``.  The final section ``auth``
     section should look close to this but you need to replace the
     authority and client_id as explained for the wallet above.
 

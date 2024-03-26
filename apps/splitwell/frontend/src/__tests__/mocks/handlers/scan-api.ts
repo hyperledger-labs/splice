@@ -18,7 +18,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
     );
   }),
   rest.get<null, { partyId: string }, LookupEntryByPartyResponse | ErrorResponse>(
-    `${scanUrl}/v0/cns-entries/by-party/:partyId`,
+    `${scanUrl}/v0/ans-entries/by-party/:partyId`,
     (req, res, ctx) => {
       if (req.params.partyId === alicePartyId) {
         return res(
@@ -26,8 +26,8 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
             entry: {
               contract_id:
                 '00c8e178f8b0b2c2955103b3fa59ccdc5f34861c4bcf659844c2959ba9febf3f61ca0212207e6c7b0db1b456c2f3f23c3b0c75b02dfc0c470cd1ea3fb603a01527e414c922',
-              name: 'alice.unverified.cns',
-              url: 'https://alice-url.cns.com',
+              name: 'alice.unverified.ans',
+              url: 'https://alice-url.ans.com',
               description: '',
               expires_at: new Date('2024-01-07T14:50:26.364476Z'),
               user: alicePartyId,
@@ -42,8 +42,8 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
             entry: {
               contract_id:
                 '00c8e178f8b0b2c2955103b3fa59ccdc5f34861c4bcf659844c2959ba9febf3f61ca0212207e6c7b0db1b456c2f3f23c3b0c75b02dfc0c470cd1ea3fb603a01527e414c922',
-              name: 'bob.unverified.cns',
-              url: 'https://bob-url.cns.com',
+              name: 'bob.unverified.ans',
+              url: 'https://bob-url.ans.com',
               description: '',
               expires_at: new Date('2024-01-07T14:50:26.364476Z'),
               user: bobPartyId,
@@ -55,24 +55,24 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
       return res(
         ctx.status(404),
         ctx.json<ErrorResponse>({
-          error: `No cns entry found for party: ${alicePartyId}`,
+          error: `No ans entry found for party: ${alicePartyId}`,
         })
       );
     }
   ),
   rest.get<null, { name: string }, LookupEntryByNameResponse | ErrorResponse>(
-    `${scanUrl}/v0/cns-entries/by-name`,
+    `${scanUrl}/v0/ans-entries/by-name`,
     (_, res, ctx) => {
       return res(
         ctx.status(404),
         ctx.json({
-          error: `No cns entry found for party: ${alicePartyId}`,
+          error: `No ans entry found for party: ${alicePartyId}`,
         })
       );
     }
   ),
   rest.get<null, { partyId: string }, ListEntriesResponse>(
-    `${scanUrl}/v0/cns-entries`,
+    `${scanUrl}/v0/ans-entries`,
     (_, res, ctx) => {
       return res(
         ctx.json({

@@ -57,9 +57,9 @@ class LeaderBasedAutomationService(
     }
 
     registerTrigger(new ExpireElectionRequestsTrigger(triggerContext, svTaskContext))
-    registerTrigger(new CnsSubscriptionRenewalPaymentTrigger(triggerContext, svTaskContext))
-    registerTrigger(new ExpiredCnsEntryTrigger(triggerContext, svTaskContext))
-    registerTrigger(new ExpiredCnsSubscriptionTrigger(triggerContext, svTaskContext))
+    registerTrigger(new AnsSubscriptionRenewalPaymentTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpiredAnsEntryTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpiredAnsSubscriptionTrigger(triggerContext, svTaskContext))
     registerTrigger(new TerminatedSubscriptionTrigger(triggerContext, svTaskContext))
   }
 
@@ -85,9 +85,9 @@ object LeaderBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[MergeUnclaimedRewardsTrigger],
     aTrigger[ExpireRewardCouponsTrigger],
     aTrigger[ExpireElectionRequestsTrigger],
-    aTrigger[CnsSubscriptionRenewalPaymentTrigger],
-    aTrigger[ExpiredCnsEntryTrigger],
-    aTrigger[ExpiredCnsSubscriptionTrigger],
+    aTrigger[AnsSubscriptionRenewalPaymentTrigger],
+    aTrigger[ExpiredAnsEntryTrigger],
+    aTrigger[ExpiredAnsSubscriptionTrigger],
     aTrigger[TerminatedSubscriptionTrigger],
   )
 }

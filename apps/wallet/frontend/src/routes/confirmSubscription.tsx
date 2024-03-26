@@ -18,7 +18,7 @@ import {
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
-import BftCnsEntry from '../components/BftCnsEntry';
+import BftAnsEntry from '../components/BftAnsEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useSubscriptionRequest } from '../hooks';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
@@ -44,14 +44,14 @@ export const ConfirmSubscription: React.FC = () => {
             <Stack alignItems="center" spacing={1}>
               <Stack alignItems="center" direction="row" spacing={1}>
                 <Typography variant="h6">Confirm Subscription to </Typography>
-                <BftCnsEntry
+                <BftAnsEntry
                   partyId={subscriptionRequestQuery.data.payload.subscriptionData.receiver}
                   variant="h5"
                 />
               </Stack>
               <Stack alignItems="center" direction="row" spacing={1}>
                 <Typography variant="body2">via </Typography>
-                <BftCnsEntry
+                <BftAnsEntry
                   partyId={subscriptionRequestQuery.data.payload.subscriptionData.provider}
                   variant="body2"
                 />

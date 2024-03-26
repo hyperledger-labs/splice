@@ -22,7 +22,7 @@ abstract class ValidatorPreflightIntegrationTestBase
     extends FrontendIntegrationTestWithSharedEnvironment("alice-validator", "bob-validator")
     with FrontendLoginUtil
     with PreflightIntegrationTestUtil
-    with CnsFrontendTestUtil
+    with AnsFrontendTestUtil
     with WalletFrontendTestUtil
     with SplitwellFrontendTestUtil {
 
@@ -42,8 +42,8 @@ abstract class ValidatorPreflightIntegrationTestBase
 
   private lazy val walletUiUrl =
     s"https://wallet.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
-  private lazy val cnsUiUrl =
-    s"https://cns.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
+  private lazy val ansUiUrl =
+    s"https://ans.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private lazy val splitwellUiUrl =
     s"https://splitwell.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
 
@@ -296,31 +296,31 @@ abstract class ValidatorPreflightIntegrationTestBase
     }
   }
 
-  "test the CNS ui of a validator" in { _ =>
+  "test the ANS ui of a validator" in { _ =>
     val aliceUser = auth0Users.get("alice-validator").value
 
     withFrontEnd("alice-validator") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser)
 
       if (isDevNet) {
-        // On DevNet-like clusters, we test the full CNS entry creation flow
+        // On DevNet-like clusters, we test the full ANS entry creation flow
 
-        // Generate new random CNS names to avoid conflicts between multiple preflight check runs
+        // Generate new random ANS names to avoid conflicts between multiple preflight check runs
         val entryId = (new scala.util.Random).nextInt().toHexString
-        val cnsName = s"alice_${entryId}.unverified.cns"
+        val ansName = s"alice_${entryId}.unverified.ans"
 
         tapAmulets(100)
-        reserveCnsNameFor(
+        reserveAnsNameFor(
           () =>
             auth0Login(
               aliceUser,
-              cnsUiUrl,
+              ansUiUrl,
               () => {
                 waitForQuery(id("entry-name-field"))
                 find(id("entry-name-field")) should not be empty
               },
             ),
-          cnsName,
+          ansName,
           "1.0000000000",
           "USD",
           "90 days",
@@ -329,7 +329,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         // On non-DevNet clusters, we only test logging in to the directory UI
         auth0Login(
           aliceUser,
-          cnsUiUrl,
+          ansUiUrl,
           () => {
             waitForQuery(id("entry-name-field"))
             find(id("entry-name-field")) should not be empty

@@ -191,15 +191,23 @@ function rename() {
   local DAML="-i 'daml/**' $SPECIAL"
 
   # We are not adjusting lock files, as they are regenerated in the cleanup step
-  run_and_commit "renaming $description: daml files"      "gsr $extra_includes $DAML      -f $pattern"
-  run_and_commit "renaming $description: app files"       "gsr $extra_includes $APP       -f $pattern"
-  run_and_commit "renaming $description: api files"       "gsr $extra_includes $API       -f $pattern"
-  run_and_commit "renaming $description: frontend files"  "gsr $extra_includes $FRONTEND  -f $pattern"
-  run_and_commit "renaming $description: cluster files"   "gsr $extra_includes $CLUSTER   -f $pattern"
-  run_and_commit "renaming $description: crypto files"    "gsr $extra_includes $CRYPTO    -f $pattern"
-  run_and_commit "renaming $description: doc files"       "gsr $extra_includes $DOCS      -f $pattern"
-  run_and_commit "renaming $description: special files"   "gsr $extra_includes $SPECIAL   -f $pattern"
+  run_and_commit_rename "$description: daml files"      "$pattern" "$extra_includes" "$DAML"
+  run_and_commit_rename "$description: app files"       "$pattern" "$extra_includes" "$APP"
+  run_and_commit_rename "$description: api files"       "$pattern" "$extra_includes" "$API"
+  run_and_commit_rename "$description: frontend files"  "$pattern" "$extra_includes" "$FRONTEND"
+  run_and_commit_rename "$description: cluster files"   "$pattern" "$extra_includes" "$CLUSTER"
+  run_and_commit_rename "$description: crypto files"    "$pattern" "$extra_includes" "$CRYPTO"
+  run_and_commit_rename "$description: doc files"       "$pattern" "$extra_includes" "$DOCS"
+  run_and_commit_rename "$description: special files"   "$pattern" "$extra_includes" "$SPECIAL"
+}
 
+function run_and_commit_rename() {
+  local description=$1
+  local pattern=$2
+  shift 2
+  local gsr_args=("$@")
+
+  run_and_commit "renaming: $description" "gsr ${gsr_args[*]} -f $pattern"
 }
 
 function commit_occurrences() {
@@ -388,9 +396,7 @@ function subcmd_coin_amulet() {
 
 ### CNS
 
-# TODO(#11111): complete this part of the script
-
-subcommand_whitelist[internal_cns_amulet]='Rename: cns to ans'
+subcommand_whitelist[internal_cns_ans]='Rename: cns to ans'
 
 function subcmd_internal_cns_ans() {
   assert_clean_working_dir
@@ -398,23 +404,36 @@ function subcmd_internal_cns_ans() {
   assert_no_usage 'ans|Ans|ANS'
   assert_no_canton_usage 'ans|Ans|ANS'
 
-  # Rename cns and CNS
+  # Pretty sure there are no English words that contain `cns`, and luckily none of our committed public keys and hashes toes either.
   rename "cns to ans" \
-    "'\bcns\b///ans'" \
+    "'cns///ans'" \
     "" \
     ""
   rename "Cns to Ans" \
-    "'\bCns\b///Ans'" \
+    "'Cns///Ans'" \
     "" \
     ""
   rename "CNS to ANS" \
-    "'\bCNS\b///ANS'" \
+    "'CNS///ANS'" \
     "" \
     ""
+
+  rename "Canton Name to Amulet Name" \
+    "'\bCanton Name\b///Amulet Name'" \
+    "" \
+    ""
+
+  rename "Canton name to Amulet name" \
+    "'\bCanton name\b///Amulet name'" \
+    "" \
+    ""
+
+  run_and_commit_rename "cns to ans: auth0.ts" "'cns///ans'" "-i '**/auth0.ts'"
+  run_and_commit_rename "Cns to Ans: auth0.ts" "'Cns///Ans'" "-i '**/auth0.ts'"
+  run_and_commit_rename "CNS to ANS: auth0.ts" "'CNS///ANS'" "-i '**/auth0.ts'"
+
+  run_and_commit_rename "Fix docs link in release notes" "'helm-cns-web-ui///helm-ans-web-ui'" "-i '**/release_notes.rst'"
 }
-
-
-subcommand_whitelist[internal_cns_occs]='Check and store occurrences for: cns'
 
 function subcmd_internal_cns_occs() {
   assert_clean_working_dir
@@ -423,8 +442,15 @@ function subcmd_internal_cns_occs() {
   commit_occurrences "Cns"
   commit_occurrences "CNS"
   commit_occurrences "Canton Name"
+  commit_occurrences "Canton name"
+}
 
-  # TODO(#11111): check for Canton Name
+subcommand_whitelist[cns_ans]='Rename: CNS to ANS'
+
+function subcmd_cns_ans() {
+  subcmd_internal_cns_ans
+  subcmd_internal_cleanup
+  subcmd_internal_cns_occs
 }
 
 ### CCApp and CCUser

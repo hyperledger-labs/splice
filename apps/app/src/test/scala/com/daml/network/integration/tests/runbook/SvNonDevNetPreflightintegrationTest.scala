@@ -57,18 +57,18 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
     }
   }
 
-  "SV can login to the CNS UI" in { _ =>
-    val cnsUrl = s"https://cns.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
+  "SV can login to the ANS UI" in { _ =>
+    val ansUrl = s"https://ans.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
 
     withFrontEnd("sv") { implicit webDriver =>
       completeAuth0LoginWithAuthorization(
-        cnsUrl,
+        ansUrl,
         svUsername,
         svPassword,
-        // if id("cns-entries") is visible, that implies:
+        // if id("ans-entries") is visible, that implies:
         // 1) the logout button is visible
         // 2) the DirectoryInstall has been created (and therefore the request won't be aborted and thus flake)
-        () => find(id("cns-entries")) should not be empty,
+        () => find(id("ans-entries")) should not be empty,
       )
     }
   }

@@ -34,11 +34,11 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceEntryName = perTestCaseName("alice")
 
-      val entryForCns = expectedDsoCns
+      val entryForAns = expectedDsoAns
 
       withFrontEnd("alice") { implicit webDriver =>
-        createCnsEntry(
-          aliceCnsExternalClient,
+        createAnsEntry(
+          aliceAnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
           tapAmount = 5.0 * amuletPrice,
@@ -57,7 +57,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           },
         )
 
-        matchInitialTransactions(txsBefore, entryForCns)
+        matchInitialTransactions(txsBefore, entryForAns)
 
         val (_, txsAfter) = actAndCheck(
           "time passes for the next payment to happen", {
@@ -77,16 +77,16 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           },
         )
 
-        matchLockUnlockCnsPayment(txsAfter.take(2), entryForCns, isInitial = false)
-        matchInitialTransactions(txsAfter.drop(2), entryForCns)
+        matchLockUnlockAnsPayment(txsAfter.take(2), entryForAns, isInitial = false)
+        matchInitialTransactions(txsAfter.drop(2), entryForAns)
       }
     }
 
-    def matchInitialTransactions(txs: Seq[Element], entryForCns: String)(implicit
+    def matchInitialTransactions(txs: Seq[Element], entryForAns: String)(implicit
         env: CNNodeTestConsoleEnvironment
     ) = {
       inside(txs) { case rest :+ balanceChange =>
-        matchLockUnlockCnsPayment(rest, entryForCns, isInitial = true)
+        matchLockUnlockAnsPayment(rest, entryForAns, isInitial = true)
         matchTransaction(balanceChange)(
           amuletPrice = 2,
           expectedAction = "Balance Change",
@@ -97,27 +97,27 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
       }
     }
 
-    def matchLockUnlockCnsPayment(
+    def matchLockUnlockAnsPayment(
         txs: Seq[Element],
-        entryForCns: String,
+        entryForAns: String,
         isInitial: Boolean,
     )(implicit
         env: CNNodeTestConsoleEnvironment
     ) = {
-      inside(txs) { case cnsCreation +: lockForCns +: Nil =>
+      inside(txs) { case ansCreation +: lockForAns +: Nil =>
         // Note: this transfer has no effect on the balance of the sender:
         // the input for the app payment is a locked amulet that was unlocked in the same transaction.
-        matchTransaction(cnsCreation)(
+        matchTransaction(ansCreation)(
           amuletPrice = 2,
           expectedAction = "Sent",
           expectedSubtype =
             if (isInitial)
-              "CNS Entry Initial Payment Collected"
-            else "CNS Entry Renewal Payment Collected",
-          expectedPartyDescription = Some(s"$entryForCns $entryForCns"),
+              "ANS Entry Initial Payment Collected"
+            else "ANS Entry Renewal Payment Collected",
+          expectedPartyDescription = Some(s"$entryForAns $entryForAns"),
           expectedAmountCC = BigDecimal(0), // 0 USD
         )
-        matchTransaction(lockForCns)(
+        matchTransaction(lockForAns)(
           amuletPrice = 2,
           expectedAction = "Sent",
           expectedSubtype =

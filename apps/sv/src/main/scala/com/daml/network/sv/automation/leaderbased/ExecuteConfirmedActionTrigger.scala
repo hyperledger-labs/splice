@@ -10,13 +10,13 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, SummarizingMiningRound}
 import com.daml.network.codegen.java.cn.dsorules.Confirmation
 import com.daml.network.codegen.java.cn.dsorules.actionrequiringconfirmation.{
-  ARC_CnsEntryContext,
+  ARC_AnsEntryContext,
   ARC_AmuletRules,
   ARC_DsoRules,
 }
-import com.daml.network.codegen.java.cn.dsorules.cnsentrycontext_actionrequiringconfirmation.{
-  CNSRARC_CollectInitialEntryPayment,
-  CNSRARC_RejectEntryInitialPayment,
+import com.daml.network.codegen.java.cn.dsorules.ansentrycontext_actionrequiringconfirmation.{
+  ANSRARC_CollectInitialEntryPayment,
+  ANSRARC_RejectEntryInitialPayment,
 }
 import com.daml.network.codegen.java.cn.dsorules.amuletrules_actionrequiringconfirmation.{
   CRARC_MiningRound_Archive,
@@ -166,25 +166,25 @@ class ExecuteConfirmedActionTrigger(
               show"DsoRules $action is not yet supported"
             )
         }
-      case arcCnsEntryContext: ARC_CnsEntryContext =>
-        arcCnsEntryContext.cnsEntryContextAction match {
-          case _: CNSRARC_CollectInitialEntryPayment =>
-            store.lookupCnsEntryContext(arcCnsEntryContext.cnsEntryContextCid).flatMap {
+      case arcAnsEntryContext: ARC_AnsEntryContext =>
+        arcAnsEntryContext.ansEntryContextAction match {
+          case _: ANSRARC_CollectInitialEntryPayment =>
+            store.lookupAnsEntryContext(arcAnsEntryContext.ansEntryContextCid).flatMap {
               case Some(context) =>
-                store.lookupCnsEntryByName(context.payload.name).map(_.isDefined)
+                store.lookupAnsEntryByName(context.payload.name).map(_.isDefined)
               case None =>
-                // The cns context no longer exists, it doesn't make sense to retry collecting the payment.
+                // The ans context no longer exists, it doesn't make sense to retry collecting the payment.
                 Future.successful(true)
             }
-          case rejectPaymentAction: CNSRARC_RejectEntryInitialPayment =>
+          case rejectPaymentAction: ANSRARC_RejectEntryInitialPayment =>
             store
               .lookupSubscriptionInitialPayment(
-                rejectPaymentAction.cnsEntryContext_RejectEntryInitialPaymentValue.paymentCid
+                rejectPaymentAction.ansEntryContext_RejectEntryInitialPaymentValue.paymentCid
               )
               .map(_.isEmpty)
           case action =>
             throw new UnsupportedOperationException(
-              show"CNS entry context $action is not yet supported"
+              show"ANS entry context $action is not yet supported"
             )
         }
       case _ =>

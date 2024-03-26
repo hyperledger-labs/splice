@@ -7,7 +7,7 @@ import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.store.Limit
-import com.daml.network.sv.config.InitialCnsConfig
+import com.daml.network.sv.config.InitialAnsConfig
 import com.daml.network.util.{SplitwellTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient
 import com.daml.network.wallet.automation.AcceptedTransferOfferTrigger
@@ -56,11 +56,11 @@ class WalletTxLogIntegrationTest
       // Set a non-unit amulet price to better test CC-USD conversion.
       .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
       .addConfigTransform((_, config) =>
-        // setting the initialCnsEntryLifetime to be the same as initialCnsRenewalDuration
+        // setting the initialAnsEntryLifetime to be the same as initialAnsRenewalDuration
         CNNodeConfigTransforms
           .updateAllSvAppFoundCollectiveConfigs_(
             _.copy(
-              initialCnsConfig = InitialCnsConfig(
+              initialAnsConfig = InitialAnsConfig(
                 renewalDuration = NonNegativeFiniteDuration.ofDays(30),
                 entryLifetime = NonNegativeFiniteDuration.ofDays(30),
               )
@@ -1007,7 +1007,7 @@ class WalletTxLogIntegrationTest
       )
     }
 
-    "handle collected cns subscription payments" in { implicit env =>
+    "handle collected ans subscription payments" in { implicit env =>
       val aliceUserId = aliceWalletClient.config.ledgerApiUser
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val subscriptionPrice = 1.0
@@ -1017,10 +1017,10 @@ class WalletTxLogIntegrationTest
       }
 
       val (_, request) = actAndCheck(
-        "Request cns entry",
-        requestCnsEntry(
+        "Request ans entry",
+        requestAnsEntry(
           aliceValidatorBackend.participantClientWithAdminToken,
-          "alice.unverified.cns",
+          "alice.unverified.ans",
           aliceUserId,
           aliceUserParty,
         ),

@@ -15,7 +15,7 @@ import CN.Util
 -- of a series of actual Canton domains, which are introduced for handling the (rare) occasions of switching
 -- to a new Canton domain protocol version.
 data AmuletGlobalDomainConfig = AmuletGlobalDomainConfig with
-    requiredDomains : Set.Set Text -- ^ The domain-ids of all domains that CC and CNS users should be connected to.
+    requiredDomains : Set.Set Text -- ^ The domain-ids of all domains that CC and ANS users should be connected to.
     activeDomain : Text -- ^ The domain-id of the domain on which the DSO accepts transactions involving the
                         -- AmuletRules and related contracts, which must be one of the `requiredDomains`.
     fees : DomainFeesConfig -- ^ The fees charged for using the global domain. We use the same fees across all active global domains.

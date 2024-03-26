@@ -186,7 +186,7 @@ class DbMultiDomainAcsStoreTest
     override def contractExpiresAt: Option[Timestamp] = None
 
     override def indexColumns: Seq[(String, IndexColumnValue[_])] = Seq(
-      "cns_entry_name" -> lengthLimited("'); DROP TABLE bobby_tables; --")
+      "ans_entry_name" -> lengthLimited("'); DROP TABLE bobby_tables; --")
     )
   }
 }

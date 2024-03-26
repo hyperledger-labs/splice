@@ -270,18 +270,18 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-cns-ui-auth",
+        "name": "cn-app-ans-ui-auth",
         "namespace": "splitwell"
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "splitwell-cns-ui-client-id",
+          "client-id": "splitwell-ans-ui-client-id",
           "url": "https://auth0Domain"
         }
       }
     },
-    "name": "auth0-ui-secret-splitwell-cns",
+    "name": "auth0-ui-secret-splitwell-ans",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -314,18 +314,18 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-cns-ui-auth",
+        "name": "cn-app-ans-ui-auth",
         "namespace": "sv-1"
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "sv-1-cns-ui-client-id",
+          "client-id": "sv-1-ans-ui-client-id",
           "url": "https://auth0Domain"
         }
       }
     },
-    "name": "auth0-ui-secret-sv-1-cns",
+    "name": "auth0-ui-secret-sv-1-ans",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -380,18 +380,18 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-cns-ui-auth",
+        "name": "cn-app-ans-ui-auth",
         "namespace": "sv-2"
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "sv-2-cns-ui-client-id",
+          "client-id": "sv-2-ans-ui-client-id",
           "url": "https://auth0Domain"
         }
       }
     },
-    "name": "auth0-ui-secret-sv-2-cns",
+    "name": "auth0-ui-secret-sv-2-ans",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -446,18 +446,18 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-cns-ui-auth",
+        "name": "cn-app-ans-ui-auth",
         "namespace": "sv-3"
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "sv-3-cns-ui-client-id",
+          "client-id": "sv-3-ans-ui-client-id",
           "url": "https://auth0Domain"
         }
       }
     },
-    "name": "auth0-ui-secret-sv-3-cns",
+    "name": "auth0-ui-secret-sv-3-ans",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -512,18 +512,18 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-cns-ui-auth",
+        "name": "cn-app-ans-ui-auth",
         "namespace": "sv-4"
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "sv-4-cns-ui-client-id",
+          "client-id": "sv-4-ans-ui-client-id",
           "url": "https://auth0Domain"
         }
       }
     },
-    "name": "auth0-ui-secret-sv-4-cns",
+    "name": "auth0-ui-secret-sv-4-ans",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -578,18 +578,18 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-cns-ui-auth",
+        "name": "cn-app-ans-ui-auth",
         "namespace": "validator1"
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "validator1-cns-ui-client-id",
+          "client-id": "validator1-ans-ui-client-id",
           "url": "https://auth0Domain"
         }
       }
     },
-    "name": "auth0-ui-secret-validator1-cns",
+    "name": "auth0-ui-secret-validator1-ans",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },
@@ -1126,7 +1126,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": true,
+          "ans": true,
           "globalDomain": {
             "activeMigrationId": "",
             "migrationId": ""
@@ -1736,7 +1736,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": false,
+          "ans": false,
           "globalDomain": {
             "activeMigrationId": "",
             "migrationId": "0"
@@ -1778,7 +1778,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": true,
+          "ans": true,
           "globalDomain": {
             "activeMigrationId": "0",
             "migrationId": ""
@@ -2678,7 +2678,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": false,
+          "ans": false,
           "globalDomain": {
             "activeMigrationId": "",
             "migrationId": "0"
@@ -2720,7 +2720,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": true,
+          "ans": true,
           "globalDomain": {
             "activeMigrationId": "0",
             "migrationId": ""
@@ -3589,7 +3589,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": false,
+          "ans": false,
           "globalDomain": {
             "activeMigrationId": "",
             "migrationId": "0"
@@ -3631,7 +3631,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": true,
+          "ans": true,
           "globalDomain": {
             "activeMigrationId": "0",
             "migrationId": ""
@@ -4500,7 +4500,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": false,
+          "ans": false,
           "globalDomain": {
             "activeMigrationId": "",
             "migrationId": "0"
@@ -4542,7 +4542,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": true,
+          "ans": true,
           "globalDomain": {
             "activeMigrationId": "0",
             "migrationId": ""
@@ -5234,7 +5234,7 @@
         "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "cns": true,
+          "ans": true,
           "globalDomain": {
             "activeMigrationId": "0",
             "migrationId": ""

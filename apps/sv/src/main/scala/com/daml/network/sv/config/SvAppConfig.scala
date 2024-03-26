@@ -78,7 +78,7 @@ object SvOnboardingConfig {
       initialMaxNumInputs: Int = 100,
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
-      initialCnsConfig: InitialCnsConfig = InitialCnsConfig(),
+      initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
       initialTrafficControlConfig: TrafficControlConfig = TrafficControlConfig(),
       isDevNet: Boolean = false,
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
@@ -110,7 +110,7 @@ object SvOnboardingConfig {
   }
 }
 
-final case class InitialCnsConfig(
+final case class InitialAnsConfig(
     renewalDuration: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(30),
     entryLifetime: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofDays(90),
     entryFee: Double = 1.0,

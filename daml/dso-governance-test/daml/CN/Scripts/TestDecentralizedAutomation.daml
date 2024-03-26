@@ -18,8 +18,8 @@ import CN.Util
 
 import CC.Scripts.Util
 import CN.Scripts.DsoTestUtils
-import CN.Cns
-import CN.Scripts.CnsRulesParameters
+import CN.Ans
+import CN.Scripts.AnsRulesParameters
 import CN.Wallet.Subscriptions
 
 
@@ -230,40 +230,40 @@ testConfirmationExpiry = do
     DsoRules_ExpireStaleConfirmation svConfirmationCid
 
 
--- Testing CNS decentralization
+-- Testing ANS decentralization
 -------------------------------
 
-testDecentralizedCns : Script ()
-testDecentralizedCns = do
+testDecentralizedAns : Script ()
+testDecentralizedAns = do
   (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
 
   alice <- setupUser app "alice" app.dso
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
-  [(cnsRulesCid, _)] <- query @CnsRules dso
+  [(ansRulesCid, _)] <- query @AnsRules dso
 
-  cnsSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
-    name = "cns.darth.vader"
-    url = "https://darth-vader-cns.com"
-    description = "Darth Vader's CNS Description"
+  ansSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+    name = "ans.darth.vader"
+    url = "https://darth-vader-ans.com"
+    description = "Darth Vader's ANS Description"
     user = alice.primaryParty
 
   amulet <- tap app alice 1.5
 
   paymentContext <- getPaymentTransferContext app alice
-  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd cnsSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
+  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd ansSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
 
-  -- SVs create confirmations for DSO to collect initial payment of the requested cns entry.
+  -- SVs create confirmations for DSO to collect initial payment of the requested ans entry.
   appContext <- getAppTransferContext app app.dsoUser
-  let collectInitialPaymentAction = ARC_CnsEntryContext with
-        cnsEntryContextCid = cnsSummary.entryCid
-        cnsEntryContextAction = CNSRARC_CollectInitialEntryPayment $ CnsEntryContext_CollectInitialEntryPayment with
+  let collectInitialPaymentAction = ARC_AnsEntryContext with
+        ansEntryContextCid = ansSummary.entryCid
+        ansEntryContextAction = ANSRARC_CollectInitialEntryPayment $ AnsEntryContext_CollectInitialEntryPayment with
           paymentCid = initialPaymentCid
           transferContext = appContext
-          cnsRulesCid
+          ansRulesCid
 
   confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
     submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
@@ -279,7 +279,7 @@ testDecentralizedCns = do
       amuletRulesCid = None
       confirmationCids
 
-  [(entryCid, entry)] <- queryFilter @CnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "cns.darth.vader")
+  [(entryCid, entry)] <- queryFilter @AnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "ans.darth.vader")
   [(subscriptionStateCid, subscriptionState)] <- queryFilter @SubscriptionIdleState app.dso (\state -> state.subscriptionData.sender == alice.primaryParty)
 
   subscriptionState.nextPaymentDueAt === entry.expiresAt
@@ -298,25 +298,25 @@ testDecentralizedCns = do
 
   submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
     DsoRules_CollectEntryRenewalPayment with
-      cnsEntryContextCid = cnsSummary.entryCid
-      choiceArg = CnsEntryContext_CollectEntryRenewalPayment with
+      ansEntryContextCid = ansSummary.entryCid
+      choiceArg = AnsEntryContext_CollectEntryRenewalPayment with
         paymentCid
         entryCid
         transferContext = appContext
-        cnsRulesCid
+        ansRulesCid
 
-  [(_, renewedEntry)] <- queryFilter @CnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "cns.darth.vader")
+  [(_, renewedEntry)] <- queryFilter @AnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "ans.darth.vader")
   [(_, renewedSubscriptionState)] <- queryFilter @SubscriptionIdleState app.dso (\state -> state.subscriptionData.sender == alice.primaryParty)
 
-  renewedEntry.expiresAt === addRelTime entry.expiresAt defaultCnsRulesConfig.entryLifetime
+  renewedEntry.expiresAt === addRelTime entry.expiresAt defaultAnsRulesConfig.entryLifetime
   renewedSubscriptionState.nextPaymentDueAt === renewedEntry.expiresAt
 
-  -- SVs confirm to reject invalid entry payment of CNS request.
+  -- SVs confirm to reject invalid entry payment of ANS request.
 
-  rejectedSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
+  rejectedSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
     name = "reject.darth.vader"
     url = "invalid url which will be rejected by SVs by creating confirmations."
-    description = "CNS Description"
+    description = "ANS Description"
     user = alice.primaryParty
 
   amulet <- tap app alice 1.5
@@ -327,14 +327,14 @@ testDecentralizedCns = do
     context = paymentContext
     walletProvider = app.dso
 
-  -- SVs create confirmations for DSO to reject initial payment of the requested cns entry.
+  -- SVs create confirmations for DSO to reject initial payment of the requested ans entry.
   appContext <- getAppTransferContext app app.dsoUser
-  let rejectInitialPaymentAction = ARC_CnsEntryContext with
-        cnsEntryContextCid = rejectedSummary.entryCid
-        cnsEntryContextAction = CNSRARC_RejectEntryInitialPayment $ CnsEntryContext_RejectEntryInitialPayment with
+  let rejectInitialPaymentAction = ARC_AnsEntryContext with
+        ansEntryContextCid = rejectedSummary.entryCid
+        ansEntryContextAction = ANSRARC_RejectEntryInitialPayment $ AnsEntryContext_RejectEntryInitialPayment with
           paymentCid = initialPaymentCid
           transferContext = appContext
-          cnsRulesCid
+          ansRulesCid
 
   confirmationCids <- forA [sv1, sv2, sv3, sv4] $ \svParty -> do
     submitMulti [svParty] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
@@ -351,7 +351,7 @@ testDecentralizedCns = do
       confirmationCids
 
   -- entry is not created
-  [] <- queryFilter @CnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "reject.darth.vader")
+  [] <- queryFilter @AnsEntry app.dso (\entry -> entry.user == alice.primaryParty && entry.name == "reject.darth.vader")
   -- initial paynment is archived
   None <- queryContractId @SubscriptionInitialPayment app.dso initialPaymentCid
 
@@ -365,19 +365,19 @@ terminatedSubscriptionCanBeCleanedUp = script do
   alice <- setupUser app "alice" app.dso
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
-  [(cnsRulesCid, _)] <- query @CnsRules dso
+  [(ansRulesCid, _)] <- query @AnsRules dso
 
-  cnsSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd cnsRulesCid CnsRules_RequestEntry with
-    name = "cns.darth.vader"
-    url = "https://darth-vader-cns.com"
-    description = "Darth Vader's CNS Description"
+  ansSummary <- submitMulti [alice.primaryParty] [app.dso] $ exerciseCmd ansRulesCid AnsRules_RequestEntry with
+    name = "ans.darth.vader"
+    url = "https://darth-vader-ans.com"
+    description = "Darth Vader's ANS Description"
     user = alice.primaryParty
 
-  aborted <- submit alice.primaryParty $ exerciseCmd cnsSummary.requestCid SubscriptionRequest_Reject
+  aborted <- submit alice.primaryParty $ exerciseCmd ansSummary.requestCid SubscriptionRequest_Reject
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid (DsoRules_TerminateSubscription cnsSummary.entryCid aborted)
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid (DsoRules_TerminateSubscription ansSummary.entryCid aborted)
 
-  entryContexts <- query @CnsEntryContext app.dso
+  entryContexts <- query @AnsEntryContext app.dso
   entryContexts === []
 
   terminatedSubscriptions <- query @TerminatedSubscription app.dso

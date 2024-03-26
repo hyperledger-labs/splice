@@ -22,7 +22,7 @@ import {
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
-import BftCnsField from './BftCnsField';
+import BftAnsField from './BftAnsField';
 
 const SendTransfer: React.FC = () => {
   const { createTransferOffer } = useWalletClient();
@@ -88,7 +88,7 @@ const SendTransfer: React.FC = () => {
         <CardContent sx={{ paddingX: '64px' }}>
           <Stack direction="column" mb={4} spacing={1}>
             <Typography variant="h6">Recipient</Typography>
-            <BftCnsField id="create-offer-receiver" label="Receiver" onPartyChanged={setReceiver} />
+            <BftAnsField id="create-offer-receiver" label="Receiver" onPartyChanged={setReceiver} />
           </Stack>
 
           <Stack direction="column" mb={4} spacing={1}>

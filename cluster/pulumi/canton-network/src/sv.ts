@@ -423,7 +423,7 @@ function installMigrationIdSpecificComponents(
         {
           ingress: {
             wallet: false,
-            cns: false,
+            ans: false,
             scan: false,
             sequencer: true,
             sv: false,

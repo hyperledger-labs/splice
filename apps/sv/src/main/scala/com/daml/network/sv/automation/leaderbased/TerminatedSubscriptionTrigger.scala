@@ -39,25 +39,25 @@ class TerminatedSubscriptionTrigger(
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      cnsEntryContextO <- svTaskContext.dsoStore.lookupCnsEntryContext(
+      ansEntryContextO <- svTaskContext.dsoStore.lookupAnsEntryContext(
         task.contract.payload.reference
       )
-      _ <- cnsEntryContextO match {
+      _ <- ansEntryContextO match {
         case None =>
           // TODO(#7934) Log an error here.
           Future.successful(
             TaskSuccess(
-              "Ignoring TerminatedSubscription as there is no corresponding CnsEntryContext"
+              "Ignoring TerminatedSubscription as there is no corresponding AnsEntryContext"
             )
           )
-        case Some(cnsEntryContext) =>
+        case Some(ansEntryContext) =>
           for {
             _ <- svTaskContext.connection
               .submit(
                 Seq(dsoParty),
                 Seq.empty,
-                cnsEntryContext.exercise(
-                  _.exerciseCnsEntryContext_Terminate(
+                ansEntryContext.exercise(
+                  _.exerciseAnsEntryContext_Terminate(
                     dsoParty.toProtoPrimitive,
                     task.contract.contractId,
                   )
@@ -69,7 +69,7 @@ class TerminatedSubscriptionTrigger(
           } yield ()
       }
     } yield TaskSuccess(
-      "Archived CnsEntrytContext because corresponding subscription got terminated"
+      "Archived AnsEntrytContext because corresponding subscription got terminated"
     )
   }
 }

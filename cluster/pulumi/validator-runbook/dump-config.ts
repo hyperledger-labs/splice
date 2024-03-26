@@ -20,7 +20,7 @@ async function main() {
     namespaceToUiToClientId: {
       validator: {
         wallet: 'wallet-client-id',
-        cns: 'cns-client-id',
+        ans: 'ans-client-id',
       },
     },
     appToApiAudience: {

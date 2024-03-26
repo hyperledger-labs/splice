@@ -75,55 +75,55 @@ class HttpScanProxyHandler(
     }
   }
 
-  override def lookupCnsEntryByParty(
-      respond: v0.ScanproxyResource.LookupCnsEntryByPartyResponse.type
+  override def lookupAnsEntryByParty(
+      respond: v0.ScanproxyResource.LookupAnsEntryByPartyResponse.type
   )(
       party: String
-  )(tUser: TracedUser): Future[v0.ScanproxyResource.LookupCnsEntryByPartyResponse] = {
+  )(tUser: TracedUser): Future[v0.ScanproxyResource.LookupAnsEntryByPartyResponse] = {
     implicit val TracedUser(_, traceContext) = tUser
-    withSpan(s"$workflowId.lookupCnsEntryByParty") { implicit traceContext => _ =>
+    withSpan(s"$workflowId.lookupAnsEntryByParty") { implicit traceContext => _ =>
       for {
-        entry <- scanConnection.lookupCnsEntryByParty(PartyId.tryFromProtoPrimitive(party))
+        entry <- scanConnection.lookupAnsEntryByParty(PartyId.tryFromProtoPrimitive(party))
       } yield {
         entry match {
           case Some(value) =>
             respond.OK(definitions.LookupEntryByPartyResponse(value))
           case None =>
-            respond.NotFound(definitions.ErrorResponse(s"Party $party does not have any CNSEntry."))
+            respond.NotFound(definitions.ErrorResponse(s"Party $party does not have any ANSEntry."))
         }
 
       }
     }
   }
 
-  override def lookupCnsEntryByName(
-      respond: v0.ScanproxyResource.LookupCnsEntryByNameResponse.type
-  )(name: String)(tUser: TracedUser): Future[v0.ScanproxyResource.LookupCnsEntryByNameResponse] = {
+  override def lookupAnsEntryByName(
+      respond: v0.ScanproxyResource.LookupAnsEntryByNameResponse.type
+  )(name: String)(tUser: TracedUser): Future[v0.ScanproxyResource.LookupAnsEntryByNameResponse] = {
     implicit val TracedUser(_, traceContext) = tUser
-    withSpan(s"$workflowId.lookupCnsEntryByParty") { implicit traceContext => _ =>
+    withSpan(s"$workflowId.lookupAnsEntryByParty") { implicit traceContext => _ =>
       for {
-        entry <- scanConnection.lookupCnsEntryByName(name)
+        entry <- scanConnection.lookupAnsEntryByName(name)
       } yield {
         entry match {
           case Some(value) =>
             respond.OK(definitions.LookupEntryByNameResponse(value))
           case None =>
-            respond.NotFound(definitions.ErrorResponse(s"Did not find a CnsEntry with name $name"))
+            respond.NotFound(definitions.ErrorResponse(s"Did not find a AnsEntry with name $name"))
         }
 
       }
     }
   }
 
-  override def listCnsEntries(
-      respond: v0.ScanproxyResource.ListCnsEntriesResponse.type
+  override def listAnsEntries(
+      respond: v0.ScanproxyResource.ListAnsEntriesResponse.type
   )(namePrefix: Option[String], pageSize: Int)(
       tUser: TracedUser
-  ): Future[v0.ScanproxyResource.ListCnsEntriesResponse] = {
+  ): Future[v0.ScanproxyResource.ListAnsEntriesResponse] = {
     implicit val TracedUser(_, traceContext) = tUser
-    withSpan(s"$workflowId.lookupCnsEntryByParty") { implicit traceContext => _ =>
+    withSpan(s"$workflowId.lookupAnsEntryByParty") { implicit traceContext => _ =>
       for {
-        entries <- scanConnection.listCnsEntries(namePrefix, pageSize)
+        entries <- scanConnection.listAnsEntries(namePrefix, pageSize)
       } yield {
         respond.OK(definitions.ListEntriesResponse(entries.toVector))
       }

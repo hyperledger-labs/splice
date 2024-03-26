@@ -134,9 +134,9 @@ trait ScanStore
         )
       )
 
-  def lookupCnsRules()(implicit
+  def lookupAnsRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[cn.cns.CnsRules.ContractId, cn.cns.CnsRules]]]
+  ): Future[Option[ContractWithState[cn.ans.AnsRules.ContractId, cn.ans.AnsRules]]]
 
   def lookupDsoRules()(implicit
       tc: TraceContext
@@ -215,17 +215,17 @@ trait ScanStore
   def listEntries(namePrefix: String, limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[ContractWithState[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]
+    Seq[ContractWithState[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]
   ]
 
   def lookupEntryByParty(
       partyId: PartyId
   )(implicit tc: TraceContext): Future[
-    Option[ContractWithState[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]
+    Option[ContractWithState[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]
   ]
 
   def lookupEntryByName(name: String)(implicit tc: TraceContext): Future[
-    Option[ContractWithState[cn.cns.CnsEntry.ContractId, cn.cns.CnsEntry]]
+    Option[ContractWithState[cn.ans.AnsEntry.ContractId, cn.ans.AnsEntry]]
   ]
 
   def listTransactions(
@@ -319,7 +319,7 @@ object ScanStore {
         mkFilter(cc.amuletrules.AmuletRules.COMPANION)(co => co.payload.dso == dso)(
           ScanAcsStoreRowData(_)
         ),
-        mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.dso == dso)(ScanAcsStoreRowData(_)),
+        mkFilter(cn.ans.AnsRules.COMPANION)(co => co.payload.dso == dso)(ScanAcsStoreRowData(_)),
         mkFilter(cn.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso)(
           ScanAcsStoreRowData(_)
         ),
@@ -370,11 +370,11 @@ object ScanStore {
             amount = Some(contract.payload.amulet.amount.initialAmount),
           )
         },
-        mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
+        mkFilter(cn.ans.AnsEntry.COMPANION)(co => co.payload.dso == dso) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
-            cnsEntryName = Some(contract.payload.name),
-            cnsEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
+            ansEntryName = Some(contract.payload.name),
+            ansEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
           )
         },
         mkFilter(cc.globaldomain.MemberTraffic.COMPANION)(vt =>

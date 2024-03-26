@@ -1,4 +1,4 @@
-const cluster = "${CN_APP_CNS_UI_CLUSTER}";
+const cluster = "${CN_APP_ANS_UI_CLUSTER}";
 window.canton_network_config = {
   services: {
     scan: {
