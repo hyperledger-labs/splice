@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, ContractWithState, PollingStrategy } from 'common-frontend-utils';
 
-import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules/';
+import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules/';
 
 import { useScanClient } from './ScanClientContext';
 

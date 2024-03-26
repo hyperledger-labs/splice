@@ -108,12 +108,12 @@ object PackageIdResolver {
             }
           case Some(pkg) =>
             pkg match {
-              case Package.CantonAmulet => DarResources.cantonAmulet
-              case Package.CantonNameService => DarResources.cantonNameService
-              case Package.DsoGovernance => DarResources.dsoGovernance
-              case Package.ValidatorLifecycle => DarResources.validatorLifecycle
-              case Package.Wallet => DarResources.wallet
-              case Package.WalletPayments => DarResources.walletPayments
+              case Package.SpliceAmulet => DarResources.cantonAmulet
+              case Package.SpliceAmuletNameService => DarResources.cantonNameService
+              case Package.SpliceDsoGovernance => DarResources.dsoGovernance
+              case Package.SpliceValidatorLifecycle => DarResources.validatorLifecycle
+              case Package.SpliceWallet => DarResources.wallet
+              case Package.SpliceWalletPayments => DarResources.walletPayments
             }
         }
     }
@@ -180,35 +180,35 @@ object PackageIdResolver {
   ): PackageVersion = {
     import Package.*
     val version = pkg match {
-      case CantonAmulet => packageConfig.cantonAmulet
-      case CantonNameService => packageConfig.cantonNameService
-      case DsoGovernance => packageConfig.dsoGovernance
-      case ValidatorLifecycle => packageConfig.validatorLifecycle
-      case Wallet => packageConfig.wallet
-      case WalletPayments => packageConfig.walletPayments
+      case SpliceAmulet => packageConfig.cantonAmulet
+      case SpliceAmuletNameService => packageConfig.cantonNameService
+      case SpliceDsoGovernance => packageConfig.dsoGovernance
+      case SpliceValidatorLifecycle => packageConfig.validatorLifecycle
+      case SpliceWallet => packageConfig.wallet
+      case SpliceWalletPayments => packageConfig.walletPayments
     }
     PackageVersion.assertFromString(version)
   }
 
   // Map from module name to package containing that module
   private val modulePackages: Map[String, Package] = Map(
-    "Splice.Amulet" -> Package.CantonAmulet,
-    "Splice.AmuletRules" -> Package.CantonAmulet,
-    "Splice.AmuletImport" -> Package.CantonAmulet,
-    "Splice.GlobalDomain" -> Package.CantonAmulet,
-    "Splice.ValidatorLicense" -> Package.CantonAmulet,
-    "Splice.Round" -> Package.CantonAmulet,
-    "Splice.Ans" -> Package.CantonNameService,
-    "Splice.DsoBootstrap" -> Package.DsoGovernance,
-    "Splice.DsoRules" -> Package.DsoGovernance,
-    "Splice.DSO.AmuletPrice" -> Package.DsoGovernance,
-    "Splice.SvOnboarding" -> Package.DsoGovernance,
-    "Splice.ValidatorOnboarding" -> Package.ValidatorLifecycle,
-    "Splice.Wallet.Install" -> Package.Wallet,
-    "Splice.Wallet.TopUpState" -> Package.Wallet,
-    "Splice.Wallet.TransferOffer" -> Package.Wallet,
-    "Splice.Wallet.Payment" -> Package.WalletPayments,
-    "Splice.Wallet.Subscriptions" -> Package.WalletPayments,
+    "Splice.Amulet" -> Package.SpliceAmulet,
+    "Splice.AmuletRules" -> Package.SpliceAmulet,
+    "Splice.AmuletImport" -> Package.SpliceAmulet,
+    "Splice.GlobalDomain" -> Package.SpliceAmulet,
+    "Splice.ValidatorLicense" -> Package.SpliceAmulet,
+    "Splice.Round" -> Package.SpliceAmulet,
+    "Splice.Ans" -> Package.SpliceAmuletNameService,
+    "Splice.DsoBootstrap" -> Package.SpliceDsoGovernance,
+    "Splice.DsoRules" -> Package.SpliceDsoGovernance,
+    "Splice.DSO.AmuletPrice" -> Package.SpliceDsoGovernance,
+    "Splice.SvOnboarding" -> Package.SpliceDsoGovernance,
+    "Splice.ValidatorOnboarding" -> Package.SpliceValidatorLifecycle,
+    "Splice.Wallet.Install" -> Package.SpliceWallet,
+    "Splice.Wallet.TopUpState" -> Package.SpliceWallet,
+    "Splice.Wallet.TransferOffer" -> Package.SpliceWallet,
+    "Splice.Wallet.Payment" -> Package.SpliceWalletPayments,
+    "Splice.Wallet.Subscriptions" -> Package.SpliceWalletPayments,
   )
 
   sealed abstract class Package extends Product with Serializable {
@@ -223,11 +223,11 @@ object PackageIdResolver {
   }
 
   object Package {
-    final case object CantonAmulet extends Package
-    final case object CantonNameService extends Package
-    final case object DsoGovernance extends Package
-    final case object ValidatorLifecycle extends Package
-    final case object Wallet extends Package
-    final case object WalletPayments extends Package
+    final case object SpliceAmulet extends Package
+    final case object SpliceAmuletNameService extends Package
+    final case object SpliceDsoGovernance extends Package
+    final case object SpliceValidatorLifecycle extends Package
+    final case object SpliceWallet extends Package
+    final case object SpliceWalletPayments extends Package
   }
 }

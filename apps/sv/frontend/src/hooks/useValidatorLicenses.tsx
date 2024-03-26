@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { ValidatorLicense } from '@daml.js/canton-amulet/lib/Splice/ValidatorLicense/module';
+import { ValidatorLicense } from '@daml.js/splice-amulet/lib/Splice/ValidatorLicense/module';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';
 

@@ -1,8 +1,8 @@
 import * as jtv from '@mojotech/json-type-validation';
 import { GetDsoInfoResponse } from 'sv-openapi';
 
-import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules';
-import { DsoRules } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
+import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
+import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 // Static constants for mock values
 

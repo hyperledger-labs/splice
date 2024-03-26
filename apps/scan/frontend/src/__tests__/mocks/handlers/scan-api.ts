@@ -10,7 +10,7 @@ import {
   LookupEntryByPartyResponse,
 } from 'scan-openapi';
 
-import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules/module';
+import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules/module';
 import damlTypes from '@daml/types';
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [

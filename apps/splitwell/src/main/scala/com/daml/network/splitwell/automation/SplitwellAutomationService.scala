@@ -149,7 +149,7 @@ object SplitwellAutomationService extends AutomationServiceCompanion {
     Option.when(template.moduleName == "Splice.Splitwell") {
       val walletVersion = PackageIdResolver.readPackageVersion(
         packageConfig,
-        PackageIdResolver.Package.WalletPayments,
+        PackageIdResolver.Package.SpliceWalletPayments,
       )
       walletPaymentsToSplitwell
         .get(walletVersion)

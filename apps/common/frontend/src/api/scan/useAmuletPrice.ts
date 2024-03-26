@@ -3,7 +3,7 @@ import BigNumber from 'bignumber.js';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 import { GetOpenAndIssuingMiningRoundsRequest } from 'scan-openapi';
 
-import { OpenMiningRound } from '@daml.js/canton-amulet/lib/Splice/Round';
+import { OpenMiningRound } from '@daml.js/splice-amulet/lib/Splice/Round';
 
 import { useScanClient } from './ScanClientContext';
 

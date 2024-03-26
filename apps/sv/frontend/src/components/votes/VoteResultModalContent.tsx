@@ -2,7 +2,7 @@ import React from 'react';
 
 import { CardContent, Stack, Typography } from '@mui/material';
 
-import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 import ActionView from './actions/views/ActionView';
 

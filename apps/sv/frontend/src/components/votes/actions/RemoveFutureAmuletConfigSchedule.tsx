@@ -5,7 +5,7 @@ import React from 'react';
 
 import { Stack, Typography } from '@mui/material';
 
-import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
+import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 import { useDsoInfos } from '../../../contexts/SvContext';
 import { DropdownSchedules } from '../../../utils/DropdownSchedules';

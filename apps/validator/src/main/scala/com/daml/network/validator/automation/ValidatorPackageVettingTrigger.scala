@@ -24,10 +24,10 @@ class ValidatorPackageVettingTrigger(
 
 object ValidatorPackageVettingTrigger {
   val packages = Set(
-    PackageIdResolver.Package.CantonAmulet,
-    PackageIdResolver.Package.CantonNameService,
-    PackageIdResolver.Package.ValidatorLifecycle,
-    PackageIdResolver.Package.Wallet,
-    PackageIdResolver.Package.WalletPayments,
+    PackageIdResolver.Package.SpliceAmulet,
+    PackageIdResolver.Package.SpliceAmuletNameService,
+    PackageIdResolver.Package.SpliceValidatorLifecycle,
+    PackageIdResolver.Package.SpliceWallet,
+    PackageIdResolver.Package.SpliceWalletPayments,
   )
 }

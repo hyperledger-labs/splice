@@ -26,12 +26,12 @@ import {
   Typography,
 } from '@mui/material';
 
+import { ReceiverCCAmount } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import {
   BalanceUpdate,
   Group as CodegenGroup,
   SplitwellRules,
 } from '@daml.js/splitwell/lib/Splice/Splitwell';
-import { ReceiverCCAmount } from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
 
 import {
   useAcceptedInvites,

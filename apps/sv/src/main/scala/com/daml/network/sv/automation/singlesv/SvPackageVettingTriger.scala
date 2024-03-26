@@ -24,7 +24,7 @@ class SvPackageVettingTrigger(
 
 object SvPackageVettingTrigger {
   val packages = Set(
-    PackageIdResolver.Package.DsoGovernance,
-    PackageIdResolver.Package.ValidatorLifecycle,
+    PackageIdResolver.Package.SpliceDsoGovernance,
+    PackageIdResolver.Package.SpliceValidatorLifecycle,
   )
 }

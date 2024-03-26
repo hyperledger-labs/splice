@@ -65,20 +65,20 @@ lazy val root = (project in file("."))
     `apps-wallet`,
     `apps-frontends`,
     `splice-util-daml`,
-    `canton-amulet-daml`,
-    `canton-amulet-test-daml`,
-    `canton-name-service-daml`,
-    `canton-name-service-test-daml`,
-    `wallet-payments-daml`,
-    `wallet-daml`,
-    `wallet-test-daml`,
+    `splice-amulet-daml`,
+    `splice-amulet-test-daml`,
+    `splice-amulet-name-service-daml`,
+    `splice-amulet-name-service-test-daml`,
+    `splice-wallet-payments-daml`,
+    `splice-wallet-daml`,
+    `splice-wallet-test-daml`,
     `splitwell-daml`,
     `splitwell-test-daml`,
-    `dso-governance-daml`,
-    `dso-governance-test-daml`,
-    `validator-lifecycle-daml`,
-    `validator-lifecycle-test-daml`,
-    `app-manager-daml`,
+    `splice-dso-governance-daml`,
+    `splice-dso-governance-test-daml`,
+    `splice-validator-lifecycle-daml`,
+    `splice-validator-lifecycle-test-daml`,
+    `splice-app-manager-daml`,
     `build-tools-dar-lock-checker`,
     `canton-community-base`,
     `canton-community-common`,
@@ -184,9 +184,9 @@ lazy val `splice-util-daml` =
       BuildCommon.damlSettings
     )
 
-lazy val `canton-amulet-daml` =
+lazy val `splice-amulet-daml` =
   project
-    .in(file("daml/canton-amulet"))
+    .in(file("daml/splice-amulet"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -195,49 +195,49 @@ lazy val `canton-amulet-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `canton-amulet-test-daml` =
+lazy val `splice-amulet-test-daml` =
   project
-    .in(file("daml/canton-amulet-test"))
+    .in(file("daml/splice-amulet-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`canton-amulet-daml` / Compile / damlBuild).value,
+        (`splice-amulet-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `dso-governance-daml` =
+lazy val `splice-dso-governance-daml` =
   project
-    .in(file("daml/dso-governance"))
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.damlSettings,
-      Compile / damlDependencies :=
-        (`splice-util-daml` / Compile / damlBuild).value ++
-          (`canton-amulet-daml` / Compile / damlBuild).value ++
-          (`canton-name-service-daml` / Compile / damlBuild).value ++
-          (`wallet-payments-daml` / Compile / damlBuild).value,
-    )
-    .dependsOn(`canton-bindings-java`)
-
-lazy val `dso-governance-test-daml` =
-  project
-    .in(file("daml/dso-governance-test"))
+    .in(file("daml/splice-dso-governance"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`splice-util-daml` / Compile / damlBuild).value ++
-          (`canton-amulet-test-daml` / Compile / damlBuild).value ++
-          (`canton-name-service-test-daml` / Compile / damlBuild).value ++
-          (`dso-governance-daml` / Compile / damlBuild).value ++
-          (`wallet-payments-daml` / Compile / damlBuild).value,
+          (`splice-amulet-daml` / Compile / damlBuild).value ++
+          (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
+          (`splice-wallet-payments-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `validator-lifecycle-daml` =
+lazy val `splice-dso-governance-test-daml` =
   project
-    .in(file("daml/validator-lifecycle"))
+    .in(file("daml/splice-dso-governance-test"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`splice-util-daml` / Compile / damlBuild).value ++
+          (`splice-amulet-test-daml` / Compile / damlBuild).value ++
+          (`splice-amulet-name-service-test-daml` / Compile / damlBuild).value ++
+          (`splice-dso-governance-daml` / Compile / damlBuild).value ++
+          (`splice-wallet-payments-daml` / Compile / damlBuild).value,
+    )
+    .dependsOn(`canton-bindings-java`)
+
+lazy val `splice-validator-lifecycle-daml` =
+  project
+    .in(file("daml/splice-validator-lifecycle"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -245,69 +245,69 @@ lazy val `validator-lifecycle-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `validator-lifecycle-test-daml` =
+lazy val `splice-validator-lifecycle-test-daml` =
   project
-    .in(file("daml/validator-lifecycle-test"))
+    .in(file("daml/splice-validator-lifecycle-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`splice-util-daml` / Compile / damlBuild).value ++ (`validator-lifecycle-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-util-daml` / Compile / damlBuild).value ++ (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
 // This defines the Daml model that we expose to app developers
 // to manage payments through the wallet.
-lazy val `wallet-payments-daml` =
+lazy val `splice-wallet-payments-daml` =
   project
-    .in(file("daml/wallet-payments"))
+    .in(file("daml/splice-wallet-payments"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`splice-util-daml` / Compile / damlBuild).value ++
-          (`canton-amulet-daml` / Compile / damlBuild).value,
+          (`splice-amulet-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
 // This defines the Daml model that we do not expose to app devs
 // but do use internally, e.g., for batching.
-lazy val `wallet-daml` =
+lazy val `splice-wallet-daml` =
   project
-    .in(file("daml/wallet"))
+    .in(file("daml/splice-wallet"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`canton-amulet-daml` / Compile / damlBuild).value ++ (`wallet-payments-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-amulet-daml` / Compile / damlBuild).value ++ (`splice-wallet-payments-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `wallet-test-daml` =
+lazy val `splice-wallet-test-daml` =
   project
-    .in(file("daml/wallet-test"))
+    .in(file("daml/splice-wallet-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`canton-amulet-test-daml` / Compile / damlBuild).value ++ (`wallet-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-amulet-test-daml` / Compile / damlBuild).value ++ (`splice-wallet-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `canton-name-service-daml` =
+lazy val `splice-amulet-name-service-daml` =
   project
-    .in(file("daml/canton-name-service"))
+    .in(file("daml/splice-amulet-name-service"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`wallet-payments-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-wallet-payments-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `canton-name-service-test-daml` =
+lazy val `splice-amulet-name-service-test-daml` =
   project
-    .in(file("daml/canton-name-service-test"))
+    .in(file("daml/splice-amulet-name-service-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`wallet-test-daml` / Compile / damlBuild).value ++ (`canton-amulet-test-daml` / Compile / damlBuild).value ++ (`canton-name-service-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-wallet-test-daml` / Compile / damlBuild).value ++ (`splice-amulet-test-daml` / Compile / damlBuild).value ++ (`splice-amulet-name-service-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -317,7 +317,7 @@ lazy val `splitwell-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`wallet-payments-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-wallet-payments-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -327,13 +327,13 @@ lazy val `splitwell-test-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`wallet-test-daml` / Compile / damlBuild).value ++ (`splitwell-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`splice-wallet-test-daml` / Compile / damlBuild).value ++ (`splitwell-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `app-manager-daml` =
+lazy val `splice-app-manager-daml` =
   project
-    .in(file("daml/app-manager"))
+    .in(file("daml/splice-app-manager"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings
@@ -349,15 +349,15 @@ lazy val `apps-common` =
       `canton-community-testing` % "test",
       `cn-wartremover-extension` % "compile->compile;test->test",
       // We include all DARs here to make sure they are available as resources.
-      `app-manager-daml`,
-      `app-manager-daml`,
-      `canton-amulet-daml`,
-      `canton-name-service-daml`,
+      `splice-app-manager-daml`,
+      `splice-app-manager-daml`,
+      `splice-amulet-daml`,
+      `splice-amulet-name-service-daml`,
       `splitwell-daml`,
-      `dso-governance-daml`,
-      `validator-lifecycle-daml`,
-      `wallet-daml`,
-      `wallet-payments-daml`,
+      `splice-dso-governance-daml`,
+      `splice-validator-lifecycle-daml`,
+      `splice-wallet-daml`,
+      `splice-wallet-payments-daml`,
     )
     .enablePlugins(BuildInfoPlugin)
     .settings(
@@ -433,9 +433,9 @@ lazy val `apps-validator` =
       `apps-common` % "compile->compile;test->test",
       `apps-common-sv`,
       `apps-scan` % "compile->compile;test->test",
-      `wallet-daml`,
+      `splice-wallet-daml`,
       `apps-wallet`,
-      `app-manager-daml`,
+      `splice-app-manager-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(pekko_http_cors, commons_compress, jaxb_abi),
@@ -481,8 +481,8 @@ lazy val `apps-sv` =
       `apps-common` % "compile->compile;test->test",
       `apps-scan`,
       `apps-common-sv`,
-      `validator-lifecycle-daml`,
-      `dso-governance-daml`,
+      `splice-validator-lifecycle-daml`,
+      `splice-dso-governance-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(
@@ -512,7 +512,7 @@ lazy val `apps-scan` =
     .in(file("apps/scan"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
-      `dso-governance-daml`,
+      `splice-dso-governance-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(pekko_http_cors, scalapb_runtime_grpc, scalapb_runtime),
@@ -557,13 +557,13 @@ lazy val `apps-common-frontend` = {
     .settings(
       // daml typescript code generation settings:
       damlTsCodegenSources :=
-        (`canton-amulet-daml` / Compile / damlBuild).value ++
-          (`wallet-daml` / Compile / damlBuild).value ++
-          (`wallet-payments-daml` / Compile / damlBuild).value ++
-          (`canton-name-service-daml` / Compile / damlBuild).value ++
-          (`dso-governance-daml` / Compile / damlBuild).value ++
+        (`splice-amulet-daml` / Compile / damlBuild).value ++
+          (`splice-wallet-daml` / Compile / damlBuild).value ++
+          (`splice-wallet-payments-daml` / Compile / damlBuild).value ++
+          (`splice-amulet-name-service-daml` / Compile / damlBuild).value ++
+          (`splice-dso-governance-daml` / Compile / damlBuild).value ++
           (`splitwell-daml` / Compile / damlBuild).value ++
-          (`validator-lifecycle-daml` / Compile / damlBuild).value,
+          (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,
@@ -798,8 +798,8 @@ lazy val `apps-wallet` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
-      `wallet-daml`,
-      `dso-governance-daml`,
+      `splice-wallet-daml`,
+      `splice-dso-governance-daml`,
     )
     .settings(
       BuildCommon.sharedAppSettings,
@@ -1078,15 +1078,15 @@ lazy val bundleTask = {
       )
     val dars =
       Seq(
-        (`canton-amulet-daml` / Compile / damlBuild).value,
-        (`wallet-daml` / Compile / damlBuild).value,
+        (`splice-amulet-daml` / Compile / damlBuild).value,
+        (`splice-wallet-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
-        (`dso-governance-daml` / Compile / damlBuild).value,
-        (`canton-name-service-daml` / Compile / damlBuild).value,
-        (`wallet-payments-daml` / Compile / damlBuild).value,
-        (`app-manager-daml` / Compile / damlBuild).value,
-        (`validator-lifecycle-daml` / Compile / damlBuild).value,
+        (`splice-dso-governance-daml` / Compile / damlBuild).value,
+        (`splice-amulet-name-service-daml` / Compile / damlBuild).value,
+        (`splice-wallet-payments-daml` / Compile / damlBuild).value,
+        (`splice-app-manager-daml` / Compile / damlBuild).value,
+        (`splice-validator-lifecycle-daml` / Compile / damlBuild).value,
         (`splice-util-daml` / Compile / damlBuild).value,
       )
     val args: Seq[String] =
@@ -1207,8 +1207,8 @@ lazy val `apps-app` =
   project
     .in(file("apps/app"))
     .dependsOn(
-      `wallet-payments-daml`,
-      `wallet-daml`,
+      `splice-wallet-payments-daml`,
+      `splice-wallet-daml`,
       `apps-splitwell`,
       `apps-validator`,
       `apps-sv` % "compile->compile;test->test",

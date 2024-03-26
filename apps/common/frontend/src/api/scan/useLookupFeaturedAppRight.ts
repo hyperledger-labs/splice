@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 import { LookupFeaturedAppRightResponse } from 'scan-openapi';
 
-import { FeaturedAppRight } from '@daml.js/canton-amulet/lib/Splice/Amulet/';
+import { FeaturedAppRight } from '@daml.js/splice-amulet/lib/Splice/Amulet/';
 
 import { useScanClient } from './ScanClientContext';
 

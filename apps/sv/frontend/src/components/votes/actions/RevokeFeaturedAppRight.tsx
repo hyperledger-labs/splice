@@ -3,8 +3,8 @@ import React, { useState } from 'react';
 
 import { FormControl, Stack, TextField, Typography } from '@mui/material';
 
-import { FeaturedAppRight } from '@daml.js/canton-amulet/lib/Splice/Amulet';
-import { ActionRequiringConfirmation } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
+import { FeaturedAppRight } from '@daml.js/splice-amulet/lib/Splice/Amulet';
+import { ActionRequiringConfirmation } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 import { ContractId } from '@daml/types';
 
 import { useDsoInfos } from '../../../contexts/SvContext';

@@ -22,7 +22,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { VoteRequest } from '@daml.js/dso-governance/lib/Splice/DsoRules';
+import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId, Party } from '@daml/types';
 
 import { useDsoInfos } from '../../contexts/SvContext';

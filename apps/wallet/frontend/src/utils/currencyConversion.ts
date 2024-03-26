@@ -1,6 +1,6 @@
 import BigNumber from 'bignumber.js';
 
-import { Currency } from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
+import { Currency } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 
 export interface ConvertedCurrency {
   amount: BigNumber;

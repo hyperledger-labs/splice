@@ -2,8 +2,8 @@ import { useState } from 'react';
 
 import { Button, ButtonProps, Typography } from '@mui/material';
 
-import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment/module';
-import { SubscriptionRequest } from '@daml.js/wallet-payments/lib/Splice/Wallet/Subscriptions/module';
+import { AppPaymentRequest } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment/module';
+import { SubscriptionRequest } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Subscriptions/module';
 import { ContractId } from '@daml/types';
 
 interface Props<T> extends ButtonProps {

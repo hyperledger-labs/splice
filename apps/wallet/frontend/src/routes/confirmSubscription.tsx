@@ -15,7 +15,7 @@ import { Box, Button, Container, Stack, Typography } from '@mui/material';
 import {
   SubscriptionRequest,
   SubscriptionRequest as damlSubscriptionRequest,
-} from '@daml.js/wallet-payments/lib/Splice/Wallet/Subscriptions';
+} from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Subscriptions';
 import { ContractId } from '@daml/types';
 
 import BftAnsEntry from '../components/BftAnsEntry';

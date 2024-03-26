@@ -17,8 +17,8 @@ import {
   Typography,
 } from '@mui/material';
 
-import { AmuletConfig } from '@daml.js/canton-amulet/lib/Splice/AmuletConfig/module';
-import { SteppedRate } from '@daml.js/canton-amulet/lib/Splice/Fees/module';
+import { AmuletConfig } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig/module';
+import { SteppedRate } from '@daml.js/splice-amulet/lib/Splice/Fees/module';
 
 const NetworkInfo: React.FC = () => {
   const getAmuletRulesQuery = useGetAmuletRules();

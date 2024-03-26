@@ -1,7 +1,7 @@
 import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { VoteRequest } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
+import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 import { ContractId } from '@daml/types';
 
 import { useSvAdminClient } from '../contexts/SvAdminServiceContext';

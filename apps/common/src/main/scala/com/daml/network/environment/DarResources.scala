@@ -8,22 +8,22 @@ import com.google.protobuf.ByteString
 import scala.util.Using
 
 object DarResources {
-  val cantonAmulet_0_1_0 = DarResource("canton-amulet-0.1.0.dar")
-  val cantonAmulet_current = DarResource("canton-amulet-current.dar")
+  val cantonAmulet_0_1_0 = DarResource("splice-amulet-0.1.0.dar")
+  val cantonAmulet_current = DarResource("splice-amulet-current.dar")
   val cantonAmulet = PackageResource(
     cantonAmulet_0_1_0,
     Seq(cantonAmulet_current),
   )
 
-  val dsoGovernance_0_1_0 = DarResource("dso-governance-0.1.0.dar")
-  val dsoGovernance_current = DarResource("dso-governance-current.dar")
+  val dsoGovernance_0_1_0 = DarResource("splice-dso-governance-0.1.0.dar")
+  val dsoGovernance_current = DarResource("splice-dso-governance-current.dar")
   val dsoGovernance = PackageResource(
     dsoGovernance_0_1_0,
     Seq(dsoGovernance_current),
   )
 
-  val cantonNameService_0_1_0 = DarResource("canton-name-service-0.1.0.dar")
-  val cantonNameService_current = DarResource("canton-name-service-current.dar")
+  val cantonNameService_0_1_0 = DarResource("splice-amulet-name-service-0.1.0.dar")
+  val cantonNameService_current = DarResource("splice-amulet-name-service-current.dar")
   val cantonNameService = PackageResource(
     cantonNameService_0_1_0,
     Seq(cantonNameService_current),
@@ -36,29 +36,29 @@ object DarResources {
     Seq(splitwell_current),
   )
 
-  val wallet_0_1_0 = DarResource("wallet-0.1.0.dar")
-  val wallet_current = DarResource("wallet-current.dar")
+  val wallet_0_1_0 = DarResource("splice-wallet-0.1.0.dar")
+  val wallet_current = DarResource("splice-wallet-current.dar")
   val wallet = PackageResource(
     wallet_0_1_0,
     Seq(wallet_current),
   )
 
-  val walletPayments_0_1_0 = DarResource("wallet-payments-0.1.0.dar")
-  val walletPayments_current = DarResource("wallet-payments-current.dar")
+  val walletPayments_0_1_0 = DarResource("splice-wallet-payments-0.1.0.dar")
+  val walletPayments_current = DarResource("splice-wallet-payments-current.dar")
   val walletPayments = PackageResource(
     walletPayments_0_1_0,
     Seq(walletPayments_current),
   )
 
-  val validatorLifecycle_0_1_0 = DarResource("validator-lifecycle-0.1.0.dar")
-  val validatorLifecycle_current = DarResource("validator-lifecycle-current.dar")
+  val validatorLifecycle_0_1_0 = DarResource("splice-validator-lifecycle-0.1.0.dar")
+  val validatorLifecycle_current = DarResource("splice-validator-lifecycle-current.dar")
   val validatorLifecycle = PackageResource(
     validatorLifecycle_0_1_0,
     Seq(validatorLifecycle_current),
   )
 
-  val appManager_0_1_0 = DarResource("app-manager-0.1.0.dar")
-  val appManager_current = DarResource("app-manager-current.dar")
+  val appManager_0_1_0 = DarResource("splice-app-manager-0.1.0.dar")
+  val appManager_current = DarResource("splice-app-manager-current.dar")
   val appManager = PackageResource(
     appManager_0_1_0,
     Seq(appManager_current),

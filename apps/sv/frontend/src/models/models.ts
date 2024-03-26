@@ -1,4 +1,4 @@
-import { VoteRequest } from '@daml.js/dso-governance/lib/Splice/DsoRules';
+import { VoteRequest } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules';
 import { ContractId, Numeric, Optional, Party } from '@daml/types';
 
 export interface AmuletPriceVote {

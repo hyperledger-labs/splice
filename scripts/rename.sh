@@ -552,9 +552,11 @@ function subcmd_cn_module_splice() {
 
 # TODO(#11111): complete this part of the script
 
-function rename_daml_package() {
+function rename_daml_package_raw() {
   local old=$1
   local new=$2
+  local resolverOld=$3
+  local resolverNew=$4
 
   assert_clean_working_dir
 
@@ -578,22 +580,40 @@ function rename_daml_package() {
     "'(?<![-])\b$old(?=-daml)///$new'" \
     "" \
     ""
+
+  rename "Package resolver code for $resolverOld" \
+    "'(?<=case )$resolverOld\b|(?<=Package[.])$resolverOld\b|\b$resolverOld(?= extends Package)///$resolverNew'" \
+    "" \
+    ""
+}
+
+function rename_daml_package() {
+  local old=$1
+  local new=$2
+  local resolverOld=$3
+  local resolverNew=$4
+
+  rename_daml_package_raw "$old" "$new" "$resolverOld" "$resolverNew"
+  rename_daml_package_raw "$old-test" "$new-test" "${resolverOld}Test" "${resolverNew}Test"
 }
 
 subcommand_whitelist[cn_util_package]='Rename: Daml package cn-util to splice-util'
 function subcmd_cn_util_package() {
-  rename_daml_package 'cn-util' 'splice-util'
+  rename_daml_package 'cn-util' 'splice-util' 'CnUtil' 'SpliceUtil'
 }
 
-subcommand_whitelist[wallet_package]='Rename: Daml package wallet to splice-wallet'
-function subcmd_wallet_package() {
-  rename_daml_package 'wallet' 'splice-wallet'
-  rename_daml_package 'wallet-test' 'splice-wallet-test'
-
-  # subcmd_internal_cleanup
-
-  # commit_occurrences "(?<![-])\bwallet\b(?![-])"
+subcommand_whitelist[all_packages]='Rename: all Daml packages (except splitwell) to their splice counter-part'
+function subcmd_all_packages() {
+  rename_daml_package 'cn-util' 'splice-util' 'CnUtil' 'SpliceUtil'
+  rename_daml_package 'wallet' 'splice-wallet' 'Wallet' 'SpliceWallet'
+  rename_daml_package 'wallet-payments' 'splice-wallet-payments' 'WalletPayments' 'SpliceWalletPayments'
+  rename_daml_package 'validator-lifecycle' 'splice-validator-lifecycle' 'ValidatorLifecycle' 'SpliceValidatorLifecycle'
+  rename_daml_package 'dso-governance' 'splice-dso-governance' 'DsoGovernance' 'SpliceDsoGovernance'
+  rename_daml_package 'canton-amulet' 'splice-amulet' 'CantonAmulet' 'SpliceAmulet'
+  rename_daml_package 'app-manager' 'splice-app-manager' 'AppManager' 'SpliceAppManager'
+  rename_daml_package 'canton-name-service' 'splice-amulet-name-service' 'CantonNameService' 'SpliceAmuletNameService'
 }
+
 
 ################################
 ### Main

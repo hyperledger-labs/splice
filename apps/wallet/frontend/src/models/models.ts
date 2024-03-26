@@ -7,11 +7,11 @@ import {
   SubscriptionIdleState,
   SubscriptionPayment,
   SubscriptionRequest,
-} from '@daml.js/wallet-payments/lib/Splice/Wallet/Subscriptions';
+} from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Subscriptions';
 import {
   AcceptedTransferOffer,
   TransferOffer,
-} from '@daml.js/wallet/lib/Splice/Wallet/TransferOffer/module';
+} from '@daml.js/splice-wallet/lib/Splice/Wallet/TransferOffer/module';
 import { Party, ContractId } from '@daml/types';
 
 import { ConvertedCurrency } from '../utils/currencyConversion';

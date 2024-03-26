@@ -16,8 +16,8 @@ import { CometBftNodeDumpOrErrorResponse, NodeStatus } from 'sv-openapi';
 import { Box, Tab, Table, TableBody, TableRow, Tabs, Typography } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 
-import { AmuletRules } from '@daml.js/canton-amulet/lib/Splice/AmuletRules';
-import { DsoRules } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
+import { AmuletRules } from '@daml.js/splice-amulet/lib/Splice/AmuletRules';
+import { DsoRules } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 import { useDsoInfos } from '../contexts/SvContext';
 import { useCometBftDebug } from '../hooks/useCometBftDebug';

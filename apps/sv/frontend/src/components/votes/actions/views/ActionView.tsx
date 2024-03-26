@@ -11,11 +11,11 @@ import {
   Typography,
 } from '@mui/material';
 
-import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/Splice/AmuletConfig';
+import { AmuletConfig, USD } from '@daml.js/splice-amulet/lib/Splice/AmuletConfig';
 import {
   ActionRequiringConfirmation,
   DsoRulesConfig,
-} from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
+} from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 import { useDsoInfos } from '../../../../contexts/SvContext';
 

@@ -8,16 +8,16 @@ import { AssignedContract, Contract } from 'common-frontend-utils';
 import React, { useContext } from 'react';
 
 import {
+  AppPaymentRequest,
+  ReceiverCCAmount,
+} from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
+import {
   AcceptedGroupInvite,
   Group,
   GroupId,
   GroupInvite,
   SplitwellRules,
 } from '@daml.js/splitwell/lib/Splice/Splitwell';
-import {
-  AppPaymentRequest,
-  ReceiverCCAmount,
-} from '@daml.js/wallet-payments/lib/Splice/Wallet/Payment';
 import Ledger, { LedgerOptions } from '@daml/ledger';
 import { ContractId } from '@daml/types';
 

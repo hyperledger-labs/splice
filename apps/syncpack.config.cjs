@@ -11,10 +11,10 @@ module.exports = {
       label: "Daml codegen",
       packages: ["**"],
       dependencies: [
-        "@daml.js/canton-amulet",
+        "@daml.js/splice-amulet",
         "@daml.js/ans",
-        "@daml.js/wallet",
-        "@daml.js/wallet-payments",
+        "@daml.js/splice-wallet",
+        "@daml.js/splice-wallet-payments",
       ],
       isIgnored: true,
     },

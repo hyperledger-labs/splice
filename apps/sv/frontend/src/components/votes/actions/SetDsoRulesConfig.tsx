@@ -5,7 +5,7 @@ import React, { useState, useEffect } from 'react';
 
 import { Checkbox, FormControl, FormControlLabel, Stack, Typography } from '@mui/material';
 
-import { DsoRulesConfig } from '@daml.js/dso-governance/lib/Splice/DsoRules/module';
+import { DsoRulesConfig } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 import { useDsoInfos } from '../../../contexts/SvContext';
 import { ActionFromForm } from '../VoteRequest';
