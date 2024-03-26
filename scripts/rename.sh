@@ -15,7 +15,6 @@ cd "$REPO_ROOT"
 ### Env var flag defaulting
 
 SKIP_CN_CLEAN=${SKIP_CN_CLEAN:-0}
-SKIP_USAGE_CHECKS=${SKIP_USAGE_CHECKS:-0}
 
 
 ### Utility functions ###
@@ -254,10 +253,6 @@ subcommand_whitelist[internal_svc_dso_rename]='Internal - rename: svc to dso'
 function subcmd_internal_svc_dso_rename() {
   assert_clean_working_dir
 
-  if [[ $SKIP_USAGE_CHECKS != 1 ]]; then
-    assert_no_usage 'dso|Dso|DSO'
-  fi
-
   assert_no_canton_usage 'svc|Svc|SVC'
 
   local k8s_files=(
@@ -304,7 +299,7 @@ function subcmd_internal_svc_dso_occs() {
 }
 
 
-subcommand_whitelist[svc_dso]='Rename: svc to dso (run with SKIP_USAGE_CHECKS=1 to fixup merge conflicts)'
+subcommand_whitelist[svc_dso]='Rename: svc to dso (run this after a merge where you resolve conflicts to your version)'
 
 function subcmd_svc_dso() {
   subcmd_internal_svc_dso_rename
@@ -315,16 +310,10 @@ function subcmd_svc_dso() {
 
 ### Coin
 
-# TODO(#11111): complete this part of the script
-
 subcommand_whitelist[internal_coin_amulet_rename]='Internal - Rename: coin to amulet'
 
 function subcmd_internal_coin_amulet_rename() {
   assert_clean_working_dir
-
-  if [[ $SKIP_USAGE_CHECKS != 1 ]]; then
-    assert_no_usage 'amulet|Amulet'
-  fi
 
   assert_no_canton_usage 'amulet|Amulet'
   assert_no_canton_usage '\bcoin\b|\bCoin\b'
@@ -337,15 +326,18 @@ function subcmd_internal_coin_amulet_rename() {
     "'\bcoints\b///amulets'" \
     ""
 
+  # We do not change the rst files on our docs, as they do not contain URLs that need changing (manully verified)
+  local IGNORE_DOCS_RST="-e '**docs/**/*.rst'"
+
   # Note: not using word-boundary check for specific enough suffixes
   # We keep '[Cc]anton coin' mentions as they are mostly in user facing docs, which we need to adjust
   # manually once the time is ripe.
   rename "coin to amulet" \
     "'(?<!([Cc]anton ))(\b|(?<=[_-]))coin(\b|(?=([A-Z0-9_-]|rules|operation|s\b|s[A-Z0-9_]|config\b|price\b)))///amulet'" \
-    ""
+    "$IGNORE_DOCS_RST"
   rename "createdcoin to createdamulet" \
     "'\bcreatedcoin\b///createdamulet'" \
-    ""
+    "$IGNORE_DOCS_RST"
 
   # We keep '[Cc]anton Coin' mentions as they are mostly in user facing docs, which we need to adjust
   # manually once the time is ripe.
@@ -369,7 +361,7 @@ function subcmd_internal_coin_amulet_occs() {
   commit_occurrences "COIN"
 }
 
-subcommand_whitelist[coin_amulet]='Rename: coin to amulet (run with SKIP_USAGE_CHECKS=1 to fixup merge conflicts)'
+subcommand_whitelist[coin_amulet]='Rename: coin to amulet (run this after a merge where you resolve conflicts to your version)'
 
 function subcmd_coin_amulet() {
   subcmd_internal_coin_amulet_rename
