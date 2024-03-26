@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.sv.automation.leaderbased.{ExpiredCoinTrigger, ExpiredLockedCoinTrigger}
+import com.daml.network.sv.automation.leaderbased.{ExpiredAmuletTrigger, ExpiredLockedAmuletTrigger}
 import com.daml.network.util.{SplitwellTestUtil, SvTestUtil, TriggerTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.{
   BalanceChangeTxLogEntry,
@@ -23,16 +23,16 @@ class WalletTxLogTimeBasedIntegrationTest
     with TriggerTestUtil
     with SvTestUtil {
 
-  private val coinPrice = BigDecimal(1.25).setScale(10)
+  private val amuletPrice = BigDecimal(1.25).setScale(10)
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
+      // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
-      .withoutAutomaticRewardsCollectionAndCoinMerging
-      // Set a non-unit coin price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
+      // Set a non-unit amulet price to better test CC-USD conversion.
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
   }
 
   "A wallet" should {
@@ -42,7 +42,7 @@ class WalletTxLogTimeBasedIntegrationTest
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
 
-      clue("Tap to get some coins") {
+      clue("Tap to get some amulets") {
         aliceWalletClient.tap(100.0)
         aliceValidatorWalletClient.tap(100.0)
       }
@@ -88,7 +88,7 @@ class WalletTxLogTimeBasedIntegrationTest
         bobWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: TransferTxLogEntry =>
-            // Alice's validator sending 10CC to Bob, using their validator&app rewards and their coin
+            // Alice's validator sending 10CC to Bob, using their validator&app rewards and their amulet
             val senderAmount =
               (BigDecimal(10) - appRewardAmount - validatorRewardAmount) max BigDecimal(0)
             logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.P2PPaymentCompleted.toProto
@@ -103,7 +103,7 @@ class WalletTxLogTimeBasedIntegrationTest
             logEntry.appRewardsUsed shouldBe appRewardAmount
             logEntry.validatorRewardsUsed shouldBe validatorRewardAmount
             logEntry.senderHoldingFees should be > BigDecimal(0)
-            logEntry.coinPrice shouldBe coinPrice
+            logEntry.amuletPrice shouldBe amuletPrice
           },
           { case logEntry: TransferTxLogEntry =>
             // Alice sending 40CC to Bob
@@ -115,7 +115,7 @@ class WalletTxLogTimeBasedIntegrationTest
               receiver.amount should beWithin(40 - smallAmount, 40)
             }
             logEntry.senderHoldingFees shouldBe BigDecimal(0)
-            logEntry.coinPrice shouldBe coinPrice
+            logEntry.amuletPrice shouldBe amuletPrice
           },
         ),
       )
@@ -134,19 +134,19 @@ class WalletTxLogTimeBasedIntegrationTest
         sv1ScanBackend.getOpenAndIssuingMiningRounds()._1.last.contract.payload.round.number
       }
 
-      val coinConfig = clue("Get coin config") {
-        sv1ScanBackend.getCoinConfigForRound(latestRound)
+      val amuletConfig = clue("Get amulet config") {
+        sv1ScanBackend.getAmuletConfigForRound(latestRound)
       }
 
       val transferAmount = BigDecimal("32.1234567891").setScale(10)
       val transferFee =
-        coinConfig.transferFee.steps
+        amuletConfig.transferFee.steps
           .findLast(_.amount <= transferAmount)
-          .fold(coinConfig.transferFee.initial)(_.rate) * transferAmount
+          .fold(amuletConfig.transferFee.initial)(_.rate) * transferAmount
       val receiverFeeRatio = BigDecimal("0.1234567891").setScale(10)
       val senderFeeRatio = (BigDecimal(1.0) - receiverFeeRatio).setScale(10)
 
-      clue("Tap to get some coins") {
+      clue("Tap to get some amulets") {
         aliceWalletClient.tap(10000)
       }
 
@@ -163,19 +163,19 @@ class WalletTxLogTimeBasedIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           aliceValidatorBackend.getValidatorPartyId(),
-          aliceWalletClient.list().coins.head,
+          aliceWalletClient.list().amulets.head,
           Seq(
-            transferOutputCoin(
+            transferOutputAmulet(
               charlieUserParty,
               receiverFeeRatio,
               transferAmount,
             ),
-            transferOutputCoin(
+            transferOutputAmulet(
               charlieUserParty,
               receiverFeeRatio,
               transferAmount,
             ),
-            transferOutputLockedCoin(
+            transferOutputLockedAmulet(
               charlieUserParty,
               Seq(charlieUserParty, aliceValidatorUserParty),
               receiverFeeRatio,
@@ -193,18 +193,18 @@ class WalletTxLogTimeBasedIntegrationTest
       val expectedAliceBalanceChange = BigDecimal(0)
         - 3 * transferAmount // each output is worth `transferAmount`
         - 3 * transferFee * senderFeeRatio // one transferFee for each output
-        - 3 * coinConfig.coinCreateFee * senderFeeRatio // one coinCreateFee for each output
-        - coinConfig.lockHolderFee * senderFeeRatio // one lockHolderFee for each lock holder that is not the receiver
-        - coinConfig.coinCreateFee // one coinCreateFee for the sender change coin
+        - 3 * amuletConfig.amuletCreateFee * senderFeeRatio // one amuletCreateFee for each output
+        - amuletConfig.lockHolderFee * senderFeeRatio // one lockHolderFee for each lock holder that is not the receiver
+        - amuletConfig.amuletCreateFee // one amuletCreateFee for the sender change amulet
 
       val expectedCharlieBalanceChange = BigDecimal(0)
-        + 2 * transferAmount // 2 coins created for Charlie (the locked coin does not change his balance)
+        + 2 * transferAmount // 2 amulets created for Charlie (the locked amulet does not change his balance)
         - 3 * transferFee * receiverFeeRatio // one transferFee for each output
-        - 3 * coinConfig.coinCreateFee * receiverFeeRatio // one coinCreateFee for each output
-        - coinConfig.lockHolderFee * receiverFeeRatio // one lockHolderFee for each lock holder that is not the receiver
+        - 3 * amuletConfig.amuletCreateFee * receiverFeeRatio // one amuletCreateFee for each output
+        - amuletConfig.lockHolderFee * receiverFeeRatio // one lockHolderFee for each lock holder that is not the receiver
 
       // This test advances 2 rounds between the tap and the transfer
-      val expectedHoldingFees = 2 * coinConfig.holdingFee
+      val expectedHoldingFees = 2 * amuletConfig.holdingFee
 
       // Note: there are 3 places where we multiply fixed digit numbers:
       // - In our daml code, computing actual balance changes
@@ -230,27 +230,28 @@ class WalletTxLogTimeBasedIntegrationTest
       )
     }
 
-    "handle expired coins in a transaction history" in { implicit env =>
+    "handle expired amulets in a transaction history" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
       actAndCheck(
-        "Tap to get a small coin",
+        "Tap to get a small amulet",
         aliceWalletClient.tap(0.000005),
       )(
-        "Wait for coin to appear",
-        _ => aliceWalletClient.list().coins should have size (1),
+        "Wait for amulet to appear",
+        _ => aliceWalletClient.list().amulets should have size (1),
       )
 
       setTriggersWithin(
         Seq.empty,
-        triggersToResumeAtStart = Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredCoinTrigger]),
+        triggersToResumeAtStart =
+          Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredAmuletTrigger]),
       ) {
         actAndCheck(
-          "Advance 4 ticks to expire the coin",
+          "Advance 4 ticks to expire the amulet",
           Range(0, 4).foreach(_ => advanceRoundsByOneTick),
         )(
-          "Wait for coin to disappear",
-          _ => aliceWalletClient.list().coins should have size (0),
+          "Wait for amulet to disappear",
+          _ => aliceWalletClient.list().amulets should have size (0),
         )
       }
 
@@ -258,7 +259,7 @@ class WalletTxLogTimeBasedIntegrationTest
         aliceWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: BalanceChangeTxLogEntry =>
-            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.CoinExpired.toProto
+            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.AmuletExpired.toProto
           },
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
@@ -268,45 +269,45 @@ class WalletTxLogTimeBasedIntegrationTest
 
     }
 
-    "handle expired locked coins in a transaction history" in { implicit env =>
+    "handle expired locked amulets in a transaction history" in { implicit env =>
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
 
       actAndCheck(
-        "Tap to get some coin",
+        "Tap to get some amulet",
         aliceWalletClient.tap(100),
       )(
-        "Wait for coin to appear",
-        _ => aliceWalletClient.list().coins should have size (1),
+        "Wait for amulet to appear",
+        _ => aliceWalletClient.list().amulets should have size (1),
       )
 
       actAndCheck(
-        "Lock a small coin",
-        lockCoins(
+        "Lock a small amulet",
+        lockAmulets(
           aliceValidatorBackend,
           aliceParty,
           aliceValidatorParty,
-          aliceWalletClient.list().coins,
+          aliceWalletClient.list().amulets,
           BigDecimal(0.000005),
           sv1ScanBackend,
           java.time.Duration.ofMinutes(5),
         ),
       )(
-        "Wait for locked coin to appear",
-        _ => aliceWalletClient.list().lockedCoins should have size (1),
+        "Wait for locked amulet to appear",
+        _ => aliceWalletClient.list().lockedAmulets should have size (1),
       )
 
       setTriggersWithin(
         Seq.empty,
         triggersToResumeAtStart =
-          Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredLockedCoinTrigger]),
+          Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredLockedAmuletTrigger]),
       ) {
         actAndCheck(
-          "Advance 4 ticks to expire the locked coin",
+          "Advance 4 ticks to expire the locked amulet",
           Range(0, 4).foreach(_ => advanceRoundsByOneTick),
         )(
-          "Wait for locked coin to disappear",
-          _ => aliceWalletClient.list().lockedCoins should have size (0),
+          "Wait for locked amulet to disappear",
+          _ => aliceWalletClient.list().lockedAmulets should have size (0),
         )
       }
 
@@ -314,10 +315,10 @@ class WalletTxLogTimeBasedIntegrationTest
         aliceWalletClient,
         Seq[CheckTxHistoryFn](
           { case logEntry: BalanceChangeTxLogEntry =>
-            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.LockedCoinExpired.toProto
+            logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.LockedAmuletExpired.toProto
           },
           { case logEntry: TransferTxLogEntry =>
-            // The `lockCoins` utility function directly exercises the `CoinRules_Transfer` choice.
+            // The `lockAmulets` utility function directly exercises the `AmuletRules_Transfer` choice.
             // This will appear as the catch-all "unknown transfer" in the history.
             logEntry.subtype.value shouldBe walletLogEntry.TransferTransactionSubtype.Transfer.toProto
           },

@@ -1,7 +1,7 @@
 import { UseQueryResult } from '@tanstack/react-query';
 import {
   ErrorDisplay,
-  getCoinConfigurationAsOfNow,
+  getAmuletConfigurationAsOfNow,
   Loading,
   PartyId,
   SvClientProvider,
@@ -16,7 +16,7 @@ import { CometBftNodeDumpOrErrorResponse, NodeStatus } from 'sv-openapi';
 import { Box, Tab, Table, TableBody, TableRow, Tabs, Typography } from '@mui/material';
 import TableCell from '@mui/material/TableCell';
 
-import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules';
+import { AmuletRules } from '@daml.js/canton-amulet/lib/CC/AmuletRules';
 import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 import { useSvcInfos } from '../contexts/SvContext';
@@ -231,10 +231,10 @@ const SvcViewPrettyJSON = () => {
 
   const cometBftDebugTab = getCometBftDebugData(cometBftNodeDebugQuery);
 
-  const updatedCoinRules: CoinRules = {
-    svc: svcInfoData?.coinRules.payload.svc!,
-    isDevNet: svcInfoData?.coinRules.payload.isDevNet!,
-    configSchedule: getCoinConfigurationAsOfNow(svcInfoData?.coinRules.payload.configSchedule!),
+  const updatedAmuletRules: AmuletRules = {
+    svc: svcInfoData?.amuletRules.payload.svc!,
+    isDevNet: svcInfoData?.amuletRules.payload.isDevNet!,
+    configSchedule: getAmuletConfigurationAsOfNow(svcInfoData?.amuletRules.payload.configSchedule!),
   };
 
   return (
@@ -260,9 +260,9 @@ const SvcViewPrettyJSON = () => {
       </TabPanel>
       <TabPanel value={value} index={2}>
         <JSONPretty
-          id="coin-rules-information"
+          id="amulet-rules-information"
           style={{ fontSize: '10pt' }}
-          data={CoinRules.encode(updatedCoinRules)}
+          data={AmuletRules.encode(updatedAmuletRules)}
         />
       </TabPanel>
       <TabPanel value={value} index={3}>

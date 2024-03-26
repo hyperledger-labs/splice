@@ -143,16 +143,16 @@ class DistributedDomainIntegrationTest
     // and observe each other’s transactions.
     val newPrice = BigDecimal(42)
     actAndCheck(
-      "SVs can change their coin price",
-      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(_.updateCoinPriceVote(newPrice)),
+      "SVs can change their amulet price",
+      Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).foreach(_.updateAmuletPriceVote(newPrice)),
     )(
-      "SVs observe each others coin price changes",
+      "SVs observe each others amulet price changes",
       (_: Unit) =>
         forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { sv =>
-          val votes = sv.listCoinPriceVotes()
+          val votes = sv.listAmuletPriceVotes()
           votes should have size 4
           forAll(votes) { vote =>
-            vote.payload.coinPrice.toScala.map(BigDecimal(_)) shouldBe Some(newPrice)
+            vote.payload.amuletPrice.toScala.map(BigDecimal(_)) shouldBe Some(newPrice)
           }
         },
     )

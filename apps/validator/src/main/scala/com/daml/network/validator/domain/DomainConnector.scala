@@ -112,7 +112,7 @@ class DomainConnector(
       traceContext: TraceContext
   ): Future[Seq[GrpcSequencerConnection]] = {
     for {
-      globalDomainId <- scanConnection.getCoinRulesDomain()(traceContext)
+      globalDomainId <- scanConnection.getAmuletRulesDomain()(traceContext)
       domainSequencers <- scanConnection.listSvcSequencers()
       maybeSequencers = domainSequencers.find(_.domainId == globalDomainId)
     } yield maybeSequencers.fold {

@@ -54,7 +54,7 @@ abstract class ValidatorAppReference(
     getValidatorUserInfo().primaryParty
 
   @Help.Summary("Onboard a new user")
-  @Help.Description("""Onboard individual canton-coin user for the given validator party.
+  @Help.Description("""Onboard individual canton-amulet user for the given validator party.
                       |Return the newly set up partyId.""".stripMargin)
   def onboardUser(user: String): PartyId = {
     consoleEnvironment.run {
@@ -66,7 +66,7 @@ abstract class ValidatorAppReference(
 
   @Help.Summary("Register a new user identified by token")
   @Help.Description(
-    """Register individual canton-coin user for the given validator party, as identified by token.
+    """Register individual canton-amulet user for the given validator party, as identified by token.
       |Return the newly set up partyId.""".stripMargin
   )
   def register(): PartyId = {

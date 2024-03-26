@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, TransferConfig, USD}
-import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
+import com.daml.network.codegen.java.cc.amuletconfig.{AmuletConfig, TransferConfig, USD}
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
-  ARC_CoinRules,
+  ARC_AmuletRules,
   ARC_SvcRules,
 }
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
+import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
   SRARC_AddMember,
   SRARC_OffboardMember,
@@ -179,17 +179,17 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )
   }
 
-  "SVs can update their CoinPriceVote contracts" in { implicit env =>
+  "SVs can update their AmuletPriceVote contracts" in { implicit env =>
     initSvc()
     val svParties =
       Seq(("sv1", sv1Backend), ("sv2", sv2Backend), ("sv3", sv3Backend), ("sv4", sv4Backend)).map {
         case (svName, sv) => svName -> sv.getSvcInfo().svParty
       }.toMap
 
-    clue("initially only sv1 and sv2 have set the CoinPriceVote") {
+    clue("initially only sv1 and sv2 have set the AmuletPriceVote") {
       // sv1 because it's the SVC founder and sv2 because we configured it to do so
       eventually() {
-        getCoinPriceVoteMap() shouldBe Map(
+        getAmuletPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
           svParties("sv2") -> Seq(Some(BigDecimal(0.005))),
           svParties("sv3") -> Seq(None),
@@ -199,15 +199,15 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     }
 
     actAndCheck(
-      "set CoinPriceVote of sv2, sv3 and sv4", {
-        sv2Backend.updateCoinPriceVote(BigDecimal(4.0))
-        sv3Backend.updateCoinPriceVote(BigDecimal(3.0))
-        sv4Backend.updateCoinPriceVote(BigDecimal(2.0))
+      "set AmuletPriceVote of sv2, sv3 and sv4", {
+        sv2Backend.updateAmuletPriceVote(BigDecimal(4.0))
+        sv3Backend.updateAmuletPriceVote(BigDecimal(3.0))
+        sv4Backend.updateAmuletPriceVote(BigDecimal(2.0))
       },
     )(
-      "CoinPriceVote contract for sv2, sv3 anc sv4 are updated",
+      "AmuletPriceVote contract for sv2, sv3 anc sv4 are updated",
       _ => {
-        getCoinPriceVoteMap() shouldBe Map(
+        getAmuletPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
           svParties("sv2") -> Seq(Some(BigDecimal(4.0))),
           svParties("sv3") -> Seq(Some(BigDecimal(3.0))),
@@ -217,13 +217,13 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )
 
     actAndCheck(
-      "update CoinPriceVote of sv1", {
-        sv1Backend.updateCoinPriceVote(BigDecimal(5.0))
+      "update AmuletPriceVote of sv1", {
+        sv1Backend.updateAmuletPriceVote(BigDecimal(5.0))
       },
     )(
-      "CoinPriceVote contract for sv1 are updated",
+      "AmuletPriceVote contract for sv1 are updated",
       _ => {
-        getCoinPriceVoteMap() shouldBe Map(
+        getAmuletPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(5.0))),
           svParties("sv2") -> Seq(Some(BigDecimal(4.0))),
           svParties("sv3") -> Seq(Some(BigDecimal(3.0))),
@@ -238,9 +238,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         startAllSync(svs*)
       },
     )(
-      "CoinPriceVote contracts didn't change",
+      "AmuletPriceVote contracts didn't change",
       _ => {
-        getCoinPriceVoteMap() shouldBe Map(
+        getAmuletPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(5.0))),
           svParties("sv2") -> Seq(Some(BigDecimal(4.0))),
           svParties("sv3") -> Seq(Some(BigDecimal(3.0))),
@@ -250,7 +250,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )
   }
 
-  "archive duplicated and non-member CoinPriceVote contracts" in { implicit env =>
+  "archive duplicated and non-member AmuletPriceVote contracts" in { implicit env =>
     initSvc()
     val svParties =
       Seq(("sv1", sv1Backend), ("sv2", sv2Backend), ("sv3", sv3Backend), ("sv4", sv4Backend)).map {
@@ -258,7 +258,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
       }.toMap
 
     eventually() {
-      getCoinPriceVoteMap() shouldBe Map(
+      getAmuletPriceVoteMap() shouldBe Map(
         svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
         svParties("sv2") -> Seq(Some(BigDecimal(0.005))),
         svParties("sv3") -> Seq(None),
@@ -267,7 +267,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     }
 
     actAndCheck(
-      "remove sv3 on svcRules contract to trigger `GarbageCollectCoinPriceVotesTrigger` to non member votes", {
+      "remove sv3 on svcRules contract to trigger `GarbageCollectAmuletPriceVotesTrigger` to non member votes", {
         val removeAction = new ARC_SvcRules(
           new SRARC_OffboardMember(
             new SvcRules_OffboardMember(
@@ -305,7 +305,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )(
       "vote of sv3 is remove",
       _ =>
-        getCoinPriceVoteMap() shouldBe Map(
+        getAmuletPriceVoteMap() shouldBe Map(
           svParties("sv1") -> Seq(Some(BigDecimal(0.005))),
           svParties("sv2") -> Seq(Some(BigDecimal(0.005))),
           svParties("sv3") -> Seq(None),
@@ -410,7 +410,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     )
   }
 
-  "At least 3 SVs can vote on changing the Coin Configuration" in { implicit env =>
+  "At least 3 SVs can vote on changing the Amulet Configuration" in { implicit env =>
     clue("Initialize SVC with 4 SVs") {
       initSvc()
       eventually() {
@@ -419,9 +419,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     }
 
     val (_, (voteRequestCid, initialFutureValuesSize)) = actAndCheck(
-      "SV1 create a vote request for a new Coin Configuration (changing the transfer config)", {
+      "SV1 create a vote request for a new Amulet Configuration (changing the transfer config)", {
 
-        val initialValue = sv1Backend.getSvcInfo().coinRules.payload.configSchedule.initialValue
+        val initialValue = sv1Backend.getSvcInfo().amuletRules.payload.configSchedule.initialValue
         val transferConfig = initialValue.transferConfig
         val newTransferConfig = new TransferConfig[USD](
           transferConfig.createFee,
@@ -435,9 +435,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         )
 
         val futureValue =
-          new com.daml.network.codegen.java.da.types.Tuple2[Instant, CoinConfig[USD]](
+          new com.daml.network.codegen.java.da.types.Tuple2[Instant, AmuletConfig[USD]](
             Instant.now().plusSeconds(3600),
-            new CoinConfig[USD](
+            new AmuletConfig[USD](
               newTransferConfig,
               initialValue.issuanceCurve,
               initialValue.globalDomain,
@@ -447,9 +447,9 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           )
 
         val action: ActionRequiringConfirmation =
-          new ARC_CoinRules(
-            new CRARC_AddFutureCoinConfigSchedule(
-              new CoinRules_AddFutureCoinConfigSchedule(futureValue)
+          new ARC_AmuletRules(
+            new CRARC_AddFutureAmuletConfigSchedule(
+              new AmuletRules_AddFutureAmuletConfigSchedule(futureValue)
             )
           )
 
@@ -467,7 +467,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         svs.foreach { sv => sv.listVoteRequests() should not be empty }
         val head = sv1Backend.listVoteRequests().headOption.value.contractId
         sv1Backend.lookupVoteRequest(head).payload.votes should have size 1
-        (head, sv1Backend.getSvcInfo().coinRules.payload.configSchedule.futureValues.size())
+        (head, sv1Backend.getSvcInfo().amuletRules.payload.configSchedule.futureValues.size())
       },
     )
 
@@ -476,11 +476,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         sv2Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
-      "The majority did not vote yet, thus the trigger should not change the coin config futureValues",
+      "The majority did not vote yet, thus the trigger should not change the amulet config futureValues",
       _ => {
         sv2Backend
           .getSvcInfo()
-          .coinRules
+          .amuletRules
           .payload
           .configSchedule
           .futureValues
@@ -493,11 +493,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         sv3Backend.castVote(voteRequestCid, false, "url", "description")
       },
     )(
-      "The majority has voted but without an acceptance majority, the trigger should not change the coin config futureValues",
+      "The majority has voted but without an acceptance majority, the trigger should not change the amulet config futureValues",
       _ => {
         sv3Backend
           .getSvcInfo()
-          .coinRules
+          .amuletRules
           .payload
           .configSchedule
           .futureValues
@@ -510,11 +510,11 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         sv4Backend.castVote(voteRequestCid, true, "url", "description")
       },
     )(
-      "The majority accepts, the trigger should change the coin config futureValues",
+      "The majority accepts, the trigger should change the amulet config futureValues",
       _ => {
         sv4Backend
           .getSvcInfo()
-          .coinRules
+          .amuletRules
           .payload
           .configSchedule
           .futureValues
@@ -588,16 +588,16 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     }
   }
 
-  private def getCoinPriceVoteMap()(implicit env: CNNodeTestConsoleEnvironment) =
+  private def getAmuletPriceVoteMap()(implicit env: CNNodeTestConsoleEnvironment) =
     sv1Backend
-      .listCoinPriceVotes()
+      .listAmuletPriceVotes()
       .groupBy(_.payload.sv)
       .flatMap { case (sv, contracts) =>
         Codec
           .decode(Codec.Party)(sv)
           .map(p =>
             p -> contracts.map(
-              _.payload.coinPrice.toScala.map(BigDecimal(_))
+              _.payload.amuletPrice.toScala.map(BigDecimal(_))
             )
           )
           .toOption

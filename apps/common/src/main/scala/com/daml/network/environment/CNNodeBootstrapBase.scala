@@ -52,7 +52,7 @@ trait CNNodeBootstrap[+Node <: CantonNode]
 
 }
 
-/** Bootstrapping class used to drive the initialization of a single Coin app instance
+/** Bootstrapping class used to drive the initialization of a single Amulet app instance
   *
   * Modelled after CantonNodeBootstrapBase
   *

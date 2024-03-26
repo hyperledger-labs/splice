@@ -132,7 +132,7 @@ test : Script ()
 test = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   runNextIssuance app
-  runCoinDepositBots app
+  runAmuletDepositBots app
 
   featureApp app provider1
 
@@ -193,8 +193,8 @@ testCase app Parties{..} = do
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
   request <- initiateTransfer alice provider (getGroupKey group) [ReceiverCCAmount bob.primaryParty 8.0]
-  coin <- tap app alice 63.0
-  receipt <- acceptPaymentRequest app alice (getValidator alice) None request coin
+  amulet <- tap app alice 63.0
+  receipt <- acceptPaymentRequest app alice (getValidator alice) None request amulet
 
   completeTransfer app provider receipt
 
@@ -209,8 +209,8 @@ testCase app Parties{..} = do
       ReceiverCCAmount alice.primaryParty 39.0,
       ReceiverCCAmount bob.primaryParty 11.0
     ]
-  coin <- tap app charlie 55.0
-  receipt <- acceptPaymentRequest app charlie (getValidator charlie) None request coin
+  amulet <- tap app charlie 55.0
+  receipt <- acceptPaymentRequest app charlie (getValidator charlie) None request amulet
   completeTransfer app provider receipt
 
   balance <- queryBalances alice (getGroupKey group)

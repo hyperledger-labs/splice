@@ -84,7 +84,7 @@ private[validator] object ValidatorUtil {
       knownParty: Option[PartyId],
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
-      getCoinRulesDomain: ScanConnection.GetCoinRulesDomain,
+      getAmuletRulesDomain: ScanConnection.GetAmuletRulesDomain,
       participantAdminConnection: ParticipantAdminConnection,
       retryProvider: RetryProvider,
       logger: TracedLogger,
@@ -111,7 +111,7 @@ private[validator] object ValidatorUtil {
         Seq(userPartyId),
         Seq.empty,
       )
-      domainId <- getCoinRulesDomain()(traceContext)
+      domainId <- getAmuletRulesDomain()(traceContext)
       _ <- installWalletForUser(
         endUserParty = userPartyId,
         endUserName = endUserName,

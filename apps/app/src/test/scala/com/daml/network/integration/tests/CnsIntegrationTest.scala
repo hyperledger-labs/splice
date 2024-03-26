@@ -272,7 +272,7 @@ class CnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
             .exerciseResult
             .requestCid
         }
-        clue("Alice obtains some coins and accepts the subscription") {
+        clue("Alice obtains some amulets and accepts the subscription") {
           aliceWalletClient.tap(5.0)
           aliceWalletClient.acceptSubscriptionRequest(subReqId)
         }

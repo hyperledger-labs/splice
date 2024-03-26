@@ -1,9 +1,9 @@
 import { VoteRequest } from '@daml.js/svc-governance/lib/CN/SvcRules';
 import { ContractId, Numeric, Optional, Party } from '@daml/types';
 
-export interface CoinPriceVote {
+export interface AmuletPriceVote {
   sv: Party;
-  coinPrice: Optional<Numeric>;
+  amuletPrice: Optional<Numeric>;
   lastUpdatedAt: Date;
 }
 

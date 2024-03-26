@@ -1,9 +1,9 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinrules.CoinRules_AddFutureCoinConfigSchedule
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_AddFutureCoinConfigSchedule
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.integration.tests.AppUpgradeIntegrationTest.*
 
@@ -81,7 +81,7 @@ class AppUpgradeIntegrationTest
 
           val bob = onboardWalletUser(bobWalletClient, bobValidatorBackend)
 
-          clue("Tapping some coin in the network before any upgrades") {
+          clue("Tapping some amulet in the network before any upgrades") {
             bobWalletClient.tap(10)
             bobValidatorWalletClient.tap(1_000_001)
             bobValidatorWalletClient.balance().unlockedQty should be > BigDecimal(1_000_000)
@@ -126,20 +126,20 @@ class AppUpgradeIntegrationTest
             startAllSync(sv1Backend, sv1ValidatorBackend, sv1ScanBackend)
           }
 
-          val coinRules = sv2ScanBackend.getCoinRules()
-          val coinConfig = coinRules.payload.configSchedule.initialValue
+          val amuletRules = sv2ScanBackend.getAmuletRules()
+          val amuletConfig = amuletRules.payload.configSchedule.initialValue
           // Ideally we'd like the config to take effect immediately. However, we
           // can only schedule configs in the future and this is enforced at the Daml level.
           // So we pick a date that is far enough in the future that we can complete the voting process
           // before it is reached but close enough that we don't need to wait for long.
           // 12 seconds seems to work well empirically.
           val scheduledTime = Instant.now().plus(12, ChronoUnit.SECONDS)
-          val newCoinConfig = new cc.coinconfig.CoinConfig(
-            coinConfig.transferConfig,
-            coinConfig.issuanceCurve,
-            coinConfig.globalDomain,
-            coinConfig.tickDuration,
-            new cc.coinconfig.PackageConfig(
+          val newAmuletConfig = new cc.amuletconfig.AmuletConfig(
+            amuletConfig.transferConfig,
+            amuletConfig.issuanceCurve,
+            amuletConfig.globalDomain,
+            amuletConfig.tickDuration,
+            new cc.amuletconfig.PackageConfig(
               "0.1.1",
               "0.1.1",
               "0.1.1",
@@ -148,19 +148,19 @@ class AppUpgradeIntegrationTest
               "0.1.1",
             ),
           )
-          val upgradeAction = new ARC_CoinRules(
-            new CRARC_AddFutureCoinConfigSchedule(
-              new CoinRules_AddFutureCoinConfigSchedule(
+          val upgradeAction = new ARC_AmuletRules(
+            new CRARC_AddFutureAmuletConfigSchedule(
+              new AmuletRules_AddFutureAmuletConfigSchedule(
                 new com.daml.network.codegen.java.da.types.Tuple2(
                   scheduledTime,
-                  newCoinConfig,
+                  newAmuletConfig,
                 )
               )
             )
           )
 
           actAndCheck(
-            "Voting on a CoinRules config change for upgraded packages", {
+            "Voting on a AmuletRules config change for upgraded packages", {
               val (_, voteRequest) = actAndCheck(
                 "Creating vote request",
                 eventuallySucceeds() {
@@ -188,13 +188,13 @@ class AppUpgradeIntegrationTest
               }
             },
           )(
-            "observing CoinRules with upgraded config",
+            "observing AmuletRules with upgraded config",
             _ => {
-              val newCoinRules = sv1Client.getSvcInfo().coinRules
+              val newAmuletRules = sv1Client.getSvcInfo().amuletRules
               val configs =
-                (newCoinRules.payload.configSchedule.initialValue :: newCoinRules.payload.configSchedule.futureValues.asScala.toList
+                (newAmuletRules.payload.configSchedule.initialValue :: newAmuletRules.payload.configSchedule.futureValues.asScala.toList
                   .map(_._2))
-              configs.map(_.packageConfig.cantonCoin) should contain("0.1.1")
+              configs.map(_.packageConfig.cantonAmulet) should contain("0.1.1")
             },
           )
 
@@ -208,21 +208,21 @@ class AppUpgradeIntegrationTest
             .unwrap
             .futureValue
 
-          // Vote on a dummy change on coin rules to ensure it is archived and recreated
+          // Vote on a dummy change on amulet rules to ensure it is archived and recreated
           // which indicates the new choice is being used.
-          val dummyUpgradeAction = new ARC_CoinRules(
-            new CRARC_AddFutureCoinConfigSchedule(
-              new CoinRules_AddFutureCoinConfigSchedule(
+          val dummyUpgradeAction = new ARC_AmuletRules(
+            new CRARC_AddFutureAmuletConfigSchedule(
+              new AmuletRules_AddFutureAmuletConfigSchedule(
                 new com.daml.network.codegen.java.da.types.Tuple2(
                   Instant.now().plus(1, ChronoUnit.HOURS),
-                  newCoinConfig,
+                  newAmuletConfig,
                 )
               )
             )
           )
 
           actAndCheck(
-            "Voting on a CoinRules config change for upgraded packages", {
+            "Voting on a AmuletRules config change for upgraded packages", {
               val (_, voteRequest) = actAndCheck(
                 "Creating vote request",
                 eventuallySucceeds() {
@@ -249,10 +249,10 @@ class AppUpgradeIntegrationTest
               }
             },
           )(
-            "observing CoinRules with new package id",
+            "observing AmuletRules with new package id",
             _ => {
-              val newCoinRules = sv1Backend.getSvcInfo().coinRules
-              newCoinRules.identifier.getPackageId shouldBe DarResources.cantonCoin_current.packageId
+              val newAmuletRules = sv1Backend.getSvcInfo().amuletRules
+              newAmuletRules.identifier.getPackageId shouldBe DarResources.cantonAmulet_current.packageId
             },
           )
 
@@ -262,13 +262,13 @@ class AppUpgradeIntegrationTest
               bobWalletClient.tap(20)
             },
           )(
-            "Old and new coin get merged together into a new coin",
+            "Old and new amulet get merged together into a new amulet",
             _ => {
-              val coin = bobWalletClient.list().coins.loneElement.contract
-              coin.identifier.getPackageId shouldBe DarResources.cantonCoin_current.packageId
-              BigDecimal(coin.payload.amount.initialAmount) should beWithin(
-                walletUsdToCoin(30 - smallAmount),
-                walletUsdToCoin(30),
+              val amulet = bobWalletClient.list().amulets.loneElement.contract
+              amulet.identifier.getPackageId shouldBe DarResources.cantonAmulet_current.packageId
+              BigDecimal(amulet.payload.amount.initialAmount) should beWithin(
+                walletUsdToAmulet(30 - smallAmount),
+                walletUsdToAmulet(30),
               )
             },
           )
@@ -276,7 +276,7 @@ class AppUpgradeIntegrationTest
           // Alice can join after the upgrade
           aliceValidatorBackend.startSync()
           val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-          // This is just to invalidate the coin rules cache on Alice’s side. In a real upgrade, the upgrade will be announced days or weeks in advance
+          // This is just to invalidate the amulet rules cache on Alice’s side. In a real upgrade, the upgrade will be announced days or weeks in advance
           // while cache expiration is a few minutes so this is a non-issue.
           clue("Alice taps after upgrade") {
             eventuallySucceeds() {
@@ -296,19 +296,19 @@ class AppUpgradeIntegrationTest
               // old tap
               forExactly(1, txs) { tx =>
                 val tf = tx.tap.value
-                tf.coinOwner shouldBe bob.toProtoPrimitive
-                BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(10)
+                tf.amuletOwner shouldBe bob.toProtoPrimitive
+                BigDecimal(tf.amuletAmount) shouldBe walletUsdToAmulet(10)
               }
               // new taps
               forExactly(1, txs) { tx =>
                 val tf = tx.tap.value
-                tf.coinOwner shouldBe bob.toProtoPrimitive
-                BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(20)
+                tf.amuletOwner shouldBe bob.toProtoPrimitive
+                BigDecimal(tf.amuletAmount) shouldBe walletUsdToAmulet(20)
               }
               forExactly(1, txs) { tx =>
                 val tf = tx.tap.value
-                tf.coinOwner shouldBe alice.toProtoPrimitive
-                BigDecimal(tf.coinAmount) shouldBe walletUsdToCoin(5)
+                tf.amuletOwner shouldBe alice.toProtoPrimitive
+                BigDecimal(tf.amuletAmount) shouldBe walletUsdToAmulet(5)
               }
               // new transfer
               forExactly(1, txs) { tx =>

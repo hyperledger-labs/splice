@@ -33,7 +33,7 @@ class SvSvAutomationService(
       clock,
       svStore,
       PackageIdResolver
-        .inferFromCoinRules(
+        .inferFromAmuletRules(
           clock,
           svcStore,
           loggerFactory,

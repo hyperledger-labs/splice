@@ -157,12 +157,12 @@ class ValidatorReonboardingIntegrationTest
       aliceValidatorLocalBackend.participantClient.id.code shouldBe ParticipantId.Code
       aliceValidatorLocalBackend.participantClient.id.uid.id.unwrap shouldBe "aliceValidatorLocalNew"
 
-      clue("alice coin balance is preserved") {
-        val expectedCoins: Range = 99 to 100
+      clue("alice amulet balance is preserved") {
+        val expectedAmulets: Range = 99 to 100
         checkWallet(
           aliceValidatorWalletParty,
           aliceValidatorLocalWalletClient,
-          Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+          Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
         )
       }
 
@@ -172,11 +172,11 @@ class ValidatorReonboardingIntegrationTest
       )(
         "balance updated",
         _ => {
-          val expectedCoins: Range = 149 to 150
+          val expectedAmulets: Range = 149 to 150
           checkWallet(
             aliceValidatorWalletParty,
             aliceValidatorLocalWalletClient,
-            Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+            Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
           )
         },
       )

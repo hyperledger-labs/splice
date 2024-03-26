@@ -3,7 +3,7 @@ package com.daml.network.scan.store
 import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
-import com.daml.network.codegen.java.cc.coin.{CoinCreateSummary, CoinExpireSummary}
+import com.daml.network.codegen.java.cc.amulet.{AmuletCreateSummary, AmuletExpireSummary}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.fees.ExpiringAmount
 import com.daml.network.history.*
@@ -43,7 +43,7 @@ class ScanTxLogParser(
           case Transfer(node) =>
             State.fromTransfer(tree, exercised, domainId, node)
           case Tap(node) =>
-            State.fromCoinCreateSummary(
+            State.fromAmuletCreateSummary(
               tree,
               exercised,
               domainId,
@@ -51,28 +51,28 @@ class ScanTxLogParser(
               TransactionType.Tap,
             )
           case Mint(node) =>
-            State.fromCoinCreateSummary(
+            State.fromAmuletCreateSummary(
               tree,
               exercised,
               domainId,
               node.result.value,
               TransactionType.Mint,
             )
-          case CoinRules_BuyMemberTraffic(node) =>
+          case AmuletRules_BuyMemberTraffic(node) =>
             State.fromBuyMemberTraffic(exercised, domainId, node)
-          case CoinExpire(node) =>
-            State.fromCoinExpireSummary(exercised, domainId, node.result.value)
-          case LockedCoinExpireCoin(node) =>
-            State.fromCoinExpireSummary(exercised, domainId, node.result.value)
-          case LockedCoinUnlock(_) =>
+          case AmuletExpire(node) =>
+            State.fromAmuletExpireSummary(exercised, domainId, node.result.value)
+          case LockedAmuletExpireAmulet(node) =>
+            State.fromAmuletExpireSummary(exercised, domainId, node.result.value)
+          case LockedAmuletUnlock(_) =>
             State.empty
           case CnsRules_CollectInitialEntryPayment(_) =>
             fromCnsEntryPaymentCollection(tree, exercised, domainId)
           case CnsRules_CollectEntryRenewalPayment(_) =>
             fromCnsEntryPaymentCollection(tree, exercised, domainId)
-          case CoinArchive(_) =>
+          case AmuletArchive(_) =>
             throw new RuntimeException(
-              s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getUpdateId}"
+              s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
             )
           case _ => parseTrees(tree, domainId, exercised.getChildEventIds.asScala.toList)
         }
@@ -83,13 +83,13 @@ class ScanTxLogParser(
             State.fromOpenMiningRoundCreate(root, domainId, round)
           case ClosedMiningRoundCreate(round) =>
             State.fromClosedMiningRoundCreate(tree, root, domainId, round)
-          case CoinCreate(_) =>
+          case AmuletCreate(_) =>
             throw new RuntimeException(
-              s"Unexpected coin create event for coin ${created.getContractId} in transaction ${tree.getUpdateId}"
+              s"Unexpected amulet create event for amulet ${created.getContractId} in transaction ${tree.getUpdateId}"
             )
-          case LockedCoinCreate(_) =>
+          case LockedAmuletCreate(_) =>
             throw new RuntimeException(
-              s"Unexpected locked coin create event for coin ${created.getContractId} in transaction ${tree.getUpdateId}"
+              s"Unexpected locked amulet create event for amulet ${created.getContractId} in transaction ${tree.getUpdateId}"
             )
           case _ => State.empty
         }
@@ -185,33 +185,33 @@ object ScanTxLogParser {
         a.appended(b)
     }
 
-    private def getCoinFromSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+    private def getAmuletFromSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTree,
-        ccsum: CoinCreateSummary[T],
+        ccsum: AmuletCreateSummary[T],
     ) = {
-      val coinCid = ccsum.coin.contractId
+      val amuletCid = ccsum.amulet.contractId
       tx.getEventsById.asScala
         .collectFirst {
-          case (_, c: CreatedEvent) if c.getContractId == coinCid => {
-            CoinCreate.unapply(c).map(_.payload)
+          case (_, c: CreatedEvent) if c.getContractId == amuletCid => {
+            AmuletCreate.unapply(c).map(_.payload)
           }
         }
         .flatten
         .getOrElse {
           throw new RuntimeException(
-            s"The coin contract $coinCid referenced by CoinCreateSummary was not found in transaction ${tx.getUpdateId}"
+            s"The amulet contract $amuletCid referenced by AmuletCreateSummary was not found in transaction ${tx.getUpdateId}"
           )
         }
     }
 
-    def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+    def fromAmuletCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTree,
         event: TreeEvent,
         domainId: DomainId,
-        ccsum: CoinCreateSummary[T],
+        ccsum: AmuletCreateSummary[T],
         activityType: TransactionType,
     ): State = {
-      val coin = getCoinFromSummary(tx, ccsum)
+      val amulet = getAmuletFromSummary(tx, ccsum)
       val activityEntry: TransactionTxLogEntry = activityType match {
         case TransactionType.Tap =>
           TapTxLogEntry(
@@ -219,9 +219,9 @@ object ScanTxLogParser {
             eventId = event.getEventId,
             domainId = domainId,
             date = Some(tx.getEffectiveAt),
-            coinOwner = PartyId.tryFromProtoPrimitive(coin.owner),
-            coinAmount = coin.amount.initialAmount,
-            coinPrice = ccsum.coinPrice,
+            amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
+            amuletAmount = amulet.amount.initialAmount,
+            amuletPrice = ccsum.amuletPrice,
             round = ccsum.round.number,
           )
         case TransactionType.Mint =>
@@ -230,9 +230,9 @@ object ScanTxLogParser {
             eventId = event.getEventId,
             domainId = domainId,
             date = Some(tx.getEffectiveAt),
-            coinOwner = PartyId.tryFromProtoPrimitive(coin.owner),
-            coinAmount = coin.amount.initialAmount,
-            coinPrice = ccsum.coinPrice,
+            amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
+            amuletAmount = amulet.amount.initialAmount,
+            amuletPrice = ccsum.amuletPrice,
             round = ccsum.round.number,
           )
         case TransactionType.SvRewardCollected =>
@@ -241,29 +241,29 @@ object ScanTxLogParser {
             eventId = event.getEventId,
             domainId = domainId,
             date = Some(tx.getEffectiveAt),
-            coinOwner = PartyId.tryFromProtoPrimitive(coin.owner),
-            coinAmount = coin.amount.initialAmount,
-            coinPrice = ccsum.coinPrice,
+            amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
+            amuletAmount = amulet.amount.initialAmount,
+            amuletPrice = ccsum.amuletPrice,
             round = ccsum.round.number,
           )
         case unexpected =>
           throw new Exception(
-            s"unexpected activityType: $unexpected in fromCoinCreateSummary"
+            s"unexpected activityType: $unexpected in fromAmuletCreateSummary"
           )
       }
 
       State(
-        ScanTxLogParser.entryFromCoin(
+        ScanTxLogParser.entryFromAmulet(
           event.getEventId(),
           domainId,
-          coin,
+          amulet,
         )
       ).append(activityEntry)
     }
 
     def rewardsEntriesFromTransferSummary(
         sender: PartyId,
-        summary: cc.coinrules.TransferSummary,
+        summary: cc.amuletrules.TransferSummary,
         event: TreeEvent,
         round: Long,
         domainId: DomainId,
@@ -381,9 +381,9 @@ object ScanTxLogParser {
               eventId = archiveSvRewardEventId,
               domainId = domainId,
               date = Some(tx.getEffectiveAt),
-              coinOwner = sender,
-              coinAmount = node.result.value.summary.inputSvRewardAmount,
-              coinPrice = node.result.value.summary.coinPrice,
+              amuletOwner = sender,
+              amuletAmount = node.result.value.summary.inputSvRewardAmount,
+              amuletPrice = node.result.value.summary.amuletPrice,
               round = round.number, // Of the collection, not the round the coupon is received.
             )
           )
@@ -399,7 +399,7 @@ object ScanTxLogParser {
         domainId: DomainId,
         node: ExerciseNode[Transfer.Arg, Transfer.Res],
     ): TransferTxLogEntry = {
-      val coinPrice = node.result.value.summary.coinPrice
+      val amuletPrice = node.result.value.summary.amuletPrice
       val sender = parseSenderAmount(node.argument.value, node.result.value)
       val receivers = parseReceiverAmounts(node.argument.value, node.result.value)
 
@@ -422,14 +422,14 @@ object ScanTxLogParser {
           .toSeq
           .sortBy(_.party),
         round = node.result.value.round.number,
-        coinPrice = coinPrice,
+        amuletPrice = amuletPrice,
       )
     }
 
-    def fromCoinExpireSummary(
+    def fromAmuletExpireSummary(
         event: TreeEvent,
         domainId: DomainId,
-        cxsum: CoinExpireSummary,
+        cxsum: AmuletExpireSummary,
     ): State = {
       State(
         BalanceChangeTxLogEntry(
@@ -451,7 +451,7 @@ object ScanTxLogParser {
     def fromBuyMemberTraffic(
         event: ExercisedEvent,
         domainId: DomainId,
-        node: ExerciseNode[CoinRules_BuyMemberTraffic.Arg, CoinRules_BuyMemberTraffic.Res],
+        node: ExerciseNode[AmuletRules_BuyMemberTraffic.Arg, AmuletRules_BuyMemberTraffic.Res],
     ): State = {
       val validatorParty = Codec
         .decode(Codec.Party)(node.argument.value.provider)
@@ -508,7 +508,7 @@ object ScanTxLogParser {
 
       State(buyExtraTrafficEntry)
         .appended(rewardEntries)
-        // append the balance change entry from burning the transferred coin
+        // append the balance change entry from burning the transferred amulet
         .appended(balanceChangeEntry)
     }
 
@@ -518,45 +518,45 @@ object ScanTxLogParser {
         domainId: DomainId,
         stateFromPaymentCollection: State,
     ): State = {
-      // second child event is burning of transferred coin by SVC
-      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
-      // Adjust tx log entries for SVC since the coin it receives is immediately burnt
-      val stateFromBurntCoin =
-        State.fromCoinArchiveEvent(tx, coinArchiveEvent, domainId, Some(event.getEventId()))
-      stateFromPaymentCollection.appended(stateFromBurntCoin)
+      // second child event is burning of transferred amulet by SVC
+      val amuletArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      // Adjust tx log entries for SVC since the amulet it receives is immediately burnt
+      val stateFromBurntAmulet =
+        State.fromAmuletArchiveEvent(tx, amuletArchiveEvent, domainId, Some(event.getEventId()))
+      stateFromPaymentCollection.appended(stateFromBurntAmulet)
     }
 
-    def fromCoinArchiveEvent(
+    def fromAmuletArchiveEvent(
         tx: TransactionTree,
         event: TreeEvent,
         domainId: DomainId,
         rootEventId: Option[String] = None,
     ): State = {
-      val burntCoin = tx.getEventsById.asScala
+      val burntAmulet = tx.getEventsById.asScala
         .collectFirst {
           case (_, c: CreatedEvent) if c.getContractId == event.getContractId =>
-            CoinCreate.unapply(c).map(_.payload)
+            AmuletCreate.unapply(c).map(_.payload)
         }
         .flatten
         .getOrElse(
           throw new RuntimeException(
-            s"The coin contract ${event.getContractId} " +
-              s"referenced by the coin archive event ${event.getEventId} " +
+            s"The amulet contract ${event.getContractId} " +
+              s"referenced by the amulet archive event ${event.getEventId} " +
               s"was not found in transaction ${tx.getUpdateId}"
           )
         )
       // negative value for both initial amount and holding fee so that the total balance can be calculated correctly
-      val amountAO0 = -amountAsOfRoundZero(burntCoin.amount)
-      val holdingFees = -burntCoin.amount.ratePerRound.rate
+      val amountAO0 = -amountAsOfRoundZero(burntAmulet.amount)
+      val holdingFees = -burntAmulet.amount.ratePerRound.rate
       State(
         BalanceChangeTxLogEntry(
           eventId = rootEventId.getOrElse(event.getEventId()),
           domainId = domainId,
-          round = burntCoin.amount.createdAt.number,
+          round = burntAmulet.amount.createdAt.number,
           changeToInitialAmountAsOfRoundZero = amountAO0,
           changeToHoldingFeesRate = holdingFees,
           partyBalanceChanges = Map(
-            PartyId.tryFromProtoPrimitive(burntCoin.owner) -> PartyBalanceChange(
+            PartyId.tryFromProtoPrimitive(burntAmulet.owner) -> PartyBalanceChange(
               amountAO0,
               holdingFees,
             )
@@ -571,21 +571,21 @@ object ScanTxLogParser {
         round: OpenMiningRoundCreate.ContractType,
     ): State = {
       val config = round.payload.transferConfigUsd
-      val coinPrice = round.payload.coinPrice
+      val amuletPrice = round.payload.amuletPrice
       val newEntry = OpenMiningRoundTxLogEntry(
         eventId = event.getEventId(),
         domainId = domainId,
         round = round.payload.round.number,
-        coinCreateFee = dollarsToCC(config.createFee.fee, coinPrice),
-        holdingFee = dollarsToCC(config.holdingFee.rate, coinPrice),
-        lockHolderFee = dollarsToCC(config.lockHolderFee.fee, coinPrice),
+        amuletCreateFee = dollarsToCC(config.createFee.fee, amuletPrice),
+        holdingFee = dollarsToCC(config.holdingFee.rate, amuletPrice),
+        lockHolderFee = dollarsToCC(config.lockHolderFee.fee, amuletPrice),
         transferFee = Some(
           SteppedRate(
             initialRate = config.transferFee.initialRate,
             steps = config.transferFee.steps.asScala.toSeq
               .map(step =>
                 SteppedRate.Step(
-                  from = dollarsToCC(step._1, coinPrice),
+                  from = dollarsToCC(step._1, amuletPrice),
                   rate = step._2,
                 )
               ),
@@ -613,12 +613,12 @@ object ScanTxLogParser {
     }
   }
 
-  private def entryFromCoin(
+  private def entryFromAmulet(
       eventId: String,
       domainId: DomainId,
-      coin: cc.coin.Coin,
+      amulet: cc.amulet.Amulet,
   ): TxLogEntry = {
-    val amount = coin.amount
+    val amount = amulet.amount
     val amountAO0 = amountAsOfRoundZero(amount)
     BalanceChangeTxLogEntry(
       eventId = eventId,
@@ -627,7 +627,7 @@ object ScanTxLogParser {
       changeToInitialAmountAsOfRoundZero = amountAO0,
       changeToHoldingFeesRate = amount.ratePerRound.rate,
       partyBalanceChanges = Map(
-        PartyId.tryFromProtoPrimitive(coin.owner) -> PartyBalanceChange(
+        PartyId.tryFromProtoPrimitive(amulet.owner) -> PartyBalanceChange(
           amountAO0,
           amount.ratePerRound.rate,
         )

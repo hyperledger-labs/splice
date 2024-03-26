@@ -3,7 +3,7 @@ package com.daml.network.console
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.validatoronboarding as vo
-import com.daml.network.codegen.java.cn.svc.coinprice as cp
+import com.daml.network.codegen.java.cn.svc.amuletprice as cp
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   VoteRequest,
@@ -319,18 +319,18 @@ class SvAppBackendReference(
     }
 
   @Help.Summary("Update CC price vote (via admin API)")
-  def updateCoinPriceVote(coinPrice: BigDecimal): Unit =
+  def updateAmuletPriceVote(amuletPrice: BigDecimal): Unit =
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.UpdateCoinPriceVote(coinPrice)
+        HttpSvAdminAppClient.UpdateAmuletPriceVote(amuletPrice)
       )
     }
 
   @Help.Summary("List CC price vote (via admin API)")
-  def listCoinPriceVotes(): Seq[Contract[cp.CoinPriceVote.ContractId, cp.CoinPriceVote]] = {
+  def listAmuletPriceVotes(): Seq[Contract[cp.AmuletPriceVote.ContractId, cp.AmuletPriceVote]] = {
     consoleEnvironment.run {
       httpCommand(
-        HttpSvAdminAppClient.ListCoinPriceVotes
+        HttpSvAdminAppClient.ListAmuletPriceVotes
       )
     }
   }

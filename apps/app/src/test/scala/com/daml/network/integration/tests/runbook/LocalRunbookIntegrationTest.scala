@@ -58,8 +58,8 @@ class LocalRunbookIntegrationTest
     // by the persistent Canton instance started by `./start-canton.sh`:
     // - The local SVC node uses ports 9xxx (hardcoded in config files)
     // - The self-hosted validator uses ports 7xxx (set via CLI arguments below)
-    // Note: the coin apps started implicitly through `environmentDefinition`, including all SVC-hosted coin apps,
-    // still use ports 5xxx. This is fine because we only start coin apps for the duration of tests, and we never
+    // Note: the amulet apps started implicitly through `environmentDefinition`, including all SVC-hosted amulet apps,
+    // still use ports 5xxx. This is fine because we only start amulet apps for the duration of tests, and we never
     // run tests in parallel on the same machine.
     val process = startCanton(
       Seq(

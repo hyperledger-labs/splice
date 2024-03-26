@@ -130,19 +130,19 @@ abstract class ValidatorPreflightIntegrationTestBase
 
     val alicePartyId = withFrontEnd("alice-validator") { implicit webDriver =>
       val alicePartyId = loginAndOnboardToWalletUi(aliceUser)
-      findAll(className("coins-table-row")) should have size 0
+      findAll(className("amulets-table-row")) should have size 0
       alicePartyId
     }
 
     val bobPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
       val bobPartyId = loginAndOnboardToWalletUi(bobUser)
-      findAll(className("coins-table-row")) should have size 0
+      findAll(className("amulets-table-row")) should have size 0
       bobPartyId
     }
 
     withFrontEnd("alice-validator") { implicit webDriver =>
       if (isDevNet) {
-        tapCoins(100)
+        tapAmulets(100)
 
         clue(s"Creating transfer offer for: $bobPartyId") {
           createTransferOffer(
@@ -186,7 +186,7 @@ abstract class ValidatorPreflightIntegrationTestBase
                 transaction.partyDescription.getOrElse(fail("There should be a party."))
               description should fullyMatch regex partyR
               transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
-              // we can't test a specific coin price as the coin price on a live network can change
+              // we can't test a specific amulet price as the amulet price on a live network can change
               val rateR = """^\s*(\d+(?:\.\d+)?)\s*CC/USD\s*$""".r
               inside(transaction.rate) { case rateR(rate) =>
                 BigDecimal(rate) should be > BigDecimal(0)
@@ -218,7 +218,7 @@ abstract class ValidatorPreflightIntegrationTestBase
       val bobUserPartyId = withFrontEnd("bob-validator") { implicit webDriver =>
         val bobUserPartyId = loginAndOnboardToWalletUi(bobUser)
         if (isDevNet) {
-          tapCoins(710)
+          tapAmulets(710)
         }
         bobUserPartyId
       }
@@ -309,7 +309,7 @@ abstract class ValidatorPreflightIntegrationTestBase
         val entryId = (new scala.util.Random).nextInt().toHexString
         val cnsName = s"alice_${entryId}.unverified.cns"
 
-        tapCoins(100)
+        tapAmulets(100)
         reserveCnsNameFor(
           () =>
             auth0Login(

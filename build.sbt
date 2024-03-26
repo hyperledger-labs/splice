@@ -65,8 +65,8 @@ lazy val root = (project in file("."))
     `apps-wallet`,
     `apps-frontends`,
     `cn-util-daml`,
-    `canton-coin-daml`,
-    `canton-coin-test-daml`,
+    `canton-amulet-daml`,
+    `canton-amulet-test-daml`,
     `canton-name-service-daml`,
     `canton-name-service-test-daml`,
     `wallet-payments-daml`,
@@ -184,9 +184,9 @@ lazy val `cn-util-daml` =
       BuildCommon.damlSettings
     )
 
-lazy val `canton-coin-daml` =
+lazy val `canton-amulet-daml` =
   project
-    .in(file("daml/canton-coin"))
+    .in(file("daml/canton-amulet"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -195,14 +195,14 @@ lazy val `canton-coin-daml` =
     )
     .dependsOn(`canton-bindings-java`)
 
-lazy val `canton-coin-test-daml` =
+lazy val `canton-amulet-test-daml` =
   project
-    .in(file("daml/canton-coin-test"))
+    .in(file("daml/canton-amulet-test"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
-        (`canton-coin-daml` / Compile / damlBuild).value,
+        (`canton-amulet-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -214,7 +214,7 @@ lazy val `svc-governance-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
-          (`canton-coin-daml` / Compile / damlBuild).value ++
+          (`canton-amulet-daml` / Compile / damlBuild).value ++
           (`canton-name-service-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value,
     )
@@ -228,7 +228,7 @@ lazy val `svc-governance-test-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
-          (`canton-coin-test-daml` / Compile / damlBuild).value ++
+          (`canton-amulet-test-daml` / Compile / damlBuild).value ++
           (`canton-name-service-test-daml` / Compile / damlBuild).value ++
           (`svc-governance-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value,
@@ -265,7 +265,7 @@ lazy val `wallet-payments-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
-          (`canton-coin-daml` / Compile / damlBuild).value,
+          (`canton-amulet-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -277,7 +277,7 @@ lazy val `wallet-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`canton-coin-daml` / Compile / damlBuild).value ++ (`wallet-payments-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`canton-amulet-daml` / Compile / damlBuild).value ++ (`wallet-payments-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -287,7 +287,7 @@ lazy val `wallet-test-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`canton-coin-test-daml` / Compile / damlBuild).value ++ (`wallet-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`canton-amulet-test-daml` / Compile / damlBuild).value ++ (`wallet-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -307,7 +307,7 @@ lazy val `canton-name-service-test-daml` =
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
-      Compile / damlDependencies := (`wallet-test-daml` / Compile / damlBuild).value ++ (`canton-coin-test-daml` / Compile / damlBuild).value ++ (`canton-name-service-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`wallet-test-daml` / Compile / damlBuild).value ++ (`canton-amulet-test-daml` / Compile / damlBuild).value ++ (`canton-name-service-daml` / Compile / damlBuild).value,
     )
     .dependsOn(`canton-bindings-java`)
 
@@ -351,7 +351,7 @@ lazy val `apps-common` =
       // We include all DARs here to make sure they are available as resources.
       `app-manager-daml`,
       `app-manager-daml`,
-      `canton-coin-daml`,
+      `canton-amulet-daml`,
       `canton-name-service-daml`,
       `splitwell-daml`,
       `svc-governance-daml`,
@@ -557,7 +557,7 @@ lazy val `apps-common-frontend` = {
     .settings(
       // daml typescript code generation settings:
       damlTsCodegenSources :=
-        (`canton-coin-daml` / Compile / damlBuild).value ++
+        (`canton-amulet-daml` / Compile / damlBuild).value ++
           (`wallet-daml` / Compile / damlBuild).value ++
           (`wallet-payments-daml` / Compile / damlBuild).value ++
           (`canton-name-service-daml` / Compile / damlBuild).value ++
@@ -1078,7 +1078,7 @@ lazy val bundleTask = {
       )
     val dars =
       Seq(
-        (`canton-coin-daml` / Compile / damlBuild).value,
+        (`canton-amulet-daml` / Compile / damlBuild).value,
         (`wallet-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
         (`splitwell-daml` / Compile / damlBuild).value,
@@ -1132,7 +1132,7 @@ syncpackCheck := {
   runCommand(Seq("syncpack", "list-mismatches"), log, None, Some(baseDirectory.value / "apps"))
 }
 
-lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `canton-coin`")
+lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `canton-amulet`")
 cleanCnDars := {
   val log = streams.value.log
   runCommand(Seq("find", "apps", "-name", "*.dar", "-delete"), log)

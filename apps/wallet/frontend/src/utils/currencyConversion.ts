@@ -5,33 +5,33 @@ import { Currency } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 export interface ConvertedCurrency {
   amount: BigNumber;
   currency: Currency;
-  coinPriceToShow: BigNumber;
+  amuletPriceToShow: BigNumber;
 }
 
 /**
  * Converts the `originalAmount` of `originalCurrency` to the amount in the other currency.
  *
  * E.g.:
- * originalAmount = 2, originalCurrency = CC, coinPrice = 2 (USD/CC)
+ * originalAmount = 2, originalCurrency = CC, amuletPrice = 2 (USD/CC)
  * would return:
- * amount = 4, currency = USD, coinPriceToShow = 0.5 (CC/USD)
+ * amount = 4, currency = USD, amuletPriceToShow = 0.5 (CC/USD)
  */
 export function convertCurrency(
   originalAmount: BigNumber,
   originalCurrency: Currency,
-  coinPrice: BigNumber
+  amuletPrice: BigNumber
 ): ConvertedCurrency {
   if (originalCurrency === 'CC') {
     return {
-      amount: originalAmount.times(coinPrice),
+      amount: originalAmount.times(amuletPrice),
       currency: 'USD',
-      coinPriceToShow: new BigNumber(1).div(coinPrice),
+      amuletPriceToShow: new BigNumber(1).div(amuletPrice),
     };
   } else {
     return {
-      amount: originalAmount.div(coinPrice),
+      amount: originalAmount.div(amuletPrice),
       currency: 'CC',
-      coinPriceToShow: coinPrice, // already in USD/CC
+      amuletPriceToShow: amuletPrice, // already in USD/CC
     };
   }
 }

@@ -33,7 +33,7 @@ import com.daml.network.sv.automation.singlesv.{
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   AssignedContract,
-  CoinConfigSchedule,
+  AmuletConfigSchedule,
   ConfigScheduleUtil,
   Contract,
   ContractWithState,
@@ -124,20 +124,20 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       .futureValue
       .discard
 
-    val (previousGlobalId, coinRulesCid) = clue("change coinconfig to migrate domains") {
-      inside(sv1ScanBackend.getCoinRules()) {
-        case ContractWithState(firstCoinRules, Assigned(global1)) =>
+    val (previousGlobalId, amuletRulesCid) = clue("change amuletconfig to migrate domains") {
+      inside(sv1ScanBackend.getAmuletRules()) {
+        case ContractWithState(firstAmuletRules, Assigned(global1)) =>
           val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-          val currentSchedule = firstCoinRules.payload.configSchedule
+          val currentSchedule = firstAmuletRules.payload.configSchedule
           val activeDomainId =
-            CoinConfigSchedule(currentSchedule).getConfigAsOf(now).globalDomain.activeDomain
+            AmuletConfigSchedule(currentSchedule).getConfigAsOf(now).globalDomain.activeDomain
 
           globalUpgradeId.toProtoPrimitive should not be activeDomainId
           global1.toProtoPrimitive shouldBe activeDomainId
 
           val upgradeAfterTick = new Tuple2(
             env.environment.clock.now.add(timeUntilNewRule.asJava).toInstant,
-            mkUpdatedCoinConfig(
+            mkUpdatedAmuletConfig(
               currentSchedule,
               defaultTickDuration,
               nextDomainId = Some(globalUpgradeId),
@@ -145,21 +145,22 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           )
 
           val setScheduleResult = cleanAndAddNewSchedule(
-            AssignedContract(firstCoinRules, global1),
+            AssignedContract(firstAmuletRules, global1),
             upgradeAfterTick,
           ) withClue "set config schedule with upgraded domain"
 
           eventually() {
-            inside(sv1ScanBackend.getCoinRules()) { case ContractWithState(secondCoinRules, _) =>
-              secondCoinRules.contractId should not be firstCoinRules.contractId
-              setScheduleResult shouldBe secondCoinRules.contractId
+            inside(sv1ScanBackend.getAmuletRules()) {
+              case ContractWithState(secondAmuletRules, _) =>
+                secondAmuletRules.contractId should not be firstAmuletRules.contractId
+                setScheduleResult shouldBe secondAmuletRules.contractId
             }
           }
           (global1, setScheduleResult)
       }
     }
 
-    clue("trigger CoinRules cache invalidation right after config change") {
+    clue("trigger AmuletRules cache invalidation right after config change") {
       eventually() {
         try sv1WalletClient.tap(1)
         catch {
@@ -290,7 +291,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       )
     }
 
-    clue("create SVC-signed coin contracts of various kinds") {
+    clue("create SVC-signed amulet contracts of various kinds") {
       val (oldestRound, newestRound) = {
         val rounds = sv1ScanBackend.getOpenAndIssuingMiningRounds()._1
         (rounds.headOption.value, rounds.lastOption.value)
@@ -324,11 +325,14 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       actAndCheck(
         "create sample FeaturedAppRight",
-        exerciseSvc(coinRulesCid.exerciseCoinRules_DevNet_FeatureApp(sv1Party.toProtoPrimitive)),
-      )("ensure FeaturedAppRight is there", _ => nonEmptyOnSv1(cc.coin.FeaturedAppRight.COMPANION))
+        exerciseSvc(amuletRulesCid.exerciseAmuletRules_DevNet_FeatureApp(sv1Party.toProtoPrimitive)),
+      )(
+        "ensure FeaturedAppRight is there",
+        _ => nonEmptyOnSv1(cc.amulet.FeaturedAppRight.COMPANION),
+      )
 
-      createSampleAndEnsurePresence(cc.coin.UnclaimedReward.COMPANION)(
-        new cc.coin.UnclaimedReward(svcParty.toProtoPrimitive, dummyDecimal)
+      createSampleAndEnsurePresence(cc.amulet.UnclaimedReward.COMPANION)(
+        new cc.amulet.UnclaimedReward(svcParty.toProtoPrimitive, dummyDecimal)
       )
     }
 
@@ -402,8 +406,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
 
       protectAppRewardCoupons.pause().futureValue
 
-      createSampleAndEnsurePresence(cc.coin.AppRewardCoupon.COMPANION)(
-        new cc.coin.AppRewardCoupon(
+      createSampleAndEnsurePresence(cc.amulet.AppRewardCoupon.COMPANION)(
+        new cc.amulet.AppRewardCoupon(
           svcParty.toProtoPrimitive,
           provider.toProtoPrimitive,
           false,
@@ -411,10 +415,10 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           dummyRound,
         )
       )
-      val lockedCoinCid = loggerFactory.assertLogs(
-        createSampleAndEnsurePresence(cc.coin.LockedCoin.COMPANION)(
-          new cc.coin.LockedCoin(
-            new cc.coin.Coin(
+      val lockedAmuletCid = loggerFactory.assertLogs(
+        createSampleAndEnsurePresence(cc.amulet.LockedAmulet.COMPANION)(
+          new cc.amulet.LockedAmulet(
+            new cc.amulet.Amulet(
               svcParty.toProtoPrimitive,
               provider.toProtoPrimitive,
               new cc.fees.ExpiringAmount(
@@ -430,12 +434,12 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           )
         ),
         _.errorMessage should include(
-          "Unexpected locked coin create event"
+          "Unexpected locked amulet create event"
         ),
       )
 
-      createSampleAndEnsurePresence(cc.coin.ValidatorRewardCoupon.COMPANION)(
-        new cc.coin.ValidatorRewardCoupon(
+      createSampleAndEnsurePresence(cc.amulet.ValidatorRewardCoupon.COMPANION)(
+        new cc.amulet.ValidatorRewardCoupon(
           svcParty.toProtoPrimitive,
           validator.toProtoPrimitive,
           dummyDecimal,
@@ -451,8 +455,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         )
       )
 
-      createSampleAndEnsurePresence(cc.coin.SvRewardCoupon.COMPANION)(
-        new cc.coin.SvRewardCoupon(
+      createSampleAndEnsurePresence(cc.amulet.SvRewardCoupon.COMPANION)(
+        new cc.amulet.SvRewardCoupon(
           svcParty.toProtoPrimitive,
           sv1Party.toProtoPrimitive,
           sv1Party.toProtoPrimitive,
@@ -479,7 +483,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           java.util.List.of,
           provider.toProtoPrimitive,
           svc,
-          lockedCoinCid,
+          lockedAmuletCid,
           dummyRound,
           appPaymentRequestCid,
         )
@@ -581,9 +585,9 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       }
     }
 
-    clue("see whether coinrules follows svcrules") {
+    clue("see whether amuletrules follows svcrules") {
       eventually() {
-        sv1ScanBackend.getCoinRules().state shouldBe Assigned(globalUpgradeId)
+        sv1ScanBackend.getAmuletRules().state shouldBe Assigned(globalUpgradeId)
       }
     }
 
@@ -632,15 +636,15 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       allContractsMigrated(templatesMovedBySvAutomation.map(c(_, sv1Party))*)
     }
 
-    // wait a tick for next, as below wait for CoinRules to move
+    // wait a tick for next, as below wait for AmuletRules to move
     advanceTime(tickDurationWithBuffer)
 
     clue(
-      "see whether coin contracts signed only by SVC (in particular mining rounds) follow svcrules"
+      "see whether amulet contracts signed only by SVC (in particular mining rounds) follow svcrules"
     ) {
       import com.daml.network.sv.store.SvSvcStore
       allContractsMigrated(
-        SvSvcStore.coinRulesFollowers
+        SvSvcStore.amuletRulesFollowers
           filterNot Set(
             cnw.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8386)
             cc.round.SummarizingMiningRound.COMPANION, // TODO (#10705)
@@ -650,17 +654,17 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
     }
 
     clue(
-      "wait for scan to yield transferred CoinRules. "
+      "wait for scan to yield transferred AmuletRules. "
         + "This does not mean the cache was invalidated, though"
     ) {
       eventually() {
-        sv1ScanBackend.getCoinRules().state shouldBe Assigned(globalUpgradeId)
+        sv1ScanBackend.getAmuletRules().state shouldBe Assigned(globalUpgradeId)
       }
     }
 
     // TODO (#8135) tap here instead to check improved cache invalidation
 
-    clue("see whether coin/wallet contracts signed by validator follow coinrules") {
+    clue("see whether amulet/wallet contracts signed by validator follow amuletrules") {
       val sv1ValidatorParty = sv1ValidatorBackend.getValidatorPartyId()
       import com.daml.network.validator.store.ValidatorStore.templatesMovedByMyAutomation as templatesMovedByValidatorAutomation
       allContractsMigrated(
@@ -668,7 +672,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
       )
     }
 
-    clue("see whether coin/wallet contracts signed by wallet user follow coinrules") {
+    clue("see whether amulet/wallet contracts signed by wallet user follow amuletrules") {
       import com.daml.network.wallet.store.UserWalletStore.templatesMovedByMyAutomation as templatesMovedByUserWalletAutomation
       allContractsMigrated(
         templatesMovedByUserWalletAutomation
@@ -685,11 +689,11 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
   }
 
   private[this] def cleanAndAddNewSchedule(
-      start: AssignedContract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules],
-      newSchedule: Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]],
-  )(implicit fp: FixtureParam): cc.coinrules.CoinRules.ContractId = {
+      start: AssignedContract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules],
+      newSchedule: Tuple2[Instant, cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD]],
+  )(implicit fp: FixtureParam): cc.amuletrules.AmuletRules.ContractId = {
     sv1ScanBackend
-      .getCoinRules()
+      .getAmuletRules()
       .payload
       .configSchedule
       .futureValues
@@ -700,7 +704,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
             actAs = Seq(svcParty),
             readAs = Seq.empty,
             update = start.contractId
-              .exerciseCoinRules_RemoveFutureCoinConfigSchedule(config._1),
+              .exerciseAmuletRules_RemoveFutureAmuletConfigSchedule(config._1),
             domainId = Some(start.domain),
           )
           .exerciseResult
@@ -710,10 +714,10 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         userId = sv1Backend.config.ledgerApiUser,
         actAs = Seq(svcParty),
         readAs = Seq.empty,
-        update = start.contractId.exerciseCoinRules_AddFutureCoinConfigSchedule(newSchedule),
+        update = start.contractId.exerciseAmuletRules_AddFutureAmuletConfigSchedule(newSchedule),
         domainId = Some(start.domain),
       )
       .exerciseResult
-      .newCoinRules
+      .newAmuletRules
   }
 }

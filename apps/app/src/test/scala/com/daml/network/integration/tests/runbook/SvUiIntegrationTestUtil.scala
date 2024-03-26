@@ -63,27 +63,27 @@ trait SvUiIntegrationTestUtil extends CNNodeTestCommon {
         )
       }
 
-      clue("SVs 1-4 have placed a coin price vote") {
+      clue("SVs 1-4 have placed a amulet price vote") {
         actAndCheck(
-          "Opening coin price tab",
+          "Opening amulet price tab",
           click on "navlink-cc-price",
         )(
-          s"We see that this SV and the other SVs have placed a coin price vote",
+          s"We see that this SV and the other SVs have placed a amulet price vote",
           _ => {
             // the price fields hold "Not Set" if the SV has never voted
             val priceR = """^\s*(\d+(\.\d+)?)\s*USD\s*$""".r
             clue(s"We see that this SV has voted") {
-              inside(find(id("cur-sv-coin-price-usd"))) { case Some(e) =>
+              inside(find(id("cur-sv-amulet-price-usd"))) { case Some(e) =>
                 e.text should fullyMatch regex priceR
               }
             }
             clue(s"We see, via this SV's UI, that all others of SV1-4 have voted") {
-              val votes = findAll(className("coin-price-table-row"))
+              val votes = findAll(className("amulet-price-table-row"))
                 .map(row =>
                   (PartyId
                     .tryFromProtoPrimitive(
                       seleniumText(row.childElement(className("sv-party")))
-                    ) -> row.childElement(className("coin-price")).text)
+                    ) -> row.childElement(className("amulet-price")).text)
                 )
                 .toMap
               votedSvParties.foreach(sv => votes(sv) should fullyMatch regex priceR)

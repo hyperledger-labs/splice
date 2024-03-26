@@ -83,7 +83,7 @@ object SplitwellAppBootstrap {
   def apply(
       name: String,
       splitwellConfig: SplitwellAppBackendConfig,
-      coinAppParameters: SharedCNNodeAppParameters,
+      amuletAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       splitwellMetrics: SplitwellAppMetrics,
       testingConfigInternal: TestingConfigInternal,
@@ -102,7 +102,7 @@ object SplitwellAppBootstrap {
         new SplitwellAppBootstrap(
           _,
           splitwellConfig,
-          coinAppParameters,
+          amuletAppParameters,
           testingConfigInternal,
           clock,
           splitwellMetrics,

@@ -37,10 +37,10 @@ class WalletAppRewardsTimeBasedIntegrationTest
         )(config)
       )
       // TODO (#10859) remove and fix test failures
-      .withCoinPrice(walletCoinPrice)
+      .withAmuletPrice(walletAmuletPrice)
 
   // TODO (#10859) remove and fix test failures
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(1.0)
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(1.0)
 
   "A wallet" should {
 
@@ -102,7 +102,7 @@ class WalletAppRewardsTimeBasedIntegrationTest
           .pause()
           .futureValue
 
-        val feeCeiling = walletUsdToCoin(smallAmount)
+        val feeCeiling = walletUsdToAmulet(smallAmount)
 
         actAndCheck(
           "Advance rounds again to collect rewards",
@@ -131,13 +131,13 @@ class WalletAppRewardsTimeBasedIntegrationTest
               .sum + aliceValidatorCoupons
               .map(_.payload.amount)
               .map(BigDecimal(_))
-              .sum + walletUsdToCoin(2.85) * 3 // 2.85 USD per faucet coupon
+              .sum + walletUsdToAmulet(2.85) * 3 // 2.85 USD per faucet coupon
             checkBalance(
               aliceValidatorWalletClient,
               Some(aliceValidatorStartBalance.round + 4),
               (
                 expectedBalance - feeCeiling,
-                expectedBalance + walletUsdToCoin(
+                expectedBalance + walletUsdToAmulet(
                   2.85
                 ), // the last validator faucet may or may not have been received/claimed
               ),

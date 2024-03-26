@@ -54,7 +54,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class SplitwellApp(
     override val name: InstanceName,
     val config: SplitwellAppBackendConfig,
-    val coinAppParameters: SharedCNNodeAppParameters,
+    val amuletAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -69,7 +69,7 @@ class SplitwellApp(
 ) extends CNNode[SplitwellApp.State](
       config.providerUser,
       config.participantClient,
-      coinAppParameters,
+      amuletAppParameters,
       loggerFactory,
       tracerProvider,
       futureSupervisor,
@@ -95,7 +95,7 @@ class SplitwellApp(
     }
     participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
-      coinAppParameters.loggingConfig.api,
+      amuletAppParameters.loggingConfig.api,
       loggerFactory,
       metrics.grpcClientMetrics,
       retryProvider,

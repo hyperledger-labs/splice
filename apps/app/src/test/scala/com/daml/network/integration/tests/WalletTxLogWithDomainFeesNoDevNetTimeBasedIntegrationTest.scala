@@ -21,14 +21,14 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
     with WalletTxLogTestUtil
     with SvTestUtil {
 
-  private val coinPrice = BigDecimal(1.25).setScale(10)
+  private val amuletPrice = BigDecimal(1.25).setScale(10)
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       .addConfigTransform((_, config) => CNNodeConfigTransforms.noDevNet(config))
-      // Set a non-unit coin price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
+      // Set a non-unit amulet price to better test CC-USD conversion.
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
       .withTrafficTopupsDisabled
       .addConfigTransforms((_, config) =>
@@ -57,7 +57,7 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
 
       val transferAmount = BigDecimal(100)
       actAndCheck(
-        "Provide some initial coin balance to aliceValidator",
+        "Provide some initial amulet balance to aliceValidator",
         p2pTransfer(
           sv1WalletClient,
           aliceValidatorWalletClient,
@@ -72,13 +72,13 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
       )
 
       val now = env.environment.clock.now
-      val domainFeesConfig = sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.fees
+      val domainFeesConfig = sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount, 1_000_000L)
       val (_, totalCostCc) = computeDomainFees(trafficAmount, now)
 
       actAndCheck(
         "Purchase extra traffic for SV1", {
-          buyMemberTraffic(sv1ValidatorBackend, trafficAmount, now, sv1WalletClient.list().coins)
+          buyMemberTraffic(sv1ValidatorBackend, trafficAmount, now, sv1WalletClient.list().amulets)
         },
       )(
         "Check that an extra traffic purchase is registered in SV1's tx history",
@@ -140,7 +140,7 @@ class WalletTxLogWithDomainFeesNoDevNetTimeBasedIntegrationTest
             aliceValidatorBackend,
             trafficAmount,
             now,
-            aliceValidatorWalletClient.list().coins,
+            aliceValidatorWalletClient.list().amulets,
           )
         },
       )(

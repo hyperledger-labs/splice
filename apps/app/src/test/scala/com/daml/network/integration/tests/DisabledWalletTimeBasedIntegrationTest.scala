@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coin.{Coin, SvRewardCoupon, UnclaimedReward}
+import com.daml.network.codegen.java.cc.amulet.{Amulet, SvRewardCoupon, UnclaimedReward}
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
@@ -9,7 +9,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.util.CNNodeUtil.defaultIssuanceCurve
 import com.daml.network.util.{SvTestUtil, TimeTestUtil, WalletTestUtil}
-import com.daml.network.wallet.automation.CollectRewardsAndMergeCoinsTrigger
+import com.daml.network.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule.LevelAndAbove
@@ -44,7 +44,7 @@ class DisabledWalletTimeBasedIntegrationTest
               log.loggerName.matches(
                 s".*${classOf[TreasuryService].getSimpleName}.*SV=sv1.*"
               ) || log.loggerName.matches(
-                s".*${classOf[CollectRewardsAndMergeCoinsTrigger].getSimpleName}.*SV=sv1.*"
+                s".*${classOf[CollectRewardsAndMergeAmuletsTrigger].getSimpleName}.*SV=sv1.*"
               )
             ) should be(false)
           }
@@ -95,7 +95,7 @@ class DisabledWalletTimeBasedIntegrationTest
         unclaimed should not be empty
 
         sv1Backend.participantClient.ledger_api_extensions.acs
-          .filterJava(Coin.COMPANION)(svcParty, _ => true) shouldBe empty
+          .filterJava(Amulet.COMPANION)(svcParty, _ => true) shouldBe empty
       }
     }
 

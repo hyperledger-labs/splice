@@ -20,10 +20,10 @@ class WalletRewardsTimeBasedIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // TODO (#10859) remove and fix test failures
-      .withCoinPrice(walletCoinPrice)
+      .withAmuletPrice(walletAmuletPrice)
 
   // TODO (#10859) remove and fix test failures
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(1.0)
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(1.0)
 
   "A wallet" should {
 
@@ -32,14 +32,14 @@ class WalletRewardsTimeBasedIntegrationTest
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
 
-      // Tap coin and do a transfer from alice to bob
-      aliceWalletClient.tap(walletCoinToUsd(50))
+      // Tap amulet and do a transfer from alice to bob
+      aliceWalletClient.tap(walletAmuletToUsd(50))
 
       p2pTransfer(aliceWalletClient, bobWalletClient, bob, 40.0)
 
-      // Retrieve transferred coin in bob's wallet and transfer part of it back to alice;
+      // Retrieve transferred amulet in bob's wallet and transfer part of it back to alice;
       // bob's validator will receive some app rewards
-      eventually()(bobWalletClient.list().coins should have size 1)
+      eventually()(bobWalletClient.list().amulets should have size 1)
       p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0)
 
       val openRounds = eventually() {
@@ -90,8 +90,8 @@ class WalletRewardsTimeBasedIntegrationTest
       assertInRange(
         newBalance - prevBalance,
         (
-          walletUsdToCoin(-0.1 + faucetCouponAmountUsd),
-          walletUsdToCoin(0.5 + faucetCouponAmountUsd),
+          walletUsdToAmulet(-0.1 + faucetCouponAmountUsd),
+          walletUsdToAmulet(0.5 + faucetCouponAmountUsd),
         ),
       )
     }

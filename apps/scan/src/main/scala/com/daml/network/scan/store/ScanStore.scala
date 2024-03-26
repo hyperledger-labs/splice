@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.cn
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
 import com.daml.network.scan.store.db.{
   DbScanStore,
   ScanAggregatesReader,
@@ -16,7 +16,7 @@ import com.daml.network.scan.store.db.{
 import com.daml.network.scan.store.db.ScanTables.ScanAcsStoreRowData
 import com.daml.network.util.{
   AssignedContract,
-  CoinConfigSchedule,
+  AmuletConfigSchedule,
   Contract,
   ContractWithState,
   TemplateJsonDecoder,
@@ -49,7 +49,7 @@ trait ScanStore
     extends CNNodeAppStore[
       TxLogEntry
     ]
-    with PackageIdResolver.HasCoinRules {
+    with PackageIdResolver.HasAmuletRules {
 
   def aggregate()(implicit
       tc: TraceContext
@@ -73,17 +73,19 @@ trait ScanStore
     override def decodeEntry = TxLogEntry.decode
   }
 
-  def lookupCoinRules()(implicit
+  def lookupAmuletRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]]]
+  ): Future[
+    Option[ContractWithState[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]]
+  ]
 
-  private def getCoinRulesWithState()(implicit
+  private def getAmuletRulesWithState()(implicit
       tc: TraceContext
-  ): Future[ContractWithState[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]] =
-    lookupCoinRules().map(
+  ): Future[ContractWithState[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]] =
+    lookupAmuletRules().map(
       _.getOrElse(
         throw Status.NOT_FOUND
-          .withDescription("No active CoinRules contract")
+          .withDescription("No active AmuletRules contract")
           .asRuntimeException()
       )
     )
@@ -114,20 +116,20 @@ trait ScanStore
       } yield domainId -> ScanInfo(scan.publicUrl, nodeState.svName)
     }
   }
-  def getCoinRules()(implicit
+  def getAmuletRules()(implicit
       tc: TraceContext
-  ): Future[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]] =
-    getCoinRulesWithState().map(_.contract)
+  ): Future[Contract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]] =
+    getAmuletRulesWithState().map(_.contract)
 
   def getGlobalDomainId()(implicit
       tc: TraceContext
   ): Future[DomainId] =
-    getCoinRulesWithState()
+    getAmuletRulesWithState()
       .flatMap(
         _.state.fold(
           Future.successful,
           Future failed Status.FAILED_PRECONDITION
-            .withDescription("CoinRules is in-flight, no current global domain")
+            .withDescription("AmuletRules is in-flight, no current global domain")
             .asRuntimeException(),
         )
       )
@@ -151,7 +153,7 @@ trait ScanStore
       )
     )
 
-  def getTotalCoinBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
+  def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
 
   def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
   def getRewardsCollectedInRound(round: Long)(implicit tc: TraceContext): Future[BigDecimal]
@@ -160,7 +162,7 @@ trait ScanStore
       tc: TraceContext
   ): Future[BigDecimal]
 
-  def getCoinConfigForRound(round: Long)(implicit
+  def getAmuletConfigForRound(round: Long)(implicit
       tc: TraceContext
   ): Future[OpenMiningRoundTxLogEntry]
 
@@ -194,8 +196,8 @@ trait ScanStore
   def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
       tc: TraceContext
   ): Future[cc.globaldomain.BaseRateTrafficLimits] =
-    getCoinRulesWithState().map(cr =>
-      CoinConfigSchedule(cr)
+    getAmuletRulesWithState().map(cr =>
+      AmuletConfigSchedule(cr)
         .getConfigAsOf(t)
         .globalDomain
         .fees
@@ -314,7 +316,7 @@ object ScanStore {
     MultiDomainAcsStore.SimpleContractFilter(
       key.svcParty,
       Map(
-        mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc)(
+        mkFilter(cc.amuletrules.AmuletRules.COMPANION)(co => co.payload.svc == svc)(
           ScanAcsStoreRowData(_)
         ),
         mkFilter(cn.cns.CnsRules.COMPANION)(co => co.payload.svc == svc)(ScanAcsStoreRowData(_)),
@@ -348,24 +350,24 @@ object ScanStore {
               round = Some(contract.payload.round.number),
             )
         },
-        mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc) { contract =>
+        mkFilter(cc.amulet.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             featuredAppRightProvider =
               Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
           )
         },
-        mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc) { contract =>
+        mkFilter(cc.amulet.Amulet.COMPANION)(co => co.payload.svc == svc) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             amount = Some(contract.payload.amount.initialAmount),
           )
         },
-        mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc) { contract =>
+        mkFilter(cc.amulet.LockedAmulet.COMPANION)(co => co.payload.amulet.svc == svc) { contract =>
           ScanAcsStoreRowData(
             contract = contract,
             contractExpiresAt = Some(Timestamp.assertFromInstant(contract.payload.lock.expiresAt)),
-            amount = Some(contract.payload.coin.amount.initialAmount),
+            amount = Some(contract.payload.amulet.amount.initialAmount),
           )
         },
         mkFilter(cn.cns.CnsEntry.COMPANION)(co => co.payload.svc == svc) { contract =>

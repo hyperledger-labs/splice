@@ -125,7 +125,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
     return {
       list: async (): Promise<ListResponse> => {
         const res = await walletClient.list();
-        return { coins: res.coins, lockedCoins: res.locked_coins };
+        return { amulets: res.amulets, lockedAmulets: res.locked_amulets };
       },
       tap: async amount => {
         const request = { amount: amount };
@@ -149,18 +149,18 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           const { date, transaction_subtype } = item;
 
           if (item.transaction_type === 'balance_change') {
-            const coinPrice = new BigNumber(item.coin_price!);
+            const amuletPrice = new BigNumber(item.amulet_price!);
             const balanceChange: BalanceChange = {
               transactionType: 'balance_change',
               transactionSubtype: transaction_subtype,
               id,
               date,
               receivers,
-              coinPrice,
+              amuletPrice,
             };
             return [balanceChange];
           } else if (item.transaction_type === 'transfer') {
-            const coinPrice = new BigNumber(item.coin_price!);
+            const amuletPrice = new BigNumber(item.amulet_price!);
             const transfer: Transfer = {
               transactionType: 'transfer',
               transactionSubtype: transaction_subtype,
@@ -171,7 +171,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
               providerId: item.provider!,
               senderId: item.sender!.party,
               senderAmountCC: new BigNumber(item.sender!.amount),
-              coinPrice,
+              amuletPrice,
             };
             return [transfer];
           } else if (item.transaction_type === 'notification') {

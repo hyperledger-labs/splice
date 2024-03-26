@@ -73,12 +73,12 @@ class CloseVoteRequestWithEarlyClosingTrigger(
             taskOutcome <-
               if (votes.size >= requiredNumVotesForEarlyClosing) {
                 for {
-                  coinRules <- store.getCoinRules()
-                  coinRulesId = coinRules.contractId
+                  amuletRules <- store.getAmuletRules()
+                  amuletRulesId = amuletRules.contractId
                   cmd = svcRules.exercise(
                     _.exerciseSvcRules_CloseVoteRequest(
                       currentRequestCid,
-                      java.util.Optional.of(coinRulesId),
+                      java.util.Optional.of(amuletRulesId),
                     )
                   )
                   _ <- svTaskContext.connection

@@ -10,8 +10,8 @@ import DA.Time
 
 import CC.Round
 import CC.Types
-import CC.Coin
-import CC.CoinRules
+import CC.Amulet
+import CC.AmuletRules
 
 import CN.SvcRules
 import CN.Util
@@ -139,11 +139,11 @@ testUnclaimedRewardsMerging = do
 
   forA_ [1..6] do \_ -> generateUnclaimedReward app provider1
 
-  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  [(amuletRulesCid, _)] <- query @AmuletRules app.svc
   unclaimedRewards <- query @UnclaimedReward app.svc
   leaderSubmits app $ \cid -> exerciseCmd cid $
     SvcRules_MergeUnclaimedRewards with
-      coinRulesCid
+      amuletRulesCid
       unclaimedRewardCids = (fmap fst unclaimedRewards)
 
   unclaimedRewards <- query @UnclaimedReward app.svc
@@ -160,7 +160,7 @@ testRequiredNumOfConfirmation : Script ()
 testRequiredNumOfConfirmation = do
   (_, svc, (sv1, sv2, sv3, _)) <- initDevNetCollective
 
-  [(coinRulesCid, _)] <- query @CoinRules svc
+  [(amuletRulesCid, _)] <- query @AmuletRules svc
   [(svcRulesCid, svcRules)] <- query @SvcRules svc
 
   Map.size svcRules.members === 4
@@ -188,7 +188,7 @@ testRequiredNumOfConfirmation = do
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
     SvcRules_ExecuteConfirmedAction with
       action
-      coinRulesCid = Some coinRulesCid
+      amuletRulesCid = Some amuletRulesCid
       confirmationCids
 
   -- check that the `action` was executed
@@ -248,11 +248,11 @@ testDecentralizedCns = do
     description = "Darth Vader's CNS Description"
     user = alice.primaryParty
 
-  coin <- tap app alice 1.5
+  amulet <- tap app alice 1.5
 
   paymentContext <- getPaymentTransferContext app alice
   (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd cnsSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
-    inputs = [InputCoin coin]
+    inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.svc
 
@@ -276,7 +276,7 @@ testDecentralizedCns = do
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
     SvcRules_ExecuteConfirmedAction with
       action = collectInitialPaymentAction
-      coinRulesCid = None
+      amuletRulesCid = None
       confirmationCids
 
   [(entryCid, entry)] <- queryFilter @CnsEntry app.svc (\entry -> entry.user == alice.primaryParty && entry.name == "cns.darth.vader")
@@ -290,9 +290,9 @@ testDecentralizedCns = do
   paymentContext <- getPaymentTransferContext app alice
   appContext <- getAppTransferContext app app.svcUser
 
-  coin <- tap app alice 1.5
+  amulet <- tap app alice 1.5
   (paymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
-    inputs = [InputCoin coin]
+    inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.svc
 
@@ -319,11 +319,11 @@ testDecentralizedCns = do
     description = "CNS Description"
     user = alice.primaryParty
 
-  coin <- tap app alice 1.5
+  amulet <- tap app alice 1.5
 
   paymentContext <- getPaymentTransferContext app alice
   (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.svc] [] $ exerciseCmd rejectedSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
-    inputs = [InputCoin coin]
+    inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.svc
 
@@ -347,7 +347,7 @@ testDecentralizedCns = do
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid
     SvcRules_ExecuteConfirmedAction with
       action = rejectInitialPaymentAction
-      coinRulesCid = None
+      amuletRulesCid = None
       confirmationCids
 
   -- entry is not created

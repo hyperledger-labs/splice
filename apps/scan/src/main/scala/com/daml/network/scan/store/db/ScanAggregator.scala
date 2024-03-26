@@ -240,7 +240,7 @@ final class ScanAggregator(
         cumulative_validator_rewards,
         cumulative_change_to_initial_amount_as_of_round_zero,
         cumulative_change_to_holding_fees_rate,
-        total_coin_balance
+        total_amulet_balance
       )
       values (
         ${storeId},
@@ -254,7 +254,7 @@ final class ScanAggregator(
         ${rt.cumulativeValidatorRewards},
         ${rt.cumulativeChangeToInitialAmountAsOfRoundZero},
         ${rt.cumulativeChangeToHoldingFeesRate},
-        ${rt.totalCoinBalance}
+        ${rt.totalAmuletBalance}
       )
       on conflict do nothing
     """.asUpdate.map(_ => ())
@@ -651,7 +651,7 @@ final class ScanAggregator(
                   cumulative_validator_rewards,
                   cumulative_change_to_initial_amount_as_of_round_zero,
                   cumulative_change_to_holding_fees_rate,
-                  total_coin_balance
+                  total_amulet_balance
       )
       select      $storeId,
                   ct.round,
@@ -899,7 +899,7 @@ object ScanAggregator {
       cumulativeValidatorRewards: BigDecimal = zero,
       cumulativeChangeToInitialAmountAsOfRoundZero: BigDecimal = zero,
       cumulativeChangeToHoldingFeesRate: BigDecimal = zero,
-      totalCoinBalance: BigDecimal = zero,
+      totalAmuletBalance: BigDecimal = zero,
   )
 
   implicit val GetResultRoundRange: GetResult[RoundRange] =
@@ -924,7 +924,7 @@ object ScanAggregator {
     coalesce(cumulative_validator_rewards, 0),
     coalesce(cumulative_change_to_initial_amount_as_of_round_zero, 0),
     coalesce(cumulative_change_to_holding_fees_rate, 0),
-    coalesce(total_coin_balance, 0)
+    coalesce(total_amulet_balance, 0)
     """
 
   implicit val GetResultRoundTotals: GetResult[RoundTotals] =

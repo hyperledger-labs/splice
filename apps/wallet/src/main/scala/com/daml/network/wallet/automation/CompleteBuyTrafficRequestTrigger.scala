@@ -6,8 +6,8 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.coinrules.invalidtransferreason
-import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteBuyTrafficRequest
+import com.daml.network.codegen.java.cc.amuletrules.invalidtransferreason
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.CO_CompleteBuyTrafficRequest
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
@@ -51,9 +51,9 @@ class CompleteBuyTrafficRequestTrigger(
     } else {
       val operation = new CO_CompleteBuyTrafficRequest(trafficRequest.contractId)
       treasury
-        .enqueueCoinOperation(operation)
+        .enqueueAmuletOperation(operation)
         .flatMap {
-          case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
+          case failedOperation: installCodegen.amuletoperationoutcome.COO_Error =>
             failedOperation.invalidTransferReasonValue match {
               case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
                 val missingStr = s"(missing ${fundsError.missingAmount} CC)"
@@ -74,11 +74,11 @@ class CompleteBuyTrafficRequestTrigger(
                 Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
             }
 
-          case _: installCodegen.coinoperationoutcome.COO_CompleteBuyTrafficRequest =>
+          case _: installCodegen.amuletoperationoutcome.COO_CompleteBuyTrafficRequest =>
             Future.successful(TaskSuccess("Completed buy traffic request"))
 
           case unknownOutcome =>
-            val msg = s"Unexpected coin-operation outcome $unknownOutcome"
+            val msg = s"Unexpected amulet-operation outcome $unknownOutcome"
             Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
         }
     }

@@ -1,6 +1,6 @@
 package com.daml.network.wallet.config
 
-/** Config for the treasury service for executing coin-balance-manipulating operations
+/** Config for the treasury service for executing amulet-balance-manipulating operations
   *
   * The service executes them in a sequential, batched fashion to avoid contention.
   *
@@ -11,8 +11,8 @@ package com.daml.network.wallet.config
   * quickly and operations unnecessarily time-out, as they stay in the queue for a long time, instead of being aborted
   * quickly.
   *
-  * @param batchSize how many coin-balance-manipulating operations to combine into a single batch.
-  * @param queueSize how many coin-balance-manipulating operations to queue for creating the next batch.
+  * @param batchSize how many amulet-balance-manipulating operations to combine into a single batch.
+  * @param queueSize how many amulet-balance-manipulating operations to queue for creating the next batch.
   */
 case class TreasuryConfig(
     batchSize: Int = 10,

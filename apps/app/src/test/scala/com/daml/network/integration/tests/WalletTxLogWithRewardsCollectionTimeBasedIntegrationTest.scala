@@ -16,13 +16,13 @@ class WalletTxLogWithRewardsCollectionTimeBasedIntegrationTest
     with SplitwellTestUtil
     with WalletTxLogTestUtil {
 
-  private val coinPrice = BigDecimal(1.25).setScale(10)
+  private val amuletPrice = BigDecimal(1.25).setScale(10)
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      // Set a non-unit coin price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
+      // Set a non-unit amulet price to better test CC-USD conversion.
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
       .addConfigTransforms((_, config) =>
         // without this, you can have 1 or 2 transfers in the txlog, or just 1 with different balance
         updateAutomationConfig(ConfigurableApp.Validator)(

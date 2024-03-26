@@ -2,8 +2,8 @@ module CN.Wallet.TransferOffer where
 
 import DA.Text
 
-import CC.Coin
-import CC.CoinRules
+import CC.Amulet
+import CC.AmuletRules
 import CC.Round
 import CN.Util
 import CN.Wallet.Payment
@@ -75,7 +75,7 @@ template AcceptedTransferOffer
     signatory sender, receiver
 
     choice AcceptedTransferOffer_Complete
-      : ((TransferResult, TransferOfferTrackingInfo), Optional (ContractId Coin))
+      : ((TransferResult, TransferOfferTrackingInfo), Optional (ContractId Amulet))
       with
         inputs : [TransferInput]
         transferContext : PaymentTransferContext
@@ -100,7 +100,7 @@ template AcceptedTransferOffer
                   receiverFeeRatio = 0.0
               ]
         result <- exercisePaymentTransfer transferContext transfer
-        pure ((result, TransferOfferTrackingInfo { .. }), result.senderChangeCoin)
+        pure ((result, TransferOfferTrackingInfo { .. }), result.senderChangeAmulet)
 
     choice AcceptedTransferOffer_Withdraw : TransferOfferTrackingInfo
       with

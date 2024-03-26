@@ -407,7 +407,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
-      "description": "On non-devnet environments, end users get 1000 coins from the validator for transfers.",
+      "description": "On non-devnet environments, end users get 1000 amulets from the validator for transfers.",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -475,7 +475,7 @@
           "useBackend": false
         }
       ],
-      "title": "Validator Operator Coin Balance",
+      "title": "Validator Operator Amulet Balance",
       "type": "gauge"
     },
     {

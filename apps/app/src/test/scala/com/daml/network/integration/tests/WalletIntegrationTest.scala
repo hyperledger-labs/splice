@@ -5,7 +5,7 @@ import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCo
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.http.v0.definitions.TapRequest
 import com.daml.network.http.v0.wallet.WalletClient
@@ -59,12 +59,12 @@ class WalletIntegrationTest
     "allow two wallet app users to connect to one wallet backend and tap" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-      aliceWalletClient.tap(walletCoinToUsd(50.0))
+      aliceWalletClient.tap(walletAmuletToUsd(50.0))
       checkWallet(aliceUserParty, aliceWalletClient, Seq((50, 50)))
 
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
-      charlieWalletClient.tap(walletCoinToUsd(50.0))
+      charlieWalletClient.tap(walletAmuletToUsd(50.0))
       checkWallet(charlieUserParty, charlieWalletClient, Seq((50, 50)))
     }
 
@@ -98,14 +98,14 @@ class WalletIntegrationTest
           forAtLeast(1, entries)(
             // .. and we see that the empty batch is skipped.
             _.message should include(
-              "Coin operation batch was empty after filtering"
+              "Amulet operation batch was empty after filtering"
             )
           )
         },
       )
     }
 
-    "concurrent coin-operations" should {
+    "concurrent amulet-operations" should {
       "be batched" in { implicit env =>
         val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         aliceWalletClient.tap(50)
@@ -130,23 +130,25 @@ class WalletIntegrationTest
         val txs =
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.transactions
             .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
-        val createdCoinsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_).size)
-        val createdLockedCoinsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.LockedCoin.COMPANION)(_).size)
+        val createdAmuletsInTx =
+          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.Amulet.COMPANION)(_).size)
+        val createdLockedAmuletsInTx =
+          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.LockedAmulet.COMPANION)(_).size)
 
         // in rare cases all 3 commands get batched in one transaction,
         // so we only check if the 3 commands are included in the 2 transactions
 
         // create change
-        createdCoinsInTx.sum shouldBe 3
-        // lock coin
-        createdLockedCoinsInTx.sum shouldBe 3
+        createdAmuletsInTx.sum shouldBe 3
+        // lock amulet
+        createdLockedAmuletsInTx.sum shouldBe 3
 
-        (createdCoinsInTx zip createdLockedCoinsInTx).foreach { case (cc, clc) => cc shouldBe clc }
+        (createdAmuletsInTx zip createdLockedAmuletsInTx).foreach { case (cc, clc) =>
+          cc shouldBe clc
+        }
       }
 
-      "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
+      "be batched up to `batchSize` concurrent amulet-operations" in { implicit env =>
         val batchSize = aliceValidatorBackend.config.treasury.batchSize
         val alice = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
         aliceWalletClient.tap(1000)
@@ -181,20 +183,22 @@ class WalletIntegrationTest
         val txs =
           aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.transactions
             .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
-        val createdCoinsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_).size)
-        val createdLockedCoinsInTx =
-          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.LockedCoin.COMPANION)(_).size)
+        val createdAmuletsInTx =
+          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.Amulet.COMPANION)(_).size)
+        val createdLockedAmuletsInTx =
+          txs.map(DecodeUtil.decodeAllCreatedTree(amuletCodegen.LockedAmulet.COMPANION)(_).size)
 
         // all operations are contained in at most 3 transactions
-        createdCoinsInTx.sum shouldBe (batchSize.toLong + 2)
-        createdLockedCoinsInTx.sum shouldBe (batchSize.toLong + 2)
+        createdAmuletsInTx.sum shouldBe (batchSize.toLong + 2)
+        createdLockedAmuletsInTx.sum shouldBe (batchSize.toLong + 2)
 
         // one transaction is "maxed out"
-        createdCoinsInTx.exists(_ == batchSize.toLong)
-        createdLockedCoinsInTx.exists(_ == batchSize.toLong)
+        createdAmuletsInTx.exists(_ == batchSize.toLong)
+        createdLockedAmuletsInTx.exists(_ == batchSize.toLong)
 
-        (createdCoinsInTx zip createdLockedCoinsInTx).foreach { case (cc, clc) => cc shouldBe clc }
+        (createdAmuletsInTx zip createdLockedAmuletsInTx).foreach { case (cc, clc) =>
+          cc shouldBe clc
+        }
       }
 
       "filter stale actions from batches, and complete the rest" in { implicit env =>
@@ -233,8 +237,8 @@ class WalletIntegrationTest
             aliceWalletClient,
             None,
             (
-              walletUsdToCoin(1 + successfulTaps * 10 - 1),
-              walletUsdToCoin(1 + successfulTaps * 10),
+              walletUsdToAmulet(1 + successfulTaps * 10 - 1),
+              walletUsdToAmulet(1 + successfulTaps * 10),
             ),
             exactly(0),
             (0, smallAmount),
@@ -335,7 +339,7 @@ class WalletIntegrationTest
 
       actAndCheck(
         "Splitwell provider grants itself a featured app right",
-        // We need to retry as the command might failed due to inactive cached CoinRules contract
+        // We need to retry as the command might failed due to inactive cached AmuletRules contract
         // The failed command submission will triggers a cache invalidation
         retryCommandSubmission(splitwellWalletClient.selfGrantFeaturedAppRight()),
       )(

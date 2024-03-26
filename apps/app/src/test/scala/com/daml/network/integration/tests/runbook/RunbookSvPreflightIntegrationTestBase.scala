@@ -103,7 +103,7 @@ abstract class RunbookSvPreflightIntegrationTestBase
         },
       )
       if (isDevNet) { // can't tap in NonDevNet
-        tapCoins(100)
+        tapAmulets(100)
       }
     }
   }
@@ -231,9 +231,9 @@ abstract class RunbookSvPreflightIntegrationTestBase
           val round =
             Try(asOfRound.split(" ").last.toLong)
               .getOrElse(fail(s"Failed parsing round number from: $asOfRound"))
-          val totalCoinBalanceSv = find(id("total-coin-balance-cc")).value.text
-          val totalCoinBalanceSv1 = sv1ScanClient.getTotalCoinBalance(round)
-          BigDecimal(totalCoinBalanceSv.stripSuffix("CC").trim) shouldBe totalCoinBalanceSv1
+          val totalAmuletBalanceSv = find(id("total-amulet-balance-cc")).value.text
+          val totalAmuletBalanceSv1 = sv1ScanClient.getTotalAmuletBalance(round)
+          BigDecimal(totalAmuletBalanceSv.stripSuffix("CC").trim) shouldBe totalAmuletBalanceSv1
         }
       }
     } else {
@@ -300,10 +300,10 @@ abstract class RunbookSvPreflightIntegrationTestBase
     }
     val activeDomain = clue("Can get active domain from Scan") {
       val svActiveDomain = DomainId.tryFromString(
-        svScanClient.getCoinConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
+        svScanClient.getAmuletConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
       )
       val sv1ActiveDomain = DomainId.tryFromString(
-        sv1ScanClient.getCoinConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
+        sv1ScanClient.getAmuletConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
       )
       svActiveDomain shouldBe sv1ActiveDomain
       svActiveDomain

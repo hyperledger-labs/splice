@@ -35,7 +35,7 @@ import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.{
   BackupDump,
-  CoinConfigSchedule,
+  AmuletConfigSchedule,
   HasHealth,
   PackageVetting,
   UploadablePackage,
@@ -88,7 +88,7 @@ import scala.util.{Failure, Success}
 class ValidatorApp(
     override val name: InstanceName,
     val config: ValidatorAppBackendConfig,
-    val coinAppParameters: SharedCNNodeAppParameters,
+    val amuletAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -103,7 +103,7 @@ class ValidatorApp(
 ) extends CNNode[ValidatorApp.State](
       config.ledgerApiUser,
       config.participantClient,
-      coinAppParameters,
+      amuletAppParameters,
       loggerFactory,
       tracerProvider,
       futureSupervisor,
@@ -222,7 +222,7 @@ class ValidatorApp(
                           ) { scanConnection =>
                             scanConnection.getAcsSnapshot(partyId)
                           },
-                        Seq(DarResources.cantonCoin.bootstrap),
+                        Seq(DarResources.cantonAmulet.bootstrap),
                       ),
                   ).tupled
                 } yield partyId
@@ -317,8 +317,8 @@ class ValidatorApp(
           Some(party),
           storeWithIngestion,
           validatorUserName = config.ledgerApiUser,
-          // we're initializing so CoinRules is guaranteed to be on domainId
-          getCoinRulesDomain = () => _ => Future successful domainId,
+          // we're initializing so AmuletRules is guaranteed to be on domainId
+          getAmuletRulesDomain = () => _ => Future successful domainId,
           participantAdminConnection,
           retryProvider,
           logger,
@@ -434,7 +434,7 @@ class ValidatorApp(
   private def withParticipantAdminConnection[T](f: ParticipantAdminConnection => Future[T]) = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
-      coinAppParameters.loggingConfig.api,
+      amuletAppParameters.loggingConfig.api,
       loggerFactory,
       metrics.grpcClientMetrics,
       retryProvider,
@@ -450,10 +450,10 @@ class ValidatorApp(
       config.domains.global.trafficReservedForTopupsO
         .fold(Future.successful(Option.empty[NonNegativeLong]))(trafficReservedForTopups => {
           for {
-            coinRules <- scanConnection.getCoinRulesWithState()
-            coinConfig = CoinConfigSchedule(coinRules).getConfigAsOf(clock.now)
+            amuletRules <- scanConnection.getAmuletRulesWithState()
+            amuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(clock.now)
             reservedTraffic = Option.when(
-              coinConfig.globalDomain.requiredDomains.map.containsKey(domainId.toProtoPrimitive)
+              amuletConfig.globalDomain.requiredDomains.map.containsKey(domainId.toProtoPrimitive)
             )(trafficReservedForTopups)
           } yield reservedTraffic
         })
@@ -476,7 +476,7 @@ class ValidatorApp(
       _ <- Future.successful(())
       participantAdminConnection = new ParticipantAdminConnection(
         config.participantClient.adminApi,
-        coinAppParameters.loggingConfig.api,
+        amuletAppParameters.loggingConfig.api,
         loggerFactory,
         metrics.grpcClientMetrics,
         retryProvider,
@@ -513,7 +513,7 @@ class ValidatorApp(
       // before the automation kicks in.
       _ <- appInitStep("Vet packages") {
         for {
-          coinRules <- scanConnection.getCoinRules()
+          amuletRules <- scanConnection.getAmuletRules()
           packageVetting = new PackageVetting(
             ValidatorPackageVettingTrigger.packages,
             config.prevetDuration,
@@ -521,7 +521,7 @@ class ValidatorApp(
             participantAdminConnection,
             loggerFactory,
           )
-          _ <- packageVetting.vetPackages(coinRules)
+          _ <- packageVetting.vetPackages(amuletRules)
         } yield ()
       }
 
@@ -628,8 +628,8 @@ class ValidatorApp(
           knownParty = Some(validatorParty),
           automation,
           validatorUserName = config.ledgerApiUser,
-          // we're initializing so CoinRules is guaranteed to be on domainId
-          getCoinRulesDomain = () => _ => Future successful domainId,
+          // we're initializing so AmuletRules is guaranteed to be on domainId
+          getAmuletRulesDomain = () => _ => Future successful domainId,
           participantAdminConnection,
           retryProvider,
           logger,
@@ -649,7 +649,7 @@ class ValidatorApp(
         new HttpValidatorHandler(
           automation,
           validatorUserName = config.ledgerApiUser,
-          getCoinRulesDomain = scanConnection.getCoinRulesDomain,
+          getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
           participantAdminConnection,
           retryProvider,
           loggerFactory,
@@ -661,7 +661,7 @@ class ValidatorApp(
           participantIdentitiesStore,
           validatorUserName = config.ledgerApiUser,
           validatorWalletUserName = config.validatorWalletUser,
-          getCoinRulesDomain = scanConnection.getCoinRulesDomain,
+          getAmuletRulesDomain = scanConnection.getAmuletRulesDomain,
           participantAdminConnection,
           config.domains.global.alias,
           retryProvider = retryProvider,

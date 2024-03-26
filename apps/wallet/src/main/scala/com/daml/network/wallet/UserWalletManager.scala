@@ -1,7 +1,7 @@
 package com.daml.network.wallet
 
 import org.apache.pekko.stream.Materializer
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
@@ -217,7 +217,7 @@ class UserWalletManager(
       tc: TraceContext
   ): Future[
     Seq[
-      Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+      Contract[amuletCodegen.ValidatorRewardCoupon.ContractId, amuletCodegen.ValidatorRewardCoupon]
     ]
   ] =
     for {
@@ -226,8 +226,8 @@ class UserWalletManager(
       validatorRewardCouponsFs: Seq[
         Future[Seq[
           Contract[
-            coinCodegen.ValidatorRewardCoupon.ContractId,
-            coinCodegen.ValidatorRewardCoupon,
+            amuletCodegen.ValidatorRewardCoupon.ContractId,
+            amuletCodegen.ValidatorRewardCoupon,
           ]
         ]]
       ] = hostedUsers.toSeq

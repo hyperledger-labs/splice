@@ -1,0 +1,120 @@
+module CC.Round where
+
+import DA.Optional (fromOptional)
+
+import CC.AmuletConfig
+import CC.Types
+import CC.Issuance
+
+import CN.Util
+
+import DA.Time
+
+-- | A mining round for which new rewards can be registered.
+-- Note that multiple mining rounds can be open at the same time to give some
+-- time for propagating a new open round, while still registering rewards
+-- against the previous open round.
+template OpenMiningRound
+  with
+    svc : Party
+    round : Round
+    amuletPrice : Decimal
+    opensAt : Time -- ^ Time after which transfers can use this mining round
+    targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
+    issuingFor : RelTime -- ^ Time for which the SVC has been issuing rewards. Determines the configuration for the issuance round.
+    transferConfigUsd : TransferConfig USD -- ^ Configuration determining the fees and limits in USD for CC transfers
+    issuanceConfig : IssuanceConfig -- ^ Configuration for issuance of this round.
+    tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
+  where
+    signatory svc
+    ensure isDefinedRound round
+
+    nonconsuming choice OpenMiningRound_Fetch : OpenMiningRound
+      with
+        p : Party
+      controller p
+      do pure this
+
+-- | A mining round for which the total sum of registered rewards
+-- is being computed. Rewards can no longer be registered aginst such a round.
+template SummarizingMiningRound
+  with
+    svc : Party
+    round : Round
+    amuletPrice : Decimal
+    issuanceConfig : IssuanceConfig
+    tickDuration : RelTime
+  where
+    signatory svc
+    ensure isDefinedRound round
+
+-- | A mining round for whose rewards amulets are being issued.
+template IssuingMiningRound
+  with
+    svc : Party
+    round : Round
+    issuancePerValidatorRewardCoupon : Decimal
+    issuancePerFeaturedAppRewardCoupon : Decimal
+    issuancePerUnfeaturedAppRewardCoupon : Decimal
+    issuancePerSvRewardCoupon : Decimal
+    opensAt : Time-- ^ Time after which rewards from this mining round can be collected
+    targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
+    optIssuancePerValidatorFaucetCoupon : Optional Decimal
+      -- ^ Introduced in CIP-3
+  where
+    signatory svc
+    ensure isDefinedRound round
+
+-- | Accessor with defaulting for the optional issuancePerValidatorFaucetCoupon field
+getIssuingMiningRoundIssuancePerValidatorFaucetCoupon : IssuingMiningRound -> Decimal
+getIssuingMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound =
+  fromOptional 0.0 issuingMiningRound.optIssuancePerValidatorFaucetCoupon
+
+-- | A record that a specific mining round has been closed, which can
+-- be used to archive expired rewards.
+template ClosedMiningRound
+  with
+    svc : Party
+    round : Round
+    issuancePerValidatorRewardCoupon : Decimal
+    issuancePerFeaturedAppRewardCoupon : Decimal
+    issuancePerUnfeaturedAppRewardCoupon : Decimal
+    issuancePerSvRewardCoupon : Decimal
+    optIssuancePerValidatorFaucetCoupon : Optional Decimal
+      -- ^ Introduced in CIP-3
+  where
+    signatory svc
+    ensure isDefinedRound round
+
+-- | Accessor with defaulting for the optional issuancePerValidatorFaucetCoupon field
+getClosedMiningRoundIssuancePerValidatorFaucetCoupon : ClosedMiningRound -> Decimal
+getClosedMiningRoundIssuancePerValidatorFaucetCoupon issuingMiningRound =
+  fromOptional 0.0 issuingMiningRound.optIssuancePerValidatorFaucetCoupon
+
+
+-- instances
+------------
+
+instance HasCheckedFetch OpenMiningRound ForSvc where
+  contractGroupId OpenMiningRound with svc; .. = ForSvc with svc
+
+instance HasCheckedFetch OpenMiningRound ForRound where
+  contractGroupId OpenMiningRound with svc; round; .. = ForRound with svc; round
+
+instance HasCheckedFetch SummarizingMiningRound ForSvc where
+  contractGroupId SummarizingMiningRound with svc; .. = ForSvc with svc
+
+instance HasCheckedFetch SummarizingMiningRound ForRound where
+  contractGroupId SummarizingMiningRound with svc; round; .. = ForRound with svc; round
+
+instance HasCheckedFetch IssuingMiningRound ForSvc where
+  contractGroupId IssuingMiningRound with svc; .. = ForSvc with svc
+
+instance HasCheckedFetch IssuingMiningRound ForRound where
+  contractGroupId IssuingMiningRound with svc; round; .. = ForRound with svc; round
+
+instance HasCheckedFetch ClosedMiningRound ForSvc where
+  contractGroupId ClosedMiningRound with svc; .. = ForSvc with svc
+
+instance HasCheckedFetch ClosedMiningRound ForRound where
+  contractGroupId ClosedMiningRound with svc; round; .. = ForRound with svc; round

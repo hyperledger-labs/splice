@@ -35,8 +35,8 @@ class CloseVoteRequestTrigger(
     val voteRequestCid = task.work.contractId
     for {
       svcRules <- svTaskContext.svcStore.getSvcRules()
-      coinRules <- store.getCoinRules()
-      coinRulesId = coinRules.contractId
+      amuletRules <- store.getAmuletRules()
+      amuletRulesId = amuletRules.contractId
       _ <- svTaskContext.connection
         .submit(
           Seq(svTaskContext.svcStore.key.svParty),
@@ -44,7 +44,7 @@ class CloseVoteRequestTrigger(
           svcRules.exercise(
             _.exerciseSvcRules_CloseVoteRequest(
               voteRequestCid,
-              java.util.Optional.of(coinRulesId),
+              java.util.Optional.of(amuletRulesId),
             )
           ),
         )

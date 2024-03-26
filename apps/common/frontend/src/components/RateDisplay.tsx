@@ -4,19 +4,19 @@ import BigNumber from 'bignumber.js';
 type RateDisplayProps = {
   base: Currency;
   quote: Currency;
-  coinPrice: number | BigNumber;
+  amuletPrice: number | BigNumber;
 };
 
 const RateDisplay: React.FC<RateDisplayProps> = props => {
-  var { base, quote, coinPrice } = props;
+  var { base, quote, amuletPrice } = props;
   var amount, rate;
   switch (true) {
     case base === 'CC' && quote === 'USD':
-      amount = BigNumber(1).div(coinPrice);
+      amount = BigNumber(1).div(amuletPrice);
       rate = 'CC/USD';
       break;
     case base === 'USD' && quote === 'CC':
-      amount = coinPrice;
+      amount = amuletPrice;
       rate = 'USD/CC';
       break;
     default:

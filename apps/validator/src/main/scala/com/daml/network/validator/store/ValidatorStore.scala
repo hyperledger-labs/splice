@@ -2,8 +2,8 @@ package com.daml.network.validator.store
 
 import cats.syntax.traverseFilter.*
 import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  coinrules as coinrulesCodegen,
+  amulet as amuletCodegen,
+  amuletrules as amuletrulesCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
@@ -56,7 +56,9 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
       party: PartyId
   )(implicit tc: TraceContext): Future[
     QueryResult[
-      Option[ContractWithState[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]
+      Option[
+        ContractWithState[amuletCodegen.ValidatorRight.ContractId, amuletCodegen.ValidatorRight]
+      ]
     ]
   ]
 
@@ -186,14 +188,14 @@ trait ValidatorStore extends WalletStore with CNNodeAppStoreWithoutHistory {
     appManagerCodegen.ApprovedReleaseConfiguration,
   ]]]]
 
-  final def listCoinRulesTransferFollowers(
-      coinRules: AssignedContract[
-        coinrulesCodegen.CoinRules.ContractId,
-        coinrulesCodegen.CoinRules,
+  final def listAmuletRulesTransferFollowers(
+      amuletRules: AssignedContract[
+        amuletrulesCodegen.AmuletRules.ContractId,
+        amuletrulesCodegen.AmuletRules,
       ]
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] =
     multiDomainAcsStore.listAssignedContractsNotOnDomainN(
-      coinRules.domain,
+      amuletRules.domain,
       templatesMovedByMyAutomation(key.appManagerEnabled),
     )
 }
@@ -270,7 +272,7 @@ object ValidatorStore {
   ): Seq[ConstrainedTemplate] =
     Seq[ConstrainedTemplate](
       walletCodegen.WalletAppInstall.COMPANION,
-      coinCodegen.ValidatorRight.COMPANION,
+      amuletCodegen.ValidatorRight.COMPANION,
     ) ++ (if (appManagerEnabled)
             Seq[ConstrainedTemplate](
               appManagerCodegen.AppConfiguration.COMPANION,
@@ -311,7 +313,7 @@ object ValidatorStore {
             validatorParty = Some(key.validatorParty),
           )
         },
-        mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
+        mkFilter(amuletCodegen.ValidatorRight.COMPANION)(co =>
           co.payload.validator == validator &&
             co.payload.svc == svc
         ) { contract =>
@@ -321,7 +323,7 @@ object ValidatorStore {
             validatorParty = Some(key.validatorParty),
           )
         },
-        mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
+        mkFilter(amuletCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == validator
         ) { contract =>
           ValidatorAcsStoreRowData(
@@ -338,7 +340,7 @@ object ValidatorStore {
             trafficDomainId = Some(DomainId.tryFromString(contract.payload.domainId)),
           )
         },
-        mkFilter(coinCodegen.Coin.COMPANION)(co =>
+        mkFilter(amuletCodegen.Amulet.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.owner == validator
         )(ValidatorAcsStoreRowData(_)),

@@ -59,7 +59,7 @@ class SvTimeBasedRewardCouponIntegrationTest
       )
       .withTrafficTopupsDisabled
 
-  private val feesUpperBoundCC = walletUsdToCoin(smallAmount)
+  private val feesUpperBoundCC = walletUsdToAmulet(smallAmount)
 
   "SVs" should {
 
@@ -163,13 +163,13 @@ class SvTimeBasedRewardCouponIntegrationTest
               )
               .filter(
                 _.svRewardCollected
-                  .map(_.coinOwner)
+                  .map(_.amuletOwner)
                   .exists(
                     Seq(sv1Party.toProtoPrimitive, aliceValidatorParty.toProtoPrimitive).contains
                   )
               )
             reward <- tx.svRewardCollected
-          } yield (reward.coinOwner, reward.coinAmount)).toMap
+          } yield (reward.amuletOwner, reward.amuletAmount)).toMap
           BigDecimal(txs(sv1Party.toProtoPrimitive)) should beWithin(
             BigDecimal(eachSvGetInRound0) - smallAmount,
             eachSvGetInRound0,

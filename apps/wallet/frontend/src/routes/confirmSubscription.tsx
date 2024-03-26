@@ -21,7 +21,7 @@ import { ContractId } from '@daml/types';
 import BftCnsEntry from '../components/BftCnsEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useSubscriptionRequest } from '../hooks';
-import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
+import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmSubscription: React.FC = () => {
@@ -37,7 +37,7 @@ export const ConfirmSubscription: React.FC = () => {
       <Stack alignItems="center" paddingTop={4} spacing={4}>
         {subscriptionRequestQuery.isError ? (
           <Box display="flex" alignItems="center" justifyContent="center">
-            <ErrorDisplay message={'Error while fetching subscription request and coin price'} />
+            <ErrorDisplay message={'Error while fetching subscription request and amulet price'} />
           </Box>
         ) : (
           <>
@@ -70,20 +70,20 @@ export default ConfirmSubscription;
 const SubscriptionContainer: React.FC<{ subscription: Contract<SubscriptionRequest> }> = ({
   subscription,
 }) => {
-  const coinPriceQuery = useCoinPrice();
+  const amuletPriceQuery = useAmuletPrice();
 
-  if (coinPriceQuery.isLoading) {
+  if (amuletPriceQuery.isLoading) {
     return <Loading />;
   }
 
-  if (coinPriceQuery.isError) {
-    return <ErrorDisplay message={'Error while fetching coin price'} />;
+  if (amuletPriceQuery.isError) {
+    return <ErrorDisplay message={'Error while fetching amulet price'} />;
   }
 
   const payData = subscription.payload.payData;
   const amount = new BigNumber(payData.paymentAmount.amount);
   const currency = payData.paymentAmount.currency;
-  const converted = convertCurrency(amount, currency, coinPriceQuery.data);
+  const converted = convertCurrency(amount, currency, amuletPriceQuery.data);
 
   return (
     <Container maxWidth="xl">
@@ -103,7 +103,7 @@ const SubscriptionContainer: React.FC<{ subscription: Contract<SubscriptionReque
             </Typography>
             <Typography variant="body2" className="sub-request-price-converted">
               <AmountDisplay amount={converted.amount} currency={converted.currency} /> @{' '}
-              <AmountDisplay amount={coinPriceQuery.data} currency={currency} />/
+              <AmountDisplay amount={amuletPriceQuery.data} currency={currency} />/
               {converted.currency}
             </Typography>
             <Typography variant="body2">Fees will be added.</Typography>

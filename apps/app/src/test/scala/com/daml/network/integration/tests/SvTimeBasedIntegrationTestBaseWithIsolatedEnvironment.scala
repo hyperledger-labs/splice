@@ -108,7 +108,7 @@ abstract class SvTimeBasedIntegrationTestBaseWithIsolatedEnvironmentWithElection
     .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
     .withManualStart
     // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
-    .withoutAutomaticRewardsCollectionAndCoinMerging
+    .withoutAutomaticRewardsCollectionAndAmuletMerging
     .addConfigTransforms((_, config) =>
       updateAutomationConfig(ConfigurableApp.Sv)(
         // Since automatic rewards collection is disabled, closed rounds cannot be archived,
@@ -135,6 +135,6 @@ abstract class SvTimeBasedIntegrationTestBaseWithSharedEnvironment
     CNNodeEnvironmentDefinition
       .simpleTopology4SvsWithSimTime(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
-      .withoutAutomaticRewardsCollectionAndCoinMerging
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
       .withoutLeaderReplacement
 }

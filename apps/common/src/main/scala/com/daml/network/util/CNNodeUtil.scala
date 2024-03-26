@@ -6,10 +6,10 @@ import com.daml.lf.data.Ref.PackageVersion
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.coin.Coin
+import com.daml.network.codegen.java.cc.amulet.Amulet
 import com.daml.network.codegen.java.cc.globaldomain.{
   BaseRateTrafficLimits,
-  CoinGlobalDomainConfig,
+  AmuletGlobalDomainConfig,
   DomainFeesConfig,
 }
 import com.daml.network.codegen.java.cc.issuance.IssuanceConfig
@@ -43,9 +43,9 @@ object CNNodeUtil {
   private def readDarVersion(resource: DarResource): PackageVersion =
     DarUtil.readDarMetadata(resource.path).version
 
-  private def readPackageConfig(): cc.coinconfig.PackageConfig = {
-    new cc.coinconfig.PackageConfig(
-      readDarVersion(DarResources.cantonCoin.bootstrap).toString,
+  private def readPackageConfig(): cc.amuletconfig.PackageConfig = {
+    new cc.amuletconfig.PackageConfig(
+      readDarVersion(DarResources.cantonAmulet.bootstrap).toString,
       readDarVersion(DarResources.cantonNameService.bootstrap).toString,
       readDarVersion(DarResources.svcGovernance.bootstrap).toString,
       readDarVersion(DarResources.validatorLifecycle.bootstrap).toString,
@@ -85,12 +85,12 @@ object CNNodeUtil {
       )
   }
 
-  /** Creates a contract that gives the given validator the right to claim coin issuances for the given user's burns. */
+  /** Creates a contract that gives the given validator the right to claim amulet issuances for the given user's burns. */
   private def createValidatorRightCommand(
       svc: PartyId,
       validator: PartyId,
       user: PartyId,
-  ) = new cc.coin.ValidatorRight(
+  ) = new cc.amulet.ValidatorRight(
     svc.toProtoPrimitive,
     user.toProtoPrimitive,
     validator.toProtoPrimitive,
@@ -108,7 +108,7 @@ object CNNodeUtil {
           PartyId
       ) => Future[
         QueryResult[
-          Option[ContractWithState[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]
+          Option[ContractWithState[cc.amulet.ValidatorRight.ContractId, cc.amulet.ValidatorRight]]
         ]
       ],
       priority: CommandPriority = CommandPriority.Low,
@@ -148,11 +148,11 @@ object CNNodeUtil {
 
   // Using the issuance config for the 10+ years segment of the curve
   def issuanceConfig(
-      coinsToIssuePerYear: Double,
+      amuletsToIssuePerYear: Double,
       validatorPercentage: Double,
       appPercentage: Double,
   ): cc.issuance.IssuanceConfig = new IssuanceConfig(
-    damlDecimal(coinsToIssuePerYear),
+    damlDecimal(amuletsToIssuePerYear),
     damlDecimal(validatorPercentage),
     damlDecimal(appPercentage),
 
@@ -210,7 +210,7 @@ object CNNodeUtil {
 
   // TODO(tech-debt) revisit naming here. "default" and "initial" are two things that are no longer accurate (these are used for other things as well), and consider adding more default values to methods here
 
-  def defaultCoinConfigSchedule(
+  def defaultAmuletConfigSchedule(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
       initialDomainId: DomainId,
@@ -218,8 +218,8 @@ object CNNodeUtil {
       initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
-  ) = new cc.schedule.Schedule[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]](
-    defaultCoinConfig(
+  ) = new cc.schedule.Schedule[Instant, cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD]](
+    defaultAmuletConfig(
       initialTickDuration,
       initialMaxNumInputs,
       initialDomainId,
@@ -228,10 +228,10 @@ object CNNodeUtil {
       initialReadVsWriteScalingFactor,
       holdingFee,
     ),
-    List.empty[Tuple2[Instant, cc.coinconfig.CoinConfig[cc.coinconfig.USD]]].asJava,
+    List.empty[Tuple2[Instant, cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD]]].asJava,
   )
 
-  def defaultCoinConfig(
+  def defaultAmuletConfig(
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
       initialDomainId: DomainId,
@@ -240,7 +240,7 @@ object CNNodeUtil {
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
       holdingFee: BigDecimal = defaultHoldingFee.rate,
       nextDomainId: Option[DomainId] = None,
-  ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = new cc.coinconfig.CoinConfig(
+  ): cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD] = new cc.amuletconfig.AmuletConfig(
     // transferConfig
     defaultTransferConfig(initialMaxNumInputs, holdingFee),
 
@@ -286,10 +286,10 @@ object CNNodeUtil {
       initialBaseRateBurstAmount: Long,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration,
       initialReadVsWriteScalingFactor: Int,
-  ): CoinGlobalDomainConfig = {
+  ): AmuletGlobalDomainConfig = {
     val domainId = initialDomainId.toProtoPrimitive
     val next = nextDomainId.map(_.toProtoPrimitive)
-    new CoinGlobalDomainConfig(
+    new AmuletGlobalDomainConfig(
       // requiredDomains
       new DamlSet(
         (Map(domainId -> DamlUnit.getInstance) ++ next
@@ -310,26 +310,26 @@ object CNNodeUtil {
   def defaultTransferConfig(
       initialMaxNumInputs: Int,
       holdingFee: BigDecimal,
-  ): cc.coinconfig.TransferConfig[cc.coinconfig.USD] = new cc.coinconfig.TransferConfig(
-    // Fee to create a new coin.
+  ): cc.amuletconfig.TransferConfig[cc.amuletconfig.USD] = new cc.amuletconfig.TransferConfig(
+    // Fee to create a new amulet.
     // Set to the fixed part of the transfer fee.
     defaultCreateFee,
 
-    // Fee for keeping a coin around.
+    // Fee for keeping a amulet around.
     // This is roughly equivalent to 1$/360 days but expressed as rounds
     // with one day corresponding to 24*60/2.5 rounds, i.e., one round
     // every 2.5 minutes.
-    // Incentivizes users to actively merge their coins.
+    // Incentivizes users to actively merge their amulets.
     new cc.fees.RatePerRound(
       holdingFee.bigDecimal.setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
     ),
 
-    // Fee for transferring some amount of coin to a new owner.
+    // Fee for transferring some amount of amulet to a new owner.
     defaultTransferFee,
 
     // Fee per lock holder.
     // Chosen to match the update fee to cover the cost of informing lock-holders about
-    // actions on the locked coin.
+    // actions on the locked amulet.
     defaultLockHolderFee,
 
     // Extra featured app reward amount, chosen to be equal to the domain fee cost of a single CC transfer
@@ -369,49 +369,49 @@ object CNNodeUtil {
   }
 
   def holdingFee(
-      coin: Coin,
+      amulet: Amulet,
       currentRound: Long,
   ): java.math.BigDecimal = {
-    coin.amount.initialAmount.min(
+    amulet.amount.initialAmount.min(
       java.math.BigDecimal
-        .valueOf(currentRound - coin.amount.createdAt.number)
+        .valueOf(currentRound - amulet.amount.createdAt.number)
         .setScale(10)
-        .multiply(coin.amount.ratePerRound.rate)
+        .multiply(amulet.amount.ratePerRound.rate)
         .setScale(10, RoundingMode.HALF_EVEN)
     )
   }
 
   def currentAmount(
-      coin: Coin,
+      amulet: Amulet,
       currentRound: Long,
   ): java.math.BigDecimal = {
-    coin.amount.initialAmount.subtract(holdingFee(coin, currentRound))
+    amulet.amount.initialAmount.subtract(holdingFee(amulet, currentRound))
   }
 
-  def coinExpiresAt(coin: Coin): Round = {
-    val rounds = coin.amount.initialAmount
+  def amuletExpiresAt(amulet: Amulet): Round = {
+    val rounds = amulet.amount.initialAmount
       .divide(
-        coin.amount.ratePerRound.rate,
+        amulet.amount.ratePerRound.rate,
         0,
         RoundingMode.CEILING,
       )
       .longValueExact
-    new Round(coin.amount.createdAt.number + rounds)
+    new Round(amulet.amount.createdAt.number + rounds)
   }
 
   def relTimeToDuration(dt: RelTime): Duration =
     Duration.ofNanos(dt.microseconds * 1000)
 
-  /** Converts the given amount of USD to an amount of CC, at the given coin price.
+  /** Converts the given amount of USD to an amount of CC, at the given amulet price.
     * Uses the same semantics for numerical division as Daml.
     */
   def dollarsToCC(
       usd: java.math.BigDecimal,
-      coinPrice: java.math.BigDecimal,
+      amuletPrice: java.math.BigDecimal,
   ): java.math.BigDecimal = {
     val scale = Numeric.Scale.assertFromInt(10)
     val usdN = Numeric.assertFromBigDecimal(scale, usd)
-    val coinPriceN = Numeric.assertFromBigDecimal(scale, coinPrice)
-    com.daml.lf.data.assertRight(Numeric.divide(scale, usdN, coinPriceN))
+    val amuletPriceN = Numeric.assertFromBigDecimal(scale, amuletPrice)
+    com.daml.lf.data.assertRight(Numeric.divide(scale, usdN, amuletPriceN))
   }
 }

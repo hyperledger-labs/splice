@@ -34,13 +34,13 @@ import {
   VoteRequestValidity,
 } from '../../utils/validations';
 import ListVoteRequests from './ListVoteRequests';
-import AddFutureCoinConfigSchedule from './actions/AddFutureCoinConfigSchedule';
+import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
 import OffboardMember from './actions/OffboardMember';
-import RemoveFutureCoinConfigSchedule from './actions/RemoveFutureCoinConfigSchedule';
+import RemoveFutureAmuletConfigSchedule from './actions/RemoveFutureAmuletConfigSchedule';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetSvcRulesConfig from './actions/SetSvcRulesConfig';
-import UpdateFutureCoinConfigSchedule from './actions/UpdateFutureCoinConfigSchedule';
+import UpdateFutureAmuletConfigSchedule from './actions/UpdateFutureAmuletConfigSchedule';
 
 dayjs.extend(utc);
 
@@ -58,8 +58,10 @@ const VoteRequest: React.FC = () => {
   const [expiration, setExpiration] = useState<Dayjs | null>(null);
 
   // States related to constraints from vote requests
-  const [maxDateTimeIfAddFutureCoinConfigSchedule, setMaxDateTimeIfAddFutureCoinConfigSchedule] =
-    useState<Dayjs | undefined>(undefined);
+  const [
+    maxDateTimeIfAddFutureAmuletConfigSchedule,
+    setMaxDateTimeIfAddFutureAmuletConfigSchedule,
+  ] = useState<Dayjs | undefined>(undefined);
   const [alertMessage, setAlertMessage] = useState<AlertState>({});
 
   const svcInfosQuery = useSvcInfos();
@@ -67,9 +69,9 @@ const VoteRequest: React.FC = () => {
 
   function getDefaultExpiration(): Dayjs {
     switch (actionName) {
-      case 'CRARC_RemoveFutureCoinConfigSchedule':
-      case 'CRARC_UpdateFutureCoinConfigSchedule':
-      case 'CRARC_AddFutureCoinConfigSchedule': {
+      case 'CRARC_RemoveFutureAmuletConfigSchedule':
+      case 'CRARC_UpdateFutureAmuletConfigSchedule':
+      case 'CRARC_AddFutureAmuletConfigSchedule': {
         return dayjs();
       }
       default: {
@@ -88,7 +90,7 @@ const VoteRequest: React.FC = () => {
 
   useEffect(() => {
     setExpiration(getDefaultExpiration);
-    setMaxDateTimeIfAddFutureCoinConfigSchedule(undefined);
+    setMaxDateTimeIfAddFutureAmuletConfigSchedule(undefined);
     setUrl('');
     setSummary('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -99,14 +101,14 @@ const VoteRequest: React.FC = () => {
     { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
     { name: 'Set SvcRules Configuration', value: 'SRARC_SetConfig' },
-    { name: 'Add SVC App Configuration Schedule', value: 'CRARC_AddFutureCoinConfigSchedule' },
+    { name: 'Add SVC App Configuration Schedule', value: 'CRARC_AddFutureAmuletConfigSchedule' },
     {
       name: 'Remove SVC App Configuration Schedule',
-      value: 'CRARC_RemoveFutureCoinConfigSchedule',
+      value: 'CRARC_RemoveFutureAmuletConfigSchedule',
     },
     {
       name: 'Update SVC App Configuration Schedule',
-      value: 'CRARC_UpdateFutureCoinConfigSchedule',
+      value: 'CRARC_UpdateFutureAmuletConfigSchedule',
     },
   ];
 
@@ -119,23 +121,23 @@ const VoteRequest: React.FC = () => {
   const chooseAction = (action: ActionFromForm) => {
     setAction(action);
     if (!actionFromFormIsError(action)) {
-      if (action.tag === 'ARC_CoinRules') {
-        switch (action.value.coinRulesAction.tag) {
-          case 'CRARC_AddFutureCoinConfigSchedule': {
-            setMaxDateTimeIfAddFutureCoinConfigSchedule(
-              max(dayjs(), dayjs(action.value.coinRulesAction.value.newScheduleItem._1))
+      if (action.tag === 'ARC_AmuletRules') {
+        switch (action.value.amuletRulesAction.tag) {
+          case 'CRARC_AddFutureAmuletConfigSchedule': {
+            setMaxDateTimeIfAddFutureAmuletConfigSchedule(
+              max(dayjs(), dayjs(action.value.amuletRulesAction.value.newScheduleItem._1))
             );
             return;
           }
-          case 'CRARC_UpdateFutureCoinConfigSchedule': {
-            setMaxDateTimeIfAddFutureCoinConfigSchedule(
-              max(dayjs(), dayjs(action.value.coinRulesAction.value.scheduleItem._1))
+          case 'CRARC_UpdateFutureAmuletConfigSchedule': {
+            setMaxDateTimeIfAddFutureAmuletConfigSchedule(
+              max(dayjs(), dayjs(action.value.amuletRulesAction.value.scheduleItem._1))
             );
             return;
           }
-          case 'CRARC_RemoveFutureCoinConfigSchedule': {
-            setMaxDateTimeIfAddFutureCoinConfigSchedule(
-              max(dayjs(), dayjs(action.value.coinRulesAction.value.scheduleTime))
+          case 'CRARC_RemoveFutureAmuletConfigSchedule': {
+            setMaxDateTimeIfAddFutureAmuletConfigSchedule(
+              max(dayjs(), dayjs(action.value.amuletRulesAction.value.scheduleTime))
             );
             return;
           }
@@ -145,23 +147,23 @@ const VoteRequest: React.FC = () => {
   };
 
   function validateAction(action: ActionRequiringConfirmation) {
-    if (action?.tag !== 'ARC_CoinRules') {
+    if (action?.tag !== 'ARC_AmuletRules') {
       setAlertMessage({});
       return true;
     }
 
-    const coinRulesAction = action.value.coinRulesAction;
+    const amuletRulesAction = action.value.amuletRulesAction;
     let effectiveDate: string;
 
-    switch (coinRulesAction.tag) {
-      case 'CRARC_AddFutureCoinConfigSchedule':
-        effectiveDate = coinRulesAction.value.newScheduleItem._1;
+    switch (amuletRulesAction.tag) {
+      case 'CRARC_AddFutureAmuletConfigSchedule':
+        effectiveDate = amuletRulesAction.value.newScheduleItem._1;
         break;
-      case 'CRARC_UpdateFutureCoinConfigSchedule':
-        effectiveDate = coinRulesAction.value.scheduleItem._1;
+      case 'CRARC_UpdateFutureAmuletConfigSchedule':
+        effectiveDate = amuletRulesAction.value.scheduleItem._1;
         break;
-      case 'CRARC_RemoveFutureCoinConfigSchedule':
-        effectiveDate = coinRulesAction.value.scheduleTime;
+      case 'CRARC_RemoveFutureAmuletConfigSchedule':
+        effectiveDate = amuletRulesAction.value.scheduleTime;
         break;
       default:
         setAlertMessage({});
@@ -205,7 +207,7 @@ const VoteRequest: React.FC = () => {
           .then(() => setActionName('SRARC_OffboardMember'))
           .then(() => setAction(undefined))
           .then(() => setExpiration(getDefaultExpiration))
-          .then(() => setMaxDateTimeIfAddFutureCoinConfigSchedule(undefined))
+          .then(() => setMaxDateTimeIfAddFutureAmuletConfigSchedule(undefined))
           .then(() => setAlertMessage({}));
       }
     },
@@ -252,14 +254,14 @@ const VoteRequest: React.FC = () => {
             <RevokeFeaturedAppRight chooseAction={chooseAction} />
           )}
           {actionName === 'SRARC_SetConfig' && <SetSvcRulesConfig chooseAction={chooseAction} />}
-          {actionName === 'CRARC_AddFutureCoinConfigSchedule' && (
-            <AddFutureCoinConfigSchedule chooseAction={chooseAction} />
+          {actionName === 'CRARC_AddFutureAmuletConfigSchedule' && (
+            <AddFutureAmuletConfigSchedule chooseAction={chooseAction} />
           )}
-          {actionName === 'CRARC_RemoveFutureCoinConfigSchedule' && (
-            <RemoveFutureCoinConfigSchedule chooseAction={chooseAction} />
+          {actionName === 'CRARC_RemoveFutureAmuletConfigSchedule' && (
+            <RemoveFutureAmuletConfigSchedule chooseAction={chooseAction} />
           )}
-          {actionName === 'CRARC_UpdateFutureCoinConfigSchedule' && (
-            <UpdateFutureCoinConfigSchedule chooseAction={chooseAction} />
+          {actionName === 'CRARC_UpdateFutureAmuletConfigSchedule' && (
+            <UpdateFutureAmuletConfigSchedule chooseAction={chooseAction} />
           )}
           <Typography variant="h5">Proposal</Typography>
 
@@ -298,7 +300,7 @@ const VoteRequest: React.FC = () => {
               label={`Enter time in local timezone (${getUTCWithOffset()})`}
               value={expiration}
               minDateTime={dayjs()}
-              maxDateTime={maxDateTimeIfAddFutureCoinConfigSchedule}
+              maxDateTime={maxDateTimeIfAddFutureAmuletConfigSchedule}
               readOnly={false}
               onChange={(newValue: Dayjs | null) => setExpiration(newValue)}
               slotProps={{

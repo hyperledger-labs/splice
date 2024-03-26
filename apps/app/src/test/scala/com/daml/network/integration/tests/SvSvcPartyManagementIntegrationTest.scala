@@ -156,34 +156,36 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
             filterParty = svcPartyStr,
             filterParticipant = sv3Participant.id.toProtoPrimitive,
           ) should have size 1
-        val coinFromsv3Participant = getCoins(sv3Participant, svcParty)
-        val coinFromSv1Participant = getCoins(sv1Participant, svcParty)
+        val amuletFromsv3Participant = getAmulets(sv3Participant, svcParty)
+        val amuletFromSv1Participant = getAmulets(sv1Participant, svcParty)
 
-        coinFromsv3Participant should have size 2
-        coinFromsv3Participant shouldBe coinFromSv1Participant
+        amuletFromsv3Participant should have size 2
+        amuletFromsv3Participant shouldBe amuletFromSv1Participant
 
         sv3Participant.ledger_api.state.acs.of_party(svcParty) should not be empty
       }
 
-      clue("sv3 can exercise CoinRules_DevNet_Tap without disclosed contracts or extra observer.") {
+      clue(
+        "sv3 can exercise AmuletRules_DevNet_Tap without disclosed contracts or extra observer."
+      ) {
         val sv3Party = sv3Backend.getSvcInfo().svParty
 
         wc("sv3Wallet").tap(100.0)
 
-        def checksv3CoinContract(participant: CNParticipantClientReference, party: PartyId) = {
-          val coins = getCoins(participant, party, _.data.owner == sv3Party.toProtoPrimitive)
-          inside(coins) { case Seq(coin) =>
-            coin.data.svc shouldBe svcPartyStr
+        def checksv3AmuletContract(participant: CNParticipantClientReference, party: PartyId) = {
+          val amulets = getAmulets(participant, party, _.data.owner == sv3Party.toProtoPrimitive)
+          inside(amulets) { case Seq(amulet) =>
+            amulet.data.svc shouldBe svcPartyStr
             // the amount might diverge slightly due to (merged) SV rewards and fees
-            BigDecimal(coin.data.amount.initialAmount) should
-              beWithin(walletUsdToCoin(99), walletUsdToCoin(101))
-            coin.data.owner shouldBe sv3Party.toProtoPrimitive
+            BigDecimal(amulet.data.amount.initialAmount) should
+              beWithin(walletUsdToAmulet(99), walletUsdToAmulet(101))
+            amulet.data.owner shouldBe sv3Party.toProtoPrimitive
           }
         }
 
         eventually() {
-          checksv3CoinContract(sv1Participant, svcParty)
-          checksv3CoinContract(sv3Participant, sv3Party)
+          checksv3AmuletContract(sv1Participant, svcParty)
+          checksv3AmuletContract(sv3Participant, sv3Party)
         }
       }
 
@@ -193,13 +195,13 @@ class SvSvcPartyManagementIntegrationTest extends SvIntegrationTestBase with Wal
       }
   }
 
-  private def getCoins(
+  private def getAmulets(
       participant: CNParticipantClientReference,
       party: PartyId,
-      predicate: cc.coin.Coin.Contract => Boolean = _ => true,
-  ): Seq[cc.coin.Coin.Contract] = {
+      predicate: cc.amulet.Amulet.Contract => Boolean = _ => true,
+  ): Seq[cc.amulet.Amulet.Contract] = {
     participant.ledger_api_extensions.acs
-      .filterJava(cc.coin.Coin.COMPANION)(party, predicate)
+      .filterJava(cc.amulet.Amulet.COMPANION)(party, predicate)
       .sortBy(_.data.amount.initialAmount)
   }
 }

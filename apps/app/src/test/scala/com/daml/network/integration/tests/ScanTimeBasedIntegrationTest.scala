@@ -28,9 +28,9 @@ class ScanTimeBasedIntegrationTest
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
+      // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
-      .withoutAutomaticRewardsCollectionAndCoinMerging
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
       // Start ScanAggregationTrigger in paused state, calling runOnce in tests
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Scan)(
@@ -47,8 +47,8 @@ class ScanTimeBasedIntegrationTest
     roundNum() shouldBe 2
   }
 
-  "return correct coin configs" in { implicit env =>
-    // TODO(#2930) test also with changing coin prices.
+  "return correct amulet configs" in { implicit env =>
+    // TODO(#2930) test also with changing amulet prices.
     // TODO(#2930) Currently we are not guaranteed that the first three rounds are correctly
     // captured in the tx log, so for now we first advance a round, and query only on that
     // round and beyond. Once that is fixed, we should make sure that querying for round 0 is reliable as well.
@@ -57,16 +57,16 @@ class ScanTimeBasedIntegrationTest
 
     clue("Get config for round 3") {
       val cfg = eventuallySucceeds() {
-        sv1ScanBackend.getCoinConfigForRound(3)
+        sv1ScanBackend.getAmuletConfigForRound(3)
       }
-      cfg.coinCreateFee.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultCreateFee.fee divide walletCoinPrice setScale 10
+      cfg.amuletCreateFee.bigDecimal.setScale(10) should be(
+        CNNodeUtil.defaultCreateFee.fee divide walletAmuletPrice setScale 10
       )
       cfg.holdingFee.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultHoldingFee.rate divide walletCoinPrice setScale 10
+        CNNodeUtil.defaultHoldingFee.rate divide walletAmuletPrice setScale 10
       )
       cfg.lockHolderFee.bigDecimal.setScale(10) should be(
-        CNNodeUtil.defaultLockHolderFee.fee divide walletCoinPrice setScale 10
+        CNNodeUtil.defaultLockHolderFee.fee divide walletAmuletPrice setScale 10
       )
       cfg.transferFee.initial.bigDecimal.setScale(10) should be(
         CNNodeUtil.defaultTransferFee.initialRate.setScale(10)
@@ -74,7 +74,7 @@ class ScanTimeBasedIntegrationTest
       cfg.transferFee.steps shouldBe (
         CNNodeUtil.defaultTransferFee.steps.asScala.toSeq.map(step =>
           HttpScanAppClient.RateStep(
-            step._1 divide walletCoinPrice,
+            step._1 divide walletAmuletPrice,
             step._2,
           )
         )
@@ -83,20 +83,20 @@ class ScanTimeBasedIntegrationTest
 
     clue("Try to get config for round 4 which does not yet exist") {
       assertThrowsAndLogsCommandFailures(
-        sv1ScanBackend.getCoinConfigForRound(4),
+        sv1ScanBackend.getAmuletConfigForRound(4),
         _.errorMessage should include("Round 4 not found"),
       )
     }
 
     val newHoldingFee = 0.1
     clue("schedule a config change, and advance time for it to take effect") {
-      val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+      val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
       val configSchedule =
         createConfigSchedule(
           currentConfigSchedule,
           (
             defaultTickDuration.asJava,
-            mkUpdatedCoinConfig(
+            mkUpdatedAmuletConfig(
               currentConfigSchedule,
               tickDuration = defaultTickDuration,
               holdingFee = newHoldingFee,
@@ -110,8 +110,8 @@ class ScanTimeBasedIntegrationTest
     }
     clue("Round 4 should now be open, and have the new configuration") {
       eventuallySucceeds() {
-        sv1ScanBackend.getCoinConfigForRound(4).holdingFee should be(
-          walletUsdToCoin(newHoldingFee)
+        sv1ScanBackend.getAmuletConfigForRound(4).holdingFee should be(
+          walletUsdToAmulet(newHoldingFee)
         )
       }
     }
@@ -122,7 +122,7 @@ class ScanTimeBasedIntegrationTest
     waitForWalletUser(aliceValidatorWalletClient)
     waitForWalletUser(bobValidatorWalletClient)
 
-    clue("Tap to get some coins") {
+    clue("Tap to get some amulets") {
       aliceWalletClient.tap(500.0)
       bobWalletClient.tap(500.0)
       aliceValidatorWalletClient.tap(100.0)
@@ -296,7 +296,7 @@ class ScanTimeBasedIntegrationTest
     )
   }
 
-  "get total coin balance" in { implicit env =>
+  "get total amulet balance" in { implicit env =>
     val (_, _) = onboardAliceAndBob()
 
     def roundNum() =
@@ -330,23 +330,23 @@ class ScanTimeBasedIntegrationTest
     )
 
     clue("Get total balances for round 0, 1 and 2") {
-      val total0 = sv1ScanBackend.getTotalCoinBalance(0)
-      val total1 = sv1ScanBackend.getTotalCoinBalance(1)
-      val total2 = sv1ScanBackend.getTotalCoinBalance(2)
+      val total0 = sv1ScanBackend.getTotalAmuletBalance(0)
+      val total1 = sv1ScanBackend.getTotalAmuletBalance(1)
+      val total2 = sv1ScanBackend.getTotalAmuletBalance(2)
 
       val holdingFeeAfterOneRound = 1 * defaultHoldingFeeCC
       val holdingFeeAfterTwoRounds = 2 * defaultHoldingFeeCC
 
       total0 shouldBe 0.0
-      total1 shouldBe (walletUsdToCoin(tapRound1Amount) - holdingFeeAfterOneRound)
+      total1 shouldBe (walletUsdToAmulet(tapRound1Amount) - holdingFeeAfterOneRound)
       total2 shouldBe (
-        walletUsdToCoin(tapRound1Amount) - holdingFeeAfterTwoRounds +
-          walletUsdToCoin(tapRound2Amount) - holdingFeeAfterOneRound
+        walletUsdToAmulet(tapRound1Amount) - holdingFeeAfterTwoRounds +
+          walletUsdToAmulet(tapRound2Amount) - holdingFeeAfterOneRound
       )
       sv1ScanBackend.getAggregatedRounds().value shouldBe ScanAggregator.RoundRange(0, 2)
       sv1ScanBackend
         .listRoundTotals(0, 2)
-        .map(rt => (rt.closedRound, BigDecimal(rt.totalCoinBalance))) shouldBe List(
+        .map(rt => (rt.closedRound, BigDecimal(rt.totalAmuletBalance))) shouldBe List(
         0L -> total0,
         1L -> total1,
         2L -> total2,

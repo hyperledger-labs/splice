@@ -18,5 +18,5 @@ COPY target/monitoring.conf target/entrypoint.sh target/bootstrap-entrypoint.sc 
 
 RUN ln -s bin/canton cn-image-bin
 
-# point entrypoint to the coin executable
+# point entrypoint to the amulet executable
 ENTRYPOINT ["/usr/bin/tini", "--", "/app/entrypoint.sh"]

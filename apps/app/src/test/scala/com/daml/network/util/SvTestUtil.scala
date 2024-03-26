@@ -208,14 +208,14 @@ trait SvTestUtil extends CNNodeTestCommon {
     domainUpgradeSchedule.toJava,
   )
 
-  def computeCoinsToIssueToSvc(
+  def computeAmuletsToIssueToSvc(
       config: IssuanceConfig,
       tickDuration: NonNegativeFiniteDuration,
   ): java.math.BigDecimal = {
     val RoundsPerYear =
       BigDecimal(365 * 24 * 60 * 60).bigDecimal
         .divide(BigDecimal(tickDuration.duration.toSeconds).bigDecimal)
-    config.coinToIssuePerYear
+    config.amuletToIssuePerYear
       .multiply(
         BigDecimal(1.0).bigDecimal
           .subtract(config.appRewardPercentage)
@@ -231,7 +231,7 @@ trait SvTestUtil extends CNNodeTestCommon {
       tickDuration: NonNegativeFiniteDuration,
       svcSize: Int,
   ): java.math.BigDecimal = {
-    computeCoinsToIssueToSvc(config, tickDuration)
+    computeAmuletsToIssueToSvc(config, tickDuration)
       .divide(BigDecimal(svcSize).bigDecimal, RoundingMode.HALF_UP)
       .setScale(10, RoundingMode.HALF_UP)
   }

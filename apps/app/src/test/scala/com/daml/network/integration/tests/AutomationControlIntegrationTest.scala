@@ -11,7 +11,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
 import com.daml.network.util.*
-import com.daml.network.wallet.automation.CollectRewardsAndMergeCoinsTrigger
+import com.daml.network.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -158,17 +158,17 @@ class AutomationControlIntegrationTest
 
   }
 
-  "merge coins as automation is controlled" in { implicit env =>
+  "merge amulets as automation is controlled" in { implicit env =>
     val aliceUserName = aliceWalletClient.config.ledgerApiUser
     onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
 
-    // The trigger that merges coins for alice
+    // The trigger that merges amulets for alice
     // Note: using `def`, as the trigger may be destroyed and recreated (when user is offboarded and onboarded)
-    def aliceMergeCoinsTrigger =
+    def aliceMergeAmuletsTrigger =
       aliceValidatorBackend
         .userWalletAutomation(aliceUserName)
-        .trigger[CollectRewardsAndMergeCoinsTrigger]
+        .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
     // ------------------------------------------------------------------------
     // Pausing the trigger
@@ -177,37 +177,37 @@ class AutomationControlIntegrationTest
     // In the previous test, we had to make sure the trigger starts in a paused state by modifying the automation
     // config using a CNNodeConfigTransforms, because the AdvanceOpenMiningRoundTrigger might start doing work
     // before we enter the test body.
-    // In this case, it's ok to pause the CollectRewardsAndMergeCoinsTrigger inside the test body, because we
-    // know the trigger won't do any work unless we explicitly give Alice some coins.
-    aliceMergeCoinsTrigger.pause().futureValue
+    // In this case, it's ok to pause the CollectRewardsAndMergeAmuletsTrigger inside the test body, because we
+    // know the trigger won't do any work unless we explicitly give Alice some amulets.
+    aliceMergeAmuletsTrigger.pause().futureValue
 
     actAndCheck(
-      "Tap 2 coins for Alice", {
+      "Tap 2 amulets for Alice", {
         aliceWalletClient.tap(50.0)
         aliceWalletClient.tap(50.0)
       },
     )(
-      "Coins should appear in Alice's wallet",
-      _ => aliceWalletClient.list().coins should have length 2,
+      "Amulets should appear in Alice's wallet",
+      _ => aliceWalletClient.list().amulets should have length 2,
     )
 
     // Note: this is just to illustrate that nothing is happening while Alice's automation is paused.
-    clue("Verify that no coins are merged over a long time interval") {
+    clue("Verify that no amulets are merged over a long time interval") {
       Threading.sleep(waitTimeInMillis)
-      aliceWalletClient.list().coins should have length 2
+      aliceWalletClient.list().amulets should have length 2
     }
 
-    // Meanwhile, when Charlie taps 2 coins, they are quickly merged into 1 coin
+    // Meanwhile, when Charlie taps 2 amulets, they are quickly merged into 1 amulet
     actAndCheck(
-      "Tap 2 coins for Charlie", {
+      "Tap 2 amulets for Charlie", {
         charlieWalletClient.tap(50.0)
         charlieWalletClient.tap(50.0)
       },
     )(
-      "Charlie should see one merged coin",
+      "Charlie should see one merged amulet",
       _ => {
         charlieWalletClient.balance().unlockedQty should be > BigDecimal(99.0)
-        charlieWalletClient.list().coins should have length 1
+        charlieWalletClient.list().amulets should have length 1
       },
     )
 
@@ -215,18 +215,18 @@ class AutomationControlIntegrationTest
     // Resuming the trigger
     // ------------------------------------------------------------------------
 
-    // Note: aliceMergeCoinsTrigger.runOnce().futureValue guarantees that the coins have been merged
+    // Note: aliceMergeAmuletsTrigger.runOnce().futureValue guarantees that the amulets have been merged
     // on the ledger, but this might not immediately be visible in the wallet app.
     actAndCheck(
-      "Run merge coins automation once",
+      "Run merge amulets automation once",
       // Note: runOnce() does nothing if there is no work to be done, but in this case we know
-      // that the user wallet store knows about 2 coins
-      aliceMergeCoinsTrigger.runOnce().futureValue,
+      // that the user wallet store knows about 2 amulets
+      aliceMergeAmuletsTrigger.runOnce().futureValue,
     )(
-      "Verify that coins were merged",
+      "Verify that amulets were merged",
       workDone => {
         workDone should be(true)
-        aliceWalletClient.list().coins should have length 1
+        aliceWalletClient.list().amulets should have length 1
       },
     )
   }

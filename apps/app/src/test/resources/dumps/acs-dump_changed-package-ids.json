@@ -2,7 +2,7 @@
   "offset": "000000000000000034",
   "contracts": [
     {
-      "template_id": "deadbeef001:CC.Coin:Coin",
+      "template_id": "deadbeef001:CC.Amulet:Amulet",
       "contract_id": "00086905fab468531d4cbf26fc750b8ae2c7987bbe4a6a36a77ae5216e273abdf8ca0212204bbd5c8a72f6fb8923b93f4be00619addd4df16269e5468492e7a12a52b9b05d",
       "payload": {
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -22,7 +22,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Coin:Coin",
+      "template_id": "deadbeef001:CC.Amulet:Amulet",
       "contract_id": "00090a9ba7b1addeba87c8ae8d9562cbe70e6d8f06ae83f1f153aace06771c2cd0ca02122044c42ff7286d2a8eb3a7c55735afb0064cc976123efa1874786cff25f22450e8",
       "payload": {
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -42,7 +42,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Coin:Coin",
+      "template_id": "deadbeef001:CC.Amulet:Amulet",
       "contract_id": "00d2a322a7b626a7b154af265d2af5dfb870558d6c4a5ffc970c8e7696cfb18580ca021220f3e18f148e5ba64082deddc7f59efac36f2fbe038ac1bc4120bed0f3558e935a",
       "payload": {
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -62,7 +62,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Coin:Coin",
+      "template_id": "deadbeef001:CC.Amulet:Amulet",
       "contract_id": "00483db7cef89a74bb72c537a11371bfe53a43fed724488dd92ffa1caac4f3b41dca0212205c4c80b6b9036ef14ed2570581c35a04327f35126971922f2bc74d3dd78fdc01",
       "payload": {
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -82,13 +82,13 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.CoinImport:ImportCrate",
+      "template_id": "deadbeef001:CC.AmuletImport:ImportCrate",
       "contract_id": "003d0c4156b123bd527be56edd22c5cddb8c4399d70733300b9e5d7186e5cc7053ca0212208ed98a8d17c4296f80a2c30b69fdc914c4c20d3707a35865e20e27166a0ffdd6",
       "payload": {
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "receiver": "charlie__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
         "payload": {
-          "tag": "IP_Coin",
+          "tag": "IP_Amulet",
           "value": {
             "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
             "owner": "charlie__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
@@ -109,10 +109,10 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.Coin:LockedCoin",
+      "template_id": "deadbeef001:CC.Amulet:LockedAmulet",
       "contract_id": "00cbccd1d46f5b707d74d5c61645019e84895534fdfd7df84953d92c82a43fc7cbca0212203a1a79892adc6ee3518fa146b9e8df07f379465f1b8f0183682a811ff9535f91",
       "payload": {
-        "coin": {
+        "amulet": {
           "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
           "owner": "alice__wallet__user-fbae5254__tc0::12203d347bfec9a7f6f2b027ad5451b55d920fd4f930a5ab4d5df704bb3b1f6ab250",
           "amount": {
@@ -135,14 +135,14 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:CC.CoinRules:CoinRules",
+      "template_id": "deadbeef001:CC.AmuletRules:AmuletRules",
       "contract_id": "0017028f8349afbc1d1c773a721f68261f7aba5934d449f6c7bffb71ad8f256ccfca0212205aa5ff43a477e34eb631cb4771adcd5ff72c99415b4e6a50dd87aa7ff006b82b",
       "payload": {
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "configSchedule": {
           "initialValue": {
             "packageConfig": {
-              "cantonCoin": "0.1.0",
+              "cantonAmulet": "0.1.0",
               "svcGovernance": "0.1.0",
               "validatorLifecycle": "0.1.0",
               "cantonNameService": "0.1.0",
@@ -209,7 +209,7 @@
             "issuanceCurve": {
               "initialValue": {
                 "validatorRewardPercentage": "0.5",
-                "coinToIssuePerYear": "40000000000.0",
+                "amuletToIssuePerYear": "40000000000.0",
                 "unfeaturedAppRewardCap": "0.6",
                 "appRewardPercentage": "0.15",
                 "featuredAppRewardCap": "100.0",
@@ -222,7 +222,7 @@
                   },
                   "_2": {
                     "validatorRewardPercentage": "0.12",
-                    "coinToIssuePerYear": "20000000000.0",
+                    "amuletToIssuePerYear": "20000000000.0",
                     "unfeaturedAppRewardCap": "0.6",
                     "appRewardPercentage": "0.4",
                     "featuredAppRewardCap": "100.0",
@@ -235,7 +235,7 @@
                   },
                   "_2": {
                     "validatorRewardPercentage": "0.18",
-                    "coinToIssuePerYear": "10000000000.0",
+                    "amuletToIssuePerYear": "10000000000.0",
                     "unfeaturedAppRewardCap": "0.6",
                     "appRewardPercentage": "0.62",
                     "featuredAppRewardCap": "100.0",
@@ -248,7 +248,7 @@
                   },
                   "_2": {
                     "validatorRewardPercentage": "0.21",
-                    "coinToIssuePerYear": "5000000000.0",
+                    "amuletToIssuePerYear": "5000000000.0",
                     "unfeaturedAppRewardCap": "0.6",
                     "appRewardPercentage": "0.69",
                     "featuredAppRewardCap": "100.0",
@@ -261,7 +261,7 @@
                   },
                   "_2": {
                     "validatorRewardPercentage": "0.2",
-                    "coinToIssuePerYear": "2500000000.0",
+                    "amuletToIssuePerYear": "2500000000.0",
                     "unfeaturedAppRewardCap": "0.6",
                     "appRewardPercentage": "0.75",
                     "featuredAppRewardCap": "100.0",
@@ -280,7 +280,7 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CC.Coin:UnclaimedReward",
+      "template_id": "deadbeef001:CC.Amulet:UnclaimedReward",
       "contract_id": "007a7cf290ce574cc77cff3bfaca4c0a5488061f23a7e950bfaa90c14c7b8aa341ca0212208054c9d9a0e6448252318675ba91825b71f787044d7e88daa25366757cae246a",
       "payload": {
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -330,7 +330,7 @@
         },
         "issuanceConfig": {
           "validatorRewardPercentage": "0.5",
-          "coinToIssuePerYear": "40000000000.0",
+          "amuletToIssuePerYear": "40000000000.0",
           "unfeaturedAppRewardCap": "0.6",
           "appRewardPercentage": "0.15",
           "featuredAppRewardCap": "100.0",
@@ -369,7 +369,7 @@
           "maxNumOutputs": "100"
         },
         "targetClosesAt": "1970-01-01T00:05:00Z",
-        "coinPrice": "1.0",
+        "amuletPrice": "1.0",
         "tickDuration": {
           "microseconds": "150000000"
         },
@@ -390,7 +390,7 @@
         },
         "issuanceConfig": {
           "validatorRewardPercentage": "0.5",
-          "coinToIssuePerYear": "40000000000.0",
+          "amuletToIssuePerYear": "40000000000.0",
           "unfeaturedAppRewardCap": "0.6",
           "appRewardPercentage": "0.15",
           "featuredAppRewardCap": "100.0",
@@ -429,7 +429,7 @@
           "maxNumOutputs": "100"
         },
         "targetClosesAt": "1970-01-01T00:07:30Z",
-        "coinPrice": "1.0",
+        "amuletPrice": "1.0",
         "tickDuration": {
           "microseconds": "150000000"
         },
@@ -450,7 +450,7 @@
         },
         "issuanceConfig": {
           "validatorRewardPercentage": "0.5",
-          "coinToIssuePerYear": "40000000000.0",
+          "amuletToIssuePerYear": "40000000000.0",
           "unfeaturedAppRewardCap": "0.6",
           "appRewardPercentage": "0.15",
           "featuredAppRewardCap": "100.0",
@@ -489,7 +489,7 @@
           "maxNumOutputs": "100"
         },
         "targetClosesAt": "1970-01-01T00:10:10Z",
-        "coinPrice": "1.0",
+        "amuletPrice": "1.0",
         "tickDuration": {
           "microseconds": "150000000"
         },
@@ -592,12 +592,12 @@
       "created_at": "1970-01-01T00:00:00Z"
     },
     {
-      "template_id": "deadbeef001:CN.SVC.CoinPrice:CoinPriceVote",
+      "template_id": "deadbeef001:CN.SVC.AmuletPrice:AmuletPriceVote",
       "contract_id": "00d2bcf8af8932506f3b9e93eff17567558b8613c8804f7f36989e37dd1f49a437ca021220a8d3c0ebc404b8a99eaeb24b3f36e64269a02186eab815468759588d906e025e",
       "payload": {
         "svc": "svc-fbae5254-fbae5254::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
         "sv": "canton-foundation-1-fbae5254::122022a627f9b39c854dc6c26c0f71c7112b1f9664133a0cd88431fac50880ba3616",
-        "coinPrice": "1.0",
+        "amuletPrice": "1.0",
         "lastUpdatedAt": "1970-01-01T00:00:00Z"
       },
       "created_event_blob": "CgIxNRKnBApFANK8+K+JMlBvO56T7/F1Z1WLhhPIgE9/NpieN90fSaQ3ygISIKjTwOvEBLipnq6ySz825kJpoCGG6rgVRodZWI2QbgJeEmUKQDk0MzE4YjQxOGEwN2FmNjc0NTJhMzE2ZmQ4YjgyYjQ5ZDU0NGM2NzhhZDdmZmEzYjhhMDU0M2Q4ZmZmMmIwNTcSAkNOEgNTVkMSCUNvaW5QcmljZRoNQ29pblByaWNlVm90ZRrvAQrsARJfEl1SW3N2Yy1mYmFlNTI1NC1mYmFlNTI1NDo6MTIyMGUyMTQ0YTQyZjg2YTZlOTljN2IyZGZhZTNiYWM5ZTE4MDE5ZTljYTJiMWUxZWFhYjA0MTM4YWMwMDg0NDI3N2ISZhJkUmJjYW50b24tZm91bmRhdGlvbi0xLWZiYWU1MjU0OjoxMjIwMjJhNjI3ZjliMzljODU0ZGM2YzI2YzBmNzFjNzExMmIxZjk2NjQxMzNhMGNkODg0MzFmYWM1MDg4MGJhMzYxNhIUEhJyEAoOMgwxLjAwMDAwMDAwMDASCxIJSQAAAAAAAAAAKltzdmMtZmJhZTUyNTQtZmJhZTUyNTQ6OjEyMjBlMjE0NGE0MmY4NmE2ZTk5YzdiMmRmYWUzYmFjOWUxODAxOWU5Y2EyYjFlMWVhYWIwNDEzOGFjMDA4NDQyNzdiQigKJgokCAESIIBK/W1wAlIEE1aLEQgjSDkVzp808bca8IgDf8dL/vYS",

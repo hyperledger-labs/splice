@@ -26,7 +26,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 
 import java.time.{Duration, Instant}
 import scala.concurrent.{ExecutionContext, Future}
-import com.daml.network.codegen.java.cc.coinrules as coinrulesCodegen
+import com.daml.network.codegen.java.cc.amuletrules as amuletrulesCodegen
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.tracing.TraceContext
 import org.slf4j.event.Level
@@ -56,16 +56,16 @@ class BftScanConnectionTest
     }
     connections.foreach { connection =>
       // all of this is noise...
-      when(connection.getCoinRulesWithState(eqTo(None))(any[ExecutionContext], any[TraceContext]))
+      when(connection.getAmuletRulesWithState(eqTo(None))(any[ExecutionContext], any[TraceContext]))
         .thenReturn(
           Future.successful(
             ContractWithState(
               Contract(
-                coinrulesCodegen.CoinRules.TEMPLATE_ID,
-                new coinrulesCodegen.CoinRules.ContractId("whatever"),
-                new coinrulesCodegen.CoinRules(
+                amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
+                new amuletrulesCodegen.AmuletRules.ContractId("whatever"),
+                new amuletrulesCodegen.AmuletRules(
                   partyIdA.toProtoPrimitive,
-                  CNNodeUtil.defaultCoinConfigSchedule(
+                  CNNodeUtil.defaultAmuletConfigSchedule(
                     NonNegativeFiniteDuration(Duration.ofMinutes(10)),
                     10,
                     domainId,

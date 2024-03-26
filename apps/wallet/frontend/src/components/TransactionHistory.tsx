@@ -25,18 +25,18 @@ import Typography from '@mui/material/Typography';
 import { Party } from '@daml/types';
 
 import { usePrimaryParty, useTransactions } from '../hooks';
-import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
+import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { Transaction, TransactionSubtype } from '../models/models';
 import BftCnsEntry from './BftCnsEntry';
 
 const TransactionHistory: React.FC = () => {
   const txQuery = useTransactions();
 
-  const coinPriceQuery = useCoinPrice();
+  const amuletPriceQuery = useAmuletPrice();
   const primaryPartyId = usePrimaryParty();
 
-  const isLoading = coinPriceQuery.isLoading || txQuery.isLoading;
-  const isError = coinPriceQuery.isError || txQuery.isError || !primaryPartyId;
+  const isLoading = amuletPriceQuery.isLoading || txQuery.isLoading;
+  const isError = amuletPriceQuery.isError || txQuery.isError || !primaryPartyId;
 
   const hasNoTransactions = (pagedTxs: Transaction[][]): boolean => {
     return (
@@ -56,7 +56,7 @@ const TransactionHistory: React.FC = () => {
       {isLoading ? (
         <Loading />
       ) : isError ? (
-        <ErrorDisplay message={'Error while fetching either transactions or coin price.'} />
+        <ErrorDisplay message={'Error while fetching either transactions or amulet price.'} />
       ) : hasNoTransactions(pagedTransactions) ? (
         <Typography variant="h6">No Transactions yet</Typography>
       ) : (
@@ -174,7 +174,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
   switch (subtype.choice) {
     case 'WalletAppInstall_ExecuteBatch':
       // WalletAutomation
-      switch (subtype.coin_operation) {
+      switch (subtype.amulet_operation) {
         case 'CO_CompleteAcceptedTransfer':
           text = 'P2P Payment Failed';
           break;
@@ -186,7 +186,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
           text = 'Automation';
           break;
         default:
-          console.warn('Unknown Transaction Coin Operation', subtype);
+          console.warn('Unknown Transaction Amulet Operation', subtype);
           text = subtype.choice;
       }
       break;
@@ -202,7 +202,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // AppPaymentAccepted
       text = 'App Payment Accepted';
       break;
-    case 'CoinRules_BuyMemberTraffic':
+    case 'AmuletRules_BuyMemberTraffic':
       // ExtraTrafficPurchase
       text = 'Extra Traffic Purchase';
       break;
@@ -218,7 +218,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // SubscriptionInitialPaymentAccepted
       text = 'Subscription Initial Payment Accepted';
       break;
-    case 'CoinRules_Transfer':
+    case 'AmuletRules_Transfer':
       // Transfer
       text = 'Transfer';
       break;
@@ -230,13 +230,13 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // AppPaymentExpired
       text = 'App Payment Expired';
       break;
-    case 'CoinRules_Mint':
+    case 'AmuletRules_Mint':
       // Mint
       text = 'Mint';
       break;
-    case 'Coin_Expire':
-      // CoinExpired
-      text = 'Coin Expired';
+    case 'Amulet_Expire':
+      // AmuletExpired
+      text = 'Amulet Expired';
       break;
     case 'SvRewardCoupon_ArchiveAsBeneficiary':
       // SvRewardCollected
@@ -246,21 +246,21 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // SubscriptionPaymentRejected
       text = 'Subscription Payment Rejected';
       break;
-    case 'LockedCoin_Unlock':
-      // LockedCoinUnlocked
-      text = 'Locked Coin Unlocked';
+    case 'LockedAmulet_Unlock':
+      // LockedAmuletUnlocked
+      text = 'Locked Amulet Unlocked';
       break;
     case 'SubscriptionInitialPayment_Reject':
       // SubscriptionInitialPaymentRejected
       text = 'Subscription Initial Payment Rejected';
       break;
-    case 'LockedCoin_OwnerExpireLock':
-      // LockedCoinOwnerExpired
-      text = 'Locked Coin Owner Expired';
+    case 'LockedAmulet_OwnerExpireLock':
+      // LockedAmuletOwnerExpired
+      text = 'Locked Amulet Owner Expired';
       break;
-    case 'LockedCoin_ExpireCoin':
-      // LockedCoinExpired
-      text = 'Locked Coin Expired';
+    case 'LockedAmulet_ExpireAmulet':
+      // LockedAmuletExpired
+      text = 'Locked Amulet Expired';
       break;
     case 'AcceptedAppPayment_Reject':
       // AppPaymentRejected
@@ -274,7 +274,7 @@ const TransactionSubtypeText: React.FC<{ subtype: TransactionSubtype }> = ({ sub
       // SubscriptionPaymentExpired
       text = 'Subscription Payment Expired';
       break;
-    case 'CoinRules_DevNet_Tap':
+    case 'AmuletRules_DevNet_Tap':
       // Tap
       text = 'Tap';
       break;
@@ -399,7 +399,7 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, prim
   // If the balance change is negative, the number already contains the minus sign.
   const sign = amountCC.isPositive() ? '+' : '';
 
-  const coinPriceAtTimeOfTransaction = transaction.coinPrice;
+  const amuletPriceAtTimeOfTransaction = transaction.amuletPrice;
 
   return (
     <Stack direction="column">
@@ -414,12 +414,12 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, prim
             amount={amountCC}
             currency="CC"
             convert="CCtoUSD"
-            coinPrice={coinPriceAtTimeOfTransaction}
+            amuletPrice={amuletPriceAtTimeOfTransaction}
           />
         </Typography>
         <Typography variant="caption">@</Typography>
         <Typography variant="caption" className="tx-amount-rate">
-          <RateDisplay base="CC" quote="USD" coinPrice={coinPriceAtTimeOfTransaction} />
+          <RateDisplay base="CC" quote="USD" amuletPrice={amuletPriceAtTimeOfTransaction} />
         </Typography>
       </Stack>
     </Stack>

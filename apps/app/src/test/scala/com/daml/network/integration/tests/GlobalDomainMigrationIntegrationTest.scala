@@ -397,10 +397,10 @@ class GlobalDomainMigrationIntegrationTest
       )
       .withManualStart
       // TODO (#10859) remove and fix test failures
-      .withCoinPrice(walletCoinPrice)
+      .withAmuletPrice(walletAmuletPrice)
 
   // TODO (#10859) remove and fix test failures
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(1.0)
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(1.0)
 
   "migrate global domain to new nodes with downtime" in { implicit env =>
     import env.environment.scheduler
@@ -430,9 +430,9 @@ class GlobalDomainMigrationIntegrationTest
         // buffer to account for domain fee payments
         assertInRange(
           sv1WalletClient.balance().unlockedQty,
-          (walletUsdToCoin(1000), walletUsdToCoin(2000)),
+          (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
         )
-        countTapsFromScan(sv1ScanBackend, walletUsdToCoin(1337)) shouldBe 1
+        countTapsFromScan(sv1ScanBackend, walletUsdToAmulet(1337)) shouldBe 1
       },
     )
 
@@ -449,20 +449,20 @@ class GlobalDomainMigrationIntegrationTest
       }
     }
 
-    def startValidatorAndTapCoin(
+    def startValidatorAndTapAmulet(
         validatorBackend: ValidatorAppBackendReference,
         walletClient: WalletAppClientReference,
         tapAmount: BigDecimal = 50.0,
-        expectedCoins: Range = 50 to 50,
+        expectedAmulets: Range = 50 to 50,
     ) = {
       startAllSync(validatorBackend)
       val walletUserParty = onboardWalletUser(walletClient, validatorBackend)
       walletClient.tap(tapAmount)
-      withClueAndLog(s"${validatorBackend.name} has tapped a coin") {
+      withClueAndLog(s"${validatorBackend.name} has tapped a amulet") {
         checkWallet(
           walletUserParty,
           walletClient,
-          Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+          Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
         )
       }
       validatorBackend.participantClientWithAdminToken.health.status.isActive shouldBe Some(
@@ -481,7 +481,7 @@ class GlobalDomainMigrationIntegrationTest
       "stop-bob-validator-before-domain-migration",
       "VALIDATOR_ADMIN_USER" -> bobValidatorLocalBackend.config.ledgerApiUser,
     ) {
-      startValidatorAndTapCoin(bobValidatorLocalBackend, bobWalletClient)
+      startValidatorAndTapAmulet(bobValidatorLocalBackend, bobWalletClient)
       bobValidatorLocalBackend.stop()
     }
 
@@ -521,7 +521,7 @@ class GlobalDomainMigrationIntegrationTest
       ),
     )() {
       aliceValidatorBackend.participantClient.upload_dar_unless_exists(splitwellDarPath)
-      val aliceUserParty = startValidatorAndTapCoin(aliceValidatorBackend, aliceWalletClient)
+      val aliceUserParty = startValidatorAndTapAmulet(aliceValidatorBackend, aliceWalletClient)
       val splitwellGroupKey = createSplitwellGroupAndTransfer(aliceUserParty)
 
       val sequencerUrlSetBeforeUpgrade = clue("validator should connect to all sequencer urls") {
@@ -736,11 +736,11 @@ class GlobalDomainMigrationIntegrationTest
           val aliceValidatorLocal = v("aliceValidatorLocal")
           withClueAndLog("validator can migrate to the new domain") {
             val validatorThatMigrates = aliceValidatorLocal
-            startValidatorAndTapCoin(
+            startValidatorAndTapAmulet(
               validatorThatMigrates,
               uwc("aliceWalletLocal"),
               // tap 2 times (100) minus splitwell transfer (42)
-              expectedCoins = 57 to 58,
+              expectedAmulets = 57 to 58,
             )
           }
 
@@ -768,7 +768,7 @@ class GlobalDomainMigrationIntegrationTest
             }
           }
 
-          startValidatorAndTapCoin(
+          startValidatorAndTapAmulet(
             v("splitwellValidatorLocal"),
             uwc("splitwellProviderWalletLocal"),
           )
@@ -798,8 +798,8 @@ class GlobalDomainMigrationIntegrationTest
               assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 4000))
               inside(listTapsFromScan(sv1ScanLocalBackend, sv1Party, 1337, 1338)) {
                 case Seq(formerTap, laterTap) =>
-                  BigDecimal(formerTap.coinAmount) shouldBe BigDecimal(1337)
-                  BigDecimal(laterTap.coinAmount) shouldBe BigDecimal(1338)
+                  BigDecimal(formerTap.amuletAmount) shouldBe BigDecimal(1337)
+                  BigDecimal(laterTap.amuletAmount) shouldBe BigDecimal(1338)
               }
             },
           )
@@ -955,7 +955,7 @@ class GlobalDomainMigrationIntegrationTest
 
   private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: BigDecimal) = {
     listTransactionsFromScan(scan).count(
-      _.tap.map(a => BigDecimal(a.coinAmount)).contains(tapAmount)
+      _.tap.map(a => BigDecimal(a.amuletAmount)).contains(tapAmount)
     )
   }
 
@@ -968,9 +968,9 @@ class GlobalDomainMigrationIntegrationTest
     listTransactionsFromScan(scan)
       .flatMap(_.tap)
       .filter { tx =>
-        tx.coinOwner == owner.toProtoPrimitive &&
-        BigDecimal(tx.coinAmount) >= BigDecimal(fromTapAmount) &&
-        BigDecimal(tx.coinAmount) <= BigDecimal(toTapAmount)
+        tx.amuletOwner == owner.toProtoPrimitive &&
+        BigDecimal(tx.amuletAmount) >= BigDecimal(fromTapAmount) &&
+        BigDecimal(tx.amuletAmount) <= BigDecimal(toTapAmount)
       }
   }
 

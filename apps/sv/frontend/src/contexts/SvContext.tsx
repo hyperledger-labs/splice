@@ -2,7 +2,7 @@ import { useQuery, UseQueryResult } from '@tanstack/react-query';
 import { useSvClient } from 'common-frontend';
 import { Contract, PollingStrategy } from 'common-frontend-utils';
 
-import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules';
+import { AmuletRules } from '@daml.js/canton-amulet/lib/CC/AmuletRules';
 import { ElectionRequest, SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules';
 
 import { useSvAdminClient } from './SvAdminServiceContext';
@@ -13,7 +13,7 @@ type SvUiState =
       svPartyId: string;
       svcPartyId: string;
       votingThreshold: bigint;
-      coinRules: Contract<CoinRules>;
+      amuletRules: Contract<AmuletRules>;
       svcRules: Contract<SvcRules>;
     }
   | undefined;
@@ -22,7 +22,7 @@ export const useSvcInfos = (): UseQueryResult<SvUiState> => {
   const { getSvcInfo } = useSvClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
-    queryKey: ['getSvcInfo', SvcRules, CoinRules],
+    queryKey: ['getSvcInfo', SvcRules, AmuletRules],
     queryFn: async () => {
       const resp = await getSvcInfo();
       return {
@@ -30,7 +30,7 @@ export const useSvcInfos = (): UseQueryResult<SvUiState> => {
         svPartyId: resp.sv_party_id,
         svcPartyId: resp.svc_party_id,
         votingThreshold: resp.voting_threshold,
-        coinRules: Contract.decodeOpenAPI(resp.coin_rules, CoinRules),
+        amuletRules: Contract.decodeOpenAPI(resp.amulet_rules, AmuletRules),
         svcRules: Contract.decodeOpenAPI(resp.svc_rules, SvcRules),
       };
     },

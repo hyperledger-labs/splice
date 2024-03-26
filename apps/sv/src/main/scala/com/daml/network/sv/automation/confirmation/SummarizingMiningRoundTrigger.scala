@@ -8,12 +8,12 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinrules.CoinRules_MiningRound_StartIssuing
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_MiningRound_StartIssuing
 import com.daml.network.codegen.java.cc.issuance.OpenMiningRoundSummary
 import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_StartIssuing
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.store.SvSvcStore
@@ -44,13 +44,13 @@ class SummarizingMiningRoundTrigger(
   private val svParty = store.key.svParty
   private val svcParty = store.key.svcParty
 
-  private def coinRulesStartIssuingAction(
+  private def amuletRulesStartIssuingAction(
       miningRoundCid: SummarizingMiningRound.ContractId,
       summary: OpenMiningRoundSummary,
   ): ActionRequiringConfirmation =
-    new ARC_CoinRules(
+    new ARC_AmuletRules(
       new CRARC_MiningRound_StartIssuing(
-        new CoinRules_MiningRound_StartIssuing(
+        new AmuletRules_MiningRound_StartIssuing(
           miningRoundCid,
           summary,
         )
@@ -69,7 +69,7 @@ class SummarizingMiningRoundTrigger(
         summarizingRound.domain,
       )
       svcRules <- store.getSvcRules()
-      action = coinRulesStartIssuingAction(
+      action = amuletRulesStartIssuingAction(
         summarizingRound.contractId,
         rewards.summary,
       )

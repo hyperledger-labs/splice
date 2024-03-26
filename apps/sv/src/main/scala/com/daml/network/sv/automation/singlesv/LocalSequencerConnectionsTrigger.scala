@@ -40,7 +40,7 @@ class LocalSequencerConnectionsTrigger(
         domainId,
         maxDomainTimeLag = context.config.pollingInterval,
       )
-      globalDomainId <- store.getCoinRulesDomain()(traceContext)
+      globalDomainId <- store.getAmuletRulesDomain()(traceContext)
       svcRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
         globalDomainId,
         domainTimeLb.timestamp.toInstant,

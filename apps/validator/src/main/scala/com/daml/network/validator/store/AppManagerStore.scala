@@ -5,7 +5,7 @@ import cats.syntax.either.*
 import com.daml.network.codegen.java.cn.appmanager.store as codegen
 import com.daml.network.environment.{CNLedgerConnection, CommandPriority, RetryProvider}
 import com.daml.network.http.v0.definitions
-import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
+import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.ContractWithState
@@ -31,7 +31,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * Note that contrary to our contract-based stores this also provides the write endpoints.
   */
 final class AppManagerStore(
-    getCoinRulesDomain: GetCoinRulesDomain,
+    getAmuletRulesDomain: GetAmuletRulesDomain,
     storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
     retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
@@ -155,9 +155,9 @@ final class AppManagerStore(
   )(implicit tc: TraceContext): Future[Unit] =
     retryProvider
       .retryForClientCalls(
-        "fetch_coin_rules_domain",
-        "Fetching global domain from CoinRules",
-        getCoinRulesDomain()(tc),
+        "fetch_amulet_rules_domain",
+        "Fetching global domain from AmuletRules",
+        getAmuletRulesDomain()(tc),
         logger,
       )
       .flatMap { domain =>

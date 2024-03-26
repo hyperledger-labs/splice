@@ -3,9 +3,9 @@ package com.daml.network.store.db
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.DamlRecord
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinrules.{
+import com.daml.network.codegen.java.cc.amuletrules.{
   AppTransferContext,
-  CoinRules_MiningRound_Archive,
+  AmuletRules_MiningRound_Archive,
 }
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
@@ -19,14 +19,14 @@ import com.daml.network.codegen.java.cn.svc.globaldomain.{
 import com.daml.network.codegen.java.cn.svcrules.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CnsEntryContext,
-  ARC_CoinRules,
+  ARC_AmuletRules,
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.{
   CNSRARC_CollectInitialEntryPayment,
   CNSRARC_RejectEntryInitialPayment,
 }
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
+import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svcrules.electionrequestreason.ERR_OtherReason
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.{
   SRARC_AddMember,
@@ -114,7 +114,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
     }
 
     lookupTests("lookupSvcRulesWithOffset")(svcRules())(_.lookupSvcRulesWithOffset())
-    lookupTests("lookupCoinRulesWithOffset")(coinRules())(_.lookupCoinRulesWithOffset())
+    lookupTests("lookupAmuletRulesWithOffset")(amuletRules())(_.lookupAmuletRulesWithOffset())
     lookupTests("lookupCnsRulesWithOffset")(cnsRules())(
       _.lookupCnsRulesWithOffset()
     )
@@ -234,13 +234,13 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listExpiredCoins" should {
+    "listExpiredAmulets" should {
 
-      "return all the coins that are expired as of the latest open mining round" in {
-        val expiresAtRound2 = coin(storeSvParty, 1.0, 1, 1.0)
-        val expiresAtRound3 = coin(storeSvParty, 1.0, 2, 1.0)
-        val expiresAtRound4 = coin(storeSvParty, 3.0, 1, 1.0)
-        val wontExpireAnyTimeSoon = coin(storeSvParty, 10.0, 2, 0.0001)
+      "return all the amulets that are expired as of the latest open mining round" in {
+        val expiresAtRound2 = amulet(storeSvParty, 1.0, 1, 1.0)
+        val expiresAtRound3 = amulet(storeSvParty, 1.0, 2, 1.0)
+        val expiresAtRound4 = amulet(storeSvParty, 3.0, 1, 1.0)
+        val wontExpireAnyTimeSoon = amulet(storeSvParty, 10.0, 2, 0.0001)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
@@ -250,7 +250,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listExpiredCoins(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+          result <- store.listExpiredAmulets(CantonTimestamp.now(), PageLimit.tryCreate(100))(
             traceContext
           )
         } yield {
@@ -259,16 +259,16 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
-      "do not return expired coins from other domains" in {
-        val expiresAtRound2 = coin(storeSvParty, 1.0, 1, 1.0)
-        val expiresAtRound3 = coin(storeSvParty, 1.0, 2, 1.0)
+      "do not return expired amulets from other domains" in {
+        val expiresAtRound2 = amulet(storeSvParty, 1.0, 1, 1.0)
+        val expiresAtRound3 = amulet(storeSvParty, 1.0, 2, 1.0)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
           _ <- dummy2Domain.create(expiresAtRound2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(expiresAtRound3)(store.multiDomainAcsStore)
-          result <- store.listExpiredCoins(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+          result <- store.listExpiredAmulets(CantonTimestamp.now(), PageLimit.tryCreate(100))(
             traceContext
           )
         } yield {
@@ -279,13 +279,13 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listLockedExpiredCoins" should {
+    "listLockedExpiredAmulets" should {
 
-      "return all the locked coins that are expired as of the latest open mining round" in {
-        val expiresAtRound2 = lockedCoin(storeSvParty, 1.0, 1, 1.0)
-        val expiresAtRound3 = lockedCoin(storeSvParty, 1.0, 2, 1.0)
-        val expiresAtRound4 = lockedCoin(storeSvParty, 3.0, 1, 1.0)
-        val wontExpireAnyTimeSoon = lockedCoin(storeSvParty, 10.0, 2, 0.0001)
+      "return all the locked amulets that are expired as of the latest open mining round" in {
+        val expiresAtRound2 = lockedAmulet(storeSvParty, 1.0, 1, 1.0)
+        val expiresAtRound3 = lockedAmulet(storeSvParty, 1.0, 2, 1.0)
+        val expiresAtRound4 = lockedAmulet(storeSvParty, 3.0, 1, 1.0)
+        val wontExpireAnyTimeSoon = lockedAmulet(storeSvParty, 10.0, 2, 0.0001)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
@@ -295,7 +295,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           )(
             dummyDomain.create(_)(store.multiDomainAcsStore)
           )
-          result <- store.listLockedExpiredCoins(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+          result <- store.listLockedExpiredAmulets(CantonTimestamp.now(), PageLimit.tryCreate(100))(
             traceContext
           )
         } yield {
@@ -304,16 +304,16 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
-      "do not return expired locked coins from other domains" in {
-        val expiresAtRound2 = lockedCoin(storeSvParty, 1.0, 1, 1.0)
-        val expiresAtRound3 = lockedCoin(storeSvParty, 1.0, 2, 1.0)
+      "do not return expired locked amulets from other domains" in {
+        val expiresAtRound2 = lockedAmulet(storeSvParty, 1.0, 1, 1.0)
+        val expiresAtRound3 = lockedAmulet(storeSvParty, 1.0, 2, 1.0)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(svcRules())(store.multiDomainAcsStore)
           _ <- createMiningRoundsTriple(store, startRound = 3L) // oldest is round 3, newest is 5
           _ <- dummy2Domain.create(expiresAtRound2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(expiresAtRound3)(store.multiDomainAcsStore)
-          result <- store.listLockedExpiredCoins(CantonTimestamp.now(), PageLimit.tryCreate(100))(
+          result <- store.listLockedExpiredAmulets(CantonTimestamp.now(), PageLimit.tryCreate(100))(
             traceContext
           )
         } yield {
@@ -583,9 +583,9 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.create(
             confirmation(
               n = 6,
-              action = new ARC_CoinRules(
+              action = new ARC_AmuletRules(
                 new CRARC_MiningRound_Archive(
-                  new CoinRules_MiningRound_Archive(
+                  new AmuletRules_MiningRound_Archive(
                     hasConfirmation.contractId
                   )
                 )
@@ -841,7 +841,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       "list followers" in {
 
         val leaderContract = svcRules()
-        val followerContract1 = coinRules()
+        val followerContract1 = amuletRules()
         val followerContract2 = memberRewardState("sv1")
         val alreadyReassigned = memberRewardState("sv2")
         for {
@@ -860,10 +860,10 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
       }
     }
 
-    "listCoinRulesTransferFollowers" should {
+    "listAmuletRulesTransferFollowers" should {
       "list followers" in {
 
-        val leaderContract = coinRules()
+        val leaderContract = amuletRules()
         val followerContract1 = openMiningRound(svcParty, 3, 1.0)
         val followerContract2 = closedMiningRound(svcParty, 1)
         val alreadyReassigned = closedMiningRound(svcParty, 2)
@@ -873,7 +873,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummy2Domain.create(followerContract1)(store.multiDomainAcsStore)
           _ <- dummy2Domain.create(followerContract2)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(alreadyReassigned)(store.multiDomainAcsStore)
-          result <- store.listCoinRulesTransferFollowers()
+          result <- store.listAmuletRulesTransferFollowers()
         } yield result.map(x =>
           x.leader.contractId -> x.follower.contractId
         ) should contain theSameElementsAs Seq(
@@ -1001,7 +1001,7 @@ abstract class SvSvcStoreTest extends StoreTest with HasExecutionContext {
         new SubscriptionInitialPayment.ContractId(validContractId(1)),
   ): ActionRequiringConfirmation = {
     val appTransferContext = new AppTransferContext(
-      new cc.coinrules.CoinRules.ContractId(validContractId(1)),
+      new cc.amuletrules.AmuletRules.ContractId(validContractId(1)),
       new cc.round.OpenMiningRound.ContractId(validContractId(1)),
       Optional.empty(),
     )
@@ -1266,7 +1266,7 @@ class DbSvSvcStoreTest
   override protected def mkStore(): Future[DbSvSvcStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.cantonCoin.all ++
+        DarResources.cantonAmulet.all ++
           DarResources.validatorLifecycle.all ++
           DarResources.svcGovernance.all
       )

@@ -54,7 +54,7 @@ import org.apache.pekko.stream.Materializer
 class ScanApp(
     override val name: InstanceName,
     val config: ScanAppBackendConfig,
-    val coinAppParameters: SharedCNNodeAppParameters,
+    val amuletAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -69,7 +69,7 @@ class ScanApp(
 ) extends CNNode[ScanApp.State](
       config.svUser,
       config.participantClient,
-      coinAppParameters,
+      amuletAppParameters,
       loggerFactory,
       tracerProvider,
       futureSupervisor,
@@ -106,7 +106,7 @@ class ScanApp(
       )
       participantAdminConnection = new ParticipantAdminConnection(
         config.participantClient.adminApi,
-        coinAppParameters.loggingConfig.api,
+        amuletAppParameters.loggingConfig.api,
         loggerFactory,
         nodeMetrics.grpcClientMetrics,
         retryProvider,
@@ -128,7 +128,7 @@ class ScanApp(
       )
       sequencerAdminConnection = new SequencerAdminConnection(
         config.sequencerAdminClient,
-        coinAppParameters.loggingConfig.api,
+        amuletAppParameters.loggingConfig.api,
         loggerFactory,
         nodeMetrics.grpcClientMetrics,
         retryProvider,
@@ -227,7 +227,7 @@ class ScanApp(
   }
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredPackageIds = Set(DarResources.cantonCoin.bootstrap.packageId)
+  override lazy val requiredPackageIds = Set(DarResources.cantonAmulet.bootstrap.packageId)
 
   protected[this] override def automationServices(st: ScanApp.State) =
     Seq(st.automation)

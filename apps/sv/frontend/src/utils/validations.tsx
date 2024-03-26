@@ -19,17 +19,17 @@ function validateScheduleDateTime(
   const takenTimes =
     data.map(e => {
       switch (e.payload.action.tag) {
-        case 'ARC_CoinRules':
-          const coinRulesAction = e.payload.action.value.coinRulesAction;
-          switch (coinRulesAction.tag) {
-            case 'CRARC_RemoveFutureCoinConfigSchedule': {
-              return coinRulesAction.value.scheduleTime;
+        case 'ARC_AmuletRules':
+          const amuletRulesAction = e.payload.action.value.amuletRulesAction;
+          switch (amuletRulesAction.tag) {
+            case 'CRARC_RemoveFutureAmuletConfigSchedule': {
+              return amuletRulesAction.value.scheduleTime;
             }
-            case 'CRARC_UpdateFutureCoinConfigSchedule': {
-              return coinRulesAction.value.scheduleItem._1;
+            case 'CRARC_UpdateFutureAmuletConfigSchedule': {
+              return amuletRulesAction.value.scheduleItem._1;
             }
-            case 'CRARC_AddFutureCoinConfigSchedule': {
-              return coinRulesAction.value.newScheduleItem._1;
+            case 'CRARC_AddFutureAmuletConfigSchedule': {
+              return amuletRulesAction.value.newScheduleItem._1;
             }
             default:
               return '';

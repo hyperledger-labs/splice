@@ -20,13 +20,13 @@ class ScanFrontendTimeBasedIntegrationTest
     with DomainFeesTestUtil
     with TriggerTestUtil {
 
-  val coinPrice = 2
+  val amuletPrice = 2
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      .withCoinPrice(coinPrice)
+      .withAmuletPrice(amuletPrice)
       .addConfigTransforms((_, config) =>
         updateAutomationConfig(ConfigurableApp.Validator)(
           _.withPausedTrigger[ReceiveFaucetCouponTrigger]
@@ -49,7 +49,7 @@ class ScanFrontendTimeBasedIntegrationTest
 
       grantFeaturedAppRight(aliceValidatorWalletClient)
 
-      clue("Tap to get some coins") {
+      clue("Tap to get some amulets") {
         aliceWalletClient.tap(500.0)
         aliceValidatorWalletClient.tap(100.0)
       }
@@ -106,12 +106,12 @@ class ScanFrontendTimeBasedIntegrationTest
       }
     }
 
-    "see expected current and future coin configurations" in { implicit env =>
+    "see expected current and future amulet configurations" in { implicit env =>
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck("Go to Scan UI main page", go to s"http://localhost:${scanUIPort}")(
-          "Check the initial coin config matches the defaults",
+          "Check the initial amulet config matches the defaults",
           _ => {
-            find(id("coin-creation-fee")).value.text should matchText(
+            find(id("amulet-creation-fee")).value.text should matchText(
               s"${CNNodeUtil.defaultCreateFee.fee.doubleValue()} CC"
             )
 
@@ -143,24 +143,25 @@ class ScanFrontendTimeBasedIntegrationTest
       val newHoldingFee = 0.1
 
       // Note that the ledger time is in 1970. It will however not change anything because
-      // `sv1ScanBackend.getCoinRules().contract.payload.configSchedule`
+      // `sv1ScanBackend.getAmuletRules().contract.payload.configSchedule`
       // is a contract such as it was written when it got accepted (e.g. like in 1970).
       // The values are not processed as of now, but the frontend does post-process
-      // the Coin Rules contract to get the actual coin configurations (see getCoinConfigurationAsOfNow()).
+      // the Amulet Rules contract to get the actual amulet configurations (see getAmuletConfigurationAsOfNow()).
       val ledgerNow = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
       val javaYesterday = Instant.now().minusSeconds(86400) // yesterday
       val javaTomorrow = Instant.now().plusSeconds(86400) // tomorrow
 
       actAndCheck(
-        "schedule a coin configuration in which the last configuration's time was yesterday", {
-          val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+        "schedule a amulet configuration in which the last configuration's time was yesterday", {
+          val currentConfigSchedule =
+            sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
           val configSchedule =
             createConfigSchedule(
               currentConfigSchedule,
               (
                 Duration.between(ledgerNow.toInstant, javaYesterday),
-                mkUpdatedCoinConfig(
+                mkUpdatedAmuletConfig(
                   currentConfigSchedule,
                   tickDuration = defaultTickDuration,
                   holdingFee = 2 * newHoldingFee,
@@ -186,15 +187,16 @@ class ScanFrontendTimeBasedIntegrationTest
       )
 
       actAndCheck(
-        "schedule a coin configuration in which the configuration's time is tomorrow", {
-          val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+        "schedule a amulet configuration in which the configuration's time is tomorrow", {
+          val currentConfigSchedule =
+            sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
           val configSchedule =
             createConfigSchedule(
               currentConfigSchedule,
               (
                 Duration.between(ledgerNow.toInstant, javaTomorrow),
-                mkUpdatedCoinConfig(
+                mkUpdatedAmuletConfig(
                   currentConfigSchedule,
                   tickDuration = defaultTickDuration,
                   holdingFee = 3 * newHoldingFee,
@@ -209,7 +211,7 @@ class ScanFrontendTimeBasedIntegrationTest
         _ => {
           withFrontEnd("scan-ui") { implicit webDriver =>
             find(id("holding-fee")).value.text should matchText(
-              s"${sv1ScanBackend.getCoinRules().contract.payload.configSchedule.initialValue.transferConfig.holdingFee.rate} CC/Round"
+              s"${sv1ScanBackend.getAmuletRules().contract.payload.configSchedule.initialValue.transferConfig.holdingFee.rate} CC/Round"
             )
 
             find(id("next-config-update-time")).value.text should equal("1 day").or(
@@ -237,7 +239,7 @@ class ScanFrontendTimeBasedIntegrationTest
           aliceValidatorWalletClient.tap(100.0)
           bobValidatorWalletClient.tap(100.0)
           val trafficAmount = sv1ScanBackend
-            .getCoinConfigAsOf(env.environment.clock.now)
+            .getAmuletConfigAsOf(env.environment.clock.now)
             .globalDomain
             .fees
             .minTopupAmount
@@ -288,7 +290,7 @@ class ScanFrontendTimeBasedIntegrationTest
       }
     }
 
-    "See expected total coin balance" in { implicit env =>
+    "See expected total amulet balance" in { implicit env =>
       onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val firstRound = sv1ScanBackend
         .getLatestOpenMiningRound(env.environment.clock.now)
@@ -307,23 +309,23 @@ class ScanFrontendTimeBasedIntegrationTest
         "Wait for round to close in scan",
         _ => sv1ScanBackend.getRoundOfLatestData()._1 shouldBe (firstRound + 1),
       )
-      // We do not check the backend computation here, nor do we want to rely on the exact coin balance created in other tests,
+      // We do not check the backend computation here, nor do we want to rely on the exact amulet balance created in other tests,
       // so here we simply test that:
       // The total balance increased as a result of our tap by the tap amount minus some amount to account for holding fees
       // The frontend shows the balance from the backend
-      sv1ScanBackend.getTotalCoinBalance(firstRound + 1) should
-        (be > (sv1ScanBackend.getTotalCoinBalance(firstRound) + 99.0))
+      sv1ScanBackend.getTotalAmuletBalance(firstRound + 1) should
+        (be > (sv1ScanBackend.getTotalAmuletBalance(firstRound) + 99.0))
 
       withFrontEnd("scan-ui") { implicit webDriver =>
         actAndCheck(
           "Go to Scan UI main page",
           go to s"http://localhost:${scanUIPort}",
         )(
-          "See valid total coin balance",
+          "See valid total amulet balance",
           _ => {
             screenshot()
-            seleniumText(find(id("total-coin-balance-cc"))) should matchText(
-              s"${sv1ScanBackend.getTotalCoinBalance(firstRound + 1)} CC"
+            seleniumText(find(id("total-amulet-balance-cc"))) should matchText(
+              s"${sv1ScanBackend.getTotalAmuletBalance(firstRound + 1)} CC"
             )
           },
         )

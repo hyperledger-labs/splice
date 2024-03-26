@@ -7,7 +7,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { Grid, Tab, Tabs, Typography, Box, Stack } from '@mui/material';
 
 import NetworkInfo from '../components/NetworkInfo';
-import TotalCoinBalance from '../components/TotalCoinBalance';
+import TotalAmuletBalance from '../components/TotalAmuletBalance';
 import TotalRewards from '../components/TotalRewards';
 
 const Root: React.FC = () => {
@@ -63,7 +63,7 @@ const Root: React.FC = () => {
       </Grid>
 
       <Grid item xs={12} lg={6}>
-        <TotalCoinBalance />
+        <TotalAmuletBalance />
       </Grid>
 
       <Grid item xs={12} lg={6}>

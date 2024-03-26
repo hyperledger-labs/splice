@@ -37,18 +37,18 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsProxyResponse"
-  /v0/scan-proxy/coin-rules:
+  /v0/scan-proxy/amulet-rules:
     get:
       tags: [ scan-proxy ]
       x-jvm-package: scanproxy
-      operationId: "getCoinRules"
+      operationId: "getAmuletRules"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetCoinRulesProxyResponse"
+                "$ref": "#/components/schemas/GetAmuletRulesProxyResponse"
   /v0/cns-entries/by-party/{party}:
     get:
       tags: [ scan-proxy ]
@@ -133,13 +133,13 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
     # the contract is not-MaybeCached
-    GetCoinRulesProxyResponse:
+    GetAmuletRulesProxyResponse:
       type: object
       required:
         [
-          "coin_rules",
+          "amulet_rules",
         ]
       properties:
-        coin_rules:
+        amulet_rules:
           "$ref": "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/ContractWithState"
 

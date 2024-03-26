@@ -3,7 +3,7 @@ package com.daml.network.sv.onboarding.sponsor
 import cats.data.EitherT
 import cats.syntax.foldable.*
 import com.daml.error.utils.ErrorDetails
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor, RetryProvider}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.onboarding.SvcPartyHosting

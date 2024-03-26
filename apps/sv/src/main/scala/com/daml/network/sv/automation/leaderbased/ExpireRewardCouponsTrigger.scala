@@ -6,7 +6,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.coinrules.{CoinRules, CoinRules_ClaimExpiredRewards}
+import com.daml.network.codegen.java.cc.amuletrules.{AmuletRules, AmuletRules_ClaimExpiredRewards}
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
 import com.daml.network.sv.store.ExpiredRewardCouponsBatch
 import com.daml.network.util.{AssignedContract, Contract}
@@ -45,11 +45,11 @@ class ExpireRewardCouponsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svcRules <- store.getSvcRules()
-      coinRules <- store.getCoinRules()
+      amuletRules <- store.getAmuletRules()
       numCmds <- expireRewardCouponsForRound(
         expiredRewardsTask,
         svcRules,
-        coinRules,
+        amuletRules,
       )
     } yield TaskSuccess(
       show"Expired ${numCmds} old reward coupons for closed round ${expiredRewardsTask}"
@@ -59,14 +59,14 @@ class ExpireRewardCouponsTrigger(
   private def expireRewardCouponsForRound(
       expiredRewardsTask: ExpiredRewardCouponsBatch,
       svcRules: AssignedContract[SvcRules.ContractId, SvcRules],
-      coinRules: Contract[CoinRules.ContractId, CoinRules],
+      amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
   )(implicit
       tc: TraceContext
   ): Future[Int] = {
     val validatorRewardCmd = svcRules.exercise(
       _.exerciseSvcRules_ClaimExpiredRewards(
-        coinRules.contractId,
-        new CoinRules_ClaimExpiredRewards(
+        amuletRules.contractId,
+        new AmuletRules_ClaimExpiredRewards(
           expiredRewardsTask.closedRoundCid,
           expiredRewardsTask.validatorCoupons.asJava,
           Seq.empty.asJava,
@@ -77,8 +77,8 @@ class ExpireRewardCouponsTrigger(
     )
     val validatorFaucetCmd = svcRules.exercise(
       _.exerciseSvcRules_ClaimExpiredRewards(
-        coinRules.contractId,
-        new CoinRules_ClaimExpiredRewards(
+        amuletRules.contractId,
+        new AmuletRules_ClaimExpiredRewards(
           expiredRewardsTask.closedRoundCid,
           Seq.empty.asJava,
           Seq.empty.asJava,
@@ -89,8 +89,8 @@ class ExpireRewardCouponsTrigger(
     )
     val appRewardCmd = svcRules.exercise(
       _.exerciseSvcRules_ClaimExpiredRewards(
-        coinRules.contractId,
-        new CoinRules_ClaimExpiredRewards(
+        amuletRules.contractId,
+        new AmuletRules_ClaimExpiredRewards(
           expiredRewardsTask.closedRoundCid,
           Seq.empty.asJava,
           expiredRewardsTask.appCoupons.asJava,
@@ -101,8 +101,8 @@ class ExpireRewardCouponsTrigger(
     )
     val svRewardCmd = svcRules.exercise(
       _.exerciseSvcRules_ClaimExpiredRewards(
-        coinRules.contractId,
-        new CoinRules_ClaimExpiredRewards(
+        amuletRules.contractId,
+        new AmuletRules_ClaimExpiredRewards(
           expiredRewardsTask.closedRoundCid,
           Seq.empty.asJava,
           Seq.empty.asJava,

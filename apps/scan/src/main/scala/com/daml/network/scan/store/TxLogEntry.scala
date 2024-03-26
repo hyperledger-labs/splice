@@ -95,7 +95,7 @@ object TxLogEntry extends StoreErrors {
   object Http {
     private def toResponse(data: SenderAmount) = httpDef.SenderAmount(
       party = data.party.toProtoPrimitive,
-      inputCoinAmount = Some(Codec.encode(data.inputCoinAmount)),
+      inputAmuletAmount = Some(Codec.encode(data.inputAmuletAmount)),
       inputAppRewardAmount = Some(Codec.encode(data.inputAppRewardAmount)),
       inputValidatorRewardAmount = Some(Codec.encode(data.inputValidatorRewardAmount)),
       senderChangeAmount = Codec.encode(data.senderChangeAmount),
@@ -133,7 +133,7 @@ object TxLogEntry extends StoreErrors {
           )
         ),
         round = entry.round,
-        coinPrice = Codec.encode(entry.coinPrice),
+        amuletPrice = Codec.encode(entry.amuletPrice),
       )
 
     private def toTapResponseItem(entry: TapTxLogEntry) = httpDef.TransactionHistoryResponseItem(
@@ -144,13 +144,13 @@ object TxLogEntry extends StoreErrors {
       date = java.time.OffsetDateTime
         .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
       tap = Some(
-        httpDef.CoinAmount(
-          coinOwner = entry.coinOwner.toProtoPrimitive,
-          coinAmount = Codec.encode(entry.coinAmount),
+        httpDef.AmuletAmount(
+          amuletOwner = entry.amuletOwner.toProtoPrimitive,
+          amuletAmount = Codec.encode(entry.amuletAmount),
         )
       ),
       round = entry.round,
-      coinPrice = Codec.encode(entry.coinPrice),
+      amuletPrice = Codec.encode(entry.amuletPrice),
     )
 
     private def toMintResponseItem(entry: MintTxLogEntry) = httpDef.TransactionHistoryResponseItem(
@@ -161,13 +161,13 @@ object TxLogEntry extends StoreErrors {
       date = java.time.OffsetDateTime
         .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
       mint = Some(
-        httpDef.CoinAmount(
-          coinOwner = entry.coinOwner.toProtoPrimitive,
-          coinAmount = Codec.encode(entry.coinAmount),
+        httpDef.AmuletAmount(
+          amuletOwner = entry.amuletOwner.toProtoPrimitive,
+          amuletAmount = Codec.encode(entry.amuletAmount),
         )
       ),
       round = entry.round,
-      coinPrice = Codec.encode(entry.coinPrice),
+      amuletPrice = Codec.encode(entry.amuletPrice),
     )
 
     private def toSvRewardCollectedResponseItem(entry: SvRewardCollectedTxLogEntry) =
@@ -179,13 +179,13 @@ object TxLogEntry extends StoreErrors {
         date = java.time.OffsetDateTime
           .ofInstant(entry.date.getOrElse(throw txMissingField()), ZoneOffset.UTC),
         svRewardCollected = Some(
-          httpDef.CoinAmount(
-            coinOwner = entry.coinOwner.toProtoPrimitive,
-            coinAmount = Codec.encode(entry.coinAmount),
+          httpDef.AmuletAmount(
+            amuletOwner = entry.amuletOwner.toProtoPrimitive,
+            amuletAmount = Codec.encode(entry.amuletAmount),
           )
         ),
         round = entry.round,
-        coinPrice = Codec.encode(entry.coinPrice),
+        amuletPrice = Codec.encode(entry.amuletPrice),
       )
 
     def toResponseItem(entry: TransactionTxLogEntry): httpDef.TransactionHistoryResponseItem =
@@ -207,8 +207,8 @@ object TxLogEntry extends StoreErrors {
   }
 
   def parseSenderAmount(
-      arg: cc.coinrules.CoinRules_Transfer,
-      res: cc.coinrules.TransferResult,
+      arg: cc.amuletrules.AmuletRules_Transfer,
+      res: cc.amuletrules.TransferResult,
   ): SenderAmount = {
     val sender = arg.transfer.sender
     val senderFee = parseOutputAmounts(arg, res)
@@ -217,7 +217,7 @@ object TxLogEntry extends StoreErrors {
 
     SenderAmount(
       party = PartyId.tryFromProtoPrimitive(sender),
-      inputCoinAmount = res.summary.inputCoinAmount,
+      inputAmuletAmount = res.summary.inputAmuletAmount,
       inputAppRewardAmount = res.summary.inputAppRewardAmount,
       inputValidatorRewardAmount = res.summary.inputValidatorRewardAmount,
       senderChangeAmount = res.summary.senderChangeAmount,
@@ -228,8 +228,8 @@ object TxLogEntry extends StoreErrors {
   }
 
   def parseReceiverAmounts(
-      arg: cc.coinrules.CoinRules_Transfer,
-      res: cc.coinrules.TransferResult,
+      arg: cc.amuletrules.AmuletRules_Transfer,
+      res: cc.amuletrules.TransferResult,
   ): Seq[ReceiverAmount] = {
 
     // Note: the same receiver party can appear multiple times in the transfer result
@@ -264,14 +264,14 @@ object TxLogEntry extends StoreErrors {
     * @param receiverFee Actual amount of fees paid by the receiver.
     */
   private final case class OutputWithFees(
-      output: cc.coinrules.TransferOutput,
+      output: cc.amuletrules.TransferOutput,
       senderFee: BigDecimal,
       receiverFee: BigDecimal,
   )
 
   private def parseOutputAmounts(
-      arg: cc.coinrules.CoinRules_Transfer,
-      res: cc.coinrules.TransferResult,
+      arg: cc.amuletrules.AmuletRules_Transfer,
+      res: cc.amuletrules.TransferResult,
   ): Seq[OutputWithFees] = {
     assert(
       arg.transfer.outputs.size() == res.summary.outputFees.size(),

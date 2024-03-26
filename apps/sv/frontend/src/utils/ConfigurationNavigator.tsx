@@ -8,30 +8,32 @@ import { Box, Button, Card, CardContent, CardHeader, Stack, Typography } from '@
 import { DesktopDateTimePicker } from '@mui/x-date-pickers/DesktopDateTimePicker';
 
 import { Tuple2 } from '@daml.js/5aee9b21b8e9a4c4975b5f4c4198e6e6e8469df49e2010820e792f393db870f4/lib/DA/Types';
-import { CoinConfig, USD } from '@daml.js/canton-coin/lib/CC/CoinConfig';
-import { Schedule } from '@daml.js/canton-coin/lib/CC/Schedule';
+import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/CC/AmuletConfig';
+import { Schedule } from '@daml.js/canton-amulet/lib/CC/Schedule';
 
 dayjs.extend(utc);
 
 interface ComponentSwitcherProps {
-  data: Schedule<string, CoinConfig<'USD'>> | undefined;
-  onChange: (updatedJson: Schedule<string, CoinConfig<'USD'>>) => void;
+  data: Schedule<string, AmuletConfig<'USD'>> | undefined;
+  onChange: (updatedJson: Schedule<string, AmuletConfig<'USD'>>) => void;
 }
 
 const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChange }) => {
   // use to schedule new configuration (futureValues)
-  const baseComponent: Tuple2<string, CoinConfig<'USD'>> = {
+  const baseComponent: Tuple2<string, AmuletConfig<'USD'>> = {
     _1: '',
     _2: data?.initialValue!,
   };
 
-  const [initialComponent, setInitialComponent] = useState<CoinConfig<'USD'>>(data?.initialValue!);
-  const [components, setComponents] = useState<Tuple2<string, CoinConfig<'USD'>>[]>(
+  const [initialComponent, setInitialComponent] = useState<AmuletConfig<'USD'>>(
+    data?.initialValue!
+  );
+  const [components, setComponents] = useState<Tuple2<string, AmuletConfig<'USD'>>[]>(
     data?.futureValues!
   );
 
   async function setDecodedInitialComponent(svcRulesConfig: Record<string, JSONValue>) {
-    const decodedConfig = CoinConfig(USD).decoder.runWithException(svcRulesConfig);
+    const decodedConfig = AmuletConfig(USD).decoder.runWithException(svcRulesConfig);
     setInitialComponent(decodedConfig);
     onChange({ initialValue: initialComponent, futureValues: components });
   }
@@ -62,9 +64,12 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
     onChange({ initialValue: initialComponent, futureValues: components });
   };
 
-  function addCoinConfigSchedule(coinConfig: Record<string, JSONValue>, time?: string | undefined) {
+  function addAmuletConfigSchedule(
+    amuletConfig: Record<string, JSONValue>,
+    time?: string | undefined
+  ) {
     components.filter(comp => comp._1 === time)[0]._2 =
-      CoinConfig(USD).decoder.runWithException(coinConfig);
+      AmuletConfig(USD).decoder.runWithException(amuletConfig);
     onChange({ initialValue: initialComponent, futureValues: components });
   }
 
@@ -80,7 +85,7 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
         onChange={(newValue: React.SetStateAction<Dayjs | null>) => setDate(newValue)}
         slotProps={{
           textField: {
-            id: 'datetime-picker-coin-configuration',
+            id: 'datetime-picker-amulet-configuration',
           },
         }}
         closeOnSelect
@@ -90,7 +95,7 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
       </Button>
       <CardComponent key={0}>
         <JsonEditor
-          data={CoinConfig(USD).encode(initialComponent) as Record<string, JSONValue>}
+          data={AmuletConfig(USD).encode(initialComponent) as Record<string, JSONValue>}
           onChange={setDecodedInitialComponent}
         />
       </CardComponent>
@@ -102,8 +107,8 @@ const ConfigurationNavigator: React.FC<ComponentSwitcherProps> = ({ data, onChan
           removeFunction={() => handleRemoveComponent(index)}
         >
           <JsonEditor
-            data={CoinConfig(USD).encode(Component._2) as Record<string, JSONValue>}
-            onChange={newJson => addCoinConfigSchedule(newJson, Component._1)}
+            data={AmuletConfig(USD).encode(Component._2) as Record<string, JSONValue>}
+            onChange={newJson => addAmuletConfigSchedule(newJson, Component._1)}
           />
         </CardComponent>
       ))}

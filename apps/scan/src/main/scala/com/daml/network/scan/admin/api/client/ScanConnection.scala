@@ -1,8 +1,8 @@
 package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amuletrules.{AppTransferContext, AmuletRules}
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns.CnsRules
@@ -33,7 +33,7 @@ import org.apache.pekko.stream.Materializer
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.OptionConverters.*
 
-trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAsync {
+trait ScanConnection extends PackageIdResolver.HasAmuletRules with FlagCloseableAsync {
 
   protected val clock: Clock
   protected val retryProvider: RetryProvider
@@ -56,10 +56,10 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
       logger,
     )
 
-  def getCoinRulesWithState()(implicit
+  def getAmuletRulesWithState()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[ContractWithState[CoinRules.ContractId, CoinRules]]
+  ): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]]
 
   def getCnsRules()(implicit
       ec: ExecutionContext,
@@ -99,24 +99,26 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
       openAndIssuingRounds <- getOpenAndIssuingMiningRounds()
       openRounds = openAndIssuingRounds._1
       latestOpenMiningRound = CNNodeUtil.selectLatestOpenMiningRound(clock.now, openRounds)
-      coinRules <- getCoinRulesWithState()
-    } yield TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
+      amuletRules <- getAmuletRulesWithState()
+    } yield TransferContextWithInstances(amuletRules, latestOpenMiningRound, openRounds)
   }
 
-  def getCoinRulesDomain: GetCoinRulesDomain = { () => implicit tc =>
-    getCoinRulesWithState()
+  def getAmuletRulesDomain: GetAmuletRulesDomain = { () => implicit tc =>
+    getAmuletRulesWithState()
       .flatMap(
         _.state.fold(
           Future.successful,
           Future failed Status.FAILED_PRECONDITION
-            .withDescription("CoinRules is in-flight, no current global domain")
+            .withDescription("AmuletRules is in-flight, no current global domain")
             .asRuntimeException(),
         )
       )
   }
 
-  def getCoinRules()(implicit tc: TraceContext): Future[Contract[CoinRules.ContractId, CoinRules]] =
-    getCoinRulesWithState().map(_.contract)
+  def getAmuletRules()(implicit
+      tc: TraceContext
+  ): Future[Contract[AmuletRules.ContractId, AmuletRules]] =
+    getAmuletRulesWithState().map(_.contract)
 
   def getLatestOpenMiningRound()(implicit
       ec: ExecutionContext,
@@ -139,15 +141,15 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
       context <- getTransferContextWithInstances()
       featured <- lookupFeaturedAppRight(providerPartyId)
     } yield {
-      val coinRules = context.coinRules
+      val amuletRules = context.amuletRules
       val openMiningRound = context.latestOpenMiningRound
       (
         new AppTransferContext(
-          coinRules.contractId,
+          amuletRules.contractId,
           openMiningRound.contractId,
           featured.map(_.contractId).toJava,
         ),
-        DisclosedContracts(coinRules, openMiningRound),
+        DisclosedContracts(amuletRules, openMiningRound),
       )
     }
   }
@@ -163,17 +165,17 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
       context <- getTransferContextWithInstances()
       featured <- lookupFeaturedAppRight(providerPartyId)
     } yield {
-      val coinRules = context.coinRules
+      val amuletRules = context.amuletRules
       context.openMiningRounds.find(_.payload.round == round) match {
         case Some(openMiningRound) =>
           Right(
             (
               new AppTransferContext(
-                coinRules.contractId,
+                amuletRules.contractId,
                 openMiningRound.contractId,
                 featured.map(_.contractId).toJava,
               ),
-              DisclosedContracts(coinRules, openMiningRound),
+              DisclosedContracts(amuletRules, openMiningRound),
             )
           )
         case None => Left("round is not an open mining round")
@@ -190,7 +192,7 @@ trait ScanConnection extends PackageIdResolver.HasCoinRules with FlagCloseableAs
 
 object ScanConnection {
   def singleCached(
-      coinLedgerClient: CNLedgerClient,
+      amuletLedgerClient: CNLedgerClient,
       config: ScanAppClientConfig,
       clock: Clock,
       retryProvider: RetryProvider,
@@ -204,7 +206,7 @@ object ScanConnection {
       templateDecoder: TemplateJsonDecoder,
   ): Future[ScanConnection] =
     HttpAppConnection.checkVersionOrClose(
-      new CachedScanConnection(coinLedgerClient, config, clock, retryProvider, loggerFactory),
+      new CachedScanConnection(amuletLedgerClient, config, clock, retryProvider, loggerFactory),
       retryConnectionOnInitialFailure,
     )
 
@@ -226,14 +228,14 @@ object ScanConnection {
       retryConnectionOnInitialFailure,
     )
 
-  private[client] case class CachedCoinRules(
+  private[client] case class CachedAmuletRules(
       cacheValidUntil: CantonTimestamp,
-      coinRules: ContractWithState[CoinRules.ContractId, CoinRules],
+      amuletRules: ContractWithState[AmuletRules.ContractId, AmuletRules],
   ) {
     def validAsOf(now: CantonTimestamp): Boolean =
-      now.isBefore(cacheValidUntil) && coinRules.state.fold(
+      now.isBefore(cacheValidUntil) && amuletRules.state.fold(
         assignment =>
-          CoinConfigSchedule(coinRules)
+          AmuletConfigSchedule(amuletRules)
             .getConfigAsOf(now)
             .globalDomain
             .activeDomain == assignment.toProtoPrimitive,
@@ -245,10 +247,10 @@ object ScanConnection {
       cacheValidUntil: CantonTimestamp,
       cnsRules: ContractWithState[CnsRules.ContractId, CnsRules],
   ) {
-    def validAsOf(now: CantonTimestamp, coinRules: ContractWithState[?, CoinRules]): Boolean =
-      now.isBefore(cacheValidUntil) && coinRules.state.fold(
+    def validAsOf(now: CantonTimestamp, amuletRules: ContractWithState[?, AmuletRules]): Boolean =
+      now.isBefore(cacheValidUntil) && amuletRules.state.fold(
         assignment =>
-          CoinConfigSchedule(coinRules)
+          AmuletConfigSchedule(amuletRules)
             .getConfigAsOf(now)
             .globalDomain
             .activeDomain == assignment.toProtoPrimitive,
@@ -264,13 +266,13 @@ object ScanConnection {
         ContractWithState[IssuingMiningRound.ContractId, IssuingMiningRound]
       ] = Seq(),
   ) {
-    def validAsOf(now: CantonTimestamp, coinRules: ContractWithState[?, CoinRules]): Boolean =
+    def validAsOf(now: CantonTimestamp, amuletRules: ContractWithState[?, AmuletRules]): Boolean =
       cacheValidUntil.exists(validUntil => now.isBefore(validUntil)) && {
         val states = (sortedOpenMiningRounds.view ++ sortedIssuingMiningRounds).map(_.state).toSet
         states.sizeIs <= 1 && states.forall(
           _.fold(
             assignment =>
-              CoinConfigSchedule(coinRules)
+              AmuletConfigSchedule(amuletRules)
                 .getConfigAsOf(now)
                 .globalDomain
                 .activeDomain == assignment.toProtoPrimitive,
@@ -294,7 +296,7 @@ object ScanConnection {
         .map(_.payload.round.number)}, and following open rounds: ${sortedOpenMiningRounds.map(_.payload.round.number)}"
   }
 
-  type GetCoinRulesDomain = () => TraceContext => Future[DomainId]
+  type GetAmuletRulesDomain = () => TraceContext => Future[DomainId]
 }
 
 /** Connection to the admin API of CC Scan usable for version and availability checks

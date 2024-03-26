@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinrules.TransferOutput
+import com.daml.network.codegen.java.cc.amuletrules.TransferOutput
 import com.daml.network.codegen.java.cc.expiry.TimeLock
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cc.types.Round
@@ -49,7 +49,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
         // so we will wait the full participantResponseTimeout (30s by default) which
         // then results in `eventually`'s in tests never completing.
         //
-        // The waiting implement below should ensure that existing background automation (e.g. coin merging)
+        // The waiting implement below should ensure that existing background automation (e.g. amulet merging)
         // can complete in-flight commands before we change the time. The assumption here
         // is that our period automation also takes sim time into account so if
         // the time does not change, it won't continue sending commands.
@@ -87,11 +87,11 @@ trait TimeTestUtil extends CNNodeTestCommon {
     }
   }
 
-  def transferOutputCoin(
+  def transferOutputAmulet(
       receiver: PartyId,
       receiverFeeRatio: BigDecimal,
       amount: BigDecimal,
-  ): cc.coinrules.TransferOutput = {
+  ): cc.amuletrules.TransferOutput = {
     new TransferOutput(
       receiver.toProtoPrimitive,
       receiverFeeRatio.bigDecimal,
@@ -100,13 +100,13 @@ trait TimeTestUtil extends CNNodeTestCommon {
     )
   }
 
-  def transferOutputLockedCoin(
+  def transferOutputLockedAmulet(
       receiver: PartyId,
       lockHolders: Seq[PartyId],
       receiverFeeRatio: BigDecimal,
       amount: BigDecimal,
       expiredDuration: Duration,
-  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): cc.coinrules.TransferOutput = {
+  )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): cc.amuletrules.TransferOutput = {
     val expiredAt = cnNodeEnv.environment.clock.now.add(expiredDuration)
     val expiration = Codec.decode(Codec.Timestamp)(expiredAt.underlying.micros).value
 
@@ -123,36 +123,36 @@ trait TimeTestUtil extends CNNodeTestCommon {
     )
   }
 
-  def lockCoins(
+  def lockAmulets(
       userValidator: ValidatorAppBackendReference,
       userParty: PartyId,
       validatorParty: PartyId,
-      coins: Seq[HttpWalletAppClient.CoinPosition],
+      amulets: Seq[HttpWalletAppClient.AmuletPosition],
       amount: BigDecimal,
       scan: ScanAppBackendReference,
       expiredDuration: Duration,
   )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment): Unit =
-    clue(s"Locking $amount coins for $userParty") {
-      val coin = coins.find(_.effectiveAmount >= amount).value
-      val coinRules = scan.getCoinRules()
+    clue(s"Locking $amount amulets for $userParty") {
+      val amulet = amulets.find(_.effectiveAmount >= amount).value
+      val amuletRules = scan.getAmuletRules()
       val transferContext = scan.getUnfeaturedAppTransferContext(getLedgerTime)
       val openRound = scan.getLatestOpenMiningRound(getLedgerTime)
 
       userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
         Seq(userParty, validatorParty),
         optTimeout = None,
-        commands = transferContext.coinRules
-          .exerciseCoinRules_Transfer(
-            new cc.coinrules.Transfer(
+        commands = transferContext.amuletRules
+          .exerciseAmuletRules_Transfer(
+            new cc.amuletrules.Transfer(
               userParty.toProtoPrimitive,
               userParty.toProtoPrimitive,
-              Seq[cc.coinrules.TransferInput](
-                new cc.coinrules.transferinput.InputCoin(
-                  coin.contract.contractId
+              Seq[cc.amuletrules.TransferInput](
+                new cc.amuletrules.transferinput.InputAmulet(
+                  amulet.contract.contractId
                 )
               ).asJava,
-              Seq[cc.coinrules.TransferOutput](
-                transferOutputLockedCoin(
+              Seq[cc.amuletrules.TransferOutput](
+                transferOutputLockedAmulet(
                   userParty,
                   Seq(userParty),
                   BigDecimal(0.0),
@@ -161,10 +161,10 @@ trait TimeTestUtil extends CNNodeTestCommon {
                 )
               ).asJava,
             ),
-            new cc.coinrules.TransferContext(
+            new cc.amuletrules.TransferContext(
               transferContext.openMiningRound,
               Map.empty[Round, IssuingMiningRound.ContractId].asJava,
-              Map.empty[String, cc.coin.ValidatorRight.ContractId].asJava,
+              Map.empty[String, cc.amulet.ValidatorRight.ContractId].asJava,
               // note: we don't provide a featured app right as sender == provider
               None.toJava,
             ),
@@ -172,11 +172,12 @@ trait TimeTestUtil extends CNNodeTestCommon {
           .commands
           .asScala
           .toSeq,
-        disclosedContracts = DisclosedContracts(coinRules, openRound).toLedgerApiDisclosedContracts,
+        disclosedContracts =
+          DisclosedContracts(amuletRules, openRound).toLedgerApiDisclosedContracts,
       )
     }
 
-  /** Directly exercises the CoinRules_Transfer choice.
+  /** Directly exercises the AmuletRules_Transfer choice.
     * Note that all parties participating in the transfer need to be hosted on the same participant
     */
   def rawTransfer(
@@ -184,39 +185,39 @@ trait TimeTestUtil extends CNNodeTestCommon {
       userId: String,
       userParty: PartyId,
       validatorParty: PartyId,
-      coin: HttpWalletAppClient.CoinPosition,
-      outputs: Seq[cc.coinrules.TransferOutput],
+      amulet: HttpWalletAppClient.AmuletPosition,
+      outputs: Seq[cc.amuletrules.TransferOutput],
       now: CantonTimestamp,
   )(implicit cnNodeEnv: CNNodeTestConsoleEnvironment) = {
-    val coinRules = sv1ScanBackend.getCoinRules()
+    val amuletRules = sv1ScanBackend.getAmuletRules()
     val transferContext = sv1ScanBackend.getUnfeaturedAppTransferContext(now)
     val openRound = sv1ScanBackend.getLatestOpenMiningRound(now)
 
     val authorizers =
       Seq(userParty, validatorParty) ++ outputs.map(o => PartyId.tryFromProtoPrimitive(o.receiver))
 
-    val disclosure = DisclosedContracts(coinRules, openRound)
+    val disclosure = DisclosedContracts(amuletRules, openRound)
 
     userValidator.participantClientWithAdminToken.ledger_api_extensions.commands.submitJava(
       applicationId = userId,
       actAs = authorizers.distinct,
       readAs = Seq.empty,
-      commands = transferContext.coinRules
-        .exerciseCoinRules_Transfer(
-          new cc.coinrules.Transfer(
+      commands = transferContext.amuletRules
+        .exerciseAmuletRules_Transfer(
+          new cc.amuletrules.Transfer(
             userParty.toProtoPrimitive,
             userParty.toProtoPrimitive,
-            Seq[cc.coinrules.TransferInput](
-              new cc.coinrules.transferinput.InputCoin(
-                coin.contract.contractId
+            Seq[cc.amuletrules.TransferInput](
+              new cc.amuletrules.transferinput.InputAmulet(
+                amulet.contract.contractId
               )
             ).asJava,
             outputs.asJava,
           ),
-          new cc.coinrules.TransferContext(
+          new cc.amuletrules.TransferContext(
             transferContext.openMiningRound,
             Map.empty[Round, IssuingMiningRound.ContractId].asJava,
-            Map.empty[String, cc.coin.ValidatorRight.ContractId].asJava,
+            Map.empty[String, cc.amulet.ValidatorRight.ContractId].asJava,
             // note: we don't provide a featured app right as sender == provider
             None.toJava,
           ),
@@ -332,7 +333,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
   ) = {
     val now = sv1Backend.participantClient.ledger_api.time.get()
     val validatorTopupParameters = ExtraTrafficTopupParameters(
-      sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.fees,
+      sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.fees,
       validatorAppRef.config.domains.global.buyExtraTraffic,
       validatorAppRef.config.automation.pollingInterval,
     )

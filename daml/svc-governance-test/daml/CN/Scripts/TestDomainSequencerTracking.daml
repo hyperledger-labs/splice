@@ -34,7 +34,7 @@ testDomainMigration = do
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
 
-  -- sequencer info are published to svcRules and coinRules
+  -- sequencer info are published to svcRules and amuletRules
   forA_ svs $ \sv -> do
     (_, nodeState) <- getSvNodeState app sv
     let  Some domainConfig = Map.lookup domainId nodeState.state.domainNodes

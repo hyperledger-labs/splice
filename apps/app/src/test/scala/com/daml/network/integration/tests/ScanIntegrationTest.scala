@@ -12,7 +12,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.util.*
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.wallet.automation.CollectRewardsAndMergeCoinsTrigger
+import com.daml.network.wallet.automation.CollectRewardsAndMergeAmuletsTrigger
 import com.daml.network.sv.automation.leaderbased.AdvanceOpenMiningRoundTrigger
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
@@ -35,7 +35,7 @@ class ScanIntegrationTest
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms((_, config) =>
         (updateAutomationConfig(ConfigurableApp.Validator)(
-          _.withPausedTrigger[CollectRewardsAndMergeCoinsTrigger]
+          _.withPausedTrigger[CollectRewardsAndMergeAmuletsTrigger]
         ) andThen
           updateAutomationConfig(ConfigurableApp.Sv)(
             _.withPausedTrigger[AdvanceOpenMiningRoundTrigger]
@@ -51,22 +51,22 @@ class ScanIntegrationTest
   "list transaction pages in ascending and descending order" in { implicit env =>
     onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
     val nrTaps = 10
-    val coinAmounts = (1 to nrTaps).map(walletUsdToCoin(_))
+    val amuletAmounts = (1 to nrTaps).map(walletUsdToAmulet(_))
     val pageSize = nrTaps / 2
 
-    def toCoinAmounts(page: Seq[TransactionHistoryResponseItem]) =
-      page.flatMap(_.tap.map(t => BigDecimal(t.coinAmount)))
+    def toAmuletAmounts(page: Seq[TransactionHistoryResponseItem]) =
+      page.flatMap(_.tap.map(t => BigDecimal(t.amuletAmount)))
 
     actAndCheck(
-      "Tap coins for Alice", {
+      "Tap amulets for Alice", {
         (1 to nrTaps).foreach { i =>
           aliceWalletClient.tap(BigDecimal(i))
         }
       },
     )(
-      "Coins should appear in Alice's wallet",
+      "Amulets should appear in Alice's wallet",
       _ => {
-        aliceWalletClient.list().coins should have length nrTaps.toLong
+        aliceWalletClient.list().amulets should have length nrTaps.toLong
       },
     )
 
@@ -80,8 +80,8 @@ class ScanIntegrationTest
 
       tapsFirstPageAscending.map(_.round) should contain only latestRound
 
-      toCoinAmounts(tapsFirstPageAscending) should be(
-        coinAmounts.take(pageSize)
+      toAmuletAmounts(tapsFirstPageAscending) should be(
+        amuletAmounts.take(pageSize)
       )
 
       val firstPageEndEventId = tapsFirstPageAscending.last.eventId
@@ -93,8 +93,8 @@ class ScanIntegrationTest
             pageSize.toInt,
           )
 
-      toCoinAmounts(tapsSecondPageAscending) should be(
-        coinAmounts.drop(pageSize).take(pageSize)
+      toAmuletAmounts(tapsSecondPageAscending) should be(
+        amuletAmounts.drop(pageSize).take(pageSize)
       )
 
       sv1ScanBackend
@@ -111,8 +111,8 @@ class ScanIntegrationTest
             TransactionHistoryRequest.SortOrder.Desc,
             pageSize.toInt,
           )
-      toCoinAmounts(tapsFirstPageDescending) should be(
-        coinAmounts.reverse.take(pageSize)
+      toAmuletAmounts(tapsFirstPageDescending) should be(
+        amuletAmounts.reverse.take(pageSize)
       )
 
       val firstPageEndEventIdDescending = tapsFirstPageDescending.last.eventId
@@ -131,58 +131,60 @@ class ScanIntegrationTest
           pageSize.toInt,
         ) should be(empty)
 
-      toCoinAmounts(tapsSecondPageDescending) should be(
-        coinAmounts.reverse.drop(pageSize).take(pageSize)
+      toAmuletAmounts(tapsSecondPageDescending) should be(
+        amuletAmounts.reverse.drop(pageSize).take(pageSize)
       )
-      toCoinAmounts(
+      toAmuletAmounts(
         tapsFirstPageAscending ++ tapsSecondPageAscending
-      ) should be(toCoinAmounts((tapsFirstPageDescending ++ tapsSecondPageDescending).reverse))
+      ) should be(toAmuletAmounts((tapsFirstPageDescending ++ tapsSecondPageDescending).reverse))
     }
   }
 
-  "list tap and coin merge transactions" in { implicit env =>
+  "list tap and amulet merge transactions" in { implicit env =>
     val aliceUserName = aliceWalletClient.config.ledgerApiUser
     val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
 
-    def aliceMergeCoinsTrigger =
+    def aliceMergeAmuletsTrigger =
       aliceValidatorBackend
         .userWalletAutomation(aliceUserName)
-        .trigger[CollectRewardsAndMergeCoinsTrigger]
+        .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
-    aliceMergeCoinsTrigger.pause().futureValue
+    aliceMergeAmuletsTrigger.pause().futureValue
     val tap1 = 40.0
     val tap2 = 60.0
-    val aliceCoin = tap1 + tap2
+    val aliceAmulet = tap1 + tap2
     actAndCheck(
-      "Tap 2 coins for Alice", {
+      "Tap 2 amulets for Alice", {
         aliceWalletClient.tap(tap1)
         aliceWalletClient.tap(tap2)
       },
     )(
-      "Coins should appear in Alice's wallet",
-      _ => aliceWalletClient.list().coins should have length 2,
+      "Amulets should appear in Alice's wallet",
+      _ => aliceWalletClient.list().amulets should have length 2,
     )
 
     actAndCheck(
-      "Run merge coins automation once",
-      aliceMergeCoinsTrigger.runOnce().futureValue,
+      "Run merge amulets automation once",
+      aliceMergeAmuletsTrigger.runOnce().futureValue,
     )(
-      "Verify that coins were merged",
+      "Verify that amulets were merged",
       workDone => {
         workDone should be(true)
-        aliceWalletClient.list().coins should have length 1
+        aliceWalletClient.list().amulets should have length 1
       },
     )
 
     eventually() {
       val taps = sv1ScanBackend.listActivity(None, 10).flatMap(_.tap).filter { tap =>
         PartyId.tryFromProtoPrimitive(
-          tap.coinOwner
+          tap.amuletOwner
         ) == aliceUserParty
       }
       taps should have size (2)
-      taps.map(t => (PartyId.tryFromProtoPrimitive(t.coinOwner), BigDecimal(t.coinAmount))) shouldBe
-        Vector((aliceUserParty, walletUsdToCoin(tap2)), (aliceUserParty, walletUsdToCoin(tap1)))
+      taps.map(t =>
+        (PartyId.tryFromProtoPrimitive(t.amuletOwner), BigDecimal(t.amuletAmount))
+      ) shouldBe
+        Vector((aliceUserParty, walletUsdToAmulet(tap2)), (aliceUserParty, walletUsdToAmulet(tap1)))
 
       val merges =
         sv1ScanBackend.listActivity(None, 10).flatMap(_.transfer).filter { transfer =>
@@ -194,58 +196,58 @@ class ScanIntegrationTest
       merges should have size (1)
       val mergeTransfer = merges.head
       PartyId.tryFromProtoPrimitive(mergeTransfer.sender.party) shouldBe aliceUserParty
-      mergeTransfer.sender.inputCoinAmount
+      mergeTransfer.sender.inputAmuletAmount
         .map(BigDecimal(_))
-        .getOrElse(BigDecimal(0)) shouldBe walletUsdToCoin(aliceCoin)
-      BigDecimal(mergeTransfer.sender.senderChangeAmount) shouldBe (walletUsdToCoin(
-        aliceCoin
+        .getOrElse(BigDecimal(0)) shouldBe walletUsdToAmulet(aliceAmulet)
+      BigDecimal(mergeTransfer.sender.senderChangeAmount) shouldBe (walletUsdToAmulet(
+        aliceAmulet
       ) - BigDecimal(mergeTransfer.sender.senderChangeFee) - BigDecimal(
         mergeTransfer.sender.holdingFees
       ) - BigDecimal(mergeTransfer.sender.senderFee))
     }
   }
 
-  "list recent transfers and taps, with rewards collection and coin merging turned off" in {
+  "list recent transfers and taps, with rewards collection and amulet merging turned off" in {
     implicit env =>
       val (aliceUserParty, bobUserParty) = onboardAliceAndBob()
       val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
       val aliceUserName = aliceWalletClient.config.ledgerApiUser
       val bobUserName = bobWalletClient.config.ledgerApiUser
 
-      def aliceMergeCoinsTrigger =
+      def aliceMergeAmuletsTrigger =
         aliceValidatorBackend
           .userWalletAutomation(aliceUserName)
-          .trigger[CollectRewardsAndMergeCoinsTrigger]
+          .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
-      aliceMergeCoinsTrigger.pause().futureValue
+      aliceMergeAmuletsTrigger.pause().futureValue
 
-      def bobMergeCoinsTrigger =
+      def bobMergeAmuletsTrigger =
         bobValidatorBackend
           .userWalletAutomation(bobUserName)
-          .trigger[CollectRewardsAndMergeCoinsTrigger]
+          .trigger[CollectRewardsAndMergeAmuletsTrigger]
 
-      bobMergeCoinsTrigger.pause().futureValue
+      bobMergeAmuletsTrigger.pause().futureValue
 
       val latestRound =
         sv1ScanBackend.getLatestOpenMiningRound(CantonTimestamp.now()).contract.payload.round.number
 
-      val coinConfig =
-        sv1ScanBackend.getCoinConfigForRound(latestRound)
+      val amuletConfig =
+        sv1ScanBackend.getAmuletConfigForRound(latestRound)
 
-      val holdingFee = coinConfig.holdingFee
+      val holdingFee = amuletConfig.holdingFee
       val bobTapAmount = 100000.0
       val aliceTapAmount = 100000.0
 
       actAndCheck(
-        "Tap coins for Alice and bob", {
+        "Tap amulets for Alice and bob", {
           aliceWalletClient.tap(aliceTapAmount)
           bobWalletClient.tap(bobTapAmount)
         },
       )(
-        "Coins should appear in Alice and Bob's wallet",
+        "Amulets should appear in Alice and Bob's wallet",
         _ => {
-          aliceWalletClient.list().coins should have length 1
-          bobWalletClient.list().coins should have length 1
+          aliceWalletClient.list().amulets should have length 1
+          bobWalletClient.list().amulets should have length 1
         },
       )
       val openRoundForTransfer =
@@ -259,16 +261,16 @@ class ScanIntegrationTest
       clue("Alice receives the transfer from bob") {
         eventually() {
           val balance = aliceWalletClient.balance()
-          balance.unlockedQty shouldBe (walletUsdToCoin(aliceTapAmount) + transferAmount)
+          balance.unlockedQty shouldBe (walletUsdToAmulet(aliceTapAmount) + transferAmount)
         }
         eventually() {
-          val approxBobFees = walletUsdToCoin(3) // this value depends on transferAmount
+          val approxBobFees = walletUsdToAmulet(3) // this value depends on transferAmount
           val balance = bobWalletClient.balance()
           assertInRange(
             balance.unlockedQty,
             (
-              walletUsdToCoin(bobTapAmount) - transferAmount - approxBobFees,
-              walletUsdToCoin(bobTapAmount) - transferAmount,
+              walletUsdToAmulet(bobTapAmount) - transferAmount - approxBobFees,
+              walletUsdToAmulet(bobTapAmount) - transferAmount,
             ),
           )
         }
@@ -291,10 +293,10 @@ class ScanIntegrationTest
           val round = activities.loneElement.round
           activities.loneElement.round shouldBe openRoundForTransfer
           val transfer = activities.flatMap(_.transfer).loneElement
-          val inputCoinAmount =
-            transfer.sender.inputCoinAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
+          val inputAmuletAmount =
+            transfer.sender.inputAmuletAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
           val senderChangeFee = BigDecimal(transfer.sender.senderChangeFee)
-          senderChangeFee shouldBe (coinConfig.coinCreateFee)
+          senderChangeFee shouldBe (amuletConfig.amuletCreateFee)
           val senderFee = BigDecimal(transfer.sender.senderFee)
           val holdingFees = BigDecimal(transfer.sender.holdingFees)
           val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
@@ -303,13 +305,13 @@ class ScanIntegrationTest
 
           val totalSenderFee = senderFee + holdingFees + senderChangeFee
 
-          inputCoinAmount - senderChangeAmount shouldBe (transferAmount + totalSenderFee)
+          inputAmuletAmount - senderChangeAmount shouldBe (transferAmount + totalSenderFee)
 
           // alice receives transfer
           transfer.receivers
             .map(r => BigDecimal(r.amount))
             .sum shouldBe transferAmount
-          val coinAsOfRoundZeroAdjustment = round * holdingFee
+          val amuletAsOfRoundZeroAdjustment = round * holdingFee
           transfer.balanceChanges shouldBe Vector(
             BalanceChange(
               aliceUserParty.toProtoPrimitive,
@@ -323,11 +325,11 @@ class ScanIntegrationTest
             BalanceChange(
               bobUserParty.toProtoPrimitive,
               Codec.encode(
-                senderChangeAmount + coinAsOfRoundZeroAdjustment - (inputCoinAmount + holdingFee * round) // See CoinRules: senderChangeAmount + coinAsOfRoundZeroAdjustment - inp.amountArchivedAsOfRoundZero
+                senderChangeAmount + amuletAsOfRoundZeroAdjustment - (inputAmuletAmount + holdingFee * round) // See AmuletRules: senderChangeAmount + amuletAsOfRoundZeroAdjustment - inp.amountArchivedAsOfRoundZero
               ),
               Codec.encode(
                 BigDecimal(
-                  0 // See CoinRules: transferConfigCC.holdingFee.rate - coin.amount.ratePerRound.rate
+                  0 // See AmuletRules: transferConfigCC.holdingFee.rate - amulet.amount.ratePerRound.rate
                 )
               ),
             ),
@@ -338,12 +340,12 @@ class ScanIntegrationTest
             .map(r => BigDecimal(r.receiverFee)) should contain only (BigDecimal(0))
 
           val taps = sv1ScanBackend.listActivity(None, 10).flatMap(_.tap).filter { tap =>
-            PartyId.tryFromProtoPrimitive(tap.coinOwner) == bobUserParty
+            PartyId.tryFromProtoPrimitive(tap.amuletOwner) == bobUserParty
           }
           taps should have size (1)
           val tap = taps.head
           // bob tapped
-          BigDecimal(tap.coinAmount) shouldBe walletUsdToCoin(bobTapAmount)
+          BigDecimal(tap.amuletAmount) shouldBe walletUsdToAmulet(bobTapAmount)
         }
       }
       val selfTransferAmount = BigDecimal(1000)
@@ -373,18 +375,18 @@ class ScanIntegrationTest
           val receiver = transfer.receivers.loneElement
           PartyId
             .tryFromProtoPrimitive(receiver.party) shouldBe (bobUserParty)
-          val inputCoinAmount =
-            transfer.sender.inputCoinAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
+          val inputAmuletAmount =
+            transfer.sender.inputAmuletAmount.map(BigDecimal(_)).getOrElse(BigDecimal(0))
           val senderChangeFee = BigDecimal(transfer.sender.senderChangeFee)
-          senderChangeFee shouldBe (coinConfig.coinCreateFee)
+          senderChangeFee shouldBe (amuletConfig.amuletCreateFee)
 
           val senderFee = BigDecimal(transfer.sender.senderFee)
           val holdingFees = BigDecimal(transfer.sender.holdingFees)
           val senderChangeAmount = BigDecimal(transfer.sender.senderChangeAmount)
-          senderFee shouldBe walletUsdToCoin(CNNodeUtil.defaultCreateFee.fee)
+          senderFee shouldBe walletUsdToAmulet(CNNodeUtil.defaultCreateFee.fee)
 
           val totalSenderFee = senderFee + holdingFees + senderChangeFee
-          inputCoinAmount - senderChangeAmount shouldBe (selfTransferAmount + totalSenderFee)
+          inputAmuletAmount - senderChangeAmount shouldBe (selfTransferAmount + totalSenderFee)
 
           BigDecimal(receiver.amount) shouldBe selfTransferAmount
           BigDecimal(receiver.receiverFee) shouldBe BigDecimal(0)
@@ -400,9 +402,9 @@ class ScanIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           aliceValidatorBackend.getValidatorPartyId(),
-          aliceWalletClient.list().coins.head,
+          aliceWalletClient.list().amulets.head,
           Seq(
-            transferOutputCoin(
+            transferOutputAmulet(
               charlieUserParty,
               receiverFeeRatio,
               transferAmount,
@@ -473,7 +475,7 @@ class ScanIntegrationTest
     def bobValidatorRewardsTrigger =
       bobValidatorBackend
         .userWalletAutomation(bobValidatorUserName)
-        .trigger[CollectRewardsAndMergeCoinsTrigger]
+        .trigger[CollectRewardsAndMergeAmuletsTrigger]
     bobValidatorRewardsTrigger.resume()
 
     // The trigger that advances rounds, running in the sv app
@@ -484,7 +486,7 @@ class ScanIntegrationTest
     clue("Bob grants featured app and taps, transfers to alice") {
       grantFeaturedAppRight(bobValidatorWalletClient)
 
-      bobWalletClient.tap(walletCoinToUsd(50))
+      bobWalletClient.tap(walletAmuletToUsd(50))
       actAndCheck(
         "Transfer from Bob to Alice",
         p2pTransfer(bobWalletClient, aliceWalletClient, alice, 30.0),
@@ -539,7 +541,7 @@ class ScanIntegrationTest
           .map(BigDecimal(_))
           .filter(_ != zero)
         val inputValidatorAmount = inputValidatorAmounts
-        // TODO (#10940) change both 78... and 79... to walletUsdToCoin(2.85)
+        // TODO (#10940) change both 78... and 79... to walletUsdToAmulet(2.85)
         inputValidatorAmount should contain theSameElementsAs (Seq(
           validatorRewardAmount + 78.9594799594
         ) ++ Seq
@@ -548,23 +550,25 @@ class ScanIntegrationTest
     }
   }
 
-  "list minted coins" in { implicit env =>
+  "list minted amulets" in { implicit env =>
     val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
     val mintAmount = 47.0
-    clue("Mint to get some coins") {
+    clue("Mint to get some amulets") {
       actAndCheck(
-        "sv1 mints coins", {
-          mintCoin(
+        "sv1 mints amulets", {
+          mintAmulet(
             sv1ValidatorBackend.participantClientWithAdminToken,
             sv1UserParty,
             mintAmount,
           )
         },
       )(
-        "Coins should appear in sv1's wallet",
+        "Amulets should appear in sv1's wallet",
         _ => {
-          sv1WalletClient.list().coins should have length 1
-          sv1WalletClient.list().coins.loneElement.effectiveAmount should be(BigDecimal(mintAmount))
+          sv1WalletClient.list().amulets should have length 1
+          sv1WalletClient.list().amulets.loneElement.effectiveAmount should be(
+            BigDecimal(mintAmount)
+          )
         },
       )
     }
@@ -572,13 +576,13 @@ class ScanIntegrationTest
       val sv1Mints = sv1ScanBackend
         .listActivity(None, defaultPageSize)
         .flatMap(_.mint)
-        .filter(_.coinOwner == sv1UserParty.toProtoPrimitive)
-      BigDecimal(sv1Mints.loneElement.coinAmount) shouldBe BigDecimal(mintAmount)
+        .filter(_.amuletOwner == sv1UserParty.toProtoPrimitive)
+      BigDecimal(sv1Mints.loneElement.amuletAmount) shouldBe BigDecimal(mintAmount)
       val sv1MintsFromHistory = sv1ScanBackend
         .listTransactions(None, TransactionHistoryRequest.SortOrder.Desc, defaultPageSize)
         .flatMap(_.mint)
-        .filter(_.coinOwner == sv1UserParty.toProtoPrimitive)
-      BigDecimal(sv1MintsFromHistory.loneElement.coinAmount) shouldBe BigDecimal(mintAmount)
+        .filter(_.amuletOwner == sv1UserParty.toProtoPrimitive)
+      BigDecimal(sv1MintsFromHistory.loneElement.amuletAmount) shouldBe BigDecimal(mintAmount)
     }
   }
 
@@ -587,14 +591,14 @@ class ScanIntegrationTest
     val step1 = CNNodeUtil.defaultTransferFee.steps.get(0)
     val step2 = CNNodeUtil.defaultTransferFee.steps.get(1)
     val step3 = CNNodeUtil.defaultTransferFee.steps.get(2)
-    val (step1Amount, step1Mult) = (walletUsdToCoin(step1._1), step1._2)
-    val (step2Amount, step2Mult) = (walletUsdToCoin(step2._1), step2._2)
+    val (step1Amount, step1Mult) = (walletUsdToAmulet(step1._1), step1._2)
+    val (step2Amount, step2Mult) = (walletUsdToAmulet(step2._1), step2._2)
     // ensuring the right steps are hardcoded here.
-    walletUsdToCoin(step3._1) should be > amount
+    walletUsdToAmulet(step3._1) should be > amount
     val steppedRate =
       initialRate * (amount min step1Amount) +
         step1Mult * ((amount - step1Amount) max 0 min step2Amount) +
         step2Mult * ((amount - step1Amount - step2Amount) max 0)
-    walletUsdToCoin(CNNodeUtil.defaultCreateFee.fee) + steppedRate
+    walletUsdToAmulet(CNNodeUtil.defaultCreateFee.fee) + steppedRate
   }
 }

@@ -39,17 +39,17 @@ class LeaderBasedAutomationService(
     }
     registerTrigger(new MergeMemberTrafficContractsTrigger(triggerContext, svTaskContext))
 
-    if (config.automation.enableExpireCoin) {
-      registerTrigger(new ExpiredCoinTrigger(triggerContext, svTaskContext))
+    if (config.automation.enableExpireAmulet) {
+      registerTrigger(new ExpiredAmuletTrigger(triggerContext, svTaskContext))
     }
 
-    registerTrigger(new ExpiredLockedCoinTrigger(triggerContext, svTaskContext))
+    registerTrigger(new ExpiredLockedAmuletTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredSvOnboardingRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new CloseVoteRequestTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpiredSvOnboardingConfirmedTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpireIssuingMiningRoundTrigger(triggerContext, svTaskContext))
     registerTrigger(new ExpireStaleConfirmationsTrigger(triggerContext, svTaskContext))
-    registerTrigger(new GarbageCollectCoinPriceVotesTrigger(triggerContext, svTaskContext))
+    registerTrigger(new GarbageCollectAmuletPriceVotesTrigger(triggerContext, svTaskContext))
 
     registerTrigger(new MergeUnclaimedRewardsTrigger(triggerContext, svTaskContext))
     if (config.automation.enableUnclaimedRewardExpiration) {
@@ -74,14 +74,14 @@ object LeaderBasedAutomationService extends AutomationServiceCompanion {
     aTrigger[ExecuteConfirmedActionTrigger],
     aTrigger[CloseVoteRequestWithEarlyClosingTrigger],
     aTrigger[MergeMemberTrafficContractsTrigger],
-    aTrigger[ExpiredCoinTrigger],
-    aTrigger[ExpiredLockedCoinTrigger],
+    aTrigger[ExpiredAmuletTrigger],
+    aTrigger[ExpiredLockedAmuletTrigger],
     aTrigger[ExpiredSvOnboardingRequestTrigger],
     aTrigger[CloseVoteRequestTrigger],
     aTrigger[ExpiredSvOnboardingConfirmedTrigger],
     aTrigger[ExpireIssuingMiningRoundTrigger],
     aTrigger[ExpireStaleConfirmationsTrigger],
-    aTrigger[GarbageCollectCoinPriceVotesTrigger],
+    aTrigger[GarbageCollectAmuletPriceVotesTrigger],
     aTrigger[MergeUnclaimedRewardsTrigger],
     aTrigger[ExpireRewardCouponsTrigger],
     aTrigger[ExpireElectionRequestsTrigger],

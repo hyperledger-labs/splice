@@ -6,7 +6,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
@@ -56,23 +56,23 @@ object HttpWalletAppClient {
       externalHttp.WalletClient.httpClient(HttpClientBuilder().buildClient(), host)
   }
 
-  final case class CoinPosition(
-      contract: Contract[coinCodegen.Coin.ContractId, coinCodegen.Coin],
+  final case class AmuletPosition(
+      contract: Contract[amuletCodegen.Amulet.ContractId, amuletCodegen.Amulet],
       round: Long,
       accruedHoldingFee: BigDecimal,
       effectiveAmount: BigDecimal,
   )
 
-  final case class LockedCoinPosition(
-      contract: Contract[coinCodegen.LockedCoin.ContractId, coinCodegen.LockedCoin],
+  final case class LockedAmuletPosition(
+      contract: Contract[amuletCodegen.LockedAmulet.ContractId, amuletCodegen.LockedAmulet],
       round: Long,
       accruedHoldingFee: BigDecimal,
       effectiveAmount: BigDecimal,
   )
 
   final case class ListResponse(
-      coins: Seq[CoinPosition],
-      lockedCoins: Seq[LockedCoinPosition],
+      amulets: Seq[AmuletPosition],
+      lockedAmulets: Seq[LockedAmuletPosition],
   )
 
   final case class Balance(
@@ -142,16 +142,16 @@ object HttpWalletAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.ListResponse.OK(response) =>
-      def decodePositions(position: definitions.CoinPosition) =
+      def decodePositions(position: definitions.AmuletPosition) =
         for {
           contract <- Contract
-            .fromHttp(coinCodegen.Coin.COMPANION)(position.contract)
+            .fromHttp(amuletCodegen.Amulet.COMPANION)(position.contract)
             .leftMap(_.toString)
 
           accruedHoldingFee <- Codec.decode(Codec.BigDecimal)(position.accruedHoldingFee)
           effectiveAmount <- Codec.decode(Codec.BigDecimal)(position.effectiveAmount)
         } yield {
-          new CoinPosition(
+          new AmuletPosition(
             contract,
             position.round,
             accruedHoldingFee,
@@ -159,16 +159,16 @@ object HttpWalletAppClient {
           )
         }
 
-      def decodeLockedPositions(lockedPosition: definitions.CoinPosition) =
+      def decodeLockedPositions(lockedPosition: definitions.AmuletPosition) =
         for {
           contract <- Contract
-            .fromHttp(coinCodegen.LockedCoin.COMPANION)(lockedPosition.contract)
+            .fromHttp(amuletCodegen.LockedAmulet.COMPANION)(lockedPosition.contract)
             .leftMap(_.toString)
 
           accruedHoldingFee <- Codec.decode(Codec.BigDecimal)(lockedPosition.accruedHoldingFee)
           effectiveAmount <- Codec.decode(Codec.BigDecimal)(lockedPosition.effectiveAmount)
         } yield {
-          LockedCoinPosition(
+          LockedAmuletPosition(
             contract,
             lockedPosition.round,
             accruedHoldingFee,
@@ -177,8 +177,8 @@ object HttpWalletAppClient {
         }
 
       for {
-        positions <- response.coins.traverse(decodePositions)
-        lockedPositions <- response.lockedCoins.traverse(decodeLockedPositions)
+        positions <- response.amulets.traverse(decodePositions)
+        lockedPositions <- response.lockedAmulets.traverse(decodeLockedPositions)
       } yield {
         ListResponse(positions, lockedPositions)
       }
@@ -186,7 +186,7 @@ object HttpWalletAppClient {
   }
 
   case class Tap(amount: BigDecimal)
-      extends InternalBaseCommand[http.TapResponse, coinCodegen.Coin.ContractId] {
+      extends InternalBaseCommand[http.TapResponse, amuletCodegen.Amulet.ContractId] {
 
     def submitRequest(
         client: Client,
@@ -197,14 +197,14 @@ object HttpWalletAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.TapResponse.OK(response) =>
-      Codec.decodeJavaContractId(coinCodegen.Coin.COMPANION)(response.contractId)
+      Codec.decodeJavaContractId(amuletCodegen.Amulet.COMPANION)(response.contractId)
     }
   }
 
   case object SelfGrantFeaturedAppRight
       extends InternalBaseCommand[
         http.SelfGrantFeatureAppRightResponse,
-        coinCodegen.FeaturedAppRight.ContractId,
+        amuletCodegen.FeaturedAppRight.ContractId,
       ] {
     def submitRequest(
         client: Client,
@@ -215,7 +215,7 @@ object HttpWalletAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = { case http.SelfGrantFeatureAppRightResponse.OK(response) =>
-      Codec.decodeJavaContractId(coinCodegen.FeaturedAppRight.COMPANION)(response.contractId)
+      Codec.decodeJavaContractId(amuletCodegen.FeaturedAppRight.COMPANION)(response.contractId)
     }
   }
 
@@ -764,7 +764,7 @@ object HttpWalletAppClient {
       extends InternalBaseCommand[
         http.ListAppRewardCouponsResponse,
         Seq[
-          Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]
+          Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon]
         ],
       ] {
     def submitRequest(
@@ -777,7 +777,7 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListAppRewardCouponsResponse.OK(response) =>
       response.appRewardCoupons
-        .traverse(req => Contract.fromHttp(coinCodegen.AppRewardCoupon.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(amuletCodegen.AppRewardCoupon.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -786,7 +786,10 @@ object HttpWalletAppClient {
       extends InternalBaseCommand[
         http.ListValidatorRewardCouponsResponse,
         Seq[
-          Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+          Contract[
+            amuletCodegen.ValidatorRewardCoupon.ContractId,
+            amuletCodegen.ValidatorRewardCoupon,
+          ]
         ],
       ] {
     def submitRequest(
@@ -799,7 +802,7 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListValidatorRewardCouponsResponse.OK(response) =>
       response.validatorRewardCoupons
-        .traverse(req => Contract.fromHttp(coinCodegen.ValidatorRewardCoupon.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(amuletCodegen.ValidatorRewardCoupon.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
@@ -836,8 +839,8 @@ object HttpWalletAppClient {
         http.ListSvRewardCouponsResponse,
         Seq[
           Contract[
-            coinCodegen.SvRewardCoupon.ContractId,
-            coinCodegen.SvRewardCoupon,
+            amuletCodegen.SvRewardCoupon.ContractId,
+            amuletCodegen.SvRewardCoupon,
           ]
         ],
       ] {
@@ -851,7 +854,7 @@ object HttpWalletAppClient {
         decoder: TemplateJsonDecoder
     ) = { case http.ListSvRewardCouponsResponse.OK(response) =>
       response.svRewardCoupons
-        .traverse(req => Contract.fromHttp(coinCodegen.SvRewardCoupon.COMPANION)(req))
+        .traverse(req => Contract.fromHttp(amuletCodegen.SvRewardCoupon.COMPANION)(req))
         .leftMap(_.toString)
     }
   }

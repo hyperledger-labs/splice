@@ -32,7 +32,7 @@ class ReconcileSequencerConnectionsTrigger(
 ) extends PollingTrigger {
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      globalDomain <- coinRulesDomain()
+      globalDomain <- amuletRulesDomain()
       maybeDomainTime <- participantAdminConnection
         .getDomainTimeLowerBound(globalDomain, maxDomainTimeLag = context.config.pollingInterval)
         .map(domainTime => Some(domainTime.timestamp))
@@ -60,8 +60,8 @@ class ReconcileSequencerConnectionsTrigger(
     } yield false
   }
 
-  private[this] def coinRulesDomain()(implicit tc: TraceContext) =
-    scanConnection.getCoinRulesDomain()(tc)
+  private[this] def amuletRulesDomain()(implicit tc: TraceContext) =
+    scanConnection.getAmuletRulesDomain()(tc)
 
   private def modifySequencerConnections(
       sequencerConnections: Seq[GrpcSequencerConnection]

@@ -89,7 +89,7 @@ class SelfHostedPreflightIntegrationTest
 
       withFrontEnd("alice-selfhosted") { implicit webDriver =>
         login(walletUiPort, "alice")
-        tapCoins(100)
+        tapAmulets(100)
         reserveCnsNameFor(
           () => login(cnsUiPort, "alice"),
           cnsName,
@@ -105,7 +105,7 @@ class SelfHostedPreflightIntegrationTest
       }
 
       // Stop nodes before Canton is shutdown
-      env.coinNodes.local.foreach(_.stop())
+      env.amuletNodes.local.foreach(_.stop())
     }
   }
 

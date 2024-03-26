@@ -120,7 +120,7 @@ reduces the domain fees you have to pay on the global domain,
 increases privacy and lets you ensure availability of your app
 independent of availability of the global domain.
 
-To do so, first stop all existing Canton and Coin processes you had
+To do so, first stop all existing Canton and Amulet processes you had
 running.
 
 First, start the splitwell domain ::

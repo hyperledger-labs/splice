@@ -7,11 +7,11 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinrules.CoinRules_MiningRound_Archive
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules_MiningRound_Archive
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.DedupOffset
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
@@ -35,12 +35,12 @@ class ArchiveClosedMiningRoundsTrigger(
   private val svParty = store.key.svParty
   private val svcParty = store.key.svcParty
 
-  private def coinRulesArchiveMiningRoundAction(
+  private def amuletRulesArchiveMiningRoundAction(
       closedRoundCid: ClosedMiningRound.ContractId
   ): ActionRequiringConfirmation =
-    new ARC_CoinRules(
+    new ARC_AmuletRules(
       new CRARC_MiningRound_Archive(
-        new CoinRules_MiningRound_Archive(
+        new AmuletRules_MiningRound_Archive(
           closedRoundCid
         )
       )
@@ -49,7 +49,7 @@ class ArchiveClosedMiningRoundsTrigger(
   private def existsClosedRoundArchivalConfirmation(
       closedRoundId: ClosedMiningRound.ContractId
   )(implicit tc: TraceContext): Future[Boolean] = {
-    val action = coinRulesArchiveMiningRoundAction(
+    val action = amuletRulesArchiveMiningRoundAction(
       closedRoundId
     )
     for {
@@ -71,7 +71,7 @@ class ArchiveClosedMiningRoundsTrigger(
     for {
       svcRules <- store.getSvcRules()
       closedRound = task.value
-      action = coinRulesArchiveMiningRoundAction(
+      action = amuletRulesArchiveMiningRoundAction(
         closedRound.contractId
       )
       update = svcRules.exercise(

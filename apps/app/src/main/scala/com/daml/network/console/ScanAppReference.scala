@@ -3,8 +3,8 @@ package com.daml.network.console
 import org.apache.pekko.actor.ActorSystem
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amuletrules.{AppTransferContext, AmuletRules}
 import com.daml.network.codegen.java.cc.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -20,7 +20,7 @@ import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.TransferContextWithInstances
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.scan.store.db.ScanAggregator
-import com.daml.network.util.{CNNodeUtil, CoinConfigSchedule, Contract, ContractWithState}
+import com.daml.network.util.{CNNodeUtil, AmuletConfigSchedule, Contract, ContractWithState}
 import com.digitalasset.canton.console.{BaseInspection, ConsoleCommandResult, Help}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
@@ -58,8 +58,8 @@ abstract class ScanAppReference(
       case None =>
         CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
     }
-    val coinRules = getCoinRules()
-    TransferContextWithInstances(coinRules, latestOpenMiningRound, openRounds)
+    val amuletRules = getAmuletRules()
+    TransferContextWithInstances(amuletRules, latestOpenMiningRound, openRounds)
   }
 
   @Help.Summary(
@@ -74,11 +74,11 @@ abstract class ScanAppReference(
   }
 
   @Help.Summary(
-    "Returns the CoinRules."
+    "Returns the AmuletRules."
   )
-  def getCoinRules(): ContractWithState[CoinRules.ContractId, CoinRules] =
+  def getAmuletRules(): ContractWithState[AmuletRules.ContractId, AmuletRules] =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetCoinRules(None))
+      httpCommand(HttpScanAppClient.GetAmuletRules(None))
     }
 
   @Help.Summary(
@@ -122,10 +122,12 @@ abstract class ScanAppReference(
       }
 
   @Help.Summary(
-    "Get the (cached) coin config effective now. Note that changes to the config might take some time to propagate due to the client-side caching."
+    "Get the (cached) amulet config effective now. Note that changes to the config might take some time to propagate due to the client-side caching."
   )
-  def getCoinConfigAsOf(now: CantonTimestamp): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
-    CoinConfigSchedule(getTransferContextWithInstances(now).coinRules).getConfigAsOf(now)
+  def getAmuletConfigAsOf(
+      now: CantonTimestamp
+  ): cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD] = {
+    AmuletConfigSchedule(getTransferContextWithInstances(now).amuletRules).getConfigAsOf(now)
   }
 
   @Help.Summary(
@@ -173,17 +175,17 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary("Get the total balance of Canton Coin in the network")
-  def getTotalCoinBalance(asOfEndOfRound: Long): BigDecimal =
+  def getTotalAmuletBalance(asOfEndOfRound: Long): BigDecimal =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetTotalCoinBalance(asOfEndOfRound))
+      httpCommand(HttpScanAppClient.GetTotalAmuletBalance(asOfEndOfRound))
     }
 
   @Help.Summary("Get the Canton Coin config parameters for a given round")
-  def getCoinConfigForRound(
+  def getAmuletConfigForRound(
       round: Long
-  ): HttpScanAppClient.CoinConfig =
+  ): HttpScanAppClient.AmuletConfig =
     consoleEnvironment.run {
-      httpCommand(HttpScanAppClient.GetCoinConfigForRound(round))
+      httpCommand(HttpScanAppClient.GetAmuletConfigForRound(round))
     }
 
   @Help.Summary(

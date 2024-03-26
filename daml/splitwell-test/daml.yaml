@@ -7,8 +7,8 @@ dependencies:
   - daml-stdlib
   - daml3-script
 data-dependencies:
-  - ../canton-coin/.daml/dist/canton-coin-0.1.0.dar
-  - ../canton-coin-test/.daml/dist/canton-coin-test-0.1.0.dar
+  - ../canton-amulet/.daml/dist/canton-amulet-0.1.0.dar
+  - ../canton-amulet-test/.daml/dist/canton-amulet-test-0.1.0.dar
   - ../cn-util/.daml/dist/cn-util-0.1.0.dar
   - ../splitwell/.daml/dist/splitwell-0.1.0.dar
   - ../wallet-payments/.daml/dist/wallet-payments-0.1.0.dar

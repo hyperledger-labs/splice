@@ -2,18 +2,18 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin.Coin
-import com.daml.network.codegen.java.cc.coinrules.BuyMemberTrafficResult
+import com.daml.network.codegen.java.cc.amulet.Amulet
+import com.daml.network.codegen.java.cc.amuletrules.BuyMemberTrafficResult
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.validatorlicense.FaucetState
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.{amulet as amuletCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.cns.CnsEntry
 import com.daml.network.codegen.java.cn.{cometbft as cometbftCodegen, svcrules as svcrulesCodegen}
 import com.daml.network.codegen.java.cn.svc.globaldomain as globaldomainCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
-import com.daml.network.history.{CoinExpire, LockedCoinExpireCoin, Transfer}
+import com.daml.network.history.{AmuletExpire, LockedAmuletExpireAmulet, Transfer}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.{
   OpenMiningRoundTxLogEntry,
@@ -56,38 +56,38 @@ abstract class ScanStoreTest
     extends StoreTest
     with HasExecutionContext
     with StoreErrors
-    with CoinTransferUtil {
+    with AmuletTransferUtil {
 
   "ScanStore" should {
 
-    "getTotalCoinBalance" should {
+    "getTotalAmuletBalance" should {
 
-      "return correct total coin balance for the round where the transfer happened and for the rounds before and after" in {
-        val coinAmount = 100.0
+      "return correct total amulet balance for the round where the transfer happened and for the rounds before and after" in {
+        val amuletAmount = 100.0
         // For aggregation to work correctly, all closed mining rounds for totals have to exist.
         val closedRounds = (0 to 3).map { round =>
           closedMiningRound(svcParty, round = round.toLong)
         }
         for {
           store <- mkStore()
-          coinRulesContract = coinRules()
+          amuletRulesContract = amuletRules()
           _ <- dummyDomain.exercise(
-            coinRulesContract,
-            interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+            amuletRulesContract,
+            interfaceId = Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
             Transfer.choice.name,
-            mkCoinRulesTransfer(user1, coinAmount),
+            mkAmuletRulesTransfer(user1, amuletAmount),
             mkTransferResult(
               round = 2,
               inputAppRewardAmount = 0,
-              inputCoinAmount = coinAmount,
+              inputAmuletAmount = amuletAmount,
               inputValidatorRewardAmount = 0,
               balanceChanges = Map(
-                user1.toProtoPrimitive -> new cc.coinrules.BalanceChange(
-                  BigDecimal(coinAmount).bigDecimal,
+                user1.toProtoPrimitive -> new cc.amuletrules.BalanceChange(
+                  BigDecimal(amuletAmount).bigDecimal,
                   BigDecimal(holdingFee).bigDecimal,
                 )
               ),
-              coinPrice = 0.0005,
+              amuletPrice = 0.0005,
             ),
             nextOffset(),
           )(
@@ -98,15 +98,15 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalCoinBalance(1).futureValue shouldBe (0.0)
+          store.getTotalAmuletBalance(1).futureValue shouldBe (0.0)
           // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
-          store.getTotalCoinBalance(2).futureValue shouldBe (coinAmount - 3 * holdingFee)
-          store.getTotalCoinBalance(3).futureValue shouldBe (coinAmount - 4 * holdingFee)
+          store.getTotalAmuletBalance(2).futureValue shouldBe (amuletAmount - 3 * holdingFee)
+          store.getTotalAmuletBalance(3).futureValue shouldBe (amuletAmount - 4 * holdingFee)
         }
       }
 
-      "return correct total coin balance for the round where the coin expired and for the rounds before and after" in {
-        val coinRound1 = 100.0
+      "return correct total amulet balance for the round where the amulet expired and for the rounds before and after" in {
+        val amuletRound1 = 100.0
         val changeToInitialAmountAsOfRoundZero = -50.0
         // For aggregation to work correctly, all closed mining rounds for totals have to exist.
         val closedRounds = (0 to 3).map { round =>
@@ -115,16 +115,16 @@ abstract class ScanStoreTest
 
         for {
           store <- mkStore()
-          _ <- dummyDomain.ingest(mintTransaction(user1, coinRound1, 1, holdingFee))(
+          _ <- dummyDomain.ingest(mintTransaction(user1, amuletRound1, 1, holdingFee))(
             store.multiDomainAcsStore
           )
-          coinContract = coin(user1, coinRound1, 1, holdingFee)
+          amuletContract = amulet(user1, amuletRound1, 1, holdingFee)
           _ <- dummyDomain.exercise(
-            coinContract,
-            interfaceId = Some(cc.coin.Coin.TEMPLATE_ID),
-            CoinExpire.choice.name,
-            mkCoinExpire(),
-            mkCoinExpireSummary(
+            amuletContract,
+            interfaceId = Some(cc.amulet.Amulet.TEMPLATE_ID),
+            AmuletExpire.choice.name,
+            mkAmuletExpire(),
+            mkAmuletExpireSummary(
               user1,
               2,
               changeToInitialAmountAsOfRoundZero,
@@ -139,18 +139,18 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalCoinBalance(1).futureValue shouldBe (coinRound1 - 1 * holdingFee)
+          store.getTotalAmuletBalance(1).futureValue shouldBe (amuletRound1 - 1 * holdingFee)
           store
-            .getTotalCoinBalance(2)
-            .futureValue shouldBe (coinRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
+            .getTotalAmuletBalance(2)
+            .futureValue shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
           store
-            .getTotalCoinBalance(3)
-            .futureValue shouldBe (coinRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
+            .getTotalAmuletBalance(3)
+            .futureValue shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
         }
       }
 
-      "return correct total coin balance for the round where the locked coin expired and for the rounds before and after" in {
-        val coinRound1 = 100.0
+      "return correct total amulet balance for the round where the locked amulet expired and for the rounds before and after" in {
+        val amuletRound1 = 100.0
         val changeToInitialAmountAsOfRoundZero = -50.0
         // For aggregation to work correctly, all closed mining rounds for totals have to exist.
         val closedRounds = (0 to 3).map { round =>
@@ -159,16 +159,16 @@ abstract class ScanStoreTest
 
         for {
           store <- mkStore()
-          _ <- dummyDomain.ingest(mintTransaction(user1, coinRound1, 1, holdingFee))(
+          _ <- dummyDomain.ingest(mintTransaction(user1, amuletRound1, 1, holdingFee))(
             store.multiDomainAcsStore
           )
-          coinContract = lockedCoin(user1, coinRound1, 1, holdingFee)
+          amuletContract = lockedAmulet(user1, amuletRound1, 1, holdingFee)
           _ <- dummyDomain.exercise(
-            coinContract,
-            interfaceId = Some(cc.coin.LockedCoin.TEMPLATE_ID),
-            LockedCoinExpireCoin.choice.name,
-            mkLockedCoinExpireCoin(),
-            mkCoinExpireSummary(
+            amuletContract,
+            interfaceId = Some(cc.amulet.LockedAmulet.TEMPLATE_ID),
+            LockedAmuletExpireAmulet.choice.name,
+            mkLockedAmuletExpireAmulet(),
+            mkAmuletExpireSummary(
               user1,
               2,
               changeToInitialAmountAsOfRoundZero,
@@ -183,17 +183,17 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalCoinBalance(1).futureValue shouldBe (coinRound1 - 1 * holdingFee)
+          store.getTotalAmuletBalance(1).futureValue shouldBe (amuletRound1 - 1 * holdingFee)
           store
-            .getTotalCoinBalance(2)
-            .futureValue shouldBe (coinRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
+            .getTotalAmuletBalance(2)
+            .futureValue shouldBe (amuletRound1 - 2 * holdingFee + changeToInitialAmountAsOfRoundZero - 3 * holdingFee)
           store
-            .getTotalCoinBalance(3)
-            .futureValue shouldBe (coinRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
+            .getTotalAmuletBalance(3)
+            .futureValue shouldBe (amuletRound1 - 3 * holdingFee + changeToInitialAmountAsOfRoundZero - 4 * holdingFee)
         }
       }
 
-      "return correct total coin balance for the round where the mint happened and for the rounds before and after" in {
+      "return correct total amulet balance for the round where the mint happened and for the rounds before and after" in {
         val mintAmount = 100.0
         // For aggregation to work correctly, all closed mining rounds for totals have to exist.
         val closedRounds = (0 to 3).map { round =>
@@ -210,10 +210,10 @@ abstract class ScanStoreTest
           )
           _ <- store.aggregate()
         } yield {
-          store.getTotalCoinBalance(1).futureValue shouldBe (0.0)
-          // The coin is minted at round 2, so at the end of that round it's already incurring 1 x holding fee
-          store.getTotalCoinBalance(2).futureValue shouldBe (mintAmount - 1 * holdingFee)
-          store.getTotalCoinBalance(3).futureValue shouldBe (mintAmount - 2 * holdingFee)
+          store.getTotalAmuletBalance(1).futureValue shouldBe (0.0)
+          // The amulet is minted at round 2, so at the end of that round it's already incurring 1 x holding fee
+          store.getTotalAmuletBalance(2).futureValue shouldBe (mintAmount - 1 * holdingFee)
+          store.getTotalAmuletBalance(3).futureValue shouldBe (mintAmount - 2 * holdingFee)
         }
       }
 
@@ -221,9 +221,9 @@ abstract class ScanStoreTest
 
     "getWalletBalance" should {
       "return correct wallet balance for the round where the transfer happened and for the rounds before and after" in {
-        val keptCoinAmount = 60.0
-        val sentCoinAmount = 40.0
-        val coinAmount = keptCoinAmount + sentCoinAmount
+        val keptAmuletAmount = 60.0
+        val sentAmuletAmount = 40.0
+        val amuletAmount = keptAmuletAmount + sentAmuletAmount
         val lastClosedRound = 3
         val closedRounds = (0 to lastClosedRound).map { round =>
           closedMiningRound(svcParty, round = round.toLong)
@@ -231,28 +231,28 @@ abstract class ScanStoreTest
 
         for {
           store <- mkStore()
-          coinRulesContract = coinRules()
+          amuletRulesContract = amuletRules()
           _ <- dummyDomain.exercise(
-            coinRulesContract,
-            interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+            amuletRulesContract,
+            interfaceId = Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
             Transfer.choice.name,
-            mkCoinRulesTransfer(user1, coinAmount),
+            mkAmuletRulesTransfer(user1, amuletAmount),
             mkTransferResult(
               round = 2,
               inputAppRewardAmount = 0,
-              inputCoinAmount = coinAmount,
+              inputAmuletAmount = amuletAmount,
               inputValidatorRewardAmount = 0,
               balanceChanges = Map(
-                user1.toProtoPrimitive -> new cc.coinrules.BalanceChange(
-                  BigDecimal(keptCoinAmount).bigDecimal,
+                user1.toProtoPrimitive -> new cc.amuletrules.BalanceChange(
+                  BigDecimal(keptAmuletAmount).bigDecimal,
                   BigDecimal(holdingFee).bigDecimal,
                 ),
-                user2.toProtoPrimitive -> new cc.coinrules.BalanceChange(
-                  BigDecimal(sentCoinAmount).bigDecimal,
+                user2.toProtoPrimitive -> new cc.amuletrules.BalanceChange(
+                  BigDecimal(sentAmuletAmount).bigDecimal,
                   BigDecimal(holdingFee).bigDecimal,
                 ),
               ),
-              coinPrice = 0.0005,
+              amuletPrice = 0.0005,
             ),
             nextOffset(),
           )(
@@ -268,25 +268,25 @@ abstract class ScanStoreTest
           // 100.0 is the initial amount as of round 0, so at the end of round 2 the holding fee was applied three times
           forEvery(
             Table(
-              ("user", "coin amount"),
-              (user1, keptCoinAmount),
-              (user2, sentCoinAmount),
+              ("user", "amulet amount"),
+              (user1, keptAmuletAmount),
+              (user2, sentAmuletAmount),
             )
-          ) { (user, coinAmount) =>
+          ) { (user, amuletAmount) =>
             store.getWalletBalance(user, 1).futureValue shouldBe (0.0) withClue "at round 1"
             store
               .getWalletBalance(user, 2)
-              .futureValue shouldBe (coinAmount - 3 * holdingFee) withClue "at round 2"
+              .futureValue shouldBe (amuletAmount - 3 * holdingFee) withClue "at round 2"
             store
               .getWalletBalance(user, 3)
-              .futureValue shouldBe (coinAmount - 4 * holdingFee) withClue "at round 3"
+              .futureValue shouldBe (amuletAmount - 4 * holdingFee) withClue "at round 3"
             val failure = store.getWalletBalance(user, lastClosedRound + 1L).failed.futureValue
             failure.getMessage should be(roundNotAggregated().getMessage)
           }
         }
       }
 
-      "accumulate on coin expiry, locked coin expiry, and minting" in {
+      "accumulate on amulet expiry, locked amulet expiry, and minting" in {
         import MonadUtil.sequentialTraverse_
         val mintAmount1 = 60.0
         val mintAmount2 = 40.0
@@ -294,7 +294,7 @@ abstract class ScanStoreTest
         val expireAmount2 = -18.0
         for {
           store <- mkStore()
-          coinRulesContract = coinRules()
+          amuletRulesContract = amuletRules()
           // the round where the mint happened and for the rounds before and after
           _ <- sequentialTraverse_(Seq(user1 -> mintAmount1, user2 -> mintAmount2)) {
             case (user, mintAmount) =>
@@ -302,14 +302,14 @@ abstract class ScanStoreTest
                 mintTransaction(user, mintAmount, 2, holdingFee)
               )(store.multiDomainAcsStore)
           }
-          // "the round where the coin expired and for the rounds before and after"
-          coinContract = coin(user1, mintAmount1, 2, holdingFee)
+          // "the round where the amulet expired and for the rounds before and after"
+          amuletContract = amulet(user1, mintAmount1, 2, holdingFee)
           _ <- dummyDomain.exercise(
-            coinContract,
-            interfaceId = Some(cc.coin.Coin.TEMPLATE_ID),
-            CoinExpire.choice.name,
-            mkCoinExpire(),
-            mkCoinExpireSummary(
+            amuletContract,
+            interfaceId = Some(cc.amulet.Amulet.TEMPLATE_ID),
+            AmuletExpire.choice.name,
+            mkAmuletExpire(),
+            mkAmuletExpireSummary(
               user1,
               4,
               expireAmount1,
@@ -317,14 +317,14 @@ abstract class ScanStoreTest
             ),
             nextOffset(),
           )(store.multiDomainAcsStore)
-          // "the round where the locked coin expired and for the rounds before and after
-          lockedCoinContract = lockedCoin(user2, mintAmount2, 2, holdingFee)
+          // "the round where the locked amulet expired and for the rounds before and after
+          lockedAmuletContract = lockedAmulet(user2, mintAmount2, 2, holdingFee)
           _ <- dummyDomain.exercise(
-            lockedCoinContract,
-            interfaceId = Some(cc.coin.LockedCoin.TEMPLATE_ID),
-            LockedCoinExpireCoin.choice.name,
-            mkLockedCoinExpireCoin(),
-            mkCoinExpireSummary(
+            lockedAmuletContract,
+            interfaceId = Some(cc.amulet.LockedAmulet.TEMPLATE_ID),
+            LockedAmuletExpireAmulet.choice.name,
+            mkLockedAmuletExpireAmulet(),
+            mkAmuletExpireSummary(
               user2,
               6,
               expireAmount2,
@@ -343,7 +343,7 @@ abstract class ScanStoreTest
           _ <- store.aggregate()
         } yield forEvery(
           Table(
-            ("user", "round", "coin amount"),
+            ("user", "round", "amulet amount"),
             (user1, 1L, 0),
             (user2, 1L, 0),
             // check mints
@@ -362,8 +362,8 @@ abstract class ScanStoreTest
             (user1, 7L, mintAmount1 - 6 * holdingFee + expireAmount1 - 8 * holdingFee),
             (user2, 7L, mintAmount2 - 6 * holdingFee + expireAmount2 - 8 * holdingFee),
           )
-        ) { (user, round, coinAmount) =>
-          store.getWalletBalance(user, round).futureValue shouldBe coinAmount
+        ) { (user, round, amuletAmount) =>
+          store.getWalletBalance(user, round).futureValue shouldBe amuletAmount
         }
       }
     }
@@ -388,17 +388,17 @@ abstract class ScanStoreTest
           _ <- MonadUtil.sequentialTraverse(appRewards.zip(validatorRewards).zipWithIndex) {
             case ((appAmount, validatorAmount), round) =>
               dummyDomain.exercise(
-                coinRules(),
-                Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+                amuletRules(),
+                Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
                 Transfer.choice.name,
-                mkCoinRulesTransfer(user1, 1.0),
+                mkAmuletRulesTransfer(user1, 1.0),
                 mkTransferResult(
                   round = round.toLong,
                   inputAppRewardAmount = appAmount,
                   inputValidatorRewardAmount = validatorAmount,
-                  inputCoinAmount = 0,
+                  inputAmuletAmount = 0,
                   balanceChanges = Map(),
-                  coinPrice = 0.0005,
+                  amuletPrice = 0.0005,
                 ),
               )(store.multiDomainAcsStore)
           }
@@ -436,33 +436,33 @@ abstract class ScanStoreTest
           store <- mkStore()
           _ <- MonadUtil.sequentialTraverse(appRewards.zipWithIndex) { case (amount, round) =>
             dummyDomain.exercise(
-              coinRules(),
-              Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+              amuletRules(),
+              Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
               Transfer.choice.name,
-              mkCoinRulesTransfer(user1, amount),
+              mkAmuletRulesTransfer(user1, amount),
               mkTransferResult(
                 round = round.toLong,
                 inputAppRewardAmount = amount,
-                inputCoinAmount = 0,
+                inputAmuletAmount = 0,
                 inputValidatorRewardAmount = 0,
                 balanceChanges = Map(),
-                coinPrice = 0.0005,
+                amuletPrice = 0.0005,
               ),
             )(store.multiDomainAcsStore)
           }
           _ <- MonadUtil.sequentialTraverse(validatorRewards.zipWithIndex) { case (amount, round) =>
             dummyDomain.exercise(
-              coinRules(),
-              Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+              amuletRules(),
+              Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
               Transfer.choice.name,
-              mkCoinRulesTransfer(user1, amount),
+              mkAmuletRulesTransfer(user1, amount),
               mkTransferResult(
                 round = round.toLong,
                 inputAppRewardAmount = 0,
                 inputValidatorRewardAmount = amount,
-                inputCoinAmount = 0,
+                inputAmuletAmount = 0,
                 balanceChanges = Map(),
-                coinPrice = 0.0005,
+                amuletPrice = 0.0005,
               ),
             )(store.multiDomainAcsStore)
           }
@@ -479,26 +479,26 @@ abstract class ScanStoreTest
 
     }
 
-    "getCoinConfigForRound" should {
+    "getAmuletConfigForRound" should {
 
-      "return the coin OpenMiningRoundTxLogEntry for the round" in {
-        val wanted = openMiningRound(svcParty, round = 2, coinPrice = 2.0)
-        val unwanted = openMiningRound(svcParty, round = 3, coinPrice = 3.0)
+      "return the amulet OpenMiningRoundTxLogEntry for the round" in {
+        val wanted = openMiningRound(svcParty, round = 2, amuletPrice = 2.0)
+        val unwanted = openMiningRound(svcParty, round = 3, amuletPrice = 3.0)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(wanted)(store.multiDomainAcsStore)
           _ <- dummyDomain.create(unwanted)(store.multiDomainAcsStore)
         } yield {
-          val logEntry = store.getCoinConfigForRound(round = 2).futureValue
+          val logEntry = store.getAmuletConfigForRound(round = 2).futureValue
           logEntry match {
             case omr: OpenMiningRoundTxLogEntry =>
               omr.round should be(wanted.payload.round.number)
             case x =>
               fail(s"Entry was not an OpenMiningRoundTxLogEntry but a $x")
           }
-          numeric(logEntry.coinCreateFee) should be(
+          numeric(logEntry.amuletCreateFee) should be(
             numeric(
-              wanted.payload.transferConfigUsd.createFee.fee.divide(wanted.payload.coinPrice)
+              wanted.payload.transferConfigUsd.createFee.fee.divide(wanted.payload.amuletPrice)
             )
           )
         }
@@ -533,7 +533,7 @@ abstract class ScanStoreTest
       }
 
       "fail if there's no closed round" in {
-        val open = openMiningRound(svcParty, round = 2, coinPrice = 2.0)
+        val open = openMiningRound(svcParty, round = 2, amuletPrice = 2.0)
         for {
           store <- mkStore()
           _ <- dummyDomain.create(open)(store.multiDomainAcsStore)
@@ -580,10 +580,10 @@ abstract class ScanStoreTest
         _ <- dummyDomain.create(closed)(store.multiDomainAcsStore)
         _ <- MonadUtil.sequentialTraverse(providerRewardRounds) { case (provider, amount, round) =>
           dummyDomain.exercise(
-            coinRules(),
-            Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+            amuletRules(),
+            Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
             Transfer.choice.name,
-            mkCoinRulesTransfer(provider, amount),
+            mkAmuletRulesTransfer(provider, amount),
             mkTransferResultForTest(
               amount,
               round.toLong,
@@ -608,10 +608,10 @@ abstract class ScanStoreTest
             mkTransferResult(
               round = round,
               inputAppRewardAmount = amount,
-              inputCoinAmount = 0,
+              inputAmuletAmount = 0,
               inputValidatorRewardAmount = 0,
               balanceChanges = Map(),
-              coinPrice = 0.0005,
+              amuletPrice = 0.0005,
             ),
         )
       }
@@ -627,9 +627,9 @@ abstract class ScanStoreTest
               round = round,
               inputAppRewardAmount = 0,
               inputValidatorRewardAmount = amount,
-              inputCoinAmount = 0,
+              inputAmuletAmount = 0,
               balanceChanges = Map(),
-              coinPrice = 0.0005,
+              amuletPrice = 0.0005,
             ),
         )
       }
@@ -641,21 +641,21 @@ abstract class ScanStoreTest
         val asOfEndOfRound = 5L
         val trafficPurchaseTrees = Seq(
           // user 1
-          coinRulesBuyMemberTrafficTransaction(
+          amuletRulesBuyMemberTrafficTransaction(
             provider = userParty(1),
             memberId = mkParticipantId("user-1"),
             round = 1,
             extraTraffic = 4,
             ccSpent = 2.0,
           )(_),
-          coinRulesBuyMemberTrafficTransaction(
+          amuletRulesBuyMemberTrafficTransaction(
             provider = userParty(1),
             memberId = mkParticipantId("user-1"),
             round = 2,
             extraTraffic = 4,
             ccSpent = 2.0,
           )(_),
-          coinRulesBuyMemberTrafficTransaction(
+          amuletRulesBuyMemberTrafficTransaction(
             provider = userParty(1),
             memberId = mkParticipantId("user-1"),
             round = 3,
@@ -663,7 +663,7 @@ abstract class ScanStoreTest
             ccSpent = 2.0,
           )(_),
           // user 2
-          coinRulesBuyMemberTrafficTransaction(
+          amuletRulesBuyMemberTrafficTransaction(
             provider = userParty(2),
             memberId = mkParticipantId("user-2"),
             round = 1,
@@ -671,14 +671,14 @@ abstract class ScanStoreTest
             ccSpent = 2.0,
           )(_),
           // user 3
-          coinRulesBuyMemberTrafficTransaction(
+          amuletRulesBuyMemberTrafficTransaction(
             provider = userParty(3),
             memberId = mkParticipantId("user-3"),
             round = 1,
             extraTraffic = 4,
             ccSpent = 3.0,
           )(_),
-          coinRulesBuyMemberTrafficTransaction(
+          amuletRulesBuyMemberTrafficTransaction(
             provider = userParty(3),
             memberId = mkParticipantId("user-3"),
             round = 2,
@@ -686,7 +686,7 @@ abstract class ScanStoreTest
             ccSpent = 3.0,
           )(_),
           // user 4
-          coinRulesBuyMemberTrafficTransaction(
+          amuletRulesBuyMemberTrafficTransaction(
             provider = userParty(4),
             memberId = mkParticipantId("user-4"),
             round = 1000, // excluded
@@ -756,16 +756,16 @@ abstract class ScanStoreTest
 
     }
 
-    "lookupCoinRules" should {
+    "lookupAmuletRules" should {
 
-      "find the latest coin rules" in {
-        val cr = coinRules()
+      "find the latest amulet rules" in {
+        val cr = amuletRules()
         for {
           store <- mkStore()
           _ <- dummyDomain.create(cr)(store.multiDomainAcsStore)
         } yield {
           store
-            .lookupCoinRules()
+            .lookupAmuletRules()
             .futureValue
             .map(_.contract) should be(Some(cr))
         }
@@ -915,7 +915,7 @@ abstract class ScanStoreTest
             balanceChanges = Seq(),
             receivers = Seq(ReceiverAmount(user2, BigDecimal(i), zero)),
             round = round,
-            coinPrice = BigDecimal(1.0),
+            amuletPrice = BigDecimal(1.0),
           )
         }.toList
         def stripEventIdAndOffset(tx: TransferTxLogEntry) =
@@ -925,33 +925,36 @@ abstract class ScanStoreTest
 
         def transferFromTransaction(
             store: ScanStore,
-            coinRulesContract: Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules],
+            amuletRulesContract: Contract[
+              cc.amuletrules.AmuletRules.ContractId,
+              cc.amuletrules.AmuletRules,
+            ],
             tx: TransferTxLogEntry,
         ) = {
           val senderParty = tx.sender.getOrElse(throw txMissingField()).party
-          val senderAmount = tx.sender.getOrElse(throw txMissingField()).inputCoinAmount
+          val senderAmount = tx.sender.getOrElse(throw txMissingField()).inputAmuletAmount
           val receiverParty = tx.receivers(0).party
           val receiverAmount = tx.receivers(0).amount
           dummyDomain
             .exercise(
-              contract = coinRulesContract,
-              interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+              contract = amuletRulesContract,
+              interfaceId = Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
               choiceName = Transfer.choice.name,
-              choiceArgument = mkCoinRules_Transfer(
+              choiceArgument = mkAmuletRules_Transfer(
                 mkTransferInputOutput(
                   senderParty,
                   senderParty,
-                  List(mkInputCoin()),
+                  List(mkInputAmulet()),
                   List(mkTransferOutput(receiverParty, receiverAmount)),
                 )
               ),
               exerciseResult = mkTransferResult(
                 round = round,
                 inputAppRewardAmount = 0,
-                inputCoinAmount = senderAmount.toDouble,
+                inputAmuletAmount = senderAmount.toDouble,
                 inputValidatorRewardAmount = 0,
                 balanceChanges = Map(),
-                coinPrice = tx.coinPrice.toDouble,
+                amuletPrice = tx.amuletPrice.toDouble,
               ),
             )(
               store.multiDomainAcsStore
@@ -961,12 +964,12 @@ abstract class ScanStoreTest
 
         for {
           store <- mkStore()
-          coinRulesContract = coinRules()
+          amuletRulesContract = amuletRules()
           _ <- txs.foldLeft(Future.successful(())) { (f, tx) =>
             f.flatMap { _ =>
               transferFromTransaction(
                 store,
-                coinRulesContract,
+                amuletRulesContract,
                 tx,
               )
             }
@@ -1039,10 +1042,10 @@ abstract class ScanStoreTest
     }
   }
 }
-trait CoinTransferUtil { self: StoreTest =>
-  def mkInputCoin() = {
-    new cc.coinrules.transferinput.InputCoin(
-      new cc.coin.Coin.ContractId(nextCid())
+trait AmuletTransferUtil { self: StoreTest =>
+  def mkInputAmulet() = {
+    new cc.amuletrules.transferinput.InputAmulet(
+      new cc.amulet.Amulet.ContractId(nextCid())
     )
   }
 
@@ -1050,8 +1053,8 @@ trait CoinTransferUtil { self: StoreTest =>
       receiver: PartyId,
       amount: BigDecimal,
       receiverFeeRatio: BigDecimal = BigDecimal(0.0),
-  ): cc.coinrules.TransferOutput =
-    new cc.coinrules.TransferOutput(
+  ): cc.amuletrules.TransferOutput =
+    new cc.amuletrules.TransferOutput(
       receiver.toProtoPrimitive,
       receiverFeeRatio.bigDecimal,
       amount.bigDecimal,
@@ -1059,14 +1062,14 @@ trait CoinTransferUtil { self: StoreTest =>
     )
 
   def mkTransfer(receiver: PartyId, amount: Double) =
-    new cc.coinrules.Transfer(
+    new cc.amuletrules.Transfer(
       receiver.toProtoPrimitive,
       receiver.toProtoPrimitive,
-      java.util.List.of(mkInputCoin()),
+      java.util.List.of(mkInputAmulet()),
       java.util.List.of(mkTransferOutput(receiver, amount)),
     )
 
-  def mkTransferContext() = new cc.coinrules.TransferContext(
+  def mkTransferContext() = new cc.amuletrules.TransferContext(
     new roundCodegen.OpenMiningRound.ContractId(nextCid()),
     java.util.Map.of(),
     java.util.Map.of(),
@@ -1076,24 +1079,24 @@ trait CoinTransferUtil { self: StoreTest =>
   def mkTransferInputOutput(
       sender: PartyId,
       provider: PartyId,
-      transferInputs: List[cc.coinrules.TransferInput],
-      transferOutputs: List[cc.coinrules.TransferOutput],
-  ): cc.coinrules.Transfer =
-    new cc.coinrules.Transfer(
+      transferInputs: List[cc.amuletrules.TransferInput],
+      transferOutputs: List[cc.amuletrules.TransferOutput],
+  ): cc.amuletrules.Transfer =
+    new cc.amuletrules.Transfer(
       sender.toProtoPrimitive,
       provider.toProtoPrimitive,
       transferInputs.asJava,
       transferOutputs.asJava,
     )
 
-  def mkCoinRules_Transfer(transfer: cc.coinrules.Transfer) =
-    new cc.coinrules.CoinRules_Transfer(
+  def mkAmuletRules_Transfer(transfer: cc.amuletrules.Transfer) =
+    new cc.amuletrules.AmuletRules_Transfer(
       transfer,
       mkTransferContext(),
     ).toValue
 
-  def mkCoinRulesTransfer(receiver: PartyId, amount: Double) =
-    new cc.coinrules.CoinRules_Transfer(
+  def mkAmuletRulesTransfer(receiver: PartyId, amount: Double) =
+    new cc.amuletrules.AmuletRules_Transfer(
       mkTransfer(receiver, amount),
       mkTransferContext(),
     ).toValue
@@ -1102,20 +1105,20 @@ trait CoinTransferUtil { self: StoreTest =>
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
       inputSvRewardAmount: Double,
-      inputCoinAmount: Double,
-      balanceChanges: Map[String, cc.coinrules.BalanceChange],
-      coinPrice: Double,
-  ) = new cc.coinrules.TransferSummary(
+      inputAmuletAmount: Double,
+      balanceChanges: Map[String, cc.amuletrules.BalanceChange],
+      amuletPrice: Double,
+  ) = new cc.amuletrules.TransferSummary(
     damlDecimal(inputAppRewardAmount),
     damlDecimal(inputValidatorRewardAmount),
     damlDecimal(inputSvRewardAmount),
-    damlDecimal(inputCoinAmount),
+    damlDecimal(inputAmuletAmount),
     balanceChanges.asJava,
     damlDecimal(0.0),
     java.util.List.of(damlDecimal(0.0)),
     damlDecimal(0.0),
     damlDecimal(0.0),
-    damlDecimal(coinPrice),
+    damlDecimal(amuletPrice),
     // the validator faucet amount is already included in the `inputValidatorRewardAmount`,
     // We'll set this here once we add support for showing faucet coupon rewards separately
     // from the usage-based validator rewards.
@@ -1127,20 +1130,20 @@ trait CoinTransferUtil { self: StoreTest =>
       round: Long,
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
-      inputCoinAmount: Double,
-      balanceChanges: Map[String, cc.coinrules.BalanceChange],
-      coinPrice: Double,
+      inputAmuletAmount: Double,
+      balanceChanges: Map[String, cc.amuletrules.BalanceChange],
+      amuletPrice: Double,
   ) =
-    new cc.coinrules.TransferResult(
+    new cc.amuletrules.TransferResult(
       new cc.types.Round(round),
       mkTransferSummary(
         inputAppRewardAmount,
         inputValidatorRewardAmount,
         // TODO (#9173): also test for sv rewards once the scan store supports them
         0.0,
-        inputCoinAmount,
+        inputAmuletAmount,
         balanceChanges,
-        coinPrice,
+        amuletPrice,
       ),
       java.util.List.of(),
       Optional.empty(),
@@ -1150,9 +1153,9 @@ trait CoinTransferUtil { self: StoreTest =>
       round: Long,
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
-      inputCoinAmount: Double,
-      balanceChanges: Map[String, cc.coinrules.BalanceChange],
-      coinPrice: Double,
+      inputAmuletAmount: Double,
+      balanceChanges: Map[String, cc.amuletrules.BalanceChange],
+      amuletPrice: Double,
       memberTrafficCid: MemberTraffic.ContractId,
   ) =
     new BuyMemberTrafficResult(
@@ -1162,16 +1165,16 @@ trait CoinTransferUtil { self: StoreTest =>
         inputValidatorRewardAmount,
         // TODO (#9173): also test for sv rewards once the scan store supports them
         0.0,
-        inputCoinAmount,
+        inputAmuletAmount,
         balanceChanges,
-        coinPrice,
+        amuletPrice,
       ),
-      new java.math.BigDecimal(inputCoinAmount),
+      new java.math.BigDecimal(inputAmuletAmount),
       memberTrafficCid,
       Optional.empty(),
     ).toValue
 
-  def coinRulesBuyMemberTrafficTransaction(
+  def amuletRulesBuyMemberTrafficTransaction(
       provider: PartyId,
       memberId: Member,
       round: Long,
@@ -1179,17 +1182,17 @@ trait CoinTransferUtil { self: StoreTest =>
       ccSpent: Double,
   )(offset: String) = {
     // This is a non-consuming choice, the store should not mind that some of the referenced contracts don't exist
-    val coinRulesCid = nextCid()
+    val amuletRulesCid = nextCid()
 
     val memberTrafficCid = new MemberTraffic.ContractId(validContractId(round.toInt))
 
-    val createdCoin = coin(provider, ccSpent, round, holdingFee)
-    val coinCreateEvent = toCreatedEvent(createdCoin, signatories = Seq(provider, svcParty))
-    val coinArchiveEvent = exercisedEvent(
-      createdCoin.contractId.contractId,
-      coinCodegen.Coin.TEMPLATE_ID,
-      Some(cc.coin.Coin.TEMPLATE_ID),
-      coinCodegen.Coin.CHOICE_Archive.name,
+    val createdAmulet = amulet(provider, ccSpent, round, holdingFee)
+    val amuletCreateEvent = toCreatedEvent(createdAmulet, signatories = Seq(provider, svcParty))
+    val amuletArchiveEvent = exercisedEvent(
+      createdAmulet.contractId.contractId,
+      amuletCodegen.Amulet.TEMPLATE_ID,
+      Some(cc.amulet.Amulet.TEMPLATE_ID),
+      amuletCodegen.Amulet.CHOICE_Archive.name,
       consuming = true,
       new DamlRecord(),
       damlUnit.getInstance(),
@@ -1198,12 +1201,12 @@ trait CoinTransferUtil { self: StoreTest =>
     mkExerciseTx(
       offset,
       exercisedEvent(
-        coinRulesCid,
-        cc.coinrules.CoinRules.TEMPLATE_ID,
+        amuletRulesCid,
+        cc.amuletrules.AmuletRules.TEMPLATE_ID,
         None,
-        cc.coinrules.CoinRules.CHOICE_CoinRules_BuyMemberTraffic.name,
+        cc.amuletrules.AmuletRules.CHOICE_AmuletRules_BuyMemberTraffic.name,
         consuming = false,
-        new cc.coinrules.CoinRules_BuyMemberTraffic(
+        new cc.amuletrules.AmuletRules_BuyMemberTraffic(
           java.util.List.of(),
           mkTransferContext(),
           provider.toProtoPrimitive,
@@ -1216,88 +1219,88 @@ trait CoinTransferUtil { self: StoreTest =>
           round = round,
           inputAppRewardAmount = 0,
           inputValidatorRewardAmount = 0,
-          inputCoinAmount = ccSpent,
+          inputAmuletAmount = ccSpent,
           balanceChanges = Map.empty,
-          coinPrice = 0.0005,
+          amuletPrice = 0.0005,
           memberTrafficCid = memberTrafficCid,
         ),
       ),
       Seq(
         // we don't care what the first event is for the store's purposes
-        // also, the creation of the burnt coin should occur somewhere in the tx tree
-        coinCreateEvent,
-        coinArchiveEvent, // the third event has to be a coin burn
+        // also, the creation of the burnt amulet should occur somewhere in the tx tree
+        amuletCreateEvent,
+        amuletArchiveEvent, // the third event has to be a amulet burn
       ),
       dummyDomain,
     )
   }
 
-  /** A CoinRules_Mint exercise event with one child Coin create event */
+  /** A AmuletRules_Mint exercise event with one child Amulet create event */
   def mintTransaction(
       receiver: PartyId,
       amount: Double,
       round: Long,
       ratePerRound: Double,
-      coinPrice: Double = 1.0,
+      amuletPrice: Double = 1.0,
   )(
       offset: String
   ) = {
-    val coinContract = coin(receiver, amount, round, ratePerRound)
+    val amuletContract = amulet(receiver, amount, round, ratePerRound)
 
     // This is a non-consuming choice, the store should not mind that some of the referenced contracts don't exist
-    val coinRulesCid = nextCid()
+    val amuletRulesCid = nextCid()
     val openMiningRoundCid = nextCid()
 
     mkExerciseTx(
       offset,
       exercisedEvent(
-        coinRulesCid,
-        cc.coinrules.CoinRules.TEMPLATE_ID,
+        amuletRulesCid,
+        cc.amuletrules.AmuletRules.TEMPLATE_ID,
         None,
-        cc.coinrules.CoinRules.CHOICE_CoinRules_Mint.name,
+        cc.amuletrules.AmuletRules.CHOICE_AmuletRules_Mint.name,
         consuming = false,
-        new cc.coinrules.CoinRules_Mint(
+        new cc.amuletrules.AmuletRules_Mint(
           receiver.toProtoPrimitive,
-          coinContract.payload.amount.initialAmount,
+          amuletContract.payload.amount.initialAmount,
           new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),
         ).toValue,
-        new cc.coin.CoinCreateSummary[coinCodegen.Coin.ContractId](
-          coinContract.contractId,
-          new java.math.BigDecimal(coinPrice),
+        new cc.amulet.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](
+          amuletContract.contractId,
+          new java.math.BigDecimal(amuletPrice),
           new Round(round),
         )
           .toValue(_.toValue),
       ),
-      Seq(toCreatedEvent(coinContract, signatories = Seq(receiver, svcParty))),
+      Seq(toCreatedEvent(amuletContract, signatories = Seq(receiver, svcParty))),
       dummyDomain,
     )
   }
 
-  def mkCoinExpire() =
-    new coinCodegen.Coin_Expire(
+  def mkAmuletExpire() =
+    new amuletCodegen.Amulet_Expire(
       new roundCodegen.OpenMiningRound.ContractId(nextCid())
     ).toValue
 
-  def mkLockedCoinExpireCoin() =
-    new coinCodegen.LockedCoin_ExpireCoin(
+  def mkLockedAmuletExpireAmulet() =
+    new amuletCodegen.LockedAmulet_ExpireAmulet(
       new roundCodegen.OpenMiningRound.ContractId(nextCid())
     ).toValue
 
-  def mkCoinExpireSummary(
+  def mkAmuletExpireSummary(
       owner: PartyId,
       round: Long,
       changeToInitialAmountAsOfRoundZero: Double,
       changeToHoldingFeesRate: Double,
   ) =
-    new cc.coin.CoinExpireSummary(
+    new cc.amulet.AmuletExpireSummary(
       owner.toProtoPrimitive,
       new cc.types.Round(round),
       new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
       new java.math.BigDecimal(changeToHoldingFeesRate),
     ).toValue
 
-  def coinTemplate(amount: Double, owner: PartyId) = {
-    new Coin(
+  def amuletTemplate(amount: Double, owner: PartyId) = {
+    new Amulet(
       svcParty.toProtoPrimitive,
       owner.toProtoPrimitive,
       expiringAmount(amount),
@@ -1403,7 +1406,7 @@ class DbScanStoreTest
   ): Future[ScanStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.cantonCoin.all ++
+        DarResources.cantonAmulet.all ++
           DarResources.cantonNameService.all ++
           DarResources.svcGovernance.all
       )

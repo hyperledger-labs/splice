@@ -86,7 +86,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
 
   protected def isInitialized = isInitializedVar.get()
 
-  protected def packages = DarResources.cantonCoin.all
+  protected def packages = DarResources.cantonAmulet.all
 
   lazy private val packageSignatures = {
     ResourceTemplateDecoder.loadPackageSignaturesFromResources(packages)
@@ -191,7 +191,7 @@ abstract class CNNodeBase[State <: AutoCloseable & HasHealth](
   // TODO(#736): fork or generalize status definition.
   override final def status: Future[NodeStatus.Status] = {
     val status = SimpleStatus(
-      uid = UniqueIdentifier.tryFromProtoPrimitive(s"coin::$name"),
+      uid = UniqueIdentifier.tryFromProtoPrimitive(s"amulet::$name"),
       uptime = uptime(),
       ports = ports,
       active = isActive,

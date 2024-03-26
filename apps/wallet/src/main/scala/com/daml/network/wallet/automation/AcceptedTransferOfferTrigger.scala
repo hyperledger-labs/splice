@@ -9,12 +9,12 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.coinrules.invalidtransferreason
+import com.daml.network.codegen.java.cc.amuletrules.invalidtransferreason
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteAcceptedTransfer
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.CO_CompleteAcceptedTransfer
 import com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.util.AssignedContract
@@ -62,9 +62,9 @@ class AcceptedTransferOfferTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val operation = new CO_CompleteAcceptedTransfer(acceptedOffer.contractId)
     treasury
-      .enqueueCoinOperation(operation)
+      .enqueueAmuletOperation(operation)
       .flatMap {
-        case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
+        case failedOperation: installCodegen.amuletoperationoutcome.COO_Error =>
           failedOperation.invalidTransferReasonValue match {
             case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
               val missingStr = s"(missing ${fundsError.missingAmount} CC)"
@@ -78,11 +78,11 @@ class AcceptedTransferOfferTrigger(
               Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
 
           }
-        case _: installCodegen.coinoperationoutcome.COO_CompleteAcceptedTransfer =>
+        case _: installCodegen.amuletoperationoutcome.COO_CompleteAcceptedTransfer =>
           Future(TaskSuccess("completed accepted transfer offer"))
 
         case unknownResult =>
-          val msg = s"Unexpected coin-operation result $unknownResult"
+          val msg = s"Unexpected amulet-operation result $unknownResult"
           Future.failed(Status.INTERNAL.withDescription(msg).asRuntimeException())
       }
   }

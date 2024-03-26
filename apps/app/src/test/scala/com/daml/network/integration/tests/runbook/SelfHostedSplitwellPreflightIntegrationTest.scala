@@ -126,7 +126,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       )
 
       // Stop nodes before Canton is shutdown
-      env.coinNodes.local.foreach(_.stop())
+      env.amuletNodes.local.foreach(_.stop())
     }
   }
 

@@ -40,10 +40,10 @@ class ExpireIssuingMiningRoundTrigger(
     val round = task.work
     for {
       svcRules <- store.getSvcRules()
-      coinRules <- store.getCoinRules()
+      amuletRules <- store.getAmuletRules()
       cmd = svcRules.exercise(
         _.exerciseSvcRules_MiningRound_Close(
-          coinRules.contractId,
+          amuletRules.contractId,
           round.contractId,
         )
       )

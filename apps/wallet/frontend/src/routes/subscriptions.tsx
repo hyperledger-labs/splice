@@ -30,17 +30,17 @@ import { Party } from '@daml/types';
 import BftCnsEntry from '../components/BftCnsEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useSubscriptions } from '../hooks';
-import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
+import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { SubscriptionState, WalletSubscription } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 
 const Subscriptions: React.FC = () => {
   const { cancelSubscription } = useWalletClient();
   const subscriptionQuery = useSubscriptions();
-  const coinPriceQuery = useCoinPrice();
+  const amuletPriceQuery = useAmuletPrice();
 
-  const isLoading = coinPriceQuery.isLoading || subscriptionQuery.isLoading;
-  const isError = coinPriceQuery.isError || subscriptionQuery.isError;
+  const isLoading = amuletPriceQuery.isLoading || subscriptionQuery.isLoading;
+  const isError = amuletPriceQuery.isError || subscriptionQuery.isError;
 
   return (
     <Stack marginY={10} spacing={2}>
@@ -50,7 +50,7 @@ const Subscriptions: React.FC = () => {
       {isLoading ? (
         <Loading />
       ) : isError ? (
-        <ErrorDisplay message={'Error while fetching either transactions or coin price.'} />
+        <ErrorDisplay message={'Error while fetching either transactions or amulet price.'} />
       ) : (
         <TableContainer>
           <Table style={{ tableLayout: 'fixed' }}>
@@ -76,7 +76,7 @@ const Subscriptions: React.FC = () => {
                     key={subscription.subscription.contractId}
                     subscription={subscription}
                     cancelSubscription={onCancel}
-                    coinPrice={coinPriceQuery.data}
+                    amuletPrice={amuletPriceQuery.data}
                   />
                 );
               })}
@@ -91,12 +91,12 @@ const Subscriptions: React.FC = () => {
 interface SubscriptionRowProps {
   subscription: WalletSubscription;
   cancelSubscription: () => void;
-  coinPrice: BigNumber;
+  amuletPrice: BigNumber;
 }
 const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
   subscription,
   cancelSubscription,
-  coinPrice,
+  amuletPrice,
 }) => {
   return (
     <TableRow className="subscription-row">
@@ -113,7 +113,7 @@ const SubscriptionRow: React.FC<SubscriptionRowProps> = ({
         />
       </TableCell>
       <TableCell align="right">
-        <Price payData={subscription.state.value.payload.payData} coinPrice={coinPrice} />
+        <Price payData={subscription.state.value.payload.payData} amuletPrice={amuletPrice} />
       </TableCell>
       <TableCell>
         <PaymentDue state={subscription.state} />
@@ -151,13 +151,13 @@ const Service: React.FC<{ provider: Party; description: string }> = ({ provider,
 
 interface PriceProps {
   payData: SubscriptionPayData;
-  coinPrice: BigNumber;
+  amuletPrice: BigNumber;
 }
-const Price: React.FC<PriceProps> = ({ payData, coinPrice }) => {
+const Price: React.FC<PriceProps> = ({ payData, amuletPrice }) => {
   const amount = new BigNumber(payData.paymentAmount.amount);
   const currency = payData.paymentAmount.currency;
   const perPeriod = payData.paymentInterval;
-  const converted = convertCurrency(amount, currency, coinPrice);
+  const converted = convertCurrency(amount, currency, amuletPrice);
 
   return (
     <Stack>
@@ -174,9 +174,9 @@ const Price: React.FC<PriceProps> = ({ payData, coinPrice }) => {
         </Typography>
         per <IntervalDisplay microseconds={perPeriod.microseconds} />
       </Box>
-      <Typography variant="caption" className="sub-coin-price">
+      <Typography variant="caption" className="sub-amulet-price">
         <AmountDisplay amount={converted.amount} currency={converted.currency} /> @{' '}
-        {converted.coinPriceToShow.toString()}
+        {converted.amuletPriceToShow.toString()}
         {currency}/{converted.currency}
       </Typography>
     </Stack>

@@ -1,12 +1,12 @@
 package com.daml.network.scan.admin.api.client
 
-import com.daml.network.codegen.java.cc.coinrules.CoinRules
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.CNLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection.{
   CachedCnsRules,
-  CachedCoinRules,
+  CachedAmuletRules,
   CachedMiningRounds,
 }
 import com.daml.network.util.ContractWithState
@@ -23,10 +23,10 @@ import scala.concurrent.{ExecutionContext, Future}
 
 trait CachingScanConnection extends ScanConnection {
 
-  protected val coinLedgerClient: CNLedgerClient
-  protected val coinRulesCacheTimeToLive: NonNegativeFiniteDuration
+  protected val amuletLedgerClient: CNLedgerClient
+  protected val amuletRulesCacheTimeToLive: NonNegativeFiniteDuration
 
-  private val coinRulesCache: AtomicReference[Option[CachedCoinRules]] =
+  private val amuletRulesCache: AtomicReference[Option[CachedAmuletRules]] =
     new AtomicReference(None)
 
   private val cnsRulesCache: AtomicReference[Option[CachedCnsRules]] =
@@ -35,26 +35,26 @@ trait CachingScanConnection extends ScanConnection {
   private val cachedRounds: AtomicReference[CachedMiningRounds] =
     new AtomicReference(CachedMiningRounds())
 
-  // register the callback to potentially invalidate the CoinRules cache.
-  coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedCoinRulesCache)
+  // register the callback to potentially invalidate the AmuletRules cache.
+  amuletLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedAmuletRulesCache)
   // and the rounds cache
-  coinLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedRoundsCache)
+  amuletLedgerClient.registerInactiveContractsCallback(signalPossiblyOutdatedRoundsCache)
   // and also nuke everything when we get an error that we're trying to downgrade.
-  coinLedgerClient.registerContractDowngradeErrorCallback(() => signalOutdatedCache())
+  amuletLedgerClient.registerContractDowngradeErrorCallback(() => signalOutdatedCache())
 
-  /** We cache the CoinRules contract, but it may be come outdated if, e.g., the SVC updates the config schedule.
+  /** We cache the AmuletRules contract, but it may be come outdated if, e.g., the SVC updates the config schedule.
     * The inactive-contracts error message that the ledger returns does not specify the template-id, thus we need
     * to check for each inactive-contract we receive from the ledger that the failure was not caused by an outdated cache
-    * of the CoinRules.
+    * of the AmuletRules.
     */
-  private def signalPossiblyOutdatedCoinRulesCache(inactiveContract: String): Unit =
-    coinRulesCache.get() match {
-      case Some(CachedCoinRules(_, cachedContract))
+  private def signalPossiblyOutdatedAmuletRulesCache(inactiveContract: String): Unit =
+    amuletRulesCache.get() match {
+      case Some(CachedAmuletRules(_, cachedContract))
           if (cachedContract.contractId.contractId: String) == inactiveContract =>
         logger.info(
-          show"Invalidating the CoinRules cache with value ${PrettyContractId(cachedContract.contract)}"
+          show"Invalidating the AmuletRules cache with value ${PrettyContractId(cachedContract.contract)}"
         )(TraceContext.empty)
-        coinRulesCache.set(None)
+        amuletRulesCache.set(None)
       case _ => ()
     }
 
@@ -69,45 +69,45 @@ trait CachingScanConnection extends ScanConnection {
   }
 
   private def signalOutdatedCache(): Unit = {
-    logger.debug("Invalidating CoinRules and rounds cache after a failed contract downgrade")(
+    logger.debug("Invalidating AmuletRules and rounds cache after a failed contract downgrade")(
       TraceContext.empty
     )
-    coinRulesCache.set(None)
+    amuletRulesCache.set(None)
     cachedRounds.set(CachedMiningRounds())
   }
 
-  override def getCoinRulesWithState()(implicit
+  override def getAmuletRulesWithState()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[ContractWithState[CoinRules.ContractId, CoinRules]] = {
+  ): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]] = {
     val now = clock.now
-    coinRulesCache.get() match {
-      case Some(ccr @ CachedCoinRules(_, coinRules)) if ccr validAsOf now =>
-        Future.successful(coinRules)
+    amuletRulesCache.get() match {
+      case Some(ccr @ CachedAmuletRules(_, amuletRules)) if ccr validAsOf now =>
+        Future.successful(amuletRules)
       case cacheO =>
         // Note that here and at other caches in this class, multiple concurrent cache misses result in multiple
         // requests that are not deduplicated against each other. We accept that as we expect low concurrency by default.
         logger.debug(
-          s"CoinRules cache is empty or outdated, retrieving CoinRules from CC scan."
+          s"AmuletRules cache is empty or outdated, retrieving AmuletRules from CC scan."
         )
         for {
-          coinRules <- runGetCoinRulesWithState(cacheO.map(_.coinRules))
+          amuletRules <- runGetAmuletRulesWithState(cacheO.map(_.amuletRules))
         } yield {
-          coinRulesCache.set(
+          amuletRulesCache.set(
             Some(
-              CachedCoinRules(
-                now.add(coinRulesCacheTimeToLive.asJava),
-                coinRules,
+              CachedAmuletRules(
+                now.add(amuletRulesCacheTimeToLive.asJava),
+                amuletRules,
               )
             )
           )
-          coinRules
+          amuletRules
         }
     }
   }
-  protected def runGetCoinRulesWithState(
-      cachedCoinRules: Option[ContractWithState[CoinRules.ContractId, CoinRules]]
-  )(implicit tc: TraceContext): Future[ContractWithState[CoinRules.ContractId, CoinRules]]
+  protected def runGetAmuletRulesWithState(
+      cachedAmuletRules: Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]
+  )(implicit tc: TraceContext): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]]
 
   override def getCnsRules()(implicit
       ec: ExecutionContext,
@@ -115,9 +115,9 @@ trait CachingScanConnection extends ScanConnection {
       tc: TraceContext,
   ): Future[ContractWithState[CnsRules.ContractId, CnsRules]] = {
     val now = clock.now
-    getCoinRulesWithState().flatMap { coinRules =>
+    getAmuletRulesWithState().flatMap { amuletRules =>
       cnsRulesCache.get() match {
-        case Some(ccr @ CachedCnsRules(_, cnsRules)) if ccr.validAsOf(now, coinRules) =>
+        case Some(ccr @ CachedCnsRules(_, cnsRules)) if ccr.validAsOf(now, amuletRules) =>
           Future.successful(cnsRules)
         case cacheO =>
           logger.debug(
@@ -129,7 +129,7 @@ trait CachingScanConnection extends ScanConnection {
             cnsRulesCache.set(
               Some(
                 CachedCnsRules(
-                  now.add(coinRulesCacheTimeToLive.asJava),
+                  now.add(amuletRulesCacheTimeToLive.asJava),
                   cnsRules,
                 )
               )
@@ -156,8 +156,8 @@ trait CachingScanConnection extends ScanConnection {
   ] = {
     val now = clock.now
     val cache = cachedRounds.get()
-    getCoinRulesWithState().flatMap { coinRules =>
-      if (cache.validAsOf(now, coinRules)) {
+    getAmuletRulesWithState().flatMap { amuletRules =>
+      if (cache.validAsOf(now, amuletRules)) {
         logger.info(
           s"Using the client-cache (validUntil ${cache.cacheValidUntil}) to load ${cache.describeRounds}."
         )

@@ -137,7 +137,7 @@ class DbSvSvStoreTest
   override protected def mkStore(): Future[DbSvSvStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.cantonCoin.all ++
+        DarResources.cantonAmulet.all ++
           DarResources.validatorLifecycle.all ++
           DarResources.svcGovernance.all ++
           DarResources.svcGovernance.all

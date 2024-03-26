@@ -11,8 +11,8 @@ import qualified DA.Set as Set
 import qualified DA.Text as T
 import DA.Time
 
-import CC.Coin
-import CC.CoinRules
+import CC.Amulet
+import CC.AmuletRules
 
 import CC.Round
 import CC.Types
@@ -23,7 +23,7 @@ import CC.GlobalDomain (MemberTraffic)
 import qualified CN.CometBft as CometBft
 import CN.Cns
 import CN.SvOnboarding
-import CN.SVC.CoinPrice
+import CN.SVC.AmuletPrice
 import CN.SVC.GlobalDomain
 import CN.SVC.MemberState
 import CN.Util
@@ -62,8 +62,8 @@ import CN.Util
 data ActionRequiringConfirmation
   = ARC_SvcRules with
       svcAction : SvcRules_ActionRequiringConfirmation
-  | ARC_CoinRules with
-      coinRulesAction : CoinRules_ActionRequiringConfirmation
+  | ARC_AmuletRules with
+      amuletRulesAction : AmuletRules_ActionRequiringConfirmation
   | ARC_CnsEntryContext with
       cnsEntryContextCid : ContractId CnsEntryContext
       cnsEntryContextAction : CnsEntryContext_ActionRequiringConfirmation
@@ -73,17 +73,17 @@ data ActionRequiringConfirmation
         -- This on takes care of providing extensibility for the specific variants below.
   deriving (Eq, Show)
 
-data CoinRules_ActionRequiringConfirmation
-  = CRARC_MiningRound_StartIssuing CoinRules_MiningRound_StartIssuing
+data AmuletRules_ActionRequiringConfirmation
+  = CRARC_MiningRound_StartIssuing AmuletRules_MiningRound_StartIssuing
     -- ^ Automated action to start an issuing round once the summary of the reward coupons have been computed.
-  | CRARC_MiningRound_Archive CoinRules_MiningRound_Archive
+  | CRARC_MiningRound_Archive AmuletRules_MiningRound_Archive
     -- ^ Automated action to archive a closed mining round once no expired reward coupons are left.
-  | CRARC_AddFutureCoinConfigSchedule CoinRules_AddFutureCoinConfigSchedule
-    -- ^ Voted action to add a config schedule to the `CoinRules`.
-  | CRARC_RemoveFutureCoinConfigSchedule CoinRules_RemoveFutureCoinConfigSchedule
-    -- ^ Voted action to remove a config schedule from the `CoinRules`.
-  | CRARC_UpdateFutureCoinConfigSchedule CoinRules_UpdateFutureCoinConfigSchedule
-    -- ^ Voted action to update a config schedule in the `CoinRules`.
+  | CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule
+    -- ^ Voted action to add a config schedule to the `AmuletRules`.
+  | CRARC_RemoveFutureAmuletConfigSchedule AmuletRules_RemoveFutureAmuletConfigSchedule
+    -- ^ Voted action to remove a config schedule from the `AmuletRules`.
+  | CRARC_UpdateFutureAmuletConfigSchedule AmuletRules_UpdateFutureAmuletConfigSchedule
+    -- ^ Voted action to update a config schedule in the `AmuletRules`.
   deriving (Eq, Show)
 
 data SvcRules_ActionRequiringConfirmation
@@ -363,7 +363,7 @@ template SvcRules with
         earliestRoundCid : ContractId OpenMiningRound
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
-        coinRulesCid: ContractId CoinRules
+        amuletRulesCid: ContractId AmuletRules
       controller sv
       do
 
@@ -485,7 +485,7 @@ template SvcRules with
     nonconsuming choice SvcRules_ExecuteConfirmedAction : ()
       with
         action : ActionRequiringConfirmation
-        coinRulesCid : Optional( ContractId CoinRules )
+        amuletRulesCid : Optional( ContractId AmuletRules )
         confirmationCids : [ContractId Confirmation]
       controller leader
       do
@@ -498,7 +498,7 @@ template SvcRules with
           require "Confirmed action matches" (confirmation.action == action)
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
-        executeActionRequiringConfirmation self coinRulesCid action
+        executeActionRequiringConfirmation self amuletRulesCid action
 
 
     -- Voting as part of on-ledger governance (version 2)
@@ -565,7 +565,7 @@ template SvcRules with
     nonconsuming choice SvcRules_CloseVoteRequest : VoteRequestResult
       with
         requestCid : ContractId VoteRequest
-        coinRulesCid : Optional (ContractId CoinRules)
+        amuletRulesCid : Optional (ContractId AmuletRules)
       controller leader
       do
         request <- fetchAndArchive (ForSvc with svc) requestCid
@@ -584,7 +584,7 @@ template SvcRules with
           if length yays >= s.requiredNumVotes
             then do
               try do
-                executeActionRequiringConfirmation self coinRulesCid request.action
+                executeActionRequiringConfirmation self amuletRulesCid request.action
                 pure $ VRO_Accepted with
                   effectiveAt = fromOptional now $
                     actionRequiringConfirmationEffectiveAt request.action
@@ -614,37 +614,37 @@ template SvcRules with
             outcome
 
 
-    -- Voting on the coin price
+    -- Voting on the amulet price
     ---------------------------
 
-    nonconsuming choice SvcRules_UpdateCoinPriceVote : ContractId CoinPriceVote
+    nonconsuming choice SvcRules_UpdateAmuletPriceVote : ContractId AmuletPriceVote
       with
         sv : Party
-        voteCid : ContractId CoinPriceVote
-        coinPrice : Decimal
+        voteCid : ContractId AmuletPriceVote
+        amuletPrice : Decimal
       controller sv
       do
         void $ fetchAndArchive (ForOwner with svc; owner = sv) voteCid
         now <- getTime
         -- create new vote
-        create CoinPriceVote with
+        create AmuletPriceVote with
           svc
           sv
-          coinPrice = Some coinPrice
+          amuletPrice = Some amuletPrice
           lastUpdatedAt = now
 
-    -- | Garbage-collect CoinPriceVotes from removed members and duplicate ones that might
+    -- | Garbage-collect AmuletPriceVotes from removed members and duplicate ones that might
     -- happen due to a too quick removal and re-addition of a member.
     -- We expect this to be run as an OnAssignedContractTrigger for the SvcRules contract.
     --
-    -- Note: we do not archive the CoinPriceVote of a member on its removal from the collective,
-    -- as that would allow that member to block the removal via updating its CoinPriceVote at the right time.
+    -- Note: we do not archive the AmuletPriceVote of a member on its removal from the collective,
+    -- as that would allow that member to block the removal via updating its AmuletPriceVote at the right time.
     --
-    -- TODO(#10063): drop this code in favor of just keeping CoinPriceVotes around.
-    nonconsuming choice SvcRules_GarbageCollectCoinPriceVotes : ()
+    -- TODO(#10063): drop this code in favor of just keeping AmuletPriceVotes around.
+    nonconsuming choice SvcRules_GarbageCollectAmuletPriceVotes : ()
       with
-        nonMemberVoteCids : [ContractId CoinPriceVote]
-        duplicateVoteCids : [[ContractId CoinPriceVote]]
+        nonMemberVoteCids : [ContractId AmuletPriceVote]
+        duplicateVoteCids : [[ContractId AmuletPriceVote]]
       controller leader
       do
         let forSvc = ForSvc with svc
@@ -800,21 +800,21 @@ template SvcRules with
           offboardedMembers = Map.insert sv offboardingInfo offboardedMembers
 
 
-    -- Coin management driven directly by the leader
+    -- Amulet management driven directly by the leader
     --------------------------------------------------
 
-    nonconsuming choice SvcRules_Coin_Expire : CoinExpireSummary
+    nonconsuming choice SvcRules_Amulet_Expire : AmuletExpireSummary
       with
-        cid : ContractId Coin
-        choiceArg : Coin_Expire
+        cid : ContractId Amulet
+        choiceArg : Amulet_Expire
       controller leader
       do
         exercise cid choiceArg
 
-    nonconsuming choice SvcRules_LockedCoin_ExpireCoin : CoinExpireSummary
+    nonconsuming choice SvcRules_LockedAmulet_ExpireAmulet : AmuletExpireSummary
       with
-        cid : ContractId LockedCoin
-        choiceArg : LockedCoin_ExpireCoin
+        cid : ContractId LockedAmulet
+        choiceArg : LockedAmulet_ExpireAmulet
       controller leader
       do
         exercise cid choiceArg
@@ -826,15 +826,15 @@ template SvcRules with
     nonconsuming choice SvcRules_AdvanceOpenMiningRounds
       : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
       with
-        coinRulesCid : ContractId CoinRules
+        amuletRulesCid : ContractId AmuletRules
         roundToArchiveCid : ContractId OpenMiningRound
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
-        coinPriceVoteCids : [ContractId CoinPriceVote]
+        amuletPriceVoteCids : [ContractId AmuletPriceVote]
       controller leader
       do
-        coinPrice <- fetchMedianCoinPrice svc (Map.keys members) coinPriceVoteCids
-        result <- exercise coinRulesCid CoinRules_AdvanceOpenMiningRounds with ..
+        amuletPrice <- fetchMedianAmuletPrice svc (Map.keys members) amuletPriceVoteCids
+        result <- exercise amuletRulesCid AmuletRules_AdvanceOpenMiningRounds with ..
         return (result.summarizingRoundCid, result.openRoundCid)
 
 
@@ -936,33 +936,33 @@ template SvcRules with
     nonconsuming choice SvcRules_ClaimExpiredRewards
       : Optional (ContractId UnclaimedReward)
       with
-        coinRulesCid : ContractId CoinRules
-        choiceArg : CoinRules_ClaimExpiredRewards
+        amuletRulesCid : ContractId AmuletRules
+        choiceArg : AmuletRules_ClaimExpiredRewards
       controller leader
       do
-        result <- exercise coinRulesCid choiceArg
+        result <- exercise amuletRulesCid choiceArg
         return result.unclaimedRewardCid
 
     -- Batch merge of unclaimed rewards
     nonconsuming choice SvcRules_MergeUnclaimedRewards
       : ContractId UnclaimedReward
       with
-        coinRulesCid : ContractId CoinRules
+        amuletRulesCid : ContractId AmuletRules
         unclaimedRewardCids : [ContractId UnclaimedReward]
       controller leader
       do
         require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
-        result <- exercise coinRulesCid CoinRules_MergeUnclaimedRewards with ..
+        result <- exercise amuletRulesCid AmuletRules_MergeUnclaimedRewards with ..
         return result.unclaimedRewardCid
 
     nonconsuming choice SvcRules_MiningRound_Close
       : ContractId ClosedMiningRound
       with
-        coinRulesCid : ContractId CoinRules
+        amuletRulesCid : ContractId AmuletRules
         issuingRoundCid : ContractId IssuingMiningRound
       controller leader
       do
-        result <- exercise coinRulesCid CoinRules_MiningRound_Close with ..
+        result <- exercise amuletRulesCid AmuletRules_MiningRound_Close with ..
         return result.closedRoundCid
 
 
@@ -984,12 +984,12 @@ template SvcRules with
     nonconsuming choice SvcRules_MergeMemberTrafficContracts
       : ContractId MemberTraffic
       with
-        coinRulesCid : ContractId CoinRules
+        amuletRulesCid : ContractId AmuletRules
         trafficCids : [ContractId MemberTraffic]
       controller leader
       do
         require "Number of member traffic contracts is above the configured threshold" $ length trafficCids > config.numMemberTrafficContractsThreshold
-        result <- exercise coinRulesCid CoinRules_MergeMemberTrafficContracts with ..
+        result <- exercise amuletRulesCid AmuletRules_MergeMemberTrafficContracts with ..
         return result.mergedTrafficCid
 
 -- Utility functions
@@ -1017,18 +1017,18 @@ summarizeCollective svcRules = CollectiveSummary with
 
 -- | Execute an action which requires certain number of confirmations from SVs.
 -- Each confirmed action can at most be executed once.
-executeActionRequiringConfirmation: ContractId SvcRules -> Optional( ContractId CoinRules ) -> ActionRequiringConfirmation -> Update ()
-executeActionRequiringConfirmation svcRulesCid coinRulesCid act = case act of
-  ARC_CoinRules with .. ->
-    case coinRulesCid of
-      None -> error "coinRulesCid was not defined."
-      Some coinRulesCid -> do
-        case coinRulesAction of
-          CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise coinRulesCid choiceArg
-          CRARC_MiningRound_Archive choiceArg -> void $ exercise coinRulesCid choiceArg
-          CRARC_AddFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
-          CRARC_RemoveFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
-          CRARC_UpdateFutureCoinConfigSchedule choiceArg -> void $ exercise coinRulesCid choiceArg
+executeActionRequiringConfirmation: ContractId SvcRules -> Optional( ContractId AmuletRules ) -> ActionRequiringConfirmation -> Update ()
+executeActionRequiringConfirmation svcRulesCid amuletRulesCid act = case act of
+  ARC_AmuletRules with .. ->
+    case amuletRulesCid of
+      None -> error "amuletRulesCid was not defined."
+      Some amuletRulesCid -> do
+        case amuletRulesAction of
+          CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_MiningRound_Archive choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_AddFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
+          CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> void $ exercise amuletRulesCid choiceArg
   ARC_SvcRules with .. ->
     case svcAction of
       SRARC_AddMember choiceArg -> void $ exercise svcRulesCid choiceArg
@@ -1132,11 +1132,11 @@ ensureNotExpired expiresAt = do
 actionRequiringConfirmationEffectiveAt : ActionRequiringConfirmation -> Optional Time
 actionRequiringConfirmationEffectiveAt action =
   case action of
-    ARC_CoinRules with .. ->
-      case coinRulesAction of
-        CRARC_AddFutureCoinConfigSchedule choiceArg -> Some choiceArg.newScheduleItem._1
-        CRARC_RemoveFutureCoinConfigSchedule choiceArg -> Some choiceArg.scheduleTime
-        CRARC_UpdateFutureCoinConfigSchedule choiceArg -> Some choiceArg.scheduleItem._1
+    ARC_AmuletRules with .. ->
+      case amuletRulesAction of
+        CRARC_AddFutureAmuletConfigSchedule choiceArg -> Some choiceArg.newScheduleItem._1
+        CRARC_RemoveFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleTime
+        CRARC_UpdateFutureAmuletConfigSchedule choiceArg -> Some choiceArg.scheduleItem._1
         CRARC_MiningRound_Archive _ -> None
         CRARC_MiningRound_StartIssuing _ -> None
     ARC_SvcRules with .. -> None
@@ -1187,8 +1187,8 @@ svcRules_addMember this0 arg@SvcRules_AddMember{..} = do
   unless (newMemberParty `Map.member` this.offboardedMembers) $
     createPerMemberContracts this arg
   -- create per SV party contracts
-  let initialCoinPriceVote = None
-  createPerSvPartyContracts svc newMemberParty newMemberName noDomainNodes initialCoinPriceVote
+  let initialAmuletPriceVote = None
+  createPerSvPartyContracts svc newMemberParty newMemberName noDomainNodes initialAmuletPriceVote
   -- register the new operator in the SvcRules
   let memberInfo = MemberInfo with
         name = newMemberName
@@ -1210,14 +1210,14 @@ createPerMemberContracts SvcRules{..} SvcRules_AddMember{..} = do
       numCouponsIssued = 0
 
 createPerSvPartyContracts : Party -> Party -> Text -> DomainNodeConfigMap -> Optional Decimal -> Update ()
-createPerSvPartyContracts svc newMemberParty newMemberName domainNodes coinPrice = do
+createPerSvPartyContracts svc newMemberParty newMemberName domainNodes amuletPrice = do
   now <- getTime
-  -- Note: we currently track the coin-price vote on a per operator basis.
+  -- Note: we currently track the amulet-price vote on a per operator basis.
   -- This implies it will be reset when an operator is offboarded and re-onboarded.
-  void $ create CoinPriceVote with
+  void $ create AmuletPriceVote with
     svc
     sv = newMemberParty
-    coinPrice
+    amuletPrice
     lastUpdatedAt = now
   void $ create SvStatusReport with
     svc

@@ -8,11 +8,11 @@ import com.google.protobuf.ByteString
 import scala.util.Using
 
 object DarResources {
-  val cantonCoin_0_1_0 = DarResource("canton-coin-0.1.0.dar")
-  val cantonCoin_current = DarResource("canton-coin-current.dar")
-  val cantonCoin = PackageResource(
-    cantonCoin_0_1_0,
-    Seq(cantonCoin_current),
+  val cantonAmulet_0_1_0 = DarResource("canton-amulet-0.1.0.dar")
+  val cantonAmulet_current = DarResource("canton-amulet-current.dar")
+  val cantonAmulet = PackageResource(
+    cantonAmulet_0_1_0,
+    Seq(cantonAmulet_current),
   )
 
   val svcGovernance_0_1_0 = DarResource("svc-governance-0.1.0.dar")
@@ -67,7 +67,7 @@ object DarResources {
   private val packageResources: Seq[PackageResource] =
     Seq(
       DarResources.appManager,
-      DarResources.cantonCoin,
+      DarResources.cantonAmulet,
       DarResources.cantonNameService,
       DarResources.splitwell,
       DarResources.svcGovernance,

@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_Error
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.COO_Error
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -19,13 +19,13 @@ class WalletTxLogWithDomainFeesIntegrationTest
     with DomainFeesTestUtil
     with WalletTxLogTestUtil {
 
-  private val coinPrice = BigDecimal(1.25).setScale(10)
+  private val amuletPrice = BigDecimal(1.25).setScale(10)
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      // Set a non-unit coin price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
+      // Set a non-unit amulet price to better test CC-USD conversion.
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
       // NOTE: automatic top-ups should be explicitly disabled for this test as currently written
       .withTrafficTopupsDisabled
   }
@@ -34,7 +34,7 @@ class WalletTxLogWithDomainFeesIntegrationTest
 
     "handle domain fees that have been paid (in a DevNet cluster)" in { implicit env =>
       val now = env.environment.clock.now
-      val domainFeesConfig = sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.fees
+      val domainFeesConfig = sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount, 1_000_000L)
       val (_, totalCostCc) = computeDomainFees(trafficAmount, now)
 

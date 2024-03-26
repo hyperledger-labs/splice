@@ -2,27 +2,27 @@ package com.daml.network.wallet.treasury
 
 import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.coin.ValidatorRight
-import com.daml.network.codegen.java.cc.coinrules.transferinput.{
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
+import com.daml.network.codegen.java.cc.amulet.ValidatorRight
+import com.daml.network.codegen.java.cc.amuletrules.transferinput.{
   ExtTransferInput,
   InputAppRewardCoupon,
-  InputCoin,
+  InputAmulet,
   InputSvRewardCoupon,
   InputValidatorRewardCoupon,
 }
-import com.daml.network.codegen.java.cc.coinrules.{
+import com.daml.network.codegen.java.cc.amuletrules.{
   PaymentTransferContext,
   TransferContext,
   TransferInput,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.codegen.java.cn.wallet.install.{
   ExecuteBatchResult,
   WalletAppInstall,
-  coinoperation,
+  amuletoperation,
 }
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
@@ -71,7 +71,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success}
 
-/** This class encapsulates the logic that sequences all operations which change the coin holdings of an user such
+/** This class encapsulates the logic that sequences all operations which change the amulet holdings of an user such
   * that concurrent manipulations don't conflict.
   *
   * For the design, please see https://github.com/DACH-NY/canton-network-node/issues/913
@@ -97,15 +97,15 @@ class TreasuryService(
 
   private val queueTerminationResult: Promise[Done] = Promise()
 
-  private val queue: BoundedSourceQueue[EnqueuedCoinOperation] = {
+  private val queue: BoundedSourceQueue[EnqueuedAmuletOperation] = {
     val queue = Source
-      .queue[EnqueuedCoinOperation](treasuryConfig.queueSize)
+      .queue[EnqueuedAmuletOperation](treasuryConfig.queueSize)
       .batchWeighted(
         treasuryConfig.batchSize.toLong,
         operation =>
           if (operation.priority == CommandPriority.High) treasuryConfig.batchSize.toLong + 1L
           else 1L,
-        operation => CoinOperationBatch(operation),
+        operation => AmuletOperationBatch(operation),
       )((batch, operation) => batch.addCOToBatch(operation))
       // Execute the batches sequentially to avoid contention
       .mapAsync(1)(filterAndExecuteBatch)
@@ -113,7 +113,7 @@ class TreasuryService(
         Sink.onComplete(result0 => {
           val result =
             retryProvider
-              .logTerminationAndRecoverOnShutdown("coin operation batch executor", logger)(
+              .logTerminationAndRecoverOnShutdown("amulet operation batch executor", logger)(
                 result0
               )(TraceContext.empty)
           val _ = queueTerminationResult.tryComplete(result)
@@ -121,16 +121,16 @@ class TreasuryService(
       )(Keep.left)
       .run()
     logger.debug(
-      show"Started coin operation operation batch executor with ${treasuryConfig.toString.unquoted}"
+      show"Started amulet operation operation batch executor with ${treasuryConfig.toString.unquoted}"
     )(TraceContext.empty)
     queue
   }
 
   retryProvider.runOnShutdown_(new RunOnShutdown {
-    override def name: String = s"terminate coin operation batch executor"
+    override def name: String = s"terminate amulet operation batch executor"
     override def done: Boolean = queueTerminationResult.isCompleted
     override def run(): Unit = {
-      logger.debug("Terminating coin operation batch executor, as we are shutting down.")(
+      logger.debug("Terminating amulet operation batch executor, as we are shutting down.")(
         TraceContext.empty
       )
       try queue.complete()
@@ -144,7 +144,7 @@ class TreasuryService(
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
     Seq[AsyncOrSyncCloseable](
       AsyncCloseable(
-        "waiting for coin operation batch executor shutdown",
+        "waiting for amulet operation batch executor shutdown",
         queueTerminationResult.future,
         timeouts.shutdownShort,
       )
@@ -156,18 +156,18 @@ class TreasuryService(
   override def toString: String =
     show"TreasureService(endUserParty=${userStore.key.endUserParty})"
 
-  /** Enqueues a coin operation into an internal task queue.
+  /** Enqueues a amulet operation into an internal task queue.
     * The [[TreasuryService]] will schedule the operation and then complete the returned with its result.
     */
-  def enqueueCoinOperation[T](
-      operation: installCodegen.CoinOperation,
+  def enqueueAmuletOperation[T](
+      operation: installCodegen.AmuletOperation,
       priority: CommandPriority = CommandPriority.Low,
-  )(implicit tc: TraceContext): Future[installCodegen.CoinOperationOutcome] = {
-    val p = Promise[installCodegen.CoinOperationOutcome]()
+  )(implicit tc: TraceContext): Future[installCodegen.AmuletOperationOutcome] = {
+    val p = Promise[installCodegen.AmuletOperationOutcome]()
     logger.debug(
       show"Received operation (queue size before adding this: ${queue.size()}): $operation"
     )
-    queue.offer(EnqueuedCoinOperation(operation, p, tc, priority)) match {
+    queue.offer(EnqueuedAmuletOperation(operation, p, tc, priority)) match {
       case Enqueued =>
         logger.debug(show"Operation $operation enqueued successfully")
         p.future
@@ -188,79 +188,79 @@ class TreasuryService(
     }
   }
 
-  private def closingException(operation: installCodegen.CoinOperation) =
+  private def closingException(operation: installCodegen.AmuletOperation) =
     Status.UNAVAILABLE
       .withDescription(
-        show"Rejected operation because the coin operation batch executor is shutting down: $operation"
+        show"Rejected operation because the amulet operation batch executor is shutting down: $operation"
       )
       .asRuntimeException
 
   // Try looking up the contracts relevant for identifying operation staleness. Will throw a [[io.grpc.StatusRuntimeException]] if not found.
-  private def tryLookupCoinOperation(
-      op0: installCodegen.CoinOperation
+  private def tryLookupAmuletOperation(
+      op0: installCodegen.AmuletOperation
   )(implicit tc: TraceContext): Future[Unit] =
     op0 match {
-      case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
+      case op: amuletoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
         for {
           _ <- userStore.multiDomainAcsStore.getContractById(
             subsCodegen.SubscriptionRequest.COMPANION
           )(op.contractIdValue)
         } yield ()
 
-      case op: coinoperation.CO_SubscriptionMakePayment =>
+      case op: amuletoperation.CO_SubscriptionMakePayment =>
         for {
           _ <- userStore.multiDomainAcsStore.getContractById(
             subsCodegen.SubscriptionIdleState.COMPANION
           )(op.contractIdValue)
         } yield ()
 
-      case op: coinoperation.CO_AppPayment =>
+      case op: amuletoperation.CO_AppPayment =>
         for {
           _ <- userStore.multiDomainAcsStore.getContractById(
             walletCodegen.AppPaymentRequest.COMPANION
           )(op.contractIdValue)
         } yield ()
 
-      case op: coinoperation.CO_CompleteAcceptedTransfer =>
+      case op: amuletoperation.CO_CompleteAcceptedTransfer =>
         for {
           _ <- userStore.multiDomainAcsStore.getContractById(
             transferOffersCodegen.AcceptedTransferOffer.COMPANION
           )(op.contractIdValue)
         } yield ()
 
-      case _: coinoperation.CO_MergeTransferInputs => Future.unit
+      case _: amuletoperation.CO_MergeTransferInputs => Future.unit
 
-      case _: coinoperation.CO_Tap => Future.unit
+      case _: amuletoperation.CO_Tap => Future.unit
 
       // TODO(tech-debt): Ideally, we should modify the BuyMemberTraffic choice to also return
       //  the ValidatorTopUpState contract Id in the COOutcome and ingest these into the store
       //  in order to do the staleness check here. BuyMemberTraffic txs are always placed into
-      //  their own batch so a failure of this tx should not impact other coin txs.
-      case _: coinoperation.CO_BuyMemberTraffic => Future.unit
+      //  their own batch so a failure of this tx should not impact other amulet txs.
+      case _: amuletoperation.CO_BuyMemberTraffic => Future.unit
 
-      case op: coinoperation.CO_CompleteBuyTrafficRequest =>
+      case op: amuletoperation.CO_CompleteBuyTrafficRequest =>
         for {
           _ <- userStore.multiDomainAcsStore.getContractById(
             trafficRequestCodegen.BuyTrafficRequest.COMPANION
           )(op.trafficRequestCid)
         } yield ()
 
-      case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
+      case op => throw new NotImplementedError(show"Unexpected amulet operation: $op")
     }
 
-  private def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean =
+  private def isErrorOutcome(outcome: installCodegen.AmuletOperationOutcome): Boolean =
     outcome match {
-      case _: installCodegen.coinoperationoutcome.COO_Error => true
+      case _: installCodegen.amuletoperationoutcome.COO_Error => true
       case _ => false
     }
 
   // Checks an operation for staleness. If it is stale - completes it with a failure, and returns None.
   // Otherwise, returns the operation.
   private def completeIfStale(
-      op: EnqueuedCoinOperation
-  )(implicit tc: TraceContext): Future[Option[EnqueuedCoinOperation]] =
+      op: EnqueuedAmuletOperation
+  )(implicit tc: TraceContext): Future[Option[EnqueuedAmuletOperation]] =
     for {
-      res <- tryLookupCoinOperation(op.operation).transform {
+      res <- tryLookupAmuletOperation(op.operation).transform {
         case Failure(ex) =>
           logger.debug(show"Failing operation due to failed lookup: $op", ex)
           // if the lookup fails, complete the promise with the failed future
@@ -274,14 +274,14 @@ class TreasuryService(
   // Due to contention, an operation may get queued for a while, and become stale. Since a DB lookup is significantly cheaper than
   // a failed batch, we filter out stale operations before submitting the batch.
   private def filterBatch(
-      unfilteredBatch: CoinOperationBatch
-  )(implicit tc: TraceContext): Future[CoinOperationBatch] =
+      unfilteredBatch: AmuletOperationBatch
+  )(implicit tc: TraceContext): Future[AmuletOperationBatch] =
     for {
       filteredNonMergeOperations <- Future.traverse(unfilteredBatch.nonMergeOperations)(
         completeIfStale(_)
       )
 
-    } yield CoinOperationBatch(
+    } yield AmuletOperationBatch(
       unfilteredBatch.mergeOperationOpt,
       filteredNonMergeOperations
         .filter(_.isDefined)
@@ -289,7 +289,7 @@ class TreasuryService(
     )
 
   private def filterAndExecuteBatch(
-      unfilteredBatch: CoinOperationBatch
+      unfilteredBatch: AmuletOperationBatch
   ): Future[Done] = TraceContext.withNewTraceContext(implicit tc => {
     withSpan("executeBatch") { implicit tc => _ =>
       for {
@@ -300,18 +300,18 @@ class TreasuryService(
   })
 
   private def executeBatch(
-      batch: CoinOperationBatch
+      batch: AmuletOperationBatch
   )(implicit tc: TraceContext): Future[Done] = {
     // Remove all operations from the batch whose promise has already been completed.
     // We use this approach as the retry infrastructure retries a fixed operation, and we want to avoid
     // introducing more mutable state that can go awry.
     // We accept the cost of repeatedly filtering the batch, as batches are expected to be small.
     logger.debug(
-      show"Running batch of coin operations:\n$batch"
+      show"Running batch of amulet operations:\n$batch"
     )
 
     def completeWithFailure(
-        op: EnqueuedCoinOperation,
+        op: EnqueuedAmuletOperation,
         throwable: Throwable,
     ) = {
       op.outcomePromise.complete(
@@ -320,7 +320,7 @@ class TreasuryService(
     }
 
     if (batch.isEmpty) {
-      logger.debug("Coin operation batch was empty after filtering. ")
+      logger.debug("Amulet operation batch was empty after filtering. ")
       Future.successful(Done)
     } else {
 
@@ -335,7 +335,7 @@ class TreasuryService(
         res <-
           contextAndInputsOpt match {
             // if we returned None from getTransferContextAndInputs, this is (1) a batch that only contains a "merge" operation, but
-            // (2) there is nothing to merge (e.g. only 1 coin + no rewards already, or rewards are too small)
+            // (2) there is nothing to merge (e.g. only 1 amulet + no rewards already, or rewards are too small)
             // in this case, we just complete the merge-operation immediately without sending any data to the ledger.
             case None =>
               batch.mergeOperationOpt.foreach(
@@ -369,7 +369,7 @@ class TreasuryService(
       install: AssignedContract[WalletAppInstall.ContractId, WalletAppInstall],
       transferContext: PaymentTransferContext,
       inputs: Seq[TransferInput],
-      batch: CoinOperationBatch,
+      batch: AmuletOperationBatch,
       readAs: Set[PartyId],
       disclosedContracts: DisclosedContracts.NE,
   )(implicit tc: TraceContext): Future[Done] = {
@@ -389,7 +389,7 @@ class TreasuryService(
         .noDedup
         .yieldResultAndOffset()
 
-      // wait for store to ingest the new coin holdings, then return all outcomes to the callers
+      // wait for store to ingest the new amulet holdings, then return all outcomes to the callers
       _ <- waitForIngestion(offset, result).map(_ =>
         batch.completeBatchOperations(result)(logger, tc)
       )
@@ -412,43 +412,43 @@ class TreasuryService(
 
   private def shouldMergeOnlyTransferRun(
       totalRewardsQuantity: BigDecimal,
-      coinInputsAndQuantity: Seq[(BigDecimal, InputCoin)],
+      amuletInputsAndQuantity: Seq[(BigDecimal, InputAmulet)],
       createFeeUsd: BigDecimal,
   )(implicit tc: TraceContext): Boolean = {
-    val numCoinInputs = coinInputsAndQuantity.length
-    val totalCoinQuantity = coinInputsAndQuantity.map(_._1).sum
-    if (numCoinInputs <= 1) {
+    val numAmuletInputs = amuletInputsAndQuantity.length
+    val totalAmuletQuantity = amuletInputsAndQuantity.map(_._1).sum
+    if (numAmuletInputs <= 1) {
       val run = totalRewardsQuantity > createFeeUsd
       // only log when there are actually some rewards to possibly collect.
       if (!run && totalRewardsQuantity != 0)
         logger.debug(
-          "Not executing a merge operation because there no coins to merge " +
+          "Not executing a merge operation because there no amulets to merge " +
             s"and the totalRewardsQuantity $totalRewardsQuantity is smaller than the create-fee $createFeeUsd"
         )
       run
     } else {
-      val totalQuantity = totalRewardsQuantity + totalCoinQuantity
+      val totalQuantity = totalRewardsQuantity + totalAmuletQuantity
       val run = totalQuantity > createFeeUsd
       if (!run && totalQuantity != 0)
         logger.debug(
           "Not executing a merge operation because " +
-            s"the total rewards and coin quantity ${totalQuantity} is smaller than the create-fee $createFeeUsd"
+            s"the total rewards and amulet quantity ${totalQuantity} is smaller than the create-fee $createFeeUsd"
         )
       run
     }
   }
 
-  private def getCoinRules()(implicit
+  private def getAmuletRules()(implicit
       tc: TraceContext,
       ec: ExecutionContext,
   ) =
     for {
-      rules <- scanConnection.getCoinRulesWithState()
+      rules <- scanConnection.getAmuletRulesWithState()
     } yield (rules, rules.contractId)
 
-  /** Select transfer inputs and transfer context to satisfy the coin operations.
-    * Currently, this function selects all unlocked coins and all currently redeemable app- and validator rewards.
-    * It checks that if the coin-operation batch only consists of a merge operation, it makes
+  /** Select transfer inputs and transfer context to satisfy the amulet operations.
+    * Currently, this function selects all unlocked amulets and all currently redeemable app- and validator rewards.
+    * It checks that if the amulet-operation batch only consists of a merge operation, it makes
     * sense to run this operation (e.g. it doesn't cost more to collect rewards in fees than they grant).
     * Also returns the set of readAs parties required for the selected inputs.
     */
@@ -461,14 +461,14 @@ class TreasuryService(
       ec: ExecutionContext,
   ): Future[Option[
     (
-        Seq[cc.coinrules.TransferInput],
+        Seq[cc.amuletrules.TransferInput],
         Set[PartyId],
-        cc.coinrules.PaymentTransferContext,
+        cc.amuletrules.PaymentTransferContext,
         DisclosedContracts.NE,
     )
   ]] = {
     for {
-      (disclosedCoinRules, coinRulesInterface) <- getCoinRules()
+      (disclosedAmuletRules, amuletRulesInterface) <- getAmuletRules()
       (openRounds, issuingMiningRounds) <- scanConnection.getOpenAndIssuingMiningRounds()
       openRound = CNNodeUtil.selectLatestOpenMiningRound(now, openRounds)
       configUsd = openRound.payload.transferConfigUsd
@@ -479,16 +479,16 @@ class TreasuryService(
         (imr.round, imr)
       }.toMap
       contractsToDisclose = DisclosedContracts(
-        disclosedCoinRules,
+        disclosedAmuletRules,
         openRound,
       ) addAll openIssuingRounds
       validatorRights <- walletManager.store.multiDomainAcsStore
-        .listContracts(coinCodegen.ValidatorRight.COMPANION)
-      coinInputsAndQuantity <- userStore.listSortedCoinsAndQuantity(
+        .listContracts(amuletCodegen.ValidatorRight.COMPANION)
+      amuletInputsAndQuantity <- userStore.listSortedAmuletsAndQuantity(
         openRound.payload.round.number,
         PageLimit.tryCreate(maxNumInputs),
       )
-      (validatorRewardsCoinQuantity, validatorRewardCouponUsers, validatorRewardInputs) <-
+      (validatorRewardsAmuletQuantity, validatorRewardCouponUsers, validatorRewardInputs) <-
         getValidatorRewardsAndQuantity(
           // We select the rewards to collect them through a transfer.
           // Those rewards are then an input to a transfer.
@@ -497,15 +497,15 @@ class TreasuryService(
           validatorRewardCouponsLimit = maxNumInputs,
           issuingRoundsMap,
         )
-      (validatorFaucetsCoinQuantity, validatorFaucetInputs) <- getValidatorFaucetsAndQuantity(
+      (validatorFaucetsAmuletQuantity, validatorFaucetInputs) <- getValidatorFaucetsAndQuantity(
         maxNumInputs,
         issuingRoundsMap,
       )
-      (appRewardsTotalCoinQuantity, appRewardInputs) <- getAppRewardsAndQuantity(
+      (appRewardsTotalAmuletQuantity, appRewardInputs) <- getAppRewardsAndQuantity(
         maxNumInputs,
         issuingRoundsMap,
       )
-      (svRewardsTotalCoinQuantity, svRewardInputs) <- getSvRewardCouponsAndQuantity(
+      (svRewardsTotalAmuletQuantity, svRewardInputs) <- getSvRewardCouponsAndQuantity(
         maxNumInputs,
         issuingRoundsMap,
       )
@@ -514,8 +514,8 @@ class TreasuryService(
       val createFeeUsd = configUsd.createFee.fee
       if (
         isMergeOny && !shouldMergeOnlyTransferRun(
-          appRewardsTotalCoinQuantity + validatorRewardsCoinQuantity + validatorFaucetsCoinQuantity + svRewardsTotalCoinQuantity,
-          coinInputsAndQuantity,
+          appRewardsTotalAmuletQuantity + validatorRewardsAmuletQuantity + validatorFaucetsAmuletQuantity + svRewardsTotalAmuletQuantity,
+          amuletInputsAndQuantity,
           createFeeUsd,
         )
       ) {
@@ -523,7 +523,7 @@ class TreasuryService(
       } else {
         val inputs = constructTransferInputs(
           maxNumInputs,
-          coinInputsAndQuantity.map(_._2),
+          amuletInputsAndQuantity.map(_._2),
           validatorRewardInputs,
           appRewardInputs,
           validatorFaucetInputs,
@@ -555,7 +555,7 @@ class TreasuryService(
             .map(r => (r.payload.user, r.contractId))
             .toMap[String, ValidatorRight.ContractId]
             .asJava,
-          // The first (locking coin) leg of app rewards issues rewards to the wallet operator, and respects featured app rights.
+          // The first (locking amulet) leg of app rewards issues rewards to the wallet operator, and respects featured app rights.
           // We consider the validator to be the wallet operator, hence use the validator's featured app right (if it exists).
           validatorFeaturedAppRight
             .map(r => r.contractId)
@@ -566,7 +566,7 @@ class TreasuryService(
             inputs,
             validatorRewardCouponUsers,
             new PaymentTransferContext(
-              coinRulesInterface,
+              amuletRulesInterface,
               transferContext,
             ),
             contractsToDisclose,
@@ -584,7 +584,7 @@ class TreasuryService(
     */
   private def constructTransferInputs(
       maxNumInputs: Int,
-      coinInputs: Seq[InputCoin],
+      amuletInputs: Seq[InputAmulet],
       validatorRewardInputs: Seq[(Round, BigDecimal, InputValidatorRewardCoupon)],
       appRewardInputs: Seq[(Round, BigDecimal, InputAppRewardCoupon)],
       validatorFaucetInputs: Seq[(Round, BigDecimal, ExtTransferInput)],
@@ -604,17 +604,17 @@ class TreasuryService(
     // by the non-tap operation. However, the non-tap operation may fail in which case we would have again too
     // many inputs and thus we decided to always simply subtract the number of tap operations in a batch.)
     // In general, we refrain from merging more inputs in later steps in the batch to minimize code complexity.
-    // We prioritize including a small amount of large coins in transfers, so we avoid unnecessary out-of-funds errors
+    // We prioritize including a small amount of large amulets in transfers, so we avoid unnecessary out-of-funds errors
     // for larger transfers.
 
-    val numCoinsToPrioritize =
+    val numAmuletsToPrioritize =
       Math
-        .max(2, Math.max(coinInputs.length + sortedRewardInputs.length, maxNumInputs) * 0.1)
+        .max(2, Math.max(amuletInputs.length + sortedRewardInputs.length, maxNumInputs) * 0.1)
         .round
         .intValue
     val inputs =
-      (coinInputs.take(numCoinsToPrioritize) ++ sortedRewardInputs ++ coinInputs.drop(
-        numCoinsToPrioritize
+      (amuletInputs.take(numAmuletsToPrioritize) ++ sortedRewardInputs ++ amuletInputs.drop(
+        numAmuletsToPrioritize
       ))
         .take(maxNumInputs - numTapOperations)
     inputs
@@ -638,7 +638,7 @@ class TreasuryService(
       validatorRewardCouponUsers = validatorRewardCouponsRaw
         .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
         .toSet
-      validatorRewardsWithCoinQuantity = validatorRewardCouponsRaw.flatMap(rw => {
+      validatorRewardsWithAmuletQuantity = validatorRewardCouponsRaw.flatMap(rw => {
         val issuingO = issuingRoundsMap.get(rw.payload.round)
         issuingO
           .map(i => {
@@ -646,17 +646,17 @@ class TreasuryService(
             (rw.payload.round, rw, BigDecimal(quantity))
           })
       })
-      validatorRewardsCoinQuantity = validatorRewardsWithCoinQuantity.map(_._3).sum
-      validatorRewardInputs = validatorRewardsWithCoinQuantity.map(rw =>
+      validatorRewardsAmuletQuantity = validatorRewardsWithAmuletQuantity.map(_._3).sum
+      validatorRewardInputs = validatorRewardsWithAmuletQuantity.map(rw =>
         (
           rw._2.payload.round,
           rw._3,
-          new cc.coinrules.transferinput.InputValidatorRewardCoupon(
+          new cc.amuletrules.transferinput.InputValidatorRewardCoupon(
             rw._2.contractId
           ),
         )
       )
-    } yield (validatorRewardsCoinQuantity, validatorRewardCouponUsers, validatorRewardInputs)
+    } yield (validatorRewardsAmuletQuantity, validatorRewardCouponUsers, validatorRewardInputs)
   }
 
   private def getValidatorFaucetsAndQuantity(
@@ -670,18 +670,18 @@ class TreasuryService(
         issuingRoundsMap,
         PageLimit.tryCreate(maxNumInputs),
       )
-      validatorFaucetsCoinQuantity = validatorFaucetCouponsInputs.map(_._2).sum
+      validatorFaucetsAmuletQuantity = validatorFaucetCouponsInputs.map(_._2).sum
       validatorFaucetsInputs = validatorFaucetCouponsInputs.map(rw =>
         (
           rw._1.payload.round,
           rw._2,
-          new cc.coinrules.transferinput.ExtTransferInput(
+          new cc.amuletrules.transferinput.ExtTransferInput(
             com.daml.ledger.javaapi.data.Unit.getInstance(),
             Optional.of(rw._1.contractId),
           ),
         )
       )
-    } yield (validatorFaucetsCoinQuantity, validatorFaucetsInputs)
+    } yield (validatorFaucetsAmuletQuantity, validatorFaucetsInputs)
   }
 
   private def getSvRewardCouponsAndQuantity(
@@ -700,7 +700,7 @@ class TreasuryService(
         (
           rw._1.payload.round,
           rw._2,
-          new cc.coinrules.transferinput.InputSvRewardCoupon(rw._1.contractId),
+          new cc.amuletrules.transferinput.InputSvRewardCoupon(rw._1.contractId),
         )
       )
     } yield (svRewardCouponsQuantity, svRewardCouponInputs)
@@ -717,41 +717,41 @@ class TreasuryService(
         issuingRoundsMap,
         PageLimit.tryCreate(maxNumInputs),
       )
-      appRewardsCoinQuantity = appRewardCouponInputs.map(_._2).sum
+      appRewardsAmuletQuantity = appRewardCouponInputs.map(_._2).sum
       appRewardInputs = appRewardCouponInputs.map(rw =>
         (
           rw._1.payload.round,
           rw._2,
-          new cc.coinrules.transferinput.InputAppRewardCoupon(
+          new cc.amuletrules.transferinput.InputAppRewardCoupon(
             rw._1.contractId
           ),
         )
       )
-    } yield (appRewardsCoinQuantity, appRewardInputs)
+    } yield (appRewardsAmuletQuantity, appRewardInputs)
 }
 
 object TreasuryService {
 
-  /** Helper class for the batches of coin operations executed by the treasury service.
+  /** Helper class for the batches of amulet operations executed by the treasury service.
     * Mainly introduced to handle to cleanly separate the logic around managing CO_MergeTransferInputs.
     *
     * @param mergeOperationOpt tracks the CO_MergeTransferInputs operation if there is one as part of the batch.
     *                          tracked separately because it doesn't make sense for there
     *                          to be multiple merge operations in a single batch.
     */
-  private case class CoinOperationBatch(
-      mergeOperationOpt: Option[EnqueuedCoinOperation],
-      nonMergeOperations: Seq[EnqueuedCoinOperation],
+  private case class AmuletOperationBatch(
+      mergeOperationOpt: Option[EnqueuedAmuletOperation],
+      nonMergeOperations: Seq[EnqueuedAmuletOperation],
   ) extends PrettyPrinting {
-    override def pretty: Pretty[CoinOperationBatch.this.type] = prettyOfClass(
+    override def pretty: Pretty[AmuletOperationBatch.this.type] = prettyOfClass(
       paramIfDefined("mergeOperationOpt", _.mergeOperationOpt),
       paramIfNonEmpty("nonMergeOperations", _.nonMergeOperations),
     )
 
     lazy val numTapOperations: Int = nonMergeOperations.count(_.isCO_Tap)
 
-    /** Computes the coin operations that should be run on the ledger given the current batch state. */
-    lazy val operationsToRun: Seq[EnqueuedCoinOperation] = {
+    /** Computes the amulet operations that should be run on the ledger given the current batch state. */
+    lazy val operationsToRun: Seq[EnqueuedAmuletOperation] = {
       // if the batch is only a merge-operation - run that - else use the nonMergeOperations and don't include the
       // mergeOperation
       if (isMergeOnly) mergeOperationOpt.toList else nonMergeOperations
@@ -768,20 +768,20 @@ object TreasuryService {
       else CommandPriority.Low
     }
 
-    def addCOToBatch(operation: EnqueuedCoinOperation): CoinOperationBatch = {
+    def addCOToBatch(operation: EnqueuedAmuletOperation): AmuletOperationBatch = {
       if (
         (mergeOperationOpt.isEmpty && nonMergeOperations.isEmpty) || priority == operation.priority
       ) {
         val isMergeOp = operation.isCO_MergeTransferInputs
         mergeOperationOpt match {
-          case None if isMergeOp => CoinOperationBatch(Some(operation), nonMergeOperations)
+          case None if isMergeOp => AmuletOperationBatch(Some(operation), nonMergeOperations)
           case Some(_) if isMergeOp =>
             // if we already have a merge operation in this batch; complete the new one immediately and
             // don't add it to the batch
             operation.outcomePromise.success(new COO_MergeTransferInputs(None.toJava))
             this
           case _ =>
-            CoinOperationBatch(mergeOperationOpt, nonMergeOperations :+ operation)
+            AmuletOperationBatch(mergeOperationOpt, nonMergeOperations :+ operation)
         }
       } else sys.error("Cannot mix operations of different priorities in batch")
     }
@@ -815,34 +815,34 @@ object TreasuryService {
     }
   }
 
-  private object CoinOperationBatch {
-    def apply(operation: EnqueuedCoinOperation): CoinOperationBatch = {
-      CoinOperationBatch(None, Seq.empty).addCOToBatch(operation)
+  private object AmuletOperationBatch {
+    def apply(operation: EnqueuedAmuletOperation): AmuletOperationBatch = {
+      AmuletOperationBatch(None, Seq.empty).addCOToBatch(operation)
     }
   }
 
-  private case class EnqueuedCoinOperation(
-      operation: installCodegen.CoinOperation,
-      outcomePromise: Promise[installCodegen.CoinOperationOutcome],
+  private case class EnqueuedAmuletOperation(
+      operation: installCodegen.AmuletOperation,
+      outcomePromise: Promise[installCodegen.AmuletOperationOutcome],
       submittedFrom: TraceContext,
       priority: CommandPriority = CommandPriority.Low,
   ) extends PrettyPrinting {
-    override def pretty: Pretty[EnqueuedCoinOperation.this.type] =
+    override def pretty: Pretty[EnqueuedAmuletOperation.this.type] =
       prettyNode(
-        "CoinOperation",
+        "AmuletOperation",
         param("from", _.submittedFrom.showTraceId),
         param("op", _.operation.toValue),
       )
 
     lazy val isCO_MergeTransferInputs: Boolean =
       operation match {
-        case _: coinoperation.CO_MergeTransferInputs => true
+        case _: amuletoperation.CO_MergeTransferInputs => true
         case _ => false
       }
 
     lazy val isCO_Tap: Boolean =
       operation match {
-        case _: coinoperation.CO_Tap => true
+        case _: amuletoperation.CO_Tap => true
         case _ => false
       }
   }

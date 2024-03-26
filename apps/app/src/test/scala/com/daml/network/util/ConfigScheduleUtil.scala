@@ -1,17 +1,17 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinrules.{
-  CoinRules_AddFutureCoinConfigSchedule,
-  CoinRules_RemoveFutureCoinConfigSchedule,
+import com.daml.network.codegen.java.cc.amuletrules.{
+  AmuletRules_AddFutureAmuletConfigSchedule,
+  AmuletRules_RemoveFutureAmuletConfigSchedule,
 }
-import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
+import com.daml.network.codegen.java.cc.amuletconfig.{AmuletConfig, USD}
 import com.daml.network.codegen.java.cc.schedule.Schedule
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
-import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_CoinRules
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.{
-  CRARC_AddFutureCoinConfigSchedule,
-  CRARC_RemoveFutureCoinConfigSchedule,
+import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_AmuletRules
+import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.{
+  CRARC_AddFutureAmuletConfigSchedule,
+  CRARC_RemoveFutureAmuletConfigSchedule,
 }
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.config.CNThresholds
@@ -21,7 +21,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestCommon,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.CNNodeUtil.defaultCoinConfig
+import com.daml.network.util.CNNodeUtil.defaultAmuletConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.DomainId
 
@@ -30,25 +30,25 @@ import scala.jdk.CollectionConverters.*
 
 trait ConfigScheduleUtil extends CNNodeTestCommon {
 
-  /** Helper function to create CoinConfig's in tests for coin config changes. Uses the `currentSchedule` as a reference
+  /** Helper function to create AmuletConfig's in tests for amulet config changes. Uses the `currentSchedule` as a reference
     * to fill in the id of the activeDomain.
     */
-  protected def mkUpdatedCoinConfig(
-      currentSchedule: Schedule[Instant, CoinConfig[USD]],
+  protected def mkUpdatedAmuletConfig(
+      currentSchedule: Schedule[Instant, AmuletConfig[USD]],
       tickDuration: NonNegativeFiniteDuration,
       maxNumInputs: Int = 100,
       holdingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
       nextDomainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTests.CNNodeTestConsoleEnvironment
-  ): cc.coinconfig.CoinConfig[cc.coinconfig.USD] = {
+  ): cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD] = {
     val activeDomainId =
-      CoinConfigSchedule(currentSchedule)
+      AmuletConfigSchedule(currentSchedule)
         .getConfigAsOf(env.environment.clock.now)
         .globalDomain
         .activeDomain
     val trafficControlConfig = defaultTrafficControlConfig
-    defaultCoinConfig(
+    defaultAmuletConfig(
       tickDuration,
       maxNumInputs,
       DomainId.tryFromString(activeDomainId),
@@ -64,12 +64,12 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
     * Intended for testing only.
     */
   def createConfigSchedule(
-      currentSchedule: Schedule[Instant, CoinConfig[USD]],
-      newSchedules: (Duration, cc.coinconfig.CoinConfig[cc.coinconfig.USD])*
-  )(implicit env: CNNodeTestConsoleEnvironment): Schedule[Instant, CoinConfig[USD]] = {
+      currentSchedule: Schedule[Instant, AmuletConfig[USD]],
+      newSchedules: (Duration, cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD])*
+  )(implicit env: CNNodeTestConsoleEnvironment): Schedule[Instant, AmuletConfig[USD]] = {
     val configSchedule = {
       new cc.schedule.Schedule(
-        mkUpdatedCoinConfig(currentSchedule, defaultTickDuration),
+        mkUpdatedAmuletConfig(currentSchedule, defaultTickDuration),
         newSchedules
           .map { case (durationUntilScheduled, config) =>
             new Tuple2(
@@ -84,21 +84,21 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
     configSchedule
   }
 
-  def setFutureConfigSchedule(configSchedule: Schedule[Instant, CoinConfig[USD]])(implicit
+  def setFutureConfigSchedule(configSchedule: Schedule[Instant, AmuletConfig[USD]])(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
     // clean all futureValues
     sv1Backend
       .getSvcInfo()
-      .coinRules
+      .amuletRules
       .payload
       .configSchedule
       .futureValues
       .forEach(value => {
         votingFlow(
-          new ARC_CoinRules(
-            new CRARC_RemoveFutureCoinConfigSchedule(
-              new CoinRules_RemoveFutureCoinConfigSchedule(value._1)
+          new ARC_AmuletRules(
+            new CRARC_RemoveFutureAmuletConfigSchedule(
+              new AmuletRules_RemoveFutureAmuletConfigSchedule(value._1)
             )
           )
         )
@@ -106,9 +106,9 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
     // add new futureValues
     configSchedule.futureValues.forEach(value => {
       votingFlow(
-        new ARC_CoinRules(
-          new CRARC_AddFutureCoinConfigSchedule(
-            new CoinRules_AddFutureCoinConfigSchedule(value)
+        new ARC_AmuletRules(
+          new CRARC_AddFutureAmuletConfigSchedule(
+            new AmuletRules_AddFutureAmuletConfigSchedule(value)
           )
         )
       )

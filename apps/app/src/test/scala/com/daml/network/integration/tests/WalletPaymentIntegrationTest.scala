@@ -98,10 +98,10 @@ class WalletPaymentIntegrationTest
         aliceWalletClient.getAppPaymentRequest(cid).payload shouldBe reqC
       }
 
-      clue("Tap 50 coins") {
+      clue("Tap 50 amulets") {
         aliceWalletClient.tap(50)
         eventually() {
-          aliceWalletClient.list().coins should not be empty
+          aliceWalletClient.list().amulets should not be empty
         }
       }
 
@@ -126,7 +126,7 @@ class WalletPaymentIntegrationTest
             ).asJava,
             aliceUserParty.toProtoPrimitive,
             svcParty.toProtoPrimitive,
-            r.payload.lockedCoin,
+            r.payload.lockedAmulet,
             r.payload.round,
             cid,
           )
@@ -134,19 +134,19 @@ class WalletPaymentIntegrationTest
       }
     }
 
-    "correctly select coins for payments" in { implicit env =>
+    "correctly select amulets for payments" in { implicit env =>
       val (alice, bob) = onboardAliceAndBob()
 
-      val baseWalletFloor = walletUsdToCoin(69)
-      val baseWalletCeiling = walletUsdToCoin(70)
+      val baseWalletFloor = walletUsdToAmulet(69)
+      val baseWalletCeiling = walletUsdToAmulet(70)
 
-      clue("Alice gets some coins") {
-        // Note: it would be great if we could add coins with different holding fees,
+      clue("Alice gets some amulets") {
+        // Note: it would be great if we could add amulets with different holding fees,
         // to test whether the wallet selects the most expensive ones for the transfer.
         aliceWalletClient.tap(10)
         aliceWalletClient.tap(40)
         aliceWalletClient.tap(20)
-        // not using checkWallet as coins may already be merged by automation
+        // not using checkWallet as amulets may already be merged by automation
         checkBalance(
           aliceWalletClient,
           None,
@@ -217,7 +217,7 @@ class WalletPaymentIntegrationTest
           checkWallet(
             aliceUserParty,
             aliceWalletClient,
-            Seq((walletUsdToCoin(99.8) - 1, walletUsdToCoin(100) - 1)),
+            Seq((walletUsdToAmulet(99.8) - 1, walletUsdToAmulet(100) - 1)),
           )
           checkWallet(bobUserParty, bobWalletClient, Seq((1, 1)))
         },

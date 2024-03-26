@@ -11,14 +11,14 @@ import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, SummarizingMin
 import com.daml.network.codegen.java.cn.svcrules.Confirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CnsEntryContext,
-  ARC_CoinRules,
+  ARC_AmuletRules,
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.cnsentrycontext_actionrequiringconfirmation.{
   CNSRARC_CollectInitialEntryPayment,
   CNSRARC_RejectEntryInitialPayment,
 }
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.{
+import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.{
   CRARC_MiningRound_Archive,
   CRARC_MiningRound_StartIssuing,
 }
@@ -70,12 +70,12 @@ class ExecuteConfirmedActionTrigger(
           taskOutcome <-
             if (uniqueConfirmations.size >= requiredNumConfirmations) {
               for {
-                coinRules <- store.getCoinRules()
-                coinRulesId = coinRules.contractId
+                amuletRules <- store.getAmuletRules()
+                amuletRulesId = amuletRules.contractId
                 cmd = svcRules.exercise(
                   _.exerciseSvcRules_ExecuteConfirmedAction(
                     action,
-                    java.util.Optional.of(coinRulesId),
+                    java.util.Optional.of(amuletRulesId),
                     uniqueConfirmations
                       .map(_.contractId)
                       .asJava, // TODO(#3300) report duplicated and add test cases to make sure no duplicated confirmations here
@@ -113,11 +113,11 @@ class ExecuteConfirmedActionTrigger(
     // we check *OnDomain below because we expect to get retriggered with the
     // corrected domain if the contract in question is being reassigned
     confirmation.payload.action match {
-      case arcCoinRules: ARC_CoinRules =>
-        arcCoinRules.coinRulesAction match {
+      case arcAmuletRules: ARC_AmuletRules =>
+        arcAmuletRules.amuletRulesAction match {
           case startIssuingAction: CRARC_MiningRound_StartIssuing =>
             val sumRoundCid =
-              startIssuingAction.coinRules_MiningRound_StartIssuingValue.miningRoundCid
+              startIssuingAction.amuletRules_MiningRound_StartIssuingValue.miningRoundCid
             store.multiDomainAcsStore
               .lookupContractByIdOnDomain(SummarizingMiningRound.COMPANION)(
                 confirmation.domain,
@@ -126,7 +126,7 @@ class ExecuteConfirmedActionTrigger(
               .map(_.isEmpty)
           case archiveAction: CRARC_MiningRound_Archive =>
             val closedRoundCid =
-              archiveAction.coinRules_MiningRound_ArchiveValue.closedRoundCid
+              archiveAction.amuletRules_MiningRound_ArchiveValue.closedRoundCid
             store.multiDomainAcsStore
               .lookupContractByIdOnDomain(ClosedMiningRound.COMPANION)(
                 confirmation.domain,
@@ -135,7 +135,7 @@ class ExecuteConfirmedActionTrigger(
               .map(_.isEmpty)
           case action =>
             throw new UnsupportedOperationException(
-              show"CoinRules $action is not yet supported"
+              show"AmuletRules $action is not yet supported"
             )
         }
       case arcSvcRules: ARC_SvcRules =>

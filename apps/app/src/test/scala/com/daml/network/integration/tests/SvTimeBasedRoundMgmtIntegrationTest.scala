@@ -92,7 +92,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
   "round management with scheduled config change of doubled tickDuration" in { implicit env =>
     initSvcWithSv1Only()
-    val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
     val doubledTickDuration = NonNegativeFiniteDuration.ofSeconds(300)
 
@@ -101,7 +101,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
         currentConfigSchedule,
         (
           defaultTickDuration.asJava,
-          mkUpdatedCoinConfig(currentConfigSchedule, doubledTickDuration),
+          mkUpdatedAmuletConfig(currentConfigSchedule, doubledTickDuration),
         ),
       )
     )
@@ -193,17 +193,17 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
   "round management with scheduled config change of reduced tickDuration" in { implicit env =>
     initSvcWithSv1Only()
-    val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
     val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-    sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.activeDomain
+    sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.activeDomain
     setFutureConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,
         (
           defaultTickDuration.asJava,
-          mkUpdatedCoinConfig(currentConfigSchedule, reducedTickDuration),
+          mkUpdatedAmuletConfig(currentConfigSchedule, reducedTickDuration),
         ),
       )
     )
@@ -368,10 +368,10 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
   "round management with very tightly scheduled config" in { implicit env =>
     initSvcWithSv1Only()
-    val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
 
-    val config101 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 101)
-    val config102 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 102)
+    val config101 = mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 101)
+    val config102 = mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 102)
 
     setFutureConfigSchedule(
       createConfigSchedule(
@@ -392,14 +392,14 @@ class SvTimeBasedRoundMgmtIntegrationTest
       rounds.latestOpen.data.transferConfigUsd.maxNumInputs shouldBe config102.transferConfig.maxNumInputs
     })
 
-    val config201 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 201)
-    val config202 = mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 202)
+    val config201 = mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 201)
+    val config202 = mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 202)
 
     {
       val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
       val configSchedule = {
         new cc.schedule.Schedule(
-          mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration),
+          mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration),
           List(
             new Tuple2(
               now.add(tickDurationWithBuffer).toInstant,

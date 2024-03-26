@@ -4,7 +4,7 @@ import com.daml.network.auth.AuthExtractor.TracedUser
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validator_admin as v0}
 import com.daml.network.identities.NodeIdentitiesStore
-import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
+import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
@@ -22,7 +22,7 @@ class HttpValidatorAdminHandler(
     identitiesStore: NodeIdentitiesStore,
     validatorUserName: String,
     validatorWalletUserName: Option[String],
-    getCoinRulesDomain: GetCoinRulesDomain,
+    getAmuletRulesDomain: GetAmuletRulesDomain,
     participantAdminConnection: ParticipantAdminConnection,
     globalDomainAlias: DomainAlias,
     retryProvider: RetryProvider,
@@ -132,7 +132,7 @@ class HttpValidatorAdminHandler(
         None,
         storeWithIngestion,
         validatorUserName,
-        getCoinRulesDomain,
+        getAmuletRulesDomain,
         participantAdminConnection,
         retryProvider,
         logger,

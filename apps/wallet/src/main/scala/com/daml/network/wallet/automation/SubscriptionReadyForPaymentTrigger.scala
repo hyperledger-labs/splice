@@ -48,13 +48,13 @@ class SubscriptionReadyForPaymentTrigger(
     import com.daml.network.util.PrettyInstances.*
 
     val stateCid = task.work.contractId
-    val operation = new installCodegen.coinoperation.CO_SubscriptionMakePayment(stateCid)
+    val operation = new installCodegen.amuletoperation.CO_SubscriptionMakePayment(stateCid)
     treasury
-      .enqueueCoinOperation(operation)
+      .enqueueAmuletOperation(operation)
       .map {
-        case _: installCodegen.coinoperationoutcome.COO_SubscriptionPayment =>
+        case _: installCodegen.amuletoperationoutcome.COO_SubscriptionPayment =>
           TaskSuccess("made subscription payment")
-        case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
+        case failedOperation: installCodegen.amuletoperationoutcome.COO_Error =>
           val msg =
             show"Failed making subscription payment due to Daml exception\n${failedOperation.toValue}"
           // We're throwing this as INTERNAL to avoid that the polling trigger retries this task in a tight loop.
@@ -63,7 +63,7 @@ class SubscriptionReadyForPaymentTrigger(
 
         case unknown =>
           throw Status.INTERNAL
-            .withDescription(s"Unexpected coin operation outcome: $unknown")
+            .withDescription(s"Unexpected amulet operation outcome: $unknown")
             .asRuntimeException()
       }
   }

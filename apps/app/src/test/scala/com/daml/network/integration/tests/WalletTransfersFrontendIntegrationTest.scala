@@ -18,13 +18,13 @@ class WalletTransfersFrontendIntegrationTest
     with WalletFrontendTestUtil
     with FrontendLoginUtil {
 
-  private val coinPrice = 2
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(coinPrice.toDouble)
+  private val amuletPrice = 2
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(amuletPrice.toDouble)
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withCoinPrice(coinPrice)
+      .withAmuletPrice(amuletPrice)
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
 
@@ -107,7 +107,7 @@ class WalletTransfersFrontendIntegrationTest
               offerCard
                 .childElement(className("transfer-offer-usd-amount-rate"))
                 .text should matchText(
-                s"7 USD @ ${BigDecimal(1) / coinPrice} CC/USD"
+                s"7 USD @ ${BigDecimal(1) / amuletPrice} CC/USD"
               )
             }
           },
@@ -243,9 +243,9 @@ class WalletTransfersFrontendIntegrationTest
         aliceCnsExternalClient,
         aliceCnsName,
         aliceWalletClient,
-        cc * coinPrice,
+        cc * amuletPrice,
       )
-      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc * coinPrice)
+      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc * amuletPrice)
 
       // transfer from bob to alice
       actAndCheck(
@@ -298,9 +298,9 @@ class WalletTransfersFrontendIntegrationTest
         aliceCnsExternalClient,
         aliceCnsName,
         aliceWalletClient,
-        cc * coinPrice,
+        cc * amuletPrice,
       )
-      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc * coinPrice)
+      createCnsEntry(bobCnsExternalClient, bobCnsName, bobWalletClient, cc * amuletPrice)
 
       // transfer from bob to alice
       actAndCheck(

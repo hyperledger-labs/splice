@@ -22,7 +22,7 @@ object SvcTables extends AcsTables with NamedLogging {
   case class SvcAcsStoreRowData(
       contract: Contract[?, ?],
       contractExpiresAt: Option[Timestamp] = None,
-      coinRoundOfExpiry: Option[Long] = None,
+      amuletRoundOfExpiry: Option[Long] = None,
       rewardRound: Option[Long] = None,
       rewardParty: Option[PartyId] = None,
       rewardAmount: Option[BigDecimal] = None,
@@ -54,7 +54,7 @@ object SvcTables extends AcsTables with NamedLogging {
       svName: Option[String] = None,
   ) extends AcsRowData {
     override def indexColumns: Seq[(String, IndexColumnValue[?])] = Seq(
-      "coin_round_of_expiry" -> coinRoundOfExpiry,
+      "amulet_round_of_expiry" -> amuletRoundOfExpiry,
       "reward_round" -> rewardRound,
       "reward_party" -> rewardParty,
       "reward_amount" -> rewardAmount,

@@ -5,7 +5,7 @@ import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSucce
 import com.daml.network.environment.CNLedgerConnection
 import com.daml.network.environment.ledger.api.LedgerClient.ReassignmentCommand
 import com.daml.network.sv.store.SvSvcStore
-import com.daml.network.util.CoinConfigSchedule
+import com.daml.network.util.AmuletConfigSchedule
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
@@ -29,8 +29,8 @@ final class SvcRulesTransferTrigger(
   ): Future[Seq[Task]] = {
     val run = for {
       svcRules <- OptionT(store.lookupSvcRules())
-      coinRules <- OptionT(store.lookupCoinRules())
-      config = CoinConfigSchedule(coinRules.payload.configSchedule) getConfigAsOf now
+      amuletRules <- OptionT(store.lookupAmuletRules())
+      config = AmuletConfigSchedule(amuletRules.payload.configSchedule) getConfigAsOf now
       activeDomain <- OptionT.fromOption[Future](
         DomainId.fromString(config.globalDomain.activeDomain).toOption
       )

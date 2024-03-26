@@ -31,7 +31,7 @@ class MemberTrafficIntegrationTest
 
     "handle contracts with an invalid member id" in { implicit env =>
       val now = env.environment.clock.now
-      val globalDomainConfig = sv1ScanBackend.getCoinConfigAsOf(now).globalDomain
+      val globalDomainConfig = sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain
       val trafficAmount = Math.max(globalDomainConfig.fees.minTopupAmount.toLong, 1_000_000L)
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(100)
@@ -76,7 +76,7 @@ class MemberTrafficIntegrationTest
 
     "merge duplicate member traffic contracts" in { implicit env =>
       val now = env.environment.clock.now
-      val domainFeesConfig = sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.fees
+      val domainFeesConfig = sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount.toLong, 1_000_000L)
       val participantId = aliceValidatorBackend.participantClient.id
       val trafficContractsMergeThreshold =

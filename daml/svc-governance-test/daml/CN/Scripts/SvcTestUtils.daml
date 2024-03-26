@@ -11,8 +11,8 @@ import qualified DA.Text as T
 import Daml.Script
 import DA.Time
 
-import CC.Coin
-import CC.CoinRules
+import CC.Amulet
+import CC.AmuletRules
 import CC.Issuance
 import CC.Round
 import CC.Types
@@ -24,7 +24,7 @@ import CC.Scripts.Parameters
 import CN.CometBft
 import CN.SvcRules
 import CN.SvcBootstrap
-import CN.SVC.CoinPrice
+import CN.SVC.AmuletPrice
 import CN.SVC.GlobalDomain
 import CN.SVC.MemberState
 import CN.Scripts.CnsRulesParameters
@@ -69,7 +69,7 @@ initCollective isDevNet = do
         maxTextLength = 1024
         globalDomain = initialSvcGlobalDomainConfig
         nextScheduledDomainUpgrade = None
-  let coinConfig = defaultCoinConfig
+  let amuletConfig = defaultAmuletConfig
   let cnsRulesConfig = defaultCnsRulesConfig
 
   now <- getTime
@@ -100,8 +100,8 @@ initCollective isDevNet = do
                 scan = Some ScanConfig with
                   publicUrl = "https://sv1.example.com"
         )]
-      coinConfig
-      coinPrice = 1.0
+      amuletConfig
+      amuletPrice = 1.0
       round0Duration = hours 24
       cnsRulesConfig
       config
@@ -181,11 +181,11 @@ onboardValidator app sponsor validator = do
 
 -- | Run the next issuance.
 runNextIssuanceD : AmuletApp -> Decimal -> Script ()
-runNextIssuanceD app coinPrice = do
+runNextIssuanceD app amuletPrice = do
     advanceToNextRoundChange app
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.svc
-    [(coinRulesCid, _)] <- query @CoinRules app.svc
+    [(amuletRulesCid, _)] <- query @AmuletRules app.svc
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
 
       -- collect all unclaimed rewards into the unclaimed rewards fund
@@ -195,8 +195,8 @@ runNextIssuanceD app coinPrice = do
       validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.svc (\r -> r.round == miningRound.round)
       leaderSubmits app $ \cid -> exerciseCmd cid $
         SvcRules_ClaimExpiredRewards with
-          coinRulesCid = coinRulesCid
-          choiceArg = CoinRules_ClaimExpiredRewards with
+          amuletRulesCid = amuletRulesCid
+          choiceArg = AmuletRules_ClaimExpiredRewards with
             closedRoundCid = miningRoundCid
             validatorRewardCouponCids = map fst validatorRewards
             appCouponCids = map fst appRewards
@@ -207,13 +207,13 @@ runNextIssuanceD app coinPrice = do
       confirmAWC_MiningRound_Archive app
       executeAllConfirmedActions app
 
-    -- TODO(#8101): collect SvcRewards via SvRewards into per-SV coins
+    -- TODO(#8101): collect SvcRewards via SvRewards into per-SV amulets
 
     -- close current issuing rounds if there are any
     now <- getTime
     imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.targetClosesAt <= now)
     forA_ imcs $ \(issuingRoundCid, _) ->
-      submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with
+      submitExerciseAmuletRulesByKey app [app.svc] [] AmuletRules_MiningRound_Close with
         issuingRoundCid
 
     -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
@@ -221,15 +221,15 @@ runNextIssuanceD app coinPrice = do
     [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getOpenRoundsSorted app
 
     -- set the new agreed price. This should be done with confirmation
-    coinPriceVoteCids <- updateAgreedCoinPrice app.svc coinPrice
+    amuletPriceVoteCids <- updateAgreedAmuletPrice app.svc amuletPrice
 
     (summarizingRoundCid, _) <- leaderSubmits app $ \cid -> exerciseCmd cid $
         SvcRules_AdvanceOpenMiningRounds with
-          coinRulesCid
+          amuletRulesCid
           roundToArchiveCid
           middleRoundCid = r2Cid
           latestRoundCid = r3Cid
-          coinPriceVoteCids
+          amuletPriceVoteCids
 
     -- compute total burn
     appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
@@ -245,7 +245,7 @@ runNextIssuanceD app coinPrice = do
           optTotalValidatorFaucetCoupons = Some (length validatorFaucetCoupons)
 
     -- create issuing mining round
-    submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
+    submitExerciseAmuletRulesByKey app [app.svc] [] AmuletRules_MiningRound_StartIssuing with
       miningRoundCid = summarizingRoundCid
       summary
 
@@ -264,9 +264,9 @@ confirmAWC_MiningRound_Archive app = do
       -- mallory does not act
       unless ("mallory" `T.isPrefixOf` partyToText member) $ do
         submitMulti [member] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
-          action = ARC_CoinRules with
-            coinRulesAction = CRARC_MiningRound_Archive $
-              CoinRules_MiningRound_Archive with
+          action = ARC_AmuletRules with
+            amuletRulesAction = CRARC_MiningRound_Archive $
+              AmuletRules_MiningRound_Archive with
                 closedRoundCid = round._1
           confirmer = member
         pure ()
@@ -274,7 +274,7 @@ confirmAWC_MiningRound_Archive app = do
 executeAllConfirmedActions : AmuletApp -> Script ()
 executeAllConfirmedActions app = do
   -- get rules and collective summary
-  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  [(amuletRulesCid, _)] <- query @AmuletRules app.svc
   [(svcRulesCid, rules)] <- query @SvcRules app.svc
   let s = summarizeCollective rules
   -- query all confirmations visible to svc
@@ -286,13 +286,13 @@ executeAllConfirmedActions app = do
   forA_ executableConfirmations $ \cs -> do
     submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteConfirmedAction with
       action = (head cs)._2.action
-      coinRulesCid = Some coinRulesCid
+      amuletRulesCid = Some amuletRulesCid
       confirmationCids = map fst cs
 
 executeAllDefinitiveVotes : AmuletApp -> Script ()
 executeAllDefinitiveVotes app = do
   -- get rules and collective summary
-  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  [(amuletRulesCid, _)] <- query @AmuletRules app.svc
   [(svcRulesCid, rules)] <- query @SvcRules app.svc
   let s = summarizeCollective rules
   -- query all voting requests visible to svc
@@ -305,7 +305,7 @@ executeAllDefinitiveVotes app = do
     when execute $ do
       void $ submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
         requestCid
-        coinRulesCid = Some coinRulesCid
+        amuletRulesCid = Some amuletRulesCid
 
 initiateAndAcceptVote : AmuletApp -> [Party] -> ActionRequiringConfirmation -> Script ()
 initiateAndAcceptVote _ [] _ = error "initiateAndAcceptVote: require at least one party"
@@ -329,15 +329,15 @@ initiateAndAcceptVote app (initiator::others) action = do
 
 
 -- | Update all currently desired prices to the target price
-updateAgreedCoinPrice : Party -> Decimal -> Script [ContractId CoinPriceVote]
-updateAgreedCoinPrice svc coinPrice = do
-  votes <- query @CoinPriceVote svc
+updateAgreedAmuletPrice : Party -> Decimal -> Script [ContractId AmuletPriceVote]
+updateAgreedAmuletPrice svc amuletPrice = do
+  votes <- query @AmuletPriceVote svc
   forA votes $ \(voteCid, vote) ->
-    if (vote.coinPrice == Some coinPrice)
+    if (vote.amuletPrice == Some amuletPrice)
       then pure voteCid
       else do
         submit svc $ archiveCmd voteCid
-        submit svc $ createCmd $ vote with coinPrice = Some coinPrice
+        submit svc $ createCmd $ vote with amuletPrice = Some amuletPrice
 
 
 -- | Check that there's exactly one status report per SV member both off-boarded and onboarded.

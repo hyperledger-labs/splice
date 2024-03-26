@@ -25,15 +25,15 @@ case class AutomationConfig(
       */
     maxNumSilentPollingRetries: Int = 3,
     /** Only intended for testing. Disables the polling trigger that periodically collects rewards
-      * and merges coins.
+      * and merges amulets.
       */
-    enableAutomaticRewardsCollectionAndCoinMerging: Boolean = true,
+    enableAutomaticRewardsCollectionAndAmuletMerging: Boolean = true,
     /** TODO(M3-63) Disables the attempt to expire unclaimed rewards. Remove this once we are resilient to unavailable validators
       */
     enableUnclaimedRewardExpiration: Boolean = false,
-    /** Only intended for testing. Disables the expiration of Coin.
+    /** Only intended for testing. Disables the expiration of Amulet.
       */
-    enableExpireCoin: Boolean = false,
+    enableExpireAmulet: Boolean = false,
     /** Only intended for testing. Allows disabling leader elections based on inactivity detection for simtime tests so elections are not triggered unexpectedly.
       */
     enableLeaderReplacementTrigger: Boolean = true,

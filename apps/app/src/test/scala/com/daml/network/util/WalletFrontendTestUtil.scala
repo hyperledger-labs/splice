@@ -9,7 +9,7 @@ import scala.concurrent.duration.*
 
 trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =>
 
-  protected def tapCoins(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
+  protected def tapAmulets(tapQuantity: BigDecimal)(implicit webDriver: WebDriverType): Unit = {
     val tapsBefore =
       clue("Getting state before tap") {
         // The long eventually makes this robust against `StaleElementReferenceException` errors
@@ -32,7 +32,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
         val tapsAfter = findAll(className("tx-row")).toSeq.flatMap(readTapCCAmountFromRow)
         val newTaps = tapsAfter.diff(tapsBefore)
         forExactly(1, newTaps) { tap =>
-          tap shouldBe walletUsdToCoin(tapQuantity)
+          tap shouldBe walletUsdToAmulet(tapQuantity)
         }
       }
     }
@@ -60,7 +60,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
         )
       } catch {
         case e: Throwable =>
-          throw new RuntimeException(s"Could not parse the string '$str' as a coin amount", e)
+          throw new RuntimeException(s"Could not parse the string '$str' as a amulet amount", e)
       }
     }
 
@@ -90,25 +90,25 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
   }
 
   protected def matchTransaction(transactionRow: Element)(
-      coinPrice: BigDecimal,
+      amuletPrice: BigDecimal,
       expectedAction: String,
       expectedSubtype: String,
       expectedPartyDescription: Option[String],
       expectedAmountCC: BigDecimal,
   ): Assertion = {
-    val expectedUSD = expectedAmountCC * coinPrice
+    val expectedUSD = expectedAmountCC * amuletPrice
     matchTransactionAmountRange(transactionRow)(
-      coinPrice,
+      amuletPrice,
       expectedAction,
       expectedSubtype,
       expectedPartyDescription,
       (expectedAmountCC - smallAmount, expectedAmountCC),
-      (expectedUSD - smallAmount * coinPrice, expectedUSD),
+      (expectedUSD - smallAmount * amuletPrice, expectedUSD),
     )
   }
 
   protected def matchTransactionAmountRange(transactionRow: Element)(
-      coinPrice: BigDecimal,
+      amuletPrice: BigDecimal,
       expectedAction: String,
       expectedSubtype: String,
       expectedPartyDescription: Option[String],
@@ -129,7 +129,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       expectedAmountUSD._1,
       expectedAmountUSD._2,
     )
-    transaction.rate should matchText(s"${BigDecimal(1) / coinPrice} CC/USD")
+    transaction.rate should matchText(s"${BigDecimal(1) / amuletPrice} CC/USD")
   }
 
   protected def createTransferOffer(
@@ -191,7 +191,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       )
     } catch {
       case e: Throwable =>
-        throw new RuntimeException(s"Could not parse the string '$str' as a coin amount", e)
+        throw new RuntimeException(s"Could not parse the string '$str' as a amulet amount", e)
     }
   }
 }

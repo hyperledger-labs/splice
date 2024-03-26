@@ -4,8 +4,8 @@ import cats.data.OptionT
 import cats.syntax.either.*
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.admin.http.HttpErrorHandler
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinrules.CoinRules
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cc.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -161,34 +161,34 @@ class HttpScanHandler(
     }.toMap
   }
 
-  def getCoinRules(
-      response: v0.ScanResource.GetCoinRulesResponse.type
+  def getAmuletRules(
+      response: v0.ScanResource.GetAmuletRulesResponse.type
   )(
-      body: com.daml.network.http.v0.definitions.GetCoinRulesRequest
-  )(extracted: TraceContext): Future[v0.ScanResource.GetCoinRulesResponse] = {
+      body: com.daml.network.http.v0.definitions.GetAmuletRulesRequest
+  )(extracted: TraceContext): Future[v0.ScanResource.GetAmuletRulesResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getCoinRulesWithState") { _ => _ =>
+    withSpan(s"$workflowId.getAmuletRulesWithState") { _ => _ =>
       for {
-        coinRulesO <- store.lookupCoinRules()
-        coinRules = coinRulesO getOrElse {
-          throw new NoSuchElementException("found no coinrules instance")
+        amuletRulesO <- store.lookupAmuletRules()
+        amuletRules = amuletRulesO getOrElse {
+          throw new NoSuchElementException("found no amuletrules instance")
         }
       } yield {
         val response = MaybeCachedContractWithState(
-          body.cachedCoinRulesContractId match {
-            case Some(cachedContractId) if cachedContractId == coinRules.contractId.contractId =>
+          body.cachedAmuletRulesContractId match {
+            case Some(cachedContractId) if cachedContractId == amuletRules.contractId.contractId =>
               logger.debug(
-                show"Not sending ${PrettyContractId(CoinRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
+                show"Not sending ${PrettyContractId(AmuletRules.TEMPLATE_ID, cachedContractId)}, as it is cached by the client."
               )
               None
-            case Some(_) // else: coin rules are cached but outdated.
+            case Some(_) // else: amulet rules are cached but outdated.
                 | None =>
-              Some(coinRules.contract.toHttp)
+              Some(amuletRules.contract.toHttp)
           },
-          domainId = coinRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
+          domainId = amuletRules.state.fold(domain => Some(domain.toProtoPrimitive), None),
         )
-        definitions.GetCoinRulesResponse(
-          coinRulesUpdate = response
+        definitions.GetAmuletRulesResponse(
+          amuletRulesUpdate = response
         )
       }
     }
@@ -274,21 +274,21 @@ class HttpScanHandler(
     }
   }
 
-  def getTotalCoinBalance(
-      response: v0.ScanResource.GetTotalCoinBalanceResponse.type
+  def getTotalAmuletBalance(
+      response: v0.ScanResource.GetTotalAmuletBalanceResponse.type
   )(
       asOfEndOfRound: Long
-  )(extracted: TraceContext): Future[v0.ScanResource.GetTotalCoinBalanceResponse] = {
+  )(extracted: TraceContext): Future[v0.ScanResource.GetTotalAmuletBalanceResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getTotalCoinBalance") { _ => _ =>
+    withSpan(s"$workflowId.getTotalAmuletBalance") { _ => _ =>
       for {
         total <- store
-          .getTotalCoinBalance(asOfEndOfRound)
+          .getTotalAmuletBalance(asOfEndOfRound)
           .transform(
             HttpErrorHandler.onGrpcNotFound(s"Data for round ${asOfEndOfRound} not yet computed")
           )
       } yield {
-        definitions.GetTotalCoinBalanceResponse(
+        definitions.GetTotalAmuletBalanceResponse(
           Codec.encode(total)
         )
       }
@@ -313,18 +313,20 @@ class HttpScanHandler(
     }
   }
 
-  def getCoinConfigForRound(
-      response: v0.ScanResource.GetCoinConfigForRoundResponse.type
-  )(round: Long)(extracted: TraceContext): Future[v0.ScanResource.GetCoinConfigForRoundResponse] = {
+  def getAmuletConfigForRound(
+      response: v0.ScanResource.GetAmuletConfigForRoundResponse.type
+  )(
+      round: Long
+  )(extracted: TraceContext): Future[v0.ScanResource.GetAmuletConfigForRoundResponse] = {
     implicit val tc = extracted
-    withSpan(s"$workflowId.getCoinConfigForRound") { _ => _ =>
+    withSpan(s"$workflowId.getAmuletConfigForRound") { _ => _ =>
       store
-        .getCoinConfigForRound(round)
+        .getAmuletConfigForRound(round)
         .map(cfg => {
           val transferFee = cfg.transferFee.getOrElse(throw new RuntimeException("No transfer fee"))
-          v0.ScanResource.GetCoinConfigForRoundResponse.OK(
-            definitions.GetCoinConfigForRoundResponse(
-              Codec.encode(cfg.coinCreateFee),
+          v0.ScanResource.GetAmuletConfigForRoundResponse.OK(
+            definitions.GetAmuletConfigForRoundResponse(
+              Codec.encode(cfg.amuletCreateFee),
               Codec.encode(cfg.holdingFee),
               Codec.encode(cfg.lockHolderFee),
               definitions.SteppedRate(
@@ -613,7 +615,7 @@ class HttpScanHandler(
             tap = txItem.tap,
             transfer = txItem.transfer,
             round = txItem.round,
-            coinPrice = txItem.coinPrice,
+            amuletPrice = txItem.amuletPrice,
           )
         }.toVector
       )
@@ -793,7 +795,7 @@ class HttpScanHandler(
     withSpan(s"$workflowId.getAcsSnapshot") { _ => _ =>
       val partyId = PartyId.tryFromProtoPrimitive(party)
       for {
-        // The SVC party is a stakeholder on all "important" contracts, in particular, all coin holdings and CNS entries
+        // The SVC party is a stakeholder on all "important" contracts, in particular, all amulet holdings and CNS entries
         // so filtering an SVC snapshot to contracts another party is also a stakeholder on provides a sufficient snapshot
         // for that party to recover.
         // It does however lose third-party application data that the SVC party is not a stakeholder on. Supporting that requires
@@ -899,7 +901,7 @@ class HttpScanHandler(
                 Codec.encode(roundTotal.cumulativeChangeToInitialAmountAsOfRoundZero),
               cumulativeChangeToHoldingFeesRate =
                 Codec.encode(roundTotal.cumulativeChangeToHoldingFeesRate),
-              totalCoinBalance = Codec.encode(roundTotal.totalCoinBalance),
+              totalAmuletBalance = Codec.encode(roundTotal.totalAmuletBalance),
             )
           }
         } yield v0.ScanResource.ListRoundTotalsResponse.OK(

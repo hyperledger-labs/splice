@@ -1,8 +1,8 @@
 package com.daml.network.store.db
 
 import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  coinrules as coinrulesCodegen,
+  amulet as amuletCodegen,
+  amuletrules as amuletrulesCodegen,
   round as roundCodegen,
 }
 import com.daml.network.codegen.java.cc.types.Round
@@ -569,13 +569,13 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             payData,
             time(1),
           )
-          lockedCoinCid = new coinCodegen.LockedCoin.ContractId(nextCid())
+          lockedAmuletCid = new amuletCodegen.LockedAmulet.ContractId(nextCid())
           (subscription2, state2) = subscriptionInPaymentState(
             user1,
             provider1,
             payData,
             time(1),
-            lockedCoinCid,
+            lockedAmuletCid,
             1L,
           )
           _ <- dummyDomain.createMulti(subscription1, createdEventSignatories = Seq(user1))(
@@ -606,12 +606,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             payData,
             time(1),
           )
-          lockedCoinCid = new coinCodegen.LockedCoin.ContractId(nextCid())
+          lockedAmuletCid = new amuletCodegen.LockedAmulet.ContractId(nextCid())
           state2 = subscriptionPaymentState(
             subscription1,
             payData,
             time(1),
-            lockedCoinCid,
+            lockedAmuletCid,
             1,
           )
           _ <- dummyDomain.create(subscription1, createdEventSignatories = Seq(user1))(
@@ -710,7 +710,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
     }
 
-    "listSortedCoinsAndQuantity" should {
+    "listSortedAmuletsAndQuantity" should {
 
       "return correct results" in {
         for {
@@ -722,16 +722,16 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         } yield {
           def top3At(round: Long): Seq[Double] =
             store
-              .listSortedCoinsAndQuantity(round, PageLimit.tryCreate(3))
+              .listSortedAmuletsAndQuantity(round, PageLimit.tryCreate(3))
               .futureValue
               .map(_._1.toDouble)
 
-          // Values of the 4 coins by time:
+          // Values of the 4 amulets by time:
           // 11 10 09 08 07 06 05 04 03 02
           //    12 10 08 06 04 02 00 00 00
           //       13 09 05 01 00 00 00 00
           //          10 09 08 07 06 05 04
-          // Note: need to start at round 4, as listSortedCoinsAndQuantity() does not filter out coins
+          // Note: need to start at round 4, as listSortedAmuletsAndQuantity() does not filter out amulets
           // created after the given round
           top3At(4L) should contain theSameElementsAs Seq(10.0, 9.0, 8.0)
           top3At(5L) should contain theSameElementsAs Seq(9.0, 7.0, 6.0)
@@ -1068,7 +1068,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       subscription: Contract[subsCodegen.Subscription.ContractId, subsCodegen.Subscription],
       payData: subsCodegen.SubscriptionPayData,
       thisPaymentDueAt: CantonTimestamp,
-      lockedCoinCid: coinCodegen.LockedCoin.ContractId,
+      lockedAmuletCid: amuletCodegen.LockedAmulet.ContractId,
       round: Long,
   ) = {
     val templateId = subsCodegen.SubscriptionPayment.TEMPLATE_ID
@@ -1078,9 +1078,9 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       payData,
       thisPaymentDueAt.toInstant,
       // Note: this targetAmount is only correct for CC payments.
-      // USD payments would need to apply coin price, but we don't care about the exact value.
+      // USD payments would need to apply amulet price, but we don't care about the exact value.
       payData.paymentAmount.amount,
-      lockedCoinCid,
+      lockedAmuletCid,
       new Round(round),
       subscription.payload.reference,
     )
@@ -1112,7 +1112,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       receiver: PartyId,
       payData: subsCodegen.SubscriptionPayData,
       thisPaymentDueAt: CantonTimestamp,
-      lockedCoinCid: coinCodegen.LockedCoin.ContractId,
+      lockedAmuletCid: amuletCodegen.LockedAmulet.ContractId,
       round: Long,
   ) = {
     val reference = new subsCodegen.SubscriptionRequest.ContractId(nextCid())
@@ -1121,7 +1121,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       subscriptionContract,
       payData,
       thisPaymentDueAt,
-      lockedCoinCid,
+      lockedAmuletCid,
       round,
     )
     (subscriptionContract, paymentStateContract)
@@ -1202,43 +1202,43 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  /** A CoinRules_Mint exercise event with one child Coin create event */
+  /** A AmuletRules_Mint exercise event with one child Amulet create event */
   private def mintTransaction(
       receiver: PartyId,
       amount: Double,
       round: Long,
       ratePerRound: Double,
-      coinPrice: Double = 1.0,
+      amuletPrice: Double = 1.0,
   )(
       offset: String
   ) = {
-    val coinContract = coin(receiver, amount, round, ratePerRound)
+    val amuletContract = amulet(receiver, amount, round, ratePerRound)
 
     // This is a non-consuming choice, the store should not mind that some of the referenced contracts don't exist
-    val coinRulesCid = nextCid()
+    val amuletRulesCid = nextCid()
     val openMiningRoundCid = nextCid()
 
     mkExerciseTx(
       offset,
       exercisedEvent(
-        coinRulesCid,
-        coinrulesCodegen.CoinRules.TEMPLATE_ID,
+        amuletRulesCid,
+        amuletrulesCodegen.AmuletRules.TEMPLATE_ID,
         None,
-        coinrulesCodegen.CoinRules.CHOICE_CoinRules_Mint.name,
+        amuletrulesCodegen.AmuletRules.CHOICE_AmuletRules_Mint.name,
         consuming = false,
-        new coinrulesCodegen.CoinRules_Mint(
+        new amuletrulesCodegen.AmuletRules_Mint(
           receiver.toProtoPrimitive,
-          coinContract.payload.amount.initialAmount,
+          amuletContract.payload.amount.initialAmount,
           new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),
         ).toValue,
-        new coinCodegen.CoinCreateSummary[coinCodegen.Coin.ContractId](
-          coinContract.contractId,
-          new java.math.BigDecimal(coinPrice),
+        new amuletCodegen.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](
+          amuletContract.contractId,
+          new java.math.BigDecimal(amuletPrice),
           new Round(round),
         )
           .toValue(_.toValue),
       ),
-      Seq(toCreatedEvent(coinContract, Seq(receiver))),
+      Seq(toCreatedEvent(amuletContract, Seq(receiver))),
       dummyDomain,
     )
   }
@@ -1417,7 +1417,7 @@ class DbUserWalletStoreTest
   ): Future[DbUserWalletStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.cantonCoin.all ++
+        DarResources.cantonAmulet.all ++
           DarResources.wallet.all ++
           DarResources.cantonNameService.all
       )

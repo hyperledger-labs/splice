@@ -1,8 +1,8 @@
 import { ScanClientProvider, useScanClient } from './ScanClientContext';
 import useActivity from './useActivity';
-import useCoinPrice, { useCoinPriceFromOpenRounds } from './useCoinPrice';
+import useAmuletPrice, { useAmuletPriceFromOpenRounds } from './useAmuletPrice';
+import useGetAmuletRules from './useGetAmuletRules';
 import useGetCnsRules from './useGetCnsRules';
-import useGetCoinRules from './useGetCoinRules';
 import useGetRoundOfLatestData from './useGetRoundOfLatestData';
 import useGetSvcPartyId from './useGetSvcPartyId';
 import useGetTopValidatorsByPurchasedTraffic from './useGetTopValidatorsByPurchasedTraffic';
@@ -19,15 +19,15 @@ import useLookupFeaturedAppRight, {
   useLookupFeaturedAppRightBuilder,
 } from './useLookupFeaturedAppRight';
 import useTopAppProviders from './useTopAppProviders';
-import useTotalCoinBalance from './useTotalCoinBalance';
+import useTotalAmuletBalance from './useTotalAmuletBalance';
 import useTotalRewards from './useTotalRewards';
 
 export {
   useScanClient,
   ScanClientProvider,
-  useCoinPrice,
-  useCoinPriceFromOpenRounds,
-  useGetCoinRules,
+  useAmuletPrice,
+  useAmuletPriceFromOpenRounds,
+  useGetAmuletRules,
   useGetCnsRules,
   useGetRoundOfLatestData,
   useGetSvcPartyId,
@@ -38,7 +38,7 @@ export {
   useLookupFeaturedAppRightBuilder,
   useActivity,
   useTopAppProviders,
-  useTotalCoinBalance,
+  useTotalAmuletBalance,
   useTotalRewards,
   useListCnsEntries,
   useListCnsEntriesFromResponse,

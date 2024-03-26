@@ -5,15 +5,15 @@ import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin.CoinCreateSummary
-import com.daml.network.codegen.java.cc.coinrules.InvalidTransferReason
-import com.daml.network.codegen.java.cc.coinrules.invalidtransferreason.{
+import com.daml.network.codegen.java.cc.amulet.AmuletCreateSummary
+import com.daml.network.codegen.java.cc.amuletrules.InvalidTransferReason
+import com.daml.network.codegen.java.cc.amuletrules.invalidtransferreason.{
   ITR_InsufficientFunds,
   ITR_InsufficientTopupAmount,
   ITR_Other,
   ITR_UnknownDomain,
 }
-import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.{
   CO_AppPayment,
   CO_BuyMemberTraffic,
   CO_CompleteAcceptedTransfer,
@@ -22,10 +22,10 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperation.{
   CO_SubscriptionAcceptAndMakeInitialPayment,
   CO_SubscriptionMakePayment,
   CO_Tap,
-  ExtCoinOperation,
+  ExtAmuletOperation,
 }
-import com.daml.network.codegen.java.cn.wallet.install.{CoinOperation, CoinOperationOutcome}
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
+import com.daml.network.codegen.java.cn.wallet.install.{AmuletOperation, AmuletOperationOutcome}
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.{
   COO_Error,
   COO_MergeTransferInputs,
 }
@@ -36,13 +36,13 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.history.{
   CnsRules_CollectEntryRenewalPayment,
   CnsRules_CollectInitialEntryPayment,
-  CoinArchive,
-  CoinCreate,
-  CoinExpire,
-  CoinRules_BuyMemberTraffic,
-  LockedCoinExpireCoin,
-  LockedCoinOwnerExpireLock,
-  LockedCoinUnlock,
+  AmuletArchive,
+  AmuletCreate,
+  AmuletExpire,
+  AmuletRules_BuyMemberTraffic,
+  LockedAmuletExpireAmulet,
+  LockedAmuletOwnerExpireLock,
+  LockedAmuletUnlock,
   Mint,
   Tap,
   Transfer,
@@ -87,20 +87,20 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           // We are inspecting the WalletAppInstall_ExecuteBatch event in order to distinguish the wallet automation
-          // merging coins and collecting rewards from manually triggered transfers where the user sends coin to themselves.
+          // merging amulets and collecting rewards from manually triggered transfers where the user sends amulet to themselves.
           case WalletAppInstall_ExecuteBatch(node) =>
             val operations = node.argument.value.operations.asScala
             val outcomes = node.result.value.outcomes.asScala
             assert(
               operations.size == outcomes.size,
-              "WalletAppInstall_ExecuteBatch should return exactly one CoinOperationOutcome for each CoinOperation",
+              "WalletAppInstall_ExecuteBatch should return exactly one AmuletOperationOutcome for each AmuletOperation",
             )
 
-            // Unfortunately there is not a 1:1 correspondence between CoinOperationOutcome and child events in the
+            // Unfortunately there is not a 1:1 correspondence between AmuletOperationOutcome and child events in the
             // transaction tree:
             // - COO_Error does not produce any child event
             // - COO_BuyMemberTraffic can produce up to 2 child events of interest
-            //   - tapping of coins to pay for extra traffic (only on DevNet)
+            //   - tapping of amulets to pay for extra traffic (only on DevNet)
             //   - the actual purchase of extra traffic
             // - all other outcomes produce exactly one child exercise event
             val outputsWithChildEvent =
@@ -110,8 +110,8 @@ class UserWalletTxLogParser(
                   (
                     Queue.empty[
                       (
-                          CoinOperation,
-                          CoinOperationOutcome,
+                          AmuletOperation,
+                          AmuletOperationOutcome,
                           Either[InvalidTransferReason, Seq[ExercisedEvent]],
                       )
                     ],
@@ -129,34 +129,34 @@ class UserWalletTxLogParser(
                         )
                       case (op: CO_BuyMemberTraffic, outcome) =>
                         // Special handling for CO_BuyMemberTraffic to associate multiple events with it.
-                        // Since we auto-tap coins on DevNet, there will be 6 associated events.
+                        // Since we auto-tap amulets on DevNet, there will be 6 associated events.
                         // - Archive (of the old ValidatorTopUpState)
                         // - Create (of the new ValidatorTopUpState)
-                        // - CoinRules_Fetch
+                        // - AmuletRules_Fetch
                         // - OpenMiningRound_Fetch
-                        // - CoinRules_DevNet_Tap
-                        // - CoinRules_BuyMemberTraffic
+                        // - AmuletRules_DevNet_Tap
+                        // - AmuletRules_BuyMemberTraffic
                         // The first 4 of these are related to identifying the amount of CC to tap to cover
                         // the purchase and then actually tapping it.
                         // On non-DevNet, there will be only 4 associated events.
                         // - Archive (of the old ValidatorTopUpState)
                         // - Create (of the new ValidatorTopUpState)
-                        // - CoinRules_Fetch
-                        // - CoinRules_BuyMemberTraffic
+                        // - AmuletRules_Fetch
+                        // - AmuletRules_BuyMemberTraffic
                         val (childEventCount, expectedChildExercisedEvents) = tree.getEventsById
                           // assume non-DevNet if the fourth event is the BuyMemberTraffic choice
                           .get(exercised.getChildEventIds.get(nextChildEventId + 3)) match {
-                          case e: ExercisedEvent if e.getChoice == "CoinRules_BuyMemberTraffic" =>
-                            (4, Seq("Archive", "CoinRules_Fetch", "CoinRules_BuyMemberTraffic"))
+                          case e: ExercisedEvent if e.getChoice == "AmuletRules_BuyMemberTraffic" =>
+                            (4, Seq("Archive", "AmuletRules_Fetch", "AmuletRules_BuyMemberTraffic"))
                           case _ =>
                             (
                               6,
                               Seq(
                                 "Archive",
-                                "CoinRules_Fetch",
+                                "AmuletRules_Fetch",
                                 "OpenMiningRound_Fetch",
-                                "CoinRules_DevNet_Tap",
-                                "CoinRules_BuyMemberTraffic",
+                                "AmuletRules_DevNet_Tap",
+                                "AmuletRules_BuyMemberTraffic",
                               ),
                             )
                         }
@@ -180,7 +180,7 @@ class UserWalletTxLogParser(
                                 .map(_.getChoice)}"
                           )
                         val eventsOfInterest = childExercisedEvents.filter(e =>
-                          Seq("CoinRules_BuyMemberTraffic", "CoinRules_DevNet_Tap")
+                          Seq("AmuletRules_BuyMemberTraffic", "AmuletRules_DevNet_Tap")
                             .contains(e.getChoice)
                         )
                         (
@@ -240,14 +240,14 @@ class UserWalletTxLogParser(
                     // The errors below should not produce notifications
                     case _: CO_AppPayment | _: CO_SubscriptionAcceptAndMakeInitialPayment |
                         _: CO_MergeTransferInputs | _: CO_BuyMemberTraffic |
-                        _: CO_CompleteBuyTrafficRequest | _: CO_Tap | _: ExtCoinOperation =>
+                        _: CO_CompleteBuyTrafficRequest | _: CO_Tap | _: ExtAmuletOperation =>
                       State.empty
                     case _ => throw new RuntimeException(s"Invalid operation $op")
                   }
                 } else {
                   State.empty
                 })
-              // Tag wallet automation (coin merging, reward collection) as such, to distinguish from
+              // Tag wallet automation (amulet merging, reward collection) as such, to distinguish from
               // explicit self-transfers
               case ((_, _: COO_MergeTransferInputs, Right(Seq(childEvent))), _) =>
                 defer(parseTree(tree, childEvent, domainId))
@@ -396,7 +396,7 @@ class UserWalletTxLogParser(
           // App payments
           // ------------------------------------------------------------------
 
-          // Accepting app payment = locking a coin for the provider
+          // Accepting app payment = locking a amulet for the provider
           case AppPaymentRequest_Accept(_) =>
             defer {
               parseTrees(
@@ -406,7 +406,7 @@ class UserWalletTxLogParser(
               )
             }.map(_.setTransferSubtype(TransferTransactionSubtype.AppPaymentAccepted))
 
-          // Collecting app payments = unlocking a locked coin + transferring the coin to the provider
+          // Collecting app payments = unlocking a locked amulet + transferring the amulet to the provider
           case AcceptedAppPayment_Collect(_) =>
             defer {
               parseTrees(
@@ -418,7 +418,7 @@ class UserWalletTxLogParser(
 
           case AcceptedAppPayment_Reject(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value,
@@ -428,7 +428,7 @@ class UserWalletTxLogParser(
 
           case AcceptedAppPayment_Expire(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value,
@@ -440,7 +440,7 @@ class UserWalletTxLogParser(
           // Subscriptions
           // ------------------------------------------------------------------
 
-          // Accepting subscription = locking a coin for the provider
+          // Accepting subscription = locking a amulet for the provider
           case SubscriptionRequest_AcceptAndMakePayment(_) =>
             defer {
               parseTrees(
@@ -452,7 +452,7 @@ class UserWalletTxLogParser(
               _.setTransferSubtype(TransferTransactionSubtype.SubscriptionInitialPaymentAccepted)
             )
 
-          // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
+          // Collecting subscription payments = unlocking a locked amulet + transferring the amulet to the provider
           case SubscriptionInitialPayment_Collect(_) =>
             defer {
               parseTrees(
@@ -468,7 +468,7 @@ class UserWalletTxLogParser(
 
           case SubscriptionInitialPayment_Reject(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value,
@@ -478,7 +478,7 @@ class UserWalletTxLogParser(
 
           case SubscriptionInitialPayment_Expire(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value,
@@ -506,7 +506,7 @@ class UserWalletTxLogParser(
               )
             )
 
-          // Collecting subscription payments = unlocking a locked coin + transferring the coin to the provider
+          // Collecting subscription payments = unlocking a locked amulet + transferring the amulet to the provider
           case SubscriptionPayment_Collect(_) =>
             defer {
               parseTrees(
@@ -522,7 +522,7 @@ class UserWalletTxLogParser(
 
           case SubscriptionPayment_Reject(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value._2,
@@ -532,7 +532,7 @@ class UserWalletTxLogParser(
 
           case SubscriptionPayment_Expire(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value._2,
@@ -549,12 +549,12 @@ class UserWalletTxLogParser(
             now(State.fromTransfer(tree, exercised, node, TransferTransactionSubtype.Transfer))
 
           // ------------------------------------------------------------------
-          // Minting new coins
+          // Minting new amulets
           // ------------------------------------------------------------------
 
           case Tap(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value,
@@ -564,7 +564,7 @@ class UserWalletTxLogParser(
 
           case Mint(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value,
@@ -573,50 +573,50 @@ class UserWalletTxLogParser(
             )
 
           // ------------------------------------------------------------------
-          // Unlocking locked coins
+          // Unlocking locked amulets
           // ------------------------------------------------------------------
 
-          case LockedCoinUnlock(node) =>
+          case LockedAmuletUnlock(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value,
-                BalanceChangeTransactionSubtype.LockedCoinUnlocked,
+                BalanceChangeTransactionSubtype.LockedAmuletUnlocked,
               )
             )
 
-          case LockedCoinOwnerExpireLock(node) =>
+          case LockedAmuletOwnerExpireLock(node) =>
             now(
-              State.fromCoinCreateSummary(
+              State.fromAmuletCreateSummary(
                 tree,
                 root,
                 node.result.value,
-                BalanceChangeTransactionSubtype.LockedCoinOwnerExpired,
+                BalanceChangeTransactionSubtype.LockedAmuletOwnerExpired,
               )
             )
 
           // ------------------------------------------------------------------
-          // Removing coins with zero value
+          // Removing amulets with zero value
           // ------------------------------------------------------------------
 
-          case CoinExpire(node) =>
+          case AmuletExpire(node) =>
             now(
-              State.fromCoinExpire(
+              State.fromAmuletExpire(
                 tree,
                 exercised,
                 node.result.value.owner,
-                BalanceChangeTransactionSubtype.CoinExpired,
+                BalanceChangeTransactionSubtype.AmuletExpired,
               )
             )
 
-          case LockedCoinExpireCoin(node) =>
+          case LockedAmuletExpireAmulet(node) =>
             now(
-              State.fromCoinExpire(
+              State.fromAmuletExpire(
                 tree,
                 exercised,
                 node.result.value.owner,
-                BalanceChangeTransactionSubtype.LockedCoinExpired,
+                BalanceChangeTransactionSubtype.LockedAmuletExpired,
               )
             )
 
@@ -624,7 +624,7 @@ class UserWalletTxLogParser(
           // Buying domain traffic
           // ------------------------------------------------------------------
 
-          case CoinRules_BuyMemberTraffic(node) =>
+          case AmuletRules_BuyMemberTraffic(node) =>
             now(State.fromBuyMemberTraffic(node, tree, exercised))
 
           // ------------------------------------------------------------------
@@ -652,10 +652,10 @@ class UserWalletTxLogParser(
           // ------------------------------------------------------------------
 
           // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
-          // all possible exercise events that archive coins.
-          case CoinArchive(_) =>
+          // all possible exercise events that archive amulets.
+          case AmuletArchive(_) =>
             throw new RuntimeException(
-              s"Unexpected coin archive event for coin ${exercised.getContractId} in transaction ${tree.getUpdateId}"
+              s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
             )
 
           case _ =>
@@ -665,10 +665,10 @@ class UserWalletTxLogParser(
       case created: CreatedEvent =>
         created match {
           // The parser should never reach this leaf event, it should instead make sure to exhaustively match on
-          // all possible exercise events that produce new coins.
-          case CoinCreate(coin) =>
+          // all possible exercise events that produce new amulets.
+          case AmuletCreate(amulet) =>
             throw new RuntimeException(
-              s"Unexpected coin create event for coin ${coin.contractId.contractId} in transaction ${tree.getUpdateId}"
+              s"Unexpected amulet create event for amulet ${amulet.contractId.contractId} in transaction ${tree.getUpdateId}"
             )
 
           case _ =>
@@ -693,9 +693,9 @@ class UserWalletTxLogParser(
   )(implicit
       tc: TraceContext
   ): Seq[(DomainId, Option[ContractId[?]], TxLogEntry)] = {
-    // Note: entries may appear in a random order, but it's unlikely that a user has many coins,
-    // due to the wallet automation automatically merging coins.
-    acs.collect(ac => ac.createdEvent match { case CoinCreate(c) => State.fromAcsCoin(ac, c) })
+    // Note: entries may appear in a random order, but it's unlikely that a user has many amulets,
+    // due to the wallet automation automatically merging amulets.
+    acs.collect(ac => ac.createdEvent match { case AmuletCreate(c) => State.fromAcsAmulet(ac, c) })
   }
 
   override def tryParse(tx: TransactionTree, domainId: DomainId)(implicit
@@ -804,7 +804,7 @@ object UserWalletTxLogParser {
     /** Given a parsing state where the parser has encountered exactly one transfer and zero or more balance changes,
       * returns a parsing state where all the balance changes have been merged into the transfer event.
       *
-      * This is useful for app payments where the payment collection first unlocks locked coins and immediately uses
+      * This is useful for app payments where the payment collection first unlocks locked amulets and immediately uses
       * them for a transfer. In this case, we only want to display one balance change for the user.
       */
     def mergeBalanceChangesIntoTransfer(
@@ -860,7 +860,7 @@ object UserWalletTxLogParser {
       override def combine(a: State, b: State) =
         a.appended(b)
     }
-    def fromCoinExpire(
+    def fromAmuletExpire(
         tx: TransactionTree,
         event: TreeEvent,
         owner: String,
@@ -872,7 +872,7 @@ object UserWalletTxLogParser {
         date = Some(tx.getEffectiveAt),
         amount = BigDecimal(0),
         receiver = owner,
-        coinPrice = BigDecimal(0),
+        amuletPrice = BigDecimal(0),
       )
       State(
         entries = immutable.Queue(newEntry)
@@ -951,19 +951,19 @@ object UserWalletTxLogParser {
         node: ExerciseNode[?, AcceptedTransferOffer_Complete.Res],
     ): State = {
       val trackingInfo = node.result.value._1._2
-      val receiverCoinContractId = node.result.value._1._1.createdCoins.asScala.toList match {
-        case (coin: cc.coinrules.createdcoin.TransferResultCoin) :: Nil =>
-          coin.contractIdValue.contractId
+      val receiverAmuletContractId = node.result.value._1._1.createdAmulets.asScala.toList match {
+        case (amulet: cc.amuletrules.createdamulet.TransferResultAmulet) :: Nil =>
+          amulet.contractIdValue.contractId
         case x =>
           throw new RuntimeException(
-            s"Expected createdCoins to contain a single TransferResultCoin, but was $x"
+            s"Expected createdAmulets to contain a single TransferResultAmulet, but was $x"
           )
       }
       fromTransferOfferOperation(
         trackingInfo.trackingId,
         TransferOfferTxLogEntry.Status.Completed(
           TransferOfferStatusCompleted(
-            receiverCoinContractId,
+            receiverAmuletContractId,
             tx.getUpdateId,
           )
         ),
@@ -1004,7 +1004,7 @@ object UserWalletTxLogParser {
           sender = Some(sender),
           receivers = receivers,
           senderHoldingFees = node.result.value.summary.holdingFees,
-          coinPrice = node.result.value.summary.coinPrice,
+          amuletPrice = node.result.value.summary.amuletPrice,
           appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
           validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
         )
@@ -1028,7 +1028,7 @@ object UserWalletTxLogParser {
             date = Some(tx.getEffectiveAt),
             amount = node.result.value.summary.inputSvRewardAmount,
             receiver = sender.party,
-            coinPrice = node.result.value.summary.coinPrice,
+            amuletPrice = node.result.value.summary.amuletPrice,
           )
         }
 
@@ -1108,7 +1108,7 @@ object UserWalletTxLogParser {
     }
 
     def fromBuyMemberTraffic(
-        node: ExerciseNode[CoinRules_BuyMemberTraffic.Arg, CoinRules_BuyMemberTraffic.Res],
+        node: ExerciseNode[AmuletRules_BuyMemberTraffic.Arg, AmuletRules_BuyMemberTraffic.Res],
         tx: TransactionTree,
         event: ExercisedEvent,
     ): State = {
@@ -1118,7 +1118,7 @@ object UserWalletTxLogParser {
         case party if party != sender => PartyAndAmount(party, BigDecimal(0.0))
       }
       val summary = node.result.value.summary
-      val netSenderInput = summary.inputCoinAmount - summary.holdingFees
+      val netSenderInput = summary.inputAmuletAmount - summary.holdingFees
       val senderBalanceChange = BigDecimal(summary.senderChangeAmount) - netSenderInput
 
       val newEntry = TransferTxLogEntry(
@@ -1129,7 +1129,7 @@ object UserWalletTxLogParser {
         sender = Some(PartyAndAmount(sender, senderBalanceChange)),
         receivers = receivers,
         senderHoldingFees = node.result.value.summary.holdingFees,
-        coinPrice = node.result.value.summary.coinPrice,
+        amuletPrice = node.result.value.summary.amuletPrice,
         appRewardsUsed = BigDecimal(node.result.value.summary.inputAppRewardAmount),
         validatorRewardsUsed = BigDecimal(node.result.value.summary.inputValidatorRewardAmount),
       )
@@ -1145,40 +1145,40 @@ object UserWalletTxLogParser {
         stateFromPaymentCollection: State,
         transactionSubtype: TransferTransactionSubtype,
     ): State = {
-      // second child event is burning of transferred coin by SVC
-      val coinArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
-      // Adjust tx log entries for SVC since the coin it receives is immediately burnt
-      val burntCoin = getCoinCreateEvent(tx, coinArchiveEvent.getContractId)
-      val stateFromBurntCoin = State.fromBurntCoin(burntCoin)
+      // second child event is burning of transferred amulet by SVC
+      val amuletArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      // Adjust tx log entries for SVC since the amulet it receives is immediately burnt
+      val burntAmulet = getAmuletCreateEvent(tx, amuletArchiveEvent.getContractId)
+      val stateFromBurntAmulet = State.fromBurntAmulet(burntAmulet)
 
       stateFromPaymentCollection
-        .appended(stateFromBurntCoin)
+        .appended(stateFromBurntAmulet)
         .mergeBalanceChangesIntoTransfer(transactionSubtype)
         .setEventId(event.getEventId)
     }
 
     /** State from a choice that returns a `MintSummary`.
-      * These are choices that create exactly one new coin in their transaction subtree.
+      * These are choices that create exactly one new amulet in their transaction subtree.
       */
-    def fromCoinCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+    def fromAmuletCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
         tx: TransactionTree,
         event: TreeEvent,
-        ccsum: CoinCreateSummary[T],
+        ccsum: AmuletCreateSummary[T],
         transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
-      // Note: CoinCreateSummary only contains the contract id of the new coin, but not the coin payload.
-      // However, the new coin is always created in the same transaction.
-      // Instead of including the coin price and owner in CoinCreateSummary,
-      // we locate the corresponding coin create event in the transaction tree.
-      val coinCid = ccsum.coin.contractId
-      val coin = getCoinCreateEvent(tx, coinCid)
+      // Note: AmuletCreateSummary only contains the contract id of the new amulet, but not the amulet payload.
+      // However, the new amulet is always created in the same transaction.
+      // Instead of including the amulet price and owner in AmuletCreateSummary,
+      // we locate the corresponding amulet create event in the transaction tree.
+      val amuletCid = ccsum.amulet.contractId
+      val amulet = getAmuletCreateEvent(tx, amuletCid)
       val newEntry = BalanceChangeTxLogEntry(
         eventId = event.getEventId,
         subtype = Some(transactionSubtype.toProto),
         date = Some(tx.getEffectiveAt),
-        amount = coin.amount.initialAmount,
-        receiver = coin.owner,
-        coinPrice = ccsum.coinPrice,
+        amount = amulet.amount.initialAmount,
+        receiver = amulet.owner,
+        amuletPrice = ccsum.amuletPrice,
       )
       State(
         entries = immutable.Queue(newEntry)
@@ -1202,9 +1202,9 @@ object UserWalletTxLogParser {
       )
     }
 
-    def fromAcsCoin(
+    def fromAcsAmulet(
         ac: ActiveContract,
-        activeCoin: CoinCreate.ContractType,
+        activeAmulet: AmuletCreate.ContractType,
     ): (DomainId, Option[ContractId[?]], TxLogEntry) = {
       (
         ac.domainId,
@@ -1212,56 +1212,56 @@ object UserWalletTxLogParser {
         BalanceChangeTxLogEntry(
           eventId = ac.createdEvent.getEventId,
           subtype = Some(BalanceChangeTransactionSubtype.Mint.toProto),
-          receiver = activeCoin.payload.owner,
-          amount = activeCoin.payload.amount.initialAmount,
-          // We know the round in which the coin was created (activeCoin.payload.amount.createdAt),
-          // but we don't know when that round was open (let alone when exactly the coin was created),
-          // and what the coin price was at that time.
+          receiver = activeAmulet.payload.owner,
+          amount = activeAmulet.payload.amount.initialAmount,
+          // We know the round in which the amulet was created (activeAmulet.payload.amount.createdAt),
+          // but we don't know when that round was open (let alone when exactly the amulet was created),
+          // and what the amulet price was at that time.
           date = Some(Instant.EPOCH),
-          coinPrice = BigDecimal(1),
+          amuletPrice = BigDecimal(1),
         ),
       )
     }
 
-    private def fromBurntCoin(
-        burntCoin: CoinCreate.T
+    private def fromBurntAmulet(
+        burntAmulet: AmuletCreate.T
     ) = State(entries =
       immutable.Queue(
         BalanceChangeTxLogEntry(
-          receiver = burntCoin.owner,
-          amount = -burntCoin.amount.initialAmount,
+          receiver = burntAmulet.owner,
+          amount = -burntAmulet.amount.initialAmount,
           // all values below don't matter - they will be removed by mergeBalanceChangesIntoTransfer
           eventId = "",
           subtype = Some(BalanceChangeTransactionSubtype.Tap.toProto),
           date = Some(Instant.now()),
-          coinPrice = BigDecimal(0),
+          amuletPrice = BigDecimal(0),
         )
       )
     )
 
-    private def getCoinCreateEvent(tx: TransactionTree, cid: String) = {
+    private def getAmuletCreateEvent(tx: TransactionTree, cid: String) = {
       tx.getEventsById.asScala
         .collectFirst {
           case (_, c: CreatedEvent) if c.getContractId == cid =>
-            CoinCreate.unapply(c).map(_.payload)
+            AmuletCreate.unapply(c).map(_.payload)
         }
     }.flatten.getOrElse(
       throw new RuntimeException(
-        s"The coin contract $cid was not found in transaction ${tx.getUpdateId}"
+        s"The amulet contract $cid was not found in transaction ${tx.getUpdateId}"
       )
     )
   }
 
   private def parseSender(
-      arg: cc.coinrules.CoinRules_Transfer,
-      res: cc.coinrules.TransferResult,
+      arg: cc.amuletrules.AmuletRules_Transfer,
+      res: cc.amuletrules.TransferResult,
   ): PartyAndAmount = {
     val sender = arg.transfer.sender
 
-    // Input coins, excluding holding fees
-    val netInput = res.summary.inputCoinAmount - res.summary.holdingFees
+    // Input amulets, excluding holding fees
+    val netInput = res.summary.inputAmuletAmount - res.summary.holdingFees
 
-    // Output coins going back to the sender, after deducting transfer fees
+    // Output amulets going back to the sender, after deducting transfer fees
     val netOutput = parseOutputAmounts(arg, res)
       .filter(o => o.output.receiver == sender && o.output.lock.isEmpty)
       .map(o => o.output.amount - o.senderFee)
@@ -1279,8 +1279,8 @@ object UserWalletTxLogParser {
 
   /** Returns a list of receivers and their net balance changes */
   private def parseReceivers(
-      arg: cc.coinrules.CoinRules_Transfer,
-      res: cc.coinrules.TransferResult,
+      arg: cc.amuletrules.AmuletRules_Transfer,
+      res: cc.amuletrules.TransferResult,
   ): Seq[PartyAndAmount] = {
     def netBalanceChange(o: OutputWithFees) =
       if (o.output.lock.isEmpty) {
@@ -1309,14 +1309,14 @@ object UserWalletTxLogParser {
     * @param receiverFee Actual amount of fees paid by the receiver.
     */
   private final case class OutputWithFees(
-      output: cc.coinrules.TransferOutput,
+      output: cc.amuletrules.TransferOutput,
       senderFee: BigDecimal,
       receiverFee: BigDecimal,
   )
 
   private def parseOutputAmounts(
-      arg: cc.coinrules.CoinRules_Transfer,
-      res: cc.coinrules.TransferResult,
+      arg: cc.amuletrules.AmuletRules_Transfer,
+      res: cc.amuletrules.TransferResult,
   ): Seq[OutputWithFees] = {
     assert(
       arg.transfer.outputs.size() == res.summary.outputFees.size(),

@@ -21,16 +21,16 @@ class WalletPaymentFrontendIntegrationTest
     with WalletFrontendTestUtil
     with FrontendLoginUtil {
 
-  private val coinPrice = 2
+  private val amuletPrice = 2
   private val tolerance = 0.005
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(coinPrice.toDouble)
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(amuletPrice.toDouble)
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withoutAutomaticRewardsCollectionAndCoinMerging
-      .withCoinPrice(coinPrice)
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
+      .withAmuletPrice(amuletPrice)
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
 
@@ -46,7 +46,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -55,7 +55,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val description = "this will be accepted (in CC)"
@@ -127,7 +127,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -136,7 +136,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val description = "this will be accepted (in USD)"
@@ -212,7 +212,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -221,7 +221,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val description = "this will be accepted (in CC)"
@@ -296,7 +296,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -305,7 +305,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val description = "this will be accepted (in USD)"
@@ -380,7 +380,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val charlieUserParty = onboardWalletUser(charlieWalletClient, aliceValidatorBackend)
@@ -389,7 +389,7 @@ class WalletPaymentFrontendIntegrationTest
           charlieCnsExternalClient,
           charlieEntryName,
           charlieWalletClient,
-          tapAmount = 5 * coinPrice,
+          tapAmount = 5 * amuletPrice,
         )
 
         val description = "this will be accepted (in USD)"
@@ -568,8 +568,8 @@ class WalletPaymentFrontendIntegrationTest
 
   /** Matches the two parts of an app payment where the currently logged user
     * pays to `expectedPartyId` via the given app `provider`:
-    * the first entry is the sender locking a coin,
-    * the second entry is the receiver unlocking the coin and transferring to themselves
+    * the first entry is the sender locking a amulet,
+    * the second entry is the receiver unlocking the amulet and transferring to themselves
     * the part of the transfer that belongs to them.
     *
     * @see https://github.com/DACH-NY/canton-network-node/pull/3787#discussion_r1153496149
@@ -583,7 +583,7 @@ class WalletPaymentFrontendIntegrationTest
   )(implicit driver: WebDriverType, env: CNNodeTestConsoleEnvironment) = {
     inside(findAll(className("tx-row")).toList) { case paymentTx :: lockTx :: _ =>
       matchTransaction(lockTx)(
-        coinPrice,
+        amuletPrice,
         "Sent",
         "App Payment Accepted",
         Some(s"Automation ${aliceValidatorBackend.getValidatorPartyId().toProtoPrimitive}"),
@@ -591,7 +591,7 @@ class WalletPaymentFrontendIntegrationTest
       )
 
       matchTransaction(paymentTx)(
-        coinPrice,
+        amuletPrice,
         "Sent",
         "App Payment Collected",
         Some(s"${expectedCns(receiverPartyId, expectedEntryName)} $provider"),

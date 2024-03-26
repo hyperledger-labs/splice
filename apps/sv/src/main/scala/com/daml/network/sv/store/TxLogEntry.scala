@@ -3,7 +3,7 @@ package com.daml.network.sv.store
 import com.daml.network.codegen.java.cn.svcrules.ActionRequiringConfirmation
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
   ARC_CnsEntryContext,
-  ARC_CoinRules,
+  ARC_AmuletRules,
   ARC_SvcRules,
 }
 import com.daml.network.store.StoreErrors
@@ -53,8 +53,8 @@ object TxLogEntry extends StoreErrors {
     action match {
       case arcSvcRules: ARC_SvcRules =>
         arcSvcRules.svcAction.getClass.getSimpleName
-      case arcCoinRules: ARC_CoinRules =>
-        arcCoinRules.coinRulesAction.getClass.getSimpleName
+      case arcAmuletRules: ARC_AmuletRules =>
+        arcAmuletRules.amuletRulesAction.getClass.getSimpleName
       case arcCnsEntryContext: ARC_CnsEntryContext =>
         arcCnsEntryContext.cnsEntryContextAction.getClass.getSimpleName
       case _ => ""

@@ -4,7 +4,7 @@ import cats.Monoid
 import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.*
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
-  ARC_CoinRules,
+  ARC_AmuletRules,
   ARC_SvcRules,
 }
 import com.daml.network.codegen.java.cn.svcrules.{
@@ -111,8 +111,8 @@ object SvcTxLogParser {
       action match {
         case arcSvcRules: ARC_SvcRules =>
           arcSvcRules.svcAction.getClass.getSimpleName
-        case arcCoinRules: ARC_CoinRules =>
-          arcCoinRules.coinRulesAction.getClass.getSimpleName
+        case arcAmuletRules: ARC_AmuletRules =>
+          arcAmuletRules.amuletRulesAction.getClass.getSimpleName
         case _ => ""
       }
     }

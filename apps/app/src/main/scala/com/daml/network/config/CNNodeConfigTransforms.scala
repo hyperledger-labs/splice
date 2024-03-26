@@ -201,11 +201,11 @@ object CNNodeConfigTransforms {
         .withPausedTrigger[SvOffboardingSequencerTrigger]
     )
 
-  def setCoinPrice(price: BigDecimal): CNNodeConfigTransform =
+  def setAmuletPrice(price: BigDecimal): CNNodeConfigTransform =
     config =>
       Seq(
-        updateAllSvAppFoundCollectiveConfigs_(c => c.focus(_.initialCoinPrice).replace(price)),
-        updateAllSvAppConfigs_(c => c.focus(_.initialCoinPriceVote).replace(Some(price))),
+        updateAllSvAppFoundCollectiveConfigs_(c => c.focus(_.initialAmuletPrice).replace(price)),
+        updateAllSvAppConfigs_(c => c.focus(_.initialAmuletPriceVote).replace(Some(price))),
       ).foldLeft(config)((c, tf) => tf(c))
 
   def updateAllWalletAppClientConfigs_(

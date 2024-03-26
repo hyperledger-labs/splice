@@ -23,7 +23,7 @@ paths:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
-  /v0/wallet/coins:
+  /v0/wallet/amulets:
     get:
       tags: [wallet]
       x-jvm-package: wallet
@@ -530,19 +530,19 @@ components:
     ListResponse:
       type: object
       required:
-        - coins
-        - locked_coins
+        - amulets
+        - locked_amulets
       properties:
-        coins:
+        amulets:
           type: array
           items:
-            $ref: "#/components/schemas/CoinPosition"
-        locked_coins:
+            $ref: "#/components/schemas/AmuletPosition"
+        locked_amulets:
           type: array
           items:
-            $ref: "#/components/schemas/CoinPosition"
+            $ref: "#/components/schemas/AmuletPosition"
 
-    CoinPosition:
+    AmuletPosition:
       type: object
       required:
         - contract
@@ -811,7 +811,7 @@ components:
           type: string
         choice:
           type: string
-        coin_operation:
+        amulet_operation:
           type: string
 
     BaseListTransactionsResponseItem:
@@ -840,7 +840,7 @@ components:
             - sender
             - receivers
             - holding_fees
-            - coin_price
+            - amulet_price
             - app_rewards_used
             - validator_rewards_used
           properties:
@@ -854,7 +854,7 @@ components:
                 $ref: "#/components/schemas/PartyAndAmount"
             holding_fees:
               type: string
-            coin_price:
+            amulet_price:
               type: string
             app_rewards_used:
               type: string
@@ -866,13 +866,13 @@ components:
         - type: object
           required:
             - receivers
-            - coin_price
+            - amulet_price
           properties:
             receivers:
               type: array
               items:
                 $ref: "#/components/schemas/PartyAndAmount"
-            coin_price:
+            amulet_price:
               type: string
     NotificationResponseItem:
       allOf:

@@ -62,15 +62,15 @@ class HttpScanProxyHandler(
     }
   }
 
-  override def getCoinRules(respond: v0.ScanproxyResource.GetCoinRulesResponse.type)()(
+  override def getAmuletRules(respond: v0.ScanproxyResource.GetAmuletRulesResponse.type)()(
       tUser: TracedUser
-  ): Future[v0.ScanproxyResource.GetCoinRulesResponse] = {
+  ): Future[v0.ScanproxyResource.GetAmuletRulesResponse] = {
     implicit val TracedUser(_, traceContext) = tUser
-    withSpan(s"$workflowId.getCoinRules") { implicit traceContext => _ =>
+    withSpan(s"$workflowId.getAmuletRules") { implicit traceContext => _ =>
       for {
-        coinRules <- scanConnection.getCoinRulesWithState()
+        amuletRules <- scanConnection.getAmuletRulesWithState()
       } yield {
-        respond.OK(definitions.GetCoinRulesProxyResponse(coinRules.toHttp))
+        respond.OK(definitions.GetAmuletRulesProxyResponse(amuletRules.toHttp))
       }
     }
   }

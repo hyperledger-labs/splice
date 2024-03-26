@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coin.Coin
+import com.daml.network.codegen.java.cc.amulet.Amulet
 import com.daml.network.codegen.java.cn
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.ARC_SvcRules
@@ -354,23 +354,23 @@ class SvOnboardingAddlIntegrationTest
 
       val sv1UserId = sv1WalletClient.config.ledgerApiUser
       val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
-      val coinAmount = BigDecimal(42)
+      val amuletAmount = BigDecimal(42)
 
-      clue("create a coin with actAs = SVC") {
+      clue("create a amulet with actAs = SVC") {
         loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.ERROR))(
           () => {
-            val coinCid = createCoin(
+            val amuletCid = createAmulet(
               sv1ValidatorBackend.participantClientWithAdminToken,
               sv1UserId,
               sv1UserParty,
-              amount = coinAmount,
+              amount = amuletAmount,
             )
             eventually() {
               inside(
                 sv1ScanBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-                  .filterJava(Coin.COMPANION)(sv1UserParty)
-              ) { case Seq(coin) =>
-                coin.id shouldBe coinCid
+                  .filterJava(Amulet.COMPANION)(sv1UserParty)
+              ) { case Seq(amulet) =>
+                amulet.id shouldBe amuletCid
               }
             }
           },
@@ -378,7 +378,7 @@ class SvOnboardingAddlIntegrationTest
             forAll(lines)(line =>
               line.message should
                 include(
-                  "Unexpected coin create event"
+                  "Unexpected amulet create event"
                 )
             )
           },
@@ -405,13 +405,13 @@ class SvOnboardingAddlIntegrationTest
           sv2Participant.permission shouldBe ParticipantPermission.Submission
         }
       }
-      clue("create a coin again with actAs = SVC") {
+      clue("create a amulet again with actAs = SVC") {
         assertThrowsAndLogsCommandFailures(
-          createCoin(
+          createAmulet(
             sv1ValidatorBackend.participantClientWithAdminToken,
             sv1UserId,
             sv1UserParty,
-            amount = coinAmount,
+            amount = amuletAmount,
           ),
           _.errorMessage should (include(
             s"INVALID_ARGUMENT/An error occurred. Please contact the operator and inquire about the request"

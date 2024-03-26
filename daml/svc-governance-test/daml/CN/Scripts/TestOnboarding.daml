@@ -16,7 +16,7 @@ import CN.SvOnboarding
 
 import CC.Scripts.Util
 import CN.Scripts.SvcTestUtils
-import CC.CoinRules (CoinRules)
+import CC.AmuletRules (AmuletRules)
 import CC.Types
 
 
@@ -102,7 +102,7 @@ testSvOnboarding = do
   -- it gets the open mining rounds, so that it can set it's own `joinedAsOfRound` in a cheat-resistant way
   [(earliestRoundCid, earliestRound), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
 
-  [(coinRulesCid, _)] <- query @CoinRules svc
+  [(amuletRulesCid, _)] <- query @AmuletRules svc
 
   -- the rounds need to be passed in the correct order
   submitMultiMustFail [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
@@ -111,14 +111,14 @@ testSvOnboarding = do
     earliestRoundCid = latestRoundCid
     middleRoundCid
     latestRoundCid = earliestRoundCid
-    coinRulesCid
+    amuletRulesCid
   submitMultiMustFail [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
     sv = svX
     svOnboardingConfirmedCid
     earliestRoundCid
     middleRoundCid = earliestRoundCid
     latestRoundCid = earliestRoundCid
-    coinRulesCid
+    amuletRulesCid
 
   -- svX completes its own onboarding by adding itself to the SvcRules
   submitMulti [svX] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
@@ -127,7 +127,7 @@ testSvOnboarding = do
     earliestRoundCid
     middleRoundCid
     latestRoundCid
-    coinRulesCid
+    amuletRulesCid
 
   checkSvStatusReports app
 
@@ -381,7 +381,7 @@ testSvMemberReonboarding = do
 
   [(earliestRoundCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- getActiveOpenRoundsSorted app
 
-  [(coinRulesCid, _)] <- query @CoinRules svc
+  [(amuletRulesCid, _)] <- query @AmuletRules svc
   [(svcRulesCid, _)] <- query @SvcRules svc
 
   submitMulti [sv4New] [svc] $ exerciseCmd svcRulesCid SvcRules_AddConfirmedMember with
@@ -390,7 +390,7 @@ testSvMemberReonboarding = do
     earliestRoundCid
     middleRoundCid
     latestRoundCid
-    coinRulesCid
+    amuletRulesCid
 
   [(_, svcRules)] <- query @SvcRules svc
 

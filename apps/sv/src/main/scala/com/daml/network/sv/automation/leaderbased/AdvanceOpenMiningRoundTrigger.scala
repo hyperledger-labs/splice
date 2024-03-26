@@ -28,10 +28,10 @@ class AdvanceOpenMiningRoundTrigger(
       tc: TraceContext
   ): Future[Seq[AdvanceOpenMiningRoundTrigger.Task]] =
     (for {
-      rules <- OptionT(store.lookupCoinRules())
+      rules <- OptionT(store.lookupAmuletRules())
       rounds <- OptionT(store.lookupOpenMiningRoundTriple())
       if (rounds.readyToAdvanceAt.isBefore(now.toInstant))
-      // NOTE: we store the coin-rules reference in the task, as otherwise its tickDuration and the one that is
+      // NOTE: we store the amulet-rules reference in the task, as otherwise its tickDuration and the one that is
       // actually used in the choice might go out of sync
     } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds)).value.map(_.toList)
 
@@ -43,14 +43,14 @@ class AdvanceOpenMiningRoundTrigger(
     for {
       svcRules <- store.getSvcRules()
       _ = logger.debug(s"Starting work as leader ${svcRules.payload.leader} for ${task.work}")
-      coinPriceVotes <- store.listMemberCoinPriceVotes()
+      amuletPriceVotes <- store.listMemberAmuletPriceVotes()
       cmd = svcRules.exercise(
         _.exerciseSvcRules_AdvanceOpenMiningRounds(
-          task.work.coinRulesId,
+          task.work.amuletRulesId,
           rounds.oldest.contractId,
           rounds.middle.contractId,
           rounds.newest.contractId,
-          coinPriceVotes.map(_.contractId).asJava,
+          amuletPriceVotes.map(_.contractId).asJava,
         )
       )
       (offset, _) <- svTaskContext.connection
@@ -74,14 +74,14 @@ class AdvanceOpenMiningRoundTrigger(
 
     val domainId = task.work.openRounds.domain
     (for {
-      // lookupOpenMiningRoundTriple and lookupCoinRules will yield corrected
+      // lookupOpenMiningRoundTriple and lookupAmuletRules will yield corrected
       // domains on next task listing if these have been invalidated by
       // domain reassignment
       _ <- OptionT(
         store.multiDomainAcsStore
-          .lookupContractByIdOnDomain(cc.coinrules.CoinRules.COMPANION)(
+          .lookupContractByIdOnDomain(cc.amuletrules.AmuletRules.COMPANION)(
             domainId,
-            task.work.coinRulesId,
+            task.work.amuletRulesId,
           )
       )
       _ <- task.work.openRounds.toSeq.traverse(co =>
@@ -99,13 +99,13 @@ class AdvanceOpenMiningRoundTrigger(
 
 object AdvanceOpenMiningRoundTrigger {
   case class Task(
-      coinRulesId: cc.coinrules.CoinRules.ContractId,
+      amuletRulesId: cc.amuletrules.AmuletRules.ContractId,
       openRounds: SvSvcStore.OpenMiningRoundTriple,
   ) extends PrettyPrinting {
 
     import com.daml.network.util.PrettyInstances.*
 
     override def pretty: Pretty[this.type] =
-      prettyOfClass(param("coinRulesId", _.coinRulesId), param("openRounds", _.openRounds))
+      prettyOfClass(param("amuletRulesId", _.amuletRulesId), param("openRounds", _.openRounds))
   }
 }

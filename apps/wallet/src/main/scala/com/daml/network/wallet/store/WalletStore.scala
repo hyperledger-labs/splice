@@ -1,7 +1,7 @@
 package com.daml.network.wallet.store
 
 import cats.syntax.traverseFilter.*
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.store.CNNodeAppStoreWithoutHistory
 import com.daml.network.util.Contract
@@ -35,7 +35,9 @@ trait WalletStore extends CNNodeAppStoreWithoutHistory {
 
   def lookupValidatorFeaturedAppRight()(implicit
       tc: TraceContext
-  ): Future[Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]]
+  ): Future[
+    Option[Contract[amuletCodegen.FeaturedAppRight.ContractId, amuletCodegen.FeaturedAppRight]]
+  ]
 
   def listUsersWithArchivedWalletInstalls(
       usernames: Seq[String],

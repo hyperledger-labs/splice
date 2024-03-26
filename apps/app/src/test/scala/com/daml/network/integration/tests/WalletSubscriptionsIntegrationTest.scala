@@ -109,7 +109,7 @@ class WalletSubscriptionsIntegrationTest
               r.contractId
             },
         )
-        clue("Alice gets some coins") {
+        clue("Alice gets some amulets") {
           aliceWalletClient.tap(50)
         }
 
@@ -151,7 +151,7 @@ class WalletSubscriptionsIntegrationTest
                 optTimeout = None,
                 commands = collectCommand,
                 disclosedContracts = DisclosedContracts(
-                  transferContext.coinRules,
+                  transferContext.amuletRules,
                   roundContract,
                 ).toLedgerApiDisclosedContracts,
               )
@@ -196,7 +196,7 @@ class WalletSubscriptionsIntegrationTest
                 optTimeout = None,
                 commands = collectCommand2,
                 disclosedContracts = DisclosedContracts(
-                  transferContext.coinRules,
+                  transferContext.amuletRules,
                   roundContract,
                 ).toLedgerApiDisclosedContracts,
               )

@@ -12,13 +12,13 @@ class WalletFrontendIntegrationTest
     with WalletFrontendTestUtil
     with FrontendLoginUtil {
 
-  val coinPrice = 2
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(coinPrice.toDouble)
+  val amuletPrice = 2
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(amuletPrice.toDouble)
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withCoinPrice(coinPrice)
+      .withAmuletPrice(amuletPrice)
 
   "A wallet UI" should {
 
@@ -54,8 +54,8 @@ class WalletFrontendIntegrationTest
 
           val testTap = (amountUsd: BigDecimal, feeUpperBoundUsd: BigDecimal) => {
 
-            val amount = walletUsdToCoin(amountUsd)
-            val feeUpperBound = walletUsdToCoin(feeUpperBoundUsd)
+            val amount = walletUsdToAmulet(amountUsd)
+            val feeUpperBound = walletUsdToAmulet(feeUpperBoundUsd)
 
             val (ccTextBefore, usdTextBefore) = eventually() {
               val ccTextBefore = find(id("wallet-balance-cc")).value.text.trim
@@ -69,7 +69,7 @@ class WalletFrontendIntegrationTest
 
             actAndCheck(
               s"User taps $amount CC in the wallet", {
-                tapCoins(amountUsd)
+                tapAmulets(amountUsd)
               },
             )(
               "User sees the updated balance",
@@ -85,7 +85,7 @@ class WalletFrontendIntegrationTest
                 assertInRange(cc - ccBefore, (amount - feeUpperBound, amount))
                 assertInRange(
                   usd - usdBefore,
-                  ((amount - feeUpperBound) * coinPrice, amount * coinPrice),
+                  ((amount - feeUpperBound) * amuletPrice, amount * amuletPrice),
                 )
               },
             )
@@ -104,7 +104,7 @@ class WalletFrontendIntegrationTest
           onboardAndTapTest(aliceDamlUser)
       }
 
-      "allow a random user with uppercase characters to onboard themselves, then tap and list coins" in {
+      "allow a random user with uppercase characters to onboard themselves, then tap and list amulets" in {
         implicit env =>
           val damlUser = "UPPERCASE" + aliceWalletClient.config.ledgerApiUser
           onboardAndTapTest(damlUser)

@@ -12,8 +12,8 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinrules.{AppTransferContext, CoinRules}
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amuletrules.{AppTransferContext, AmuletRules}
 import com.daml.network.codegen.java.cc.round.{
   ClosedMiningRound,
   IssuingMiningRound,
@@ -83,7 +83,7 @@ object HttpScanAppClient {
     * (2) this class has no featuredAppRight contract.
     */
   case class TransferContextWithInstances(
-      coinRules: ContractWithState[CoinRules.ContractId, CoinRules],
+      amuletRules: ContractWithState[AmuletRules.ContractId, AmuletRules],
       latestOpenMiningRound: ContractWithState[
         OpenMiningRound.ContractId,
         OpenMiningRound,
@@ -95,7 +95,7 @@ object HttpScanAppClient {
     def toUnfeaturedAppTransferContext() = {
       val openMiningRound = latestOpenMiningRound
       new AppTransferContext(
-        coinRules.contractId,
+        amuletRules.contractId,
         openMiningRound.contractId,
         None.toJava,
       )
@@ -160,22 +160,22 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetCoinRules(
-      cachedCoinRules: Option[ContractWithState[CoinRules.ContractId, CoinRules]]
+  case class GetAmuletRules(
+      cachedAmuletRules: Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]
   ) extends InternalBaseCommand[
-        http.GetCoinRulesResponse,
-        ContractWithState[CoinRules.ContractId, CoinRules],
+        http.GetAmuletRulesResponse,
+        ContractWithState[AmuletRules.ContractId, AmuletRules],
       ] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCoinRulesResponse] = {
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAmuletRulesResponse] = {
       import MultiDomainAcsStore.ContractState.*
-      client.getCoinRules(
-        definitions.GetCoinRulesRequest(
-          cachedCoinRules.map(_.contractId.contractId),
-          cachedCoinRules.flatMap(_.state match {
+      client.getAmuletRules(
+        definitions.GetAmuletRulesRequest(
+          cachedAmuletRules.map(_.contractId.contractId),
+          cachedAmuletRules.flatMap(_.state match {
             case Assigned(domain) => Some(domain.toProtoPrimitive)
             case InFlight => None
           }),
@@ -185,13 +185,13 @@ object HttpScanAppClient {
     }
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.GetCoinRulesResponse.OK(response) =>
+      case http.GetAmuletRulesResponse.OK(response) =>
         for {
-          coinRules <- ContractWithState.handleMaybeCached(CoinRules.COMPANION)(
-            cachedCoinRules,
-            response.coinRulesUpdate,
+          amuletRules <- ContractWithState.handleMaybeCached(AmuletRules.COMPANION)(
+            cachedAmuletRules,
+            response.amuletRulesUpdate,
           )
-        } yield coinRules
+        } yield amuletRules
     }
   }
 
@@ -346,19 +346,19 @@ object HttpScanAppClient {
     }
   }
 
-  case class GetTotalCoinBalance(asOfEndOfRound: Long)
-      extends InternalBaseCommand[http.GetTotalCoinBalanceResponse, BigDecimal] {
+  case class GetTotalAmuletBalance(asOfEndOfRound: Long)
+      extends InternalBaseCommand[http.GetTotalAmuletBalanceResponse, BigDecimal] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTotalCoinBalanceResponse] =
-      client.getTotalCoinBalance(asOfEndOfRound, headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetTotalAmuletBalanceResponse] =
+      client.getTotalAmuletBalance(asOfEndOfRound, headers)
 
     override def handleOk()(implicit decoder: TemplateJsonDecoder) = {
-      case http.GetTotalCoinBalanceResponse.OK(response) =>
+      case http.GetTotalAmuletBalanceResponse.OK(response) =>
         Codec.decode(Codec.BigDecimal)(response.totalBalance)
-      case http.GetTotalCoinBalanceResponse.NotFound(err) =>
+      case http.GetTotalAmuletBalanceResponse.NotFound(err) =>
         Left(err.error)
     }
   }
@@ -371,20 +371,20 @@ object HttpScanAppClient {
       initial: BigDecimal,
       steps: Seq[RateStep],
   )
-  final case class CoinConfig(
-      coinCreateFee: BigDecimal,
+  final case class AmuletConfig(
+      amuletCreateFee: BigDecimal,
       holdingFee: BigDecimal,
       lockHolderFee: BigDecimal,
       transferFee: SteppedRate,
   )
-  case class GetCoinConfigForRound(round: Long)
-      extends InternalBaseCommand[http.GetCoinConfigForRoundResponse, CoinConfig] {
+  case class GetAmuletConfigForRound(round: Long)
+      extends InternalBaseCommand[http.GetAmuletConfigForRoundResponse, AmuletConfig] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetCoinConfigForRoundResponse] =
-      client.getCoinConfigForRound(round, headers)
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.GetAmuletConfigForRoundResponse] =
+      client.getAmuletConfigForRound(round, headers)
 
     private def decodeStep(step: definitions.RateStep): Either[String, RateStep] =
       for {
@@ -400,16 +400,16 @@ object HttpScanAppClient {
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ) = {
-      case http.GetCoinConfigForRoundResponse.OK(response) =>
+      case http.GetAmuletConfigForRoundResponse.OK(response) =>
         for {
-          coinCreate <- Codec.decode(Codec.BigDecimal)(response.coinCreateFee)
+          amuletCreate <- Codec.decode(Codec.BigDecimal)(response.amuletCreateFee)
           holding <- Codec.decode(Codec.BigDecimal)(response.holdingFee)
           lockHolder <- Codec.decode(Codec.BigDecimal)(response.lockHolderFee)
           initial <- Codec.decode(Codec.BigDecimal)(response.transferFee.initial)
           steps <- decodeTransferFeeSteps(response.transferFee.steps.toSeq)
         } yield {
-          CoinConfig(
-            coinCreateFee = coinCreate,
+          AmuletConfig(
+            amuletCreateFee = amuletCreate,
             holdingFee = holding,
             lockHolderFee = lockHolder,
             transferFee = SteppedRate(
@@ -418,7 +418,7 @@ object HttpScanAppClient {
             ),
           )
         }
-      case http.GetCoinConfigForRoundResponse.NotFound(err) =>
+      case http.GetAmuletConfigForRoundResponse.NotFound(err) =>
         Left(err.error)
     }
   }

@@ -4,7 +4,7 @@ import cats.data.EitherT
 import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
-import com.daml.network.codegen.java.cc.coinrules.CoinRules
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.svc.memberstate.SvNodeState
 import com.daml.network.codegen.java.cn.svcrules.SvcRules
@@ -32,7 +32,7 @@ object HttpSvAppClient {
       svcParty: PartyId,
       votingThreshold: BigInt,
       latestMiningRound: Contract[OpenMiningRound.ContractId, OpenMiningRound],
-      coinRules: Contract[CoinRules.ContractId, CoinRules],
+      amuletRules: Contract[AmuletRules.ContractId, AmuletRules],
       svcRules: Contract[SvcRules.ContractId, SvcRules],
       svNodeStates: Map[PartyId, Contract[SvNodeState.ContractId, SvNodeState]],
   )
@@ -182,7 +182,7 @@ object HttpSvAppClient {
               svcPartyId,
               votingThreshold,
               latestMiningRound,
-              coinRules,
+              amuletRules,
               svcRules,
               svNodeStates,
             )
@@ -193,7 +193,7 @@ object HttpSvAppClient {
           latestMiningRound <- Contract
             .fromHttp(OpenMiningRound.COMPANION)(latestMiningRound)
             .leftMap(_.toString)
-          coinRules <- Contract.fromHttp(CoinRules.COMPANION)(coinRules).left.map(_.toString)
+          amuletRules <- Contract.fromHttp(AmuletRules.COMPANION)(amuletRules).left.map(_.toString)
           svcRules <- Contract.fromHttp(SvcRules.COMPANION)(svcRules).left.map(_.toString)
           svNodeStates <- svNodeStates.traverse { co =>
             for {
@@ -207,7 +207,7 @@ object HttpSvAppClient {
           svcPartyId,
           votingThreshold,
           latestMiningRound,
-          coinRules,
+          amuletRules,
           svcRules,
           svNodeStates.toMap,
         )

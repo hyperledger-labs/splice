@@ -9,7 +9,7 @@ import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.duration._
 
 println("Waiting for SVC initialization...")
-// We need to do this at the beginning, otherwise later commands can fail because CoinRules is locked.n
+// We need to do this at the beginning, otherwise later commands can fail because AmuletRules is locked.n
 Seq(sv1, sv2, sv3, sv4).foreach(
   _.waitForInitialization(NonNegativeDuration.tryFromDuration(5.minute))
 )
@@ -55,7 +55,7 @@ def ensureCnsEntry(
       cns.createCnsEntry(name, url, description)
       println("Waiting for wallet initialization to complete")
       wallet.waitForInitialization()
-      println("Wallet initialization complete, tapping coin")
+      println("Wallet initialization complete, tapping amulet")
       wallet.tap(5.0)
       utils.retry_until_true { wallet.listSubscriptionRequests().length == 1 }
       wallet.acceptSubscriptionRequest(

@@ -1,7 +1,7 @@
 package com.daml.network.wallet.store.db
 
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cc.validatorlicense as validatorCodegen
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.types.Round
@@ -94,11 +94,11 @@ class DbUserWalletStore(
       activeIssuingRoundsO: Option[Set[Long]],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
-    Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+    Contract[amuletCodegen.ValidatorRewardCoupon.ContractId, amuletCodegen.ValidatorRewardCoupon]
   ]] = for {
     _ <- waitUntilAcsIngested()
     rewards <- multiDomainAcsStore.listContracts(
-      coinCodegen.ValidatorRewardCoupon.COMPANION
+      amuletCodegen.ValidatorRewardCoupon.COMPANION
     )
   } yield applyLimit(
     "listSortedValidatorRewards",
@@ -123,11 +123,11 @@ class DbUserWalletStore(
       issuingRoundsMap: Map[Round, IssuingMiningRound],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
-    (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
+    (Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon], BigDecimal)
   ]] = for {
     _ <- waitUntilAcsIngested()
     rewards <- multiDomainAcsStore.listContracts(
-      coinCodegen.AppRewardCoupon.COMPANION
+      amuletCodegen.AppRewardCoupon.COMPANION
     )
   } yield applyLimit(
     "listSortedAppRewards",
@@ -149,7 +149,7 @@ class DbUserWalletStore(
       .sorted(
         Ordering[(Long, BigDecimal)].on(
           (x: (
-              Contract.Has[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon],
+              Contract.Has[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon],
               BigDecimal,
           )) => (x._1.payload.round.number, -x._2)
         )
@@ -180,10 +180,12 @@ class DbUserWalletStore(
   )(implicit
       tc: TraceContext
   ): Future[
-    Seq[(Contract[coinCodegen.SvRewardCoupon.ContractId, coinCodegen.SvRewardCoupon], BigDecimal)]
+    Seq[
+      (Contract[amuletCodegen.SvRewardCoupon.ContractId, amuletCodegen.SvRewardCoupon], BigDecimal)
+    ]
   ] =
     listSortedRewardCoupons(
-      coinCodegen.SvRewardCoupon.COMPANION,
+      amuletCodegen.SvRewardCoupon.COMPANION,
       issuingRoundsMap,
       r => Some(BigDecimal(r.issuancePerSvRewardCoupon)),
       limit,

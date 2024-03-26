@@ -3,8 +3,8 @@ package com.daml.network.scan.store.db
 import cats.implicits.*
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinrules.CoinRules
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsRules}
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.validatorlicense.ValidatorLicense
@@ -137,9 +137,9 @@ class DbScanStore(
 
   def storeId: Int = multiDomainAcsStore.storeId
 
-  override def lookupCoinRules()(implicit
+  override def lookupAmuletRules()(implicit
       tc: TraceContext
-  ): Future[Option[ContractWithState[CoinRules.ContractId, CoinRules]]] =
+  ): Future[Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]] =
     waitUntilAcsIngested {
       for {
         row <- storage
@@ -148,14 +148,15 @@ class DbScanStore(
               ScanTables.acsTableName,
               storeId,
               domainMigrationId,
-              where = sql"""template_id_qualified_name = ${QualifiedName(CoinRules.TEMPLATE_ID)}""",
+              where =
+                sql"""template_id_qualified_name = ${QualifiedName(AmuletRules.TEMPLATE_ID)}""",
               orderLimit = sql"""order by event_number desc limit 1""",
             ).headOption,
-            "lookupCoinRules",
+            "lookupAmuletRules",
           )
           .value
         contractWithState = row.map(
-          contractWithStateFromRow(CoinRules.COMPANION)(_)
+          contractWithStateFromRow(AmuletRules.COMPANION)(_)
         )
       } yield contractWithState
     }
@@ -366,7 +367,7 @@ class DbScanStore(
       } yield contractWithStateFromRow(FeaturedAppRight.COMPANION)(row)).value
     }
 
-  override def getCoinConfigForRound(round: Long)(implicit
+  override def getAmuletConfigForRound(round: Long)(implicit
       tc: TraceContext
   ): Future[OpenMiningRoundTxLogEntry] = waitUntilAcsIngested {
     for {
@@ -381,7 +382,7 @@ class DbScanStore(
               """,
             orderLimit = sql"order by entry_number desc limit 1",
           ).headOption,
-          "getCoinConfigForRound",
+          "getAmuletConfigForRound",
         )
         .value
       entry = row.map(txLogEntryFromRow[OpenMiningRoundTxLogEntry](txLogConfig))
@@ -421,7 +422,7 @@ class DbScanStore(
       } yield result
     }
 
-  override def getTotalCoinBalance(asOfEndOfRound: Long)(implicit
+  override def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit
       tc: TraceContext
   ): Future[BigDecimal] =
     waitUntilAcsIngested {
@@ -429,12 +430,12 @@ class DbScanStore(
         result <- ensureAggregated(asOfEndOfRound) {
           storage.query(
             sql"""
-              select total_coin_balance
+              select total_amulet_balance
               from   round_totals
               where  store_id = $storeId
               and    closed_round = $asOfEndOfRound;
               """.as[Option[BigDecimal]].headOption,
-            "getTotalCoinBalance",
+            "getTotalAmuletBalance",
           )
         }
       } yield result.flatten.getOrElse(0)
@@ -485,9 +486,9 @@ class DbScanStore(
         storage.query(
           // The round_party_totals might not have a row for the given round, (when the party has not been active in that round)
           // in that case just take the most recent round.
-          // This is also why the total_coin_balance is calculated from the two cumulative fields.
+          // This is also why the total_amulet_balance is calculated from the two cumulative fields.
           sql"""
-             select   cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1) as total_coin_balance
+             select   cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1) as total_amulet_balance
              from     round_party_totals
              where    store_id = $storeId
              and      closed_round <= $asOfEndOfRound

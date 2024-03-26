@@ -8,7 +8,7 @@ import cats.syntax.either.*
 import com.digitalasset.canton.daml.lf.value.json.ApiCodecCompressed
 import com.daml.network.admin.api.client.commands.{HttpClientBuilder, HttpCommand}
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
-import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
+import com.daml.network.codegen.java.cn.svc.amuletprice.AmuletPriceVote
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
   VoteRequest,
@@ -97,43 +97,43 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case object ListCoinPriceVotes
-      extends BaseCommand[http.ListCoinPriceVotesResponse, Seq[
-        Contract[CoinPriceVote.ContractId, CoinPriceVote]
+  case object ListAmuletPriceVotes
+      extends BaseCommand[http.ListAmuletPriceVotesResponse, Seq[
+        Contract[AmuletPriceVote.ContractId, AmuletPriceVote]
       ]] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListCoinPriceVotesResponse] =
-      client.listCoinPriceVotes(
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.ListAmuletPriceVotesResponse] =
+      client.listAmuletPriceVotes(
         headers = headers
       )
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.ListCoinPriceVotesResponse.OK(response) =>
-      response.coinPriceVotes
-        .traverse(req => Contract.fromHttp(CoinPriceVote.COMPANION)(req))
+    ) = { case http.ListAmuletPriceVotesResponse.OK(response) =>
+      response.amuletPriceVotes
+        .traverse(req => Contract.fromHttp(AmuletPriceVote.COMPANION)(req))
         .leftMap(_.toString)
     }
   }
 
-  case class UpdateCoinPriceVote(coinPrice: BigDecimal)
-      extends BaseCommand[http.UpdateCoinPriceVoteResponse, Unit] {
+  case class UpdateAmuletPriceVote(amuletPrice: BigDecimal)
+      extends BaseCommand[http.UpdateAmuletPriceVoteResponse, Unit] {
 
     override def submitRequest(
         client: Client,
         headers: List[HttpHeader],
-    ): EitherT[Future, Either[Throwable, HttpResponse], http.UpdateCoinPriceVoteResponse] =
-      client.updateCoinPriceVote(
-        body = definitions.UpdateCoinPriceVoteRequest(Codec.encode(coinPrice)),
+    ): EitherT[Future, Either[Throwable, HttpResponse], http.UpdateAmuletPriceVoteResponse] =
+      client.updateAmuletPriceVote(
+        body = definitions.UpdateAmuletPriceVoteRequest(Codec.encode(amuletPrice)),
         headers = headers,
       )
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.UpdateCoinPriceVoteResponse.OK =>
+    ) = { case http.UpdateAmuletPriceVoteResponse.OK =>
       Right(())
     }
   }

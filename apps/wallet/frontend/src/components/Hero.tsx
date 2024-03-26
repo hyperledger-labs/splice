@@ -5,14 +5,14 @@ import { Box, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
 import { useBalance } from '../hooks';
-import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
+import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 
 const Hero: React.FC = () => {
   const balanceQuery = useBalance();
-  const coinPriceQuery = useCoinPrice();
+  const amuletPriceQuery = useAmuletPrice();
 
-  const isLoading = balanceQuery.isLoading || coinPriceQuery.isLoading;
-  const isError = balanceQuery.isError || coinPriceQuery.isError;
+  const isLoading = balanceQuery.isLoading || amuletPriceQuery.isLoading;
+  const isError = balanceQuery.isError || amuletPriceQuery.isError;
 
   return (
     <Stack mt={4} mb={4} spacing={4} direction="row" justifyContent="space-between">
@@ -20,7 +20,7 @@ const Hero: React.FC = () => {
         {isLoading ? (
           <Loading />
         ) : isError ? (
-          <ErrorDisplay message={'Error while fetching balance and coin price.'} />
+          <ErrorDisplay message={'Error while fetching balance and amulet price.'} />
         ) : (
           <Box>
             <Typography variant="h6">Total Available Balance</Typography>
@@ -32,11 +32,11 @@ const Hero: React.FC = () => {
                 amount={balanceQuery.data.availableCC}
                 currency="CC"
                 convert="CCtoUSD"
-                coinPrice={coinPriceQuery.data}
+                amuletPrice={amuletPriceQuery.data}
               />
             </Typography>
             <Typography variant="caption">
-              Reflects unlocked coin, rewards earned and holding fees
+              Reflects unlocked amulet, rewards earned and holding fees
             </Typography>
           </Box>
         )}

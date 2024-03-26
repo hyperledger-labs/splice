@@ -1,4 +1,4 @@
-// Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
+// Commands needed to initialize the CN apps, tap some amulets and make some transfers. Can be run as a bootstrap script.
 
 import com.digitalasset.canton.data.CantonTimestamp
 import java.time.Duration
@@ -15,9 +15,9 @@ println(s"Onboarding Bob user: " + bobUserName)
 val bobParty = validatorApp.onboardUser(bobUserName)
 
 aliceWallet.tap(100.0)
-utils.retry_until_true(aliceWallet.list().coins.length == 1)
+utils.retry_until_true(aliceWallet.list().amulets.length == 1)
 
-require(bobWallet.list().coins.length == 0)
+require(bobWallet.list().amulets.length == 0)
 
 val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
 val uuid = UUID.randomUUID().toString()
@@ -25,8 +25,8 @@ val transferOffer = aliceWallet.createTransferOffer(bobParty, 10.0, "p2ptransfer
 utils.retry_until_true(bobWallet.listTransferOffers().length == 1)
 bobWallet.acceptTransferOffer(transferOffer)
 
-utils.retry_until_true(bobWallet.list().coins.length == 1)
+utils.retry_until_true(bobWallet.list().amulets.length == 1)
 bobWallet
   .list()
-  .coins
-  .foreach(coin => require(BigDecimal(coin.contract.payload.amount.initialAmount) == 10))
+  .amulets
+  .foreach(amulet => require(BigDecimal(amulet.contract.payload.amount.initialAmount) == 10))

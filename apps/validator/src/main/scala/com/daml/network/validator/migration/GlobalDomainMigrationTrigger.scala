@@ -41,7 +41,7 @@ final class GlobalDomainMigrationTrigger(
       .map(schedule => ScheduledMigration(schedule.time.toInstant, schedule.migrationId))
 
   override protected def getDomainId()(implicit tc: TraceContext): Future[DomainId] = {
-    scanConnection.getCoinRulesDomain()(tc)
+    scanConnection.getAmuletRulesDomain()(tc)
   }
 
   override protected def existingDumpFileMigrationId(dump: DomainMigrationDump): Long =

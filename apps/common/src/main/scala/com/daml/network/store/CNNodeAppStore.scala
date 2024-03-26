@@ -24,7 +24,7 @@ trait CNNodeAppStore[TXE] extends NamedLogging with AutoCloseable with StoreErro
   def updateHistory: Option[UpdateHistory]
 }
 
-/** A coin app store whose TxLog is always empty.
+/** A amulet app store whose TxLog is always empty.
   */
 trait CNNodeAppStoreWithoutHistory extends CNNodeAppStore[Nothing] {
   override final def txLogConfig = TxLogStore.Config.empty

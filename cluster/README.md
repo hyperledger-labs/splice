@@ -1493,7 +1493,7 @@ The following steps assume that:
    Consider running multiple `cncluster backup_noces X Y Z` invocations in parallel.
    Note that our tooling currently doesn't support backing up our runbook nodes.
    If they break we need to redeploy them with empty state.
-1. Note (or take a screenshot of) the coin balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
+1. Note (or take a screenshot of) the amulet balance of one of our SVs. (For post-migration [sanity check](#new-domain-readiness-checks).)
 1. Run `cncluster hard_domain_migration_migrate` to set up our apps for migrating.
    Note that this command contains multiple `pulumi up` steps
    (one for the main deployment, one for the runbook SV, one for the runbook validator),
@@ -1539,11 +1539,11 @@ We expect to get an error here because the sequencer's public API should not be 
 
 #### New domain readiness checks
 
-1. We have our expected coin balance.
+1. We have our expected amulet balance.
 2. Alls SVs are in sync based on the "SV Status Reports" [Grafana dashboard](#prometheus-metrics-and-grafana-dashboards).
 3. In the participant logs of one of our SVs, we see `Commitment correct` messages for all SV participants.
    If we're in sync with all other SVs it's reasonable to assume they're also in sync with each other.
-4. All our partners confirm that they have their expected coin balance and that they aren't seeing anything weird.
+4. All our partners confirm that they have their expected amulet balance and that they aren't seeing anything weird.
 
 ## Interacting with Canton Network UIs
 

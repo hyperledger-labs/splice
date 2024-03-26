@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.ValidatorAppBackendReference
 import com.daml.network.integration.CNNodeEnvironmentDefinition
@@ -17,28 +17,31 @@ class WalletTxLogAcsIntegrationTest
     with SplitwellTestUtil
     with WalletTxLogTestUtil {
 
-  private val coinPrice = BigDecimal(0.75).setScale(10)
+  private val amuletPrice = BigDecimal(0.75).setScale(10)
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      // The wallet automation periodically merges coins, which leads to non-deterministic balance changes.
+      // The wallet automation periodically merges amulets, which leads to non-deterministic balance changes.
       // We disable the automation for this suite.
-      .withoutAutomaticRewardsCollectionAndCoinMerging
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
       // disable top-ups to prevent extra traffic purchase txs entering the tx log non-deterministically
       // and interfering with the tests in this suite.
       .withTrafficTopupsDisabled
-      // Set a non-unit coin price to better test CC-USD conversion.
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.setCoinPrice(coinPrice)(config))
+      // Set a non-unit amulet price to better test CC-USD conversion.
+      .addConfigTransform((_, config) => CNNodeConfigTransforms.setAmuletPrice(amuletPrice)(config))
       .withManualStart
   }
 
   "A wallet" should {
 
     "handle initial ACS" in { implicit env =>
-      def coins(validator: ValidatorAppBackendReference, party: PartyId): Seq[coinCodegen.Coin] =
+      def amulets(
+          validator: ValidatorAppBackendReference,
+          party: PartyId,
+      ): Seq[amuletCodegen.Amulet] =
         validator.participantClientWithAdminToken.ledger_api_extensions.acs
-          .filterJava(coinCodegen.Coin.COMPANION)(
+          .filterJava(amuletCodegen.Amulet.COMPANION)(
             party
           )
           .map(_.data)
@@ -53,26 +56,26 @@ class WalletTxLogAcsIntegrationTest
       }
 
       // Note: this test uses an SV party, as it's easier to create
-      // coins for parties hosted on a SV participant.
+      // amulets for parties hosted on a SV participant.
       val sv1UserParty = sv1Backend.getSvcInfo().svParty
 
-      clue("SV1 has no coins initially") {
-        coins(sv1ValidatorBackend, sv1UserParty) should be(empty)
+      clue("SV1 has no amulets initially") {
+        amulets(sv1ValidatorBackend, sv1UserParty) should be(empty)
       }
 
       val mintAmount = BigDecimal(47.0).bigDecimal.setScale(10)
       actAndCheck(
-        "SV1 mints a coin", {
-          tapCoin(
+        "SV1 mints a amulet", {
+          tapAmulet(
             sv1ValidatorBackend.participantClientWithAdminToken,
             sv1UserParty,
             mintAmount,
           )
         },
       )(
-        "Coin should appear on the ledger",
+        "Amulet should appear on the ledger",
         _ => {
-          coins(sv1ValidatorBackend, sv1UserParty).loneElement.amount.initialAmount should be(
+          amulets(sv1ValidatorBackend, sv1UserParty).loneElement.amount.initialAmount should be(
             mintAmount
           )
         },
@@ -90,7 +93,7 @@ class WalletTxLogAcsIntegrationTest
           { case logEntry: BalanceChangeTxLogEntry =>
             logEntry.subtype.value shouldBe walletLogEntry.BalanceChangeTransactionSubtype.Tap.toProto
             logEntry.amount.bigDecimal shouldBe mintAmount
-            logEntry.coinPrice shouldBe coinPrice
+            logEntry.amuletPrice shouldBe amuletPrice
           }
         ),
       )

@@ -375,18 +375,18 @@ paths:
           description: ok
         "400":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/400"
-  /v0/admin/sv/coin-price/votes:
+  /v0/admin/sv/amulet-price/votes:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
-      operationId: "ListCoinPriceVotes"
+      operationId: "ListAmuletPriceVotes"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/ListCoinPriceVotesResponse"
+                "$ref": "#/components/schemas/ListAmuletPriceVotesResponse"
   /v0/admin/sv/open-mining-rounds:
     get:
       tags: [sv]
@@ -399,17 +399,17 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/ListOpenMiningRoundsResponse"
-  /v0/admin/sv/coin-price/vote:
+  /v0/admin/sv/amulet-price/vote:
     put:
       tags: [sv]
       x-jvm-package: sv_admin
-      operationId: "UpdateCoinPriceVote"
+      operationId: "UpdateAmuletPriceVote"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/UpdateCoinPriceVoteRequest"
+              "$ref": "#/components/schemas/UpdateAmuletPriceVoteRequest"
       responses:
         "200":
           description: ok
@@ -815,12 +815,12 @@ components:
         reason_description:
           type: string
 
-    ListCoinPriceVotesResponse:
+    ListAmuletPriceVotesResponse:
       type: object
       required:
-        - coin_price_votes
+        - amulet_price_votes
       properties:
-        coin_price_votes:
+        amulet_price_votes:
           type: array
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
@@ -835,12 +835,12 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
-    UpdateCoinPriceVoteRequest:
+    UpdateAmuletPriceVoteRequest:
       type: object
       required:
-        - coin_price
+        - amulet_price
       properties:
-        coin_price:
+        amulet_price:
           type: string
 
     BatchListVotesByVoteRequestsRequest:
@@ -1018,7 +1018,7 @@ components:
         - svc_party_id
         - voting_threshold
         - latest_mining_round
-        - coin_rules
+        - amulet_rules
         - svc_rules
         - sv_node_states
       properties:
@@ -1037,8 +1037,8 @@ components:
         # Contract ID of the OpenMiningRound contract of the latest Mining Round
         latest_mining_round:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # Contract ID of the CoinRules contract associated with the SVC
-        coin_rules:
+        # Contract ID of the AmuletRules contract associated with the SVC
+        amulet_rules:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
         # Contract IDs of the SvcRules contract associated with the SVC
         svc_rules:

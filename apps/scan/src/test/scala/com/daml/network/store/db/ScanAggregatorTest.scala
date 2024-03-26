@@ -34,9 +34,9 @@ class ScanAggregatorTest
     with HasExecutionContext
     with StoreErrors
     with CNPostgresTest
-    with CoinTransferUtil {
+    with AmuletTransferUtil {
 
-  val coinPrice = 1.0
+  val amuletPrice = 1.0
 
   def createReader(store: DbScanStore) = new ScanAggregatesReader() {
     def readRoundAggregateFromSvc(
@@ -274,7 +274,7 @@ class ScanAggregatorTest
       }
     }
 
-    "append round totals for coin balance" in {
+    "append round totals for amulet balance" in {
       val (aggr, store) = mkAggregator(svcParty).futureValue
       val lastRound = 10
       val holdingFee = 0.05
@@ -324,14 +324,14 @@ class ScanAggregatorTest
             cumulativeChangeToInitialAmountAsOfRoundZero =
               expectedRound1CumulativeChangeToInitialAmountAsOfRoundZero,
             cumulativeChangeToHoldingFeesRate = expectedRound1CumulativeChangeToHoldingFeesRate,
-            totalCoinBalance =
+            totalAmuletBalance =
               expectedRound1CumulativeChangeToInitialAmountAsOfRoundZero - expectedRound1CumulativeChangeToHoldingFeesRate * (1 + closedRound),
           )
 
-        getTotalCoinBalanceFromTxLog(
+        getTotalAmuletBalanceFromTxLog(
           closedRound,
           store.storeId,
-        ).futureValue shouldBe prevTotals.totalCoinBalance
+        ).futureValue shouldBe prevTotals.totalAmuletBalance
 
         val _ = storage
           .update_(
@@ -353,14 +353,14 @@ class ScanAggregatorTest
             cumulativeChangeToInitialAmountAsOfRoundZero =
               expectedRound10CumulativeChangeToInitialAmountAsOfRoundZero,
             cumulativeChangeToHoldingFeesRate = expectedRound10CumulativeChangeToHoldingFeesRate,
-            totalCoinBalance =
+            totalAmuletBalance =
               expectedRound10CumulativeChangeToInitialAmountAsOfRoundZero - expectedRound10CumulativeChangeToHoldingFeesRate * (1 + lastRound),
           )
 
-        getTotalCoinBalanceFromTxLog(
+        getTotalAmuletBalanceFromTxLog(
           lastRound.toLong,
           store.storeId,
-        ).futureValue shouldBe lastTotals.totalCoinBalance
+        ).futureValue shouldBe lastTotals.totalAmuletBalance
 
         val (round, effectiveAt) = store.getRoundOfLatestData().futureValue
         round shouldBe lastTotals.closedRound
@@ -583,7 +583,7 @@ class ScanAggregatorTest
           cumulativeValidatorRewards = BigDecimal(i + 6),
           cumulativeChangeToInitialAmountAsOfRoundZero = BigDecimal(i + 7),
           cumulativeChangeToHoldingFeesRate = BigDecimal(i + 8),
-          totalCoinBalance = BigDecimal(i + 9),
+          totalAmuletBalance = BigDecimal(i + 9),
         ),
         Vector(
           RoundPartyTotals(
@@ -653,7 +653,7 @@ class ScanAggregatorTest
   ): Future[(ScanAggregator, DbScanStore)] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.cantonCoin.all ++
+        DarResources.cantonAmulet.all ++
           DarResources.cantonNameService.all ++
           DarResources.svcGovernance.all
       )
@@ -692,25 +692,25 @@ class ScanAggregatorTest
       balanceChangeRoundZero: BigDecimal,
       balanceChangeHoldingFees: BigDecimal,
   ): Future[Unit] = {
-    val coinRulesContract = coinRules()
+    val amuletRulesContract = amuletRules()
     for {
       _ <- dummyDomain.exercise(
-        coinRulesContract,
-        interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+        amuletRulesContract,
+        interfaceId = Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
         Transfer.choice.name,
-        mkCoinRulesTransfer(party, 0),
+        mkAmuletRulesTransfer(party, 0),
         mkTransferResult(
           round = round,
           inputAppRewardAmount = 0,
-          inputCoinAmount = 0,
+          inputAmuletAmount = 0,
           inputValidatorRewardAmount = 0,
           balanceChanges = Map(
-            party.toProtoPrimitive -> new cc.coinrules.BalanceChange(
+            party.toProtoPrimitive -> new cc.amuletrules.BalanceChange(
               balanceChangeRoundZero.bigDecimal,
               balanceChangeHoldingFees.bigDecimal,
             )
           ),
-          coinPrice = coinPrice,
+          amuletPrice = amuletPrice,
         ),
         nextOffset(),
       )(
@@ -723,7 +723,7 @@ class ScanAggregatorTest
       store: DbScanStore,
       round: Long,
   ): Future[Unit] = {
-    val openRound = openMiningRound(svcParty, round = round, coinPrice = coinPrice)
+    val openRound = openMiningRound(svcParty, round = round, amuletPrice = amuletPrice)
     dummyDomain.create(openRound)(store.multiDomainAcsStore).map(_ => ())
   }
 
@@ -741,20 +741,20 @@ class ScanAggregatorTest
       rewardAmount: Double,
       rewardedParty: PartyId,
   ): Future[Unit] = {
-    val coinRulesContract = coinRules()
+    val amuletRulesContract = amuletRules()
     for {
       _ <- dummyDomain.exercise(
-        coinRulesContract,
-        interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+        amuletRulesContract,
+        interfaceId = Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
         Transfer.choice.name,
-        mkCoinRulesTransfer(rewardedParty, 0),
+        mkAmuletRulesTransfer(rewardedParty, 0),
         mkTransferResult(
           round = round,
           inputAppRewardAmount = rewardAmount,
-          inputCoinAmount = 0,
+          inputAmuletAmount = 0,
           inputValidatorRewardAmount = 0,
           balanceChanges = Map(),
-          coinPrice = coinPrice,
+          amuletPrice = amuletPrice,
         ),
         nextOffset(),
       )(
@@ -769,20 +769,20 @@ class ScanAggregatorTest
       rewardAmount: Double,
       rewardedParty: PartyId,
   ): Future[Unit] = {
-    val coinRulesContract = coinRules()
+    val amuletRulesContract = amuletRules()
     for {
       _ <- dummyDomain.exercise(
-        coinRulesContract,
-        interfaceId = Some(cc.coinrules.CoinRules.TEMPLATE_ID),
+        amuletRulesContract,
+        interfaceId = Some(cc.amuletrules.AmuletRules.TEMPLATE_ID),
         Transfer.choice.name,
-        mkCoinRulesTransfer(rewardedParty, 0),
+        mkAmuletRulesTransfer(rewardedParty, 0),
         mkTransferResult(
           round = round,
           inputAppRewardAmount = 0,
-          inputCoinAmount = 0,
+          inputAmuletAmount = 0,
           inputValidatorRewardAmount = rewardAmount,
           balanceChanges = Map(),
-          coinPrice = coinPrice,
+          amuletPrice = amuletPrice,
         ),
         nextOffset(),
       )(
@@ -800,7 +800,9 @@ class ScanAggregatorTest
       spent: BigDecimal,
   ): Future[Unit] = {
     dummyDomain
-      .ingest(coinRulesBuyMemberTrafficTransaction(party, member, round, purchase, spent.toDouble))(
+      .ingest(
+        amuletRulesBuyMemberTrafficTransaction(party, member, round, purchase, spent.toDouble)
+      )(
         store.multiDomainAcsStore
       )
       .map(_ => ())
@@ -809,7 +811,7 @@ class ScanAggregatorTest
   def lengthLimited(s: String): CantonRequireTypes.String2066 =
     CantonRequireTypes.String2066.tryCreate(s)
 
-  def getTotalCoinBalanceFromTxLog(asOfEndOfRound: Long, storeId: Int): Future[BigDecimal] =
+  def getTotalAmuletBalanceFromTxLog(asOfEndOfRound: Long, storeId: Int): Future[BigDecimal] =
     for {
       result <- storage.query(
         sql"""
@@ -820,7 +822,7 @@ class ScanAggregatorTest
                  and entry_type = ${EntryType.BalanceChangeTxLogEntry}
                  and round <= $asOfEndOfRound;
              """.as[Option[BigDecimal]].headOption,
-        "getTotalCoinBalanceFromTxLog",
+        "getTotalAmuletBalanceFromTxLog",
       )
     } yield result.flatten.getOrElse(0)
 

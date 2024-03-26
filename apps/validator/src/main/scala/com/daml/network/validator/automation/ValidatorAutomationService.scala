@@ -62,7 +62,7 @@ class ValidatorAutomationService(
       automationConfig,
       clock,
       store,
-      PackageIdResolver.inferFromCoinRules(
+      PackageIdResolver.inferFromAmuletRules(
         clock,
         scanConnection,
         loggerFactory,
@@ -76,7 +76,7 @@ class ValidatorAutomationService(
 
   val appManagerStore =
     new AppManagerStore(
-      scanConnection.getCoinRulesDomain,
+      scanConnection.getAmuletRulesDomain,
       this,
       retryProvider,
       loggerFactory,
@@ -87,7 +87,7 @@ class ValidatorAutomationService(
 
     registerTrigger(new OffboardUsersTrigger(triggerContext, walletManager, connection))
 
-    if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
+    if (automationConfig.enableAutomaticRewardsCollectionAndAmuletMerging) {
       registerTrigger(
         new ReceiveFaucetCouponTrigger(
           triggerContext,
@@ -149,12 +149,12 @@ class ValidatorAutomationService(
       connection,
       store.key.validatorParty,
       implicit tc =>
-        scanConnection.getCoinRulesWithState().flatMap { coinRulesCWS =>
-          coinRulesCWS.toAssignedContract
-            .map { coinRules =>
+        scanConnection.getAmuletRulesWithState().flatMap { amuletRulesCWS =>
+          amuletRulesCWS.toAssignedContract
+            .map { amuletRules =>
               store
-                .listCoinRulesTransferFollowers(coinRules)
-                .map(_ map (FollowTask(coinRules, _)))
+                .listAmuletRulesTransferFollowers(amuletRules)
+                .map(_ map (FollowTask(amuletRules, _)))
             }
             .getOrElse(Future successful Seq.empty)
         },
@@ -205,9 +205,9 @@ object ValidatorAutomationService extends AutomationServiceCompanion {
     template.moduleName match {
       // App manager storage is participant local so we can freely choose the package id.
       case "CN.AppManager.Store" => Some(DarResources.appManager.bootstrap.packageId)
-      // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
+      // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
-      case "CC.CoinImport" => Some(DarResources.cantonCoin.bootstrap.packageId)
+      case "CC.AmuletImport" => Some(DarResources.cantonAmulet.bootstrap.packageId)
       case _ => None
     }
 

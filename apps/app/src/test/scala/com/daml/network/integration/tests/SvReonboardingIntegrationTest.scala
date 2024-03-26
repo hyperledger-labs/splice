@@ -183,7 +183,7 @@ class SvReonboardingIntegrationTest
       .withTrafficTopupsDisabled
       .withManualStart
 
-  "reonboard SV with new party id and recover coin via new regular validator" in { implicit env =>
+  "reonboard SV with new party id and recover amulet via new regular validator" in { implicit env =>
     // Mediators/sequencers that have been offboarded stay in a broken state which is fine in prod
     // (you can onboard a fresh mediator/sequencer)
     // but annoying in tests so we use a dedicated Canton instance for this test.
@@ -511,12 +511,12 @@ class SvReonboardingIntegrationTest
 
         sv4WalletClient.userStatus().party shouldBe sv4PartyNew.toProtoPrimitive
 
-        clue("coin balance is preserved from off-boarded sv4") {
-          val expectedCoins: Range = 99 to 100
+        clue("amulet balance is preserved from off-boarded sv4") {
+          val expectedAmulets: Range = 99 to 100
           checkWallet(
             sv4Party,
             validatorLocalWalletClient,
-            Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+            Seq((walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))),
           )
         }
 
@@ -526,11 +526,13 @@ class SvReonboardingIntegrationTest
         )(
           "balance updated",
           _ => {
-            val expectedCoins: Range = 149 to 150
+            val expectedAmulets: Range = 149 to 150
             checkWallet(
               sv4Party,
               validatorLocalWalletClient,
-              Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+              Seq(
+                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
+              ),
             )
           },
         )
@@ -540,8 +542,8 @@ class SvReonboardingIntegrationTest
             "sv4Party creates transfer offer via the validator",
             validatorLocalWalletClient.createTransferOffer(
               sv4PartyNew,
-              walletUsdToCoin(148.0),
-              "transfer recovered coin back to SV",
+              walletUsdToAmulet(148.0),
+              "transfer recovered amulet back to SV",
               CantonTimestamp.now().plus(JDUration.ofMinutes(1)),
               UUID.randomUUID.toString,
             ),
@@ -557,11 +559,13 @@ class SvReonboardingIntegrationTest
           "sv4PartyNew sees updated balance",
           _ => {
             sv4WalletClient.listTransferOffers() should have length 0
-            val expectedCoins: Range = 147 to 148
+            val expectedAmulets: Range = 147 to 148
             checkWallet(
               sv4PartyNew,
               sv4WalletClient,
-              Seq((walletUsdToCoin(expectedCoins.start), walletUsdToCoin(expectedCoins.end))),
+              Seq(
+                (walletUsdToAmulet(expectedAmulets.start), walletUsdToAmulet(expectedAmulets.end))
+              ),
             )
           },
         )

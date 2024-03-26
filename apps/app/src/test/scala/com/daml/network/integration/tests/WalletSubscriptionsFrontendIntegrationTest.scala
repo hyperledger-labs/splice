@@ -15,12 +15,12 @@ class WalletSubscriptionsFrontendIntegrationTest
     with FrontendLoginUtil
     with TimeTestUtil {
 
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(2.0)
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(2.0)
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withCoinPrice(walletCoinPrice)
+      .withAmuletPrice(walletAmuletPrice)
       // TODO(#8300) Consider removing this once domain config updates are less disruptive to carefully-timed batching tests.
       .withSequencerConnectionsFromScanDisabled()
 
@@ -48,7 +48,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         expectedReceiver = expectedCns(alicePartyId, aliceEntryName),
         expectedProvider = expectedCns(alicePartyId, aliceEntryName),
         expectedPrice = "42 CC per 1 day",
-        expectedCoinPrice = "84 USD @ 0.5CC/USD",
+        expectedAmuletPrice = "84 USD @ 0.5CC/USD",
         expectedPaymentDate = s"${aDate.getMonthValue}/${aDate.getDayOfMonth}/${aDate.getYear}",
         expectedButtonEnabled = true,
         expectedDescription = selfSubscriptionDescription,
@@ -69,7 +69,7 @@ class WalletSubscriptionsFrontendIntegrationTest
               expectedReceiver = svcEntry,
               expectedProvider = svcEntry,
               expectedPrice = "1 USD per 90 days",
-              expectedCoinPrice = "0.5 CC @ 2USD/CC",
+              expectedAmuletPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =
                 s"${cnsPaymentDue.getMonthValue}/${cnsPaymentDue.getDayOfMonth}/${cnsPaymentDue.getYear}",
               expectedButtonEnabled = true,
@@ -132,7 +132,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         aliceCnsExternalClient,
         aliceEntryName1,
         aliceWalletClient,
-        walletCoinToUsd(5),
+        walletAmuletToUsd(5),
       )
 
       val svcEntry = expectedSvcCns
@@ -191,7 +191,7 @@ class WalletSubscriptionsFrontendIntegrationTest
               expectedReceiver = svcEntry,
               expectedProvider = svcEntry,
               expectedPrice = "1 USD per 90 days",
-              expectedCoinPrice = "0.5 CC @ 2USD/CC",
+              expectedAmuletPrice = "0.5 CC @ 2USD/CC",
               expectedPaymentDate =
                 s"${cnsPaymentDue.getMonthValue}/${cnsPaymentDue.getDayOfMonth}/${cnsPaymentDue.getYear}",
               expectedButtonEnabled = true,
@@ -209,7 +209,7 @@ class WalletSubscriptionsFrontendIntegrationTest
       expectedReceiver: String,
       expectedProvider: String,
       expectedPrice: String,
-      expectedCoinPrice: String,
+      expectedAmuletPrice: String,
       expectedPaymentDate: String,
       expectedButtonEnabled: Boolean,
       expectedDescription: String,
@@ -226,16 +226,16 @@ class WalletSubscriptionsFrontendIntegrationTest
 
     subscriptionRow.childElement(className("sub-price")).text should matchText(expectedPrice)
 
-    subscriptionRow.childElement(className("sub-coin-price")).text should matchText(
-      expectedCoinPrice
+    subscriptionRow.childElement(className("sub-amulet-price")).text should matchText(
+      expectedAmuletPrice
     )
 
     subscriptionRow.childElement(className("sub-payment-date")).text should matchText(
       expectedPaymentDate
     )
 
-    subscriptionRow.childElement(className("sub-coin-price")).text should matchText(
-      expectedCoinPrice
+    subscriptionRow.childElement(className("sub-amulet-price")).text should matchText(
+      expectedAmuletPrice
     )
 
     cancelIsEnabled(subscriptionRow, expectedButtonEnabled)

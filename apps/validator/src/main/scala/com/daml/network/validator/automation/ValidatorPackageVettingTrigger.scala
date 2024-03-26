@@ -18,13 +18,13 @@ class ValidatorPackageVettingTrigger(
     override val ec: ExecutionContext,
     override val tracer: Tracer,
 ) extends PackageVettingTrigger(ValidatorPackageVettingTrigger.packages) {
-  override def getCoinRules()(implicit tc: TraceContext) =
-    scanConnection.getCoinRules()
+  override def getAmuletRules()(implicit tc: TraceContext) =
+    scanConnection.getAmuletRules()
 }
 
 object ValidatorPackageVettingTrigger {
   val packages = Set(
-    PackageIdResolver.Package.CantonCoin,
+    PackageIdResolver.Package.CantonAmulet,
     PackageIdResolver.Package.CantonNameService,
     PackageIdResolver.Package.ValidatorLifecycle,
     PackageIdResolver.Package.Wallet,

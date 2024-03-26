@@ -89,15 +89,15 @@ class UpdateHistoryIntegrationTest
     val (aliceUserParty, bobUserParty, _, _, key, _) = initSplitwellTest()
 
     actAndCheck(
-      "Tap coins for Alice and Bob", {
+      "Tap amulets for Alice and Bob", {
         aliceWalletClient.tap(tapAmount)
         bobWalletClient.tap(tapAmount)
       },
     )(
-      "Coins should appear in Alice and Bob's wallet",
+      "Amulets should appear in Alice and Bob's wallet",
       _ => {
-        aliceWalletClient.list().coins should have length 1
-        bobWalletClient.list().coins should have length 1
+        aliceWalletClient.list().amulets should have length 1
+        bobWalletClient.list().amulets should have length 1
       },
     )
     clue("Transfer some CC to alice") {
@@ -108,14 +108,14 @@ class UpdateHistoryIntegrationTest
       "Transfer some CC to alice, to commit transactions related to CC transfers",
       p2pTransfer(bobWalletClient, aliceWalletClient, aliceUserParty, transferAmount),
     )(
-      "Alice receives the transfer from bob and merges coins",
+      "Alice receives the transfer from bob and merges amulets",
       _ => {
-        val partitionAmount = walletUsdToCoin(tapAmount) + transferAmount / 2
+        val partitionAmount = walletUsdToAmulet(tapAmount) + transferAmount / 2
         aliceWalletClient.balance().unlockedQty should be > partitionAmount
         bobWalletClient.balance().unlockedQty should be < partitionAmount
 
-        aliceWalletClient.list().coins should have length 1
-        bobWalletClient.list().coins should have length 1
+        aliceWalletClient.list().amulets should have length 1
+        bobWalletClient.list().amulets should have length 1
       },
     )
 

@@ -1,8 +1,8 @@
 package com.daml.network.scan.admin.api.client
 
 import cats.data.OptionT
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinrules.CoinRules
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.environment.{CNLedgerClient, HttpAppConnection, RetryProvider}
@@ -69,22 +69,22 @@ class SingleScanConnection private[client] (
     }
   }
 
-  override def getCoinRulesWithState()(implicit
+  override def getAmuletRulesWithState()(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[ContractWithState[CoinRules.ContractId, CoinRules]] = {
-    getCoinRulesWithState(None)
+  ): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]] = {
+    getAmuletRulesWithState(None)
   }
 
-  def getCoinRulesWithState(
-      cachedCoinRules: Option[ContractWithState[CoinRules.ContractId, CoinRules]]
+  def getAmuletRulesWithState(
+      cachedAmuletRules: Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[ContractWithState[CoinRules.ContractId, CoinRules]] = {
+  ): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]] = {
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.GetCoinRules(cachedCoinRules),
+      HttpScanAppClient.GetAmuletRules(cachedAmuletRules),
     )
   }
 
@@ -295,7 +295,7 @@ class SingleScanConnection private[client] (
         .decode(Codec.BigDecimal)(rt.cumulativeChangeToInitialAmountAsOfRoundZero)
       cumulativeChangeToHoldingFeesRate <- Codec
         .decode(Codec.BigDecimal)(rt.cumulativeChangeToHoldingFeesRate)
-      totalCoinBalance <- Codec.decode(Codec.BigDecimal)(rt.totalCoinBalance)
+      totalAmuletBalance <- Codec.decode(Codec.BigDecimal)(rt.totalAmuletBalance)
     } yield {
       ScanAggregator.RoundTotals(
         closedRound = rt.closedRound,
@@ -308,7 +308,7 @@ class SingleScanConnection private[client] (
         cumulativeValidatorRewards = cumulativeValidatorRewards,
         cumulativeChangeToInitialAmountAsOfRoundZero = cumulativeChangeToInitialAmountAsOfRoundZero,
         cumulativeChangeToHoldingFeesRate = cumulativeChangeToHoldingFeesRate,
-        totalCoinBalance = totalCoinBalance,
+        totalAmuletBalance = totalAmuletBalance,
       )
     })
   }
@@ -386,7 +386,7 @@ object SingleScanConnection {
 }
 
 class CachedScanConnection private[client] (
-    protected val coinLedgerClient: CNLedgerClient,
+    protected val amuletLedgerClient: CNLedgerClient,
     config: ScanAppClientConfig,
     clock: Clock,
     retryProvider: RetryProvider,
@@ -400,15 +400,15 @@ class CachedScanConnection private[client] (
 ) extends SingleScanConnection(config, clock, retryProvider, outerLoggerFactory)
     with CachingScanConnection {
 
-  override protected val coinRulesCacheTimeToLive: NonNegativeFiniteDuration =
-    config.coinRulesCacheTimeToLive
+  override protected val amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
+    config.amuletRulesCacheTimeToLive
 
-  override protected def runGetCoinRulesWithState(
-      cachedCoinRules: Option[ContractWithState[CoinRules.ContractId, CoinRules]]
-  )(implicit tc: TraceContext): Future[ContractWithState[CoinRules.ContractId, CoinRules]] =
+  override protected def runGetAmuletRulesWithState(
+      cachedAmuletRules: Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]
+  )(implicit tc: TraceContext): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]] =
     runHttpCmd(
       config.adminApi.url,
-      HttpScanAppClient.GetCoinRules(cachedCoinRules),
+      HttpScanAppClient.GetAmuletRules(cachedAmuletRules),
     )
 
   override protected def runGetCnsRules(

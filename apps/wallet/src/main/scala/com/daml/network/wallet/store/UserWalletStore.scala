@@ -5,8 +5,8 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  coinrules as coinrulesCodegen,
+  amulet as amuletCodegen,
+  amuletrules as amuletrulesCodegen,
   round as roundCodegen,
   validatorlicense as validatorCodegen,
 }
@@ -221,15 +221,15 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
     requests <- multiDomainAcsStore.listContracts(subsCodegen.SubscriptionRequest.COMPANION, limit)
   } yield requests map (_.contract)
 
-  /** List all non-expired coins owned by a user in descending order according to their current amount in the given submitting round. */
-  def listSortedCoinsAndQuantity(
+  /** List all non-expired amulets owned by a user in descending order according to their current amount in the given submitting round. */
+  def listSortedAmuletsAndQuantity(
       submittingRound: Long,
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[(BigDecimal, coinrulesCodegen.transferinput.InputCoin)]] = for {
-    coins <- multiDomainAcsStore.listContracts(coinCodegen.Coin.COMPANION)
-  } yield coins
+  ): Future[Seq[(BigDecimal, amuletrulesCodegen.transferinput.InputAmulet)]] = for {
+    amulets <- multiDomainAcsStore.listContracts(amuletCodegen.Amulet.COMPANION)
+  } yield amulets
     .map(c =>
       (
         CNNodeUtil
@@ -237,17 +237,17 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
         c,
       )
     )
-    .filter { quantityAndCoin => quantityAndCoin._1.compareTo(BigDecimal.valueOf(0)) > 0 }
-    .sortBy(quantityAndCoin =>
+    .filter { quantityAndAmulet => quantityAndAmulet._1.compareTo(BigDecimal.valueOf(0)) > 0 }
+    .sortBy(quantityAndAmulet =>
       // negating because largest values should come first.
-      quantityAndCoin._1.negate()
+      quantityAndAmulet._1.negate()
     )
     .take(limit.limit)
-    .map(quantityAndCoin =>
+    .map(quantityAndAmulet =>
       (
-        quantityAndCoin._1,
-        new coinrulesCodegen.transferinput.InputCoin(
-          quantityAndCoin._2.contractId
+        quantityAndAmulet._1,
+        new amuletrulesCodegen.transferinput.InputAmulet(
+          quantityAndAmulet._2.contractId
         ),
       )
     )
@@ -259,7 +259,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       activeIssuingRoundsO: Option[Set[Long]],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
-    Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+    Contract[amuletCodegen.ValidatorRewardCoupon.ContractId, amuletCodegen.ValidatorRewardCoupon]
   ]]
 
   /** Returns the app reward coupon sorted by their round in ascending order and their value in descending order.
@@ -269,7 +269,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
       issuingRoundsMap: Map[cc.types.Round, roundCodegen.IssuingMiningRound],
       limit: Limit = Limit.DefaultLimit,
   )(implicit tc: TraceContext): Future[Seq[
-    (Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon], BigDecimal)
+    (Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon], BigDecimal)
   ]]
 
   /** Returns the validator faucet coupons sorted by their round in ascending order and their value in descending order.
@@ -297,27 +297,27 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
   )(implicit tc: TraceContext): Future[Seq[
     (
         Contract[
-          coinCodegen.SvRewardCoupon.ContractId,
-          coinCodegen.SvRewardCoupon,
+          amuletCodegen.SvRewardCoupon.ContractId,
+          amuletCodegen.SvRewardCoupon,
         ],
         BigDecimal,
     )
   ]]
 
   final def lookupFeaturedAppRight()(implicit ec: ExecutionContext, tc: TraceContext): Future[
-    Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
+    Option[Contract[amuletCodegen.FeaturedAppRight.ContractId, amuletCodegen.FeaturedAppRight]]
   ] =
     // Note: there is nothing that prevents a party from having multiple FeaturedAppRight contracts
     // here we just take the first one.
-    lookupArbitraryPreferAssigned(coinCodegen.FeaturedAppRight.COMPANION)
+    lookupArbitraryPreferAssigned(amuletCodegen.FeaturedAppRight.COMPANION)
       .map(_ map (_.contract))
 
   /** Lists all the validator rights where the corresponding user is entered as the validator. */
   final def getValidatorRightsWhereUserIsValidator()(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]] =
+  ): Future[Seq[Contract[amuletCodegen.ValidatorRight.ContractId, amuletCodegen.ValidatorRight]]] =
     multiDomainAcsStore
-      .listContracts(coinCodegen.ValidatorRight.COMPANION)
+      .listContracts(amuletCodegen.ValidatorRight.COMPANION)
       .map(_ map (_.contract))
 
   def listTransactions(
@@ -397,7 +397,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
     }
   }
 
-  final def listLaggingCoinRulesFollowers(
+  final def listLaggingAmuletRulesFollowers(
       targetDomain: DomainId
   )(implicit
       tc: TraceContext
@@ -523,12 +523,12 @@ object UserWalletStore {
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] = {
     Seq[ConstrainedTemplate](
-      coinCodegen.AppRewardCoupon.COMPANION,
-      coinCodegen.Coin.COMPANION,
-      coinCodegen.LockedCoin.COMPANION,
-      coinCodegen.ValidatorRewardCoupon.COMPANION,
+      amuletCodegen.AppRewardCoupon.COMPANION,
+      amuletCodegen.Amulet.COMPANION,
+      amuletCodegen.LockedAmulet.COMPANION,
+      amuletCodegen.ValidatorRewardCoupon.COMPANION,
       validatorCodegen.ValidatorFaucetCoupon.COMPANION,
-      coinCodegen.SvRewardCoupon.COMPANION,
+      amuletCodegen.SvRewardCoupon.COMPANION,
       subsCodegen.Subscription.COMPANION,
       subsCodegen.SubscriptionRequest.COMPANION,
       subsCodegen.SubscriptionInitialPayment.COMPANION,
@@ -579,23 +579,23 @@ object UserWalletStore {
           co.payload.svcParty == svc &&
             co.payload.endUserParty == endUser
         )(UserWalletAcsStoreRowData(_)),
-        // Coins
-        mkFilter(coinCodegen.Coin.COMPANION)(co =>
+        // Amulets
+        mkFilter(amuletCodegen.Amulet.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.owner == endUser
         )(UserWalletAcsStoreRowData(_)),
-        mkFilter(coinCodegen.LockedCoin.COMPANION)(co =>
-          co.payload.coin.svc == svc &&
-            co.payload.coin.owner == endUser
+        mkFilter(amuletCodegen.LockedAmulet.COMPANION)(co =>
+          co.payload.amulet.svc == svc &&
+            co.payload.amulet.owner == endUser
         )(UserWalletAcsStoreRowData(_)),
         // Rewards
-        mkFilter(coinCodegen.AppRewardCoupon.COMPANION)(co =>
+        mkFilter(amuletCodegen.AppRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.provider == endUser
         )(co =>
           UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
         ),
-        mkFilter(coinCodegen.ValidatorRewardCoupon.COMPANION)(co =>
+        mkFilter(amuletCodegen.ValidatorRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.user == endUser
         )(co =>
@@ -607,7 +607,7 @@ object UserWalletStore {
         )(co =>
           UserWalletAcsStoreRowData(co, None, rewardCouponRound = Some(co.payload.round.number))
         ),
-        mkFilter(coinCodegen.SvRewardCoupon.COMPANION)(co =>
+        mkFilter(amuletCodegen.SvRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.beneficiary == endUser
         )(co =>
@@ -618,7 +618,7 @@ object UserWalletStore {
             rewardCouponWeight = Some(co.payload.weight),
           )
         ),
-        mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
+        mkFilter(amuletCodegen.ValidatorRight.COMPANION)(co =>
           // All validator rights where the current user is the validator.
           co.payload.svc == svc &&
             co.payload.validator == endUser
@@ -687,7 +687,7 @@ object UserWalletStore {
             co.payload.subscriptionData.sender == endUser
         )(UserWalletAcsStoreRowData(_)),
         // Featured app right
-        mkFilter(coinCodegen.FeaturedAppRight.COMPANION)(co =>
+        mkFilter(amuletCodegen.FeaturedAppRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.provider == endUser
         )(UserWalletAcsStoreRowData(_)),
         // CNS entry

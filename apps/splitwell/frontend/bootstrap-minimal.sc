@@ -6,7 +6,7 @@ import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
 
 println("Waiting for SVC initialization...")
-// We need to do this at the beginning, otherwise later commands can fail because CoinRules is locked.n
+// We need to do this at the beginning, otherwise later commands can fail because AmuletRules is locked.n
 sv1.waitForInitialization()
 
 println("Waiting for validator initialization...")
@@ -51,7 +51,7 @@ def ensureCnsEntry(
       cns.createCnsEntry(name, url, description)
       println("Waiting for wallet initialization to complete")
       wallet.waitForInitialization()
-      println("Wallet initialization complete, tapping coin")
+      println("Wallet initialization complete, tapping amulet")
       wallet.tap(5.0)
       println("Waiting for submission request")
       utils.retry_until_true { wallet.listSubscriptionRequests().length == 1 }

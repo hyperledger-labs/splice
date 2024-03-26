@@ -1,16 +1,16 @@
 import React from 'react';
 
-import useGetCoinRules from '../hooks/scan-proxy/useGetCoinRules';
+import useGetAmuletRules from '../hooks/scan-proxy/useGetAmuletRules';
 
 const DevNetOnly: React.FC<{ children: React.ReactElement }> = props => {
-  const { data: coinRules, error } = useGetCoinRules();
+  const { data: amuletRules, error } = useGetAmuletRules();
 
   if (error) {
     console.error('Failed to resolve isDevNet', error);
     return null;
   }
 
-  const isDevNet = coinRules?.contract.payload.isDevNet;
+  const isDevNet = amuletRules?.contract.payload.isDevNet;
 
   if (!isDevNet) {
     return null;

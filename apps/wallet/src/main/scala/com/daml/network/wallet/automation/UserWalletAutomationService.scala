@@ -43,7 +43,7 @@ class UserWalletAutomationService(
       automationConfig,
       clock,
       store,
-      PackageIdResolver.inferFromCoinRules(
+      PackageIdResolver.inferFromAmuletRules(
         clock,
         scanConnection,
         loggerFactory,
@@ -70,9 +70,9 @@ class UserWalletAutomationService(
   registerTrigger(
     new CompleteBuyTrafficRequestTrigger(triggerContext, store, treasury, connection)
   )
-  if (automationConfig.enableAutomaticRewardsCollectionAndCoinMerging) {
+  if (automationConfig.enableAutomaticRewardsCollectionAndAmuletMerging) {
     registerTrigger(
-      new CollectRewardsAndMergeCoinsTrigger(triggerContext, treasury)
+      new CollectRewardsAndMergeAmuletsTrigger(triggerContext, treasury)
     )
   }
 
@@ -96,11 +96,11 @@ class UserWalletAutomationService(
       connection,
       store.key.endUserParty,
       implicit tc =>
-        scanConnection.getCoinRulesWithState() flatMap { coinRules =>
-          coinRules.toAssignedContract map { coinRules =>
+        scanConnection.getAmuletRulesWithState() flatMap { amuletRules =>
+          amuletRules.toAssignedContract map { amuletRules =>
             store
-              .listLaggingCoinRulesFollowers(coinRules.domain)
-              .map(_ map (FollowTask(coinRules, _)))
+              .listLaggingAmuletRulesFollowers(amuletRules.domain)
+              .map(_ map (FollowTask(amuletRules, _)))
           } getOrElse Future.successful(Seq.empty)
         },
     )
@@ -109,10 +109,10 @@ class UserWalletAutomationService(
 
 object UserWalletAutomationService extends AutomationServiceCompanion {
   private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
-    // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
+    // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
     // we can hardcode this.
-    Option.when(template.moduleName == "CC.CoinImport")(
-      DarResources.cantonCoin.bootstrap.packageId
+    Option.when(template.moduleName == "CC.AmuletImport")(
+      DarResources.cantonAmulet.bootstrap.packageId
     )
 
   // defined because instances are created by UserWalletService, not immediately
@@ -126,7 +126,7 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
       aTrigger[SubscriptionReadyForPaymentTrigger],
       aTrigger[AcceptedTransferOfferTrigger],
       aTrigger[CompleteBuyTrafficRequestTrigger],
-      aTrigger[CollectRewardsAndMergeCoinsTrigger],
+      aTrigger[CollectRewardsAndMergeAmuletsTrigger],
       aTrigger[UnassignTrigger.Template[?, ?]],
       aTrigger[AssignTrigger],
       aTrigger[TransferFollowTrigger],

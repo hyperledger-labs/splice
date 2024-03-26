@@ -12,7 +12,7 @@ import com.digitalasset.canton.topology.UniqueIdentifier
 
 import java.time.Duration
 
-// A fork of SimpleStatus from Canton for Coin apps, without topologyQueues member
+// A fork of SimpleStatus from Canton for Amulet apps, without topologyQueues member
 case class CNNodeStatus(
     uid: UniqueIdentifier,
     uptime: Duration,

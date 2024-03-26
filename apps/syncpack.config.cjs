@@ -11,7 +11,7 @@ module.exports = {
       label: "Daml codegen",
       packages: ["**"],
       dependencies: [
-        "@daml.js/canton-coin",
+        "@daml.js/canton-amulet",
         "@daml.js/cns",
         "@daml.js/wallet",
         "@daml.js/wallet-payments",

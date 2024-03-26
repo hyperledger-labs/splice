@@ -90,7 +90,7 @@ import scala.jdk.OptionConverters.*
 class SvApp(
     override val name: InstanceName,
     val config: SvAppBackendConfig,
-    val coinAppParameters: SharedCNNodeAppParameters,
+    val amuletAppParameters: SharedCNNodeAppParameters,
     storage: Storage,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -105,7 +105,7 @@ class SvApp(
 ) extends CNNodeBase[SvApp.State](
       config.ledgerApiUser,
       config.participantClient,
-      coinAppParameters,
+      amuletAppParameters,
       loggerFactory,
       tracerProvider,
       futureSupervisor,
@@ -121,7 +121,7 @@ class SvApp(
   override def preInitializeBeforeLedgerConnection()(implicit tc: TraceContext): Future[Unit] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
-      coinAppParameters.loggingConfig.api,
+      amuletAppParameters.loggingConfig.api,
       loggerFactory,
       metrics.grpcClientMetrics,
       retryProvider,
@@ -170,7 +170,7 @@ class SvApp(
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     val participantAdminConnection = new ParticipantAdminConnection(
       config.participantClient.adminApi,
-      coinAppParameters.loggingConfig.api,
+      amuletAppParameters.loggingConfig.api,
       loggerFactory,
       metrics.grpcClientMetrics,
       retryProvider,
@@ -182,14 +182,14 @@ class SvApp(
           participantAdminConnection,
           new SequencerAdminConnection(
             config.sequencer.adminApi,
-            coinAppParameters.loggingConfig.api,
+            amuletAppParameters.loggingConfig.api,
             loggerFactory,
             metrics.grpcClientMetrics,
             retryProvider,
           ),
           new MediatorAdminConnection(
             config.mediator.adminApi,
-            coinAppParameters.loggingConfig.api,
+            amuletAppParameters.loggingConfig.api,
             loggerFactory,
             metrics.grpcClientMetrics,
             retryProvider,
@@ -271,7 +271,7 @@ class SvApp(
           loggerFactory,
           retryProvider,
         )
-      // Ensure SVC party, SvcRules, CoinRules, Mediator, and Sequencer nodes are setup
+      // Ensure SVC party, SvcRules, AmuletRules, Mediator, and Sequencer nodes are setup
       // -------------------------------------------------------------------------------
       case (
         globalDomain,
@@ -359,19 +359,19 @@ class SvApp(
             clock,
           )
         },
-        appInitStep("Get CoinRules to determine if we are in a DevNet") {
+        appInitStep("Get AmuletRules to determine if we are in a DevNet") {
           retryProvider.getValueWithRetriesNoPretty(
             RetryFor.WaitingOnInitDependency,
-            "get_coin_rules",
-            "get CoinRules to determine if we are in a DevNet",
-            svcStore.getCoinRules().map(coinRules => coinRules.payload.isDevNet),
+            "get_amulet_rules",
+            "get AmuletRules to determine if we are in a DevNet",
+            svcStore.getAmuletRules().map(amuletRules => amuletRules.payload.isDevNet),
             logger,
           )
         },
-        appInitStep("Ensure coin price has a vote") {
-          config.initialCoinPriceVote
+        appInitStep("Ensure amulet price has a vote") {
+          config.initialAmuletPriceVote
             .map(
-              ensureCoinPriceVoteHasCoinPrice(
+              ensureAmuletPriceVoteHasAmuletPrice(
                 _,
                 svcAutomation,
                 logger,
@@ -538,7 +538,7 @@ class SvApp(
 
   private val darFilesToUploadDuringInit: Seq[UploadablePackage] =
     Seq(
-      SvApp.coinPackage,
+      SvApp.amuletPackage,
       SvApp.svcGovernancePackage,
       SvApp.validatorLifecyclePackage,
     )
@@ -654,23 +654,23 @@ class SvApp(
       logger,
     )
 
-  private def ensureCoinPriceVoteHasCoinPrice(
-      defaultCoinPriceVote: BigDecimal,
+  private def ensureAmuletPriceVoteHasAmuletPrice(
+      defaultAmuletPriceVote: BigDecimal,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       logger: TracedLogger,
   )(implicit tc: TraceContext): Future[Either[String, Unit]] =
-    svcStoreWithIngestion.store.lookupCoinPriceVoteByThisSv().flatMap {
-      case Some(vote) if vote.payload.coinPrice.toScala.isDefined =>
-        logger.info(s"A coin price vote with a defined coin price already exists")
+    svcStoreWithIngestion.store.lookupAmuletPriceVoteByThisSv().flatMap {
+      case Some(vote) if vote.payload.amuletPrice.toScala.isDefined =>
+        logger.info(s"A amulet price vote with a defined amulet price already exists")
         Future.successful(Right(()))
       case _ =>
         retryProvider.retry(
           RetryFor.WaitingOnInitDependency,
-          "update_coin_price",
-          "Update coin price vote to configured initial coin price vote",
+          "update_amulet_price",
+          "Update amulet price vote to configured initial amulet price vote",
           SvApp
-            .updateCoinPriceVote(
-              defaultCoinPriceVote,
+            .updateAmuletPriceVote(
+              defaultAmuletPriceVote,
               svcStoreWithIngestion,
               logger,
             ),
@@ -775,24 +775,24 @@ object SvApp {
     } yield res
   }
 
-  def updateCoinPriceVote(
-      desiredCoinPrice: BigDecimal,
+  def updateAmuletPriceVote(
+      desiredAmuletPrice: BigDecimal,
       svcStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvcStore],
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
     val svcStore = svcStoreWithIngestion.store
-    svcStore.lookupCoinPriceVoteByThisSv().flatMap {
-      case Some(vote) if vote.payload.coinPrice.toScala.contains(desiredCoinPrice.bigDecimal) =>
-        logger.info(s"Coin price vote is already set to $desiredCoinPrice")
+    svcStore.lookupAmuletPriceVoteByThisSv().flatMap {
+      case Some(vote) if vote.payload.amuletPrice.toScala.contains(desiredAmuletPrice.bigDecimal) =>
+        logger.info(s"Amulet price vote is already set to $desiredAmuletPrice")
         Future.successful(Right(()))
       case Some(vote) =>
         for {
           svcRules <- svcStore.getSvcRules()
           cmd = svcRules.exercise(
-            _.exerciseSvcRules_UpdateCoinPriceVote(
+            _.exerciseSvcRules_UpdateAmuletPriceVote(
               svcStore.key.svParty.toProtoPrimitive,
               vote.contractId,
-              desiredCoinPrice.bigDecimal,
+              desiredAmuletPrice.bigDecimal,
             )
           )
           _ <- svcStoreWithIngestion.connection
@@ -1222,8 +1222,8 @@ object SvApp {
     })
   }
 
-  val coinPackage: UploadablePackage =
-    UploadablePackage.fromResource(DarResources.cantonCoin.bootstrap)
+  val amuletPackage: UploadablePackage =
+    UploadablePackage.fromResource(DarResources.cantonAmulet.bootstrap)
   val svcGovernancePackage: UploadablePackage =
     UploadablePackage.fromResource(DarResources.svcGovernance.bootstrap)
   val validatorLifecyclePackage: UploadablePackage =

@@ -95,20 +95,20 @@ case class UseToxiproxy(
               .map { case ((n, config), i) =>
                 val basePortBump = i * 100
                 config.scanClient match {
-                  case BftScanClientConfig.TrustSingle(url, coinRulesCacheTimeToLive) =>
+                  case BftScanClientConfig.TrustSingle(url, amuletRulesCacheTimeToLive) =>
                     val newUrl = addScanAppHttpProxy(n.unwrap, url, basePortBump)
                     (
                       n,
                       config.copy(scanClient =
-                        BftScanClientConfig.TrustSingle(newUrl, coinRulesCacheTimeToLive)
+                        BftScanClientConfig.TrustSingle(newUrl, amuletRulesCacheTimeToLive)
                       ),
                     )
-                  case BftScanClientConfig.Bft(seedUrls, _, coinRulesCacheTimeToLive) =>
+                  case BftScanClientConfig.Bft(seedUrls, _, amuletRulesCacheTimeToLive) =>
                     val newUrl = addScanAppHttpProxy(n.unwrap, seedUrls.head, basePortBump)
                     (
                       n,
                       config.copy(scanClient =
-                        BftScanClientConfig.TrustSingle(newUrl, coinRulesCacheTimeToLive)
+                        BftScanClientConfig.TrustSingle(newUrl, amuletRulesCacheTimeToLive)
                       ),
                     )
                 }

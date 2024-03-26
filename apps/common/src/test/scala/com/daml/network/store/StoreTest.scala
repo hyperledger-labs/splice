@@ -13,8 +13,8 @@ import com.daml.ledger.javaapi.data.{
   Value as damlValue,
 }
 import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  coinrules as coinrulesCodegen,
+  amulet as amuletCodegen,
+  amuletrules as amuletrulesCodegen,
   expiry as expiryCodegen,
   fees as feesCodegen,
   round as roundCodegen,
@@ -41,11 +41,11 @@ import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.scalatest.wordspec.AsyncWordSpec
 import com.daml.lf.data.Numeric
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinconfig.{CoinConfig, USD}
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amuletconfig.{AmuletConfig, USD}
 import com.daml.network.codegen.java.cn.svc.memberstate.{MemberRewardState, RewardState}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.history.{AppRewardCreate, CoinCreate}
+import com.daml.network.history.{AppRewardCreate, AmuletCreate}
 import com.daml.network.store.MultiDomainAcsStore.HasIngestionSink
 import com.daml.network.store.db.TxLogRowData
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -92,23 +92,23 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     LfContractId.assertFromString("00" + f"$cIdCounter%064x").coid
   }
 
-  private val schedule: scheduleCodegen.Schedule[Instant, CoinConfig[USD]] =
-    CNNodeUtil.defaultCoinConfigSchedule(
+  private val schedule: scheduleCodegen.Schedule[Instant, AmuletConfig[USD]] =
+    CNNodeUtil.defaultAmuletConfigSchedule(
       NonNegativeFiniteDuration(Duration.ofMinutes(10)),
       10,
       dummyDomain,
     )
-  protected def coinRules() = {
-    val templateId = coinrulesCodegen.CoinRules.TEMPLATE_ID
+  protected def amuletRules() = {
+    val templateId = amuletrulesCodegen.AmuletRules.TEMPLATE_ID
 
-    val template = new coinrulesCodegen.CoinRules(
+    val template = new amuletrulesCodegen.AmuletRules(
       svcParty.toProtoPrimitive,
       schedule,
       false,
     )
     contract(
       identifier = templateId,
-      contractId = new coinrulesCodegen.CoinRules.ContractId(nextCid()),
+      contractId = new amuletrulesCodegen.AmuletRules.ContractId(nextCid()),
       payload = template,
     )
   }
@@ -133,11 +133,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
 
   protected val holdingFee = 1.0
 
-  protected def openMiningRound(svc: PartyId, round: Long, coinPrice: Double) = {
+  protected def openMiningRound(svc: PartyId, round: Long, amuletPrice: Double) = {
     val template = new roundCodegen.OpenMiningRound(
       svc.toProtoPrimitive,
       new Round(round),
-      numeric(coinPrice),
+      numeric(amuletPrice),
       Instant.now().truncatedTo(ChronoUnit.MICROS),
       Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(600),
       new RelTime(1_000_000),
@@ -171,9 +171,14 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
-  protected def coin(owner: PartyId, amount: Double, createdAtRound: Long, ratePerRound: Double) = {
-    val templateId = coinCodegen.Coin.TEMPLATE_ID
-    val template = new coinCodegen.Coin(
+  protected def amulet(
+      owner: PartyId,
+      amount: Double,
+      createdAtRound: Long,
+      ratePerRound: Double,
+  ) = {
+    val templateId = amuletCodegen.Amulet.TEMPLATE_ID
+    val template = new amuletCodegen.Amulet(
       svcParty.toProtoPrimitive,
       owner.toProtoPrimitive,
       new feesCodegen.ExpiringAmount(
@@ -184,26 +189,26 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
     )
     contract(
       identifier = templateId,
-      contractId = new coinCodegen.Coin.ContractId(nextCid()),
+      contractId = new amuletCodegen.Amulet.ContractId(nextCid()),
       payload = template,
     )
   }
 
-  protected def lockedCoin(
+  protected def lockedAmulet(
       owner: PartyId,
       amount: Double,
       createdAtRound: Long,
       ratePerRound: Double,
   ) = {
-    val templateId = coinCodegen.LockedCoin.TEMPLATE_ID
-    val coinTemplate = coin(owner, amount, createdAtRound, ratePerRound).payload
-    val template = new coinCodegen.LockedCoin(
-      coinTemplate,
+    val templateId = amuletCodegen.LockedAmulet.TEMPLATE_ID
+    val amuletTemplate = amulet(owner, amount, createdAtRound, ratePerRound).payload
+    val template = new amuletCodegen.LockedAmulet(
+      amuletTemplate,
       new expiryCodegen.TimeLock(java.util.List.of(), Instant.now().truncatedTo(ChronoUnit.MICROS)),
     )
     contract(
       identifier = templateId,
-      contractId = new coinCodegen.LockedCoin.ContractId(nextCid()),
+      contractId = new amuletCodegen.LockedAmulet.ContractId(nextCid()),
       payload = template,
     )
   }
@@ -214,11 +219,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       featured: Boolean = false,
       amount: Numeric.Numeric = numeric(1.0),
       contractId: String = nextCid(),
-  ): Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon] =
+  ): Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon] =
     contract(
-      identifier = coinCodegen.AppRewardCoupon.TEMPLATE_ID,
-      contractId = new coinCodegen.AppRewardCoupon.ContractId(contractId),
-      payload = new coinCodegen.AppRewardCoupon(
+      identifier = amuletCodegen.AppRewardCoupon.TEMPLATE_ID,
+      contractId = new amuletCodegen.AppRewardCoupon.ContractId(contractId),
+      payload = new amuletCodegen.AppRewardCoupon(
         svcParty.toProtoPrimitive,
         provider.toProtoPrimitive,
         featured,
@@ -255,13 +260,13 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       user: PartyId,
       amount: Numeric.Numeric = numeric(1.0),
   ): Contract[
-    coinCodegen.ValidatorRewardCoupon.ContractId,
-    coinCodegen.ValidatorRewardCoupon,
+    amuletCodegen.ValidatorRewardCoupon.ContractId,
+    amuletCodegen.ValidatorRewardCoupon,
   ] =
     contract(
-      identifier = coinCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
-      contractId = new coinCodegen.ValidatorRewardCoupon.ContractId(nextCid()),
-      payload = new coinCodegen.ValidatorRewardCoupon(
+      identifier = amuletCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
+      contractId = new amuletCodegen.ValidatorRewardCoupon.ContractId(nextCid()),
+      payload = new amuletCodegen.ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         user.toProtoPrimitive,
         amount,
@@ -305,7 +310,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       subscriptionData,
       payData,
       numeric(amount.bigDecimal),
-      new coinCodegen.LockedCoin.ContractId(nextCid()),
+      new amuletCodegen.LockedAmulet.ContractId(nextCid()),
       new Round(1L),
       reference,
     )
@@ -334,11 +339,11 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       beneficiary: PartyId,
       weight: Long,
       contractId: String = nextCid(),
-  ): Contract[coinCodegen.SvRewardCoupon.ContractId, coinCodegen.SvRewardCoupon] =
+  ): Contract[amuletCodegen.SvRewardCoupon.ContractId, amuletCodegen.SvRewardCoupon] =
     contract(
-      identifier = coinCodegen.SvRewardCoupon.TEMPLATE_ID,
-      contractId = new coinCodegen.SvRewardCoupon.ContractId(contractId),
-      payload = new coinCodegen.SvRewardCoupon(
+      identifier = amuletCodegen.SvRewardCoupon.TEMPLATE_ID,
+      contractId = new amuletCodegen.SvRewardCoupon.ContractId(contractId),
+      payload = new amuletCodegen.SvRewardCoupon(
         svcParty.toProtoPrimitive,
         sv.toProtoPrimitive,
         beneficiary.toProtoPrimitive,
@@ -1037,19 +1042,19 @@ object StoreTest {
     ): Seq[(DomainId, Option[ContractId[?]], TestTxLogEntry)] = Seq.empty
 
     private def parseCreatedEvent(event: CreatedEvent): TestTxLogEntry = {
-      // Note: coins and app reward coupons are heavily used in MultiDomainAcsStoreTest
+      // Note: amulets and app reward coupons are heavily used in MultiDomainAcsStoreTest
       event match {
-        case CoinCreate(coin) =>
+        case AmuletCreate(amulet) =>
           TestTxLogEntry(
             eventId = event.getEventId,
             contractId = event.getContractId,
-            numericValue = coin.payload.amount.initialAmount,
+            numericValue = amulet.payload.amount.initialAmount,
           )
-        case AppRewardCreate(coin) =>
+        case AppRewardCreate(amulet) =>
           TestTxLogEntry(
             eventId = event.getEventId,
             contractId = event.getContractId,
-            numericValue = coin.payload.amount,
+            numericValue = amulet.payload.amount,
           )
         case _ =>
           TestTxLogEntry(

@@ -34,7 +34,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
       // for testing that input limits are respected.
-      .withoutAutomaticRewardsCollectionAndCoinMerging
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
       .addConfigTransform((_, config) =>
         // for testing that input limits are respected.
         CNNodeConfigTransforms
@@ -57,7 +57,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     advanceRoundsByOneTick
 
     eventually() {
-      aliceValidatorWalletClient.list().coins should have length 2
+      aliceValidatorWalletClient.list().amulets should have length 2
       aliceValidatorWalletClient
         .listValidatorRewardCoupons() should have length 2
       aliceValidatorWalletClient
@@ -69,7 +69,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       // and the rewards from round 1 are prioritized
       p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
       eventually() {
-        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient.list().amulets should have length 1
         aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
@@ -89,7 +89,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
       eventually() {
         // fails here when p2p-ing above.
-        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient.list().amulets should have length 1
         aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 2) should have length 0
@@ -119,7 +119,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     advanceRoundsByOneTick
 
     eventually() {
-      aliceValidatorWalletClient.list().coins should have length 1
+      aliceValidatorWalletClient.list().amulets should have length 1
       aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 3
       aliceValidatorWalletClient.listAppRewardCoupons() should have length 3
     }
@@ -131,9 +131,9 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
 
       eventually() {
-        // four inputs: 1 coin, 3 rewards.
+        // four inputs: 1 amulet, 3 rewards.
         // only the most valuable validator reward is chosen as input because of the issuance curve.
-        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient.list().amulets should have length 1
         aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1)
@@ -151,7 +151,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
 
       eventually() {
-        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient.list().amulets should have length 1
 
         aliceValidatorWalletClient
           .listValidatorRewardCoupons()
@@ -167,13 +167,13 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     // current config: maxNumInputs = 4
     // We then schedule a reduction of maxNumInputs to 3
     val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-    val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
+    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
     val configSchedule = new cc.schedule.Schedule(
-      mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 4),
+      mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 4),
       List(
         new Tuple2(
           now.add(Duration.ofSeconds(160 * 4 - 10)).toInstant,
-          mkUpdatedCoinConfig(currentConfigSchedule, defaultTickDuration, 3),
+          mkUpdatedAmuletConfig(currentConfigSchedule, defaultTickDuration, 3),
         )
       ).asJava,
     )
@@ -198,7 +198,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       val currentInstant =
         sv1Backend.participantClientWithAdminToken.ledger_api.time.get().toInstant
       getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(1, 2)
-      aliceValidatorWalletClient.list().coins should have length 2
+      aliceValidatorWalletClient.list().amulets should have length 2
       aliceValidatorWalletClient
         .listValidatorRewardCoupons() should have length 3
       aliceValidatorWalletClient
@@ -210,7 +210,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       // and the rewards from round 1 are prioritized
       p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
       eventually() {
-        aliceValidatorWalletClient.list().coins should have length 1
+        aliceValidatorWalletClient.list().amulets should have length 1
         aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
@@ -241,8 +241,8 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
           sv1Backend.participantClientWithAdminToken.ledger_api.time.get().toInstant
         getOpenIssuingRounds(currentInstant).map(_.data.round.number) shouldBe Seq(2, 3)
         // As the max number of input is reduced to 3
-        // only 3 inputs are used: 1 coin, ValidatorRewardCoupon from round 2 and AppRewardCoupon from round 2
-        aliceValidatorWalletClient.list().coins should have length 1
+        // only 3 inputs are used: 1 amulet, ValidatorRewardCoupon from round 2 and AppRewardCoupon from round 2
+        aliceValidatorWalletClient.list().amulets should have length 1
         aliceValidatorWalletClient
           .listValidatorRewardCoupons()
           .filter(_.payload.round.number == 1) should have length 0
@@ -271,12 +271,12 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     aliceValidatorWalletClient.tap(50)
     p2pTransfer(aliceValidatorWalletClient, aliceWalletClient, alice, 5)
     eventually() {
-      aliceValidatorWalletClient.list().coins should have length 1
+      aliceValidatorWalletClient.list().amulets should have length 1
     }
     aliceValidatorWalletClient.tap(50)
 
     eventually() {
-      aliceValidatorWalletClient.list().coins should have length 2
+      aliceValidatorWalletClient.list().amulets should have length 2
       aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 1
       aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
     }
@@ -290,7 +290,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
       {
         aliceValidatorWalletClient.tap(1)
         eventually() {
-          aliceValidatorWalletClient.list().coins should have length 3
+          aliceValidatorWalletClient.list().amulets should have length 3
           aliceValidatorWalletClient.listValidatorRewardCoupons() should have length 1
           aliceValidatorWalletClient.listAppRewardCoupons() should have length 1
         }
@@ -303,7 +303,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
           // if we run a tap, only 3 of 4 possible inputs are selected because one input slot is "taken" by the tap
           // (notice how the app reward coupon is not an input)
           _.message should include regex (
-            "with inputs Vector\\(InputCoin\\(.*\\), InputCoin\\(.*\\), InputAppRewardCoupon\\(.*\\)\\)"
+            "with inputs Vector\\(InputAmulet\\(.*\\), InputAmulet\\(.*\\), InputAppRewardCoupon\\(.*\\)\\)"
           )
         )
       },
@@ -311,22 +311,22 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
 
   }
 
-  "ignore expired-coins in the treasury service input" in { implicit env =>
+  "ignore expired-amulets in the treasury service input" in { implicit env =>
     val (_, bob) = onboardAliceAndBob()
 
     aliceWalletClient.tap(100)
 
-    // creating 5 soon-to-be-expired coins because the 'expire coin' automation expires
-    // 4 coins at once by default & so even in the case it starts expiring coins, we have one unexpired coin for the test.
-    // If this test flakes because the automation already expired all expired coins, increase the number of
-    // soon-to-be-expired coins we create here
+    // creating 5 soon-to-be-expired amulets because the 'expire amulet' automation expires
+    // 4 amulets at once by default & so even in the case it starts expiring amulets, we have one unexpired amulet for the test.
+    // If this test flakes because the automation already expired all expired amulets, increase the number of
+    // soon-to-be-expired amulets we create here
     (1 to 5).map(_ => aliceWalletClient.tap(CNNodeUtil.defaultHoldingFee.rate))
 
     eventually() {
-      aliceWalletClient.list().coins should have length 6
+      aliceWalletClient.list().amulets should have length 6
     }
 
-    // after one more tick, the coins have no value and should be ignored.
+    // after one more tick, the amulets have no value and should be ignored.
     advanceRoundsByOneTick
 
     loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
@@ -334,8 +334,8 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
         p2pTransfer(aliceWalletClient, bobWalletClient, bob, 1)
         eventually() {
           bobWalletClient.balance().unlockedQty should be > BigDecimal(0)
-          // there is still >1 coin
-          aliceWalletClient.list().coins.size should be > 1
+          // there is still >1 amulet
+          aliceWalletClient.list().amulets.size should be > 1
         }
       },
       entries => {
@@ -343,9 +343,9 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
           1,
           entries,
         )(
-          // but only the non-expired coin is selected as input.
+          // but only the non-expired amulet is selected as input.
           _.message should include regex (
-            "with inputs Vector\\(InputCoin\\(.*\\)\\)"
+            "with inputs Vector\\(InputAmulet\\(.*\\)\\)"
           )
         )
       },
@@ -431,7 +431,7 @@ class TimeBasedTreasuryIntegrationTestWithoutMerging
     p2pTransfer(validatorWallet, userWallet, receiverParty, 5)
 
     eventually() {
-      validatorWallet.list().coins should have length 1
+      validatorWallet.list().amulets should have length 1
       validatorWallet
         .listValidatorRewardCoupons()
         .filter(_.payload.round.number == round) should have length 1

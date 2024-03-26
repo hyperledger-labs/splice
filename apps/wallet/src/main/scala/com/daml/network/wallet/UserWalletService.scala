@@ -60,7 +60,7 @@ class UserWalletService(
     ledgerClient.connection(
       this.getClass.getSimpleName,
       loggerFactory,
-      PackageIdResolver.inferFromCoinRules(clock, scanConnection, loggerFactory),
+      PackageIdResolver.inferFromAmuletRules(clock, scanConnection, loggerFactory),
     ),
     treasuryConfig,
     clock,
@@ -75,7 +75,7 @@ class UserWalletService(
     store,
     treasury,
     ledgerClient,
-    scanConnection.getCoinRulesDomain,
+    scanConnection.getAmuletRulesDomain,
     automationConfig,
     clock,
     scanConnection,

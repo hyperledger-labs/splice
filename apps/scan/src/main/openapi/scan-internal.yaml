@@ -57,24 +57,24 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/GetOpenAndIssuingMiningRoundsResponse"
-  /v0/coin-rules:
+  /v0/amulet-rules:
     post:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "getCoinRules"
+      operationId: "getAmuletRules"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              "$ref": "#/components/schemas/GetCoinRulesRequest"
+              "$ref": "#/components/schemas/GetAmuletRulesRequest"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetCoinRulesResponse"
+                "$ref": "#/components/schemas/GetAmuletRulesResponse"
   /v0/cns-rules:
     post:
       tags: [scan]
@@ -123,11 +123,11 @@ paths:
             application/json:
               schema:
                 "$ref": "#/components/schemas/LookupFeaturedAppRightResponse"
-  /v0/total-coin-balance:
+  /v0/total-amulet-balance:
     get:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "getTotalCoinBalance"
+      operationId: "getTotalAmuletBalance"
       parameters:
         - in: query
           name: asOfEndOfRound
@@ -141,7 +141,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetTotalCoinBalanceResponse"
+                "$ref": "#/components/schemas/GetTotalAmuletBalanceResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
@@ -172,11 +172,11 @@ paths:
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
 
-  /v0/coin-config-for-round:
+  /v0/amulet-config-for-round:
     get:
       tags: [scan]
       x-jvm-package: scan
-      operationId: "getCoinConfigForRound"
+      operationId: "getAmuletConfigForRound"
       parameters:
         - in: query
           name: round
@@ -190,7 +190,7 @@ paths:
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetCoinConfigForRoundResponse"
+                "$ref": "#/components/schemas/GetAmuletConfigForRoundResponse"
         "404":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/404"
   /v0/round-of-latest-data:
@@ -618,19 +618,19 @@ components:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithStateMap"
         issuing_mining_rounds:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithStateMap"
-    GetCoinRulesRequest:
+    GetAmuletRulesRequest:
       type: object
       properties:
-        cached_coin_rules_contract_id:
+        cached_amulet_rules_contract_id:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/ContractId"
-        cached_coin_rules_domain_id:
+        cached_amulet_rules_domain_id:
           type: string
-    GetCoinRulesResponse:
+    GetAmuletRulesResponse:
       type: object
       properties:
-        coin_rules_update:
+        amulet_rules_update:
           $ref: "../../../../common/src/main/openapi/common-internal.yaml#/components/schemas/MaybeCachedContractWithState"
-      required: ["coin_rules_update"]
+      required: ["amulet_rules_update"]
     GetCnsRulesRequest:
       type: object
       properties:
@@ -663,18 +663,18 @@ components:
       properties:
         wallet_balance:
           type: string
-    GetTotalCoinBalanceResponse:
+    GetTotalAmuletBalanceResponse:
       type: object
       required: ["total_balance"]
       properties:
         total_balance:
           type: string
-    GetCoinConfigForRoundResponse:
+    GetAmuletConfigForRoundResponse:
       type: object
       required:
-        ["coin_create_fee", "holding_fee", "lock_holder_fee", "transfer_fee"]
+        ["amulet_create_fee", "holding_fee", "lock_holder_fee", "transfer_fee"]
       properties:
-        coin_create_fee:
+        amulet_create_fee:
           type: string
         holding_fee:
           type: string
@@ -918,7 +918,7 @@ components:
         - event_id
         - date
         - domain_id
-        - coin_price
+        - amulet_price
         - round
       properties:
         transaction_type:
@@ -954,9 +954,9 @@ components:
             The round for which this transaction was registered.
           type: integer
           format: int64
-        coin_price:
+        amulet_price:
           description: |
-            The coin price for the round at which this transfer was executed.
+            The amulet price for the round at which this transfer was executed.
           type: string
         transfer:
           description: |
@@ -964,16 +964,16 @@ components:
           $ref: "#/components/schemas/Transfer"
         mint:
           description: |
-            The SVC mints coin for the cases where the collective rules allow for that.
-          $ref: "#/components/schemas/CoinAmount"
+            The SVC mints amulet for the cases where the collective rules allow for that.
+          $ref: "#/components/schemas/AmuletAmount"
         tap:
           description: |
-            A tap creates a Coin, only used for development purposes, and enabled only on DevNet.
-          $ref: "#/components/schemas/CoinAmount"
+            A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
+          $ref: "#/components/schemas/AmuletAmount"
         sv_reward_collected:
           description: |
             An SV collected an SvReward.
-          $ref: "#/components/schemas/CoinAmount"
+          $ref: "#/components/schemas/AmuletAmount"
     ListActivityRequest:
       type: object
       required:
@@ -1006,7 +1006,7 @@ components:
         - date
         - domain_id
         - round
-        - coin_price
+        - amulet_price
       properties:
         activity_type:
           description: |
@@ -1041,9 +1041,9 @@ components:
             The round for which this transaction was registered.
           type: integer
           format: int64
-        coin_price:
+        amulet_price:
           description: |
-            The coin price for the round at which this transfer was executed.
+            The amulet price for the round at which this transfer was executed.
           type: string
         transfer:
           description: |
@@ -1051,16 +1051,16 @@ components:
           $ref: "#/components/schemas/Transfer"
         mint:
           description: |
-            The SVC mints coin for the cases where the collective rules allow for that.
-          $ref: "#/components/schemas/CoinAmount"
+            The SVC mints amulet for the cases where the collective rules allow for that.
+          $ref: "#/components/schemas/AmuletAmount"
         tap:
           description: |
-            A tap creates a Coin, only used for development purposes, and enabled only on DevNet.
-          $ref: "#/components/schemas/CoinAmount"
+            A tap creates a Amulet, only used for development purposes, and enabled only on DevNet.
+          $ref: "#/components/schemas/AmuletAmount"
         sv_reward_collected:
           description: |
             An SV collected an SvReward.
-          $ref: "#/components/schemas/CoinAmount"
+          $ref: "#/components/schemas/AmuletAmount"
     Transfer:
       description: |
         A transfer between one sender and possibly many receivers, provided by an application provider.
@@ -1105,25 +1105,25 @@ components:
         change_to_initial_amount_as_of_round_zero:
           description: |
             The change to the total balance introduced by this balance change, normalized to round zero, i.e.,
-            a coin created in round 3 is treated as a coin created in round 0 with a higher initial amount.
+            a amulet created in round 3 is treated as a amulet created in round 0 with a higher initial amount.
           type: string
         change_to_holding_fees_rate:
           description: |
             The change of total holding fees introduced by this balance change.
           type: string
-    CoinAmount:
+    AmuletAmount:
       type: object
       required:
-        - coin_owner
-        - coin_amount
+        - amulet_owner
+        - amulet_amount
       properties:
-        coin_owner:
+        amulet_owner:
           description: |
-            The party that owns the coin.
+            The party that owns the amulet.
           type: string
-        coin_amount:
+        amulet_amount:
           description: |
-            The coin amount.
+            The amulet amount.
           type: string
     SenderAmount:
       type: object
@@ -1136,11 +1136,11 @@ components:
       properties:
         party:
           description: |
-            The sender who has transferred coin.
+            The sender who has transferred amulet.
           type: string
-        input_coin_amount:
+        input_amulet_amount:
           description: |
-            Total amount of coin input into this transfer, before deducting holding fees.
+            Total amount of amulet input into this transfer, before deducting holding fees.
           type: string
         input_app_reward_amount:
           description: |
@@ -1154,11 +1154,11 @@ components:
           description: |
             Fee charged for returning change to the sender,
             which is the smaller of the left-over balance after paying for all outputs
-            or one coin create fee.
+            or one amulet create fee.
           type: string
         sender_change_amount:
           description: |
-            The final amount of coin returned to the sender after paying for all outputs and fees.
+            The final amount of amulet returned to the sender after paying for all outputs and fees.
           type: string
         sender_fee:
           description: |
@@ -1166,7 +1166,7 @@ components:
           type: string
         holding_fees:
           description: |
-            Holding fees paid by the sender on their input coins.
+            Holding fees paid by the sender on their input amulets.
           type: string
     ReceiverAmount:
       type: object
@@ -1177,11 +1177,11 @@ components:
       properties:
         party:
           description: |
-            The receiver who will own the created output coin.
+            The receiver who will own the created output amulet.
           type: string
         amount:
           description: |
-            The amount of coin to receive, before deducting receiver's part of the fees.
+            The amount of amulet to receive, before deducting receiver's part of the fees.
           type: string
         receiver_fee:
           description: |
@@ -1345,7 +1345,7 @@ components:
         - "cumulative_validator_rewards"
         - "cumulative_change_to_initial_amount_as_of_round_zero"
         - "cumulative_change_to_holding_fees_rate"
-        - "total_coin_balance"
+        - "total_amulet_balance"
       properties:
         closed_round:
           type: integer
@@ -1369,7 +1369,7 @@ components:
           type: string
         cumulative_change_to_holding_fees_rate:
           type: string
-        total_coin_balance:
+        total_amulet_balance:
           type: string
     MigrationSchedule:
       type: object

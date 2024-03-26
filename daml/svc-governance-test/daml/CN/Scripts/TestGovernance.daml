@@ -7,13 +7,13 @@ import qualified DA.Map as Map
 import Daml.Script
 import DA.Time
 
-import CC.Coin
-import CC.CoinRules
+import CC.Amulet
+import CC.AmuletRules
 import CC.Round
 import CC.Schedule
 
 import CN.SvcRules
-import CN.SVC.CoinPrice
+import CN.SVC.AmuletPrice
 
 import CN.Scripts.SvcTestUtils
 
@@ -147,7 +147,7 @@ testVoteRequestRejection = do
   now <- getTime
   result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid
-    coinRulesCid = None
+    amuletRulesCid = None
 
   result.completedAt === now
   result.offboardedVoters === []
@@ -209,7 +209,7 @@ testRacingMembershipRemoval = do
   now <- getTime
   result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req1
-    coinRulesCid = None
+    amuletRulesCid = None
 
   result.completedAt === now
   result.offboardedVoters === []
@@ -220,7 +220,7 @@ testRacingMembershipRemoval = do
   [(svcRulesCid, _)] <- query @SvcRules svc
   result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req2
-    coinRulesCid = None
+    amuletRulesCid = None
 
   result.completedAt === now
   result.offboardedVoters === []
@@ -231,7 +231,7 @@ testRacingMembershipRemoval = do
   [(svcRulesCid, _)] <- query @SvcRules svc
   result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req3
-    coinRulesCid = None
+    amuletRulesCid = None
 
   result.completedAt === now
   result.offboardedVoters === ["sv2"]
@@ -257,13 +257,13 @@ testRacingMembershipRemoval = do
   -- time for some of the SV's to change their vote
   submitMultiMustFail [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req4
-    coinRulesCid = None
+    amuletRulesCid = None
 
   -- after enough time has passed the closing works
   passTime (seconds 1)
   result <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req4
-    coinRulesCid = None
+    amuletRulesCid = None
 
   -- however sv4 is still here, as at least `numMembers / 2 + 1` members need to accept the offboarding
   result.outcome === VRO_Expired
@@ -288,7 +288,7 @@ testRacingMembershipRemoval = do
   now <- getTime
   result <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = req5
-    coinRulesCid = None
+    amuletRulesCid = None
 
   result.outcome === VRO_Accepted with effectiveAt = now
 
@@ -318,9 +318,9 @@ testSvcRulesConfigChange = do
   svcRules.config === newConfig
 
 
--- | Test membership removal and GC of CoinPriceVotes
-testOffboardMemberAndCoinPriceVotes : Script ()
-testOffboardMemberAndCoinPriceVotes = do
+-- | Test membership removal and GC of AmuletPriceVotes
+testOffboardMemberAndAmuletPriceVotes : Script ()
+testOffboardMemberAndAmuletPriceVotes = do
   (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
 
   -- check that the leader is currently sv1
@@ -347,28 +347,28 @@ testOffboardMemberAndCoinPriceVotes = do
   Map.keys (svcRules.offboardedMembers) === [sv1]
   svcRules.leader === sv2
 
-  -- duplicate the CoinPriceVote for sv2 to test duplicate removal
-  coinPriceVotes <- query @CoinPriceVote svc
-  let [(sv2VoteCid1, sv2Vote)] = filter (\(_, vote) -> vote.sv == sv2) coinPriceVotes
+  -- duplicate the AmuletPriceVote for sv2 to test duplicate removal
+  amuletPriceVotes <- query @AmuletPriceVote svc
+  let [(sv2VoteCid1, sv2Vote)] = filter (\(_, vote) -> vote.sv == sv2) amuletPriceVotes
   sv2VoteCid2 <- submit svc $ createCmd sv2Vote
 
   -- there should now be five votes
-  coinPriceVotes <- query @CoinPriceVote svc
-  length coinPriceVotes === 5
+  amuletPriceVotes <- query @AmuletPriceVote svc
+  length amuletPriceVotes === 5
 
-  -- garbage collect the CoinPriceVote of sv1
-  let [(sv1VoteCid, _)] = filter (\(_, vote) -> vote.sv == sv1) coinPriceVotes
-  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_GarbageCollectCoinPriceVotes with
+  -- garbage collect the AmuletPriceVote of sv1
+  let [(sv1VoteCid, _)] = filter (\(_, vote) -> vote.sv == sv1) amuletPriceVotes
+  submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_GarbageCollectAmuletPriceVotes with
     nonMemberVoteCids = [sv1VoteCid]
     duplicateVoteCids = [[sv2VoteCid1, sv2VoteCid2]]
 
   -- there should now be only three votes
-  coinPriceVotes <- query @CoinPriceVote svc
-  length coinPriceVotes === 3
+  amuletPriceVotes <- query @AmuletPriceVote svc
+  length amuletPriceVotes === 3
 
   -- one cannot archive a vote by listing it as a duplicate of its own
-  let [(sv3VoteCid, _)] = filter (\(_, vote) -> vote.sv == sv3) coinPriceVotes
-  submitMultiMustFail [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_GarbageCollectCoinPriceVotes with
+  let [(sv3VoteCid, _)] = filter (\(_, vote) -> vote.sv == sv3) amuletPriceVotes
+  submitMultiMustFail [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_GarbageCollectAmuletPriceVotes with
     nonMemberVoteCids = []
     duplicateVoteCids = [[sv3VoteCid, sv3VoteCid]]
 
@@ -390,7 +390,7 @@ testVoteRequestExpire = do
   -- attempt to close the vote request before its voting period
   submitMultiMustFail [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = requestCid
-    coinRulesCid = None
+    amuletRulesCid = None
 
   passTime(days 7)
   now <- getTime
@@ -398,7 +398,7 @@ testVoteRequestExpire = do
   -- close the vote request once the voting period is over
   result <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_CloseVoteRequest with
     requestCid = requestCid
-    coinRulesCid = None
+    amuletRulesCid = None
 
   -- only sv1 voted to accept as they created the request
   result.completedAt === now
@@ -409,7 +409,7 @@ testVoteRequestExpire = do
   return ()
 
 
--- Coin Prices
+-- Amulet Prices
 --------------
 
 
@@ -422,47 +422,47 @@ unitTestMedian = do
   median [1.0, 200.0, 3.0, 4.0, 1000.0] === 4.0
 
 
-testCoinPriceVoting : Script ()
-testCoinPriceVoting = do
+testAmuletPriceVoting : Script ()
+testAmuletPriceVoting = do
 
   (app, svc, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
 
-  -- run a normal issuance so time advances and the coin price is set to 1.2 for everybody
+  -- run a normal issuance so time advances and the amulet price is set to 1.2 for everybody
   runNextIssuanceD app 1.2
 
   -- have all SV's adjust their prices
   [(svcRulesCid, _)] <- query @SvcRules svc
-  forA_ (zip [1, 2, 3, 4] [sv1, sv2, sv3, sv4]) $ \(coinPriceInt, sv) -> do
-    [(voteCid, _)] <- queryFilter @CoinPriceVote svc (\vote -> vote.sv == sv)
-    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateCoinPriceVote with
+  forA_ (zip [1, 2, 3, 4] [sv1, sv2, sv3, sv4]) $ \(amuletPriceInt, sv) -> do
+    [(voteCid, _)] <- queryFilter @AmuletPriceVote svc (\vote -> vote.sv == sv)
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateAmuletPriceVote with
       sv
-      coinPrice = intToDecimal coinPriceInt
+      amuletPrice = intToDecimal amuletPriceInt
       voteCid
 
-  [(voteCid, _)] <- queryFilter @CoinPriceVote svc (\vote -> vote.sv == sv1)
+  [(voteCid, _)] <- queryFilter @AmuletPriceVote svc (\vote -> vote.sv == sv1)
 
-  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateCoinPriceVote with
+  submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_UpdateAmuletPriceVote with
     sv = sv1
-    coinPrice = 5.0
+    amuletPrice = 5.0
     voteCid
 
-  [(coinRulesCid, coinRules)] <- query @CoinRules svc
+  [(amuletRulesCid, amuletRules)] <- query @AmuletRules svc
   now <- getTime
-  let coinConfig = CC.Schedule.getValueAsOf now coinRules.configSchedule
-  passTime (coinConfig.tickDuration)
+  let amuletConfig = CC.Schedule.getValueAsOf now amuletRules.configSchedule
+  passTime (amuletConfig.tickDuration)
 
   -- pass enough time to advance the open mining round and lock in the price
   [(roundToArchiveCid, _), (middleRoundCid, _), (latestRoundCid, _)] <- sortOn (._2.round) <$> query @OpenMiningRound svc
-  coinPriceVotes <- query @CoinPriceVote svc
+  amuletPriceVotes <- query @AmuletPriceVote svc
   submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_AdvanceOpenMiningRounds with
-    coinRulesCid
+    amuletRulesCid
     roundToArchiveCid
     middleRoundCid
     latestRoundCid
-    coinPriceVoteCids = map fst coinPriceVotes
+    amuletPriceVoteCids = map fst amuletPriceVotes
 
-  -- check that the most recent round has the median a coin price of the votes
+  -- check that the most recent round has the median a amulet price of the votes
   (_, latestRound) <- (last . sortOn (._2.round)) <$> query @OpenMiningRound svc
-  latestRound.coinPrice === 3.5
+  latestRound.amuletPrice === 3.5
 
   pure ()

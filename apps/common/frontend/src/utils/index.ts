@@ -1,4 +1,4 @@
 export * from './AppManager';
 export * from './auth';
-export * from './coinRules';
+export * from './amuletRules';
 export * from './helpers';

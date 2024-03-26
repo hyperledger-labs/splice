@@ -4,7 +4,7 @@ import com.daml.ledger.api.v2.event.CreatedEvent.toJavaProto
 import com.daml.ledger.api.v2.transaction.TreeEvent
 import com.daml.ledger.api.v2.transaction.TransactionTree
 import com.daml.ledger.javaapi.data.CreatedEvent
-import com.daml.network.history.CoinCreate
+import com.daml.network.history.AmuletCreate
 import com.daml.network.http.v0.definitions as d0
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.*
@@ -153,17 +153,17 @@ class WalletTransferOfferStatusIntegrationTest
                   _._2.getExercised.choice == "AcceptedTransferOffer_Complete"
                 )
                 .valueOrFail("Did not find complete tx")
-              val coins = tree.eventsById.view
+              val amulets = tree.eventsById.view
                 .filter(_._2.getCreated.contractId.nonEmpty)
                 .mapValues(evt => CreatedEvent.fromProto(toJavaProto(evt.getCreated)))
-                .collect { case (_, CoinCreate(coin)) =>
-                  coin
+                .collect { case (_, AmuletCreate(amulet)) =>
+                  amulet
                 }
-              coins.exists { coin =>
-                coin.payload.owner == bobUserParty.toProtoPrimitive &&
-                coin.payload.amount.initialAmount
+              amulets.exists { amulet =>
+                amulet.payload.owner == bobUserParty.toProtoPrimitive &&
+                amulet.payload.amount.initialAmount
                   .doubleValue() == transferOfferAmount.doubleValue &&
-                coin.contractId.contractId == contractId
+                amulet.contractId.contractId == contractId
               } should be(true)
           }
         },

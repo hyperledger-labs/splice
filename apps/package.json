@@ -20,7 +20,7 @@
     "app-manager/frontend"
   ],
   "dependencies": {
-    "@daml.js/canton-coin": "file:common/frontend/daml.js/canton-coin-0.1.0",
+    "@daml.js/canton-amulet": "file:common/frontend/daml.js/canton-amulet-0.1.0",
     "@daml.js/cns": "file:common/frontend/daml.js/canton-name-service-0.1.0",
     "@daml.js/wallet": "file:common/frontend/daml.js/wallet-0.1.0",
     "@daml.js/wallet-payments": "file:common/frontend/daml.js/wallet-payments-0.1.0",

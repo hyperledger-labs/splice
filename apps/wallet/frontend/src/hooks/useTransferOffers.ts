@@ -7,7 +7,7 @@ import { TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer/modul
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
 export const useTransferOffers = (
-  coinPrice?: BigNumber
+  amuletPrice?: BigNumber
 ): UseQueryResult<Contract<TransferOffer>[]> => {
   const { listTransferOffers } = useWalletClient();
   return useQuery({
@@ -17,6 +17,6 @@ export const useTransferOffers = (
       const { offersList } = await listTransferOffers();
       return offersList;
     },
-    enabled: !!coinPrice,
+    enabled: !!amuletPrice,
   });
 };

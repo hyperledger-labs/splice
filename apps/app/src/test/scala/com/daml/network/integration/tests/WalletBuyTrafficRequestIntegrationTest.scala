@@ -417,5 +417,5 @@ class WalletBuyTrafficRequestIntegrationTest
   private val defaultTrackingId = "myTrackingId"
 
   private def minTopupAmount(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) =
-    sv1ScanBackend.getCoinConfigAsOf(env.environment.clock.now).globalDomain.fees.minTopupAmount
+    sv1ScanBackend.getAmuletConfigAsOf(env.environment.clock.now).globalDomain.fees.minTopupAmount
 }

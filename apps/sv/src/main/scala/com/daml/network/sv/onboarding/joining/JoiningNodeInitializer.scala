@@ -257,7 +257,7 @@ class JoiningNodeInitializer(
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
         "svc_rules_visible",
-        show"the SvcRules and CoinRules are visible",
+        show"the SvcRules and AmuletRules are visible",
         svcStore.getSvcRules().map(_ => ()),
         logger,
       )
@@ -448,9 +448,9 @@ class JoiningNodeInitializer(
             "add_svc_member",
             "add member to Svc",
             for {
-              (svcRules, coinRules, openMiningRounds, svOnboardingConfirmedOpt) <- (
+              (svcRules, amuletRules, openMiningRounds, svOnboardingConfirmedOpt) <- (
                 svcStore.getSvcRules(),
-                svcStore.getCoinRules(),
+                svcStore.getAmuletRules(),
                 svcStore.getOpenMiningRoundTriple(),
                 svcStore.lookupSvOnboardingConfirmedByParty(
                   svcStore.key.svParty
@@ -483,7 +483,7 @@ class JoiningNodeInitializer(
                         openMiningRounds.oldest.contractId,
                         openMiningRounds.middle.contractId,
                         openMiningRounds.newest.contractId,
-                        coinRules.contractId,
+                        amuletRules.contractId,
                       )
                     )
                     svcStoreWithIngestion.connection
@@ -584,7 +584,7 @@ class JoiningNodeInitializer(
         // we will only vet packages that have been statically compiled into the app.
         // At most, we can be tricked into vetting a package a bit too early.
         svcInfo <- svConnection.getSvcInfo()
-        coinRules = svcInfo.coinRules
+        amuletRules = svcInfo.amuletRules
         vetting = new PackageVetting(
           SvPackageVettingTrigger.packages,
           config.prevetDuration,
@@ -592,7 +592,7 @@ class JoiningNodeInitializer(
           participantAdminConnection,
           loggerFactory,
         )
-        _ <- vetting.vetPackages(coinRules)
+        _ <- vetting.vetPackages(amuletRules)
         _ = logger.info("Packages vetting completed")
       } yield ()
     }

@@ -233,7 +233,7 @@ class DisasterRecoveryIntegrationTest
             // buffer to account for domain fee payments
             assertInRange(
               sv1WalletClient.balance().unlockedQty,
-              (walletUsdToCoin(1000), walletUsdToCoin(2000)),
+              (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
             )
             countTapsFromScan(sv1ScanBackend, 1337) shouldBe 1
           },
@@ -245,11 +245,11 @@ class DisasterRecoveryIntegrationTest
         // available on the SV participants.
         val timestampBeforeDisaster = Instant.now()
 
-        // Tap some more coin and wait for SVs to see it (even though we're going to recover to a point before it)
+        // Tap some more amulet and wait for SVs to see it (even though we're going to recover to a point before it)
         sv1WalletClient.tap(1338)
         val timestampAfterLostTap = Instant.now()
 
-        // Tap yet more coin without waiting for it to necessarily be ingested on all SVs
+        // Tap yet more amulet without waiting for it to necessarily be ingested on all SVs
         sv1WalletClient.tap(1339)
 
         waitForSvParticipantsToCatchup(timestampAfterLostTap)
@@ -323,7 +323,7 @@ class DisasterRecoveryIntegrationTest
               entries =>
                 forAll(entries) {
                   _.errorMessage should include(
-                    "Unexpected coin create event"
+                    "Unexpected amulet create event"
                   )
                 },
             )
@@ -334,14 +334,14 @@ class DisasterRecoveryIntegrationTest
           withClueAndLog("Old balance has been transferred to new domain") {
             assertInRange(
               sv1WalletLocalClient.balance().unlockedQty,
-              (walletUsdToCoin(1000), walletUsdToCoin(2000)),
+              (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
             )
           }
           withClueAndLog("New domain is functional") {
             sv1WalletLocalClient.tap(1337)
             assertInRange(
               sv1WalletLocalClient.balance().unlockedQty,
-              (walletUsdToCoin(2000), walletUsdToCoin(3000)),
+              (walletUsdToAmulet(2000), walletUsdToAmulet(3000)),
             )
           }
         }
@@ -389,7 +389,7 @@ class DisasterRecoveryIntegrationTest
 
   private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: Double) = {
     listTransactionsFromScan(scan).count(
-      _.tap.map(a => BigDecimal(a.coinAmount)).contains(BigDecimal(tapAmount))
+      _.tap.map(a => BigDecimal(a.amuletAmount)).contains(BigDecimal(tapAmount))
     )
   }
 

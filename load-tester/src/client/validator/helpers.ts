@@ -87,7 +87,7 @@ export function waitForBalance(
       const balance = syncRetryUndefined(client.v0.wallet.getBalance);
       return balance;
     } else {
-      // In non-devnet environments, users must be sent coins from the validator admin. The validator admin will have to have
+      // In non-devnet environments, users must be sent amulets from the validator admin. The validator admin will have to have
       //  its wallet balance topped up manually
       sendAndWaitForTransferOffer(admin, client, topUpAmount);
       const balance = syncRetryUndefined(client.v0.wallet.getBalance);

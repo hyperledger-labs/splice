@@ -125,10 +125,10 @@ case class CNNodeEnvironmentDefinition(
     )
   }
 
-  def withoutAutomaticRewardsCollectionAndCoinMerging: CNNodeEnvironmentDefinition =
+  def withoutAutomaticRewardsCollectionAndAmuletMerging: CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       CNNodeConfigTransforms.updateAllAutomationConfigs(
-        _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
+        _.focus(_.enableAutomaticRewardsCollectionAndAmuletMerging).replace(false)
       )(config)
     )
 
@@ -199,8 +199,8 @@ case class CNNodeEnvironmentDefinition(
       )(config)
     )
 
-  def withCoinPrice(price: BigDecimal): CNNodeEnvironmentDefinition =
-    addConfigTransforms((_, conf) => CNNodeConfigTransforms.setCoinPrice(price)(conf))
+  def withAmuletPrice(price: BigDecimal): CNNodeEnvironmentDefinition =
+    addConfigTransforms((_, conf) => CNNodeConfigTransforms.setAmuletPrice(price)(conf))
 
   /** For an SV’s sequencer to be safely usable, we need to wait for participantResponseTimeout + mediatorResponseTimeout.
     * However, in some tests, we do care that an SV can connect to their own sequencer reasonably quickly.
@@ -356,7 +356,7 @@ object CNNodeEnvironmentDefinition extends CommonCNNodeAppInstanceReferences {
     CNNodeEnvironmentDefinition(CNNodeConfig.empty, context = testName)
 
   def waitForNodeInitialization(env: CNNodeConsoleEnvironment): Unit =
-    env.coinNodes.local.foreach(_.waitForInitialization())
+    env.amuletNodes.local.foreach(_.waitForInitialization())
 
   def allocateParty(participant: CNParticipantClientReference, hint: String) =
     participant.ledger_api.parties.allocate(hint, hint).party

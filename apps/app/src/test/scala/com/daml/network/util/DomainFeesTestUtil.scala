@@ -6,10 +6,10 @@ import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cn.wallet.buytrafficrequest.BuyTrafficRequest
-import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyMemberTraffic
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.CO_BuyMemberTraffic
 import com.daml.network.codegen.java.cn.wallet.install.{
-  CoinOperation,
-  CoinOperationOutcome,
+  AmuletOperation,
+  AmuletOperationOutcome,
   WalletAppInstall,
 }
 import com.daml.network.codegen.java.cn.wallet.topupstate.ValidatorTopUpState
@@ -20,7 +20,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeTestConsoleEnvironment,
 }
 import com.daml.network.validator.util.ExtraTrafficTopupParameters
-import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.CoinPosition
+import com.daml.network.wallet.admin.api.client.commands.HttpWalletAppClient.AmuletPosition
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.sequencing.protocol.SequencedEventTrafficState
 import com.digitalasset.canton.topology.{DomainId, Member, PartyId}
@@ -95,21 +95,21 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     }
   }
 
-  /** Perform a self top-up with the provided coins.
+  /** Perform a self top-up with the provided amulets.
     *
     * A self top-up is one where a (super-)validator purchases traffic for its own participant.
-    * On DevNet, we auto-tap coins for extra traffic purchases, so inputCoins can be omitted for DevNet clusters.
+    * On DevNet, we auto-tap amulets for extra traffic purchases, so inputAmulets can be omitted for DevNet clusters.
     */
   def buyMemberTraffic(
       validatorApp: ValidatorAppBackendReference,
       trafficAmount: Long,
       ts: CantonTimestamp,
-      inputCoins: Seq[CoinPosition] = Seq(),
-  )(implicit env: CNNodeTestConsoleEnvironment): CoinOperationOutcome = {
+      inputAmulets: Seq[AmuletPosition] = Seq(),
+  )(implicit env: CNNodeTestConsoleEnvironment): AmuletOperationOutcome = {
     val memberId = validatorApp.participantClient.id
     val validatorParty = validatorApp.getValidatorPartyId()
     val domainId =
-      DomainId.tryFromString(sv1ScanBackend.getCoinConfigAsOf(ts).globalDomain.activeDomain)
+      DomainId.tryFromString(sv1ScanBackend.getAmuletConfigAsOf(ts).globalDomain.activeDomain)
     val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
     val topupStateCid = getOrCreateTopupStateCid(validatorApp, memberId, domainId)
     val walletInstall = inside(
@@ -120,22 +120,22 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
         )
     ) { case Seq(install) => install }
     val executeBatchCmd = walletInstall.id.exerciseWalletAppInstall_ExecuteBatch(
-      new cc.coinrules.PaymentTransferContext(
-        transferContext.coinRules.contract.contractId,
-        new cc.coinrules.TransferContext(
+      new cc.amuletrules.PaymentTransferContext(
+        transferContext.amuletRules.contract.contractId,
+        new cc.amuletrules.TransferContext(
           transferContext.latestOpenMiningRound.contract.contractId,
           Map.empty[Round, IssuingMiningRound.ContractId].asJava,
-          Map.empty[String, cc.coin.ValidatorRight.ContractId].asJava,
+          Map.empty[String, cc.amulet.ValidatorRight.ContractId].asJava,
           None.toJava,
         ),
       ),
-      inputCoins
+      inputAmulets
         .map(_.contract.contractId.contractId)
-        .map[cc.coinrules.TransferInput](cid =>
-          new cc.coinrules.transferinput.InputCoin(new cc.coin.Coin.ContractId(cid))
+        .map[cc.amuletrules.TransferInput](cid =>
+          new cc.amuletrules.transferinput.InputAmulet(new cc.amulet.Amulet.ContractId(cid))
         )
         .asJava,
-      List[CoinOperation](
+      List[AmuletOperation](
         new CO_BuyMemberTraffic(
           trafficAmount,
           memberId.toProtoPrimitive,
@@ -154,7 +154,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
           Seq(validatorParty),
           executeBatchCmd,
           disclosedContracts = DisclosedContracts(
-            transferContext.coinRules,
+            transferContext.amuletRules,
             transferContext.latestOpenMiningRound,
           ).toLedgerApiDisclosedContracts,
         )
@@ -178,7 +178,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
   ): Contract[BuyTrafficRequest.ContractId, BuyTrafficRequest] = {
     val now = env.environment.clock.now
     val domainId =
-      DomainId.tryFromString(sv1ScanBackend.getCoinConfigAsOf(now).globalDomain.activeDomain)
+      DomainId.tryFromString(sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.activeDomain)
     val validatorParty = validatorApp.getValidatorPartyId()
     val walletInstall = inside(
       validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
@@ -203,7 +203,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
         cmd,
         None,
         disclosedContracts = DisclosedContracts(
-          sv1ScanBackend.getCoinRules(),
+          sv1ScanBackend.getAmuletRules(),
           sv1ScanBackend.getLatestOpenMiningRound(now),
         ).toLedgerApiDisclosedContracts,
       )
@@ -213,7 +213,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       env: CNNodeTestConsoleEnvironment
   ): ExtraTrafficTopupParameters = {
     ExtraTrafficTopupParameters(
-      sv1ScanBackend.getCoinConfigAsOf(ts).globalDomain.fees,
+      sv1ScanBackend.getAmuletConfigAsOf(ts).globalDomain.fees,
       validatorApp.config.domains.global.buyExtraTraffic,
       validatorApp.config.automation.pollingInterval,
     )
@@ -222,10 +222,10 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
   def computeDomainFees(trafficAmount: Long, ts: CantonTimestamp)(implicit
       env: CNNodeTestConsoleEnvironment
   ): (BigDecimal, BigDecimal) = {
-    val trafficPriceUsd = sv1ScanBackend.getCoinConfigAsOf(ts).globalDomain.fees.extraTrafficPrice
+    val trafficPriceUsd = sv1ScanBackend.getAmuletConfigAsOf(ts).globalDomain.fees.extraTrafficPrice
     val totalCostUsd = BigDecimal(trafficAmount) / 1e6 * trafficPriceUsd
-    val coinPrice = sv1ScanBackend.getLatestOpenMiningRound(ts).contract.payload.coinPrice
-    val totalCostCc = totalCostUsd / coinPrice
+    val amuletPrice = sv1ScanBackend.getLatestOpenMiningRound(ts).contract.payload.amuletPrice
+    val totalCostCc = totalCostUsd / amuletPrice
     (totalCostUsd, totalCostCc)
   }
 
@@ -247,6 +247,6 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
 
   def activeDomainId(implicit env: CNNodeTestConsoleEnvironment) =
     DomainId.tryFromString(
-      sv1ScanBackend.getCoinConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
+      sv1ScanBackend.getAmuletConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
     )
 }

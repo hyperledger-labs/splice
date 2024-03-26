@@ -26,16 +26,16 @@ class TimeBasedTreasuryIntegrationTest
         )(config)
       )
       // TODO (#10859) remove and fix test failures
-      .withCoinPrice(walletCoinPrice)
+      .withAmuletPrice(walletAmuletPrice)
 
   // TODO (#10859) remove and fix test failures
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(1.0)
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(1.0)
 
   "automatically merge transfer inputs when the automation is triggered" in { implicit env =>
     val (alice, bob) = onboardAliceAndBob()
     waitForWalletUser(aliceValidatorWalletClient)
 
-    // create two coins in alice's wallet
+    // create two amulets in alice's wallet
     aliceWalletClient.tap(50)
     checkWallet(alice, aliceWalletClient, Seq(exactly(50)))
 
@@ -43,7 +43,7 @@ class TimeBasedTreasuryIntegrationTest
     p2pTransfer(aliceWalletClient, bobWalletClient, bob, 40.0)
     eventually()(aliceValidatorWalletClient.listAppRewardCoupons() should have size 1)
     eventually()(aliceValidatorWalletClient.listValidatorRewardCoupons() should have size 1)
-    // and give alice another coin.
+    // and give alice another amulet.
     aliceWalletClient.tap(50)
     checkWallet(alice, aliceWalletClient, Seq((9, 10), exactly(50)))
 
@@ -59,7 +59,7 @@ class TimeBasedTreasuryIntegrationTest
       aliceValidatorWalletClient
         .listAppRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
-      // and coins are automatically merged.
+      // and amulets are automatically merged.
       checkWallet(alice, aliceWalletClient, Seq((59, 61)))
       // same for validator rewards
       aliceValidatorWalletClient
@@ -68,7 +68,7 @@ class TimeBasedTreasuryIntegrationTest
     })
   }
 
-  "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
+  "allow calling tap, list the created amulets, and get the balance - locally and remotely" in {
     implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       val aliceValidatorParty = aliceValidatorBackend.getValidatorPartyId()
@@ -78,11 +78,11 @@ class TimeBasedTreasuryIntegrationTest
       // leads to archival of open round 0
       advanceRoundsByOneTick
 
-      lockCoins(
+      lockAmulets(
         aliceValidatorBackend,
         aliceUserParty,
         aliceValidatorParty,
-        aliceWalletClient.list().coins,
+        aliceWalletClient.list().amulets,
         10,
         sv1ScanBackend,
         Duration.ofDays(10),
@@ -108,16 +108,16 @@ class TimeBasedTreasuryIntegrationTest
       )
   }
 
-  "don't collect rewards if their collection is more expensive than they reward in coins" in {
+  "don't collect rewards if their collection is more expensive than they reward in amulets" in {
     implicit env =>
       val (_, bob) = onboardAliceAndBob()
       waitForWalletUser(aliceValidatorWalletClient)
 
-      // giving alice 2 coins...
+      // giving alice 2 amulets...
       aliceWalletClient.tap(1)
       aliceWalletClient.tap(1)
       eventually() {
-        aliceWalletClient.list().coins should have length 2
+        aliceWalletClient.list().amulets should have length 2
       }
       // ..so when she pays bob, she doesn't have to pay a transfer fee which
       // will result in alice validator's reward being small enough that its not worth it to collect the reward
@@ -149,14 +149,14 @@ class TimeBasedTreasuryIntegrationTest
         {
           aliceValidatorWalletClient.tap(1)
           eventually() {
-            aliceValidatorWalletClient.list().coins should have length 1
+            aliceValidatorWalletClient.list().amulets should have length 1
           }
         },
         entries => {
           forAtLeast(
             1,
             entries,
-          )( // .. even when alice's validator has another coin and would only need to pay
+          )( // .. even when alice's validator has another amulet and would only need to pay
             // an create-fee for collecting the reward.
             _.message should include(
               "is smaller than the create-fee"
@@ -166,13 +166,13 @@ class TimeBasedTreasuryIntegrationTest
       )
   }
 
-  "don't run merge if rewards and coins are too small" in { implicit env =>
+  "don't run merge if rewards and amulets are too small" in { implicit env =>
     val (_, _) = onboardAliceAndBob()
     aliceWalletClient.tap(0.001)
     aliceWalletClient.tap(0.001)
 
     eventually() {
-      aliceWalletClient.list().coins should have length 2
+      aliceWalletClient.list().amulets should have length 2
     }
 
     loggerFactory.assertEventuallyLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
@@ -185,9 +185,9 @@ class TimeBasedTreasuryIntegrationTest
           1,
           entries,
         )(
-          // but do nothing since our coins are too small to be worth merging.
+          // but do nothing since our amulets are too small to be worth merging.
           _.message should include regex (
-            "the total rewards and coin quantity .* is smaller than the create-fee"
+            "the total rewards and amulet quantity .* is smaller than the create-fee"
           )
         )
       },

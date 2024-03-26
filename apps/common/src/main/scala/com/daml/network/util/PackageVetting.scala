@@ -2,7 +2,7 @@ package com.daml.network.util
 
 import cats.syntax.foldable.*
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinrules.CoinRules
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.environment.{
   DarResource,
   DarResources,
@@ -10,7 +10,7 @@ import com.daml.network.environment.{
   ParticipantAdminConnection,
   RetryFor,
 }
-import com.daml.network.util.{CoinConfigSchedule, UploadablePackage}
+import com.daml.network.util.{AmuletConfigSchedule, UploadablePackage}
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -30,9 +30,9 @@ class PackageVetting(
     extends NamedLogging {
 
   def vetPackages(
-      coinRules: Contract[CoinRules.ContractId, CoinRules]
+      amuletRules: Contract[AmuletRules.ContractId, AmuletRules]
   )(implicit tc: TraceContext): Future[Unit] = {
-    val schedule = CoinConfigSchedule(coinRules)
+    val schedule = AmuletConfigSchedule(amuletRules)
     val now = clock.now.plus(prevetDuration.asJava)
     val currentConfig = schedule.getConfigAsOf(now)
     for {
@@ -50,7 +50,7 @@ class PackageVetting(
 
   // The current config must be vetted.
   private def vetCurrentConfig(
-      config: cc.coinconfig.CoinConfig[cc.coinconfig.USD]
+      config: cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD]
   )(implicit tc: TraceContext): Future[Unit] =
     packages.toSeq.traverse_ { pkg =>
       val version = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
@@ -58,7 +58,7 @@ class PackageVetting(
       darResource match {
         case None =>
           logger.error(
-            show"Package ${pkg.packageName} is required in version ${version.toString} according to CoinConfig but this version is not part of the deployed release, upgrade immediately to avoid any issues"
+            show"Package ${pkg.packageName} is required in version ${version.toString} according to AmuletConfig but this version is not part of the deployed release, upgrade immediately to avoid any issues"
           )
           Future.unit
         case Some(resource) => uploadDar(resource)
@@ -69,14 +69,14 @@ class PackageVetting(
   // you must upgrade soon.
   private def warnIfFutureConfigUnknown(
       time: CantonTimestamp,
-      config: cc.coinconfig.CoinConfig[cc.coinconfig.USD],
+      config: cc.amuletconfig.AmuletConfig[cc.amuletconfig.USD],
   )(implicit tc: TraceContext): Future[Unit] =
     packages.toSeq.traverse_ { pkg =>
       val version = PackageIdResolver.readPackageVersion(config.packageConfig, pkg)
       val darResource = DarResources.lookupPackageMetadata(pkg.packageName, version)
       if (darResource.isEmpty) {
         logger.warn(
-          show"Package ${pkg.packageName} is required in version ${version.toString} after $time according to CoinConfig but this version is not part of the deployed release, upgrade before $time to avoid any issues"
+          show"Package ${pkg.packageName} is required in version ${version.toString} after $time according to AmuletConfig but this version is not part of the deployed release, upgrade before $time to avoid any issues"
         )
       }
       Future.unit

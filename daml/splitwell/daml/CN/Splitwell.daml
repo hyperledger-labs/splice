@@ -7,7 +7,7 @@ import DA.Assert
 import DA.Foldable (forA_)
 import DA.Time
 import DA.Set qualified as Set
-import CC.CoinRules (AppTransferContext(..))
+import CC.AmuletRules (AppTransferContext(..))
 import CC.Round
 import CN.Util
 import CN.Wallet.Payment
@@ -296,7 +296,7 @@ template TransferInProgress
                provider = group.provider
                ccReceiverAmounts = receiverAmounts
                svc = group.svc
-               lockedCoin = acceptedPayment.lockedCoin
+               lockedAmulet = acceptedPayment.lockedAmulet
                round = openMiningRound.round
                reference
          acceptedPayment === expectedAcceptedPayment

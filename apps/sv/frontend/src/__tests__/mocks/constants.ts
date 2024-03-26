@@ -1,14 +1,14 @@
 import * as jtv from '@mojotech/json-type-validation';
 import { GetSvcInfoResponse } from 'sv-openapi';
 
-import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules';
+import { AmuletRules } from '@daml.js/canton-amulet/lib/CC/AmuletRules';
 import { SvcRules } from '@daml.js/svc-governance/lib/CN/SvcRules/module';
 
 // Static constants for mock values
 
 // Obtained via `curl https://sv.sv-1.svc.cimain.network.canton.global/api/sv/v0/svc`
 // ...and then npmFix made it look nice.
-// You'll need to update this on template changes to SvcRules and CoinRules.
+// You'll need to update this on template changes to SvcRules and AmuletRules.
 export const svcInfo: GetSvcInfoResponse = {
   sv_user: 'OBpJ9oTyOLuAKF0H2hhzdSFUICt0diIn@clients',
   sv_party_id:
@@ -26,7 +26,7 @@ export const svcInfo: GetSvcInfoResponse = {
       },
       issuanceConfig: {
         validatorRewardPercentage: '0.5',
-        coinToIssuePerYear: '40000000000.0',
+        amuletToIssuePerYear: '40000000000.0',
         unfeaturedAppRewardCap: '0.6',
         appRewardPercentage: '0.15',
         validatorFaucetCap: '2.85',
@@ -66,7 +66,7 @@ export const svcInfo: GetSvcInfoResponse = {
         maxNumOutputs: '100',
       },
       targetClosesAt: '2024-01-09T19:25:43.133736Z',
-      coinPrice: '1.0',
+      amuletPrice: '1.0',
       tickDuration: {
         microseconds: '150000000',
       },
@@ -79,27 +79,27 @@ export const svcInfo: GetSvcInfoResponse = {
       'CgNkZXYS8QYKRQDF6WSFrAAEO34LV2+u/m71l7miefB4B+6jsYonicZeHMoCEiCrg9oVr0uQ6hBCR3sz6mjOvQVeB0gGCMP5YVKxxJ9xBhJeCkAyMThiZDFkMTI5MTQ5NTdmZjY1YzJmMjZmM2U3NTIzMzdmMTBiNjQzYjIxMTVhZjcxMmUyODdlMDZkYzI0OGNhEgJDQxIFUm91bmQaD09wZW5NaW5pbmdSb3VuZBrJBArGBBJNEktSSVNWQzo6MTIyMGE1NTVlY2NlZWQ3ZmVmNDQ1YzdlYzMzM2MxNDQ0OWQ5ODFmYjY1OTViZTIxOGM1ZDcwMWVlZjVlYTYzYTFiY2ESChIICgYSBBICKAYSEBIOMgwxLjAwMDAwMDAwMDASCxIJSSgD6jWIDgYAEgsSCUkopstHiA4GABIOEgwKChIIEgYogNKTrQMSiQIShgIKgwISFhIUChISEBIOMgwwLjAzMDAwMDAwMDASFhIUChISEBIOMgwwLjAwMDAwNDgyMjUSpAESoQEKngESEBIOMgwwLjAxMDAwMDAwMDASiQEShgEigwEKKAomEhISEDIOMTAwLjAwMDAwMDAwMDASEBIOMgwwLjAwMTAwMDAwMDAKKQonEhMSETIPMTAwMC4wMDAwMDAwMDAwEhASDjIMMC4wMDAxMDAwMDAwCiwKKhIWEhQyEjEwMDAwMDAuMDAwMDAwMDAwMBIQEg4yDDAuMDAwMDEwMDAwMBIWEhQKEhIQEg4yDDAuMDA1MDAwMDAwMBIFEgMoyAESBRIDKMgBEgQSAihkEpABEo0BCooBEhoSGDIWNDAwMDAwMDAwMDAuMDAwMDAwMDAwMBIQEg4yDDAuNTAwMDAwMDAwMBIQEg4yDDAuMTUwMDAwMDAwMBIQEg4yDDAuMjAwMDAwMDAwMBISEhAyDjEwMC4wMDAwMDAwMDAwEhASDjIMMC42MDAwMDAwMDAwEhASDjIMMi44NTAwMDAwMDAwEg4SDAoKEggSBiiAxoaPASpJU1ZDOjoxMjIwYTU1NWVjY2VlZDdmZWY0NDVjN2VjMzMzYzE0NDQ5ZDk4MWZiNjU5NWJlMjE4YzVkNzAxZWVmNWVhNjNhMWJjYTmoMfksiA4GAEIoCiYKJAgBEiCgTuxgdiWHx5vZWf1A6G5VedSrPWvqJqL4OyX06xBIUw==',
     created_at: '2024-01-09T19:18:13.133736Z',
   },
-  coin_rules: {
+  amulet_rules: {
     template_id:
-      '218bd1d12914957ff65c2f26f3e752337f10b643b2115af712e287e06dc248ca:CC.CoinRules:CoinRules',
+      '218bd1d12914957ff65c2f26f3e752337f10b643b2115af712e287e06dc248ca:CC.AmuletRules:AmuletRules',
     contract_id:
       '0084bd1732e6ef1757c2755a83d6acfdc9bf68688b7f55d19d4586008ee3228bceca02122028af9a1d4fff115e10a40adb65d08dcd69463ad6bf5c3055e12d1b960bbad9da',
     payload: {
       svc: 'SVC::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
       configSchedule: {
-        initialValue: getCoinConfig('0.03'),
+        initialValue: getAmuletConfig('0.03'),
         futureValues: [
           {
             _1: '2023-03-15T08:35:00Z',
-            _2: getCoinConfig('0.003'),
+            _2: getAmuletConfig('0.003'),
           },
           {
             _1: '2024-03-15T08:35:00Z',
-            _2: getCoinConfig('4815162342'),
+            _2: getAmuletConfig('4815162342'),
           },
           {
             _1: '2524-03-19T08:35:00Z',
-            _2: getCoinConfig('0.03'),
+            _2: getAmuletConfig('0.03'),
           },
         ],
       },
@@ -395,10 +395,10 @@ export const svcInfo: GetSvcInfoResponse = {
   sv_node_states: [], // TODO(tech-debt): add better mock data
 };
 
-function getCoinConfig(createFee: string) {
+function getAmuletConfig(createFee: string) {
   return {
     packageConfig: {
-      cantonCoin: '0.1.0',
+      cantonAmulet: '0.1.0',
       walletPayments: '0.1.0',
       svcGovernance: '0.1.0',
       validatorLifecycle: '0.1.0',
@@ -447,7 +447,7 @@ function getCoinConfig(createFee: string) {
     issuanceCurve: {
       initialValue: {
         validatorRewardPercentage: '0.5',
-        coinToIssuePerYear: '40000000000.0',
+        amuletToIssuePerYear: '40000000000.0',
         unfeaturedAppRewardCap: '0.6',
         appRewardPercentage: '0.15',
         featuredAppRewardCap: '100.0',
@@ -459,7 +459,7 @@ function getCoinConfig(createFee: string) {
           _1: { microseconds: '15768000000000' },
           _2: {
             validatorRewardPercentage: '0.12',
-            coinToIssuePerYear: '20000000000.0',
+            amuletToIssuePerYear: '20000000000.0',
             unfeaturedAppRewardCap: '0.6',
             appRewardPercentage: '0.4',
             featuredAppRewardCap: '100.0',
@@ -471,7 +471,7 @@ function getCoinConfig(createFee: string) {
           _1: { microseconds: '47304000000000' },
           _2: {
             validatorRewardPercentage: '0.18',
-            coinToIssuePerYear: '10000000000.0',
+            amuletToIssuePerYear: '10000000000.0',
             unfeaturedAppRewardCap: '0.6',
             appRewardPercentage: '0.62',
             featuredAppRewardCap: '100.0',
@@ -483,7 +483,7 @@ function getCoinConfig(createFee: string) {
           _1: { microseconds: '157680000000000' },
           _2: {
             validatorRewardPercentage: '0.21',
-            coinToIssuePerYear: '5000000000.0',
+            amuletToIssuePerYear: '5000000000.0',
             unfeaturedAppRewardCap: '0.6',
             appRewardPercentage: '0.69',
             featuredAppRewardCap: '100.0',
@@ -495,7 +495,7 @@ function getCoinConfig(createFee: string) {
           _1: { microseconds: '315360000000000' },
           _2: {
             validatorRewardPercentage: '0.2',
-            coinToIssuePerYear: '2500000000.0',
+            amuletToIssuePerYear: '2500000000.0',
             unfeaturedAppRewardCap: '0.6',
             appRewardPercentage: '0.75',
             featuredAppRewardCap: '100.0',
@@ -511,7 +511,7 @@ function getCoinConfig(createFee: string) {
 // Sanity check / guard against template changes
 
 const result = jtv.Result.andThen(
-  () => CoinRules.decoder.run(svcInfo.coin_rules.payload),
+  () => AmuletRules.decoder.run(svcInfo.amulet_rules.payload),
   SvcRules.decoder.run(svcInfo.svc_rules.payload)
 );
 if (!result.ok) {

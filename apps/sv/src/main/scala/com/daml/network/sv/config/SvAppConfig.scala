@@ -76,7 +76,7 @@ object SvOnboardingConfig {
       // We use the tickDuration as the default bootstrapping duration to ensure our tests focus on the steady state.
       roundZeroDuration: Option[NonNegativeFiniteDuration] = None,
       initialMaxNumInputs: Int = 100,
-      initialCoinPrice: BigDecimal = 0.005,
+      initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
       initialCnsConfig: InitialCnsConfig = InitialCnsConfig(),
       initialTrafficControlConfig: TrafficControlConfig = TrafficControlConfig(),
@@ -172,7 +172,7 @@ case class SvAppBackendConfig(
     // because this one can be suffixed per test while we keep the onboarding name stable.
     svPartyHint: Option[String] = None,
     onboarding: Option[SvOnboardingConfig] = None,
-    initialCoinPriceVote: Option[BigDecimal] = None,
+    initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[CometBftConfig] = None,
     localDomainNode: Option[SvDomainNodeConfig],
     scan: Option[SvScanConfig],

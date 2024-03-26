@@ -18,14 +18,14 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
     with FrontendLoginUtil
     with OptionValues {
 
-  private val coinPrice = 2
+  private val amuletPrice = 2
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      .withoutAutomaticRewardsCollectionAndCoinMerging
-      .withCoinPrice(coinPrice)
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
+      .withAmuletPrice(amuletPrice)
 
   "A wallet transaction history UI" should {
 
@@ -41,7 +41,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           aliceCnsExternalClient,
           aliceEntryName,
           aliceWalletClient,
-          tapAmount = 5.0 * coinPrice,
+          tapAmount = 5.0 * amuletPrice,
         )
         val (_, txsBefore) = actAndCheck(
           "Alice goes to wallet", {
@@ -88,7 +88,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
       inside(txs) { case rest :+ balanceChange =>
         matchLockUnlockCnsPayment(rest, entryForCns, isInitial = true)
         matchTransaction(balanceChange)(
-          coinPrice = 2,
+          amuletPrice = 2,
           expectedAction = "Balance Change",
           expectedSubtype = "Tap",
           expectedPartyDescription = None,
@@ -106,9 +106,9 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
     ) = {
       inside(txs) { case cnsCreation +: lockForCns +: Nil =>
         // Note: this transfer has no effect on the balance of the sender:
-        // the input for the app payment is a locked coin that was unlocked in the same transaction.
+        // the input for the app payment is a locked amulet that was unlocked in the same transaction.
         matchTransaction(cnsCreation)(
-          coinPrice = 2,
+          amuletPrice = 2,
           expectedAction = "Sent",
           expectedSubtype =
             if (isInitial)
@@ -118,7 +118,7 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           expectedAmountCC = BigDecimal(0), // 0 USD
         )
         matchTransaction(lockForCns)(
-          coinPrice = 2,
+          amuletPrice = 2,
           expectedAction = "Sent",
           expectedSubtype =
             if (isInitial)

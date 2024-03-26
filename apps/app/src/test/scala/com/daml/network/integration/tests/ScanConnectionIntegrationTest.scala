@@ -21,20 +21,20 @@ class ScanConnectionIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
       // Disable automatic reward collection, so that the wallet does not auto-collect rewards that we want the svc to consider unclaimed
-      .withoutAutomaticRewardsCollectionAndCoinMerging
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
 
-  "coin rules cache should be invalidated when the coin rules change" in { implicit env =>
+  "amulet rules cache should be invalidated when the amulet rules change" in { implicit env =>
     val (_, _) = onboardAliceAndBob()
-    // tap once so the CoinRules are cached...
+    // tap once so the AmuletRules are cached...
     aliceWalletClient.tap(5)
-    val currentConfigSchedule = sv1ScanBackend.getCoinRules().contract.payload.configSchedule
-    clue("schedule a config change, so the coinrules change, invalidating the cache.") {
+    val currentConfigSchedule = sv1ScanBackend.getAmuletRules().contract.payload.configSchedule
+    clue("schedule a config change, so the amuletrules change, invalidating the cache.") {
       val configSchedule =
         createConfigSchedule(
           currentConfigSchedule,
           (
             defaultTickDuration.asJava,
-            mkUpdatedCoinConfig(
+            mkUpdatedAmuletConfig(
               currentConfigSchedule,
               tickDuration = defaultTickDuration,
               maxNumInputs = 101,
@@ -56,7 +56,7 @@ class ScanConnectionIntegrationTest
           // will initially fail and lead to a cache invalidation.
           // then the retry logic in tap will trigger cache refreshment
           _.message should include regex (
-            s"CoinRules cache is empty or outdated, retrieving CoinRules from CC scan"
+            s"AmuletRules cache is empty or outdated, retrieving AmuletRules from CC scan"
           )
         )
       },

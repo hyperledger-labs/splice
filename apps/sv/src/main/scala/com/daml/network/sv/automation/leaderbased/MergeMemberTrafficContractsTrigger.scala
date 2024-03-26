@@ -74,9 +74,9 @@ class MergeMemberTrafficContractsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svcRules <- store.getSvcRules()
-      coinRules <- store.getCoinRules()
+      amuletRules <- store.getAmuletRules()
       arg = new SvcRules_MergeMemberTrafficContracts(
-        coinRules.contractId,
+        amuletRules.contractId,
         memberTraffics.map(_.contractId).asJava,
       )
       cmd = svcRules.exercise(_.exerciseSvcRules_MergeMemberTrafficContracts(arg))

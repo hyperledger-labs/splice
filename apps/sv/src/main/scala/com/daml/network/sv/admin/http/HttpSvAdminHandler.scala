@@ -131,16 +131,16 @@ class HttpSvAdminHandler(
     }
   }
 
-  def listCoinPriceVotes(
-      respond: v0.SvAdminResource.ListCoinPriceVotesResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListCoinPriceVotesResponse] = {
+  def listAmuletPriceVotes(
+      respond: v0.SvAdminResource.ListAmuletPriceVotesResponse.type
+  )()(tuser: TracedUser): Future[v0.SvAdminResource.ListAmuletPriceVotesResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.listCoinPriceVotes") { _ => _ =>
+    withSpan(s"$workflowId.listAmuletPriceVotes") { _ => _ =>
       for {
-        coinPriceVotes <- svcStore.listCoinPriceVotes()
+        amuletPriceVotes <- svcStore.listAmuletPriceVotes()
       } yield {
-        definitions.ListCoinPriceVotesResponse(
-          coinPriceVotes.map(_.toHttp).toVector
+        definitions.ListAmuletPriceVotesResponse(
+          amuletPriceVotes.map(_.toHttp).toVector
         )
       }
     }
@@ -164,23 +164,23 @@ class HttpSvAdminHandler(
     }
   }
 
-  def updateCoinPriceVote(
-      respond: v0.SvAdminResource.UpdateCoinPriceVoteResponse.type
+  def updateAmuletPriceVote(
+      respond: v0.SvAdminResource.UpdateAmuletPriceVoteResponse.type
   )(
-      body: definitions.UpdateCoinPriceVoteRequest
-  )(tuser: TracedUser): Future[v0.SvAdminResource.UpdateCoinPriceVoteResponse] = {
+      body: definitions.UpdateAmuletPriceVoteRequest
+  )(tuser: TracedUser): Future[v0.SvAdminResource.UpdateAmuletPriceVoteResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.updateCoinPriceVote") { _ => _ =>
-      val coinPrice = Codec.tryDecode(Codec.BigDecimal)(body.coinPrice)
+    withSpan(s"$workflowId.updateAmuletPriceVote") { _ => _ =>
+      val amuletPrice = Codec.tryDecode(Codec.BigDecimal)(body.amuletPrice)
       SvApp
-        .updateCoinPriceVote(
-          coinPrice,
+        .updateAmuletPriceVote(
+          amuletPrice,
           svcStoreWithIngestion,
           logger,
         )
         .flatMap {
           case Left(reason) => Future.failed(HttpErrorHandler.badRequest(reason))
-          case Right(()) => Future.successful(v0.SvAdminResource.UpdateCoinPriceVoteResponseOK)
+          case Right(()) => Future.successful(v0.SvAdminResource.UpdateAmuletPriceVoteResponseOK)
         }
     }
   }

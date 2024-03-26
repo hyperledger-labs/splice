@@ -5,20 +5,20 @@ import com.daml.ledger.javaapi.data as javab
 import com.daml.lf.data.Time.Timestamp
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
-import com.daml.network.codegen.java.cc.coin.UnclaimedReward
-import com.daml.network.codegen.java.cc.coinrules.{
+import com.daml.network.codegen.java.cc.amulet.UnclaimedReward
+import com.daml.network.codegen.java.cc.amuletrules.{
   AppTransferContext,
-  CoinRules_MiningRound_Archive,
+  AmuletRules_MiningRound_Archive,
 }
 import com.daml.network.codegen.java.cc.types.Round
 import com.daml.network.codegen.java.cc.validatorlicense as vl
-import com.daml.network.codegen.java.cn.svc.coinprice as cp
+import com.daml.network.codegen.java.cn.svc.amuletprice as cp
 import com.daml.network.codegen.java.cn.svc.memberstate.MemberRewardState
 import com.daml.network.codegen.java.cn.svcrules.actionrequiringconfirmation.{
-  ARC_CoinRules,
+  ARC_AmuletRules,
   ARC_SvcRules,
 }
-import com.daml.network.codegen.java.cn.svcrules.coinrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
+import com.daml.network.codegen.java.cn.svcrules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.cn.svcrules.svcrules_actionrequiringconfirmation.SRARC_ConfirmSvOnboarding
 import com.daml.network.codegen.java.cn.svcrules.{
   ActionRequiringConfirmation,
@@ -30,7 +30,7 @@ import com.daml.network.codegen.java.cn.svonboarding as so
 import com.daml.network.codegen.java.cn.wallet.subscriptions as sub
 import com.daml.network.codegen.java.{cc, cn}
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
-import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
+import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
 import com.daml.network.store.db.AcsJdbcTypes
@@ -55,8 +55,8 @@ import scala.jdk.OptionConverters.*
 import scala.jdk.CollectionConverters.*
 
 /* Store used by the SV app for filtering contracts visible to the SVC party. */
-trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCoinRules {
-  import SvSvcStore.{coinRulesFollowers, svcRulesFollowers}
+trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAmuletRules {
+  import SvSvcStore.{amuletRulesFollowers, svcRulesFollowers}
 
   protected val outerLoggerFactory: NamedLoggerFactory
   protected def templateJsonDecoder: TemplateJsonDecoder
@@ -184,33 +184,37 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       tc: TraceContext
   ): Future[Option[AssignedContract[MemberRewardState.ContractId, MemberRewardState]]]
 
-  def lookupCoinRulesWithOffset()(implicit tc: TraceContext): Future[
+  def lookupAmuletRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
-      AssignedContract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]
+      AssignedContract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]
     ]]
   ] = multiDomainAcsStore
-    .findAnyContractWithOffset(cc.coinrules.CoinRules.COMPANION)
+    .findAnyContractWithOffset(cc.amuletrules.AmuletRules.COMPANION)
     .map(_.map(_.flatMap(_.toAssignedContract)))
 
-  def lookupCoinRules()(implicit
+  def lookupAmuletRules()(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]]] =
-    lookupCoinRulesWithOffset().map(_.value)
+  ): Future[
+    Option[AssignedContract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]]
+  ] =
+    lookupAmuletRulesWithOffset().map(_.value)
 
-  def getCoinRules()(implicit
+  def getAmuletRules()(implicit
       tc: TraceContext
-  ): Future[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]] =
-    lookupCoinRules().map(
+  ): Future[Contract[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules]] =
+    lookupAmuletRules().map(
       _.map(_.contract).getOrElse(
-        throw Status.NOT_FOUND.withDescription("No active CoinRules contract").asRuntimeException()
+        throw Status.NOT_FOUND
+          .withDescription("No active AmuletRules contract")
+          .asRuntimeException()
       )
     )
 
-  def getCoinRulesDomain: GetCoinRulesDomain = { () => implicit tc =>
-    lookupCoinRules().map(
+  def getAmuletRulesDomain: GetAmuletRulesDomain = { () => implicit tc =>
+    lookupAmuletRules().map(
       _.getOrElse(
         throw Status.NOT_FOUND
-          .withDescription("No active CoinRules contract")
+          .withDescription("No active AmuletRules contract")
           .asRuntimeException()
       ).domain
     )
@@ -301,14 +305,15 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
     )
   )
 
-  /** List coins that are expired and can never be used as transfer input. */
-  final def listExpiredCoins: ListExpiredContracts[cc.coin.Coin.ContractId, cc.coin.Coin] =
-    listExpiredRoundBased(cc.coin.Coin.COMPANION)(identity)
+  /** List amulets that are expired and can never be used as transfer input. */
+  final def listExpiredAmulets
+      : ListExpiredContracts[cc.amulet.Amulet.ContractId, cc.amulet.Amulet] =
+    listExpiredRoundBased(cc.amulet.Amulet.COMPANION)(identity)
 
-  /** List locked coins that are expired and can never be used as transfer input. */
-  final def listLockedExpiredCoins
-      : ListExpiredContracts[cc.coin.LockedCoin.ContractId, cc.coin.LockedCoin] =
-    listExpiredRoundBased(cc.coin.LockedCoin.COMPANION)(_.coin)
+  /** List locked amulets that are expired and can never be used as transfer input. */
+  final def listLockedExpiredAmulets
+      : ListExpiredContracts[cc.amulet.LockedAmulet.ContractId, cc.amulet.LockedAmulet] =
+    listExpiredRoundBased(cc.amulet.LockedAmulet.COMPANION)(_.amulet)
 
   def listExpiredVoteRequests(): ListExpiredContracts[VoteRequest.ContractId, VoteRequest] =
     multiDomainAcsStore.listExpiredFromPayloadExpiry(VoteRequest.COMPANION)(_.voteBefore)
@@ -326,7 +331,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       limit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]]]
+  ): Future[Seq[Contract[cc.amulet.AppRewardCoupon.ContractId, cc.amulet.AppRewardCoupon]]]
 
   def sumAppRewardCouponsOnDomain(
       round: Long,
@@ -341,14 +346,14 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Seq[cc.coin.AppRewardCoupon.ContractId]]]
+  ): Future[Seq[Seq[cc.amulet.AppRewardCoupon.ContractId]]]
 
   def listValidatorRewardCouponsOnDomain(
       round: Long,
       domainId: DomainId,
       limit: Limit,
   )(implicit tc: TraceContext): Future[
-    Seq[Contract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]]
+    Seq[Contract[cc.amulet.ValidatorRewardCoupon.ContractId, cc.amulet.ValidatorRewardCoupon]]
   ]
 
   def sumValidatorRewardCouponsOnDomain(
@@ -360,7 +365,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       roundNumber: Long,
       roundDomain: DomainId,
       totalCouponsLimit: Limit,
-  )(implicit tc: TraceContext): Future[Seq[Seq[cc.coin.ValidatorRewardCoupon.ContractId]]]
+  )(implicit tc: TraceContext): Future[Seq[Seq[cc.amulet.ValidatorRewardCoupon.ContractId]]]
 
   def listValidatorFaucetCouponsOnDomain(
       round: Long,
@@ -392,8 +397,8 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       limit: Limit,
   )(implicit tc: TraceContext): Future[
     Seq[Contract[
-      cc.coin.SvRewardCoupon.ContractId,
-      cc.coin.SvRewardCoupon,
+      cc.amulet.SvRewardCoupon.ContractId,
+      cc.amulet.SvRewardCoupon,
     ]]
   ]
 
@@ -408,7 +413,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       totalCouponsLimit: Limit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Seq[cc.coin.SvRewardCoupon.ContractId]]]
+  ): Future[Seq[Seq[cc.amulet.SvRewardCoupon.ContractId]]]
 
   protected[this] def lookupOldestClosedMiningRound()(implicit
       tc: TraceContext
@@ -544,9 +549,9 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
             domain,
             PageLimit.tryCreate(1),
           )
-          action = new ARC_CoinRules(
+          action = new ARC_AmuletRules(
             new CRARC_MiningRound_Archive(
-              new CoinRules_MiningRound_Archive(
+              new AmuletRules_MiningRound_Archive(
                 round.contractId
               )
             )
@@ -696,16 +701,16 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
 
   protected def listExpiredRoundBased[Id <: javab.codegen.ContractId[T], T <: javab.Template](
       companion: TemplateCompanion[Id, T]
-  )(coin: T => cc.coin.Coin): ListExpiredContracts[Id, T]
+  )(amulet: T => cc.amulet.Amulet): ListExpiredContracts[Id, T]
 
   final def listUnclaimedRewards(
       limit: Limit
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.coin.UnclaimedReward]]] =
+  ): Future[Seq[Contract[UnclaimedReward.ContractId, cc.amulet.UnclaimedReward]]] =
     for {
       unclaimedRewards <- multiDomainAcsStore.listContracts(
-        cc.coin.UnclaimedReward.COMPANION,
+        cc.amulet.UnclaimedReward.COMPANION,
         limit = limit,
       )
     } yield unclaimedRewards map (_.contract)
@@ -732,24 +737,24 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       _.expiresAt
     )
 
-  /** List all the current coin price votes. */
-  final def listAllCoinPriceVotes(
+  /** List all the current amulet price votes. */
+  final def listAllAmuletPriceVotes(
       limit: Limit = Limit.DefaultLimit
   )(implicit tc: TraceContext): Future[
-    Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
+    Seq[Contract[cn.svc.amuletprice.AmuletPriceVote.ContractId, cn.svc.amuletprice.AmuletPriceVote]]
   ] =
     for {
       votes <- multiDomainAcsStore.listContracts(
-        cn.svc.coinprice.CoinPriceVote.COMPANION,
+        cn.svc.amuletprice.AmuletPriceVote.COMPANION,
         limit,
       )
     } yield votes map (_.contract)
 
-  /** List the current coin price votes by the SVC members. */
-  def listMemberCoinPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
+  /** List the current amulet price votes by the SVC members. */
+  def listMemberAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
+    Seq[Contract[cn.svc.amuletprice.AmuletPriceVote.ContractId, cn.svc.amuletprice.AmuletPriceVote]]
   ]
 
   protected def lookupSvOnboardingRequestByCandidatePartyWithOffset(
@@ -774,13 +779,13 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       tc: TraceContext
   ): Future[Long]
 
-  def listCoinPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
+  def listAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[Contract[cn.svc.coinprice.CoinPriceVote.ContractId, cn.svc.coinprice.CoinPriceVote]]
+    Seq[Contract[cn.svc.amuletprice.AmuletPriceVote.ContractId, cn.svc.amuletprice.AmuletPriceVote]]
   ] =
     multiDomainAcsStore
-      .listContracts(cn.svc.coinprice.CoinPriceVote.COMPANION, limit)
+      .listContracts(cn.svc.amuletprice.AmuletPriceVote.COMPANION, limit)
       .map(_ map (_.contract))
 
   def listVoteRequests(limit: Limit = Limit.DefaultLimit)(implicit tc: TraceContext): Future[
@@ -826,9 +831,9 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
     QueryResult[Option[Contract[VoteRequest.ContractId, VoteRequest]]]
   ]
 
-  def lookupCoinPriceVoteByThisSv()(implicit
+  def lookupAmuletPriceVoteByThisSv()(implicit
       tc: TraceContext
-  ): Future[Option[Contract[cp.CoinPriceVote.ContractId, cp.CoinPriceVote]]]
+  ): Future[Option[Contract[cp.AmuletPriceVote.ContractId, cp.AmuletPriceVote]]]
 
   protected def lookupSvOnboardingRequestByCandidateNameWithOffset(
       candidateName: String
@@ -869,12 +874,12 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   private[this] def listLaggingSvcRulesFollowers(
       targetDomain: DomainId
   )(implicit tc: TraceContext): Future[Seq[AssignedContract[?, ?]]] = for {
-    coinRulesO <- lookupCoinRules()
+    amuletRulesO <- lookupAmuletRules()
     otherContracts <- multiDomainAcsStore.listAssignedContractsNotOnDomainN(
       targetDomain,
       svcRulesFollowers,
     )
-  } yield otherContracts ++ coinRulesO
+  } yield otherContracts ++ amuletRulesO
     .filterNot(_.domain == targetDomain)
     .toList
 
@@ -887,16 +892,18 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
     }.getOrElse(Future successful Seq.empty))
   }
 
-  def listCoinRulesTransferFollowers()(implicit
+  def listAmuletRulesTransferFollowers()(implicit
       tc: TraceContext
-  ): Future[Seq[FollowTask[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules, ?, ?]]] = {
-    lookupCoinRules().flatMap(_.map { coinRules =>
+  ): Future[
+    Seq[FollowTask[cc.amuletrules.AmuletRules.ContractId, cc.amuletrules.AmuletRules, ?, ?]]
+  ] = {
+    lookupAmuletRules().flatMap(_.map { amuletRules =>
       multiDomainAcsStore
         .listAssignedContractsNotOnDomainN(
-          coinRules.domain,
-          coinRulesFollowers,
+          amuletRules.domain,
+          amuletRulesFollowers,
         )
-        .map(_.map(FollowTask(coinRules, _)).toSeq)
+        .map(_.map(FollowTask(amuletRules, _)).toSeq)
     }.getOrElse(Future successful Seq.empty))
   }
 
@@ -944,7 +951,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
       providerPartyId: PartyId
   )(implicit tc: TraceContext): Future[
     QueryResult[
-      Option[AssignedContract[cc.coin.FeaturedAppRight.ContractId, cc.coin.FeaturedAppRight]]
+      Option[AssignedContract[cc.amulet.FeaturedAppRight.ContractId, cc.amulet.FeaturedAppRight]]
     ]
   ]
 
@@ -953,7 +960,7 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   )(implicit
       tc: TraceContext
   ): Future[
-    Option[AssignedContract[cc.coin.FeaturedAppRight.ContractId, cc.coin.FeaturedAppRight]]
+    Option[AssignedContract[cc.amulet.FeaturedAppRight.ContractId, cc.amulet.FeaturedAppRight]]
   ] =
     lookupFeaturedAppRightWithOffset(providerPartyId).map(_.value)
 
@@ -974,10 +981,10 @@ trait SvSvcStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasCo
   )(implicit tc: TraceContext): Future[AppTransferContext] = {
     for {
       featured <- lookupFeaturedAppRight(key.svcParty)
-      coinRules <- getCoinRules()
+      amuletRules <- getAmuletRules()
     } yield {
       new AppTransferContext(
-        coinRules.contractId,
+        amuletRules.contractId,
         openMiningRound.contractId,
         featured.map(_.contractId).toJava,
       )
@@ -1023,7 +1030,7 @@ object SvSvcStore {
   private val svcRulesFollowers: Seq[ConstrainedTemplate] = {
     import com.daml.network.codegen.java.cn.svcrules
     Seq[ConstrainedTemplate](
-      // CoinRules is specially handled so should *not* be listed here, even
+      // AmuletRules is specially handled so should *not* be listed here, even
       // though it follows SvcRules
       svcrules.VoteRequest.COMPANION,
       svcrules.Confirmation.COMPANION,
@@ -1036,26 +1043,26 @@ object SvSvcStore {
     )
   }
 
-  private[network] val coinRulesFollowers: Seq[ConstrainedTemplate] = Seq[ConstrainedTemplate](
+  private[network] val amuletRulesFollowers: Seq[ConstrainedTemplate] = Seq[ConstrainedTemplate](
     cc.round.OpenMiningRound.COMPANION,
     cc.round.SummarizingMiningRound.COMPANION,
     cc.round.IssuingMiningRound.COMPANION,
     cc.round.ClosedMiningRound.COMPANION,
-    cc.coin.FeaturedAppRight.COMPANION,
-    cc.coin.UnclaimedReward.COMPANION,
+    cc.amulet.FeaturedAppRight.COMPANION,
+    cc.amulet.UnclaimedReward.COMPANION,
     cc.validatorlicense.ValidatorLicense.COMPANION,
     cn.cns.CnsEntry.COMPANION,
     cn.cns.CnsEntryContext.COMPANION,
     cn.cns.CnsRules.COMPANION,
-    cn.svc.coinprice.CoinPriceVote.COMPANION,
+    cn.svc.amuletprice.AmuletPriceVote.COMPANION,
     cn.wallet.subscriptions.TerminatedSubscription.COMPANION, // TODO (#8782) move it to UserWalletStore.templatesMovedByMyAutomation
   )
 
   private[network] val templatesMovedByMyAutomation: Seq[ConstrainedTemplate] =
-    (svcRulesFollowers ++ coinRulesFollowers) ++ Seq[ConstrainedTemplate](
-      // CoinRules and SvcRules are specially handled, so not listed in followers
+    (svcRulesFollowers ++ amuletRulesFollowers) ++ Seq[ConstrainedTemplate](
+      // AmuletRules and SvcRules are specially handled, so not listed in followers
       cn.svcrules.SvcRules.COMPANION,
-      cc.coinrules.CoinRules.COMPANION,
+      cc.amuletrules.AmuletRules.COMPANION,
     )
 
   /** Contract filter of an sv acs store for a specific acs party. */
@@ -1067,11 +1074,12 @@ object SvSvcStore {
     val svc = svcParty.toProtoPrimitive
 
     val svcFilters = Map[PackageQualifiedName, TemplateFilter[?, ?, SvcAcsStoreRowData]](
-      mkFilter(cn.svc.coinprice.CoinPriceVote.COMPANION)(co => co.payload.svc == svc) { contract =>
-        SvcAcsStoreRowData(
-          contract,
-          voter = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
-        )
+      mkFilter(cn.svc.amuletprice.AmuletPriceVote.COMPANION)(co => co.payload.svc == svc) {
+        contract =>
+          SvcAcsStoreRowData(
+            contract,
+            voter = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
+          )
       },
       mkFilter(cn.svcrules.Confirmation.COMPANION)(co => co.payload.svc == svc) { contract =>
         val (
@@ -1168,28 +1176,28 @@ object SvSvcStore {
           svCandidateName = Some(contract.payload.svName),
         )
       },
-      mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc)(
+      mkFilter(cc.amuletrules.AmuletRules.COMPANION)(co => co.payload.svc == svc)(
         SvcAcsStoreRowData(_)
       ),
-      mkFilter(cc.coin.Coin.COMPANION)(co => co.payload.svc == svc) { contract =>
+      mkFilter(cc.amulet.Amulet.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
-          coinRoundOfExpiry = Some(CNNodeUtil.coinExpiresAt(contract.payload).number),
+          amuletRoundOfExpiry = Some(CNNodeUtil.amuletExpiresAt(contract.payload).number),
         )
       },
-      mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc) { contract =>
+      mkFilter(cc.amulet.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
           featuredAppRightProvider = Some(PartyId.tryFromProtoPrimitive(contract.payload.provider)),
         )
       },
-      mkFilter(cc.coin.LockedCoin.COMPANION)(co => co.payload.coin.svc == svc) { contract =>
+      mkFilter(cc.amulet.LockedAmulet.COMPANION)(co => co.payload.amulet.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
-          coinRoundOfExpiry = Some(CNNodeUtil.coinExpiresAt(contract.payload.coin).number),
+          amuletRoundOfExpiry = Some(CNNodeUtil.amuletExpiresAt(contract.payload.amulet).number),
         )
       },
-      mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
+      mkFilter(cc.amulet.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
           rewardRound = Some(contract.payload.round.number),
@@ -1198,7 +1206,7 @@ object SvSvcStore {
           appRewardIsFeatured = Some(contract.payload.featured),
         )
       },
-      mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
+      mkFilter(cc.amulet.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
           rewardRound = Some(contract.payload.round.number),
@@ -1214,7 +1222,7 @@ object SvSvcStore {
             rewardParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
           )
       },
-      mkFilter(cc.coin.SvRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
+      mkFilter(cc.amulet.SvRewardCoupon.COMPANION)(co => co.payload.svc == svc) { contract =>
         SvcAcsStoreRowData(
           contract,
           rewardRound = Some(contract.payload.round.number),
@@ -1247,7 +1255,7 @@ object SvSvcStore {
           miningRound = Some(contract.payload.round.number),
         )
       },
-      mkFilter(cc.coin.UnclaimedReward.COMPANION)(co => co.payload.svc == svc)(
+      mkFilter(cc.amulet.UnclaimedReward.COMPANION)(co => co.payload.svc == svc)(
         SvcAcsStoreRowData(_)
       ),
       mkFilter(vl.ValidatorLicense.COMPANION)(vl => vl.payload.svc == svc) { contract =>
@@ -1357,7 +1365,7 @@ object SvSvcStore {
       Ordering[Instant].max(
         oldest.payload.targetClosesAt,
         Ordering[Instant].max(
-          // TODO(M3-07): when changing CoinConfigs it will make sense to store tickDuration on the rounds and express targetClosesAt as 2 * tickDuration
+          // TODO(M3-07): when changing AmuletConfigs it will make sense to store tickDuration on the rounds and express targetClosesAt as 2 * tickDuration
           middle.payload.opensAt.plus(middleTickDuration),
           newest.payload.opensAt,
         ),
@@ -1490,9 +1498,9 @@ object SvSvcStore {
 case class ExpiredRewardCouponsBatch(
     closedRoundCid: cc.round.ClosedMiningRound.ContractId,
     closedRoundNumber: Long,
-    validatorCoupons: Seq[cc.coin.ValidatorRewardCoupon.ContractId],
-    appCoupons: Seq[cc.coin.AppRewardCoupon.ContractId],
-    svRewardCoupons: Seq[cc.coin.SvRewardCoupon.ContractId],
+    validatorCoupons: Seq[cc.amulet.ValidatorRewardCoupon.ContractId],
+    appCoupons: Seq[cc.amulet.AppRewardCoupon.ContractId],
+    svRewardCoupons: Seq[cc.amulet.SvRewardCoupon.ContractId],
     validatorFaucets: Seq[cc.validatorlicense.ValidatorFaucetCoupon.ContractId],
 ) extends PrettyPrinting {
   override def pretty: Pretty[this.type] =

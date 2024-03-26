@@ -3,8 +3,8 @@ module CN.SvcBootstrap where
 import qualified DA.Map as Map
 import DA.Time
 
-import CC.CoinConfig
-import CC.CoinRules
+import CC.AmuletConfig
+import CC.AmuletRules
 import CC.Schedule
 import CC.Types
 
@@ -12,7 +12,7 @@ import CN.Cns
 import CN.SVC.GlobalDomain
 import CN.SvcRules
 
--- | A template for bootstrapping the collective and CoinRules.
+-- | A template for bootstrapping the collective and AmuletRules.
 template SvcBootstrap with
     svc : Party
     founderParty : Party -- ^ the founding SV
@@ -21,8 +21,8 @@ template SvcBootstrap with
     founderParticipantId : Text -- ^ the id of the participant of the founding SV
     founderDomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
     round0Duration : RelTime
-    coinConfig : CoinConfig USD
-    coinPrice : Decimal
+    amuletConfig : AmuletConfig USD
+    amuletPrice : Decimal
     cnsRulesConfig: CnsRulesConfig
     config : SvcRulesConfig
     initialTrafficState: Map.Map Text TrafficState
@@ -34,20 +34,20 @@ template SvcBootstrap with
     choice SvcBootstrap_Bootstrap : ()
       controller svc
       do
-        -- create coin-rules and the initial price vote of the founding member
-        coinRulesCid <- create CoinRules with
+        -- create amulet-rules and the initial price vote of the founding member
+        amuletRulesCid <- create AmuletRules with
           svc
           configSchedule = Schedule with
-            initialValue = coinConfig
+            initialValue = amuletConfig
             futureValues = []
           isDevNet
         _ <- create CnsRules with
           svc
           config = cnsRulesConfig
         -- bootstrap rounds
-        exercise coinRulesCid CoinRules_Bootstrap_Rounds with
+        exercise amuletRulesCid AmuletRules_Bootstrap_Rounds with
           round0Duration
-          coinPrice
+          amuletPrice
         -- create the SVC rules with the founding member as the sole member
         let founderMemberInfo = MemberInfo with
               name = founderName
@@ -72,4 +72,4 @@ template SvcBootstrap with
               joinedAsOfRound = Round 0
               newMemberRewardWeight = founderRewardWeight
         createPerMemberContracts svcRules addMemberChoiceArgs
-        createPerSvPartyContracts svc founderParty founderName founderDomainNodes (Some coinPrice)
+        createPerSvPartyContracts svc founderParty founderName founderDomainNodes (Some amuletPrice)

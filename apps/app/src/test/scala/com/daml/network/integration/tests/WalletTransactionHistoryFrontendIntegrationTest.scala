@@ -30,15 +30,15 @@ class WalletTransactionHistoryFrontendIntegrationTest
     with DomainFeesTestUtil
     with FrontendLoginUtil {
 
-  private val coinPrice = 2
-  override def walletCoinPrice = CNNodeUtil.damlDecimal(coinPrice.toDouble)
+  private val amuletPrice = 2
+  override def walletAmuletPrice = CNNodeUtil.damlDecimal(amuletPrice.toDouble)
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1Sv(this.getClass.getSimpleName)
-      .withoutAutomaticRewardsCollectionAndCoinMerging
-      .withCoinPrice(coinPrice)
+      .withoutAutomaticRewardsCollectionAndAmuletMerging
+      .withAmuletPrice(amuletPrice)
 
   "A wallet transaction history UI" should {
 
@@ -80,7 +80,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               aliceCnsExternalClient,
               aliceEntryName,
               aliceWalletClient,
-              tapAmount = 5 * coinPrice,
+              tapAmount = 5 * amuletPrice,
             )
             // charlie -> alice
             charlieWalletClient.tap(50)
@@ -117,14 +117,14 @@ class WalletTransactionHistoryFrontendIntegrationTest
         inside(txs) {
           case otp +: sent +: received +: cnsCreation +: lockForCns +: balanceChange +: Nil =>
             matchTransaction(otp)(
-              coinPrice = 2,
+              amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "App Payment Accepted",
               expectedPartyDescription = Some(s"Automation $aliceValidatorParty"),
               expectedAmountCC = BigDecimal("-1.31415"),
             )
             matchTransaction(sent)(
-              coinPrice = 2,
+              amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "P2P Payment Completed",
               expectedPartyDescription = Some(
@@ -133,7 +133,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAmountCC = BigDecimal("-1.18"),
             )
             matchTransaction(received)(
-              coinPrice = 2,
+              amuletPrice = 2,
               expectedAction = "Received",
               expectedSubtype = "P2P Payment Completed",
               expectedPartyDescription = Some(
@@ -142,23 +142,23 @@ class WalletTransactionHistoryFrontendIntegrationTest
               expectedAmountCC = BigDecimal("1.07"),
             )
             // Note: this transfer has no effect on the balance of the sender:
-            // the input for the app payment is a locked coin that was unlocked in the same transaction.
+            // the input for the app payment is a locked amulet that was unlocked in the same transaction.
             matchTransaction(cnsCreation)(
-              coinPrice = 2,
+              amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "CNS Entry Initial Payment Collected",
               expectedPartyDescription = Some(s"$svcEntry $svcEntry"),
               expectedAmountCC = BigDecimal(0), // 0 USD
             )
             matchTransaction(lockForCns)(
-              coinPrice = 2,
+              amuletPrice = 2,
               expectedAction = "Sent",
               expectedSubtype = "Subscription Initial Payment Accepted",
               expectedPartyDescription = Some(s"Automation $aliceValidatorParty"),
               expectedAmountCC = BigDecimal("-0.5"), // 1 USD
             )
             matchTransaction(balanceChange)(
-              coinPrice = 2,
+              amuletPrice = 2,
               expectedAction = "Balance Change",
               expectedSubtype = "Tap",
               expectedPartyDescription = None,
@@ -195,7 +195,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 .name
             forExactly(1, txs) { tx =>
               matchTransaction(tx)(
-                coinPrice = 2,
+                amuletPrice = 2,
                 expectedAction = "Sent",
                 expectedSubtype = "Extra Traffic Purchase",
                 expectedPartyDescription = Some(

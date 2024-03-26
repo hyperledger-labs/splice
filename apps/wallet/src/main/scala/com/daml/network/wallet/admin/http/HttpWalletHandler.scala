@@ -3,14 +3,14 @@ package com.daml.network.wallet.admin.http
 import org.apache.pekko.stream.Materializer
 import com.daml.error.utils.ErrorDetails
 import com.daml.error.utils.ErrorDetails.ErrorInfoDetail
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
-import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
+import com.daml.network.codegen.java.cc.amulet.{Amulet, LockedAmulet}
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.install.{
-  CoinOperationOutcome,
-  coinoperation,
-  coinoperationoutcome,
+  AmuletOperationOutcome,
+  amuletoperation,
+  amuletoperationoutcome,
 }
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
@@ -71,16 +71,16 @@ class HttpWalletHandler(
       for {
         userStore <- getUserStore(user)
         currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
-        coins <- userStore.multiDomainAcsStore.listContracts(
-          coinCodegen.Coin.COMPANION
+        amulets <- userStore.multiDomainAcsStore.listContracts(
+          amuletCodegen.Amulet.COMPANION
         )
-        lockedCoins <- userStore.multiDomainAcsStore.listContracts(
-          coinCodegen.LockedCoin.COMPANION
+        lockedAmulets <- userStore.multiDomainAcsStore.listContracts(
+          amuletCodegen.LockedAmulet.COMPANION
         )
       } yield r0.ListResponseOK(
         d0.ListResponse(
-          coins.map(c => coinToCoinPosition(c.contract, currentRound)).toVector,
-          lockedCoins.map(c => lockedCoinToCoinPosition(c.contract, currentRound)).toVector,
+          amulets.map(c => amuletToAmuletPosition(c.contract, currentRound)).toVector,
+          lockedAmulets.map(c => lockedAmuletToAmuletPosition(c.contract, currentRound)).toVector,
         )
       )
     }
@@ -141,7 +141,7 @@ class HttpWalletHandler(
   ): Future[v0.WalletResource.ListAppRewardCouponsResponse] = {
     implicit val TracedUser(user, traceContext) = tuser
     listContracts(
-      coinCodegen.AppRewardCoupon.COMPANION,
+      amuletCodegen.AppRewardCoupon.COMPANION,
       user,
       d0.ListAppRewardCouponsResponse(_),
     )
@@ -235,7 +235,7 @@ class HttpWalletHandler(
   ): Future[v0.WalletResource.ListSvRewardCouponsResponse] = {
     implicit val TracedUser(user, traceContext) = tUser
     listContracts(
-      coinCodegen.SvRewardCoupon.COMPANION,
+      amuletCodegen.SvRewardCoupon.COMPANION,
       user,
       d0.ListSvRewardCouponsResponse(_),
     )
@@ -271,16 +271,16 @@ class HttpWalletHandler(
     implicit val TracedUser(user, traceContext) = tuser
     withSpan(s"$workflowId.selfGrantFeatureAppRight") { implicit traceContext => _ =>
       for {
-        coinRules <- scanConnection.getCoinRulesWithState()
+        amuletRules <- scanConnection.getAmuletRulesWithState()
         result <- exerciseWalletAction((installCid, _) =>
           Future.successful(
             installCid
               .exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(
-                coinRules.contractId
+                amuletRules.contractId
               )
               .map(_.exerciseResult)
           )
-        )(user, dislosedContracts = DisclosedContracts(coinRules))
+        )(user, dislosedContracts = DisclosedContracts(amuletRules))
       } yield d0.SelfGrantFeaturedAppRightResponse(Codec.encodeContractId(result))
     }
   }
@@ -384,8 +384,8 @@ class HttpWalletHandler(
       retryProvider.retryForClientCalls(
         "accept_app_payment",
         "Accept app payment request",
-        exerciseWalletCoinAction(
-          new coinoperation.CO_AppPayment(requestCid),
+        exerciseWalletAmuletAction(
+          new amuletoperation.CO_AppPayment(requestCid),
           user,
           (outcome: COO_AcceptedAppPayment) =>
             r0.AcceptAppPaymentRequestResponse.OK(
@@ -450,10 +450,10 @@ class HttpWalletHandler(
       retryProvider.retryForClientCalls(
         "accept_subscription",
         "Accept subscription and make initial payment",
-        exerciseWalletCoinAction(
-          new coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
+        exerciseWalletAmuletAction(
+          new amuletoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
           user,
-          (outcome: coinoperationoutcome.COO_SubscriptionInitialPayment) =>
+          (outcome: amuletoperationoutcome.COO_SubscriptionInitialPayment) =>
             d0.AcceptSubscriptionRequestResponse(
               Codec.encodeContractId(outcome.contractIdValue)
             ),
@@ -509,27 +509,27 @@ class HttpWalletHandler(
     withSpan(s"$workflowId.getBalance") { _ => _ =>
       for {
         userStore <- getUserStore(user)
-        coins <- userStore.multiDomainAcsStore.listContracts(
-          coinCodegen.Coin.COMPANION
+        amulets <- userStore.multiDomainAcsStore.listContracts(
+          amuletCodegen.Amulet.COMPANION
         )
-        lockedCoins <- userStore.multiDomainAcsStore.listContracts(
-          coinCodegen.LockedCoin.COMPANION
+        lockedAmulets <- userStore.multiDomainAcsStore.listContracts(
+          amuletCodegen.LockedAmulet.COMPANION
         )
         currentRound <- scanConnection
           .getLatestOpenMiningRound()
           .map(_.payload.round.number)
       } yield {
         val unlockedHoldingFees =
-          coins.view
+          amulets.view
             .map(c => BigDecimal(CNNodeUtil.holdingFee(c.payload, currentRound)))
             .sum
         val unlockedQty =
-          coins.view
+          amulets.view
             .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload, currentRound)))
             .sum
         val lockedQty =
-          lockedCoins.view
-            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload.coin, currentRound)))
+          lockedAmulets.view
+            .map(c => BigDecimal(CNNodeUtil.currentAmount(c.payload.amulet, currentRound)))
             .sum
 
         d0.GetBalanceResponse(
@@ -555,12 +555,12 @@ class HttpWalletHandler(
         for {
           (openRounds, _) <- scanConnection.getOpenAndIssuingMiningRounds()
           openRound = CNNodeUtil.selectLatestOpenMiningRound(walletManager.clock.now, openRounds)
-          result <- exerciseWalletCoinAction(
-            new coinoperation.CO_Tap(
-              amount.divide(openRound.payload.coinPrice, JRM.CEILING)
+          result <- exerciseWalletAmuletAction(
+            new amuletoperation.CO_Tap(
+              amount.divide(openRound.payload.amuletPrice, JRM.CEILING)
             ),
             user,
-            (outcome: coinoperationoutcome.COO_Tap) =>
+            (outcome: amuletoperationoutcome.COO_Tap) =>
               d0.TapResponse(Codec.encodeContractId(outcome.contractIdValue)),
           )
         } yield result,
@@ -623,27 +623,27 @@ class HttpWalletHandler(
     }
   }
 
-  private def coinToCoinPosition(
-      coin: Contract[Coin.ContractId, Coin],
+  private def amuletToAmuletPosition(
+      amulet: Contract[Amulet.ContractId, Amulet],
       round: Long,
-  )(implicit errorLoggingContext: ErrorLoggingContext): d0.CoinPosition = {
-    d0.CoinPosition(
-      coin.toHttp,
+  )(implicit errorLoggingContext: ErrorLoggingContext): d0.AmuletPosition = {
+    d0.AmuletPosition(
+      amulet.toHttp,
       round,
-      Codec.encode(CNNodeUtil.holdingFee(coin.payload, round)),
-      Codec.encode(CNNodeUtil.currentAmount(coin.payload, round)),
+      Codec.encode(CNNodeUtil.holdingFee(amulet.payload, round)),
+      Codec.encode(CNNodeUtil.currentAmount(amulet.payload, round)),
     )
   }
 
-  private def lockedCoinToCoinPosition(
-      lockedCoin: Contract[LockedCoin.ContractId, LockedCoin],
+  private def lockedAmuletToAmuletPosition(
+      lockedAmulet: Contract[LockedAmulet.ContractId, LockedAmulet],
       round: Long,
-  )(implicit errorLoggingContext: ErrorLoggingContext): d0.CoinPosition =
-    d0.CoinPosition(
-      lockedCoin.toHttp,
+  )(implicit errorLoggingContext: ErrorLoggingContext): d0.AmuletPosition =
+    d0.AmuletPosition(
+      lockedAmulet.toHttp,
       round,
-      Codec.encode(CNNodeUtil.holdingFee(lockedCoin.payload.coin, round)),
-      Codec.encode(CNNodeUtil.currentAmount(lockedCoin.payload.coin, round)),
+      Codec.encode(CNNodeUtil.holdingFee(lockedAmulet.payload.amulet, round)),
+      Codec.encode(CNNodeUtil.currentAmount(lockedAmulet.payload.amulet, round)),
     )
 
   private[this] def getUserTreasury(user: String): Future[TreasuryService] =
@@ -656,51 +656,51 @@ class HttpWalletHandler(
     * wallet user party as a readAs party.
     *
     * Additionally, the validator service party is also a readAs party (workaround for lack
-    * of explicit disclosure for CoinRules).
+    * of explicit disclosure for AmuletRules).
     */
-  private def exerciseWalletCoinAction[
-      ExpectedCOO <: CoinOperationOutcome: ClassTag,
+  private def exerciseWalletAmuletAction[
+      ExpectedCOO <: AmuletOperationOutcome: ClassTag,
       R,
   ](
-      operation: installCodegen.CoinOperation,
+      operation: installCodegen.AmuletOperation,
       user: String,
       processResponse: ExpectedCOO => R,
   )(implicit tc: TraceContext): Future[R] =
     for {
       userTreasury <- getUserTreasury(user)
       res <- userTreasury
-        .enqueueCoinOperation(operation)
+        .enqueueAmuletOperation(operation)
         .map(processCOO[ExpectedCOO, R](processResponse))
     } yield res
 
-  /** Helper function to process a CoinOperationOutcome.
+  /** Helper function to process a AmuletOperationOutcome.
     * Ensures that the outcome is of the expected type and throws an appropriate exception if it isn't.
     */
   private def processCOO[
-      ExpectedCOO <: CoinOperationOutcome: ClassTag,
+      ExpectedCOO <: AmuletOperationOutcome: ClassTag,
       R,
   ](
       process: ExpectedCOO => R
   )(
-      actual: installCodegen.CoinOperationOutcome
+      actual: installCodegen.AmuletOperationOutcome
   )(implicit tc: TraceContext): R = {
     // I (Arne) did not find a way to avoid ClassTag usage (or passing along a partial function) here
     // For example, passing along the `ExpectedCOO` type to the treasury service doesn't work
     // because inside the TreasuryService we have a Queue of
-    // different coin operation outcomes and thus the type of that Queue needs to be CoinOperationOutcome
-    // and it can't be the type of a particular coin operation outcome (like `ExpectedCOO`)
+    // different amulet operation outcomes and thus the type of that Queue needs to be AmuletOperationOutcome
+    // and it can't be the type of a particular amulet operation outcome (like `ExpectedCOO`)
     val clazz = implicitly[ClassTag[ExpectedCOO]].runtimeClass
     actual match {
       case result: ExpectedCOO if clazz.isInstance(result) => process(result)
-      case failedOperation: coinoperationoutcome.COO_Error =>
+      case failedOperation: amuletoperationoutcome.COO_Error =>
         throw Status.FAILED_PRECONDITION
           .withDescription(
-            s"the coin operation failed with a Daml exception: ${failedOperation}."
+            s"the amulet operation failed with a Daml exception: ${failedOperation}."
           )
           .asRuntimeException()
       case _ =>
         ErrorUtil.internalErrorGrpc(
-          s"expected to receive a coin operation outcome of type $clazz or `COO_Error` but received type ${actual.getClass} with value: $actual"
+          s"expected to receive a amulet operation outcome of type $clazz or `COO_Error` but received type ${actual.getClass} with value: $actual"
         )
     }
   }

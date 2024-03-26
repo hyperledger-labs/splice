@@ -36,7 +36,7 @@ class CNNodeConsoleEnvironment(
     DarResources.splitwell.all ++
       DarResources.validatorLifecycle.all ++
       DarResources.wallet.all ++
-      DarResources.cantonCoin.all ++
+      DarResources.cantonAmulet.all ++
       DarResources.svcGovernance.all
   )
   implicit val actorSystem: ActorSystem = environment.actorSystem
@@ -61,11 +61,11 @@ class CNNodeConsoleEnvironment(
 
   override lazy val nodes = NodeReferences(
     // this override ensures that config options like manualStart also work for CN apps
-    coinNodes.local,
-    coinNodes.remote,
+    amuletNodes.local,
+    amuletNodes.remote,
   )
 
-  lazy val coinNodes: NodeReferences[
+  lazy val amuletNodes: NodeReferences[
     CNNodeAppReference,
     CNNodeAppReference,
     CNNodeAppBackendReference,
@@ -346,9 +346,9 @@ class CNNodeConsoleEnvironment(
         Seq("App References"),
       ) :+
       TopLevelValue(
-        "coinNodes",
-        "All Coin nodes excluding standard Canton nodes",
-        coinNodes,
+        "amuletNodes",
+        "All Amulet nodes excluding standard Canton nodes",
+        amuletNodes,
         Seq("App references"),
       )
 

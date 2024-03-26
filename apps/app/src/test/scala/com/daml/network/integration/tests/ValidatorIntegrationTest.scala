@@ -44,10 +44,10 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
 
   "initialize SVC and validator apps" in { implicit env =>
     initSvcWithSv1Only()
-    // Check that there is exactly one CoinRule and OpenMiningRound
-    val coinRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
-      .filterJava(cc.coinrules.CoinRules.COMPANION)(svcParty)
-    coinRules should have length 1
+    // Check that there is exactly one AmuletRule and OpenMiningRound
+    val amuletRules = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
+      .filterJava(cc.amuletrules.AmuletRules.COMPANION)(svcParty)
+    amuletRules should have length 1
 
     val openRounds = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
@@ -377,13 +377,13 @@ class ValidatorIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil
       "Onboarding alice back",
       aliceValidatorBackend.onboardUser(aliceWalletClient.config.ledgerApiUser),
     )(
-      "Alice should have retained her coin",
+      "Alice should have retained her amulet",
       _ => {
         val balance = Try(loggerFactory.suppressErrors((aliceWalletClient.balance())))
           .getOrElse(fail(s"Could not get balance for alice"))
         assertInRange(
           balance.unlockedQty,
-          (walletUsdToCoin(tapAmount - 0.1), walletUsdToCoin(tapAmount)),
+          (walletUsdToAmulet(tapAmount - 0.1), walletUsdToAmulet(tapAmount)),
         )
       },
     )

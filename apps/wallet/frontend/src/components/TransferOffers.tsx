@@ -13,20 +13,20 @@ import { TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer/modul
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { usePrimaryParty, useTransferOffers } from '../hooks';
-import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
+import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import { WalletTransferOffer } from '../models/models';
 import { convertCurrency } from '../utils/currencyConversion';
 import BftCnsEntry from './BftCnsEntry';
 
 export const TransferOffers: React.FC = () => {
   const [offers, setOffers] = useState<WalletTransferOffer[]>([]);
-  const coinPriceQuery = useCoinPrice();
+  const amuletPriceQuery = useAmuletPrice();
   const primaryPartyId = usePrimaryParty();
 
   const toWalletTransferOffer = useCallback(
     async (
       offerList: Contract<TransferOffer>[],
-      coinPrice: BigNumber
+      amuletPrice: BigNumber
     ): Promise<WalletTransferOffer[]> => {
       return offerList
         .filter(o => o.payload.sender !== primaryPartyId)
@@ -34,12 +34,14 @@ export const TransferOffers: React.FC = () => {
           return {
             contractId: offer.contractId,
             ccAmount: offer.payload.amount.amount,
-            usdAmount: coinPrice ? coinPrice.times(offer.payload.amount.amount).toString() : '...',
-            conversionRate: coinPrice ? coinPrice?.toString() : '...',
+            usdAmount: amuletPrice
+              ? amuletPrice.times(offer.payload.amount.amount).toString()
+              : '...',
+            conversionRate: amuletPrice ? amuletPrice?.toString() : '...',
             convertedCurrency: convertCurrency(
               BigNumber(offer.payload.amount.amount),
               Currency.CC,
-              coinPrice
+              amuletPrice
             ),
             senderId: offer.payload.sender,
             expiry: offer.payload.expiresAt,
@@ -49,18 +51,18 @@ export const TransferOffers: React.FC = () => {
     [primaryPartyId]
   );
 
-  const transferOfferContractsQuery = useTransferOffers(coinPriceQuery.data);
+  const transferOfferContractsQuery = useTransferOffers(amuletPriceQuery.data);
   const { data: transferOfferContracts } = transferOfferContractsQuery;
-  const coinPrice = coinPriceQuery.data;
+  const amuletPrice = amuletPriceQuery.data;
 
   useMemo(() => {
-    if (transferOfferContracts && coinPrice) {
-      toWalletTransferOffer(transferOfferContracts, coinPrice).then(setOffers);
+    if (transferOfferContracts && amuletPrice) {
+      toWalletTransferOffer(transferOfferContracts, amuletPrice).then(setOffers);
     }
-  }, [coinPrice, toWalletTransferOffer, transferOfferContracts]);
+  }, [amuletPrice, toWalletTransferOffer, transferOfferContracts]);
 
-  const isLoading = coinPriceQuery.isLoading || transferOfferContractsQuery.isLoading;
-  const isError = coinPriceQuery.isError || transferOfferContractsQuery.isError;
+  const isLoading = amuletPriceQuery.isLoading || transferOfferContractsQuery.isLoading;
+  const isError = amuletPriceQuery.isError || transferOfferContractsQuery.isError;
 
   return (
     <Stack spacing={4} direction="column" justifyContent="center" id="transfer-offers">
@@ -71,7 +73,7 @@ export const TransferOffers: React.FC = () => {
       {isLoading ? (
         <Loading />
       ) : isError ? (
-        <ErrorDisplay message={'Error while fetching coin price and transfer offers'} />
+        <ErrorDisplay message={'Error while fetching amulet price and transfer offers'} />
       ) : offers.length === 0 ? (
         <Box display="flex" justifyContent="center">
           <Typography variant="h6">No transfer offers available</Typography>
@@ -123,7 +125,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
                 amount={offer.convertedCurrency.amount}
                 currency={offer.convertedCurrency.currency}
               />{' '}
-              @ {offer.convertedCurrency.coinPriceToShow.toString()} CC/USD
+              @ {offer.convertedCurrency.amuletPriceToShow.toString()} CC/USD
             </>
           </Typography>
         </Stack>

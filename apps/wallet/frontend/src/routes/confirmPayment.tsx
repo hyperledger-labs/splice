@@ -30,27 +30,27 @@ import { ContractId } from '@daml/types';
 import BftCnsEntry from '../components/BftCnsEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { useAppPaymentRequest } from '../hooks';
-import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
-import useGetCoinRules from '../hooks/scan-proxy/useGetCoinRules';
+import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
+import useGetAmuletRules from '../hooks/scan-proxy/useGetAmuletRules';
 import { convertCurrency } from '../utils/currencyConversion';
 
 export const ConfirmPayment: React.FC = () => {
   const { cid } = useParams();
-  const coinPriceQuery = useCoinPrice();
+  const amuletPriceQuery = useAmuletPrice();
   const appPaymentRequestQuery = useAppPaymentRequest(cid!);
 
-  if (appPaymentRequestQuery.isLoading || coinPriceQuery.isLoading) {
+  if (appPaymentRequestQuery.isLoading || amuletPriceQuery.isLoading) {
     return <Loading />;
   }
 
-  if (coinPriceQuery.isError || appPaymentRequestQuery.isError) {
-    return <ErrorDisplay message={'Error while fetching payment requests and coin price'} />;
+  if (amuletPriceQuery.isError || appPaymentRequestQuery.isError) {
+    return <ErrorDisplay message={'Error while fetching payment requests and amulet price'} />;
   }
 
   const appPaymentRequest = appPaymentRequestQuery.data.contract;
   const appPaymentRequestDomain = appPaymentRequestQuery.data.domainId;
 
-  const total = computeTotal(appPaymentRequest.payload.receiverAmounts, coinPriceQuery.data);
+  const total = computeTotal(appPaymentRequest.payload.receiverAmounts, amuletPriceQuery.data);
 
   if (!total) {
     console.error('No receivers in app payment.');
@@ -68,7 +68,7 @@ export const ConfirmPayment: React.FC = () => {
     <MultiRecipientsInfo
       receiverAmounts={appPaymentRequest.payload.receiverAmounts}
       currencyForAllReceivers={total.currencyForAllReceivers}
-      coinPrice={coinPriceQuery.data}
+      amuletPrice={amuletPriceQuery.data}
       provider={appPaymentRequest.payload.provider}
     />
   );
@@ -82,7 +82,7 @@ export const ConfirmPayment: React.FC = () => {
           contractId={appPaymentRequest.contractId}
           domainId={appPaymentRequestDomain}
           total={total}
-          coinPrice={coinPriceQuery.data}
+          amuletPrice={amuletPriceQuery.data}
         />
       </Stack>
     </Container>
@@ -101,7 +101,10 @@ interface Total {
    */
   currencyForAllReceivers: Currency | BothCurrencies;
 }
-function computeTotal(receiverAmounts: ReceiverAmount[], coinPrice: BigNumber): Total | undefined {
+function computeTotal(
+  receiverAmounts: ReceiverAmount[],
+  amuletPrice: BigNumber
+): Total | undefined {
   // The currency is NOT necessarily the same for all receivers
   const { totalCC, totalUSD } = receiverAmounts.reduce(
     (acc, next) => {
@@ -138,7 +141,7 @@ function computeTotal(receiverAmounts: ReceiverAmount[], coinPrice: BigNumber): 
     return { totalCurrency: 'USD', totalAmount: totalUSD, currencyForAllReceivers: 'USD' };
   } else {
     // both, we use CC to show the total amount
-    const totalAmount = totalUSD.div(coinPrice).plus(totalCC);
+    const totalAmount = totalUSD.div(amuletPrice).plus(totalCC);
     return { totalCurrency: 'CC', totalAmount, currencyForAllReceivers: 'CC & USD' };
   }
 }
@@ -173,14 +176,14 @@ const SingleRecipientInfo: React.FC<SingleRecipientInfoProps> = ({
 interface MultipleRecipientsInfoProps {
   receiverAmounts: ReceiverAmount[];
   currencyForAllReceivers: Currency | BothCurrencies;
-  coinPrice: BigNumber;
+  amuletPrice: BigNumber;
   provider: string;
 }
 
 const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
   currencyForAllReceivers,
   receiverAmounts,
-  coinPrice,
+  amuletPrice,
   provider,
 }) => {
   return (
@@ -196,7 +199,7 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
       <Table>
         <TableBody>
           {receiverAmounts.map(({ amount: { amount, currency }, receiver }) => {
-            const converted = convertCurrency(new BigNumber(amount), currency, coinPrice);
+            const converted = convertCurrency(new BigNumber(amount), currency, amuletPrice);
             return (
               <TableRow key={receiver} id={`${receiver}-payment-row`}>
                 <TableCell variant="party">
@@ -244,19 +247,19 @@ interface PaymentContainerProps {
   contractId: ContractId<payment.AppPaymentRequest>;
   domainId?: string;
   total: Total;
-  coinPrice: BigNumber;
+  amuletPrice: BigNumber;
 }
 const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
   contractId,
   domainId,
   total,
-  coinPrice,
+  amuletPrice,
 }) => {
-  const converted = convertCurrency(total.totalAmount, total.totalCurrency, coinPrice);
+  const converted = convertCurrency(total.totalAmount, total.totalCurrency, amuletPrice);
   const ccAmount = total.totalCurrency === 'CC' ? total.totalAmount : converted.amount;
 
   const totalCC = ccAmount; // TODO (#3492): compute actual fee
-  const totalUSD = totalCC.times(coinPrice);
+  const totalUSD = totalCC.times(amuletPrice);
 
   return (
     <Container>
@@ -272,7 +275,7 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
               <RateDisplay
                 base={total.totalCurrency}
                 quote={converted.currency}
-                coinPrice={coinPrice}
+                amuletPrice={amuletPrice}
               />
             </Typography>
             <Typography variant="body2">Fees will be added.</Typography>
@@ -291,8 +294,8 @@ const ConfirmPaymentButton: React.FC<{
   const { acceptAppPaymentRequest } = useWalletClient();
   const [searchParams] = useSearchParams();
   const redirect = searchParams.get('redirect');
-  const coinRules = useGetCoinRules();
-  const coinRulesDomain = coinRules.data && coinRules.data.domainId;
+  const amuletRules = useGetAmuletRules();
+  const amuletRulesDomain = amuletRules.data && amuletRules.data.domainId;
 
   const onAccept = async () => {
     await acceptAppPaymentRequest(contractId);
@@ -306,8 +309,8 @@ const ConfirmPaymentButton: React.FC<{
       conditions={[
         { disabled: !domainId, reason: 'No domainId (request is in flight)' },
         {
-          disabled: domainId !== coinRulesDomain,
-          reason: `Wrong domainId (request is on domain ${domainId}, coin rules are on domain ${coinRulesDomain})`,
+          disabled: domainId !== amuletRulesDomain,
+          reason: `Wrong domainId (request is on domain ${domainId}, amulet rules are on domain ${amuletRulesDomain})`,
         },
       ]}
     >

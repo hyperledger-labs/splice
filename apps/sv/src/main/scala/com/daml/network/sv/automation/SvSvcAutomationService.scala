@@ -61,7 +61,7 @@ class SvSvcAutomationService(
       clock,
       svcStore,
       PackageIdResolver
-        .inferFromCoinRules(
+        .inferFromAmuletRules(
           clock,
           svcStore,
           loggerFactory,
@@ -84,7 +84,7 @@ class SvSvcAutomationService(
       retryProvider,
     )
 
-  // Triggers that require namespace permissions and the existence of the SvcRules and CoinRules contracts
+  // Triggers that require namespace permissions and the existence of the SvcRules and AmuletRules contracts
   def registerPostOnboardingTriggers(): Unit = {
     registerTrigger(new SummarizingMiningRoundTrigger(triggerContext, svcStore, connection))
     registerTrigger(
@@ -118,10 +118,10 @@ class SvSvcAutomationService(
         store.key.svcParty,
         implicit tc =>
           svcStore.listSvcRulesTransferFollowers().flatMap { svcRulesFollowers =>
-            // don't try to schedule CoinRules' followers if CoinRules might move
+            // don't try to schedule AmuletRules' followers if AmuletRules might move
             // (i.e. be one of svcRulesFollowers)
             if (svcRulesFollowers.nonEmpty) Future successful svcRulesFollowers
-            else svcStore.listCoinRulesTransferFollowers()
+            else svcStore.listAmuletRulesTransferFollowers()
           },
       )
     )
@@ -379,13 +379,13 @@ object SvSvcAutomationService extends AutomationServiceCompanion {
 
   private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
     template.moduleName match {
-      // SvcBootstrap is how we create CoinRules in the first place so we cannot infer the package id for that from CoinRules.
+      // SvcBootstrap is how we create AmuletRules in the first place so we cannot infer the package id for that from AmuletRules.
       case "CN.SvcBootstrap" =>
         Some(DarResources.svcGovernance.bootstrap.packageId)
-      // ImportCrates are created before CoinRules. Given that this is only a hack until we have upgrading
+      // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
-      case "CC.CoinImport" =>
-        Some(DarResources.cantonCoin.bootstrap.packageId)
+      case "CC.AmuletImport" =>
+        Some(DarResources.cantonAmulet.bootstrap.packageId)
       case _ => None
     }
 

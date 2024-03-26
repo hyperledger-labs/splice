@@ -40,19 +40,19 @@ case class ScanAppBackendConfig(
 case class ScanAppClientConfig(
     adminApi: NetworkAppClientConfig,
 
-    /** Configures how long clients cache the CoinRules they receive from the ScanApp
+    /** Configures how long clients cache the AmuletRules they receive from the ScanApp
       * before rehydrating their cached value. In general, clients have a mechanism to invalidate
-      * their CoinRules cache if it becomes outdated, however, as a safety-layer we
+      * their AmuletRules cache if it becomes outdated, however, as a safety-layer we
       * invalidate it periodically because no CC transactions on a node could go through
-      * if its CoinRules cache is outdated and the client never notices and rehydrates it.
+      * if its AmuletRules cache is outdated and the client never notices and rehydrates it.
       */
-    coinRulesCacheTimeToLive: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
+    amuletRulesCacheTimeToLive: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
 ) extends HttpCNNodeClientConfig
     with BaseScanAppConfig {
   override def clientAdminApi: NetworkAppClientConfig = adminApi
 }
 
 object ScanAppClientConfig {
-  val DefaultCoinRulesCacheTimeToLive: NonNegativeFiniteDuration =
+  val DefaultAmuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofMinutes(10)
 }

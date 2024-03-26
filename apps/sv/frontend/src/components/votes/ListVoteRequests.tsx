@@ -158,11 +158,11 @@ const ListVoteRequests: React.FC = () => {
           return `${svcRulesAction.tag}`;
         }
       }
-    } else if (action.tag === 'ARC_CoinRules') {
-      const coinRulesAction = action.value.coinRulesAction;
-      switch (coinRulesAction.tag) {
+    } else if (action.tag === 'ARC_AmuletRules') {
+      const amuletRulesAction = action.value.amuletRulesAction;
+      switch (amuletRulesAction.tag) {
         default: {
-          return `${coinRulesAction.tag}`;
+          return `${amuletRulesAction.tag}`;
         }
       }
     }

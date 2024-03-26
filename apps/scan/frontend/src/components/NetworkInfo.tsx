@@ -1,8 +1,8 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { ErrorDisplay, getCoinConfigurationAsOfNow, Loading } from 'common-frontend';
+import { ErrorDisplay, getAmuletConfigurationAsOfNow, Loading } from 'common-frontend';
 import { microsecondsToMinutes } from 'common-frontend-utils';
-import { useGetCoinRules } from 'common-frontend/scan-api';
+import { useGetAmuletRules } from 'common-frontend/scan-api';
 import { formatDistanceToNow } from 'date-fns';
 
 import {
@@ -17,17 +17,17 @@ import {
   Typography,
 } from '@mui/material';
 
-import { CoinConfig } from '@daml.js/canton-coin/lib/CC/CoinConfig/module';
-import { SteppedRate } from '@daml.js/canton-coin/lib/CC/Fees/module';
+import { AmuletConfig } from '@daml.js/canton-amulet/lib/CC/AmuletConfig/module';
+import { SteppedRate } from '@daml.js/canton-amulet/lib/CC/Fees/module';
 
 const NetworkInfo: React.FC = () => {
-  const getCoinRulesQuery = useGetCoinRules();
+  const getAmuletRulesQuery = useGetAmuletRules();
 
-  switch (getCoinRulesQuery.status) {
+  switch (getAmuletRulesQuery.status) {
     case 'loading':
       return <Loading />;
     case 'error':
-      return <ErrorDisplay message="Failed to fetch coin rules" />;
+      return <ErrorDisplay message="Failed to fetch amulet rules" />;
     case 'success':
       return (
         <Card>
@@ -35,7 +35,7 @@ const NetworkInfo: React.FC = () => {
             <Stack spacing={4}>
               <Typography variant="h3">Current Canton Coin Configuration</Typography>
               <Typography variant="body1">
-                The coin configuration details below are voted on by the Super Validators, and may
+                The amulet configuration details below are voted on by the Super Validators, and may
                 be updated over time.
               </Typography>
               <Stack spacing={1}>
@@ -50,9 +50,9 @@ const NetworkInfo: React.FC = () => {
                 </Typography>
               </Stack>
               <FeesTable
-                coinConfig={
-                  getCoinConfigurationAsOfNow(
-                    getCoinRulesQuery.data.contract.payload.configSchedule
+                amuletConfig={
+                  getAmuletConfigurationAsOfNow(
+                    getAmuletRulesQuery.data.contract.payload.configSchedule
                   ).initialValue
                 }
               />
@@ -65,11 +65,11 @@ const NetworkInfo: React.FC = () => {
 };
 
 const NextConfigUpdate: React.FC = () => {
-  const { data: coinRules } = useGetCoinRules();
+  const { data: amuletRules } = useGetAmuletRules();
 
   const futureValues =
-    coinRules &&
-    getCoinConfigurationAsOfNow(coinRules.contract.payload.configSchedule).futureValues;
+    amuletRules &&
+    getAmuletConfigurationAsOfNow(amuletRules.contract.payload.configSchedule).futureValues;
   const configurationUpdate =
     futureValues && futureValues.length > 0 && new Date(futureValues[0]._1);
 
@@ -84,7 +84,7 @@ const NextConfigUpdate: React.FC = () => {
           <Typography variant="h3" id="next-config-update">
             Fees
           </Typography>
-          <FeesTable coinConfig={futureValues.at(0)!._2} />
+          <FeesTable amuletConfig={futureValues.at(0)!._2} />
         </Stack>
       ) : (
         <Typography variant="caption" id="next-config-update-time">
@@ -95,35 +95,35 @@ const NextConfigUpdate: React.FC = () => {
   );
 };
 
-const FeesTable: React.FC<{ coinConfig: CoinConfig<'USD'> }> = ({ coinConfig }) => {
+const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConfig }) => {
   return (
     <TableContainer>
       <Table>
         <TableBody>
           <FeeTableRow
-            name="Coin Creation Fee"
-            value={`${BigNumber(coinConfig.transferConfig.createFee.fee)} CC`}
-            description="A fixed fee for the creation of new coin records."
+            name="Amulet Creation Fee"
+            value={`${BigNumber(amuletConfig.transferConfig.createFee.fee)} CC`}
+            description="A fixed fee for the creation of new amulet records."
           />
           <FeeTableRow
             name="Holding Fee"
-            value={`${BigNumber(coinConfig.transferConfig.holdingFee.rate)} CC/Round`}
-            description="A fixed fee for maintaining each active coin record, charged per round."
+            value={`${BigNumber(amuletConfig.transferConfig.holdingFee.rate)} CC/Round`}
+            description="A fixed fee for maintaining each active amulet record, charged per round."
           />
           <FeeTableRow
             name="Lock Holder Fee"
-            value={`${BigNumber(coinConfig.transferConfig.lockHolderFee.fee)} CC`}
-            description="A fixed fee for extra lock holders on coin records."
+            value={`${BigNumber(amuletConfig.transferConfig.lockHolderFee.fee)} CC`}
+            description="A fixed fee for extra lock holders on amulet records."
           />
-          <TransferFees transferFees={coinConfig.transferConfig.transferFee} />
+          <TransferFees transferFees={amuletConfig.transferConfig.transferFee} />
           <FeeTableRow
             name="Round Tick Duration"
-            value={`${microsecondsToMinutes(coinConfig.tickDuration.microseconds)} Minutes`}
+            value={`${microsecondsToMinutes(amuletConfig.tickDuration.microseconds)} Minutes`}
             description="The interval at which new rounds are opened."
           />
           <FeeTableRow
             name="Domain Fee"
-            value={`${BigNumber(coinConfig.globalDomain.fees.extraTrafficPrice)} $/MB`}
+            value={`${BigNumber(amuletConfig.globalDomain.fees.extraTrafficPrice)} $/MB`}
             description="Cost of processing 1 MB of transactions through the global synchronizer"
           />
         </TableBody>
@@ -203,7 +203,7 @@ const TransferFees: React.FC<{ transferFees: SteppedRate }> = ({ transferFees })
         </Typography>
         <Typography variant="caption">
           A proportional fee charged for the value created by locking and/or transferring a
-          particular amount of coin. The rates are specified in tranches.
+          particular amount of amulet. The rates are specified in tranches.
         </Typography>
       </TableCell>
       <TableCell align="right">

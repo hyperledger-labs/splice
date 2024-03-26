@@ -21,12 +21,12 @@ import {
 } from '@mui/material';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
+import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import BftCnsField from './BftCnsField';
 
 const SendTransfer: React.FC = () => {
   const { createTransferOffer } = useWalletClient();
-  const coinPriceQuery = useCoinPrice();
+  const amuletPriceQuery = useAmuletPrice();
 
   const [receiver, setReceiver] = useState<string>('');
   const [usd, setUsdAmount] = useState<BigNumber | undefined>(undefined);
@@ -69,11 +69,11 @@ const SendTransfer: React.FC = () => {
   });
 
   useMemo(() => {
-    if (coinPriceQuery.data) {
-      const usdAmount = coinPriceQuery.data.times(ccAmount);
+    if (amuletPriceQuery.data) {
+      const usdAmount = amuletPriceQuery.data.times(ccAmount);
       setUsdAmount(prev => (prev && prev.eq(usdAmount) ? prev : usdAmount));
     }
-  }, [ccAmount, coinPriceQuery.data]);
+  }, [ccAmount, amuletPriceQuery.data]);
 
   const onCCAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCCAmountText(e.target.value);

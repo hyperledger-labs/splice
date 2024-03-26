@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import com.daml.network.auth.AuthUtil
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cc.validatorlicense as validatorLicenseCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   buytrafficrequest as trafficRequestCodegen,
@@ -34,10 +34,10 @@ abstract class WalletAppReference(
   override def basePath = "/api/validator"
   override protected val instanceType = "Wallet user"
 
-  @Help.Summary("List all coins associated with the configured user")
+  @Help.Summary("List all amulets associated with the configured user")
   @Help.Description(
-    "Queries the configured remote participant for the Coins owned by the configured user. " +
-      "Returns all found coins."
+    "Queries the configured remote participant for the Amulets owned by the configured user. " +
+      "Returns all found amulets."
   )
   def list(): ListResponse = {
     consoleEnvironment.run {
@@ -49,10 +49,10 @@ abstract class WalletAppReference(
     "Credits an amount of Canton coin corresponding to the requested USD amount to the wallet's user"
   )
   @Help.Description(
-    "This function will only be available in the devnet. It allows creating coins for testing purposes." +
+    "This function will only be available in the devnet. It allows creating amulets for testing purposes." +
       "Returns the contract ID of the created contract. "
   )
-  def tap(usdAmount: BigDecimal): coinCodegen.Coin.ContractId = {
+  def tap(usdAmount: BigDecimal): amuletCodegen.Amulet.ContractId = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.Tap(usdAmount))
     }
@@ -62,15 +62,15 @@ abstract class WalletAppReference(
   @Help.Description(
     "This function will only be available in the devnet. It allows an app provider to grant a featured app right to themselves without the SVC having to approve."
   )
-  def selfGrantFeaturedAppRight(): coinCodegen.FeaturedAppRight.ContractId = {
+  def selfGrantFeaturedAppRight(): amuletCodegen.FeaturedAppRight.ContractId = {
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.SelfGrantFeaturedAppRight)
     }
   }
 
-  @Help.Summary("Retrieve an overall balance of coin holdings")
+  @Help.Summary("Retrieve an overall balance of amulet holdings")
   @Help.Description(
-    "Display a count across all coin holdings, consisting of: total unlocked coin balance, total locked coin balance, total holding fees accumulated. Balances are calculated after holding fees are applied."
+    "Display a count across all amulet holdings, consisting of: total unlocked amulet balance, total locked amulet balance, total holding fees accumulated. Balances are calculated after holding fees are applied."
   )
   def balance(): HttpWalletAppClient.Balance = {
     consoleEnvironment.run {
@@ -108,7 +108,7 @@ abstract class WalletAppReference(
 
   @Help.Summary("Accept a payment request")
   @Help.Description(
-    "Accept a payment request and deliver the coin to be locked into the accepted payment." +
+    "Accept a payment request and deliver the amulet to be locked into the accepted payment." +
       " Returns the contract ID of the accepted payment."
   )
   def acceptAppPaymentRequest(
@@ -198,7 +198,7 @@ abstract class WalletAppReference(
 
   @Help.Summary("Accept a subscription request")
   @Help.Description(
-    "Accept a payment request and deliver the coin to be locked into the initial subscription payment." +
+    "Accept a payment request and deliver the amulet to be locked into the initial subscription payment." +
       " Returns the contract ID of the initial subscription payment."
   )
   def acceptSubscriptionRequest(
@@ -368,7 +368,7 @@ abstract class WalletAppReference(
   @Help.Summary("List app rewards")
   @Help.Description("List all open app rewards for the configured user")
   def listAppRewardCoupons()
-      : Seq[Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]] =
+      : Seq[Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon]] =
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListAppRewardCoupons)
     }
@@ -378,7 +378,7 @@ abstract class WalletAppReference(
     "List all open validator rewards for the configured user based on the active ValidatorRights"
   )
   def listValidatorRewardCoupons(): Seq[
-    Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+    Contract[amuletCodegen.ValidatorRewardCoupon.ContractId, amuletCodegen.ValidatorRewardCoupon]
   ] =
     consoleEnvironment.run {
       httpCommand(HttpWalletAppClient.ListValidatorRewardCoupons)
@@ -404,8 +404,8 @@ abstract class WalletAppReference(
   )
   def listSvRewardCoupons(): Seq[
     Contract[
-      coinCodegen.SvRewardCoupon.ContractId,
-      coinCodegen.SvRewardCoupon,
+      amuletCodegen.SvRewardCoupon.ContractId,
+      amuletCodegen.SvRewardCoupon,
     ]
   ] =
     consoleEnvironment.run {

@@ -15,8 +15,8 @@ import { LocalizationProvider } from '@mui/x-date-pickers';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
 
 import { SvAdminClientProvider } from './contexts/SvAdminServiceContext';
+import AmuletPrice from './routes/amuletPrice';
 import AuthCheck from './routes/authCheck';
-import CoinPrice from './routes/coinPrice';
 import Leader from './routes/leader';
 import Root from './routes/root';
 import Svc from './routes/svc';
@@ -65,7 +65,7 @@ const router = createBrowserRouter(
         <Route index element={<Svc />} />
         <Route path="svc" element={<Svc />} />
         <Route path="validator-onboarding" element={<ValidatorOnboarding />} />
-        <Route path="cc-price" element={<CoinPrice />} />
+        <Route path="cc-price" element={<AmuletPrice />} />
         <Route path="votes" element={<Voting />} />
         <Route path="leader" element={<Leader />} />
       </Route>

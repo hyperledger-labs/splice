@@ -9,7 +9,7 @@ import {
   TitledTable,
 } from 'common-frontend';
 import { useGetSvcPartyId, useActivity } from 'common-frontend/scan-api';
-import { ListActivityResponseItem, SenderAmount, Transfer, CoinAmount } from 'scan-openapi';
+import { ListActivityResponseItem, SenderAmount, Transfer, AmuletAmount } from 'scan-openapi';
 
 import { Button, Stack, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 import Typography from '@mui/material/Typography';
@@ -111,7 +111,7 @@ interface ActivityView {
   receiver: string | 'Multiple';
   feesBurnt: BigNumber;
   transferAmount: BigNumber;
-  coinPrice: BigNumber;
+  amuletPrice: BigNumber;
   eventId: string;
 }
 
@@ -191,46 +191,46 @@ function toActivities(item: ListActivityResponseItem, svcPartyId: string): Activ
       receiver: receiver,
       feesBurnt: feesBurnt,
       transferAmount: transferAmount,
-      coinPrice: BigNumber(item.coin_price),
+      amuletPrice: BigNumber(item.amulet_price),
       eventId: item.event_id,
     };
   }
 
-  function getActivityFromMint(mint: CoinAmount): ActivityView {
+  function getActivityFromMint(mint: AmuletAmount): ActivityView {
     return {
       activityType: 'Mint',
-      provider: mint.coin_owner,
-      sender: mint.coin_owner,
-      receiver: mint.coin_owner,
+      provider: mint.amulet_owner,
+      sender: mint.amulet_owner,
+      receiver: mint.amulet_owner,
       feesBurnt: BigNumber(0),
-      transferAmount: BigNumber(mint.coin_amount),
-      coinPrice: BigNumber(item.coin_price),
+      transferAmount: BigNumber(mint.amulet_amount),
+      amuletPrice: BigNumber(item.amulet_price),
       eventId: item.event_id,
     };
   }
 
-  function getActivityFromTap(tap: CoinAmount): ActivityView {
+  function getActivityFromTap(tap: AmuletAmount): ActivityView {
     return {
       activityType: 'Tap',
-      provider: tap.coin_owner,
-      sender: tap.coin_owner,
-      receiver: tap.coin_owner,
+      provider: tap.amulet_owner,
+      sender: tap.amulet_owner,
+      receiver: tap.amulet_owner,
       feesBurnt: BigNumber(0),
-      transferAmount: BigNumber(tap.coin_amount),
-      coinPrice: BigNumber(item.coin_price),
+      transferAmount: BigNumber(tap.amulet_amount),
+      amuletPrice: BigNumber(item.amulet_price),
       eventId: item.event_id,
     };
   }
 
-  function getActivityFromSvRewardCollected(svr: CoinAmount): ActivityView {
+  function getActivityFromSvRewardCollected(svr: AmuletAmount): ActivityView {
     return {
       activityType: 'SV Reward Collected',
       provider: svcPartyId,
       sender: svcPartyId,
-      receiver: svr.coin_owner,
+      receiver: svr.amulet_owner,
       feesBurnt: BigNumber(0),
-      transferAmount: BigNumber(svr.coin_amount),
-      coinPrice: BigNumber(item.coin_price),
+      transferAmount: BigNumber(svr.amulet_amount),
+      amuletPrice: BigNumber(item.amulet_price),
       eventId: item.event_id,
     };
   }
@@ -315,7 +315,7 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
         <ActivityAmountDisplay amountCC={activity.feesBurnt} />
       </TableCell>
       <TableCell align="right">
-        <RateDisplay base="CC" quote="USD" coinPrice={activity.coinPrice} />
+        <RateDisplay base="CC" quote="USD" amuletPrice={activity.amuletPrice} />
       </TableCell>
     </TableRow>
   );

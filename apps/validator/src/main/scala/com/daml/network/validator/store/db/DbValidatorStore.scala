@@ -2,7 +2,7 @@ package com.daml.network.validator.store.db
 
 import cats.implicits.*
 import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
+  amulet as amuletCodegen,
   validatorlicense as validatorLicenseCodegen,
 }
 import com.daml.network.codegen.java.cn.appmanager.store as appManagerCodegen
@@ -120,7 +120,7 @@ class DbValidatorStore(
   override def lookupValidatorFeaturedAppRight()(implicit
       tc: TraceContext
   ): Future[
-    Option[Contract[coinCodegen.FeaturedAppRight.ContractId, coinCodegen.FeaturedAppRight]]
+    Option[Contract[amuletCodegen.FeaturedAppRight.ContractId, amuletCodegen.FeaturedAppRight]]
   ] = for {
     row <- storage
       .querySingle(
@@ -129,14 +129,14 @@ class DbValidatorStore(
           storeId,
           domainMigrationId,
           where = sql"""template_id_qualified_name = ${QualifiedName(
-              coinCodegen.FeaturedAppRight.COMPANION.TEMPLATE_ID
+              amuletCodegen.FeaturedAppRight.COMPANION.TEMPLATE_ID
             )} and provider_party = ${walletKey.validatorParty}""",
           orderLimit = sql"limit 1",
         ).headOption,
         "lookupValidatorFeaturedAppRight",
       )
       .value
-  } yield row.map(contractFromRow(coinCodegen.FeaturedAppRight.COMPANION)(_))
+  } yield row.map(contractFromRow(amuletCodegen.FeaturedAppRight.COMPANION)(_))
 
   override def lookupWalletInstallByNameWithOffset(
       endUserName: String
@@ -207,7 +207,9 @@ class DbValidatorStore(
       party: PartyId
   )(implicit tc: TraceContext): Future[
     QueryResult[
-      Option[ContractWithState[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]
+      Option[
+        ContractWithState[amuletCodegen.ValidatorRight.ContractId, amuletCodegen.ValidatorRight]
+      ]
     ]
   ] = waitUntilAcsIngested {
     for {
@@ -219,7 +221,7 @@ class DbValidatorStore(
             domainMigrationId,
             sql"""
             template_id_qualified_name = ${QualifiedName(
-                coinCodegen.ValidatorRight.COMPANION.TEMPLATE_ID
+                amuletCodegen.ValidatorRight.COMPANION.TEMPLATE_ID
               )}
               and user_party = $party
             """,
@@ -231,7 +233,7 @@ class DbValidatorStore(
     } yield QueryResult(
       resultWithOffset.offset,
       resultWithOffset.row.map(
-        contractWithStateFromRow(coinCodegen.ValidatorRight.COMPANION)(_)
+        contractWithStateFromRow(amuletCodegen.ValidatorRight.COMPANION)(_)
       ),
     )
   }

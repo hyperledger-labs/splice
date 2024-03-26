@@ -1,7 +1,7 @@
 package com.daml.network.validator.admin.http
 
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.scan.admin.api.client.ScanConnection.GetCoinRulesDomain
+import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.http.v0.{definitions, validator as v0}
@@ -17,7 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class HttpValidatorHandler(
     storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
     validatorUserName: String,
-    getCoinRulesDomain: GetCoinRulesDomain,
+    getAmuletRulesDomain: GetAmuletRulesDomain,
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
@@ -47,7 +47,7 @@ class HttpValidatorHandler(
         None,
         storeWithIngestion,
         validatorUserName,
-        getCoinRulesDomain,
+        getAmuletRulesDomain,
         participantAdminConnection,
         retryProvider,
         logger,

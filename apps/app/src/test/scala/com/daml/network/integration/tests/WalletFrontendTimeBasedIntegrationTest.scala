@@ -21,12 +21,12 @@ class WalletFrontendTimeBasedIntegrationTest
     with FrontendLoginUtil
     with TimeTestUtil {
 
-  val coinPrice = 2
+  val amuletPrice = 2
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
     CNNodeEnvironmentDefinition
       .simpleTopology1SvWithSimTime(this.getClass.getSimpleName)
-      .withCoinPrice(coinPrice)
+      .withAmuletPrice(amuletPrice)
 
   "A wallet UI" should {
 
@@ -110,15 +110,15 @@ class WalletFrontendTimeBasedIntegrationTest
     "show balances after login" in { implicit env =>
       val aliceDamlUser = aliceWalletClient.config.ledgerApiUser
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-      actAndCheck("alice taps", aliceWalletClient.tap(2 * coinPrice))(
+      actAndCheck("alice taps", aliceWalletClient.tap(2 * amuletPrice))(
         "alice balance is bigger than 1",
         _ => aliceWalletClient.balance().unlockedQty should be > BigDecimal(1.5),
       )
-      lockCoins(
+      lockAmulets(
         aliceValidatorBackend,
         aliceParty,
         aliceValidatorBackend.getValidatorPartyId(),
-        aliceWalletClient.list().coins,
+        aliceWalletClient.list().amulets,
         BigDecimal(1),
         sv1ScanBackend,
         Duration.ofDays(1),
@@ -139,7 +139,7 @@ class WalletFrontendTimeBasedIntegrationTest
           assertInRange(cc, (BigDecimal(1) - smallAmount, BigDecimal(1)))
           assertInRange(
             usd,
-            ((BigDecimal(1) - smallAmount) * coinPrice, BigDecimal(1) * coinPrice),
+            ((BigDecimal(1) - smallAmount) * amuletPrice, BigDecimal(1) * amuletPrice),
           )
         }
       }

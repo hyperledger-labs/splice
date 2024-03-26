@@ -6,8 +6,8 @@ import com.daml.network.util.SvTestUtil
 
 trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
 
-  protected val cantonCoinDarPath =
-    "daml/canton-coin/.daml/dist/canton-coin-0.1.0.dar"
+  protected val cantonAmuletDarPath =
+    "daml/canton-amulet/.daml/dist/canton-amulet-0.1.0.dar"
   protected val svcGovernanceDarPath =
     "daml/svc-governance/.daml/dist/svc-governance-0.1.0.dar"
 
@@ -18,6 +18,6 @@ trait SvIntegrationTestBase extends CNNodeIntegrationTest with SvTestUtil {
       .withAdditionalSetup(implicit env => {
         // Some tests rely on those DARs being present without starting the SV/validator app which usually upload these.
         sv2Backend.participantClient.upload_dar_unless_exists(svcGovernanceDarPath)
-        bobValidatorBackend.participantClient.upload_dar_unless_exists(cantonCoinDarPath)
+        bobValidatorBackend.participantClient.upload_dar_unless_exists(cantonAmuletDarPath)
       })
 }

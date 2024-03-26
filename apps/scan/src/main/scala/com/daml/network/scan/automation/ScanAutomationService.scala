@@ -28,7 +28,7 @@ class ScanAutomationService(
       automationConfig,
       clock,
       store,
-      PackageIdResolver.inferFromCoinRules(clock, store, loggerFactory),
+      PackageIdResolver.inferFromAmuletRules(clock, store, loggerFactory),
       ledgerClient,
       retryProvider,
       ingestFromParticipantBegin,

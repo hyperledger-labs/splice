@@ -1,6 +1,6 @@
 package com.daml.network.store
 
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory.NoOpMetricsFactory
 import com.digitalasset.canton.topology.DomainId
 
@@ -373,15 +373,15 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
       }
     }
 
-    "listCoinRulesTransferFollowers" should {
+    "listAmuletRulesTransferFollowers" should {
       "return correct results" in {
         val signatories = Seq(validator)
         for {
           store <- mkStore()
-          coinRules1 = coinRules()
+          amuletRules1 = amuletRules()
           walletInstall1 = walletInstall(user1, "user1")
           // TODO (#7822) move to UserWallet
-          coin1 = coin(validator, 1, 1L, 0.1)
+          amulet1 = amulet(validator, 1, 1L, 0.1)
           validatorRight1 = validatorRight(user1)
           appConfiguration1 = appConfiguration(provider1, 1L, "config")
           appRelease1 = appRelease(provider1, "version")
@@ -392,7 +392,7 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.create(walletInstall1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
           )
-          _ <- dummyDomain.create(coin1, createdEventSignatories = signatories)(
+          _ <- dummyDomain.create(amulet1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
           )
           _ <- dummyDomain.create(validatorRight1, createdEventSignatories = signatories)(
@@ -416,11 +416,11 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
           _ <- dummyDomain.create(validatorFaucetCoupon1, createdEventSignatories = signatories)(
             store.multiDomainAcsStore
           )
-          _ <- dummy2Domain.create(coinRules1)(
+          _ <- dummy2Domain.create(amuletRules1)(
             store.multiDomainAcsStore
           )
-          tfResult <- store.listCoinRulesTransferFollowers(
-            AssignedContract(coinRules1, dummy2Domain)
+          tfResult <- store.listAmuletRulesTransferFollowers(
+            AssignedContract(amuletRules1, dummy2Domain)
           )
         } yield {
           val actual = tfResult.map(_.contract.identifier.getEntityName)
@@ -461,15 +461,15 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
   }
 
   private def validatorRight(user: PartyId) = {
-    val templateId = coinCodegen.ValidatorRight.TEMPLATE_ID
-    val template = new coinCodegen.ValidatorRight(
+    val templateId = amuletCodegen.ValidatorRight.TEMPLATE_ID
+    val template = new amuletCodegen.ValidatorRight(
       svcParty.toProtoPrimitive,
       user.toProtoPrimitive,
       validator.toProtoPrimitive,
     )
     contract(
       identifier = templateId,
-      contractId = new coinCodegen.ValidatorRight.ContractId(nextCid()),
+      contractId = new amuletCodegen.ValidatorRight.ContractId(nextCid()),
       payload = template,
     )
   }
@@ -597,7 +597,7 @@ class DbValidatorStoreTest
   override protected def mkStore(): Future[DbValidatorStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.cantonCoin.all ++
+        DarResources.cantonAmulet.all ++
           DarResources.wallet.all ++
           DarResources.appManager.all
       )

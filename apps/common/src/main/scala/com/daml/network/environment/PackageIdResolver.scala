@@ -3,11 +3,11 @@ package com.daml.network.environment
 import com.daml.lf.data.Ref.{PackageName, PackageVersion}
 import com.daml.ledger.javaapi.data.{Command, Identifier}
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coinrules.CoinRules
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.util.{CoinConfigSchedule, Contract, QualifiedName}
+import com.daml.network.util.{AmuletConfigSchedule, Contract, QualifiedName}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -80,8 +80,10 @@ abstract class PackageIdResolver()(implicit ec: ExecutionContext) {
 }
 
 object PackageIdResolver {
-  trait HasCoinRules {
-    def getCoinRules()(implicit tc: TraceContext): Future[Contract[CoinRules.ContractId, CoinRules]]
+  trait HasAmuletRules {
+    def getAmuletRules()(implicit
+        tc: TraceContext
+    ): Future[Contract[AmuletRules.ContractId, AmuletRules]]
   }
 
   /** Package id resolver for direct command submissions in tests.
@@ -106,7 +108,7 @@ object PackageIdResolver {
             }
           case Some(pkg) =>
             pkg match {
-              case Package.CantonCoin => DarResources.cantonCoin
+              case Package.CantonAmulet => DarResources.cantonAmulet
               case Package.CantonNameService => DarResources.cantonNameService
               case Package.SvcGovernance => DarResources.svcGovernance
               case Package.ValidatorLifecycle => DarResources.validatorLifecycle
@@ -116,27 +118,27 @@ object PackageIdResolver {
         }
     }
 
-  /** Infer the package ids based on the current config in CoinRules.
-    * Templates not covered by CoinRules can be specified in `extraPackageIdResolver`
-    * which takes precedence over CoinRules.
+  /** Infer the package ids based on the current config in AmuletRules.
+    * Templates not covered by AmuletRules can be specified in `extraPackageIdResolver`
+    * which takes precedence over AmuletRules.
     */
-  def inferFromCoinRules(
+  def inferFromAmuletRules(
       clock: Clock,
-      coinRulesFetcher: HasCoinRules,
+      amuletRulesFetcher: HasAmuletRules,
       loggerFactory0: NamedLoggerFactory,
       // Resolver that is checked before all other resolvers. Crucially this one
-      // can work even if CoinRules cannot be fetched, e.g., during bootstrapping
-      // when CoinRules is not yet created.
+      // can work even if AmuletRules cannot be fetched, e.g., during bootstrapping
+      // when AmuletRules is not yet created.
       bootstrapPackageIdResolver: QualifiedName => Option[String] = _ => None,
       // Resolver that is checked when none of the standard packages match.
-      extraPackageIdResolver: (cc.coinconfig.PackageConfig, QualifiedName) => Option[String] =
+      extraPackageIdResolver: (cc.amuletconfig.PackageConfig, QualifiedName) => Option[String] =
         (_, _) => None,
   )(implicit ec: ExecutionContext) = new PackageIdResolver with NamedLogging {
 
     override val loggerFactory = loggerFactory0
 
-    private def fromCoinRules(
-        packageConfig: cc.coinconfig.PackageConfig,
+    private def fromAmuletRules(
+        packageConfig: cc.amuletconfig.PackageConfig,
         name: QualifiedName,
     ): Option[String] = {
       modulePackages
@@ -158,10 +160,10 @@ object PackageIdResolver {
     )(implicit tc: TraceContext): Future[String] = {
       val pkgId = bootstrapPackageIdResolver(name) match {
         case None =>
-          coinRulesFetcher.getCoinRules().map { coinRules =>
-            val schedule = CoinConfigSchedule(coinRules)
+          amuletRulesFetcher.getAmuletRules().map { amuletRules =>
+            val schedule = AmuletConfigSchedule(amuletRules)
             val config = schedule.getConfigAsOf(clock.now)
-            fromCoinRules(config.packageConfig, name)
+            fromAmuletRules(config.packageConfig, name)
               .orElse(extraPackageIdResolver(config.packageConfig, name))
               .getOrElse(throw new IllegalArgumentException(s"Unknown template $name"))
           }
@@ -173,12 +175,12 @@ object PackageIdResolver {
   }
 
   def readPackageVersion(
-      packageConfig: cc.coinconfig.PackageConfig,
+      packageConfig: cc.amuletconfig.PackageConfig,
       pkg: Package,
   ): PackageVersion = {
     import Package.*
     val version = pkg match {
-      case CantonCoin => packageConfig.cantonCoin
+      case CantonAmulet => packageConfig.cantonAmulet
       case CantonNameService => packageConfig.cantonNameService
       case SvcGovernance => packageConfig.svcGovernance
       case ValidatorLifecycle => packageConfig.validatorLifecycle
@@ -190,16 +192,16 @@ object PackageIdResolver {
 
   // Map from module name to package containing that module
   private val modulePackages: Map[String, Package] = Map(
-    "CC.Coin" -> Package.CantonCoin,
-    "CC.CoinRules" -> Package.CantonCoin,
-    "CC.CoinImport" -> Package.CantonCoin,
-    "CC.GlobalDomain" -> Package.CantonCoin,
-    "CC.ValidatorLicense" -> Package.CantonCoin,
-    "CC.Round" -> Package.CantonCoin,
+    "CC.Amulet" -> Package.CantonAmulet,
+    "CC.AmuletRules" -> Package.CantonAmulet,
+    "CC.AmuletImport" -> Package.CantonAmulet,
+    "CC.GlobalDomain" -> Package.CantonAmulet,
+    "CC.ValidatorLicense" -> Package.CantonAmulet,
+    "CC.Round" -> Package.CantonAmulet,
     "CN.Cns" -> Package.CantonNameService,
     "CN.SvcBootstrap" -> Package.SvcGovernance,
     "CN.SvcRules" -> Package.SvcGovernance,
-    "CN.SVC.CoinPrice" -> Package.SvcGovernance,
+    "CN.SVC.AmuletPrice" -> Package.SvcGovernance,
     "CN.SvOnboarding" -> Package.SvcGovernance,
     "CN.ValidatorOnboarding" -> Package.ValidatorLifecycle,
     "CN.Wallet.Install" -> Package.Wallet,
@@ -212,7 +214,7 @@ object PackageIdResolver {
   sealed abstract class Package extends Product with Serializable {
     def packageName = {
       val clsName = this.productPrefix
-      // Turn CantonCoin into canton-coin
+      // Turn CantonAmulet into canton-amulet
       PackageName.assertFromString(
         "[A-Z]".r
           .replaceAllIn(clsName, m => (if (m.start != 0) "-" else "") + m.matched.toLowerCase())
@@ -221,7 +223,7 @@ object PackageIdResolver {
   }
 
   object Package {
-    final case object CantonCoin extends Package
+    final case object CantonAmulet extends Package
     final case object CantonNameService extends Package
     final case object SvcGovernance extends Package
     final case object ValidatorLifecycle extends Package

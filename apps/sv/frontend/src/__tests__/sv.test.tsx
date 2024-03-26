@@ -56,7 +56,7 @@ describe('SV user can', () => {
     expect(await screen.findByText('nextScheduledDomainUpgrade.time')).toBeDefined();
   });
 
-  test('AddFutureCoinConfigSchedule defaults to the current coin configuration', async () => {
+  test('AddFutureAmuletConfigSchedule defaults to the current amulet configuration', async () => {
     const user = userEvent.setup();
     render(<App />);
 
@@ -68,7 +68,7 @@ describe('SV user can', () => {
 
     const dropdown = screen.getByTestId('display-actions');
     expect(dropdown).toBeDefined();
-    fireEvent.change(dropdown!, { target: { value: 'CRARC_AddFutureCoinConfigSchedule' } });
+    fireEvent.change(dropdown!, { target: { value: 'CRARC_AddFutureAmuletConfigSchedule' } });
 
     expect(await screen.findByText('transferConfig.createFee.fee')).toBeDefined();
     expect(await screen.findByDisplayValue('4815162342')).toBeDefined();

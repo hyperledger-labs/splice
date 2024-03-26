@@ -3,8 +3,8 @@ module CN.Wallet.Subscriptions where
 import DA.Time
 import DA.List (dedupSort)
 
-import CC.Coin
-import CC.CoinRules
+import CC.Amulet
+import CC.AmuletRules
 import CC.Expiry
 import CC.Types
 import CC.Round
@@ -79,7 +79,7 @@ template TerminatedSubscription
 -- | Payment-related properties. Expected to be mutated rarely.
 data SubscriptionPayData = SubscriptionPayData
   with
-    paymentAmount : PaymentAmount -- ^ What amount of coin is due on each interval.
+    paymentAmount : PaymentAmount -- ^ What amount of amulet is due on each interval.
     paymentInterval : RelTime -- ^ At which intervals payments should be made.
     paymentDuration : RelTime -- ^ The time available to the sender to initiate a payment; they can initiate the payment this much before the end of the current interval.
   deriving (Eq, Show)
@@ -100,7 +100,7 @@ template SubscriptionRequest
     ensure payDataIsValid payData
 
     choice SubscriptionRequest_AcceptAndMakePayment
-      : (ContractId SubscriptionInitialPayment, Optional (ContractId Coin))
+      : (ContractId SubscriptionInitialPayment, Optional (ContractId Amulet))
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -108,7 +108,7 @@ template SubscriptionRequest
       controller subscriptionData.sender, walletProvider
       do
         now <- getTime
-        (lockedCoin, senderChange, targetAmount, round) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
+        (lockedAmulet, senderChange, targetAmount, round) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
 
         subscriptionPayment <- create SubscriptionInitialPayment with reference = self, ..
 
@@ -131,14 +131,14 @@ template SubscriptionInitialPayment
     subscriptionData : SubscriptionData
     payData : SubscriptionPayData
     targetAmount : Decimal -- ^ Exact amount in CC that the receiver will get.
-    lockedCoin : ContractId LockedCoin
-    round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
+    lockedAmulet : ContractId LockedAmulet
+    round : Round -- ^ The round in which the locked amulet was created, added as an extra field so we can avoid ingesting locked amulets.
     reference : ContractId SubscriptionRequest -- ^ Reference to the subscription request, note that the contract will no longer be active so this just acts as a tracking id.
   where
     signatory subscriptionSignatories subscriptionData
     ensure payDataIsValid payData
 
-    choice SubscriptionInitialPayment_Collect : (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
+    choice SubscriptionInitialPayment_Collect : (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Amulet)
       with
         transferContext : AppTransferContext
       controller signatory this
@@ -152,28 +152,28 @@ template SubscriptionInitialPayment
           nextPaymentDueAt = now `addRelTime` payData.paymentInterval
           ..
 
-        coin <- unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin
+        amulet <- unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet
 
-        pure (subscription, state, coin)
+        pure (subscription, state, amulet)
 
-    choice SubscriptionInitialPayment_Reject : CoinCreateSummary (ContractId Coin)
+    choice SubscriptionInitialPayment_Reject : AmuletCreateSummary (ContractId Amulet)
       with
         transferContext : AppTransferContext
       controller subscriptionData.receiver
       do
         _ <- create TerminatedSubscription with ..
-        exercise lockedCoin (LockedCoin_Unlock transferContext.openMiningRound)
+        exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
 
-    choice SubscriptionInitialPayment_Expire : CoinCreateSummary (ContractId Coin)
+    choice SubscriptionInitialPayment_Expire : AmuletCreateSummary (ContractId Amulet)
       with
         actor : Party
         transferContext : AppTransferContext
       controller actor
       do
-        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedCoin, and the AcceptedAppPayment in #3152
+        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedAmulet, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         _ <- create TerminatedSubscription with ..
-        exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
+        exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
 
 
 -- | The base state in our subscription flow.
@@ -191,7 +191,7 @@ template SubscriptionIdleState
     ensure payDataIsValid payData
 
     choice SubscriptionIdleState_MakePayment
-      : (ContractId SubscriptionPayment, Optional (ContractId Coin))
+      : (ContractId SubscriptionPayment, Optional (ContractId Amulet))
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -204,7 +204,7 @@ template SubscriptionIdleState
         require "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
         -- We deliberately don't check whether it's "too late" to pay. In this way, providers can implement a "grace period".
 
-        (lockedCoin, senderChange, targetAmount, round) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
+        (lockedAmulet, senderChange, targetAmount, round) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
 
         payment <- create SubscriptionPayment with
           thisPaymentDueAt = nextPaymentDueAt
@@ -241,14 +241,14 @@ template SubscriptionPayment
     payData : SubscriptionPayData -- ^ Payment-related properties.
     thisPaymentDueAt : Time -- ^ After which time the next payment can and should be paid.
     targetAmount : Decimal
-    lockedCoin : ContractId LockedCoin
-    round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
+    lockedAmulet : ContractId LockedAmulet
+    round : Round -- ^ The round in which the locked amulet was created, added as an extra field so we can avoid ingesting locked amulets.
     reference : ContractId SubscriptionRequest
   where
     signatory subscriptionSignatories subscriptionData
     ensure payDataIsValid payData
 
-    choice SubscriptionPayment_Collect : (ContractId SubscriptionIdleState, ContractId Coin)
+    choice SubscriptionPayment_Collect : (ContractId SubscriptionIdleState, ContractId Amulet)
       with
         transferContext : AppTransferContext
       controller signatory this
@@ -260,10 +260,10 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
           ..
-        coin <- unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin
-        pure (state, coin)
+        amulet <- unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet
+        pure (state, amulet)
 
-    choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, CoinCreateSummary (ContractId Coin))
+    choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, AmuletCreateSummary (ContractId Amulet))
       with
         transferContext : AppTransferContext
       controller subscriptionData.receiver
@@ -272,28 +272,28 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        ccsum <- exercise lockedCoin (LockedCoin_Unlock transferContext.openMiningRound)
+        ccsum <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
         pure (state, ccsum)
 
-    choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, CoinCreateSummary (ContractId Coin))
+    choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, AmuletCreateSummary (ContractId Amulet))
       with
         actor : Party
         transferContext : AppTransferContext
       controller actor
       do
-        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedCoin, and the AcceptedAppPayment in #3152
+        -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedAmulet, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        ccsum <- exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
+        ccsum <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
         pure (state, ccsum)
 
 
 lockAndMakeChange
   : PaymentTransferContext -> SubscriptionData -> SubscriptionPayData -> [TransferInput] -> Time -> Party
-  -> Update (ContractId LockedCoin, Optional (ContractId Coin), Decimal, Round)
+  -> Update (ContractId LockedAmulet, Optional (ContractId Amulet), Decimal, Round)
 lockAndMakeChange context subscriptionData payData inputs now walletProvider = do
   let SubscriptionData { sender; receiver; provider; svc } = subscriptionData
   let SubscriptionPayData { paymentAmount; .. } = payData
@@ -326,27 +326,27 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
          ]
 
   result <- exercisePaymentTransfer context transfer
-  let [TransferResultLockedCoin lockedCoin] = result.createdCoins
+  let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
 
-  pure(lockedCoin, result.senderChangeCoin, targetAmount, result.round)
+  pure(lockedAmulet, result.senderChangeAmulet, targetAmount, result.round)
 
 
-unlockAndTransfer: AppTransferContext -> SubscriptionData -> Decimal -> ContractId LockedCoin -> Update (ContractId Coin)
-unlockAndTransfer transferContext subscriptionData targetAmount lockedCoin = do
+unlockAndTransfer: AppTransferContext -> SubscriptionData -> Decimal -> ContractId LockedAmulet -> Update (ContractId Amulet)
+unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = do
   let SubscriptionData { sender; receiver; provider } = subscriptionData
 
-  -- unlock coin and transfer the remainder to the receiver
-  ccsum <- exercise lockedCoin (LockedCoin_Unlock transferContext.openMiningRound)
+  -- unlock amulet and transfer the remainder to the receiver
+  ccsum <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
   let transfer = Transfer with
         sender
         provider
-        inputs = [InputCoin ccsum.coin]
+        inputs = [InputAmulet ccsum.amulet]
         outputs = [mkTransferOutput receiver targetAmount]
   result <- exerciseAppTransfer transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
-  let [TransferResultCoin coinCid] = result.createdCoins
+  let [TransferResultAmulet amuletCid] = result.createdAmulets
 
-  pure coinCid
+  pure amuletCid
 
 mkTransferOutput : Party -> Decimal -> TransferOutput
 mkTransferOutput receiver amount =

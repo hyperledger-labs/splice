@@ -4,8 +4,8 @@ import DA.List (dedupSort)
 import DA.Time
 
 import CN.Util
-import CC.Coin
-import CC.CoinRules
+import CC.Amulet
+import CC.AmuletRules
 import CC.Expiry
 import CC.Round
 import CC.Types
@@ -42,7 +42,7 @@ paymentAmountToCC svc openMiningRound pq =
     USD ->
       do
         require "SVC matches" (openMiningRound.svc == svc)
-        pure (pq.amount / openMiningRound.coinPrice)
+        pure (pq.amount / openMiningRound.amuletPrice)
     CC ->
       pure pq.amount
     ExtCurrency -> error "ExtCurrency: bare extension constructors are not allowed at runtime"
@@ -81,7 +81,7 @@ template AppPaymentRequest
          create TerminatedAppPayment with reference = self, sender, provider, receivers = map (\a -> a.receiver) receiverAmounts
 
     choice AppPaymentRequest_Accept
-      : (ContractId AcceptedAppPayment, Optional (ContractId Coin))
+      : (ContractId AcceptedAppPayment, Optional (ContractId Amulet))
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -101,7 +101,7 @@ template AppPaymentRequest
          -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
          let expiresAt = max (addRelTime now contextRound.tickDuration) contextRound.targetClosesAt
 
-         -- lock the coin and create an accepted payment
+         -- lock the amulet and create an accepted payment
          let transfer = Transfer with
               sender
               -- this step is orchestrated by the sender's wallet, so the sender's wallet provider gets the rewards
@@ -117,12 +117,12 @@ template AppPaymentRequest
                     receiverFeeRatio = 0.0
                 ]
          result <- exercisePaymentTransfer context transfer
-         let [TransferResultLockedCoin lockedCoin] = result.createdCoins
+         let [TransferResultLockedAmulet lockedAmulet] = result.createdAmulets
          let round = result.round
          acceptedPayment <- create AcceptedAppPayment
            with
-             svc, provider, ccReceiverAmounts, sender, lockedCoin, round, reference = self
-         return (acceptedPayment, result.senderChangeCoin)
+             svc, provider, ccReceiverAmounts, sender, lockedAmulet, round, reference = self
+         return (acceptedPayment, result.senderChangeAmulet)
 
     choice AppPaymentRequest_Withdraw : ContractId TerminatedAppPayment
       controller appPaymentRequest_receivers this
@@ -143,11 +143,11 @@ template TerminatedAppPayment
   where
     signatory sender, provider, receivers
 
-data ReceiverCoin = ReceiverCoin with receiver : Party, lockedCoin : ContractId LockedCoin
+data ReceiverAmulet = ReceiverAmulet with receiver : Party, lockedAmulet : ContractId LockedAmulet
   deriving (Eq, Show)
 
-unzipReceiverCoins : [ReceiverCoin] -> ([Party], [ContractId LockedCoin])
-unzipReceiverCoins = foldr (\ReceiverCoin{..} (rs,cs) -> (receiver :: rs, lockedCoin :: cs)) ([], [])
+unzipReceiverAmulets : [ReceiverAmulet] -> ([Party], [ContractId LockedAmulet])
+unzipReceiverAmulets = foldr (\ReceiverAmulet{..} (rs,cs) -> (receiver :: rs, lockedAmulet :: cs)) ([], [])
 
 mkReceiverOutput : ReceiverCCAmount -> TransferOutput
 mkReceiverOutput receiverAmount =
@@ -158,7 +158,7 @@ mkReceiverOutput receiverAmount =
     lock = None
 
 data AcceptedAppPayment_Collect_Result = AcceptedAppPayment_Collect_Result with
-  receiverCoins: [(Party, ContractId Coin)]
+  receiverAmulets: [(Party, ContractId Amulet)]
 
 template AcceptedAppPayment
   with
@@ -166,8 +166,8 @@ template AcceptedAppPayment
     ccReceiverAmounts : [ReceiverCCAmount]
     provider : Party
     svc : Party
-    lockedCoin : ContractId LockedCoin
-    round : Round -- ^ The round in which the locked coin was created, added as an extra field so we can avoid ingesting locked coins.
+    lockedAmulet : ContractId LockedAmulet
+    round : Round -- ^ The round in which the locked amulet was created, added as an extra field so we can avoid ingesting locked amulets.
     reference : ContractId AppPaymentRequest -- ^ The contract id of the original payment request to correlate it. Note that the contract will no longer be active.
   where
     signatory sender, provider, map (\r -> r.receiver) ccReceiverAmounts
@@ -179,31 +179,31 @@ template AcceptedAppPayment
       do
         contextRound <- exercise context.openMiningRound (OpenMiningRound_Fetch provider)
         require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
-        -- unlock coin and transfer the remainder to the receiver
-        ccsum <- exercise lockedCoin (LockedCoin_Unlock context.openMiningRound)
+        -- unlock amulet and transfer the remainder to the receiver
+        ccsum <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
         let transfer = Transfer with
               sender
               provider
-              inputs = [InputCoin ccsum.coin]
+              inputs = [InputAmulet ccsum.amulet]
               outputs = map mkReceiverOutput ccReceiverAmounts
         result <- exerciseAppTransfer context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
-        let coins = map (\(TransferResultCoin coinCid) -> coinCid) result.createdCoins
+        let amulets = map (\(TransferResultAmulet amuletCid) -> amuletCid) result.createdAmulets
         let receivers = map (\r -> r.receiver) ccReceiverAmounts
         pure AcceptedAppPayment_Collect_Result with
-            receiverCoins = zip receivers coins
+            receiverAmulets = zip receivers amulets
 
-    choice AcceptedAppPayment_Reject : CoinCreateSummary (ContractId Coin)
+    choice AcceptedAppPayment_Reject : AmuletCreateSummary (ContractId Amulet)
       with
         context : AppTransferContext
       controller map (\r -> r.receiver) ccReceiverAmounts
       do create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
-         exercise lockedCoin (LockedCoin_Unlock context.openMiningRound)
+         exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
 
-    choice AcceptedAppPayment_Expire : CoinCreateSummary (ContractId Coin)
+    choice AcceptedAppPayment_Expire : AmuletCreateSummary (ContractId Amulet)
       with
         context : AppTransferContext
       controller sender
-      do -- TODO(#3152) Split out coin unlocking from payment expiry
+      do -- TODO(#3152) Split out amulet unlocking from payment expiry
          create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
-         exercise lockedCoin (LockedCoin_OwnerExpireLock context.openMiningRound)
+         exercise lockedAmulet (LockedAmulet_OwnerExpireLock context.openMiningRound)

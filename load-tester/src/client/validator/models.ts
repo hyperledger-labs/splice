@@ -40,7 +40,7 @@ const listTransactionsItem = z.object({
   transaction_subtype: z.object({
     template_id: z.string(),
     choice: z.string(),
-    coin_operation: z.optional(z.string()),
+    amulet_operation: z.optional(z.string()),
   }),
   event_id: z.string(),
   offset: z.optional(z.string()),
@@ -50,7 +50,7 @@ const listTransactionsItem = z.object({
   sender: z.optional(partyAndAmount),
   receivers: z.optional(z.array(partyAndAmount)),
   holding_fees: z.optional(z.string()),
-  coin_price: z.optional(z.string()),
+  amulet_price: z.optional(z.string()),
   app_rewards_used: z.optional(z.string()),
   validator_rewards_used: z.optional(z.string()),
   details: z.optional(z.string()),

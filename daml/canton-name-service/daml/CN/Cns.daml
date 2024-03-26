@@ -3,8 +3,8 @@ module CN.Cns where
 import DA.Action (void)
 import DA.Time
 
-import CC.Coin
-import CC.CoinRules
+import CC.Amulet
+import CC.AmuletRules
 import CC.Types
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
@@ -50,7 +50,7 @@ template CnsRules
   with
     svc : Party
     -- It is accepted to have a single config for now for simplification.
-    -- We can extend it to be effectively dated schedule config like what we have in CoinRules when needed.
+    -- We can extend it to be effectively dated schedule config like what we have in AmuletRules when needed.
     config : CnsRulesConfig
   where
     signatory svc
@@ -100,10 +100,10 @@ template CnsRules
         payment <- fetchAndValidateInitialPayment paymentCid (ExpectedPayment with svc, sender = user)
         context <- fetchAndValidateEntryContext entryContext (ExpectedEntryContext with svc, user, reference = payment.reference)
         -- accept payment which creates the subscription
-        (_, subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionInitialPayment_Collect with
+        (_, subscriptionStateCid, amuletCid) <- exercise paymentCid SubscriptionInitialPayment_Collect with
           transferContext
-        -- burn the coin created for the SVC (using fetchAndArchive for extra safety)
-        void $ fetchAndArchive (ForOwner with svc; owner = svc) coinCid
+        -- burn the amulet created for the SVC (using fetchAndArchive for extra safety)
+        void $ fetchAndArchive (ForOwner with svc; owner = svc) amuletCid
         subscriptionState <- fetchUncheckedReferenceData subscriptionStateCid
         -- deliver the promised good: create the cns entry
         entryCid <- case context of
@@ -135,10 +135,10 @@ template CnsRules
         require "Subscription entry renewal times are in sync"
           (payment.thisPaymentDueAt == entry.expiresAt)
         -- accept payment
-        (subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionPayment_Collect with
+        (subscriptionStateCid, amuletCid) <- exercise paymentCid SubscriptionPayment_Collect with
           transferContext
-        -- burn the coin created for the SVC (using fetchAndArchive for extra safety)
-        void $ fetchAndArchive (ForOwner with svc; owner = svc) coinCid
+        -- burn the amulet created for the SVC (using fetchAndArchive for extra safety)
+        void $ fetchAndArchive (ForOwner with svc; owner = svc) amuletCid
         -- renew entry
         renewSummary <- exercise entryCid CnsEntry_Renew with
           extension = payment.payData.paymentInterval
@@ -147,7 +147,7 @@ template CnsRules
           entryCid = renewSummary.entryCid
           ..
 
-    nonconsuming choice CnsRules_RejectEntryInitialPayment: CoinCreateSummary (ContractId Coin)
+    nonconsuming choice CnsRules_RejectEntryInitialPayment: AmuletCreateSummary (ContractId Amulet)
       with
         paymentCid: ContractId SubscriptionInitialPayment
         transferContext : AppTransferContext
@@ -254,7 +254,7 @@ template CnsEntryContext
           entryCid = summary.entryCid
           subscriptionStateCid = summary.subscriptionStateCid
 
-    nonconsuming choice CnsEntryContext_RejectEntryInitialPayment : CoinCreateSummary (ContractId Coin)
+    nonconsuming choice CnsEntryContext_RejectEntryInitialPayment : AmuletCreateSummary (ContractId Amulet)
       with
         paymentCid : ContractId SubscriptionInitialPayment
         transferContext : AppTransferContext

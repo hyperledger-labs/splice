@@ -9,7 +9,7 @@ import {
   CreateElectionRequest,
   CreateVoteRequest,
   GetElectionRequestResponse,
-  ListCoinPriceVotesResponse,
+  ListAmuletPriceVotesResponse,
   ListOngoingValidatorOnboardingsResponse,
   ListOpenMiningRoundsResponse,
   ListSvcRulesVoteRequestsResponse,
@@ -24,7 +24,7 @@ import {
   RequestContext,
   ResponseContext,
   ServerConfiguration,
-  UpdateCoinPriceVoteRequest,
+  UpdateAmuletPriceVoteRequest,
 } from 'sv-openapi';
 
 import { RelTime } from '@daml.js/b70db8369e1c461d5c70f1c86f526a29e9776c655e6ffc2560f95b05ccb8b946/lib/DA/Time/Types';
@@ -71,8 +71,8 @@ export interface SvAdminClient {
   prepareValidatorOnboarding: (expiresIn: number) => Promise<PrepareValidatorOnboardingResponse>;
   listOngoingValidatorOnboardings: () => Promise<ListOngoingValidatorOnboardingsResponse>;
   listValidatorLicenses: () => Promise<ListValidatorLicensesResponse>;
-  listCoinPriceVotes: () => Promise<ListCoinPriceVotesResponse>;
-  updateDesiredCoinPrice: (coinPrice: BigNumber) => Promise<void>;
+  listAmuletPriceVotes: () => Promise<ListAmuletPriceVotesResponse>;
+  updateDesiredAmuletPrice: (amuletPrice: BigNumber) => Promise<void>;
   listOpenMiningRounds: () => Promise<ListOpenMiningRoundsResponse>;
   getCometBftNodeDebug: () => Promise<openapi.CometBftNodeDumpOrErrorResponse>;
   getSequencerNodeStatus: () => Promise<openapi.NodeStatus>;
@@ -187,12 +187,12 @@ export const SvAdminClientProvider: React.FC<React.PropsWithChildren<SvAdminProp
       listValidatorLicenses: async (): Promise<ListValidatorLicensesResponse> => {
         return await svAdminClient.listValidatorLicenses();
       },
-      listCoinPriceVotes: async (): Promise<ListCoinPriceVotesResponse> => {
-        return await svAdminClient.listCoinPriceVotes();
+      listAmuletPriceVotes: async (): Promise<ListAmuletPriceVotesResponse> => {
+        return await svAdminClient.listAmuletPriceVotes();
       },
-      updateDesiredCoinPrice: async (coinPrice: BigNumber): Promise<void> => {
-        const request: UpdateCoinPriceVoteRequest = { coin_price: coinPrice.toString() };
-        return await svAdminClient.updateCoinPriceVote(request);
+      updateDesiredAmuletPrice: async (amuletPrice: BigNumber): Promise<void> => {
+        const request: UpdateAmuletPriceVoteRequest = { amulet_price: amuletPrice.toString() };
+        return await svAdminClient.updateAmuletPriceVote(request);
       },
       listOpenMiningRounds: async (): Promise<ListOpenMiningRoundsResponse> => {
         return await svAdminClient.listOpenMiningRounds();

@@ -7,12 +7,12 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.coin.*
+import com.daml.network.codegen.java.cc.amulet.*
 import com.daml.network.codegen.java.cc.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.cc.validatorlicense.{ValidatorFaucetCoupon, ValidatorLicense}
 import com.daml.network.codegen.java.cn.cns.{CnsEntry, CnsEntryContext}
-import com.daml.network.codegen.java.cn.svc.coinprice.CoinPriceVote
+import com.daml.network.codegen.java.cn.svc.amuletprice.AmuletPriceVote
 import com.daml.network.codegen.java.cn.svc.memberstate.{MemberRewardState, SvNodeState}
 import com.daml.network.codegen.java.cn.svc.memberstate.SvStatusReport
 import com.daml.network.codegen.java.cn.svcrules.*
@@ -678,7 +678,7 @@ class DbSvSvcStore(
 
   override protected def listExpiredRoundBased[Id <: ContractId[T], T <: javab.Template](
       companion: Template[Id, T]
-  )(coin: T => Coin): ListExpiredContracts[Id, T] = (_, limit) =>
+  )(amulet: T => Amulet): ListExpiredContracts[Id, T] = (_, limit) =>
     implicit tc =>
       waitUntilAcsIngested {
         for {
@@ -691,7 +691,7 @@ class DbSvSvcStore(
               where = sql"""
                 template_id_qualified_name = ${QualifiedName(companion.TEMPLATE_ID)}
                 and assigned_domain = $domainId
-                and acs.coin_round_of_expiry <= (
+                and acs.amulet_round_of_expiry <= (
                   select mining_round - 2
                   from svc_acs_store
                   where store_id = $storeId
@@ -730,9 +730,9 @@ class DbSvSvcStore(
     )
   }
 
-  override def listMemberCoinPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
+  override def listMemberAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[CoinPriceVote.ContractId, CoinPriceVote]]] = waitUntilAcsIngested {
+  ): Future[Seq[Contract[AmuletPriceVote.ContractId, AmuletPriceVote]]] = waitUntilAcsIngested {
     import scala.jdk.CollectionConverters.*
     for {
       svcRules <- getSvcRules()
@@ -748,14 +748,15 @@ class DbSvSvcStore(
             SvcTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = (sql"""template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
+            where =
+              (sql"""template_id_qualified_name = ${QualifiedName(AmuletPriceVote.TEMPLATE_ID)}
                  and voter in """ ++ voterParties).toActionBuilder,
             orderLimit = sql"""limit ${sqlLimit(limit)}""",
           ),
-          "listMemberCoinPriceVotes",
+          "listMemberAmuletPriceVotes",
         )
-      limited = applyLimit("listMemberCoinPriceVotes", limit, result)
-    } yield limited.map(contractFromRow(CoinPriceVote.COMPANION)(_)).distinctBy(_.payload.sv)
+      limited = applyLimit("listMemberAmuletPriceVotes", limit, result)
+    } yield limited.map(contractFromRow(AmuletPriceVote.COMPANION)(_)).distinctBy(_.payload.sv)
   }
 
   override protected def lookupSvOnboardingRequestByCandidatePartyWithOffset(
@@ -936,9 +937,9 @@ class DbSvSvcStore(
     )).getOrRaise(offsetExpectedError())
   }
 
-  override def lookupCoinPriceVoteByThisSv()(implicit
+  override def lookupAmuletPriceVoteByThisSv()(implicit
       tc: TraceContext
-  ): Future[Option[Contract[CoinPriceVote.ContractId, CoinPriceVote]]] = waitUntilAcsIngested {
+  ): Future[Option[Contract[AmuletPriceVote.ContractId, AmuletPriceVote]]] = waitUntilAcsIngested {
     for {
       result <- storage
         .querySingle(
@@ -946,14 +947,14 @@ class DbSvSvcStore(
             SvcTables.acsTableName,
             storeId,
             domainMigrationId,
-            where = sql"""template_id_qualified_name = ${QualifiedName(CoinPriceVote.TEMPLATE_ID)}
+            where = sql"""template_id_qualified_name = ${QualifiedName(AmuletPriceVote.TEMPLATE_ID)}
                           and voter = ${key.svParty}""",
             orderLimit = sql"""limit 1""",
           ).headOption,
-          "lookupCoinPriceVoteByThisSv",
+          "lookupAmuletPriceVoteByThisSv",
         )
         .value
-    } yield result.map(contractFromRow(CoinPriceVote.COMPANION)(_))
+    } yield result.map(contractFromRow(AmuletPriceVote.COMPANION)(_))
   }
 
   override protected def lookupSvOnboardingRequestByCandidateNameWithOffset(

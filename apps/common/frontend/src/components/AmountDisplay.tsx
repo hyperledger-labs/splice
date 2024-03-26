@@ -5,7 +5,7 @@ type AmountDisplayProps = {
   amount?: number | string | BigNumber;
   currency: Currency;
   convert?: Conversion;
-  coinPrice?: number | BigNumber;
+  amuletPrice?: number | BigNumber;
 };
 
 const AmountDisplay: React.FC<AmountDisplayProps> = props => {
@@ -22,14 +22,14 @@ const AmountDisplay: React.FC<AmountDisplayProps> = props => {
     _amount = props.amount;
   }
 
-  if (props.convert && props.coinPrice) {
+  if (props.convert && props.amuletPrice) {
     switch (true) {
       case props.currency === 'CC' && props.convert === 'CCtoUSD':
-        _amount = _amount.multipliedBy(props.coinPrice);
+        _amount = _amount.multipliedBy(props.amuletPrice);
         _currency = 'USD';
         break;
       case props.currency === 'USD' && props.convert === 'USDtoCC':
-        _amount = _amount.div(props.coinPrice);
+        _amount = _amount.div(props.amuletPrice);
         _currency = 'CC';
         break;
       default:

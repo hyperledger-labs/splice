@@ -27,7 +27,7 @@ import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapT
 import com.daml.network.sv.store.{SvStore, SvSvcStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{AssignedContract, TemplateJsonDecoder, UploadablePackage}
-import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultCoinConfig}
+import com.daml.network.util.CNNodeUtil.{defaultCnsConfig, defaultAmuletConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -185,13 +185,13 @@ class FoundingNodeInitializer(
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
         "bootstrap_svc_rules",
-        show"the SvcRules and CoinRules are bootstrapped",
+        show"the SvcRules and AmuletRules are bootstrapped",
         svcStore.lookupSvcRules().map(_.isDefined), {
           withSvcStore.foundCollective()
         },
         logger,
       )
-      // Only start the triggers once SvcRules and CoinRules have been bootstrapped
+      // Only start the triggers once SvcRules and AmuletRules have been bootstrapped
       _ = svcAutomation.registerPostOnboardingTriggers()
       // The previous foundCollective step will set the domain node config if SvcRules is not yet bootstrapped.
       // This is for the case that SvcRules is already bootstrapped but setting the domain node config is required,
@@ -409,17 +409,17 @@ class FoundingNodeInitializer(
       )
     }
 
-    // Create SvcRules and CoinRules and open the first mining round
+    // Create SvcRules and AmuletRules and open the first mining round
     private def bootstrapSvc()(implicit
         tc: TraceContext
     ): Future[Unit] = {
       val svcRulesConfig = SvUtil.defaultSvcRulesConfig(domainId)
       for {
-        (participantId, mediatorId, trafficStateForAllMembers, coinRules, svcRules) <- (
+        (participantId, mediatorId, trafficStateForAllMembers, amuletRules, svcRules) <- (
           participantAdminConnection.getParticipantId(),
           localDomainNode.mediatorAdminConnection.getMediatorId,
           localDomainNode.sequencerAdminConnection.listSequencerTrafficControlState(),
-          svcStore.lookupCoinRules(),
+          svcStore.lookupAmuletRules(),
           svcStore.lookupSvcRulesWithOffset(),
         ).tupled
         _ <- (
@@ -438,14 +438,14 @@ class FoundingNodeInitializer(
         ).tupled
         _ <- svcRules match {
           case QueryResult(offset, None) =>
-            coinRules match {
-              case Some(coinRules) =>
+            amuletRules match {
+              case Some(amuletRules) =>
                 sys.error(
-                  "A CoinRules contract was found but no SvcRules contract exists. " +
-                    show"This should never happen.\nCoinRules: $coinRules"
+                  "A AmuletRules contract was found but no SvcRules contract exists. " +
+                    show"This should never happen.\nAmuletRules: $amuletRules"
                 )
               case None =>
-                val coinConfig = defaultCoinConfig(
+                val amuletConfig = defaultAmuletConfig(
                   foundingConfig.initialTickDuration,
                   foundingConfig.initialMaxNumInputs,
                   domainId,
@@ -486,8 +486,8 @@ class FoundingNodeInitializer(
                               .toNanos
                           )
                         ),
-                        coinConfig,
-                        foundingConfig.initialCoinPrice.bigDecimal,
+                        amuletConfig,
+                        foundingConfig.initialAmuletPrice.bigDecimal,
                         defaultCnsConfig(
                           foundingConfig.initialCnsConfig.renewalDuration,
                           foundingConfig.initialCnsConfig.entryLifetime,
@@ -515,24 +515,24 @@ class FoundingNodeInitializer(
                 } yield ()
             }
           case QueryResult(_, Some(AssignedContract(svcRules, _))) =>
-            coinRules match {
-              case Some(coinRules) =>
+            amuletRules match {
+              case Some(amuletRules) =>
                 if (svcRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
                   logger.info(
-                    "CoinRules and SvcRules already exist and founding party is an SVC member; doing nothing." +
-                      show"\nCoinRules: $coinRules\nSvcRules: $svcRules"
+                    "AmuletRules and SvcRules already exist and founding party is an SVC member; doing nothing." +
+                      show"\nAmuletRules: $amuletRules\nSvcRules: $svcRules"
                   )
                   Future.successful(())
                 } else {
                   sys.error(
-                    "CoinRules and SvcRules already exist but party tasked with founding the SVC isn't member." +
+                    "AmuletRules and SvcRules already exist but party tasked with founding the SVC isn't member." +
                       "Is more than one SV app configured to `found-collective`?" +
-                      show"\nCoinRules: $coinRules\nSvcRules: $svcRules"
+                      show"\nAmuletRules: $amuletRules\nSvcRules: $svcRules"
                   )
                 }
               case None =>
                 sys.error(
-                  "An SvcRules contract was found but no CoinRules contract exists. " +
+                  "An SvcRules contract was found but no AmuletRules contract exists. " +
                     show"This should never happen.\nSvcRules: $svcRules"
                 )
             }

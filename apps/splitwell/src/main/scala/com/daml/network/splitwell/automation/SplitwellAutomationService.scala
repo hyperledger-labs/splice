@@ -46,7 +46,7 @@ class SplitwellAutomationService(
       automationConfig,
       clock,
       store,
-      PackageIdResolver.inferFromCoinRules(
+      PackageIdResolver.inferFromAmuletRules(
         clock,
         scanConnection,
         loggerFactory,
@@ -92,7 +92,7 @@ class SplitwellAutomationService(
       triggerContext,
       store,
       connection,
-      scanConnection.getCoinRulesDomain,
+      scanConnection.getAmuletRulesDomain,
       store.key.providerParty,
       splitwellCodegen.TransferInProgress.COMPANION,
     )
@@ -143,7 +143,7 @@ object SplitwellAutomationService extends AutomationServiceCompanion {
     }.toMap
 
   private[automation] def extraPackageIdResolver(
-      packageConfig: cc.coinconfig.PackageConfig,
+      packageConfig: cc.amuletconfig.PackageConfig,
       template: QualifiedName,
   ): Option[String] =
     Option.when(template.moduleName == "CN.Splitwell") {

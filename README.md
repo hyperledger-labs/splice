@@ -111,7 +111,7 @@ clusters.)
       ```
 5. After switching to the CC repo you should see a line like
    ```
-   direnv: error /home/moritz/daml-projects/canton-coin/.envrc is blocked. Run `direnv allow` to approve its content
+   direnv: error /home/moritz/daml-projects/canton-amulet/.envrc is blocked. Run `direnv allow` to approve its content
    ```
 6. Run `direnv allow`. You should see a bunch of output including `direnv: using nix`.
 7. If you get an authorization exception, like the following:
@@ -342,7 +342,7 @@ Note that the entire command must be quoted in this case, especially if it has s
 - `formatFix`: apply `scalafmt`, `sbt scalafixAll`, and `sbt apps-frontends/npmFix` to format source files
 - `lint`: lint-check. Does not apply any fixes. Checks enforcement of `scalafmt`, `buf`, `scalafix`, `apps-frontends/npmLint`, and `shellcheck` rules
 - `damlBuild`: create `.dar` files for all Daml projects
-- `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.
+- `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `amulet` to call it.
 - `checkErrors`: check test log for errors and fail if there is one. Note that if you haven't deleted your local log file in a long time, this may find very old errors.
 
 Test:
@@ -545,7 +545,7 @@ data TransferInput
   = InputAppRewardCoupon (ContractId AppRewardCoupon)
   | InputValidatorRewardCoupon (ContractId ValidatorRewardCoupon)
   | InputSvRewardCoupon (ContractId SvRewardCoupon)
-  | InputCoin (ContractId Coin)
+  | InputAmulet (ContractId Amulet)
   | ExtTransferInput with
       dummyUnitField : ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
@@ -981,7 +981,7 @@ preflight check:
 cd cluster/deployment/devnet
 cncluster start_frontends # optional: sbt_for_preflight will not automatically manage the self-hosted frontends
 cncluster sbt_for_preflight
-sbt:coin> testOnly *Preflight* -- -z validator1 # only run the tests against validator1
+sbt:amulet> testOnly *Preflight* -- -z validator1 # only run the tests against validator1
 ```
 
 After the test, you have to manually stop the frontends using the typical `stop-frontends.sh` script in the repo root.
@@ -1096,7 +1096,7 @@ our own apps. Here we use the topology from our tests:
 ./start-canton.sh -m
 ```
 
-2. Start the Coin apps and run the bootstrap script to
+2. Start the Amulet apps and run the bootstrap script to
    initialize. This starts the necessary Canton Coin apps (in a single
    process) to run the front ends.
    The logs from these apps are output to `log/cn-node_local_frontend_testing.clog`.

@@ -4,16 +4,16 @@ import { AmountDisplay, ErrorDisplay, Loading } from 'common-frontend';
 import { Box, Divider, Stack, Toolbar, Typography } from '@mui/material';
 
 import { useBalance } from '../hooks';
-import useCoinPrice from '../hooks/scan-proxy/useCoinPrice';
+import useAmuletPrice from '../hooks/scan-proxy/useAmuletPrice';
 import CurrentUser from './CurrentUser';
 import { LogoutButton } from './LogoutButton';
 
 const PaymentHeader: React.FC = () => {
-  const coinPriceQuery = useCoinPrice();
+  const amuletPriceQuery = useAmuletPrice();
   const balanceQuery = useBalance();
 
-  const isLoading = coinPriceQuery.isLoading || balanceQuery.isLoading;
-  const isError = coinPriceQuery.isError || balanceQuery.isError;
+  const isLoading = amuletPriceQuery.isLoading || balanceQuery.isLoading;
+  const isError = amuletPriceQuery.isError || balanceQuery.isError;
 
   return (
     <Box bgcolor="colors.neutral.20">
@@ -32,7 +32,7 @@ const PaymentHeader: React.FC = () => {
           {isLoading ? (
             <Loading />
           ) : isError ? (
-            <ErrorDisplay message={'Error while fetching coin price and balance'} />
+            <ErrorDisplay message={'Error while fetching amulet price and balance'} />
           ) : (
             <Typography className="available-balance">
               Total Available Balance:{' '}
@@ -41,7 +41,7 @@ const PaymentHeader: React.FC = () => {
                 amount={balanceQuery.data.availableCC}
                 currency="CC"
                 convert="CCtoUSD"
-                coinPrice={coinPriceQuery.data}
+                amuletPrice={amuletPriceQuery.data}
               />
             </Typography>
           )}

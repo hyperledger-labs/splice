@@ -1,16 +1,16 @@
 import { RestHandler, rest } from 'msw';
 import {
   ErrorResponse,
-  GetCoinRulesResponse,
+  GetAmuletRulesResponse,
   GetRewardsCollectedResponse,
   GetRoundOfLatestDataResponse,
   GetSvcPartyIdResponse,
-  GetTotalCoinBalanceResponse,
+  GetTotalAmuletBalanceResponse,
   ListActivityResponse,
   LookupEntryByPartyResponse,
 } from 'scan-openapi';
 
-import { CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules/module';
+import { AmuletRules } from '@daml.js/canton-amulet/lib/CC/AmuletRules/module';
 import damlTypes from '@daml/types';
 
 export const buildScanMock = (scanUrl: string): RestHandler[] => [
@@ -32,7 +32,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
             date: new Date(),
             domain_id:
               'global-domain::1220af85fa0c58e7f551de289be22793993ce7672cb0751afa2f2de397ce4a695677',
-            coin_price: '1.0000000000',
+            amulet_price: '1.0000000000',
             round: 1,
             transfer: {
               provider:
@@ -40,7 +40,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
               sender: {
                 party:
                   'charlie__wallet__user::12200d3c885d2cb51226911f828da25f7f0fc0d06b8c6bf00c714266729033f138f7',
-                input_coin_amount: '5.0000000000',
+                input_amulet_amount: '5.0000000000',
                 input_app_reward_amount: '0.0000000000',
                 input_validator_reward_amount: '0.0000000000',
                 sender_change_fee: '0.0300000000',
@@ -69,19 +69,19 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
   rest.get(`${scanUrl}/v0/rewards-collected`, (_, res, ctx) => {
     return res(ctx.json<GetRewardsCollectedResponse>({ amount: '0.0' }));
   }),
-  rest.get(`${scanUrl}/v0/total-coin-balance`, (_, res, ctx) => {
-    return res(ctx.json<GetTotalCoinBalanceResponse>({ total_balance: '66605.2180742781' }));
+  rest.get(`${scanUrl}/v0/total-amulet-balance`, (_, res, ctx) => {
+    return res(ctx.json<GetTotalAmuletBalanceResponse>({ total_balance: '66605.2180742781' }));
   }),
-  rest.post(`${scanUrl}/v0/coin-rules`, (_, res, ctx) => {
+  rest.post(`${scanUrl}/v0/amulet-rules`, (_, res, ctx) => {
     return res(
-      ctx.json<GetCoinRulesResponse>({
-        coin_rules_update: {
+      ctx.json<GetAmuletRulesResponse>({
+        amulet_rules_update: {
           contract: {
             template_id:
-              'f4693252b3cab434649f66f5fd309ae98ca01512b10b482086aa8ff529ca83e3:CC.Coin:CoinRules',
+              'f4693252b3cab434649f66f5fd309ae98ca01512b10b482086aa8ff529ca83e3:CC.Amulet:AmuletRules',
             contract_id:
               '00ed7531fa0fb6a06f0d0f1ea8a31867704da8a6c341e7262894c5d0e15312aca6ca0212200412a9e6c1b9bff1449205e02c88596bad60b8eb8d14bee48f26509f6531d4db',
-            payload: CoinRules.encode({
+            payload: AmuletRules.encode({
               svc: 'SVC::1220af85fa0c58e7f551de289be22793993ce7672cb0751afa2f2de397ce4a695677',
               configSchedule: {
                 initialValue: {
@@ -120,7 +120,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                   issuanceCurve: {
                     initialValue: {
                       validatorRewardPercentage: '0.5',
-                      coinToIssuePerYear: '40000000000.0',
+                      amuletToIssuePerYear: '40000000000.0',
                       unfeaturedAppRewardCap: '0.6',
                       appRewardPercentage: '0.15',
                       featuredAppRewardCap: '100.0',
@@ -134,7 +134,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                         },
                         _2: {
                           validatorRewardPercentage: '0.12',
-                          coinToIssuePerYear: '20000000000.0',
+                          amuletToIssuePerYear: '20000000000.0',
                           unfeaturedAppRewardCap: '0.6',
                           appRewardPercentage: '0.4',
                           featuredAppRewardCap: '100.0',
@@ -148,7 +148,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                         },
                         _2: {
                           validatorRewardPercentage: '0.18',
-                          coinToIssuePerYear: '10000000000.0',
+                          amuletToIssuePerYear: '10000000000.0',
                           unfeaturedAppRewardCap: '0.6',
                           appRewardPercentage: '0.62',
                           featuredAppRewardCap: '100.0',
@@ -162,7 +162,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                         },
                         _2: {
                           validatorRewardPercentage: '0.21',
-                          coinToIssuePerYear: '5000000000.0',
+                          amuletToIssuePerYear: '5000000000.0',
                           unfeaturedAppRewardCap: '0.6',
                           appRewardPercentage: '0.69',
                           featuredAppRewardCap: '100.0',
@@ -176,7 +176,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                         },
                         _2: {
                           validatorRewardPercentage: '0.2',
-                          coinToIssuePerYear: '2500000000.0',
+                          amuletToIssuePerYear: '2500000000.0',
                           unfeaturedAppRewardCap: '0.6',
                           appRewardPercentage: '0.75',
                           featuredAppRewardCap: '100.0',
@@ -214,7 +214,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                     microseconds: '600000000',
                   },
                   packageConfig: {
-                    cantonCoin: '0.1.0',
+                    cantonAmulet: '0.1.0',
                     cantonNameService: '0.1.0',
                     svcGovernance: '0.1.0',
                     validatorLifecycle: '0.1.0',

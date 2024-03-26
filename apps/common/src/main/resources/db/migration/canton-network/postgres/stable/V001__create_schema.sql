@@ -318,7 +318,7 @@ create table scan_acs_store
     -- the party id of the validator
     validator                   text,
 
-    -- amount of coins
+    -- amount of amulets
     amount                      numeric,
 
     -- the receiver of an ImportCrate contract
@@ -433,8 +433,8 @@ create table scan_txlog_store
     -- amount of RecentActivityIndexRecord
     recent_activity_amount                                   numeric,
 
-    -- coin_price of RecentActivityIndexRecord
-    recent_activity_coin_price                               numeric,
+    -- amulet_price of RecentActivityIndexRecord
+    recent_activity_amulet_price                               numeric,
 
     -- effective_at of closed mining round
     closed_round_effective_at                                bigint
@@ -479,8 +479,8 @@ create table round_totals
     -- the cumulative change_to_holding_fees_rate from round zero up to and including the round
     cumulative_change_to_holding_fees_rate numeric,
 
-    -- the total coin balance as of end of round
-    total_coin_balance numeric,
+    -- the total amulet balance as of end of round
+    total_amulet_balance numeric,
 
     primary key (store_id, closed_round)
 );
@@ -579,9 +579,9 @@ create table svc_acs_store
     -- index columns
     ----------------
 
-    -- In Coin/LockedCoin contracts, round_of_expiry = (created_at_round + (initial_amount / rate_per_round))
-    -- as defined in CNNodeUtil.coinExpiresAt
-    coin_round_of_expiry          bigint,
+    -- In Amulet/LockedAmulet contracts, round_of_expiry = (created_at_round + (initial_amount / rate_per_round))
+    -- as defined in CNNodeUtil.amuletExpiresAt
+    amulet_round_of_expiry          bigint,
 
     -- the round in which an AppReward or ValidatorReward was rewarded
     reward_round                  bigint,
@@ -622,7 +622,7 @@ create table svc_acs_store
     -- the traffic purchased in a MemberTraffic
     total_traffic_purchased       bigint,
 
-    -- the SV in a CoinPriceVote contract, or the voter in a Vote contract
+    -- the SV in a AmuletPriceVote contract, or the voter in a Vote contract
     voter                         text,
 
     -- the trackingCid in a VoteRequest contract
@@ -694,10 +694,10 @@ create index svc_acs_store_sid_tid_tcid
     on svc_acs_store (store_id, migration_id,  template_id_qualified_name, vote_request_tracking_cid)
     where vote_request_tracking_cid is not null;
 
--- list expired coins
+-- list expired amulets
 create index svc_acs_store_sid_tid_croe
-    on svc_acs_store (store_id, migration_id, template_id_qualified_name, coin_round_of_expiry)
-    where coin_round_of_expiry is not null;
+    on svc_acs_store (store_id, migration_id, template_id_qualified_name, amulet_round_of_expiry)
+    where amulet_round_of_expiry is not null;
 
 -- list confirmations
 create index svc_acs_store_sid_tid_ah_c

@@ -66,8 +66,8 @@ class WalletAuth0FrontendIntegrationTest
         (auth0User, userPartyId, wd) =>
           implicit val webDriver: WebDriverType = wd
 
-          clue("The user taps 100 coins") {
-            tapCoins(100)
+          clue("The user taps 100 amulets") {
+            tapAmulets(100)
           }
 
           actAndCheck(

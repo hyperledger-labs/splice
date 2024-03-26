@@ -113,7 +113,7 @@ You can now start a console with the CN apps. Use the following command, making 
   NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/validator/validator.conf --config validator-onboarding.conf --bootstrap examples/validator/validator.sc
 
 The `validator-onboarding.conf` enables the validator to request its onboarding from the sponsoring supervalidator.
-Upon verification of the onboarding secret, the sponsoring supervalidator issues a `ValidatorLicense` to the validator party and exposes a `CoinRules` contract to it.
+Upon verification of the onboarding secret, the sponsoring supervalidator issues a `ValidatorLicense` to the validator party and exposes a `AmuletRules` contract to it.
 
 Now, onboard a new user called "alice" via the validator app: ::
 

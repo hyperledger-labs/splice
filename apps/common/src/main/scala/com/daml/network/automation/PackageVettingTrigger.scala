@@ -9,13 +9,13 @@ import scala.concurrent.Future
 
 abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
     extends PollingTrigger
-    with PackageIdResolver.HasCoinRules {
+    with PackageIdResolver.HasAmuletRules {
 
   protected def participantAdminConnection: ParticipantAdminConnection
 
   // Duration that packages will be pre-vetted by. E.g.,
   // if this is set to 5 minutes packages will be vetted
-  // 5 minutes before the switch in CoinConfig.
+  // 5 minutes before the switch in AmuletConfig.
   protected def prevetDuration: NonNegativeFiniteDuration
 
   val vetting = new PackageVetting(
@@ -28,8 +28,8 @@ abstract class PackageVettingTrigger(packages: Set[PackageIdResolver.Package])
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      coinRules <- getCoinRules()
-      _ <- vetting.vetPackages(coinRules)
+      amuletRules <- getAmuletRules()
+      _ <- vetting.vetPackages(amuletRules)
     } yield false
   }
 }

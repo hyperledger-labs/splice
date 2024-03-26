@@ -7,7 +7,7 @@ import com.daml.network.environment.CNMetrics
 import com.digitalasset.canton.metrics.DbStorageMetrics
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 
-/** A shared trait to capture the commonalities across our coin node metrics. */
+/** A shared trait to capture the commonalities across our amulet node metrics. */
 trait CNNodeMetrics {
 
   def metricsFactory: CantonLabeledMetricsFactory

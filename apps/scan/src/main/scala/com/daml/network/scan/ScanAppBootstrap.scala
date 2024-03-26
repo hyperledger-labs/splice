@@ -83,7 +83,7 @@ object ScanAppBootstrap {
   def apply(
       name: String,
       scanConfig: ScanAppBackendConfig,
-      coinAppParameters: SharedCNNodeAppParameters,
+      amuletAppParameters: SharedCNNodeAppParameters,
       clock: Clock,
       scanMetrics: ScanAppMetrics,
       testingConfigInternal: TestingConfigInternal,
@@ -102,7 +102,7 @@ object ScanAppBootstrap {
         new ScanAppBootstrap(
           _,
           scanConfig,
-          coinAppParameters,
+          amuletAppParameters,
           testingConfigInternal,
           clock,
           scanMetrics,

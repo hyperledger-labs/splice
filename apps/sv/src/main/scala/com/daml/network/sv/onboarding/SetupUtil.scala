@@ -94,7 +94,7 @@ private[onboarding] object SetupUtil {
               ) { scanConnection =>
                 scanConnection.getAcsSnapshot(partyId)
               },
-            Seq(DarResources.cantonCoin.bootstrap, DarResources.svcGovernance.bootstrap),
+            Seq(DarResources.cantonAmulet.bootstrap, DarResources.svcGovernance.bootstrap),
           )
         case None =>
           connection.ensureUserPrimaryPartyIsAllocated(

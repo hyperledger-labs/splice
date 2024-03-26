@@ -1,6 +1,6 @@
 import BigNumber from 'bignumber.js';
 import { Contract } from 'common-frontend-utils';
-import { CoinPosition } from 'wallet-openapi';
+import { AmuletPosition } from 'wallet-openapi';
 
 import {
   Subscription,
@@ -23,7 +23,7 @@ export interface WalletBalance {
 export interface TransactionSubtype {
   template_id: string;
   choice: string;
-  coin_operation?: string;
+  amulet_operation?: string;
 }
 
 export type Transaction = Transfer | BalanceChange | Notification | Unknown;
@@ -37,7 +37,7 @@ export interface Transfer {
   providerId: Party;
   senderAmountCC: BigNumber; // this includes all amounts of receivers + fees
   date: Date;
-  coinPrice: BigNumber;
+  amuletPrice: BigNumber;
 }
 
 export interface BalanceChange {
@@ -46,7 +46,7 @@ export interface BalanceChange {
   transactionSubtype: TransactionSubtype;
   receivers: TransactionReceiver[];
   date: Date;
-  coinPrice: BigNumber;
+  amuletPrice: BigNumber;
 }
 
 export interface Notification {
@@ -97,8 +97,8 @@ export interface GetBalanceResponse {
 }
 
 export interface ListResponse {
-  lockedCoins: CoinPosition[];
-  coins: CoinPosition[];
+  lockedAmulets: AmuletPosition[];
+  amulets: AmuletPosition[];
 }
 
 export interface ListTransferOffersResponse {

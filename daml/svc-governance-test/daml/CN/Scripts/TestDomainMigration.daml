@@ -7,8 +7,8 @@ import Daml.Script
 import DA.Time
 import DA.List
 
-import CC.CoinConfig
-import CC.CoinRules
+import CC.AmuletConfig
+import CC.AmuletRules
 import CC.Schedule
 import CC.Scripts.Util
 
@@ -67,7 +67,7 @@ testDomainMigration = do
   -- once the SVC is confident about the working of the new domain it announces it to its users
   -- choosing a 30 day headroom until the active domain switches.
   now <- getTime
-  executeAddCoinConfigSchedule app $ \configSchedule ->
+  executeAddAmuletConfigSchedule app $ \configSchedule ->
     let config = configSchedule.initialValue
         globalDomainConfig = config.globalDomain
         newDomainId = "global-domain-id-1"
@@ -109,13 +109,13 @@ executeSvcRulesConfigChange app updateConfig = do
       svcAction = SRARC_SetConfig SvcRules_SetConfig with newConfig
 
 
-executeAddCoinConfigSchedule
-  : AmuletApp -> (Schedule Time (CoinConfig USD) -> Schedule Time (CoinConfig USD)) -> Script ()
-executeAddCoinConfigSchedule app updateConfig = do
+executeAddAmuletConfigSchedule
+  : AmuletApp -> (Schedule Time (AmuletConfig USD) -> Schedule Time (AmuletConfig USD)) -> Script ()
+executeAddAmuletConfigSchedule app updateConfig = do
   [(_, svcRules)] <- query @SvcRules app.svc
-  [(_, coinRules)] <- query @CoinRules app.svc
-  let newSchedule = updateConfig coinRules.configSchedule
+  [(_, amuletRules)] <- query @AmuletRules app.svc
+  let newSchedule = updateConfig amuletRules.configSchedule
   initiateAndAcceptVote app (Map.keys svcRules.members) $
-    ARC_CoinRules with
-      coinRulesAction = CRARC_AddFutureCoinConfigSchedule CoinRules_AddFutureCoinConfigSchedule with
+    ARC_AmuletRules with
+      amuletRulesAction = CRARC_AddFutureAmuletConfigSchedule AmuletRules_AddFutureAmuletConfigSchedule with
         newScheduleItem = head newSchedule.futureValues

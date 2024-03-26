@@ -35,7 +35,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
 
     val _ = onboardAliceAndBob()
 
-    clue("Tap some coin before sv2 scan app starts") {
+    clue("Tap some amulet before sv2 scan app starts") {
       aliceWalletClient.tap(20)
       bobWalletClient.tap(3)
     }
@@ -62,7 +62,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       }
     }
 
-    clue("Tap some more coin now that sv2 scan is up") {
+    clue("Tap some more amulet now that sv2 scan is up") {
       aliceWalletClient.tap(3)
     }
 
@@ -124,7 +124,7 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
     }
 
     val validatorFaucetAmount = 2.85
-    clue("Aggregated total coin balance on both scan apps should match") {
+    clue("Aggregated total amulet balance on both scan apps should match") {
       val svRewardPerRound =
         BigDecimal(
           computeSvRewardInRound0(
@@ -136,19 +136,19 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
       forEvery(
         Table(
           ("round", "total floor", "total ceiling"),
-          // Alice has 23 USD in Coin, Bob has 3 USD, all minus holding fees
-          (2L, walletUsdToCoin(25.9), walletUsdToCoin(26.0)),
+          // Alice has 23 USD in Amulet, Bob has 3 USD, all minus holding fees
+          (2L, walletUsdToAmulet(25.9), walletUsdToAmulet(26.0)),
           // sv2 did not start up it's validator app (thus wallet), so it won't claim any coupons.
           (
             3L,
             // validator faucets: SV1, Alice, Bob
-            walletUsdToCoin(26.0 + validatorFaucetAmount * 3 - smallAmount) + svRewardPerRound,
-            walletUsdToCoin(26.0 + validatorFaucetAmount * 3) + svRewardPerRound,
+            walletUsdToAmulet(26.0 + validatorFaucetAmount * 3 - smallAmount) + svRewardPerRound,
+            walletUsdToAmulet(26.0 + validatorFaucetAmount * 3) + svRewardPerRound,
           ),
         )
       ) { (round, floor, ceil) =>
-        val total1 = sv1ScanBackend.getTotalCoinBalance(round)
-        val total2 = sv2ScanBackend.getTotalCoinBalance(round)
+        val total1 = sv1ScanBackend.getTotalAmuletBalance(round)
+        val total2 = sv2ScanBackend.getTotalAmuletBalance(round)
         total1 shouldBe total2
         total1 should beWithin(floor, ceil)
       }
@@ -161,8 +161,8 @@ class ScanWithGradualStartsTimeBasedIntegrationTest
           (2L, BigDecimal(0), BigDecimal(0)),
           (
             3L,
-            walletUsdToCoin(validatorFaucetAmount * 3 - smallAmount),
-            walletUsdToCoin(validatorFaucetAmount * 3),
+            walletUsdToAmulet(validatorFaucetAmount * 3 - smallAmount),
+            walletUsdToAmulet(validatorFaucetAmount * 3),
           ),
         )
       ) { (round, floor, ceil) =>

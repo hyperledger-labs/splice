@@ -22,13 +22,13 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
       .simpleTopology1Sv(this.getClass.getSimpleName)
       .addConfigTransforms(
         (_, config) =>
-          // we want fine-grained control when we send a CoinOperation from the wallet & query the scan app
+          // we want fine-grained control when we send a AmuletOperation from the wallet & query the scan app
           CNNodeConfigTransforms.updateAllAutomationConfigs(
-            _.focus(_.enableAutomaticRewardsCollectionAndCoinMerging).replace(false)
+            _.focus(_.enableAutomaticRewardsCollectionAndAmuletMerging).replace(false)
           )(config),
         (_, config) =>
           CNNodeConfigTransforms.updateAllScanAppConfigs_(
-            // This avoids the values being cached for so long that we never try to fetch the CoinRules
+            // This avoids the values being cached for so long that we never try to fetch the AmuletRules
             _.copy(miningRoundsCacheTimeToLiveOverride =
               Some(NonNegativeFiniteDuration.ofSeconds(5))
             )
@@ -75,9 +75,9 @@ class WalletAppConnectivityIntegrationTest extends CNNodeIntegrationTest with Wa
       },
     )
 
-    // aliceWalletClient.list().coins contains one tap(3) and 0 or more tap(2) as it retries until connection fails.
-    forExactly(1, aliceWalletClient.list().coins) { coin =>
-      BigDecimal(coin.contract.payload.amount.initialAmount) shouldBe walletUsdToCoin(3)
+    // aliceWalletClient.list().amulets contains one tap(3) and 0 or more tap(2) as it retries until connection fails.
+    forExactly(1, aliceWalletClient.list().amulets) { amulet =>
+      BigDecimal(amulet.contract.payload.amount.initialAmount) shouldBe walletUsdToAmulet(3)
     }
 
   }

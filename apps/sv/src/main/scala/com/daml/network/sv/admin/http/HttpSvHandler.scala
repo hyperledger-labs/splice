@@ -87,7 +87,7 @@ class HttpSvHandler(
 
             case Some(vo) =>
               for {
-                // We retry here because this mutates the CoinRules and rounds contracts,
+                // We retry here because this mutates the AmuletRules and rounds contracts,
                 // which can lead to races.
                 _ <- retryProvider.retryForClientCalls(
                   "onboard_validator",
@@ -288,7 +288,7 @@ class HttpSvHandler(
     withSpan(s"$workflowId.getSvcInfo") { _ => _ =>
       for {
         latestOpenMiningRound <- svcStore.getLatestActiveOpenMiningRound()
-        coinRules <- svcStore.getCoinRules()
+        amuletRules <- svcStore.getAmuletRules()
         rulesAndStates <- svcStore.getSvcRulesWithMemberNodeStates()
         svcRules = rulesAndStates.svcRules
       } yield definitions.GetSvcInfoResponse(
@@ -297,7 +297,7 @@ class HttpSvHandler(
         svcPartyId = svcParty.toProtoPrimitive,
         votingThreshold = CNThresholds.requiredNumVotes(svcRules),
         latestMiningRound = latestOpenMiningRound.contract.toHttp,
-        coinRules = coinRules.toHttp,
+        amuletRules = amuletRules.toHttp,
         svcRules = svcRules.contract.toHttp,
         svNodeStates = rulesAndStates.svNodeStates.values.map(_.toHttp).toVector,
       )

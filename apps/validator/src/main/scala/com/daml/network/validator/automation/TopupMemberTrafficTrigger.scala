@@ -1,8 +1,8 @@
 package com.daml.network.validator.automation
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_BuyMemberTraffic
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.{
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperation.CO_BuyMemberTraffic
+import com.daml.network.codegen.java.cn.wallet.install.amuletoperationoutcome.{
   COO_BuyMemberTraffic,
   COO_Error,
 }
@@ -16,7 +16,7 @@ import com.daml.network.environment.{
 }
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.util.{CoinConfigSchedule, Contract}
+import com.daml.network.util.{AmuletConfigSchedule, Contract}
 import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ExtraTrafficTopupParameters
@@ -52,8 +52,8 @@ class TopupMemberTrafficTrigger(
 
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      coinRules <- scanConnection.getCoinRulesWithState()
-      globalDomainConfig = CoinConfigSchedule(coinRules)
+      amuletRules <- scanConnection.getAmuletRulesWithState()
+      globalDomainConfig = AmuletConfigSchedule(amuletRules)
         .getConfigAsOf(clock.now)
         .globalDomain
       topupParameters = ExtraTrafficTopupParameters(
@@ -125,7 +125,7 @@ class TopupMemberTrafficTrigger(
       validatorTreasury <- getValidatorTreasury()
       taskOutcome <-
         validatorTreasury
-          .enqueueCoinOperation(coBuyMemberTraffic, CommandPriority.High)
+          .enqueueAmuletOperation(coBuyMemberTraffic, CommandPriority.High)
           .map {
             case outcome: COO_BuyMemberTraffic =>
               logger.info(

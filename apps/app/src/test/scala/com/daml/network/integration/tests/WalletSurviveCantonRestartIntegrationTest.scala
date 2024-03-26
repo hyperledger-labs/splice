@@ -93,7 +93,7 @@ class WalletSurviveCantonRestartIntegrationTest
       clue("Check we're connecting to the correct (now disconnected) participant") {
         // This tap will fail in one of two ways:
         // 1. If this tap hits the first batch in the wallet after the disconnect, it will fail immediately with an IO exception.
-        // 2. Alternatively, sometimes the wallet tries to merge the coins before we kill canton, but we then kill it, which causes the
+        // 2. Alternatively, sometimes the wallet tries to merge the amulets before we kill canton, but we then kill it, which causes the
         //    treasury service to be blocked waiting for ingestion of the merge. In this case, this tap will just get queued and eventually
         //    time out at the pekko-http server.
         // Both failures lead to a CommandFailure exception here.

@@ -6,7 +6,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.cc.coin.UnclaimedReward
+import com.daml.network.codegen.java.cc.amulet.UnclaimedReward
 import com.daml.network.codegen.java.cn.svcrules.SvcRules_MergeUnclaimedRewards
 import com.daml.network.store.PageLimit
 import com.daml.network.util.Contract
@@ -57,9 +57,9 @@ class MergeUnclaimedRewardsTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       svcRules <- store.getSvcRules()
-      coinRules <- store.getCoinRules()
+      amuletRules <- store.getAmuletRules()
       arg = new SvcRules_MergeUnclaimedRewards(
-        coinRules.contractId,
+        amuletRules.contractId,
         unclaimedRewardsTask.contracts.map(_.contractId).asJava,
       )
       cmd = svcRules.exercise(_.exerciseSvcRules_MergeUnclaimedRewards(arg))

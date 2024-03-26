@@ -28,8 +28,8 @@ message TransactionSubtype {
   string module_name = 2;
   string entity_name = 3;
   string choice = 4;
-  // The constructor name of the CoinOperation. Only relevant for WalletAppInstall_ExecuteBatch
-  string coin_operation = 5;
+  // The constructor name of the AmuletOperation. Only relevant for WalletAppInstall_ExecuteBatch
+  string amulet_operation = 5;
 }
 
 /** Balance change due to a transfer */
@@ -44,12 +44,12 @@ message TransferTxLogEntry {
   PartyAndAmount sender = 5;
   repeated PartyAndAmount receivers = 6;
   string sender_holding_fees = 7 [(scalapb.field).type = "scala.math.BigDecimal"];
-  string coin_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 8 [(scalapb.field).type = "scala.math.BigDecimal"];
   string app_rewards_used = 9 [(scalapb.field).type = "scala.math.BigDecimal"];
   string validator_rewards_used = 10 [(scalapb.field).type = "scala.math.BigDecimal"];
 }
 
-/** Balance change not due to a transfer, for example a tap or returning a locked coin to the owner. */
+/** Balance change not due to a transfer, for example a tap or returning a locked amulet to the owner. */
 message BalanceChangeTxLogEntry {
   option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
   option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
@@ -59,10 +59,10 @@ message BalanceChangeTxLogEntry {
   google.protobuf.Timestamp date = 3 [(scalapb.field).type = "java.time.Instant"];
   string receiver = 4;
   string amount = 5 [(scalapb.field).type = "scala.math.BigDecimal"];
-  string coin_price = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
+  string amulet_price = 6 [(scalapb.field).type = "scala.math.BigDecimal"];
 }
 
-/** An event that does not change anyone's coin balance. */
+/** An event that does not change anyone's amulet balance. */
 message NotificationTxLogEntry {
   option (scalapb.message).extends = "com.daml.network.wallet.store.TxLogEntry.TransactionHistoryTxLogEntry";
   option (scalapb.message).companion_extends = "com.daml.network.store.TxLogStore.TxLogEntryTypeMappers";
@@ -84,7 +84,7 @@ message TransferOfferStatusAccepted {
 }
 
 message TransferOfferStatusCompleted {
-  string contract_id = 1; // com.daml.network.codegen.java.cc.coin.Coin.ContractId
+  string contract_id = 1; // com.daml.network.codegen.java.cc.amulet.Amulet.ContractId
   string transaction_id = 2;
 }
 

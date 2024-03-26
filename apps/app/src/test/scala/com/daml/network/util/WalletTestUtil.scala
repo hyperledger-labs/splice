@@ -1,7 +1,7 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc.types.Round
-import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.amulet as amuletCodegen
 import com.daml.network.codegen.java.cc.fees as feesCodegen
 import com.daml.network.codegen.java.cn.cns as cnsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
@@ -36,13 +36,13 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
   val exactly = (x: BigDecimal) => (x, x)
 
-  def walletCoinPrice = CNNodeUtil.damlDecimal(0.005)
-  def walletUsdToCoin(usd: BigDecimal) = usd / walletCoinPrice
-  def walletCoinToUsd(cc: BigDecimal) = cc * walletCoinPrice
+  def walletAmuletPrice = CNNodeUtil.damlDecimal(0.005)
+  def walletUsdToAmulet(usd: BigDecimal) = usd / walletAmuletPrice
+  def walletAmuletToUsd(cc: BigDecimal) = cc * walletAmuletPrice
 
-  lazy val defaultHoldingFeeCC = walletUsdToCoin(CNNodeUtil.defaultHoldingFee.rate)
+  lazy val defaultHoldingFeeCC = walletUsdToAmulet(CNNodeUtil.defaultHoldingFee.rate)
 
-  /** @param expectedAmountRanges : lower and upper bounds for coins sorted by their initial amount in ascending order. */
+  /** @param expectedAmountRanges : lower and upper bounds for amulets sorted by their initial amount in ascending order. */
   def checkWallet(
       walletParty: PartyId,
       wallet: WalletAppClientReference,
@@ -52,18 +52,18 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       defaultHoldingFeeCC.bigDecimal setScale 10
     )
     eventually(10.seconds, 500.millis) {
-      val coins =
-        wallet.list().coins.sortBy(coin => coin.contract.payload.amount.initialAmount)
-      coins should have size (expectedAmountRanges.size.toLong)
-      coins
+      val amulets =
+        wallet.list().amulets.sortBy(amulet => amulet.contract.payload.amount.initialAmount)
+      amulets should have size (expectedAmountRanges.size.toLong)
+      amulets
         .zip(expectedAmountRanges)
-        .foreach { case (coin, amountBounds) =>
-          coin.contract.payload.owner shouldBe walletParty.toProtoPrimitive
-          val coinAmount =
-            coin.contract.payload.amount
+        .foreach { case (amulet, amountBounds) =>
+          amulet.contract.payload.owner shouldBe walletParty.toProtoPrimitive
+          val amuletAmount =
+            amulet.contract.payload.amount
 
-          assertInRange(coinAmount.initialAmount, amountBounds)
-          coinAmount.ratePerRound shouldBe expectedRatePerRound
+          assertInRange(amuletAmount.initialAmount, amountBounds)
+          amuletAmount.ratePerRound shouldBe expectedRatePerRound
         }
     }
   }
@@ -123,7 +123,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
     // There should be ValidatorRight and WalletInstall contracts
     val ledgerApiEx = validatorAppBackend.participantClientWithAdminToken.ledger_api_extensions
-    ledgerApiEx.acs.filterJava(coinCodegen.ValidatorRight.COMPANION)(
+    ledgerApiEx.acs.filterJava(amuletCodegen.ValidatorRight.COMPANION)(
       endUserParty,
       c => c.data.user == endUserParty.toProtoPrimitive,
     ) should have size 1
@@ -169,7 +169,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
 
     // All validator right and wallet install contracts must be gone
     val ledgerApiEx = validatorAppBackend.participantClientWithAdminToken.ledger_api_extensions
-    ledgerApiEx.acs.filterJava(coinCodegen.ValidatorRight.COMPANION)(
+    ledgerApiEx.acs.filterJava(amuletCodegen.ValidatorRight.COMPANION)(
       endUserParty,
       c => c.data.user == endUserParty.toProtoPrimitive,
     ) shouldBe empty
@@ -266,7 +266,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val tc =
       sv1ScanBackend.getTransferContextWithInstances(now, Some(acceptedPayment.payload.round))
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = signatories,
@@ -291,7 +291,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
@@ -319,7 +319,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val tc =
       sv1ScanBackend.getTransferContextWithInstances(now, Some(acceptedPayment.payload.round))
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands
       .submitWithResult(
         userId = userId,
@@ -345,7 +345,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
@@ -371,7 +371,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now, Some(payment.payload.round))
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty, senderParty),
@@ -395,7 +395,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val now = env.environment.clock.now
     val tc = sv1ScanBackend.getTransferContextWithInstances(now)
     val appTc = tc.toUnfeaturedAppTransferContext()
-    val disclosure = DisclosedContracts(tc.coinRules, tc.latestOpenMiningRound)
+    val disclosure = DisclosedContracts(tc.amuletRules, tc.latestOpenMiningRound)
     participantClient.ledger_api_extensions.commands.submitWithResult(
       userId = userId,
       actAs = Seq(userParty),
@@ -785,7 +785,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     val party = Codec.decode(Codec.Party)(wallet.userStatus().party).value
     actAndCheck(
       "Self-grant a featured app right",
-      // We need to retry as the command might fail due to inactive cached CoinRules contract
+      // We need to retry as the command might fail due to inactive cached AmuletRules contract
       // The failed command submission will triggers a cache invalidation
       retryCommandSubmission(wallet.selfGrantFeaturedAppRight()),
     )(
@@ -815,8 +815,8 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
     )
   }
 
-  /** Directly executes the CoinRules_Mint choice. Note that the receiver must be hosted on the same participant as the SVC. */
-  def mintCoin(
+  /** Directly executes the AmuletRules_Mint choice. Note that the receiver must be hosted on the same participant as the SVC. */
+  def mintAmulet(
       participantClient: CNParticipantClientReference,
       receiver: PartyId,
       amount: BigDecimal,
@@ -831,20 +831,20 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId = aliceWalletClient.config.ledgerApiUser,
       actAs = Seq(svcParty, receiver),
       readAs = Seq.empty,
-      update = tc.coinRules.contract.contractId.exerciseCoinRules_Mint(
+      update = tc.amuletRules.contract.contractId.exerciseAmuletRules_Mint(
         receiver.toLf,
         amount.bigDecimal,
         tc.latestOpenMiningRound.contract.contractId,
       ),
-      domainId = domainId orElse (tc.coinRules.state match {
+      domainId = domainId orElse (tc.amuletRules.state match {
         case ContractState.InFlight => None
         case ContractState.Assigned(domain) => Some(domain)
       }),
     )
   }
 
-  /** Directly executes the CoinRules_DevNet_Tap choice. Note that the receiver must be hosted on the same participant as the SVC. */
-  def tapCoin(
+  /** Directly executes the AmuletRules_DevNet_Tap choice. Note that the receiver must be hosted on the same participant as the SVC. */
+  def tapAmulet(
       participantClient: CNParticipantClientReference,
       receiver: PartyId,
       amount: BigDecimal,
@@ -859,20 +859,20 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId = aliceWalletClient.config.ledgerApiUser,
       actAs = Seq(receiver),
       readAs = Seq(svcParty),
-      update = tc.coinRules.contract.contractId.exerciseCoinRules_DevNet_Tap(
+      update = tc.amuletRules.contract.contractId.exerciseAmuletRules_DevNet_Tap(
         receiver.toLf,
         amount.bigDecimal,
         tc.latestOpenMiningRound.contract.contractId,
       ),
-      domainId = domainId orElse (tc.coinRules.state match {
+      domainId = domainId orElse (tc.amuletRules.state match {
         case ContractState.InFlight => None
         case ContractState.Assigned(domain) => Some(domain)
       }),
     )
   }
 
-  /** Directly creates a new coin. Note that the receiver must be hosted on the same participant as the SVC. */
-  def createCoin(
+  /** Directly creates a new amulet. Note that the receiver must be hosted on the same participant as the SVC. */
+  def createAmulet(
       participantClient: CNParticipantClientReference,
       userId: String,
       owner: PartyId,
@@ -882,9 +882,9 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
-  ): coinCodegen.Coin.ContractId = {
-    val coin =
-      new coinCodegen.Coin(
+  ): amuletCodegen.Amulet.ContractId = {
+    val amulet =
+      new amuletCodegen.Amulet(
         svcParty.toProtoPrimitive,
         owner.toProtoPrimitive,
         new feesCodegen.ExpiringAmount(
@@ -898,18 +898,18 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
         userId = userId,
         actAs = Seq(svcParty, owner),
         readAs = Seq.empty,
-        update = coin,
+        update = amulet,
         domainId = domainId,
       )
     created.contractId
   }
 
-  /* Directly archives the given coin. */
-  def archiveCoin(
+  /* Directly archives the given amulet. */
+  def archiveAmulet(
       participantClient: CNParticipantClientReference,
       userId: String,
       owner: PartyId,
-      coin: coinCodegen.Coin.ContractId,
+      amulet: amuletCodegen.Amulet.ContractId,
       domainId: Option[DomainId] = None,
   )(implicit
       env: CNNodeTestConsoleEnvironment
@@ -918,7 +918,7 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
       userId = userId,
       actAs = Seq(svcParty, owner),
       readAs = Seq.empty,
-      update = coin.exerciseArchive(
+      update = amulet.exerciseArchive(
         new com.daml.network.codegen.java.da.internal.template.Archive()
       ),
       domainId = domainId,
@@ -928,10 +928,13 @@ trait WalletTestUtil extends CNNodeTestCommon with CnsTestUtil {
   /** Returns the total value of the given reward coupons at current issuing round */
   def getRewardCouponsValue(
       appRewards: Seq[
-        Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]
+        Contract[amuletCodegen.AppRewardCoupon.ContractId, amuletCodegen.AppRewardCoupon]
       ],
       validatorRewards: Seq[
-        Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+        Contract[
+          amuletCodegen.ValidatorRewardCoupon.ContractId,
+          amuletCodegen.ValidatorRewardCoupon,
+        ]
       ],
       featured: Boolean,
   )(implicit

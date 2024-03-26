@@ -11,7 +11,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { CoinConfig, USD } from '@daml.js/canton-coin/lib/CC/CoinConfig';
+import { AmuletConfig, USD } from '@daml.js/canton-amulet/lib/CC/AmuletConfig';
 import {
   ActionRequiringConfirmation,
   SvcRulesConfig,
@@ -84,35 +84,37 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
         );
       }
     }
-  } else if (action.tag === 'ARC_CoinRules') {
-    const coinRulesAction = action.value.coinRulesAction;
-    switch (coinRulesAction.tag) {
-      case 'CRARC_AddFutureCoinConfigSchedule': {
+  } else if (action.tag === 'ARC_AmuletRules') {
+    const amuletRulesAction = action.value.amuletRulesAction;
+    switch (amuletRulesAction.tag) {
+      case 'CRARC_AddFutureAmuletConfigSchedule': {
         return (
           <ActionValueTable
             actionType={actionType}
-            actionName={coinRulesAction.tag}
+            actionName={amuletRulesAction.tag}
             valuesMap={{
               'Effective Time': (
-                <DateDisplay format="PPp O" datetime={coinRulesAction.value.newScheduleItem._1} />
+                <DateDisplay format="PPp O" datetime={amuletRulesAction.value.newScheduleItem._1} />
               ),
-              NewScheduleItem: <PrettyJsonPrint data={coinRulesAction.value.newScheduleItem._2} />,
+              NewScheduleItem: (
+                <PrettyJsonPrint data={amuletRulesAction.value.newScheduleItem._2} />
+              ),
             }}
           />
         );
       }
-      case 'CRARC_RemoveFutureCoinConfigSchedule': {
+      case 'CRARC_RemoveFutureAmuletConfigSchedule': {
         return (
           <ActionValueTable
             actionType={actionType}
-            actionName={coinRulesAction.tag}
+            actionName={amuletRulesAction.tag}
             valuesMap={{
-              Time: <DateDisplay format="PPp O" datetime={coinRulesAction.value.scheduleTime} />,
+              Time: <DateDisplay format="PPp O" datetime={amuletRulesAction.value.scheduleTime} />,
               ScheduleItem: (
                 <PrettyJsonPrint
                   data={
-                    svcInfosQuery.data?.coinRules.payload.configSchedule.futureValues.find(
-                      e => e._1 === coinRulesAction.value.scheduleTime
+                    svcInfosQuery.data?.amuletRules.payload.configSchedule.futureValues.find(
+                      e => e._1 === amuletRulesAction.value.scheduleTime
                     )?._2
                   }
                 />
@@ -121,14 +123,16 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
           />
         );
       }
-      case 'CRARC_UpdateFutureCoinConfigSchedule': {
+      case 'CRARC_UpdateFutureAmuletConfigSchedule': {
         return (
           <ActionValueTable
             actionType={actionType}
-            actionName={coinRulesAction.tag}
+            actionName={amuletRulesAction.tag}
             valuesMap={{
-              Time: <DateDisplay format="PPp O" datetime={coinRulesAction.value.scheduleItem._1} />,
-              ScheduleItem: <PrettyJsonPrint data={coinRulesAction.value.scheduleItem._2} />,
+              Time: (
+                <DateDisplay format="PPp O" datetime={amuletRulesAction.value.scheduleItem._1} />
+              ),
+              ScheduleItem: <PrettyJsonPrint data={amuletRulesAction.value.scheduleItem._2} />,
             }}
           />
         );
@@ -185,7 +189,7 @@ const ActionValueTable: React.FC<{
 };
 
 const PrettyJsonPrint: React.FC<{
-  data?: SvcRulesConfig | CoinConfig<USD> | string;
+  data?: SvcRulesConfig | AmuletConfig<USD> | string;
 }> = ({ data }) => {
   return (
     <pre

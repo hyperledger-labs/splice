@@ -3,12 +3,12 @@ package com.daml.network.scan.admin.api.client
 import cats.data.{NonEmptyList, OptionT}
 import cats.implicits.*
 import com.daml.network.admin.http.HttpErrorWithHttpCode
-import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
-import com.daml.network.codegen.java.cc.coinrules.CoinRules
+import com.daml.network.codegen.java.cc.amulet.FeaturedAppRight
+import com.daml.network.codegen.java.cc.amuletrules.AmuletRules
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.codegen.java.cn.cns.CnsRules
 import com.daml.network.config.NetworkAppClientConfig
-import com.daml.network.environment.PackageIdResolver.HasCoinRules
+import com.daml.network.environment.PackageIdResolver.HasAmuletRules
 import com.daml.network.environment.{BaseAppConnection, CNLedgerClient, RetryFor, RetryProvider}
 import com.daml.network.http.v0.definitions.{CnsEntry, MigrationSchedule}
 import com.daml.network.scan.admin.api.client.BftScanConnection.{
@@ -43,8 +43,8 @@ import scala.util.control.NonFatal
 import scala.util.{Failure, Random, Success, Try}
 
 class BftScanConnection(
-    override protected val coinLedgerClient: CNLedgerClient,
-    override protected val coinRulesCacheTimeToLive: NonNegativeFiniteDuration,
+    override protected val amuletLedgerClient: CNLedgerClient,
+    override protected val amuletRulesCacheTimeToLive: NonNegativeFiniteDuration,
     val scanList: ScanList,
     protected val clock: Clock,
     val retryProvider: RetryProvider,
@@ -53,7 +53,7 @@ class BftScanConnection(
     extends FlagCloseableAsync
     with NamedLogging
     with RetryProvider.Has
-    with HasCoinRules
+    with HasAmuletRules
     with CachingScanConnection {
 
   private val refreshAction: Option[PeriodicAction] = scanList match {
@@ -94,11 +94,11 @@ class BftScanConnection(
       _.getSvcPartyId()
     )
 
-  override protected def runGetCoinRulesWithState(
-      cachedCoinRules: Option[ContractWithState[CoinRules.ContractId, CoinRules]]
-  )(implicit tc: TraceContext): Future[ContractWithState[CoinRules.ContractId, CoinRules]] =
+  override protected def runGetAmuletRulesWithState(
+      cachedAmuletRules: Option[ContractWithState[AmuletRules.ContractId, AmuletRules]]
+  )(implicit tc: TraceContext): Future[ContractWithState[AmuletRules.ContractId, AmuletRules]] =
     bftCall(
-      _.getCoinRulesWithState(cachedCoinRules)
+      _.getAmuletRulesWithState(cachedAmuletRules)
     )
 
   override protected def runGetCnsRules(
@@ -427,7 +427,7 @@ object BftScanConnection {
 
     private def getScansInSvcRules(connection: BftScanConnection)(implicit tc: TraceContext) = {
       for {
-        globalDomainId <- connection.getCoinRulesDomain()(tc)
+        globalDomainId <- connection.getAmuletRulesDomain()(tc)
         scans <- connection.listSvcScans()
         domainScans <- scans
           .find(_.domainId == globalDomainId)
@@ -500,25 +500,25 @@ object BftScanConnection {
   ): Future[BftScanConnection] = {
     val builder = buildScanConnection(clock, retryProvider, loggerFactory)
     config match {
-      case BftScanClientConfig.TrustSingle(url, coinRulesCacheTimeToLive) =>
+      case BftScanClientConfig.TrustSingle(url, amuletRulesCacheTimeToLive) =>
         // If this fails to connect, fail and let it retry
-        val connectionF = builder(url, coinRulesCacheTimeToLive)
+        val connectionF = builder(url, amuletRulesCacheTimeToLive)
         connectionF
           .map(conn =>
             new BftScanConnection(
               cnLedgerClient,
-              coinRulesCacheTimeToLive,
+              amuletRulesCacheTimeToLive,
               new TrustSingle(conn, retryProvider, loggerFactory),
               clock,
               retryProvider,
               loggerFactory,
             )
           )
-      case BftScanClientConfig.Bft(seedUrls, scansRefreshInterval, coinRulesCacheTimeToLive) =>
+      case BftScanClientConfig.Bft(seedUrls, scansRefreshInterval, amuletRulesCacheTimeToLive) =>
         for {
           bft <- seedUrls
             .traverse(uri =>
-              builder(uri, coinRulesCacheTimeToLive).transformWith {
+              builder(uri, amuletRulesCacheTimeToLive).transformWith {
                 case Success(conn) => Future.successful(Right(conn))
                 case Failure(err) => Future.successful(Left(uri -> err))
               }
@@ -528,7 +528,7 @@ object BftScanConnection {
               new Bft(
                 connections,
                 failed.toMap,
-                uri => builder(uri, coinRulesCacheTimeToLive),
+                uri => builder(uri, amuletRulesCacheTimeToLive),
                 scansRefreshInterval,
                 retryProvider,
                 loggerFactory,
@@ -536,7 +536,7 @@ object BftScanConnection {
             }
           bftConnection = new BftScanConnection(
             cnLedgerClient,
-            coinRulesCacheTimeToLive,
+            amuletRulesCacheTimeToLive,
             bft,
             clock,
             retryProvider,
@@ -575,14 +575,14 @@ object BftScanConnection {
       httpClient: HttpRequest => Future[HttpResponse],
       templateDecoder: TemplateJsonDecoder,
   ): (Uri, NonNegativeFiniteDuration) => Future[SingleScanConnection] =
-    (uri: Uri, coinRulesCacheTimeToLive: NonNegativeFiniteDuration) => {
+    (uri: Uri, amuletRulesCacheTimeToLive: NonNegativeFiniteDuration) => {
       ScanConnection.singleUncached( // BFTScanConnection caches itself so that caches don't desync
         ScanAppClientConfig(
           NetworkAppClientConfig(
             uri,
             failOnVersionMismatch = false,
           ),
-          coinRulesCacheTimeToLive,
+          amuletRulesCacheTimeToLive,
         ),
         clock,
         retryProvider,
@@ -597,14 +597,14 @@ object BftScanConnection {
   object BftScanClientConfig {
     case class TrustSingle(
         url: Uri,
-        coinRulesCacheTimeToLive: NonNegativeFiniteDuration =
-          ScanAppClientConfig.DefaultCoinRulesCacheTimeToLive,
+        amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
+          ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
     ) extends BftScanClientConfig
     case class Bft(
         seedUrls: NonEmptyList[Uri],
         scansRefreshInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
-        coinRulesCacheTimeToLive: NonNegativeFiniteDuration =
-          ScanAppClientConfig.DefaultCoinRulesCacheTimeToLive,
+        amuletRulesCacheTimeToLive: NonNegativeFiniteDuration =
+          ScanAppClientConfig.DefaultAmuletRulesCacheTimeToLive,
     ) extends BftScanClientConfig
 
   }

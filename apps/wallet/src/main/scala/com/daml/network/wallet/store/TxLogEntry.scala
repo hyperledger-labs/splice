@@ -5,11 +5,11 @@ import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.history.{
   CnsRules_CollectEntryRenewalPayment,
   CnsRules_CollectInitialEntryPayment,
-  CoinExpire,
-  CoinRules_BuyMemberTraffic,
-  LockedCoinExpireCoin,
-  LockedCoinOwnerExpireLock,
-  LockedCoinUnlock,
+  AmuletExpire,
+  AmuletRules_BuyMemberTraffic,
+  LockedAmuletExpireAmulet,
+  LockedAmuletOwnerExpireLock,
+  LockedAmuletUnlock,
 }
 import com.daml.network.http.v0.definitions as httpDef
 import com.daml.network.http.v0.definitions.{
@@ -169,7 +169,7 @@ object TxLogEntry extends StoreErrors {
           .map(r => httpDef.PartyAndAmount(r.party, Codec.encode(r.amount)))
           .toVector,
         holdingFees = Codec.encode(entry.senderHoldingFees),
-        coinPrice = Codec.encode(entry.coinPrice),
+        amuletPrice = Codec.encode(entry.amuletPrice),
         appRewardsUsed = Codec.encode(entry.appRewardsUsed),
         validatorRewardsUsed = Codec.encode(entry.validatorRewardsUsed),
       )
@@ -188,7 +188,7 @@ object TxLogEntry extends StoreErrors {
           } yield PartyAndAmount(r.party, amount)
         )
         senderHoldingFees <- Codec.decode(Codec.BigDecimal)(item.holdingFees)
-        coinPrice <- Codec.decode(Codec.BigDecimal)(item.coinPrice)
+        amuletPrice <- Codec.decode(Codec.BigDecimal)(item.amuletPrice)
         appRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.appRewardsUsed)
         validatorRewardsUsed <- Codec.decode(Codec.BigDecimal)(item.validatorRewardsUsed)
       } yield TransferTxLogEntry(
@@ -199,7 +199,7 @@ object TxLogEntry extends StoreErrors {
         sender = Some(PartyAndAmount(sender.party, senderAmount)),
         receivers = receivers,
         senderHoldingFees = senderHoldingFees,
-        coinPrice = coinPrice,
+        amuletPrice = amuletPrice,
         appRewardsUsed = appRewardsUsed,
         validatorRewardsUsed = validatorRewardsUsed,
       )
@@ -219,7 +219,7 @@ object TxLogEntry extends StoreErrors {
         receivers = Vector(
           httpDef.PartyAndAmount(entry.receiver, Codec.encode(entry.amount))
         ),
-        coinPrice = Codec.encode(entry.coinPrice),
+        amuletPrice = Codec.encode(entry.amuletPrice),
       )
     }
 
@@ -228,7 +228,7 @@ object TxLogEntry extends StoreErrors {
     ): Either[String, BalanceChangeTxLogEntry] = {
       for {
         receiverAndAmount <- item.receivers.headOption.toRight("No receivers")
-        coinPrice <- Codec.decode(Codec.BigDecimal)(item.coinPrice)
+        amuletPrice <- Codec.decode(Codec.BigDecimal)(item.amuletPrice)
         subtype <- subtypeFromResponseItem(item.transactionSubtype)
       } yield BalanceChangeTxLogEntry(
         subtype = Some(subtype),
@@ -236,7 +236,7 @@ object TxLogEntry extends StoreErrors {
         date = Some(item.date.toInstant),
         receiver = receiverAndAmount.party,
         amount = Codec.tryDecode(Codec.BigDecimal)(receiverAndAmount.amount),
-        coinPrice = coinPrice,
+        amuletPrice = amuletPrice,
       )
     }
 
@@ -274,7 +274,8 @@ object TxLogEntry extends StoreErrors {
       httpDef.TransactionSubtype(
         templateId = s"${subtype.packageId}:${subtype.moduleName}:${subtype.entityName}",
         choice = subtype.choice,
-        coinOperation = if (subtype.coinOperation.isEmpty) None else Some(subtype.coinOperation),
+        amuletOperation =
+          if (subtype.amuletOperation.isEmpty) None else Some(subtype.amuletOperation),
       )
 
     private def subtypeFromResponseItem(
@@ -290,7 +291,7 @@ object TxLogEntry extends StoreErrors {
       moduleName = templateId._2,
       entityName = templateId._3,
       choice = item.choice,
-      coinOperation = item.coinOperation.getOrElse(""),
+      amuletOperation = item.amuletOperation.getOrElse(""),
     )
 
     def toStatusResponse(
@@ -397,7 +398,7 @@ object TxLogEntry extends StoreErrors {
 
   sealed abstract class TransactionSubtypeDef(
       val companion: ExerciseNodeCompanion,
-      val coinOperation: Option[String],
+      val amuletOperation: Option[String],
   ) {
     val templateId: Identifier = companion.template.TEMPLATE_ID
     val choice: String = companion.choice.name
@@ -408,7 +409,7 @@ object TxLogEntry extends StoreErrors {
         moduleName = templateId.getModuleName,
         entityName = templateId.getEntityName,
         choice = choice,
-        coinOperation = coinOperation.getOrElse(""),
+        amuletOperation = amuletOperation.getOrElse(""),
       )
   }
 
@@ -430,7 +431,8 @@ object TxLogEntry extends StoreErrors {
     case object SubscriptionPaymentCollected
         extends TransferTransactionSubtype(SubscriptionPayment_Collect)
     case object WalletAutomation extends TransferTransactionSubtype(WalletAppInstall_ExecuteBatch)
-    case object ExtraTrafficPurchase extends TransferTransactionSubtype(CoinRules_BuyMemberTraffic)
+    case object ExtraTrafficPurchase
+        extends TransferTransactionSubtype(AmuletRules_BuyMemberTraffic)
     case object InitialEntryPaymentCollection
         extends TransferTransactionSubtype(CnsRules_CollectInitialEntryPayment)
     case object EntryRenewalPaymentCollection
@@ -477,11 +479,12 @@ object TxLogEntry extends StoreErrors {
         extends BalanceChangeTransactionSubtype(SubscriptionPayment_Reject)
     case object SubscriptionPaymentExpired
         extends BalanceChangeTransactionSubtype(SubscriptionPayment_Expire)
-    case object LockedCoinUnlocked extends BalanceChangeTransactionSubtype(LockedCoinUnlock)
-    case object LockedCoinOwnerExpired
-        extends BalanceChangeTransactionSubtype(LockedCoinOwnerExpireLock)
-    case object LockedCoinExpired extends BalanceChangeTransactionSubtype(LockedCoinExpireCoin)
-    case object CoinExpired extends BalanceChangeTransactionSubtype(CoinExpire)
+    case object LockedAmuletUnlocked extends BalanceChangeTransactionSubtype(LockedAmuletUnlock)
+    case object LockedAmuletOwnerExpired
+        extends BalanceChangeTransactionSubtype(LockedAmuletOwnerExpireLock)
+    case object LockedAmuletExpired
+        extends BalanceChangeTransactionSubtype(LockedAmuletExpireAmulet)
+    case object AmuletExpired extends BalanceChangeTransactionSubtype(AmuletExpire)
 
     val values: Map[String, BalanceChangeTransactionSubtype] =
       Set[BalanceChangeTransactionSubtype](
@@ -494,10 +497,10 @@ object TxLogEntry extends StoreErrors {
         SubscriptionInitialPaymentExpired,
         SubscriptionPaymentRejected,
         SubscriptionPaymentExpired,
-        LockedCoinUnlocked,
-        LockedCoinOwnerExpired,
-        LockedCoinExpired,
-        CoinExpired,
+        LockedAmuletUnlocked,
+        LockedAmuletOwnerExpired,
+        LockedAmuletExpired,
+        AmuletExpired,
       ).map(txSubtype => txSubtype.choice -> txSubtype).toMap
 
     def find(choiceName: String): Option[BalanceChangeTransactionSubtype] =
@@ -506,8 +509,8 @@ object TxLogEntry extends StoreErrors {
 
   sealed abstract class NotificationTransactionSubtype(
       companion: ExerciseNodeCompanion,
-      coinOperation: Option[String],
-  ) extends TransactionSubtypeDef(companion, coinOperation)
+      amuletOperation: Option[String],
+  ) extends TransactionSubtypeDef(companion, amuletOperation)
   object NotificationTransactionSubtype {
     case object DirectTransferFailed
         extends NotificationTransactionSubtype(
@@ -530,14 +533,14 @@ object TxLogEntry extends StoreErrors {
       ).map(txSubtype =>
         (
           txSubtype.choice,
-          txSubtype.coinOperation,
+          txSubtype.amuletOperation,
         ) -> txSubtype
       ).toMap
     def find(
         choiceName: String,
-        coinOperationConstructor: Option[String],
+        amuletOperationConstructor: Option[String],
     ): Option[NotificationTransactionSubtype] =
-      values.get((choiceName, coinOperationConstructor))
+      values.get((choiceName, amuletOperationConstructor))
   }
 
   def transferNonEmpty(transfer: TransferTxLogEntry): Boolean = {

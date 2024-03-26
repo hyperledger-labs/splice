@@ -4,8 +4,8 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
-import CC.Coin
-import CC.CoinRules
+import CC.Amulet
+import CC.AmuletRules
 import CN.Wallet.Install
 import CN.Wallet.Payment
 
@@ -15,7 +15,7 @@ testTransferOffers : Script ()
 testTransferOffers = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   runNextIssuance app
-  runCoinDepositBots app
+  runAmuletDepositBots app
 
   tap app alice 15.0
 
@@ -41,17 +41,17 @@ testTransferOffers = script do
           trackingId = trackingId
 
 -- TODO(#2957): remove read-as SVC.
-  let completeTransfer accepted coin transferContext = submitMulti [aliceValidator.primaryParty] [alice.primaryParty, aliceValidator.primaryParty, app.svc] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
-        inputs = [InputCoin coin]
+  let completeTransfer accepted amulet transferContext = submitMulti [aliceValidator.primaryParty] [alice.primaryParty, aliceValidator.primaryParty, app.svc] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
+        inputs = [InputAmulet amulet]
         operations = [CO_CompleteAcceptedTransfer accepted]
         context = transferContext
 
   offer <- createOffer 2.0 " transfer test" t "transfer_test"
   accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
-  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 2.5)
+  [(amulet, _)] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount > 2.5)
   transferContext <- getPaymentTransferContext app alice
-  _ <- completeTransfer accepted coin transferContext
+  _ <- completeTransfer accepted amulet transferContext
 
   offer <- createOffer 3.0 "to be rejected" t "to_be_rejected"
   submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall WalletAppInstall_TransferOffer_Reject with cid = offer
@@ -61,7 +61,7 @@ testTransferOffers = script do
 
   offer <- createOffer 7.0 "To expire" t "to_expire"
   passTime (minutes 6)
-  [_] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 7.5)
+  [_] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount > 7.5)
   submitMultiMustFail [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
 
@@ -87,18 +87,18 @@ testTransferOffers = script do
   accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
   transferContext <- getPaymentTransferContext app alice
-  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 1.0)
-  ExecuteBatchResult { outcomes } <- completeTransfer accepted coin transferContext
+  [(amulet, _)] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount > 1.0)
+  ExecuteBatchResult { outcomes } <- completeTransfer accepted amulet transferContext
   [COO_Error _] <- pure outcomes
-  -- tap more coin and retry the transfer
-  aliceCoinsBefore <- query @Coin alice.primaryParty
-  tap app alice 101.05  -- chosen such that all coins of alice are consumed
-  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.amount.initialAmount > 100.0)
-  ExecuteBatchResult { outcomes } <- completeTransfer accepted coin transferContext
+  -- tap more amulet and retry the transfer
+  aliceAmuletsBefore <- query @Amulet alice.primaryParty
+  tap app alice 101.05  -- chosen such that all amulets of alice are consumed
+  [(amulet, _)] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount > 100.0)
+  ExecuteBatchResult { outcomes } <- completeTransfer accepted amulet transferContext
   trace outcomes $ pure ()
   [COO_CompleteAcceptedTransfer _] <- pure outcomes
 
-  aliceCoinsAfter <- query @Coin alice.primaryParty
-  aliceCoinsAfter === aliceCoinsBefore -- no sender change was created
+  aliceAmuletsAfter <- query @Amulet alice.primaryParty
+  aliceAmuletsAfter === aliceAmuletsBefore -- no sender change was created
 
   pure ()
