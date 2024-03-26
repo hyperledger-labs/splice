@@ -100,7 +100,7 @@ testDomainMigration = do
   --    the design document: https://docs.google.com/document/d/1vjcq9iGBnqWl0Q-3sIBvXEV61U2TflolxDpuES97Kh4/edit#bookmark=id.9lc9od4yaflf
   pure ()
 
-executeSvcRulesConfigChange : CCApp -> (SvcRulesConfig -> SvcRulesConfig) -> Script ()
+executeSvcRulesConfigChange : AmuletApp -> (SvcRulesConfig -> SvcRulesConfig) -> Script ()
 executeSvcRulesConfigChange app updateConfig = do
   [(_, svcRules)] <- query @SvcRules app.svc
   let newConfig = updateConfig svcRules.config
@@ -110,7 +110,7 @@ executeSvcRulesConfigChange app updateConfig = do
 
 
 executeAddCoinConfigSchedule
-  : CCApp -> (Schedule Time (CoinConfig USD) -> Schedule Time (CoinConfig USD)) -> Script ()
+  : AmuletApp -> (Schedule Time (CoinConfig USD) -> Schedule Time (CoinConfig USD)) -> Script ()
 executeAddCoinConfigSchedule app updateConfig = do
   [(_, svcRules)] <- query @SvcRules app.svc
   [(_, coinRules)] <- query @CoinRules app.svc

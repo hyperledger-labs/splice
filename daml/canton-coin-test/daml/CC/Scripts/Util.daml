@@ -32,9 +32,9 @@ import CN.Util
 
 
 -- | A type to hold the off-ledger information required to interact with the CC app.
-data CCApp = CCApp with
+data AmuletApp = AmuletApp with
     svc : Party
-    svcUser : CCUser
+    svcUser : AmuletUser
   deriving (Eq, Ord, Show)
 
 demoTime : Time
@@ -42,11 +42,11 @@ demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
 
 
 -- | Setup the SVC party and the contracts defining the CC app.
-setupApp : Script CCApp
+setupApp : Script AmuletApp
 setupApp = genericSetupApp ""
 
 -- | Setup the SVC party with a specific prefix and the contracts defining the CC app.
-genericSetupApp : Text -> Script CCApp
+genericSetupApp : Text -> Script AmuletApp
 genericSetupApp svcPrefix = do
   -- use a time that is easy to reason about in script outputs
   setTime demoTime
@@ -55,7 +55,7 @@ genericSetupApp svcPrefix = do
   svc <- allocateParty (svcPrefix <> "SVC")
   svcUser <- validateUserId (svcPrefix <> "svc")
   _ <- createUser (User svcUser (Some svc)) []
-  let app =  CCApp with svc, svcUser = CCUser svcUser svc
+  let app =  AmuletApp with svc, svcUser = AmuletUser svcUser svc
 
   -- the SVC is its own validator
   recordValidatorOf app app.svc app.svc
@@ -75,15 +75,15 @@ genericSetupApp svcPrefix = do
   return app
 
 
--- CCApp users
+-- AmuletApp users
 --------------
 
-setupValidator : CCApp -> Text -> Script Party
+setupValidator : AmuletApp -> Text -> Script Party
 setupValidator app name = do
   validatorCcUser <- setupValidator' app name
   return validatorCcUser.primaryParty
 
-setupValidator' : CCApp -> Text -> Script CCUser
+setupValidator' : AmuletApp -> Text -> Script AmuletUser
 setupValidator' app name = do
   validatorParty <- allocatePartyWithHint name (PartyIdHint name)
   sponsorParty <- allocateParty (name <> "_dummy_SV_sponsor")
@@ -97,46 +97,46 @@ setupValidator' app name = do
   -- TODO(#2957): remove read-as SVC.
   createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.svc]
   recordValidatorOf app validatorParty validatorParty
-  tap app (CCUser userId validatorParty) 1.0
-  let validatorUser = CCUser with
+  tap app (AmuletUser userId validatorParty) 1.0
+  let validatorUser = AmuletUser with
         primaryParty = validatorParty
         userId = userId
   return validatorUser
 
-data CCUser = CCUser
+data AmuletUser = AmuletUser
   with
     userId : UserId
     primaryParty : Party
   deriving (Show, Eq, Ord)
 
-setupUser : CCApp -> Text -> Party -> Script CCUser
+setupUser : AmuletApp -> Text -> Party -> Script AmuletUser
 setupUser app name validator = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
   -- TODO(#2957): remove read-as SVC.
   createUser (User userId (Some user)) [CanActAs user, CanReadAs app.svc]
   recordValidatorOf app user validator
-  let u = CCUser userId user
+  let u = AmuletUser userId user
   tap app u 1.0
   return u
 
-setupSelfHostedUser: CCApp -> Text -> Script (CCUser, CCUser)
+setupSelfHostedUser: AmuletApp -> Text -> Script (AmuletUser, AmuletUser)
 setupSelfHostedUser app name = do
   validator <- setupValidator' app (name <> "_validator")
   user <- setupUser app name validator.primaryParty
   return (user, validator)
 
 data DefaultAppWithUsers = DefaultAppWithUsers with
-    app: CCApp
-    alice: CCUser
-    aliceValidator : CCUser
-    bob: CCUser
-    charlie: CCUser
-    bobValidator: CCUser
-    provider1: CCUser
-    provider1Validator: CCUser
-    provider2: CCUser
-    provider2Validator: CCUser
+    app: AmuletApp
+    alice: AmuletUser
+    aliceValidator : AmuletUser
+    bob: AmuletUser
+    charlie: AmuletUser
+    bobValidator: AmuletUser
+    provider1: AmuletUser
+    provider1Validator: AmuletUser
+    provider2: AmuletUser
+    provider2Validator: AmuletUser
   deriving (Show, Eq, Ord)
 
 setupDefaultAppWithUsers: Script DefaultAppWithUsers
@@ -150,12 +150,12 @@ setupDefaultAppWithUsers = do
   return DefaultAppWithUsers with ..
 
 -- dummy argument to avoid running this script by default.
-getAllValidatorRights : CCApp -> Script [ValidatorRight]
+getAllValidatorRights : AmuletApp -> Script [ValidatorRight]
 getAllValidatorRights _app = do
   parties <- listKnownParties
   map snd <$> query @ValidatorRight (map party parties)
 
-recordValidatorOf : CCApp -> Party -> Party -> Script ()
+recordValidatorOf : AmuletApp -> Party -> Party -> Script ()
 recordValidatorOf app u v =
   submitMulti [u, v] [] $
     void $ createCmd ValidatorRight with svc = app.svc; validator = v; user = u
@@ -170,7 +170,7 @@ getUserReadAs user = do
 ----------------------
 
 -- Advance issuance such that the next transfers use a round with the given coin-price
-advanceToIssuanceWithPrice : CCApp -> Decimal -> Script ()
+advanceToIssuanceWithPrice : AmuletApp -> Decimal -> Script ()
 advanceToIssuanceWithPrice app coinPrice = do
   runNextIssuanceInternal app coinPrice
   -- the round with the new price only becomes effective after one tick
@@ -180,12 +180,12 @@ advanceToIssuanceWithPrice app coinPrice = do
   runNextIssuanceInternal app coinPrice
 
 -- | Run the next issuance but don't enforce a specific coin price.
-runNextIssuance : CCApp -> Script ()
+runNextIssuance : AmuletApp -> Script ()
 runNextIssuance app = do
   runNextIssuanceInternal app 1.0
 
 -- | Advance time to next round change
-advanceToNextRoundChange : CCApp -> Script ()
+advanceToNextRoundChange : AmuletApp -> Script ()
 advanceToNextRoundChange app = do
   [(_, oldest), _, (_, newest)] <- getActiveOpenRoundsSorted app
   now <- getTime
@@ -194,7 +194,7 @@ advanceToNextRoundChange app = do
 
 -- Only directly call this function if you know what you are doing.
 -- Due to effective-dating, the price you give here is not the coin price that can be used immediately
-runNextIssuanceInternal : CCApp -> Decimal -> Script ()
+runNextIssuanceInternal : AmuletApp -> Decimal -> Script ()
 runNextIssuanceInternal app coinPrice = do
     -- now <- getTime
     -- passTime (minutes 10)
@@ -252,7 +252,7 @@ runNextIssuanceInternal app coinPrice = do
     pure ()
 
 -- Set time so that at least one mining round is open and usable
-passTimeToRoundOpen : CCApp -> Script ()
+passTimeToRoundOpen : AmuletApp -> Script ()
 passTimeToRoundOpen app = do
   now <- getTime
   -- only get rounds that won't close soon
@@ -262,7 +262,7 @@ passTimeToRoundOpen app = do
     Some (_, r) -> setTime (max now r.opensAt)
 
 -- Skip over the next n rounds. This is used in tests because actually calling runNextIssuance a few thousand times is too slow.
-skipNRounds : CCApp -> Int -> Script ()
+skipNRounds : AmuletApp -> Int -> Script ()
 skipNRounds app n = do
   [(r1Cid, r1), (r2Cid, r2), (r3Cid, r3)] <- getActiveOpenRoundsSorted app
 
@@ -281,14 +281,14 @@ skipNRounds app n = do
 -- Asset handling utilities
 ---------------------------
 
-submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> [Party] -> c -> Script r
+submitExerciseCoinRulesByKey : Choice CoinRules c r => AmuletApp -> [Party] -> [Party] -> c -> Script r
 submitExerciseCoinRulesByKey app actors readers arg = do
   (rules, _) <- fetchCoinRulesByKey app.svc
   -- TODO(#2957): remove read-as SVC.
   let adjustedReaders = (app.svc :: readers)
   submitMulti actors adjustedReaders $ exerciseCmd rules arg
 
-submitExerciseCoinRulesByKey' : Choice CoinRules c r => CCApp -> CCUser -> c -> Script r
+submitExerciseCoinRulesByKey' : Choice CoinRules c r => AmuletApp -> AmuletUser -> c -> Script r
 submitExerciseCoinRulesByKey' app user arg = do
   (rules, _) <- fetchCoinRulesByKey app.svc
   submitUser user.userId $ exerciseCmd rules arg
@@ -307,20 +307,20 @@ queryCoinRulesByKey svc = do
     [coinRules] -> pure (Some coinRules)
     rules -> abort $ "Expected 0 or 1 CoinRules contracts but got " <> show rules
 
-getCoinRules : CCApp -> Script (ContractId CoinRules, CoinRules)
+getCoinRules : AmuletApp -> Script (ContractId CoinRules, CoinRules)
 getCoinRules app = fetchCoinRulesByKey app.svc
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfers the desired amount off of them to the receiver.
 -- The left-over amount is kept.
-pay : CCApp -> CCUser -> Party -> Decimal -> Script ()
+pay : AmuletApp -> AmuletUser -> Party -> Decimal -> Script ()
 pay app sender recipient coinAmount = do
   payWithTransferFeeRatio app sender recipient coinAmount 0.0
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfers the desired amount off of them to the receiver.
 -- The left-over amount is kept.
-payWithTransferFeeRatio : CCApp -> CCUser -> Party -> Decimal -> Decimal -> Script ()
+payWithTransferFeeRatio : AmuletApp -> AmuletUser -> Party -> Decimal -> Decimal -> Script ()
 payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio = do
   -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   readAs <- getUserReadAs sender.userId
@@ -345,7 +345,7 @@ payWithTransferFeeRatio app sender recipient coinAmount transferFeeRatio = do
 -- | Locks a coin of the given amount to the given lock holder
 -- for the given time starting at the current time
 -- It gathers all coints of the sender as input coins.
-lockTo1 : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script ()
+lockTo1 : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script ()
 lockTo1 app sender lockHolder coinAmount lockDuration = do
   now <- getTime
   readAs <- getUserReadAs sender.userId
@@ -371,7 +371,7 @@ lockTo1 app sender lockHolder coinAmount lockDuration = do
       transfer, context = coinTransferContext openRound featuredAppRight
 
 -- | Draw on validator faucets for all open rounds.
-drawOnAllValidatorFaucets : CCApp -> Script ()
+drawOnAllValidatorFaucets : AmuletApp -> Script ()
 drawOnAllValidatorFaucets app = do
   openRounds <- getOpenRoundsSorted app
   forA_ openRounds $ \openRound -> do
@@ -383,7 +383,7 @@ drawOnAllValidatorFaucets app = do
         openRoundCid = openRound._1
 
 -- | Deposit all coins together with new issuances into a single coin.
-runCoinDepositBots : CCApp -> Script ()
+runCoinDepositBots : AmuletApp -> Script ()
 runCoinDepositBots app = do
   (openRound, _) <- getLatestOpenRound app
   issuingRounds <- getOpenIssuingRounds app
@@ -448,7 +448,7 @@ getCoinInputs sender = do
   pure [ InputCoin coinCid | (coinCid, _) <- coins]
 
 -- | Retrieve a list of all issuing mining rounds that are currently open.
-getOpenIssuingRounds : CCApp -> Script [(ContractId IssuingMiningRound, IssuingMiningRound)]
+getOpenIssuingRounds : AmuletApp -> Script [(ContractId IssuingMiningRound, IssuingMiningRound)]
 getOpenIssuingRounds app = do
   now <- getTime
   miningRounds <- query @IssuingMiningRound app.svc
@@ -461,7 +461,7 @@ getValidatorRights validator = do
   return $ Map.fromList [ (right.user, rightCid) | (rightCid, right) <- rights ]
 
 -- Primarily used by submitters to decide against which round they should try to transact.
-getLatestOpenRound : CCApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
+getLatestOpenRound : AmuletApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
 getLatestOpenRound app = do
   now <- getTime
   -- only get open rounds
@@ -470,7 +470,7 @@ getLatestOpenRound app = do
     None -> abort "No open open mining rounds"
     Some r-> pure r
 
-getLatestActiveOpenRound : CCApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
+getLatestActiveOpenRound : AmuletApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
 getLatestActiveOpenRound app = do
   -- get active rounds
   rounds <- query @OpenMiningRound app.svc
@@ -478,24 +478,24 @@ getLatestActiveOpenRound app = do
     None -> abort "No active open mining rounds"
     Some r-> pure r
 
-getOpenRoundsSorted : CCApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
+getOpenRoundsSorted : AmuletApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
 getOpenRoundsSorted app = do
   now <- getTime
   -- only get rounds that are actually open as-of now
   rounds <- queryFilter @OpenMiningRound app.svc (\round -> now >= round.opensAt)
   return $ sortOn (\(_, openRound) -> openRound.round) rounds
 
-getActiveOpenRoundsSorted : CCApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
+getActiveOpenRoundsSorted : AmuletApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
 getActiveOpenRoundsSorted app = do
   rounds <- query @OpenMiningRound app.svc
   return $ sortOn (\(_, openRound) -> openRound.round) rounds
 
-getFeaturedAppRight : CCApp -> Party -> Script (Optional (ContractId FeaturedAppRight))
+getFeaturedAppRight : AmuletApp -> Party -> Script (Optional (ContractId FeaturedAppRight))
 getFeaturedAppRight app provider = do
   rounds <- query @FeaturedAppRight provider
   return $ DA.List.Total.head [ cid | (cid, round) <- rounds, round.svc == app.svc ]
 
-getAppTransferContext : CCApp -> CCUser -> Script AppTransferContext
+getAppTransferContext : AmuletApp -> AmuletUser -> Script AppTransferContext
 getAppTransferContext app provider = do
   openMiningRound <- fst <$> getLatestOpenRound app
   coinRules <- fst <$> fetchCoinRulesByKey app.svc
@@ -505,7 +505,7 @@ getAppTransferContext app provider = do
     openMiningRound
     featuredAppRight
 
-getAppTransferContextForRound : CCApp -> CCUser -> Round -> Script AppTransferContext
+getAppTransferContextForRound : AmuletApp -> AmuletUser -> Round -> Script AppTransferContext
 getAppTransferContextForRound app provider round = do
   openMiningRounds <- getOpenRoundsSorted app
   openMiningRound <- case find (\(_, payload) -> payload.round == round) openMiningRounds of
@@ -518,18 +518,18 @@ getAppTransferContextForRound app provider round = do
     openMiningRound
     featuredAppRight
 
-getPaymentTransferContext : CCApp -> CCUser -> Script PaymentTransferContext
+getPaymentTransferContext : AmuletApp -> AmuletUser -> Script PaymentTransferContext
 getPaymentTransferContext app user = do
   getPaymentTransferContextFeaturedApp app user None
 
-getPaymentTransferContextFeaturedApp : CCApp -> CCUser -> Optional(ContractId FeaturedAppRight) -> Script PaymentTransferContext
+getPaymentTransferContextFeaturedApp : AmuletApp -> AmuletUser -> Optional(ContractId FeaturedAppRight) -> Script PaymentTransferContext
 getPaymentTransferContextFeaturedApp app user featuredAppRight = do
   context <- getTransferContext app user featuredAppRight
   coinRules <- fst <$> fetchCoinRulesByKey app.svc
   pure PaymentTransferContext with ..
 
 
-getTransferContext : CCApp -> CCUser -> Optional(ContractId FeaturedAppRight) -> Script TransferContext
+getTransferContext : AmuletApp -> AmuletUser -> Optional(ContractId FeaturedAppRight) -> Script TransferContext
 getTransferContext app user featuredAppRight = do
   openMiningRound <- fst <$> getLatestOpenRound app
   now <- getTime
@@ -543,7 +543,7 @@ getTransferContext app user featuredAppRight = do
     openMiningRound
     featuredAppRight = featuredAppRight
 
-tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
+tap : AmuletApp -> AmuletUser -> Decimal -> Script (ContractId Coin)
 tap app user amount = do
   (openRound, _) <- getLatestOpenRound app
   ccsum <- submitExerciseCoinRulesByKey' app user CoinRules_DevNet_Tap with
@@ -552,7 +552,7 @@ tap app user amount = do
     openRound
   return ccsum.coin
 
-featureApp : CCApp -> CCUser -> Script (ContractId FeaturedAppRight)
+featureApp : AmuletApp -> AmuletUser -> Script (ContractId FeaturedAppRight)
 featureApp app provider = do
   result <- submitExerciseCoinRulesByKey' app provider CoinRules_DevNet_FeatureApp with
     provider = provider.primaryParty
@@ -599,7 +599,7 @@ assertError f = do
     catch (_ : AnyException) -> pure True
   unless isThrown (abort "expected exception but didn't get one")
 
-getCoinConfig : CCApp -> Script (CoinConfig USD)
+getCoinConfig : AmuletApp -> Script (CoinConfig USD)
 getCoinConfig app = do
   Some (_, coinRules) <- queryCoinRulesByKey app.svc
   now <- getTime

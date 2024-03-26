@@ -20,7 +20,7 @@ testCoinRules = do
 
   pure ()
 
-testChoice : CCApp -> [Party] -> [Party] -> (ContractId CoinRules -> Commands a) -> Script ()
+testChoice : AmuletApp -> [Party] -> [Party] -> (ContractId CoinRules -> Commands a) -> Script ()
 testChoice app actAs readAs buildCommand = do
   setIsDevNetFlag app False
   Some (coinRules, _) <- queryCoinRulesByKey app.svc
@@ -31,7 +31,7 @@ testChoice app actAs readAs buildCommand = do
   submitMulti actAs readAs (buildCommand coinRules)
   pure ()
 
-setIsDevNetFlag : CCApp -> Bool -> Script ()
+setIsDevNetFlag : AmuletApp -> Bool -> Script ()
 setIsDevNetFlag app isDevNet = do
   Some (rulesCid, rules) <- queryCoinRulesByKey app.svc
   submit app.svc $

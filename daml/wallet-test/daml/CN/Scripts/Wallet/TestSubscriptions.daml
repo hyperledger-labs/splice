@@ -16,13 +16,13 @@ import CC.Scripts.Util
 
 data Users = Users with
   validator : Party
-  alice : CCUser
-  pizzeria : CCUser
-  provider : CCUser
+  alice : AmuletUser
+  pizzeria : AmuletUser
+  provider : AmuletUser
 
 testPayData = SubscriptionPayData (PaymentAmount 12.0 CC) (days 28) (days 1)
 
-testSetup : Script (CCApp, Users, ContractId SubscriptionRequest)
+testSetup : Script (AmuletApp, Users, ContractId SubscriptionRequest)
 testSetup = script do
   app <- setupApp
   runNextIssuance app
@@ -139,7 +139,7 @@ testUSDSubscription = script do
 
   featureApp app provider
   validatorUserId <- validateUserId "validator1"
-  featuredValidator <- featureApp app (CCUser validatorUserId validator)
+  featuredValidator <- featureApp app (AmuletUser validatorUserId validator)
 
   tap app alice 1.805035 -- chosen such that it exactly covers the required coin amount & no change is left-over
   let payData = SubscriptionPayData with
@@ -243,7 +243,7 @@ testUSDSubscription = script do
   pure ()
 
 acceptSubscriptionRequestAndMakePayment
-  : CCApp -> CCUser -> Party -> Optional (ContractId FeaturedAppRight) -> ContractId SubscriptionRequest
+  : AmuletApp -> AmuletUser -> Party -> Optional (ContractId FeaturedAppRight) -> ContractId SubscriptionRequest
   -> Script (ContractId SubscriptionInitialPayment)
 acceptSubscriptionRequestAndMakePayment app sender walletProvider providerFeaturedAppRight request = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
@@ -256,7 +256,7 @@ acceptSubscriptionRequestAndMakePayment app sender walletProvider providerFeatur
 
 
 makeSubscriptionPayment
-  : CCApp -> CCUser -> Party -> Optional (ContractId FeaturedAppRight) -> ContractId SubscriptionIdleState
+  : AmuletApp -> AmuletUser -> Party -> Optional (ContractId FeaturedAppRight) -> ContractId SubscriptionIdleState
   -> Script (ContractId SubscriptionPayment)
 makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
@@ -269,7 +269,7 @@ makeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state
 
 
 failMakeSubscriptionPayment
-  : CCApp -> CCUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId SubscriptionIdleState -> Script ()
+  : AmuletApp -> AmuletUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId SubscriptionIdleState -> Script ()
 failMakeSubscriptionPayment app sender walletProvider providerFeaturedAppRight state = do
   readAs <- getUserReadAs sender.userId
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
@@ -279,12 +279,12 @@ failMakeSubscriptionPayment app sender walletProvider providerFeaturedAppRight s
     context
     walletProvider
 
-collectInitialSubscriptionPayment : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
+collectInitialSubscriptionPayment : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
 collectInitialSubscriptionPayment app provider receiver sender payment = do
   (_, round) <- getLatestOpenRound app
   collectInitialSubscriptionPaymentInRound app round.round provider receiver sender payment
 
-collectInitialSubscriptionPaymentInRound : CCApp -> Round -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
+collectInitialSubscriptionPaymentInRound : AmuletApp -> Round -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
 collectInitialSubscriptionPaymentInRound app round provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
   transferContext <- getAppTransferContextForRound app provider round
@@ -292,19 +292,19 @@ collectInitialSubscriptionPaymentInRound app round provider receiver sender paym
     transferContext
   return (subscription, state, coin)
 
-collectInitialSubscriptionPaymentMustFail : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script ()
+collectInitialSubscriptionPaymentMustFail : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionInitialPayment -> Script ()
 collectInitialSubscriptionPaymentMustFail app provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
   transferContext <- getAppTransferContext app provider
   submitMultiMustFail [receiver.primaryParty, provider.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
     transferContext
 
-collectSubscriptionPayment : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
+collectSubscriptionPayment : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
 collectSubscriptionPayment app provider receiver sender payment = do
   (_, round) <- getLatestOpenRound app
   collectSubscriptionPaymentInRound app round.round provider receiver sender payment
 
-collectSubscriptionPaymentInRound : CCApp -> Round -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
+collectSubscriptionPaymentInRound : AmuletApp -> Round -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
 collectSubscriptionPaymentInRound app round provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
   transferContext <- getAppTransferContextForRound app provider round
@@ -312,7 +312,7 @@ collectSubscriptionPaymentInRound app round provider receiver sender payment = d
     transferContext
   return (state, coin)
 
-collectSubscriptionPaymentMustFail : CCApp -> CCUser -> CCUser -> Party -> ContractId SubscriptionPayment -> Script ()
+collectSubscriptionPaymentMustFail : AmuletApp -> AmuletUser -> AmuletUser -> Party -> ContractId SubscriptionPayment -> Script ()
 collectSubscriptionPaymentMustFail app provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
   transferContext <- getAppTransferContext app provider

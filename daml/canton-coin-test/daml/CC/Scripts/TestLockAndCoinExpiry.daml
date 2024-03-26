@@ -216,7 +216,7 @@ testExpireCoin = do
 
   pure ()
 
-advanceRound : CCApp -> Round -> Script (ContractId OpenMiningRound)
+advanceRound : AmuletApp -> Round -> Script (ContractId OpenMiningRound)
 advanceRound app expectedRound  = do
   runNextIssuance app
   (latestActiveRoundCid, _) <- getLatestActiveOpenRound app
@@ -238,7 +238,7 @@ testChoiceFailed actAs readAs buildCommand = do
   submitMultiMustFail actAs readAs buildCommand
   pure ()
 
-getLockedCoinCmd : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (Commands TransferResult)
+getLockedCoinCmd : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script (Commands TransferResult)
 getLockedCoinCmd app owner lockHolder amount lockDuration = do
   now <- getTime
   coin <- tap app owner (amount + 1.0)
@@ -263,14 +263,14 @@ getLockedCoinCmd app owner lockHolder amount lockDuration = do
     CoinRules_Transfer with
       transfer, context = coinTransferContext openRound featuredAppRight
 
-getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedCoin)
+getLockedCoin : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedCoin)
 getLockedCoin app owner lockHolder amount lockDuration = do
   cmd <- getLockedCoinCmd app owner lockHolder amount lockDuration
   result <- submitMulti [owner.primaryParty, lockHolder] [app.svc] cmd
   let [TransferResultLockedCoin lockedCoin] = result.createdCoins
   pure lockedCoin
 
-getLockedCoinMustFail : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script ()
+getLockedCoinMustFail : AmuletApp -> AmuletUser -> Party -> Decimal -> RelTime -> Script ()
 getLockedCoinMustFail app owner lockHolder amount lockDuration =  do
   cmd <- getLockedCoinCmd app owner lockHolder amount lockDuration
   submitMultiMustFail [owner.primaryParty, lockHolder] [app.svc] cmd

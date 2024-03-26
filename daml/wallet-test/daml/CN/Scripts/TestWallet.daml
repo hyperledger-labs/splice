@@ -22,7 +22,7 @@ import CC.Fees
 import CC.Scripts.Util
 import CC.Scripts.Parameters
 
-createPaymentRequest : CCApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
+createPaymentRequest : AmuletApp -> Party -> Party -> [(Party, PaymentAmount)] -> Script (ContractId AppPaymentRequest)
 createPaymentRequest app provider sender receiverAmounts = do
   t <- getTime
   let description = "multi, sender: " <> show sender <> ", amount: " <> show receiverAmounts
@@ -35,11 +35,11 @@ createPaymentRequest app provider sender receiverAmounts = do
     expiresAt = t `addRelTime` minutes 5
     description
 
-createSingleReceiverPaymentRequest : CCApp -> Party -> Party -> Party -> PaymentAmount -> Script (ContractId AppPaymentRequest)
+createSingleReceiverPaymentRequest : AmuletApp -> Party -> Party -> Party -> PaymentAmount -> Script (ContractId AppPaymentRequest)
 createSingleReceiverPaymentRequest app provider sender receiver amount = do
   createPaymentRequest app provider sender [(receiver, amount)]
 
-acceptPaymentRequest : CCApp -> CCUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
+acceptPaymentRequest : AmuletApp -> AmuletUser -> Party -> Optional(ContractId FeaturedAppRight) -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
 acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transferRequest coin = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   -- TODO(#2957): remove read-as SVC.
@@ -49,19 +49,19 @@ acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transfer
     walletProvider
   return accept
 
-collectAcceptedPayment : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
+collectAcceptedPayment : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
 collectAcceptedPayment app provider acceptedAppPayment = do
   (_, round) <- getLatestOpenRound app
   collectAcceptedPaymentInRound app round.round provider acceptedAppPayment
 
-collectAcceptedPaymentInRound : CCApp -> Round -> CCUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
+collectAcceptedPaymentInRound : AmuletApp -> Round -> AmuletUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
 collectAcceptedPaymentInRound app round provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContextForRound app provider round
   -- multi party submit to simplify test
   submitMulti (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
 
-collectAcceptedPaymentMustFail : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
+collectAcceptedPaymentMustFail : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script ()
 collectAcceptedPaymentMustFail app provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContext app provider
@@ -69,7 +69,7 @@ collectAcceptedPaymentMustFail app provider acceptedAppPayment = do
   _ <- submitMultiMustFail (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
   pure ()
 
-checkCoinPositions : CCUser -> [Decimal] -> Script ()
+checkCoinPositions : AmuletUser -> [Decimal] -> Script ()
 checkCoinPositions owner expectedAmounts = do
     let ownerParty = owner.primaryParty
     actualCoins <- queryFilter @Coin ownerParty (\c -> c.owner == ownerParty)
@@ -180,7 +180,7 @@ testCCPaymentRequest = script do
   runCoinDepositBots app
 
   validatorUserId <- validateUserId "alice_validator"
-  featuredValidator <- featureApp app (CCUser validatorUserId aliceValidator.primaryParty)
+  featuredValidator <- featureApp app (AmuletUser validatorUserId aliceValidator.primaryParty)
 
   -- retrieve the config
   config <- getCoinConfig app
@@ -804,7 +804,7 @@ withError outcomes f = case outcomes of
   [COO_Error e] -> f e
   _ -> abort $ "Expected COO_Error but got " <> show outcomes
 
-executeCoinOperation : CCApp -> CCUser -> CoinOperation -> Script CoinOperationOutcome
+executeCoinOperation : AmuletApp -> AmuletUser -> CoinOperation -> Script CoinOperationOutcome
 executeCoinOperation app user op = do
   [(installCid, install)] <- queryFilter @WalletAppInstall user.primaryParty (\i -> i.endUserParty == user.primaryParty)
   context <- getPaymentTransferContext app user
@@ -818,7 +818,7 @@ executeCoinOperation app user op = do
   let [outcome] = result.outcomes
   pure outcome
 
-calculateDomainFees : CCApp -> Int -> Script (Decimal, Decimal)
+calculateDomainFees : AmuletApp -> Int -> Script (Decimal, Decimal)
 calculateDomainFees app trafficAmount = do
   now <- getTime
   [(_, coinRules)] <- query @CoinRules app.svc

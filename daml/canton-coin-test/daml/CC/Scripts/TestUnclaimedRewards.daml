@@ -114,7 +114,7 @@ testUnclaimedRewards_withCoupons = do
   mergeAndCheckUnclaimedRewardAmount app (numIssuingRoundsToDate * totalRewardsPerRound)
   pure ()
 
-mergeAndCheckUnclaimedRewardAmount : CCApp -> Decimal -> Script ()
+mergeAndCheckUnclaimedRewardAmount : AmuletApp -> Decimal -> Script ()
 mergeAndCheckUnclaimedRewardAmount app expectedAmount = do
   mergeUnclaimedRewards app
   -- check target amount
@@ -125,7 +125,7 @@ mergeAndCheckUnclaimedRewardAmount app expectedAmount = do
 
 
 -- | Merge all unclaimed reward contracts.
-mergeUnclaimedRewards : CCApp -> Script ()
+mergeUnclaimedRewards : AmuletApp -> Script ()
 mergeUnclaimedRewards app  = do
   unclaimedRewards <- query @UnclaimedReward app.svc
   when (length unclaimedRewards > 1) $

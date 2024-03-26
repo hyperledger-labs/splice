@@ -408,6 +408,22 @@ function subcmd_internal_cns_occs() {
   # TODO(#11111): check for Canton Name
 }
 
+### CCApp and CCUser
+
+subcommand_whitelist[cc_app_and_user]='Rename: CCApp to AmuletApp and CCUser to AmuletUser'
+
+function subcmd_cc_app_and_user() {
+  assert_clean_working_dir
+
+  # Rename cns and CNS
+  rename "CCApp to AmuletApp" \
+    "'\bCCApp\b///AmuletApp'" \
+    ""
+  rename "CCUser to AmuletUser" \
+    "'\bCCUser\b///AmuletUser'" \
+    ""
+}
+
 
 ### Splice packages
 
