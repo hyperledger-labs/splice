@@ -122,9 +122,9 @@ const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConf
             description="The interval at which new rounds are opened."
           />
           <FeeTableRow
-            name="Domain Fee"
+            name="Synchronizer Fee"
             value={`${BigNumber(amuletConfig.globalDomain.fees.extraTrafficPrice)} $/MB`}
-            description="Cost of processing 1 MB of transactions through the global synchronizer"
+            description="Cost of processing 1 MB of transactions through the Global Synchronizer"
           />
         </TableBody>
       </Table>

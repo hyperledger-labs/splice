@@ -11,7 +11,7 @@ export const ValidatorFaucetsTable: React.FC = () => {
     case 'loading':
       return <Loading />;
     case 'error':
-      return <ErrorDisplay message={'Could not retrieve validator faucets leaderboard'} />;
+      return <ErrorDisplay message={'Could not retrieve validator liveness leaderboard'} />;
     case 'success':
       const topValidators = topValidatorsQuery.data.validatorsByReceivedFaucets.map(validator => ({
         partyId: validator.validator,
@@ -28,7 +28,7 @@ export const ValidatorFaucetsTable: React.FC = () => {
           </Typography>
         </Stack>
       ) : (
-        <TitledTable title="Validator Faucets Leaderboard">
+        <TitledTable title="Validator Liveness Leaderboard">
           <TableHead>
             <TableRow>
               <TableCell>Name</TableCell>

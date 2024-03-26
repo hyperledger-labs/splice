@@ -76,8 +76,8 @@ const GeneralInformationView: React.FC = () => {
     return (
       <Box>
         {getInfoTable('Super Validator Information', svInfos)}
-        {getInfoTable('Super Validator Collective Members', membersInfos)}
-        {getInfoTable('Super Validator Collective Information', dsoInfos)}
+        {getInfoTable('Active Super Validators', membersInfos)}
+        {getInfoTable('Decentralized Synchronizer Operations', dsoInfos)}
       </Box>
     );
   } else {
