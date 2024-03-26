@@ -6,7 +6,9 @@ Release Notes
 2024-04-01
 ----------
 
-* Added an option to disable the Validator apps' wallet. This can be done by setting `enableWallet` to `false` in the `validator-values.yaml` file.
+* Added an option to disable the Validator apps' wallet. This can be done by setting ``enableWallet`` to ``false`` in the ``validator-values.yaml`` file.
+
+* Added ANS name resolution (formally known as CNS) for ``dso.ans`` to the DSO party and ``<sv-name>.sv.ans`` to all SV members parties.
 
 
 2024-03-25
