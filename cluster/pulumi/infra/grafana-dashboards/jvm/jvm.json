@@ -99,7 +99,7 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "jvm_cpu_count{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
+          "expr": "jvm_cpu_count{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": true,
@@ -202,7 +202,7 @@
           "disableTextWrap": false,
           "editorMode": "code",
           "exemplar": false,
-          "expr": "jvm_cpu_recent_utilization_ratio{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
+          "expr": "jvm_cpu_recent_utilization_ratio{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -302,7 +302,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(container, pod) (rate(jvm_cpu_time_seconds_total{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
+          "expr": "sum by(container, pod) (rate(jvm_cpu_time_seconds_total{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
           "legendFormat": "{{pod}} {{container}}",
           "range": true,
           "refId": "A"
@@ -411,7 +411,7 @@
           },
           "disableTextWrap": false,
           "editorMode": "builder",
-          "expr": "jvm_thread_count{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
+          "expr": "jvm_thread_count{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
           "fullMetaSearch": false,
           "includeNullMetadata": true,
           "instant": false,
@@ -523,7 +523,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gc, container, pod) (rate(jvm_gc_duration_seconds_count{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
+          "expr": "sum by(gc, container, pod) (rate(jvm_gc_duration_seconds_count{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
           "legendFormat": "{{gc}} {{pod}} {{container}}",
           "range": true,
           "refId": "A"
@@ -619,7 +619,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gc, container, pod) (rate(jvm_gc_duration_seconds_sum{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
+          "expr": "sum by(gc, container, pod) (rate(jvm_gc_duration_seconds_sum{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
           "legendFormat": "{{gc}} {{pod}} {{container}}",
           "range": true,
           "refId": "A"
@@ -728,7 +728,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "jvm_memory_used_bytes{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
+          "expr": "jvm_memory_used_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
           "legendFormat": "{{pod}} {{container}} - {{jvm_memory_pool_name}} - {{jvm_memory_type}}",
           "range": true,
           "refId": "A"
@@ -824,7 +824,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "jvm_memory_limit_bytes{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
+          "expr": "jvm_memory_limit_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
           "legendFormat": "{{pod}} {{container}} - {{jvm_memory_pool_name}} - {{jvm_memory_type}}",
           "range": true,
           "refId": "A"
@@ -920,7 +920,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "jvm_memory_used_after_last_gc_bytes{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
+          "expr": "jvm_memory_used_after_last_gc_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
           "legendFormat": "{{pod}} {{container}} - {{jvm_memory_pool_name}} - {{jvm_memory_type}}",
           "range": true,
           "refId": "A"
@@ -1016,7 +1016,7 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "jvm_memory_committed_bytes{namespace=\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
+          "expr": "jvm_memory_committed_bytes{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}",
           "legendFormat": "{{pod}} {{container}} - {{jvm_memory_pool_name}} - {{jvm_memory_type}}",
           "range": true,
           "refId": "A"
@@ -1061,9 +1061,9 @@
         "definition": "label_values(jvm_gc_duration_seconds_count,namespace)",
         "description": "K8s namespace",
         "hide": 0,
-        "includeAll": false,
+        "includeAll": true,
         "label": "Namespace",
-        "multi": false,
+        "multi": true,
         "name": "namespace",
         "options": [],
         "query": {
@@ -1092,7 +1092,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(jvm_gc_duration_seconds_count{namespace=\"$namespace\"},pod)",
+        "definition": "label_values(jvm_gc_duration_seconds_count{namespace=~\"$namespace\"},pod)",
         "description": "K8s pod",
         "hide": 0,
         "includeAll": true,
@@ -1102,7 +1102,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(jvm_gc_duration_seconds_count{namespace=\"$namespace\"},pod)",
+          "query": "label_values(jvm_gc_duration_seconds_count{namespace=~\"$namespace\"},pod)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,
@@ -1126,7 +1126,7 @@
           "type": "prometheus",
           "uid": "prometheus"
         },
-        "definition": "label_values(jvm_gc_duration_seconds_count{namespace=\"$namespace\"},container)",
+        "definition": "label_values(jvm_gc_duration_seconds_count{namespace=~\"$namespace\"},container)",
         "description": "",
         "hide": 0,
         "includeAll": true,
@@ -1136,7 +1136,7 @@
         "options": [],
         "query": {
           "qryType": 1,
-          "query": "label_values(jvm_gc_duration_seconds_count{namespace=\"$namespace\"},container)",
+          "query": "label_values(jvm_gc_duration_seconds_count{namespace=~\"$namespace\"},container)",
           "refId": "PrometheusVariableQueryEditor-VariableQuery"
         },
         "refresh": 2,

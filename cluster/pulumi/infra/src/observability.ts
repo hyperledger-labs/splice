@@ -105,7 +105,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
   const prometheusStack = new k8s.helm.v3.Release('observability-metrics', {
     name: 'prometheus-grafana-monitoring',
     chart: 'kube-prometheus-stack',
-    version: '56.20.0',
+    version: '57.1.1',
     namespace: namespaceName,
     repositoryOpts: {
       repo: 'https://prometheus-community.github.io/helm-charts',
@@ -127,7 +127,10 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
         enabled: false,
       },
       kubeScheduler: {
-        enabled: false,
+        enabled: true,
+      },
+      kubeDns: {
+        enabled: true,
       },
       kubeProxy: {
         enabled: false,
