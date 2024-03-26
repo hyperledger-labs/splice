@@ -1319,7 +1319,7 @@
         },
         "fullnameOverride": "prometheus",
         "grafana": {
-          "adminPassword": "canton_network_!password",
+          "adminPassword": "grafana-keys-admin-password",
           "adminUser": "cn-admin",
           "dashboardProviders": {
             "dashboardproviders.yaml": {

@@ -109,6 +109,12 @@ export function initDumpConfig(): void {
                 secretData: `{"nodePrivateKey": "${args.inputs.secret}-node-private-key", "validatorPrivateKey": "${args.inputs.secret}-validator-private-key"
                 , "validatorPublicKey": "${args.inputs.secret}-validator-public-key"}`,
               };
+            } else if (args.inputs.secret.startsWith('grafana-keys')) {
+              return {
+                ...args.inputs,
+                secretData: `{"adminUser": "${args.inputs.secret}-admin-user"
+                , "adminPassword": "${args.inputs.secret}-admin-password"}`,
+              };
             } else if (args.inputs.secret == 'gcp-bucket-sa-key-secret') {
               const secretData = JSON.stringify({
                 projectId: args.inputs.project,

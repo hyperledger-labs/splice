@@ -18,6 +18,11 @@ export type SvCometBftKeys = {
   validatorPublicKey: string;
 };
 
+export type GrafanaKeys = {
+  adminUser: string;
+  adminPassword: string;
+};
+
 export function svKeyFromSecret(sv: string): pulumi.Output<SvIdKey> {
   const keyJson = getSecretVersionOutput({ secret: `${sv}-id` });
   return keyJson.apply(k => {

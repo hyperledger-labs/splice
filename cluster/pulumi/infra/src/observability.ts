@@ -2,8 +2,14 @@ import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import * as fs from 'fs';
 import { local } from '@pulumi/command';
+import { getSecretVersionOutput } from '@pulumi/gcp/secretmanager/getSecretVersion';
 import { Input } from '@pulumi/pulumi';
-import { CLUSTER_BASENAME, CLUSTER_DNS_NAME, publicPrometheusRemoteWrite } from 'cn-pulumi-common';
+import {
+  CLUSTER_BASENAME,
+  CLUSTER_DNS_NAME,
+  GrafanaKeys,
+  publicPrometheusRemoteWrite,
+} from 'cn-pulumi-common';
 import { REPO_ROOT } from 'cn-pulumi-common';
 
 import { clusterBasename } from './config';
@@ -256,7 +262,7 @@ export function configureObservability(dependsOn: pulumi.Resource[] = []): void 
           },
         },
         adminUser: 'cn-admin',
-        adminPassword: 'canton_network_!password',
+        adminPassword: grafanaKeysFromSecret().adminPassword,
       },
       'kube-state-metrics': {
         fullnameOverride: 'ksm',
@@ -358,4 +364,16 @@ function createGrafanaAlerting(namespace: Input<string>) {
 
 function readFile(file: string) {
   return fs.readFileSync(`${REPO_ROOT}/cluster/pulumi/infra/grafana-alerting/${file}`, 'utf-8');
+}
+
+function grafanaKeysFromSecret(): pulumi.Output<GrafanaKeys> {
+  const keyJson = getSecretVersionOutput({ secret: 'grafana-keys' });
+  return keyJson.apply(k => {
+    const secretData = k.secretData;
+    const parsed = JSON.parse(secretData);
+    return {
+      adminUser: String(parsed.adminUser),
+      adminPassword: String(parsed.adminPassword),
+    };
+  });
 }

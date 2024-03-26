@@ -75,6 +75,21 @@
     "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
+        "expression": "\n          resource.name.endsWith(\"grafana-keys/versions/latest\")\n          ",
+        "title": "Grafana keys"
+      },
+      "role": "roles/secretmanager.secretAccessor"
+    },
+    "name": "circleci-roles/secretmanager.secretAccessor-grafana-keys-iam",
+    "provider": "",
+    "type": "gcp:projects/iAMMember:IAMMember"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "condition": {
+        "description": "(managed by Pulumi)",
         "expression": "resource.name.endsWith(\"secrets/gcp-bucket-sa-key-secret/versions/1\")",
         "title": "SA key secret"
       },
@@ -185,6 +200,41 @@
     "name": "google-managed-services-default",
     "provider": "",
     "type": "gcp:compute/globalAddress:GlobalAddress"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "secret": "undefined_id",
+      "secretData": {
+        "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
+        "value": "{\"adminUser\": \"grafana-keys-admin-user\"\n                , \"adminPassword\": \"grafana-keys-admin-password\"}"
+      }
+    },
+    "name": "grafana-keys-secretversion",
+    "provider": "",
+    "type": "gcp:secretmanager/secretVersion:SecretVersion"
+  },
+  {
+    "custom": true,
+    "id": "",
+    "inputs": {
+      "replication": {
+        "auto": {}
+      },
+      "secretId": "grafana-keys"
+    },
+    "name": "grafana-keys-secret",
+    "provider": "",
+    "type": "gcp:secretmanager/secret:Secret"
+  },
+  {
+    "custom": false,
+    "id": "",
+    "inputs": {},
+    "name": "grafana-keys",
+    "provider": "",
+    "type": "cn:gcp:ImportedSecret"
   },
   {
     "custom": true,
