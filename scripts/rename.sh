@@ -1,4 +1,4 @@
-#! /bin/bash
+#!/usr/bin/env bash
 
 SUBCOMMAND_NAME="$1"
 shift
@@ -349,7 +349,7 @@ function subcmd_internal_coin_amulet_rename() {
   # manually once the time is ripe.
   rename "coin to amulet" \
     "'(?<!([Cc]anton ))(\b|(?<=[_-]))coin(\b|(?=([A-Z0-9_-]|rules|operation|s\b|s[A-Z0-9_]|config\b|price\b)))///amulet'" \
-    ""
+    "" \
     "$IGNORE_DOCS_RST"
   rename "createdcoin to createdamulet" \
     "'\bcreatedcoin\b///createdamulet'" \
