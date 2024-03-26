@@ -86,7 +86,7 @@ class MergeMemberTrafficContractsTrigger(
         .yieldResult()
     } yield TaskSuccess(
       s"Merged ${memberTraffics.length} member traffic contracts for member $memberId on domain ${dsoRules.domain} " +
-        s"into contract ${outcome.exerciseResult.contractId}"
+        s"into contract ${outcome.exerciseResult.memberTraffic.contractId}"
     )
   }
 

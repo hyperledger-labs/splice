@@ -197,8 +197,9 @@ testSvOnboardingRequestExpiry = do
   let token = "mock-token"
 
   -- sv2 (not the leader) initiates the onboarding of the new sv
-  svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+  result <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
     DsoRules_StartSvOnboarding "svX" svX "svX-participant-id" token sv2
+  let svOnboardingRequestCid = result.onboardingRequest
 
   -- leader tries to expire the onboarding, but it's too early
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
@@ -210,6 +211,8 @@ testSvOnboardingRequestExpiry = do
   -- leader expires the onboarding
   leaderSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireSvOnboardingRequest svOnboardingRequestCid
+
+  pure ()
 
 
 testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember : Script ()
@@ -224,8 +227,9 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
   let token = "mock-token"
 
   -- sv2 (not the leader) initiates the onboarding of the new sv
-  svOnboardingRequestCid <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
+  onboardingResult <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
     DsoRules_StartSvOnboarding "svX" svX "svx-participant-id" token sv2
+  let svOnboardingRequestCid = onboardingResult.onboardingRequest
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 

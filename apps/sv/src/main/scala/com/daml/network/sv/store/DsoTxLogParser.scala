@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation
 import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_CloseVoteRequest,
-  VoteRequestResult,
+  DsoRules_CloseVoteRequestResult,
 }
 import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.daml.network.store.TxLogStore
@@ -94,7 +94,7 @@ object DsoTxLogParser {
   object State {
 
     def fromCloseVoteRequest(
-        node: ExerciseNode[DsoRules_CloseVoteRequest, VoteRequestResult]
+        node: ExerciseNode[DsoRules_CloseVoteRequest, DsoRules_CloseVoteRequestResult]
     ): State = {
       State(
         immutable.Queue(

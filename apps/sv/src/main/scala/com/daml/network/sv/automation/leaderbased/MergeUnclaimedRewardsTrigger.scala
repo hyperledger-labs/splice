@@ -77,7 +77,7 @@ class MergeUnclaimedRewardsTrigger(
       res
         .map(cid => {
           TaskSuccess(
-            s"Merged unclaimed rewards into contract ${cid.exerciseResult.contractId}"
+            s"Merged unclaimed rewards into contract ${cid.exerciseResult.unclaimedReward.contractId}"
           )
         })
         .getOrElse(TaskSuccess(s"Not enough unclaimed rewards to merge"))

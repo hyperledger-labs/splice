@@ -24,7 +24,7 @@ import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRules_ConfirmSvOnboarding,
   VoteRequest,
-  VoteRequestResult,
+  DsoRules_CloseVoteRequestResult,
 }
 import com.daml.network.codegen.java.splice.svonboarding as so
 import com.daml.network.codegen.java.splice.wallet.subscriptions as sub
@@ -95,7 +95,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[VoteRequestResult]]
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]]
 
   def lookupDsoRules()(implicit
       tc: TraceContext

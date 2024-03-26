@@ -65,15 +65,16 @@ object TxLogEntry extends StoreErrors {
 
     protected implicit val voteRequestResultType: TypeMapper[
       com.google.protobuf.struct.Struct,
-      com.daml.network.codegen.java.splice.dsorules.VoteRequestResult,
+      com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult,
     ] =
       TypeMapper[
         com.google.protobuf.struct.Struct,
-        com.daml.network.codegen.java.splice.dsorules.VoteRequestResult,
+        com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult,
       ](x => {
         val javaProto = com.google.protobuf.struct.Struct.toJavaProto(x)
         val string = com.google.protobuf.util.JsonFormat.printer().print(javaProto)
-        com.daml.network.codegen.java.splice.dsorules.VoteRequestResult.fromJson(string)
+        com.daml.network.codegen.java.splice.dsorules.DsoRules_CloseVoteRequestResult
+          .fromJson(string)
       })(x => {
         val string = x.toJson
         val builder = com.google.protobuf.Struct.newBuilder()

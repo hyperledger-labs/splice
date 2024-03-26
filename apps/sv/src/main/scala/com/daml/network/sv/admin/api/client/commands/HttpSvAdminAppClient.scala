@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.splice.dso.amuletprice.AmuletPriceVote
 import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   VoteRequest,
-  VoteRequestResult,
+  DsoRules_CloseVoteRequestResult,
 }
 import com.daml.network.codegen.java.splice.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -280,7 +280,7 @@ object HttpSvAdminAppClient {
       effectiveTo: Option[String],
       limit: BigInt,
   )() extends BaseCommand[http.ListVoteRequestResultsResponse, Seq[
-        VoteRequestResult
+        DsoRules_CloseVoteRequestResult
       ]] {
 
     override def submitRequest(
@@ -306,10 +306,10 @@ object HttpSvAdminAppClient {
         response.dsoRulesVoteResults
           .map(e =>
             decoder.decodeValue(
-              VoteRequestResult.valueDecoder(),
-              VoteRequestResult._packageId,
+              DsoRules_CloseVoteRequestResult.valueDecoder(),
+              DsoRules_CloseVoteRequestResult._packageId,
               "Splice.DsoRules",
-              "VoteRequestResult",
+              "DsoRules_CloseVoteRequestResult",
             )(e)
           )
           .toSeq

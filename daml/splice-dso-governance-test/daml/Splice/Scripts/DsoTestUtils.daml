@@ -219,13 +219,14 @@ runNextIssuanceD app amuletPrice = do
     -- set the new agreed price. This should be done with confirmation
     amuletPriceVoteCids <- updateAgreedAmuletPrice app.dso amuletPrice
 
-    (summarizingRoundCid, _) <- leaderSubmits app $ \cid -> exerciseCmd cid $
+    advanceResult <- leaderSubmits app $ \cid -> exerciseCmd cid $
         DsoRules_AdvanceOpenMiningRounds with
           amuletRulesCid
           roundToArchiveCid
           middleRoundCid = r2Cid
           latestRoundCid = r3Cid
           amuletPriceVoteCids
+    let summarizingRoundCid = advanceResult.summarizingRound
 
     -- compute total burn
     appRewardCoupons <- queryFilter @AppRewardCoupon app.dso (\bc -> bc.round == roundToArchive.round)
@@ -312,16 +313,17 @@ initiateAndAcceptVote app (initiator::others) action = do
       action
       reason = Reason with url = ""; body = "let's get it done"
       voteRequestTimeout = None
-    foldlA (castVote dsoRulesCid) requestCid others
+    foldlA (castVote dsoRulesCid) requestCid.voteRequest others
     executeAllDefinitiveVotes app
   where
     castVote dsoRulesCid requestCid sv = do
-      submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+      result <- submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
           requestCid
           vote = Vote with
             sv
             accept = True
             reason = Reason with url = ""; body = "✓"
+      return result.voteRequest
 
 
 -- | Update all currently desired prices to the target price
@@ -356,11 +358,12 @@ setDomainNodeConfig : AmuletApp -> Party -> Text -> DomainNodeConfig -> Script (
 setDomainNodeConfig app sv domainId newNodeConfig = do
   (nodeStateCid, _) <- getSvNodeState app sv
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
-  submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_SetDomainNodeConfig with
+  result <- submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_SetDomainNodeConfig with
     sv
     domainId
     nodeStateCid
     newNodeConfig
+  pure result.svNodeState
 
 -- Pure utility functions
 -------------------------

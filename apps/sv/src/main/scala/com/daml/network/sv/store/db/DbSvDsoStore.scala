@@ -1200,7 +1200,7 @@ class DbSvDsoStore(
       limit: Limit = Limit.DefaultLimit,
   )(implicit
       tc: TraceContext
-  ): Future[Seq[VoteRequestResult]] = {
+  ): Future[Seq[DsoRules_CloseVoteRequestResult]] = {
     val dbType = EntryType.VoteRequestTxLogEntry
     val actionNameCondition = actionName match {
       case Some(actionName) =>

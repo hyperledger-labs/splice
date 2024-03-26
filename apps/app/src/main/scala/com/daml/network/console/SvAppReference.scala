@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.splice.dso.amuletprice as cp
 import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   VoteRequest,
-  VoteRequestResult,
+  DsoRules_CloseVoteRequestResult,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.NetworkAppClientConfig
@@ -24,8 +24,8 @@ import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.topology.{ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import org.apache.pekko.actor.ActorSystem
-import scala.jdk.OptionConverters.*
 
+import scala.jdk.OptionConverters.*
 import java.time.Instant
 import scala.concurrent.duration.FiniteDuration
 
@@ -198,7 +198,7 @@ abstract class SvAppReference(
       effectiveFrom: Option[String],
       effectiveTo: Option[String],
       limit: BigInt,
-  ): Seq[VoteRequestResult] = {
+  ): Seq[DsoRules_CloseVoteRequestResult] = {
     consoleEnvironment.run {
       httpCommand(
         HttpSvAdminAppClient.ListVoteRequestResults(

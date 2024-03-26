@@ -4,14 +4,14 @@ import com.daml.ledger.javaapi.data.Value
 import com.daml.network.codegen.java.splice.dsorules.{
   DsoRules,
   DsoRules_CloseVoteRequest,
-  VoteRequestResult,
+  DsoRules_CloseVoteRequestResult,
 }
 import com.daml.network.util.ExerciseNodeCompanion
 
 object DsoRulesCloseVoteRequest extends ExerciseNodeCompanion {
   override type Tpl = DsoRules
   override type Arg = DsoRules_CloseVoteRequest
-  override type Res = VoteRequestResult
+  override type Res = DsoRules_CloseVoteRequestResult
 
   override val template = DsoRules.COMPANION
 
@@ -20,6 +20,6 @@ object DsoRulesCloseVoteRequest extends ExerciseNodeCompanion {
   override val argDecoder = DsoRules_CloseVoteRequest.valueDecoder()
   override def argToValue(a: Arg) = a.toValue
 
-  override val resDecoder = VoteRequestResult.valueDecoder()
+  override val resDecoder = DsoRules_CloseVoteRequestResult.valueDecoder()
   override def resToValue(r: Res): Value = r.toValue
 }

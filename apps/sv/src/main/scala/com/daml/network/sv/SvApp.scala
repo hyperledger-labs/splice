@@ -992,7 +992,7 @@ object SvApp {
             } yield res,
             logger,
           )
-        } yield Right(res.exerciseResult)
+        } yield Right(res.exerciseResult.voteRequest)
       }
   }
 

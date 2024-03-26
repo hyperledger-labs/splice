@@ -130,6 +130,108 @@ data CollectiveSummary = CollectiveSummary with
     -- a leader election definitive.
   deriving (Eq, Show)
 
+-- | Choice return types
+-------------------------
+-- In order to support upgrades of the Daml models, all choices should return records, which can
+-- then be extended in future versions.
+
+data Confirmation_ExpireResult = Confirmation_ExpireResult
+
+data DsoRules_AddMemberResult = DsoRules_AddMemberResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_OffboardMemberResult = DsoRules_OffboardMemberResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_SubmitStatusReportResult = DsoRules_SubmitStatusReportResult with
+    newReport : ContractId SvStatusReport
+
+data DsoRules_AddConfirmedMemberResult = DsoRules_AddConfirmedMemberResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_SetDomainNodeConfigResult = DsoRules_SetDomainNodeConfigResult with
+    svNodeState : ContractId SvNodeState
+
+data DsoRules_RequestElectionResult = DsoRules_RequestElectionResult with
+    electionRequestCid : ContractId ElectionRequest
+
+data DsoRules_ElectLeaderResult = DsoRules_ElectLeaderResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_ArchiveOutdatedElectionRequestResult = DsoRules_ArchiveOutdatedElectionRequestResult
+
+data DsoRules_ConfirmActionResult = DsoRules_ConfirmActionResult with
+    confirmation : ContractId Confirmation
+
+data DsoRules_ExecuteConfirmedActionResult = DsoRules_ExecuteConfirmedActionResult
+
+data DsoRules_ExpireStaleConfirmationResult = DsoRules_ExpireStaleConfirmationResult
+
+data DsoRules_RequestVoteResult = DsoRules_RequestVoteResult with
+    voteRequest : ContractId VoteRequest
+
+data DsoRules_CastVoteResult = DsoRules_CastVoteResult with
+    voteRequest : ContractId VoteRequest
+
+data DsoRules_UpdateAmuletPriceVoteResult = DsoRules_UpdateAmuletPriceVoteResult with
+    amuletPriceVote : ContractId AmuletPriceVote
+
+data DsoRules_GarbageCollectAmuletPriceVotesResult = DsoRules_GarbageCollectAmuletPriceVotesResult
+
+data DsoRules_SetConfigResult = DsoRules_SetConfigResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_GrantFeaturedAppRightResult = DsoRules_GrantFeaturedAppRightResult with
+    featuredAppRight : ContractId FeaturedAppRight
+
+data DsoRules_RevokeFeaturedAppRightResult = DsoRules_RevokeFeaturedAppRightResult
+
+data DsoRules_OnboardValidatorResult = DsoRules_OnboardValidatorResult with
+    validatorLicense : ContractId ValidatorLicense
+
+data DsoRules_StartSvOnboardingResult = DsoRules_StartSvOnboardingResult with
+    onboardingRequest : ContractId SvOnboardingRequest
+
+data DsoRules_ExpireSvOnboardingRequestResult = DsoRules_ExpireSvOnboardingRequestResult
+
+data DsoRules_ArchiveSvOnboardingRequestResult = DsoRules_ArchiveSvOnboardingRequestResult
+
+data DsoRules_ConfirmSvOnboardingResult = DsoRules_ConfirmSvOnboardingResult with
+    onboardingConfirmed : ContractId SvOnboardingConfirmed
+
+data DsoRules_ExpireSvOnboardingConfirmedResult = DsoRules_ExpireSvOnboardingConfirmedResult with
+    newDsoRules : ContractId DsoRules
+
+data DsoRules_AdvanceOpenMiningRoundsResult = DsoRules_AdvanceOpenMiningRoundsResult with
+    summarizingRound: ContractId SummarizingMiningRound
+    openRound : ContractId OpenMiningRound
+
+data DsoRules_CollectEntryRenewalPaymentResult = DsoRules_CollectEntryRenewalPaymentResult with
+    ansEntry : ContractId AnsEntry
+    subscriptionState : ContractId SubscriptionIdleState
+
+data DsoRules_ExpireAnsEntryResult = DsoRules_ExpireAnsEntryResult
+
+data DsoRules_ExpireSubscriptionResult = DsoRules_ExpireSubscriptionResult
+
+data DsoRules_TerminateSubscriptionResult = DsoRules_TerminateSubscriptionResult
+
+data DsoRules_ReceiveSvRewardCouponResult = DsoRules_ReceiveSvRewardCouponResult with
+    memberRewardState : ContractId MemberRewardState
+    svRewardCoupons : [ContractId SvRewardCoupon]
+
+data DsoRules_ClaimExpiredRewardsResult = DsoRules_ClaimExpiredRewardsResult with
+    unclaimedReward: Optional (ContractId UnclaimedReward)
+
+data DsoRules_MergeUnclaimedRewardsResult = DsoRules_MergeUnclaimedRewardsResult with
+    unclaimedReward: ContractId UnclaimedReward
+
+data DsoRules_MiningRound_CloseResult = DsoRules_MiningRound_CloseResult with
+    closedRound : ContractId ClosedMiningRound
+
+data DsoRules_MergeMemberTrafficContractsResult = DsoRules_MergeMemberTrafficContractsResult with
+    memberTraffic : ContractId MemberTraffic
+
 
 -- Workflow templates
 ---------------------
@@ -173,10 +275,11 @@ template Confirmation with
     -- As for 'ElectionRequest' we only make the 'dso' a signatory.
     signatory dso
 
-    choice Confirmation_Expire : ()
+    choice Confirmation_Expire : Confirmation_ExpireResult
       controller dso
       do now <- getTime
          require "Contract has expired" (expiresAt <= now)
+         return Confirmation_ExpireResult
 
 -- | A request for the other members to vote on the execution of an action requiring confirmation.
 -- We use this for implementing on-ledger governance actions triggered by SV operators in a uniform way.
@@ -204,7 +307,7 @@ template VoteRequest
   where
     signatory dso
 
-data VoteRequestResult = VoteRequestResult with
+data DsoRules_CloseVoteRequestResult = DsoRules_CloseVoteRequestResult with
     request : VoteRequest -- ^ The original vote request.
     completedAt : Time -- ^ When the vote request was completed.
     offboardedVoters : [Text] -- ^ Members that voted but were offboarded before the vote completed.
@@ -292,7 +395,7 @@ template DsoRules with
     -- Membership management
     ------------------------
 
-    choice DsoRules_AddMember : ContractId DsoRules
+    choice DsoRules_AddMember : DsoRules_AddMemberResult
       with
         newMemberParty : Party
         newMemberName : Text
@@ -300,9 +403,10 @@ template DsoRules with
         newMemberParticipantId : Text
         joinedAsOfRound : Round
       controller dso
-      do dsoRules_addMember this arg
+      do newDsoRules <- dsoRules_addMember this arg
+         return DsoRules_AddMemberResult with ..
 
-    choice DsoRules_OffboardMember : ContractId DsoRules
+    choice DsoRules_OffboardMember : DsoRules_OffboardMemberResult
       with
         member : Party
       controller dso
@@ -324,7 +428,7 @@ template DsoRules with
                     name = info.name
                     participantId = info.participantId
             -- create the new rules contract
-            create DsoRules with
+            newDsoRules <- create DsoRules with
               dso
               epoch = newEpoch
               leader = newLeader
@@ -334,15 +438,17 @@ template DsoRules with
               initialTrafficState
               isDevNet
 
+            return DsoRules_OffboardMemberResult with ..
+
     -- Update an SV's Status report
-    nonconsuming choice DsoRules_SubmitStatusReport : ContractId SvStatusReport
+    nonconsuming choice DsoRules_SubmitStatusReport : DsoRules_SubmitStatusReportResult
       with
         sv : Party
         previousReportCid : ContractId SvStatusReport
         status : SvStatus
       controller sv
       do
-        case Map.lookup sv members of
+        newReport <- case Map.lookup sv members of
           None -> fail "SV is not a collective member"
           Some info -> do
             previousReport <- fetchAndArchive (ForSvNode with dso; sv; svName = info.name) previousReportCid
@@ -352,11 +458,12 @@ template DsoRules with
               svName = info.name
               number = previousReport.number + 1
               status = Some status
+        return DsoRules_SubmitStatusReportResult with ..
 
     -- Called by SV candidates to add themselves to the DsoRules once they are confirmed and ready.
     -- We use the passed rounds for reliably determining the earliest open round, which will be
     -- the first round in which the new SV will receive rewards.
-    nonconsuming choice DsoRules_AddConfirmedMember : ContractId DsoRules
+    nonconsuming choice DsoRules_AddConfirmedMember : DsoRules_AddConfirmedMemberResult
       with
         sv : Party
         svOnboardingConfirmedCid : ContractId SvOnboardingConfirmed
@@ -376,19 +483,22 @@ template DsoRules with
         require "middleRound is one after earliestRound" (middleRound.round.number == earliestRound.round.number + 1)
         require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
 
-        exercise self DsoRules_AddMember with
+        addMemberResult <- exercise self DsoRules_AddMember with
           newMemberParty = sv
           newMemberName = svOnboardingConfirmed.svName
           newMemberRewardWeight = svOnboardingConfirmed.svRewardWeight
           newMemberParticipantId = svOnboardingConfirmed.svParticipantId
           joinedAsOfRound = earliestRound.round
 
+        return DsoRules_AddConfirmedMemberResult with
+          newDsoRules = addMemberResult.newDsoRules
+
 
     -- Global domain config management
     -----------------------------------
 
     -- Every SV can change their own domain node's config within the configured limits.
-    nonconsuming choice DsoRules_SetDomainNodeConfig : ContractId SvNodeState
+    nonconsuming choice DsoRules_SetDomainNodeConfig : DsoRules_SetDomainNodeConfigResult
       with
         sv : Party
         domainId : Text
@@ -407,15 +517,16 @@ template DsoRules with
         let svName = info.name
         nodeState <- fetchAndArchive (ForSvNode with dso; sv; svName) nodeStateCid
         let state = nodeState.state
-        create nodeState with
+        svNodeState <- create nodeState with
           state = state with
             domainNodes = Map.insert domainId newNodeConfig state.domainNodes
+        return DsoRules_SetDomainNodeConfigResult with ..
 
 
     -- Automation leader election
     ------------------------------
     -- TODO(#7649) revise and/or remove
-    nonconsuming choice DsoRules_RequestElection : ContractId ElectionRequest
+    nonconsuming choice DsoRules_RequestElection : DsoRules_RequestElectionResult
       with
         requester : Party
         reason: ElectionRequestReason
@@ -425,11 +536,12 @@ template DsoRules with
         -- TODO(#7649): consider interaction with concurrent membership changes
         require "Requester is a collective member" (requester `Map.member` members)
         require "All members are ranked exactly once" (sort ranking == sort (Map.keys members))
-        create ElectionRequest with
+        electionRequestCid <- create ElectionRequest with
           ..
+        return DsoRules_RequestElectionResult with ..
 
     -- TODO(#7649) revise and/or remove
-    choice DsoRules_ElectLeader : DsoRules
+    choice DsoRules_ElectLeader : DsoRules_ElectLeaderResult
       with
         actor : Party
         requestCids : [ContractId ElectionRequest]
@@ -451,23 +563,23 @@ template DsoRules with
         require "There are enough requests" (numVotes >= summary.requiredNumVotes)
         let rankings = [ (req.requester, req.ranking) | req <- reqs ]
             newLeader = instantRunOffVoting numVotesForMajority (numVoters - 1) rankings
-        let newDsoRules = DsoRules with epoch = epoch + 1, leader = newLeader, ..
-        create newDsoRules
-        pure newDsoRules
+        newDsoRules <- create DsoRules with epoch = epoch + 1, leader = newLeader, ..
+        return DsoRules_ElectLeaderResult with ..
 
-    nonconsuming choice DsoRules_ArchiveOutdatedElectionRequest : ()
+    nonconsuming choice DsoRules_ArchiveOutdatedElectionRequest : DsoRules_ArchiveOutdatedElectionRequestResult
       with
         requestCid : ContractId ElectionRequest
       controller leader
       do
         request <- fetchAndArchive (ForDso with dso) requestCid
         require "Election request is outdated" (request.epoch < epoch)
+        return DsoRules_ArchiveOutdatedElectionRequestResult
 
 
     -- Executing actions with confirmation
     --------------------------------------
 
-    nonconsuming choice DsoRules_ConfirmAction : ContractId Confirmation
+    nonconsuming choice DsoRules_ConfirmAction : DsoRules_ConfirmActionResult
       with
         confirmer : Party
         action : ActionRequiringConfirmation
@@ -476,13 +588,14 @@ template DsoRules with
         require "Confirmer is a collective member" (confirmer `Map.member` members)
         now <- getTime
         let expiresAt = now `addRelTime` config.actionConfirmationTimeout
-        create Confirmation with
+        confirmation <- create Confirmation with
           dso
           confirmer
           action
           expiresAt
+        return DsoRules_ConfirmActionResult with ..
 
-    nonconsuming choice DsoRules_ExecuteConfirmedAction : ()
+    nonconsuming choice DsoRules_ExecuteConfirmedAction : DsoRules_ExecuteConfirmedActionResult
       with
         action : ActionRequiringConfirmation
         amuletRulesCid : Optional( ContractId AmuletRules )
@@ -499,13 +612,14 @@ template DsoRules with
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
         executeActionRequiringConfirmation self amuletRulesCid action
+        return DsoRules_ExecuteConfirmedActionResult
 
 
     -- Voting as part of on-ledger governance (version 2)
     -----------------------------------------------------
 
     -- TODO(#9317): rate limit inidiviual SVs wrt requesting votes
-    nonconsuming choice DsoRules_RequestVote : ContractId VoteRequest
+    nonconsuming choice DsoRules_RequestVote : DsoRules_RequestVoteResult
       with
         requester : Party
         action : ActionRequiringConfirmation
@@ -528,7 +642,7 @@ template DsoRules with
               sv = requester
               accept = True
               reason = Reason with url = ""; body = "I accept, as I requested the vote."
-        create VoteRequest with
+        voteRequest <- create VoteRequest with
           dso
           requester = requesterName
           action
@@ -536,11 +650,12 @@ template DsoRules with
           voteBefore
           votes = Map.fromList [(requesterName, requesterVote)]
           trackingCid = None
+        return DsoRules_RequestVoteResult with ..
 
 
     -- Note that this choice can be used to both cast the initial vote, and update a vote.
     -- TODO(#9319): rate limit SVs wrt updating their votes
-    nonconsuming choice DsoRules_CastVote : ContractId VoteRequest
+    nonconsuming choice DsoRules_CastVote : DsoRules_CastVoteResult
       with
         requestCid : ContractId VoteRequest
         vote : Vote
@@ -556,13 +671,14 @@ template DsoRules with
         request <- fetchAndArchive (ForDso with dso) requestCid
         require "request is open" (now < request.voteBefore)
         -- store vote
-        create request with
+        voteRequest <- create request with
           votes = Map.insert voterName vote request.votes
           trackingCid = Some (fromOptional requestCid request.trackingCid)
+        return DsoRules_CastVoteResult with ..
 
     -- We expect the TxHistory log of the SV app to store the choice argument together
     -- with its result for historical reference.
-    nonconsuming choice DsoRules_CloseVoteRequest : VoteRequestResult
+    nonconsuming choice DsoRules_CloseVoteRequest : DsoRules_CloseVoteRequestResult
       with
         requestCid : ContractId VoteRequest
         amuletRulesCid : Optional (ContractId AmuletRules)
@@ -606,7 +722,7 @@ template DsoRules with
             all (\m -> Some m == memberBeingOffboarded || m `Map.member` request.votes) activeMembers
           require "The outcome must be determined allow early closing" (outcome /= VRO_Expired)
         -- report the result
-        pure VoteRequestResult with
+        pure DsoRules_CloseVoteRequestResult with
             request
             completedAt = now
             offboardedVoters
@@ -617,7 +733,7 @@ template DsoRules with
     -- Voting on the amulet price
     ---------------------------
 
-    nonconsuming choice DsoRules_UpdateAmuletPriceVote : ContractId AmuletPriceVote
+    nonconsuming choice DsoRules_UpdateAmuletPriceVote : DsoRules_UpdateAmuletPriceVoteResult
       with
         sv : Party
         voteCid : ContractId AmuletPriceVote
@@ -627,11 +743,12 @@ template DsoRules with
         void $ fetchAndArchive (ForOwner with dso; owner = sv) voteCid
         now <- getTime
         -- create new vote
-        create AmuletPriceVote with
+        amuletPriceVote <- create AmuletPriceVote with
           dso
           sv
           amuletPrice = Some amuletPrice
           lastUpdatedAt = now
+        return DsoRules_UpdateAmuletPriceVoteResult with ..
 
     -- | Garbage-collect AmuletPriceVotes from removed members and duplicate ones that might
     -- happen due to a too quick removal and re-addition of a member.
@@ -641,7 +758,7 @@ template DsoRules with
     -- as that would allow that member to block the removal via updating its AmuletPriceVote at the right time.
     --
     -- TODO(#10063): drop this code in favor of just keeping AmuletPriceVotes around.
-    nonconsuming choice DsoRules_GarbageCollectAmuletPriceVotes : ()
+    nonconsuming choice DsoRules_GarbageCollectAmuletPriceVotes : DsoRules_GarbageCollectAmuletPriceVotesResult
       with
         nonMemberVoteCids : [ContractId AmuletPriceVote]
         duplicateVoteCids : [[ContractId AmuletPriceVote]]
@@ -671,44 +788,48 @@ template DsoRules with
                 potentiallyUnsafeArchive duplicateCid
                 require "DSO matches" (duplicate.dso == dso)
                 require "SV of duplicate matches" (duplicate.sv == vote.sv)
+        return DsoRules_GarbageCollectAmuletPriceVotesResult
 
 
     -- DSO rules config management
     ------------------------------
 
-    choice DsoRules_SetConfig : ContractId DsoRules
+    choice DsoRules_SetConfig : DsoRules_SetConfigResult
       with
         newConfig : DsoRulesConfig
       controller dso
       do
-        -- TODO(M3-57): sanity check the newConfig to avoid locking up operations, e.g., by setting `maxTextLength = -1`
-        create this with config = newConfig
+        -- TODO(M3-57): sanity check the newConfig to avoid locking up the consortium, e.g., by setting `maxTextLength = -1`
+        newDsoRules <- create this with config = newConfig
+        return DsoRules_SetConfigResult with ..
 
 
     -- App rights management
     ------------------------
 
-    nonconsuming choice DsoRules_GrantFeaturedAppRight : ContractId FeaturedAppRight
+    nonconsuming choice DsoRules_GrantFeaturedAppRight : DsoRules_GrantFeaturedAppRightResult
       with
         provider : Party
       controller dso
       do
-        create FeaturedAppRight with
+        featuredAppRight <- create FeaturedAppRight with
           dso
           provider
+        return DsoRules_GrantFeaturedAppRightResult with ..
 
-    nonconsuming choice DsoRules_RevokeFeaturedAppRight : ()
+    nonconsuming choice DsoRules_RevokeFeaturedAppRight : DsoRules_RevokeFeaturedAppRightResult
       with
         rightCid : ContractId FeaturedAppRight
       controller dso
       do
         void $ fetchAndArchive (ForDso with dso) rightCid
+        return DsoRules_RevokeFeaturedAppRightResult
 
 
     -- Validator onboarding
     -----------------------
 
-    nonconsuming choice DsoRules_OnboardValidator : ContractId ValidatorLicense
+    nonconsuming choice DsoRules_OnboardValidator : DsoRules_OnboardValidatorResult
       with
         sponsor : Party
         validator : Party
@@ -716,17 +837,18 @@ template DsoRules with
       do
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         -- create license that records in particular which SV sponsored the onboarding of the validator
-        create ValidatorLicense with
+        validatorLicense <- create ValidatorLicense with
           dso
           sponsor
           validator
           faucetState = None
+        return DsoRules_OnboardValidatorResult with ..
 
 
     -- SV onboarding
     ----------------
 
-    nonconsuming choice DsoRules_StartSvOnboarding : ContractId SvOnboardingRequest
+    nonconsuming choice DsoRules_StartSvOnboarding : DsoRules_StartSvOnboardingResult
       with
         candidateName : Text
         candidateParty : Party
@@ -738,16 +860,18 @@ template DsoRules with
         require "Sponsor is a collective member" (sponsor `Map.member` members)
         now <- getTime
         let expiresAt = now `addRelTime` config.svOnboardingRequestTimeout
-        create SvOnboardingRequest with ..
+        onboardingRequest <- create SvOnboardingRequest with ..
+        return DsoRules_StartSvOnboardingResult with ..
 
-    nonconsuming choice DsoRules_ExpireSvOnboardingRequest : ()
+    nonconsuming choice DsoRules_ExpireSvOnboardingRequest : DsoRules_ExpireSvOnboardingRequestResult
       with
         cid: ContractId SvOnboardingRequest
       controller leader
       do
         exercise cid SvOnboardingRequest_Expire
+        return DsoRules_ExpireSvOnboardingRequestResult
 
-    nonconsuming choice DsoRules_ArchiveSvOnboardingRequest : ()
+    nonconsuming choice DsoRules_ArchiveSvOnboardingRequest : DsoRules_ArchiveSvOnboardingRequestResult
       with
         svOnboardingRequestCid: ContractId SvOnboardingRequest
       controller leader
@@ -758,8 +882,9 @@ template DsoRules with
         let maybeMember = Map.lookup svOnboardingRequest.candidateParty members
         require "member party is already added to the DSO collective" (isSome maybeMember)
         require "member name matches" ((fromSome maybeMember).name == svOnboardingRequest.candidateName)
+        return DsoRules_ArchiveSvOnboardingRequestResult
 
-    nonconsuming choice DsoRules_ConfirmSvOnboarding : ContractId SvOnboardingConfirmed
+    nonconsuming choice DsoRules_ConfirmSvOnboarding : DsoRules_ConfirmSvOnboardingResult
       with
         newMemberParty : Party
         newMemberName : Text
@@ -775,7 +900,7 @@ template DsoRules with
           else pure ()
         now <- getTime
         let expiresAt = now `addRelTime` config.svOnboardingConfirmedTimeout
-        create SvOnboardingConfirmed with
+        onboardingConfirmed <- create SvOnboardingConfirmed with
           svParty = newMemberParty
           svName = newMemberName
           svRewardWeight = newMemberRewardWeight
@@ -783,8 +908,9 @@ template DsoRules with
           reason
           dso
           expiresAt
+        return DsoRules_ConfirmSvOnboardingResult with ..
 
-    choice DsoRules_ExpireSvOnboardingConfirmed : ContractId DsoRules
+    choice DsoRules_ExpireSvOnboardingConfirmed : DsoRules_ExpireSvOnboardingConfirmedResult
       with
         cid: ContractId SvOnboardingConfirmed
       controller leader
@@ -796,8 +922,9 @@ template DsoRules with
         let offboardingInfo = OffboardedMemberInfo with
               name = svOnboardingConfirmed.svName
               participantId = svOnboardingConfirmed.svParticipantId
-        create this with
+        newDsoRules <- create this with
           offboardedMembers = Map.insert sv offboardingInfo offboardedMembers
+        return DsoRules_ExpireSvOnboardingConfirmedResult with ..
 
 
     -- Amulet management driven directly by the leader
@@ -823,8 +950,7 @@ template DsoRules with
     -- Round management driven directly by the leader
     -------------------------------------------------
 
-    nonconsuming choice DsoRules_AdvanceOpenMiningRounds
-      : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
+    nonconsuming choice DsoRules_AdvanceOpenMiningRounds : DsoRules_AdvanceOpenMiningRoundsResult
       with
         amuletRulesCid : ContractId AmuletRules
         roundToArchiveCid : ContractId OpenMiningRound
@@ -835,31 +961,35 @@ template DsoRules with
       do
         amuletPrice <- fetchMedianAmuletPrice dso (Map.keys members) amuletPriceVoteCids
         result <- exercise amuletRulesCid AmuletRules_AdvanceOpenMiningRounds with ..
-        return (result.summarizingRoundCid, result.openRoundCid)
+        return DsoRules_AdvanceOpenMiningRoundsResult with
+          summarizingRound = result.summarizingRoundCid
+          openRound = result.openRoundCid
 
 
     -- ANS entry and payment management driven directly by the leader
     -----------------------------------------------
 
-    nonconsuming choice DsoRules_CollectEntryRenewalPayment : (ContractId AnsEntry, ContractId SubscriptionIdleState)
+    nonconsuming choice DsoRules_CollectEntryRenewalPayment : DsoRules_CollectEntryRenewalPaymentResult
       with
         ansEntryContextCid : ContractId AnsEntryContext
         choiceArg : AnsEntryContext_CollectEntryRenewalPayment
       controller leader
       do
         summary <- exercise ansEntryContextCid choiceArg
-        return (summary.entryCid, summary.subscriptionStateCid)
+        return DsoRules_CollectEntryRenewalPaymentResult with
+          ansEntry = summary.entryCid
+          subscriptionState = summary.subscriptionStateCid
 
-    nonconsuming choice DsoRules_ExpireAnsEntry : ()
+    nonconsuming choice DsoRules_ExpireAnsEntry : DsoRules_ExpireAnsEntryResult
       with
         ansEntryCid : ContractId AnsEntry
         choiceArg : AnsEntry_Expire
       controller leader
       do
         exercise ansEntryCid choiceArg
-        pure ()
+        pure DsoRules_ExpireAnsEntryResult
 
-    nonconsuming choice DsoRules_ExpireSubscription : ()
+    nonconsuming choice DsoRules_ExpireSubscription : DsoRules_ExpireSubscriptionResult
       with
         ansEntryContextCid : ContractId AnsEntryContext
         subscriptionIdleStateCid: ContractId SubscriptionIdleState
@@ -868,23 +998,22 @@ template DsoRules with
       do
         aborted <- exercise subscriptionIdleStateCid choiceArg
         exercise ansEntryContextCid (AnsEntryContext_Terminate dso aborted)
-        pure ()
+        pure DsoRules_ExpireSubscriptionResult
 
-    nonconsuming choice DsoRules_TerminateSubscription : ()
+    nonconsuming choice DsoRules_TerminateSubscription : DsoRules_TerminateSubscriptionResult
       with
         ansEntryContextCid : ContractId AnsEntryContext
         terminatedSubscriptionCid : ContractId TerminatedSubscription
       controller leader
       do
         exercise ansEntryContextCid (AnsEntryContext_Terminate dso terminatedSubscriptionCid)
-        pure ()
+        pure DsoRules_TerminateSubscriptionResult
 
 
     -- Reward management driven directly by the leader
     --------------------------------------------------
 
-    nonconsuming choice DsoRules_ReceiveSvRewardCoupon
-      : (ContractId MemberRewardState, [ContractId SvRewardCoupon])
+    nonconsuming choice DsoRules_ReceiveSvRewardCoupon : DsoRules_ReceiveSvRewardCouponResult
       with
         sv : Party
         openRoundCid : ContractId OpenMiningRound
@@ -928,24 +1057,25 @@ template DsoRules with
                 weight
                 round = openRound.round
 
-            return (newRewardStateCid, couponCids)
+            return DsoRules_ReceiveSvRewardCouponResult with
+                memberRewardState = newRewardStateCid
+                svRewardCoupons = couponCids
 
 
     -- Batch expiry of unclaimed rewards for a specific claimed round
     -----------------------------------------------------------------
-    nonconsuming choice DsoRules_ClaimExpiredRewards
-      : Optional (ContractId UnclaimedReward)
+    nonconsuming choice DsoRules_ClaimExpiredRewards : DsoRules_ClaimExpiredRewardsResult
       with
         amuletRulesCid : ContractId AmuletRules
         choiceArg : AmuletRules_ClaimExpiredRewards
       controller leader
       do
         result <- exercise amuletRulesCid choiceArg
-        return result.unclaimedRewardCid
+        return DsoRules_ClaimExpiredRewardsResult with
+          unclaimedReward = result.unclaimedRewardCid
 
     -- Batch merge of unclaimed rewards
-    nonconsuming choice DsoRules_MergeUnclaimedRewards
-      : ContractId UnclaimedReward
+    nonconsuming choice DsoRules_MergeUnclaimedRewards : DsoRules_MergeUnclaimedRewardsResult
       with
         amuletRulesCid : ContractId AmuletRules
         unclaimedRewardCids : [ContractId UnclaimedReward]
@@ -953,24 +1083,25 @@ template DsoRules with
       do
         require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
         result <- exercise amuletRulesCid AmuletRules_MergeUnclaimedRewards with ..
-        return result.unclaimedRewardCid
+        return DsoRules_MergeUnclaimedRewardsResult with
+          unclaimedReward = result.unclaimedRewardCid
 
-    nonconsuming choice DsoRules_MiningRound_Close
-      : ContractId ClosedMiningRound
+    nonconsuming choice DsoRules_MiningRound_Close : DsoRules_MiningRound_CloseResult
       with
         amuletRulesCid : ContractId AmuletRules
         issuingRoundCid : ContractId IssuingMiningRound
       controller leader
       do
         result <- exercise amuletRulesCid AmuletRules_MiningRound_Close with ..
-        return result.closedRoundCid
+        return DsoRules_MiningRound_CloseResult with
+          closedRound = result.closedRoundCid
 
 
     -- Contract Expiry
     ------------------
 
     -- TODO(M3-57): generalize this to `ExpiringContract` and use it for all expiring contracts in `Splice.DsoRules`
-    nonconsuming choice DsoRules_ExpireStaleConfirmation : ()
+    nonconsuming choice DsoRules_ExpireStaleConfirmation : DsoRules_ExpireStaleConfirmationResult
       with
         staleConfirmationCid : ContractId Confirmation
       controller leader
@@ -978,11 +1109,11 @@ template DsoRules with
         now <- getTime
         staleConfirmation <- fetchAndArchive (ForDso with dso) staleConfirmationCid
         require "staleConfirmation is past expiresAt" (staleConfirmation.expiresAt <= now)
+        return DsoRules_ExpireStaleConfirmationResult
 
     -- Batch merge of member traffic contracts
     -------------------------------------------
-    nonconsuming choice DsoRules_MergeMemberTrafficContracts
-      : ContractId MemberTraffic
+    nonconsuming choice DsoRules_MergeMemberTrafficContracts : DsoRules_MergeMemberTrafficContractsResult
       with
         amuletRulesCid : ContractId AmuletRules
         trafficCids : [ContractId MemberTraffic]
@@ -990,12 +1121,9 @@ template DsoRules with
       do
         require "Number of member traffic contracts is above the configured threshold" $ length trafficCids > config.numMemberTrafficContractsThreshold
         result <- exercise amuletRulesCid AmuletRules_MergeMemberTrafficContracts with ..
-        return result.mergedTrafficCid
+        return DsoRules_MergeMemberTrafficContractsResult with
+          memberTraffic = result.mergedTrafficCid
 
--- Utility functions
---------------------
-
-summarizeCollective : DsoRules -> CollectiveSummary
 summarizeCollective dsoRules = CollectiveSummary with
     leader = dsoRules.leader
     numMembers

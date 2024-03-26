@@ -33,21 +33,23 @@ testVoteRequest = do
   [] <- query @FeaturedAppRight provider
 
   -- sv1 initiates the granting of the featured app right for the provider
-  requestCid1 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv1
     action = ARC_DsoRules with
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
     reason = Reason with url = ""; body = "they are great!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
+  let requestCid1 = result.voteRequest
 
   -- sv2 rejects initially
-  requestCid <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+  castResult <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
     requestCid = requestCid1
     vote = Vote with
       sv = sv2
       accept = False
       reason = Reason with url = ""; body = "the justification is not good enough"
+  let requestCid = castResult.voteRequest
 
   -- there are two votes, which is not enough to consider the vote definitive and grant the app right
   executeAllDefinitiveVotes app
@@ -55,12 +57,13 @@ testVoteRequest = do
 
   -- a day passes and sv2 updates their vote
   passTime (days 1)
-  requestCid <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+  castResult <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
     requestCid
     vote = Vote with
       sv = sv2
       accept = True
       reason = Reason with url = ""; body = "OK, after rereading the materials, I agree."
+  let requestCid = castResult.voteRequest
 
   -- the VoteRequest trackingCid is set to the initial requestCid
   Some voteRequest <- queryContractId dso requestCid
@@ -71,12 +74,13 @@ testVoteRequest = do
   [] <- query @FeaturedAppRight provider
 
   -- sv3 accepts
-  requestCid <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+  castResult <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
     requestCid
     vote = Vote with
       sv = sv3
       accept = True
       reason = Reason with url = ""; body = "I agree!"
+  let requestCid = castResult.voteRequest
 
   -- there are now three votes in favor of the change, which are enough to grant the right,
   -- but the vote request can only be executed early if all members have voted
@@ -121,22 +125,25 @@ testVoteRequestRejection = do
   [] <- query @FeaturedAppRight provider
 
   -- sv1 initiates the granting of the featured app right for the provider
-  requestCid <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+  result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv1
     action = ARC_DsoRules with
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
         provider
     reason = Reason with url = ""; body = "they are great!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
+  let requestCid = result.voteRequest
 
   -- a super-majority rejects the request
   let rejectRequest sv requestCid =  do
-        submitMulti [sv] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+        result <- submitMulti [sv] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
           requestCid
           vote = Vote with
             sv = sv
             accept = False
             reason = Reason with url = ""; body = "nope!"
+        return result.voteRequest
+
 
   requestCid <- rejectRequest sv2 requestCid
   requestCid <- rejectRequest sv4 requestCid
@@ -164,7 +171,7 @@ testRacingMembershipRemoval = do
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
   -- sv1 is not happy with sv2, and issues two removal requests at the same time!
-  req1 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+  result1 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv1
     action = ARC_DsoRules with
       dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
@@ -172,7 +179,7 @@ testRacingMembershipRemoval = do
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
 
-  req2 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+  result2 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv1
     action = ARC_DsoRules with
       dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
@@ -181,7 +188,7 @@ testRacingMembershipRemoval = do
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
 
   -- sv2 counters and wants to remove sv1
-  req3 <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+  result3 <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv2
     action = ARC_DsoRules with
       dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
@@ -189,21 +196,23 @@ testRacingMembershipRemoval = do
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
 
+  let (req1, req2, req3) = (result1.voteRequest, result2.voteRequest, result3.voteRequest)
+
   -- sv3 and sv4 are not happy with either of them, and accept both removal requests
   [req1, req2, req3] <- forA [req1, req2, req3] $ \requestCid -> do
-    requestCid <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+    result <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
       requestCid
       vote = Vote with
         sv = sv3
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
     requestCid <- submitMulti [sv4] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
-      requestCid
+      requestCid = result.voteRequest
       vote = Vote with
         sv = sv4
         accept = True
         reason = Reason with url = ""; body = "OK, let them go"
-    pure requestCid
+    pure requestCid.voteRequest
 
   -- sv1 attempts to immediatly accept the request to remove sv2, which succeeds as SV2 is not required to vote for its own offboarding
   now <- getTime
@@ -245,13 +254,14 @@ testRacingMembershipRemoval = do
 
   -- The story continues: sv3 tries to remove sv4
   [(dsoRulesCid, _)] <- query @DsoRules dso
-  req4 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+  result4 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv3
     action = ARC_DsoRules with
       dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
         member = sv4
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (seconds 1) -- attempt to not give sv4 enough time to vote
+  let req4 = result4.voteRequest
 
   -- early closing is not possible, as the outcome of the vote is not determined, and we thus leave
   -- time for some of the SV's to change their vote
@@ -269,7 +279,7 @@ testRacingMembershipRemoval = do
   result.outcome === VRO_Expired
 
   -- Let's see if sv3 and sv4 can work together to also remove sv4
-  req5 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+  result5 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv3
     action = ARC_DsoRules with
       dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
@@ -277,12 +287,13 @@ testRacingMembershipRemoval = do
     reason = Reason with url = ""; body = "they want to leave!"
     voteRequestTimeout = Some (days 1)
 
-  req5 <- submitMulti [sv4] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
-    requestCid = req5
+  castResult <- submitMulti [sv4] [dso] $ exerciseCmd dsoRulesCid DsoRules_CastVote with
+    requestCid = result5.voteRequest
     vote = Vote with
       sv = sv4
       accept = True
       reason = Reason with url = ""; body = "yes, let me go please!"
+  let req5 = castResult.voteRequest
 
   -- and actually early closing is possible, as everybody has voted and the outcome is definite
   now <- getTime
@@ -379,7 +390,7 @@ testVoteRequestExpire = do
   provider <- allocateParty "provider"
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
-  requestCid <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
+  requestResult <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv1
     action = ARC_DsoRules with
       dsoAction = SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight with
@@ -389,7 +400,7 @@ testVoteRequestExpire = do
 
   -- attempt to close the vote request before its voting period
   submitMultiMustFail [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
-    requestCid = requestCid
+    requestCid = requestResult.voteRequest
     amuletRulesCid = None
 
   passTime(days 7)
@@ -397,7 +408,7 @@ testVoteRequestExpire = do
 
   -- close the vote request once the voting period is over
   result <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
-    requestCid = requestCid
+    requestCid = requestResult.voteRequest
     amuletRulesCid = None
 
   -- only sv1 voted to accept as they created the request

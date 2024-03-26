@@ -19,7 +19,7 @@ import * as damlTypes from '@daml/types';
 import {
   ActionRequiringConfirmation,
   Vote,
-  VoteRequestResult,
+  DsoRules_CloseVoteRequestResult,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 
 import { useListVoteRequestResult } from '../../hooks/useListVoteRequests';
@@ -205,7 +205,7 @@ export const VoteResultsFilterTable: React.FC<ListVoteResultsTableProps> = ({
   }
 
   function getVoteRequestResultRowsByCategory(
-    voteResults: VoteRequestResult[] | undefined,
+    voteResults: DsoRules_CloseVoteRequestResult[] | undefined,
     tableType: VoteRequestResultTableType
   ): VoteRequestResultRow[] {
     const now = dayjs();

@@ -3,7 +3,7 @@ import { Contract, PollingStrategy } from 'common-frontend-utils';
 
 import {
   VoteRequest,
-  VoteRequestResult,
+  DsoRules_CloseVoteRequestResult,
 } from '@daml.js/splice-dso-governance/lib/Splice/DsoRules/module';
 import { List } from '@daml/types';
 
@@ -32,13 +32,13 @@ export const useListDsoRulesVoteRequests = (): UseQueryResult<Contract<VoteReque
 export const useListVoteRequestResult = (
   query: ListVoteRequestResultParams,
   limit: number = 10
-): UseQueryResult<VoteRequestResult[]> => {
+): UseQueryResult<DsoRules_CloseVoteRequestResult[]> => {
   const { listVoteRequestResults } = useSvAdminClient();
   return useQuery({
     refetchInterval: PollingStrategy.FIXED,
     queryKey: [
       'listVoteRequestResults',
-      VoteRequestResult,
+      DsoRules_CloseVoteRequestResult,
       limit,
       query.actionName,
       query.executed,
@@ -56,7 +56,7 @@ export const useListVoteRequestResult = (
         query.effectiveTo,
         query.executed
       );
-      return List(VoteRequestResult).decoder.runWithException(dso_rules_vote_results);
+      return List(DsoRules_CloseVoteRequestResult).decoder.runWithException(dso_rules_vote_results);
     },
   });
 };

@@ -1513,7 +1513,7 @@ class DbSvDsoStoreTest
 
   private def mkVoteRequestResult(
       voteRequestContract: Contract[VoteRequest.ContractId, VoteRequest]
-  ): VoteRequestResult = new VoteRequestResult(
+  ): DsoRules_CloseVoteRequestResult = new DsoRules_CloseVoteRequestResult(
     voteRequestContract.payload,
     Instant.now().truncatedTo(ChronoUnit.MICROS),
     util.List.of(),
