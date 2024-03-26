@@ -121,11 +121,15 @@ abstract class TaskbasedTrigger[T: Pretty](
                 "Ignoring processing failure, as we are shutting down",
                 ex,
               )
-            } else
+            } else {
+              MetricsContext.withExtraMetricLabels(("outcome", "failure")) { m =>
+                metrics.completed.mark()(m)
+              }
               logger.error(
                 show"Skipping processing of \n$task\ndue to unexpected failure",
                 ex,
               )
+            }
 
             // Here we recover from the failure so that processing can continue for other tasks.
             // We signal though that we failed, so that the trigger polling loop doesn't loop tightly when

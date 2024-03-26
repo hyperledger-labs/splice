@@ -20,9 +20,9 @@ class TriggerMetrics(
   val latency: Timer = metricsFactory.timer(prefix :+ "latency")
 
   @MetricDoc.Tag(
-    summary = "Number of trigger tasks that succeeded",
+    summary = "Number of trigger tasks that finished",
     description =
-      "This metric measures the total number of successful tasks processed by the trigger.",
+      "This metric measures the total number of tasks processed by the trigger, labeled with the outcome.",
     qualification = Traffic,
   )
   val completed: Meter = metricsFactory.meter(prefix :+ "completed")
