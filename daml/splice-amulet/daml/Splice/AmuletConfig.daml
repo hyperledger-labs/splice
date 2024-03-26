@@ -13,7 +13,7 @@ data USD = USD deriving (Show, Eq)
 -- the AmuletRules.
 --
 -- See Splice.Scripts.Parameters for concrete values.
-data TransferConfig currency = TransferConfig with
+data TransferConfig unit = TransferConfig with
     createFee : FixedFee -- ^ Fee to create a new amulet.
     holdingFee : RatePerRound -- ^ Fee for keeping a amulet around
     transferFee : SteppedRate -- ^ Fee for transferring some amount of amulet to a new owner.
@@ -27,8 +27,8 @@ data TransferConfig currency = TransferConfig with
 -- | Configuration includes TransferConfig, issuance curve and tickDuration
 --
 -- See Splice.Scripts.Parameters for concrete values.
-data AmuletConfig currency = AmuletConfig with
-    transferConfig : TransferConfig currency -- ^ Configuration determining the fees and limits for CC transfers
+data AmuletConfig unit = AmuletConfig with
+    transferConfig : TransferConfig unit -- ^ Configuration determining the fees and limits for CC transfers
     issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
     globalDomain : AmuletGlobalDomainConfig -- ^ Configuration for the global domain and its fees.
     -- TODO(M4-85): the values in here are likely quite large (several URls and long domainIds) and not required for executing transfers. Split this part of the config out into a separate contract as a performance optimization.
@@ -39,7 +39,7 @@ data AmuletConfig currency = AmuletConfig with
   deriving (Eq, Show)
 
 -- Check constraints on config params on which the implementation of the choices rely.
-validAmuletConfig : AmuletConfig currency -> Bool
+validAmuletConfig : AmuletConfig unit -> Bool
 validAmuletConfig AmuletConfig{..} =
     tickDuration > days 0
   && validIssuanceCurve issuanceCurve

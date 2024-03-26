@@ -24,10 +24,7 @@ import {
 } from '@mui/material';
 
 import * as payment from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
-import {
-  Currency,
-  ReceiverAmount,
-} from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
+import { Unit, ReceiverAmount } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
 import BftAnsEntry from '../components/BftAnsEntry';
@@ -92,17 +89,17 @@ export const ConfirmPayment: React.FC = () => {
   );
 };
 
-type BothCurrencies = 'CC & USD';
+type BothUnits = 'CC & USD';
 interface Total {
   totalAmount: BigNumber;
   /**
    * The currency of `totalAmount`.
    */
-  totalCurrency: Currency;
+  totalCurrency: Unit;
   /**
    * The currency in which all the receivers are paid.
    */
-  currencyForAllReceivers: Currency | BothCurrencies;
+  currencyForAllReceivers: Unit | BothUnits;
 }
 function computeTotal(
   receiverAmounts: ReceiverAmount[],
@@ -112,7 +109,7 @@ function computeTotal(
   const { totalAmulet, totalUSD } = receiverAmounts.reduce(
     (acc, next) => {
       let newAcc;
-      switch (next.amount.currency) {
+      switch (next.amount.unit) {
         case 'CC':
           newAcc = {
             totalAmulet: acc.totalAmulet.plus(next.amount.amount),
@@ -125,10 +122,8 @@ function computeTotal(
             totalAmulet: acc.totalAmulet,
           };
           break;
-        case 'ExtCurrency':
-          console.error(
-            'Unexpectedly encountered the ExtCurrency extension constructor. Ignoring.'
-          );
+        case 'ExtUnit':
+          console.error('Unexpectedly encountered the ExtUnit extension constructor. Ignoring.');
           newAcc = acc;
           break;
       }
@@ -171,7 +166,7 @@ const SingleRecipientInfo: React.FC<SingleRecipientInfoProps> = ({
     <Stack alignItems="center" spacing={1}>
       <SendPaymentIcon />
       <Typography variant="h5" className="payment-amount">
-        Send <AmountDisplay amount={BigNumber(amount.amount)} currency={amount.currency} /> to{' '}
+        Send <AmountDisplay amount={BigNumber(amount.amount)} currency={amount.unit} /> to{' '}
       </Typography>
       <BftAnsEntry partyId={receiver} variant="h5" fontWeight="bold" className="payment-receiver" />
       <Stack direction="row" alignItems="center" spacing={1}>
@@ -184,7 +179,7 @@ const SingleRecipientInfo: React.FC<SingleRecipientInfoProps> = ({
 
 interface MultipleRecipientsInfoProps {
   receiverAmounts: ReceiverAmount[];
-  currencyForAllReceivers: Currency | BothCurrencies;
+  currencyForAllReceivers: Unit | BothUnits;
   amuletPrice: BigNumber;
   provider: string;
 }
@@ -207,8 +202,8 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
       </Stack>
       <Table>
         <TableBody>
-          {receiverAmounts.map(({ amount: { amount, currency }, receiver }) => {
-            const converted = convertCurrency(new BigNumber(amount), currency, amuletPrice);
+          {receiverAmounts.map(({ amount: { amount, unit }, receiver }) => {
+            const converted = convertCurrency(new BigNumber(amount), unit, amuletPrice);
             return (
               <TableRow key={receiver} id={`${receiver}-payment-row`}>
                 <TableCell variant="party">
@@ -216,7 +211,7 @@ const MultiRecipientsInfo: React.FC<MultipleRecipientsInfoProps> = ({
                 </TableCell>
                 <TableCell>
                   <Typography variant="h6" className="receiver-amount">
-                    <AmountDisplay amount={BigNumber(amount)} currency={currency} />
+                    <AmountDisplay amount={BigNumber(amount)} currency={unit} />
                   </Typography>
                 </TableCell>
                 <TableCell>

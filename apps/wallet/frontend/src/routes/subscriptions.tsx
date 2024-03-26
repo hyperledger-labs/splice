@@ -155,7 +155,7 @@ interface PriceProps {
 }
 const Price: React.FC<PriceProps> = ({ payData, amuletPrice }) => {
   const amount = new BigNumber(payData.paymentAmount.amount);
-  const currency = payData.paymentAmount.currency;
+  const currency = payData.paymentAmount.unit;
   const perPeriod = payData.paymentInterval;
   const converted = convertCurrency(amount, currency, amuletPrice);
 

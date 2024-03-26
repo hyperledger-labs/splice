@@ -614,6 +614,18 @@ function subcmd_all_packages() {
   rename_daml_package 'canton-name-service' 'splice-amulet-name-service' 'CantonNameService' 'SpliceAmuletNameService'
 }
 
+subcommand_whitelist[no_illegal_daml_references]='Check for illegal daml references'
+function subcmd_no_illegal_daml_references() {
+    illegal_words=(currency)
+    for word in "${illegal_words[@]}"; do
+        echo "Checking for occurences of $word"
+        if rg -i "$word" daml/; then
+            echo "$word occurs in Daml code, remove all references"
+            exit 1
+        fi
+    done
+
+}
 
 ################################
 ### Main

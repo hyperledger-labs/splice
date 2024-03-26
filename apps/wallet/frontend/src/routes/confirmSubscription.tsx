@@ -82,8 +82,8 @@ const SubscriptionContainer: React.FC<{ subscription: Contract<SubscriptionReque
 
   const payData = subscription.payload.payData;
   const amount = new BigNumber(payData.paymentAmount.amount);
-  const currency = payData.paymentAmount.currency;
-  const converted = convertCurrency(amount, currency, amuletPriceQuery.data);
+  const unit = payData.paymentAmount.unit;
+  const converted = convertCurrency(amount, unit, amuletPriceQuery.data);
 
   return (
     <Container maxWidth="xl">
@@ -98,13 +98,12 @@ const SubscriptionContainer: React.FC<{ subscription: Contract<SubscriptionReque
           <Typography variant="body1">Subscription Details</Typography>
           <Stack alignItems="center">
             <Typography variant="h6" className="sub-request-price">
-              <AmountDisplay amount={amount} currency={currency} /> per{' '}
+              <AmountDisplay amount={amount} currency={unit} /> per{' '}
               <IntervalDisplay microseconds={payData.paymentInterval.microseconds} />
             </Typography>
             <Typography variant="body2" className="sub-request-price-converted">
               <AmountDisplay amount={converted.amount} currency={converted.currency} /> @{' '}
-              <AmountDisplay amount={amuletPriceQuery.data} currency={currency} />/
-              {converted.currency}
+              <AmountDisplay amount={amuletPriceQuery.data} currency={unit} />/{converted.currency}
             </Typography>
             <Typography variant="body2">Fees will be added.</Typography>
           </Stack>

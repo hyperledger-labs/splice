@@ -37,7 +37,7 @@ import com.daml.network.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
   SvOnboardingRequest,
 }
-import com.daml.network.codegen.java.splice.wallet.payment.{Currency, PaymentAmount}
+import com.daml.network.codegen.java.splice.wallet.payment.{Unit, PaymentAmount}
 import com.daml.network.codegen.java.splice.wallet.subscriptions.{
   Subscription,
   SubscriptionData,
@@ -1188,7 +1188,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         entryDescription,
       ),
       new SubscriptionPayData(
-        new PaymentAmount(numeric(BigDecimal("1")), Currency.CC),
+        new PaymentAmount(numeric(BigDecimal("1")), Unit.CC),
         new RelTime(1_000_000_000L),
         new RelTime(1_000_000L),
       ),

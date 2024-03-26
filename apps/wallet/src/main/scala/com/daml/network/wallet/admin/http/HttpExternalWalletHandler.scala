@@ -2,7 +2,7 @@ package com.daml.network.wallet.admin.http
 
 import com.daml.network.admin.http.HttpErrorHandler
 import com.daml.network.auth.AuthExtractor.TracedUser
-import com.daml.network.codegen.java.splice.wallet.payment.{Currency, PaymentAmount}
+import com.daml.network.codegen.java.splice.wallet.payment.{Unit, PaymentAmount}
 import com.daml.network.codegen.java.splice.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.{CNLedgerConnection, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.environment.ledger.api.DedupOffset
@@ -74,7 +74,7 @@ class HttpExternalWalletHandler(
                   installCid
                     .exerciseWalletAppInstall_CreateTransferOffer(
                       receiver.toProtoPrimitive,
-                      new PaymentAmount(amount, Currency.CC),
+                      new PaymentAmount(amount, Unit.CC),
                       request.description,
                       expiresAt.toInstant,
                       request.trackingId,

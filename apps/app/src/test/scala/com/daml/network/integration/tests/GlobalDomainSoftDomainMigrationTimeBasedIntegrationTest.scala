@@ -489,7 +489,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         )
       )
 
-      val dummyPaymentAmount = new cnw.payment.PaymentAmount(dummyDecimal, cnw.payment.Currency.CC)
+      val dummyPaymentAmount = new cnw.payment.PaymentAmount(dummyDecimal, cnw.payment.Unit.CC)
 
       val dummySubscriptionData = new cnw.subscriptions.SubscriptionData(
         sv1WalletUser.toProtoPrimitive,

@@ -39,7 +39,7 @@ class WalletSubscriptionsFrontendIntegrationTest
         aliceValidatorBackend.participantClientWithAdminToken,
         aliceDamlUser,
         alicePartyId,
-        paymentAmount(42.0, paymentCodegen.Currency.CC),
+        paymentAmount(42.0, paymentCodegen.Unit.CC),
         paymentInterval = Duration.ofDays(1),
         description = selfSubscriptionDescription,
       )

@@ -479,7 +479,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   def paymentAmount(
       amount: BigDecimal,
-      currency: paymentCodegen.Currency,
+      currency: paymentCodegen.Unit,
   ) =
     new paymentCodegen.PaymentAmount(
       amount.bigDecimal,
@@ -489,7 +489,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
   def receiverAmount(
       receiverParty: PartyId,
       amount: BigDecimal,
-      currency: paymentCodegen.Currency,
+      currency: paymentCodegen.Unit,
   ) =
     new paymentCodegen.ReceiverAmount(
       receiverParty.toProtoPrimitive,
@@ -544,7 +544,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       userId: String,
       userParty: PartyId,
       amount: BigDecimal = defaultPaymentAmount.amount,
-      currency: paymentCodegen.Currency = defaultPaymentAmount.currency,
+      currency: paymentCodegen.Unit = defaultPaymentAmount.unit,
       expirationTime: Duration = Duration.ofMinutes(5),
       domainId: Option[DomainId] = None,
       description: String = "description",
@@ -571,13 +571,13 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   private val defaultSubscriptionAmount = new paymentCodegen.PaymentAmount(
     BigDecimal(10).bigDecimal.setScale(10),
-    paymentCodegen.Currency.CC,
+    paymentCodegen.Unit.CC,
   )
   private val defaultSubscriptionInterval = Duration.ofMinutes(10)
   private val defaultSubscriptionDuration = Duration.ofMinutes(60)
   private val defaultPaymentAmount = new paymentCodegen.PaymentAmount(
     BigDecimal(10).bigDecimal.setScale(10),
-    paymentCodegen.Currency.CC,
+    paymentCodegen.Unit.CC,
   )
 
   private def createSubscriptionData(

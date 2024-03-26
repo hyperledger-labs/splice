@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
-import com.daml.network.codegen.java.splice.wallet.payment.{AcceptedAppPayment, Currency}
+import com.daml.network.codegen.java.splice.wallet.payment.AcceptedAppPayment
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -65,7 +65,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(charlieUserParty, BigDecimal("1.5"), paymentCodegen.Currency.CC)
+            receiverAmount(charlieUserParty, BigDecimal("1.5"), paymentCodegen.Unit.CC)
           ),
           description = description,
         )
@@ -81,7 +81,7 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchSinglePaymentInfo(id("confirm-payment").element)(
                 expectedBalance = (4.4475, 8.895), // from the self-directory creation
-                expectedSendAmount = "1.5" -> Currency.CC,
+                expectedSendAmount = "1.5" -> paymentCodegen.Unit.CC,
                 expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 1.5,
@@ -146,7 +146,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(charlieUserParty, BigDecimal("5.5"), paymentCodegen.Currency.USD)
+            receiverAmount(charlieUserParty, BigDecimal("5.5"), paymentCodegen.Unit.USD)
           ),
           description = description,
         )
@@ -162,7 +162,7 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchSinglePaymentInfo(id("confirm-payment").element)(
                 expectedBalance = (4.4475, 8.895), // from the self-directory creation
-                expectedSendAmount = "5.5" -> Currency.USD,
+                expectedSendAmount = "5.5" -> paymentCodegen.Unit.USD,
                 expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.75,
@@ -231,8 +231,8 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Currency.CC),
-            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Currency.CC),
+            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Unit.CC),
+            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Unit.CC),
           ),
           description = description,
         )
@@ -315,8 +315,8 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Currency.USD),
-            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Currency.USD),
+            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Unit.USD),
+            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Unit.USD),
           ),
           description = description,
         )
@@ -399,8 +399,8 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Currency.CC),
-            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Currency.USD),
+            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Unit.CC),
+            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Unit.USD),
           ),
           description = description,
         )
@@ -482,7 +482,7 @@ class WalletPaymentFrontendIntegrationTest
 
   private def matchSinglePaymentInfo(element: Element)(
       expectedBalance: (BigDecimal, BigDecimal),
-      expectedSendAmount: (String, Currency),
+      expectedSendAmount: (String, paymentCodegen.Unit),
       expectedReceiver: String,
       expectedProvider: String,
       expectedTotalCC: BigDecimal,

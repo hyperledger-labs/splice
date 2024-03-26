@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.splice.wallet.payment.Currency
+import com.daml.network.codegen.java.splice.wallet.payment as paymentCodegen
 import com.daml.network.environment.CNNodeEnvironmentImpl
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
@@ -98,7 +98,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
               aliceDamlUser,
               aliceUserParty,
               receiverAmounts = Seq(
-                receiverAmount(charlieUserParty, BigDecimal("1.31415"), Currency.CC)
+                receiverAmount(charlieUserParty, BigDecimal("1.31415"), paymentCodegen.Unit.CC)
               ),
             )
             eventuallySucceeds() {

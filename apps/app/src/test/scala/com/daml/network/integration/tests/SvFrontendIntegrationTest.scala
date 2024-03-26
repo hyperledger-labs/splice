@@ -19,7 +19,7 @@ import scala.jdk.CollectionConverters.*
 import com.daml.ledger.javaapi.data.codegen.json.JsonLfReader
 import com.daml.network.codegen.java.splice.amuletconfig.AmuletConfig
 import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.VRO_AcceptedButActionFailed
-import com.daml.network.codegen.java.splice.wallet.payment.Currency
+import com.daml.network.codegen.java.splice.wallet.payment.Unit
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestTrigger
 
 import java.util.Optional
@@ -991,7 +991,7 @@ class SvFrontendIntegrationTest
                 inside(find(id("pretty-json"))) { case Some(json) =>
                   val amuletConfig =
                     AmuletConfig
-                      .jsonDecoder(Currency.jsonDecoder())
+                      .jsonDecoder(Unit.jsonDecoder())
                       .decode(new JsonLfReader(json.text))
                   BigDecimal(amuletConfig.transferConfig.createFee.fee) should be(
                     BigDecimal(requestNewTransferConfigFeeValue)

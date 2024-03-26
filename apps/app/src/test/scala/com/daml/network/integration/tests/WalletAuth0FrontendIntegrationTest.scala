@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.LocalAuth0Test
 import com.daml.network.auth.AuthConfig.Rs256
-import com.daml.network.codegen.java.splice.wallet.payment.Currency
+import com.daml.network.codegen.java.splice.wallet.payment.Unit
 import com.daml.network.config.CNNodeConfigTransforms.updateAllValidatorConfigs_
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.util.{FrontendLoginUtil, WalletFrontendTestUtil, WalletTestUtil}
@@ -85,7 +85,7 @@ class WalletAuth0FrontendIntegrationTest
               auth0User.id,
               userPartyId,
               Seq(
-                receiverAmount(userPartyId, BigDecimal("1.5"), Currency.CC)
+                receiverAmount(userPartyId, BigDecimal("1.5"), Unit.CC)
               ),
             )
             paymentRequestContractId

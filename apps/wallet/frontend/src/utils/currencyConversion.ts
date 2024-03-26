@@ -1,10 +1,10 @@
 import BigNumber from 'bignumber.js';
 
-import { Currency } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
+import { Unit } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 
 export interface ConvertedCurrency {
   amount: BigNumber;
-  currency: Currency;
+  currency: Unit;
   amuletPriceToShow: BigNumber;
 }
 
@@ -18,7 +18,7 @@ export interface ConvertedCurrency {
  */
 export function convertCurrency(
   originalAmount: BigNumber,
-  originalCurrency: Currency,
+  originalCurrency: Unit,
   amuletPrice: BigNumber
 ): ConvertedCurrency {
   if (originalCurrency === 'CC') {

@@ -8,7 +8,7 @@ import { ArrowCircleLeftOutlined } from '@mui/icons-material';
 import { Box, Button, Card, CardContent, Chip, Stack } from '@mui/material';
 import Typography from '@mui/material/Typography';
 
-import { Currency } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
+import { Unit } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import { TransferOffer } from '@daml.js/splice-wallet/lib/Splice/Wallet/TransferOffer/module';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
@@ -40,7 +40,7 @@ export const TransferOffers: React.FC = () => {
             conversionRate: amuletPrice ? amuletPrice?.toString() : '...',
             convertedCurrency: convertCurrency(
               BigNumber(offer.payload.amount.amount),
-              Currency.CC,
+              Unit.CC,
               amuletPrice
             ),
             senderId: offer.payload.sender,

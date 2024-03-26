@@ -10,10 +10,10 @@ import Splice.Expiry
 import Splice.Round
 import Splice.Types
 
-data Currency
+data Unit
   = USD
   | CC
-  | ExtCurrency
+  | ExtUnit
       -- ^ Extension constructor to work around the current lack of upgrading for variants in Daml 3.0.
       -- Will serve as the default value in a containing record in case of an extension.
   deriving (Eq, Show, Ord)
@@ -21,7 +21,7 @@ data Currency
 data PaymentAmount = PaymentAmount
   with
     amount : Decimal
-    currency : Currency
+    unit : Unit
   deriving (Eq, Show, Ord)
 
 data ReceiverAmount = ReceiverAmount
@@ -38,14 +38,14 @@ data ReceiverCCAmount = ReceiverCCAmount
 
 paymentAmountToCC : Party -> OpenMiningRound -> PaymentAmount -> Update Decimal
 paymentAmountToCC dso openMiningRound pq =
-  case pq.currency of
+  case pq.unit of
     USD ->
       do
         require "DSO matches" (openMiningRound.dso == dso)
         pure (pq.amount / openMiningRound.amuletPrice)
     CC ->
       pure pq.amount
-    ExtCurrency -> error "ExtCurrency: bare extension constructors are not allowed at runtime"
+    ExtUnit -> error "ExtUnit: bare extension constructors are not allowed at runtime"
 
 receiverAmountToCCReceiverAmount : Party -> OpenMiningRound -> ReceiverAmount -> Update ReceiverCCAmount
 receiverAmountToCCReceiverAmount dso openMiningRound rq =

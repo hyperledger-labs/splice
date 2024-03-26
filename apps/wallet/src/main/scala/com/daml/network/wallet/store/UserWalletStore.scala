@@ -388,7 +388,7 @@ trait UserWalletStore extends CNNodeAppStore[TxLogEntry] with NamedLogging {
               expiresAt = es.entry.payload.expiresAt,
               entryName = es.entry.payload.name,
               amount = subPayData.paymentAmount.amount,
-              currency = subPayData.paymentAmount.currency,
+              currency = subPayData.paymentAmount.unit,
               paymentInterval = subPayData.paymentInterval,
               paymentDuration = subPayData.paymentDuration,
             )
@@ -485,7 +485,7 @@ object UserWalletStore {
       expiresAt: Instant,
       entryName: String,
       amount: java.math.BigDecimal,
-      currency: walletCodegen.Currency,
+      currency: walletCodegen.Unit,
       paymentInterval: RelTime,
       paymentDuration: RelTime,
   )
