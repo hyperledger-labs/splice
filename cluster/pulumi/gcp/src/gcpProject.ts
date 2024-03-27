@@ -100,10 +100,7 @@ class GcpProject extends pulumi.ComponentResource {
               title: 'SV IDs',
               description: '(managed by Pulumi)',
               expression: `
-          resource.name.endsWith("secrets/sv2-id/versions/latest") ||
-          resource.name.endsWith("secrets/sv3-id/versions/latest") ||
-          resource.name.endsWith("secrets/sv4-id/versions/latest") ||
-          resource.name.endsWith("secrets/sv-id/versions/latest")
+          resource.name.endsWith("-id/versions/latest")
           `,
             },
           },

@@ -105,7 +105,7 @@
     "inputs": {
       "condition": {
         "description": "(managed by Pulumi)",
-        "expression": "\n          resource.name.endsWith(\"secrets/sv2-id/versions/latest\") ||\n          resource.name.endsWith(\"secrets/sv3-id/versions/latest\") ||\n          resource.name.endsWith(\"secrets/sv4-id/versions/latest\") ||\n          resource.name.endsWith(\"secrets/sv-id/versions/latest\")\n          ",
+        "expression": "\n          resource.name.endsWith(\"-id/versions/latest\")\n          ",
         "title": "SV IDs"
       },
       "role": "roles/secretmanager.secretAccessor"
