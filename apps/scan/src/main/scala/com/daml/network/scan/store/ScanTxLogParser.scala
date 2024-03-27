@@ -45,7 +45,7 @@ class ScanTxLogParser(
               tree,
               exercised,
               domainId,
-              node.result.value,
+              node.result.value.amuletSum,
               TransactionType.Tap,
             )
           case Mint(node) =>
@@ -53,15 +53,15 @@ class ScanTxLogParser(
               tree,
               exercised,
               domainId,
-              node.result.value,
+              node.result.value.amuletSum,
               TransactionType.Mint,
             )
           case AmuletRules_BuyMemberTraffic(node) =>
             State.fromBuyMemberTraffic(exercised, domainId, node)
           case AmuletExpire(node) =>
-            State.fromAmuletExpireSummary(exercised, domainId, node.result.value)
+            State.fromAmuletExpireSummary(exercised, domainId, node.result.value.expireSum)
           case LockedAmuletExpireAmulet(node) =>
-            State.fromAmuletExpireSummary(exercised, domainId, node.result.value)
+            State.fromAmuletExpireSummary(exercised, domainId, node.result.value.expireSum)
           case LockedAmuletUnlock(_) =>
             State.empty
           case AnsRules_CollectInitialEntryPayment(_) =>

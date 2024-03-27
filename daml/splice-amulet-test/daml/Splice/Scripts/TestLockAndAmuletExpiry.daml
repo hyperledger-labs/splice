@@ -147,8 +147,9 @@ testExpireLockedAmulet = do
   -- Amulet is expired
   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- dso expires the amulet
-  expireSummary <- testChoice [app.dso] [app.dso] $
+  result <- testChoice [app.dso] [app.dso] $
     exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
+  let expireSummary = result.expireSum
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
   expireSummary.changeToInitialAmountAsOfRoundZero === normalizedBalanceAfterExpiry - normalizedBalanceBeforeExpiry
@@ -198,8 +199,9 @@ testExpireAmulet = do
 
   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
   -- dso expires the amulet
-  expireSummary <- testChoice [app.dso] [app.dso] $
+  result <- testChoice [app.dso] [app.dso] $
     exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
+  let expireSummary = result.expireSum
 
   normalizedBalanceAfterExpiry <- getNormalizedBalance app.dso
   expireSummary.changeToInitialAmountAsOfRoundZero === normalizedBalanceAfterExpiry - normalizedBalanceBeforeExpiry

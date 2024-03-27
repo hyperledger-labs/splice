@@ -49,12 +49,12 @@ acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transfer
     walletProvider
   return result.acceptedPayment
 
-collectAcceptedPayment : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
+collectAcceptedPayment : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_CollectResult
 collectAcceptedPayment app provider acceptedAppPayment = do
   (_, round) <- getLatestOpenRound app
   collectAcceptedPaymentInRound app round.round provider acceptedAppPayment
 
-collectAcceptedPaymentInRound : AmuletApp -> Round -> AmuletUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
+collectAcceptedPaymentInRound : AmuletApp -> Round -> AmuletUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_CollectResult
 collectAcceptedPaymentInRound app round provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
   context <- getAppTransferContextForRound app provider round
@@ -108,7 +108,7 @@ testSingleReceiverCCPaymentRequest = script do
     round = lockedAmulet.amulet.amount.createdAt
     reference = transferRequest
 
-  AcceptedAppPayment_Collect_Result [(receiver, amuletCid)] <- collectAcceptedPayment app provider1 acceptedPaymentCid
+  AcceptedAppPayment_CollectResult [(receiver, amuletCid)] <- collectAcceptedPayment app provider1 acceptedPaymentCid
   receiver === bob.primaryParty
 
   Some amulet <- queryContractId bob.primaryParty amuletCid
@@ -466,7 +466,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
       (alice.primaryParty, PaymentAmount 3.0 CC)]
   -- trying to fulfill the request for 10,000 CC will fail
   context <- getPaymentTransferContext app alice
-  ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_AppPayment transferRequest3, CO_AppPayment transferRequest4]
     context
@@ -513,7 +513,7 @@ testCO_MergeTransferInputs = script do
 
   context <- getPaymentTransferContext app alice
 
-  ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet, InputAmulet amulet2]
     operations = [CO_MergeTransferInputs]
     context
@@ -757,7 +757,7 @@ testInsufficientFundsBatchSubscriptions = script do
   context <- getPaymentTransferContext app alice
   amulet <- tap  app alice 5.0
   -- TODO(#2957): remove read-as DSO.
-  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -766,7 +766,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO.
-  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
@@ -783,7 +783,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   amulet <- tap app alice 5.0
   -- TODO(#2957): remove read-as DSO.
-  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
@@ -791,7 +791,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
   amulet <- tap app alice 15.0
   -- TODO(#2957): remove read-as DSO.
-  ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [alice.primaryParty, validator] [app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context

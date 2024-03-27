@@ -17,6 +17,7 @@ import com.daml.network.codegen.java.splice.ans as ansCodegen
 import com.daml.network.codegen.java.splice.wallet.install
 import com.daml.network.codegen.java.splice.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_MintResult
 import com.daml.network.wallet.store.{
   BalanceChangeTxLogEntry,
   BuyTrafficRequestStatusRejected,
@@ -1233,12 +1234,13 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           amuletContract.payload.amount.initialAmount,
           new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),
         ).toValue,
-        new amuletCodegen.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](
-          amuletContract.contractId,
-          new java.math.BigDecimal(amuletPrice),
-          new Round(round),
-        )
-          .toValue(_.toValue),
+        new AmuletRules_MintResult(
+          new amuletCodegen.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](
+            amuletContract.contractId,
+            new java.math.BigDecimal(amuletPrice),
+            new Round(round),
+          )
+        ).toValue,
       ),
       Seq(toCreatedEvent(amuletContract, Seq(receiver))),
       dummyDomain,

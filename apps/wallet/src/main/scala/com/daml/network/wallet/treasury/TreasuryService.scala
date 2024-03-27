@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_MergeTransferInputs
 import com.daml.network.codegen.java.splice.wallet.install.{
-  ExecuteBatchResult,
+  WalletAppInstall_ExecuteBatchResult,
   WalletAppInstall,
   amuletoperation,
 }
@@ -398,7 +398,7 @@ class TreasuryService(
 
   private def waitForIngestion(
       offset: String,
-      outcomes: Exercised[ExecuteBatchResult],
+      outcomes: Exercised[WalletAppInstall_ExecuteBatchResult],
   )(implicit tc: TraceContext): Future[Unit] =
     if (outcomes.exerciseResult.outcomes.asScala.forall(isErrorOutcome)) {
       // We must not wait in this case, as the store won't see that offset until the next action comes,
@@ -800,7 +800,7 @@ object TreasuryService {
       )
 
     def completeBatchOperations(
-        outcomes: Exercised[ExecuteBatchResult]
+        outcomes: Exercised[WalletAppInstall_ExecuteBatchResult]
     )(implicit logger: TracedLogger, tc: TraceContext) = {
       (outcomes.exerciseResult.outcomes.asScala zip operationsToRun).foreach { case (outcome, op) =>
         logger.debug(show"Completing operation $op with result ${outcome.toValue}")

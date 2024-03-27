@@ -327,7 +327,7 @@ class UserWalletTxLogParser(
                 TransferOfferTxLogEntry.Status.Withdrawn(
                   TransferOfferStatusWithdrawn(node.argument.value.reason)
                 ),
-                node.result.value,
+                node.result.value.trackingInfo,
               )
             )
 
@@ -473,7 +473,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value,
+                node.result.value.amuletSum,
                 BalanceChangeTransactionSubtype.SubscriptionInitialPaymentRejected,
               )
             )
@@ -483,7 +483,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value,
+                node.result.value.amuletSum,
                 BalanceChangeTransactionSubtype.SubscriptionInitialPaymentExpired,
               )
             )
@@ -559,7 +559,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value,
+                node.result.value.amuletSum,
                 BalanceChangeTransactionSubtype.Tap,
               )
             )
@@ -569,7 +569,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value,
+                node.result.value.amuletSum,
                 BalanceChangeTransactionSubtype.Mint,
               )
             )
@@ -583,7 +583,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value,
+                node.result.value.amuletSum,
                 BalanceChangeTransactionSubtype.LockedAmuletUnlocked,
               )
             )
@@ -593,7 +593,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value,
+                node.result.value.amuletSum,
                 BalanceChangeTransactionSubtype.LockedAmuletOwnerExpired,
               )
             )
@@ -607,7 +607,7 @@ class UserWalletTxLogParser(
               State.fromAmuletExpire(
                 tree,
                 exercised,
-                node.result.value.owner,
+                node.result.value.expireSum.owner,
                 BalanceChangeTransactionSubtype.AmuletExpired,
               )
             )
@@ -617,7 +617,7 @@ class UserWalletTxLogParser(
               State.fromAmuletExpire(
                 tree,
                 exercised,
-                node.result.value.owner,
+                node.result.value.expireSum.owner,
                 BalanceChangeTransactionSubtype.LockedAmuletExpired,
               )
             )

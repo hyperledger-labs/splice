@@ -202,6 +202,12 @@ data DsoRules_ConfirmSvOnboardingResult = DsoRules_ConfirmSvOnboardingResult wit
 data DsoRules_ExpireSvOnboardingConfirmedResult = DsoRules_ExpireSvOnboardingConfirmedResult with
     newDsoRules : ContractId DsoRules
 
+data DsoRules_Amulet_ExpireResult = DsoRules_Amulet_ExpireResult with
+    expireSum : AmuletExpireSummary
+
+data DsoRules_LockedAmulet_ExpireAmuletResult = DsoRules_LockedAmulet_ExpireAmuletResult with
+    expireSum : AmuletExpireSummary
+
 data DsoRules_AdvanceOpenMiningRoundsResult = DsoRules_AdvanceOpenMiningRoundsResult with
     summarizingRound: ContractId SummarizingMiningRound
     openRound : ContractId OpenMiningRound
@@ -927,21 +933,25 @@ template DsoRules with
     -- Amulet management driven directly by the DsoDelegate
     -------------------------------------------------------
 
-    nonconsuming choice DsoRules_Amulet_Expire : AmuletExpireSummary
+    nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
       with
         cid : ContractId Amulet
         choiceArg : Amulet_Expire
       controller dsoDelegate
       do
-        exercise cid choiceArg
+        result <- exercise cid choiceArg
+        return DsoRules_Amulet_ExpireResult with
+          expireSum = result.expireSum
 
-    nonconsuming choice DsoRules_LockedAmulet_ExpireAmulet : AmuletExpireSummary
+    nonconsuming choice DsoRules_LockedAmulet_ExpireAmulet : DsoRules_LockedAmulet_ExpireAmuletResult
       with
         cid : ContractId LockedAmulet
         choiceArg : LockedAmulet_ExpireAmulet
       controller dsoDelegate
       do
-        exercise cid choiceArg
+        result <- exercise cid choiceArg
+        return DsoRules_LockedAmulet_ExpireAmuletResult with
+          expireSum = result.expireSum
 
 
     -- Round management driven directly by the DsoDelegate

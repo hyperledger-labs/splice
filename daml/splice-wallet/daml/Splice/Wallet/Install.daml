@@ -86,12 +86,12 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
         executeAmuletOperationRec execContext inputAmulets (COO_MergeTransferInputs senderChange :: prevResults) remainingOperations
 
-    handleResultTap : Either InvalidTransferReason (AmuletCreateSummary (ContractId Splice.Amulet.Amulet)) -> Update [AmuletOperationOutcome]
+    handleResultTap : Either InvalidTransferReason (AmuletRules_DevNet_TapResult) -> Update [AmuletOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
-      Right ccsum -> do
-        let tappedAmulet = ccsum.amulet
-        executeAmuletOperationRec execContext (InputAmulet tappedAmulet :: inputs) (COO_Tap ccsum.amulet :: prevResults) remainingOperations
+      Right result -> do
+        let tappedAmulet = result.amuletSum.amulet
+        executeAmuletOperationRec execContext (InputAmulet tappedAmulet :: inputs) (COO_Tap result.amuletSum.amulet :: prevResults) remainingOperations
 
     handleLeft : InvalidTransferReason -> Update [AmuletOperationOutcome]
     handleLeft errorMsg = executeAmuletOperationRec execContext inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
@@ -158,9 +158,9 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
             -- Calculate CC required to buy extra traffic
             (trafficCostCc, _) <- computeDomainFees execContext.validator trafficAmount amuletRules context.context
             -- Tap enough CC to cover extra traffic purchase
-            ccsum <- exercise amuletRulesCid (AmuletRules_DevNet_Tap execContext.validator trafficCostCc context.context.openMiningRound)
+            result <- exercise amuletRulesCid (AmuletRules_DevNet_Tap execContext.validator trafficCostCc context.context.openMiningRound)
             -- Use only the newly created amulet as input to avoid amulet merges and having to pay for a new change amulet
-            pure $ [InputAmulet ccsum.amulet]
+            pure $ [InputAmulet result.amuletSum.amulet]
           else
             pure inputs
       -- purchase extra traffic for sequencer member
@@ -224,7 +224,7 @@ data AmuletOperationOutcome
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Show)
 
-data ExecuteBatchResult = ExecuteBatchResult
+data WalletAppInstall_ExecuteBatchResult = WalletAppInstall_ExecuteBatchResult
   with
     endUserName : Text
     outcomes: [AmuletOperationOutcome]
@@ -306,7 +306,7 @@ template WalletAppInstall
     signatory endUserParty, validatorParty
 
     -- Takes a batch of commands manipulating amulets, and tries to execute them sequentially in one large Daml transaction.
-    nonconsuming choice WalletAppInstall_ExecuteBatch: ExecuteBatchResult
+    nonconsuming choice WalletAppInstall_ExecuteBatch: WalletAppInstall_ExecuteBatchResult
       with
         context : PaymentTransferContext
         inputs : [TransferInput]
@@ -319,7 +319,7 @@ template WalletAppInstall
               validator = validatorParty
               paymentContext = context
         accepted <- executeAmuletOperationRec executionContext inputs [] operations
-        return ExecuteBatchResult with
+        return WalletAppInstall_ExecuteBatchResult with
           endUserName
           outcomes = reverse accepted
 
@@ -408,8 +408,9 @@ template WalletAppInstall
         cid : ContractId AcceptedTransferOffer
         reason : Text
       controller validatorParty
-      do trackingInfo <- exercise cid $ AcceptedTransferOffer_Abort with ..
-         return WalletAppInstall_AcceptedTransferOffer_AbortResult with ..
+      do result <- exercise cid $ AcceptedTransferOffer_Abort with ..
+         return WalletAppInstall_AcceptedTransferOffer_AbortResult with
+            trackingInfo = result.trackingInfo
 
     nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Withdraw : WalletAppInstall_AcceptedTransferOffer_WithdrawResult
       with

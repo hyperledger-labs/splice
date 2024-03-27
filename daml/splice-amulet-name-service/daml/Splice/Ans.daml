@@ -30,10 +30,18 @@ data AnsRules_CollectEntryRenewalPaymentResult = AnsRules_CollectEntryRenewalPay
     entryCid : ContractId AnsEntry
     subscriptionStateCid : ContractId SubscriptionIdleState
 
+data AnsRules_RejectEntryInitialPaymentResult = AnsRules_RejectEntryInitialPaymentResult
+  with
+    amuletSum : AmuletCreateSummary (ContractId Amulet)
+
 data AnsEntryContext_CollectEntryRenewalPaymentResult = AnsEntryContext_CollectEntryRenewalPaymentResult
   with
     entryCid : ContractId AnsEntry
     subscriptionStateCid : ContractId SubscriptionIdleState
+
+data AnsEntryContext_RejectEntryInitialPaymentResult = AnsEntryContext_RejectEntryInitialPaymentResult
+  with
+    amuletSum : AmuletCreateSummary (ContractId Amulet)
 
 data AnsEntryContext_TerminateResult = AnsEntryContext_TerminateResult
   with
@@ -149,13 +157,15 @@ template AnsRules
           entryCid = renewSummary.entryCid
           ..
 
-    nonconsuming choice AnsRules_RejectEntryInitialPayment: AmuletCreateSummary (ContractId Amulet)
+    nonconsuming choice AnsRules_RejectEntryInitialPayment: AnsRules_RejectEntryInitialPaymentResult
       with
         paymentCid: ContractId SubscriptionInitialPayment
         transferContext : AppTransferContext
       controller dso
       do
-        exercise paymentCid SubscriptionInitialPayment_Reject with transferContext
+        result <- exercise paymentCid SubscriptionInitialPayment_Reject with transferContext
+        return AnsRules_RejectEntryInitialPaymentResult with
+          amuletSum = result.amuletSum
 
 data ExpectedPayment = ExpectedPayment
   with
@@ -256,16 +266,18 @@ template AnsEntryContext
           entryCid = summary.entryCid
           subscriptionStateCid = summary.subscriptionStateCid
 
-    nonconsuming choice AnsEntryContext_RejectEntryInitialPayment : AmuletCreateSummary (ContractId Amulet)
+    nonconsuming choice AnsEntryContext_RejectEntryInitialPayment : AnsEntryContext_RejectEntryInitialPaymentResult
       with
         paymentCid : ContractId SubscriptionInitialPayment
         transferContext : AppTransferContext
         ansRulesCid : ContractId AnsRules
       controller dso
       do
-        exercise ansRulesCid AnsRules_RejectEntryInitialPayment with
+        result <- exercise ansRulesCid AnsRules_RejectEntryInitialPayment with
           paymentCid
           transferContext
+        return AnsEntryContext_RejectEntryInitialPaymentResult with
+          amuletSum = result.amuletSum
 
 
 -- | A ans entry that needs to be renewed continuously.

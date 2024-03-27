@@ -546,11 +546,11 @@ getTransferContext app user featuredAppRight = do
 tap : AmuletApp -> AmuletUser -> Decimal -> Script (ContractId Amulet)
 tap app user amount = do
   (openRound, _) <- getLatestOpenRound app
-  ccsum <- submitExerciseAmuletRulesByKey' app user AmuletRules_DevNet_Tap with
+  result <- submitExerciseAmuletRulesByKey' app user AmuletRules_DevNet_Tap with
     receiver = user.primaryParty
     amount
     openRound
-  return ccsum.amulet
+  return result.amuletSum.amulet
 
 featureApp : AmuletApp -> AmuletUser -> Script (ContractId FeaturedAppRight)
 featureApp app provider = do

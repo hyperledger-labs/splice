@@ -34,7 +34,8 @@ template Escrow
       controller p
       do LockedAmulet{lock,amulet=locked} <- fetchButArchiveLater (ForOwner with dso; owner = p) lockedAmulet -- archived as part of unlocking
          require "lock holder matches locked amulet " ([arbiter] == lock.holders)
-         AmuletCreateSummary cid _ _ <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+         result <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+         let cid = result.amuletSum.amulet
          let transfer = Transfer with
                sender = p
                provider = arbiter

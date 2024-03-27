@@ -66,6 +66,12 @@ data SubscriptionInitialPayment_CollectResult = SubscriptionInitialPayment_Colle
   subscriptionState : ContractId SubscriptionIdleState
   amulet : ContractId Amulet
 
+data SubscriptionInitialPayment_RejectResult = SubscriptionInitialPayment_RejectResult with
+  amuletSum : AmuletCreateSummary (ContractId Amulet)
+
+data SubscriptionInitialPayment_ExpireResult = SubscriptionInitialPayment_ExpireResult with
+  amuletSum : AmuletCreateSummary (ContractId Amulet)
+
 data SubscriptionIdleState_ExpireSubscriptionResult = SubscriptionIdleState_ExpireSubscriptionResult with
   terminatedSubscription : ContractId TerminatedSubscription
 
@@ -199,15 +205,17 @@ template SubscriptionInitialPayment
 
         pure SubscriptionInitialPayment_CollectResult with ..
 
-    choice SubscriptionInitialPayment_Reject : AmuletCreateSummary (ContractId Amulet)
+    choice SubscriptionInitialPayment_Reject : SubscriptionInitialPayment_RejectResult
       with
         transferContext : AppTransferContext
       controller subscriptionData.receiver
       do
         _ <- create TerminatedSubscription with ..
-        exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+        result <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+        return SubscriptionInitialPayment_RejectResult with
+          amuletSum = result.amuletSum
 
-    choice SubscriptionInitialPayment_Expire : AmuletCreateSummary (ContractId Amulet)
+    choice SubscriptionInitialPayment_Expire : SubscriptionInitialPayment_ExpireResult
       with
         actor : Party
         transferContext : AppTransferContext
@@ -216,7 +224,9 @@ template SubscriptionInitialPayment
         -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedAmulet, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         _ <- create TerminatedSubscription with ..
-        exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
+        result <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
+        return SubscriptionInitialPayment_ExpireResult with
+          amuletSum = result.amuletSum
 
 
 -- | The base state in our subscription flow.
@@ -318,8 +328,10 @@ template SubscriptionPayment
         subscriptionState <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        amuletSum <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
-        pure SubscriptionPayment_RejectResult with ..
+        result <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+        pure SubscriptionPayment_RejectResult with
+          subscriptionState
+          amuletSum = result.amuletSum
 
     choice SubscriptionPayment_Expire : SubscriptionPayment_ExpireResult
       with
@@ -333,8 +345,10 @@ template SubscriptionPayment
         subscriptionState <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        amuletSum <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
-        pure SubscriptionPayment_ExpireResult with ..
+        result <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
+        pure SubscriptionPayment_ExpireResult with
+          subscriptionState
+          amuletSum = result.amuletSum
 
 
 lockAndMakeChange
@@ -382,11 +396,11 @@ unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet = d
   let SubscriptionData { sender; receiver; provider } = subscriptionData
 
   -- unlock amulet and transfer the remainder to the receiver
-  ccsum <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+  result <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
   let transfer = Transfer with
         sender
         provider
-        inputs = [InputAmulet ccsum.amulet]
+        inputs = [InputAmulet result.amuletSum.amulet]
         outputs = [mkTransferOutput receiver targetAmount]
   result <- exerciseAppTransfer transferContext transfer
   require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)

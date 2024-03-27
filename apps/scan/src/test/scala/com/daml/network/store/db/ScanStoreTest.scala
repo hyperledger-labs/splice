@@ -2,8 +2,15 @@ package com.daml.network.store.db
 
 import com.daml.ledger.javaapi.data.{DamlRecord, Unit as damlUnit}
 import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.amulet.Amulet
-import com.daml.network.codegen.java.splice.amuletrules.BuyMemberTrafficResult
+import com.daml.network.codegen.java.splice.amulet.{
+  Amulet,
+  Amulet_ExpireResult,
+  LockedAmulet_ExpireAmuletResult,
+}
+import com.daml.network.codegen.java.splice.amuletrules.{
+  AmuletRules_BuyMemberTrafficResult,
+  AmuletRules_MintResult,
+}
 import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.validatorlicense.FaucetState
@@ -128,7 +135,7 @@ abstract class ScanStoreTest
             interfaceId = Some(splice.amulet.Amulet.TEMPLATE_ID),
             AmuletExpire.choice.name,
             mkAmuletExpire(),
-            mkAmuletExpireSummary(
+            mkAmuletExpireResult(
               user1,
               2,
               changeToInitialAmountAsOfRoundZero,
@@ -172,12 +179,14 @@ abstract class ScanStoreTest
             interfaceId = Some(splice.amulet.LockedAmulet.TEMPLATE_ID),
             LockedAmuletExpireAmulet.choice.name,
             mkLockedAmuletExpireAmulet(),
-            mkAmuletExpireSummary(
-              user1,
-              2,
-              changeToInitialAmountAsOfRoundZero,
-              holdingFee,
-            ),
+            new LockedAmulet_ExpireAmuletResult(
+              new splice.amulet.AmuletExpireSummary(
+                user1.toProtoPrimitive,
+                new splice.types.Round(2),
+                new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
+                new java.math.BigDecimal(holdingFee),
+              )
+            ).toValue,
             nextOffset(),
           )(
             store.multiDomainAcsStore
@@ -313,7 +322,7 @@ abstract class ScanStoreTest
             interfaceId = Some(splice.amulet.Amulet.TEMPLATE_ID),
             AmuletExpire.choice.name,
             mkAmuletExpire(),
-            mkAmuletExpireSummary(
+            mkAmuletExpireResult(
               user1,
               4,
               expireAmount1,
@@ -328,7 +337,7 @@ abstract class ScanStoreTest
             interfaceId = Some(splice.amulet.LockedAmulet.TEMPLATE_ID),
             LockedAmuletExpireAmulet.choice.name,
             mkLockedAmuletExpireAmulet(),
-            mkAmuletExpireSummary(
+            mkAmuletExpireResult(
               user2,
               6,
               expireAmount2,
@@ -1153,7 +1162,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       Optional.empty(),
     ).toValue
 
-  def mkBuyMemberTrafficResult(
+  def mkAmuletRules_BuyMemberTrafficResult(
       round: Long,
       inputAppRewardAmount: Double,
       inputValidatorRewardAmount: Double,
@@ -1162,7 +1171,7 @@ trait AmuletTransferUtil { self: StoreTest =>
       amuletPrice: Double,
       memberTrafficCid: MemberTraffic.ContractId,
   ) =
-    new BuyMemberTrafficResult(
+    new AmuletRules_BuyMemberTrafficResult(
       new Round(round),
       mkTransferSummary(
         inputAppRewardAmount,
@@ -1219,7 +1228,7 @@ trait AmuletTransferUtil { self: StoreTest =>
           domainMigrationId,
           extraTraffic,
         ).toValue,
-        mkBuyMemberTrafficResult(
+        mkAmuletRules_BuyMemberTrafficResult(
           round = round,
           inputAppRewardAmount = 0,
           inputValidatorRewardAmount = 0,
@@ -1268,12 +1277,13 @@ trait AmuletTransferUtil { self: StoreTest =>
           amuletContract.payload.amount.initialAmount,
           new roundCodegen.OpenMiningRound.ContractId(openMiningRoundCid),
         ).toValue,
-        new splice.amulet.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](
-          amuletContract.contractId,
-          new java.math.BigDecimal(amuletPrice),
-          new Round(round),
-        )
-          .toValue(_.toValue),
+        new AmuletRules_MintResult(
+          new splice.amulet.AmuletCreateSummary[amuletCodegen.Amulet.ContractId](
+            amuletContract.contractId,
+            new java.math.BigDecimal(amuletPrice),
+            new Round(round),
+          )
+        ).toValue,
       ),
       Seq(toCreatedEvent(amuletContract, signatories = Seq(receiver, dsoParty))),
       dummyDomain,
@@ -1290,17 +1300,19 @@ trait AmuletTransferUtil { self: StoreTest =>
       new roundCodegen.OpenMiningRound.ContractId(nextCid())
     ).toValue
 
-  def mkAmuletExpireSummary(
+  def mkAmuletExpireResult(
       owner: PartyId,
       round: Long,
       changeToInitialAmountAsOfRoundZero: Double,
       changeToHoldingFeesRate: Double,
   ) =
-    new splice.amulet.AmuletExpireSummary(
-      owner.toProtoPrimitive,
-      new splice.types.Round(round),
-      new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
-      new java.math.BigDecimal(changeToHoldingFeesRate),
+    new Amulet_ExpireResult(
+      new splice.amulet.AmuletExpireSummary(
+        owner.toProtoPrimitive,
+        new splice.types.Round(round),
+        new java.math.BigDecimal(changeToInitialAmountAsOfRoundZero),
+        new java.math.BigDecimal(changeToHoldingFeesRate),
+      )
     ).toValue
 
   def amuletTemplate(amount: Double, owner: PartyId) = {

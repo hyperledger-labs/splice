@@ -33,6 +33,12 @@ data AmuletRules_ComputeFeesResult = AmuletRules_ComputeFeesResult with
 data AmuletRules_MergeMemberTrafficContractsResult = AmuletRules_MergeMemberTrafficContractsResult with
     mergedTrafficCid : ContractId MemberTraffic
 
+data AmuletRules_MintResult = AmuletRules_MintResult with
+    amuletSum : AmuletCreateSummary (ContractId Amulet)
+
+data AmuletRules_DevNet_TapResult = AmuletRules_DevNet_TapResult with
+    amuletSum : AmuletCreateSummary (ContractId Amulet)
+
 data AmuletRules_DevNet_FeatureAppResult = AmuletRules_DevNet_FeatureAppResult with
     featuredAppRightCid : ContractId FeaturedAppRight
 
@@ -103,8 +109,8 @@ template AmuletRules
     -- Global domain usage
     ----------------------
 
-    -- Returns a `BuyMemberTrafficResult` to aid parsing the transaction in Scan
-    nonconsuming choice AmuletRules_BuyMemberTraffic : BuyMemberTrafficResult
+    -- Returns a `AmuletRules_BuyMemberTrafficResult` to aid parsing the transaction in Scan
+    nonconsuming choice AmuletRules_BuyMemberTraffic : AmuletRules_BuyMemberTrafficResult
       with
         inputs : [TransferInput]
         context : TransferContext
@@ -157,7 +163,7 @@ template AmuletRules
           ccSpent = trafficCostCc
           usdSpent =  trafficCostUsd
         -- return result
-        return BuyMemberTrafficResult with
+        return AmuletRules_BuyMemberTrafficResult with
           round = transferResult.round
           summary = transferResult.summary
           ccPaid = trafficCostCc
@@ -201,7 +207,7 @@ template AmuletRules
 
     -- A choice for the DSO to mint amulet for the cases where the
     -- DSO rules allow for that; e.g., when redeeming DSO rewards.
-    nonconsuming choice AmuletRules_Mint: AmuletCreateSummary (ContractId Amulet)
+    nonconsuming choice AmuletRules_Mint: AmuletRules_MintResult
       with
         receiver: Party
         amount: Decimal
@@ -218,12 +224,13 @@ template AmuletRules
                   owner = receiver
                   amount = expiringAmount
                   ..
-        return AmuletCreateSummary with
+        let amuletSum = AmuletCreateSummary with
                   amulet
                   amuletPrice = openRound.amuletPrice
                   round = openRound.round
+        return AmuletRules_MintResult with ..
 
-    nonconsuming choice AmuletRules_DevNet_Tap: AmuletCreateSummary (ContractId Amulet)
+    nonconsuming choice AmuletRules_DevNet_Tap: AmuletRules_DevNet_TapResult
       with
         receiver: Party
         amount: Decimal
@@ -231,7 +238,9 @@ template AmuletRules
       controller receiver
       do
         require "isDevNet flag is true" isDevNet
-        exercise self AmuletRules_Mint with ..
+        result <- exercise self AmuletRules_Mint with ..
+        return AmuletRules_DevNet_TapResult with
+          amuletSum = result.amuletSum
 
     nonconsuming choice AmuletRules_DevNet_FeatureApp : AmuletRules_DevNet_FeatureAppResult
       with
@@ -1075,7 +1084,7 @@ data TransferResult
       -- Only created if there was some change to be returned after deducting the fee for returning change.
   deriving (Show, Eq)
 
-data BuyMemberTrafficResult = BuyMemberTrafficResult with
+data AmuletRules_BuyMemberTrafficResult = AmuletRules_BuyMemberTrafficResult with
     round : Round
     summary : TransferSummary
     ccPaid : Decimal

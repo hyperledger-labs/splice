@@ -23,6 +23,9 @@ data TransferOffer_ExpireResult = TransferOffer_ExpireResult with
 data AcceptedTransferOffer_WithdrawResult = AcceptedTransferOffer_WithdrawResult with
   trackingInfo : TransferOfferTrackingInfo
 
+data AcceptedTransferOffer_AbortResult = AcceptedTransferOffer_AbortResult with
+  trackingInfo : TransferOfferTrackingInfo
+
 data AcceptedTransferOffer_ExpireResult = AcceptedTransferOffer_ExpireResult with
   trackingInfo : TransferOfferTrackingInfo
 
@@ -141,12 +144,13 @@ template AcceptedTransferOffer
         pure AcceptedTransferOffer_WithdrawResult with
           trackingInfo = TransferOfferTrackingInfo { .. }
 
-    choice AcceptedTransferOffer_Abort : TransferOfferTrackingInfo
+    choice AcceptedTransferOffer_Abort : AcceptedTransferOffer_AbortResult
       with
         reason : Text
       controller sender
       do
-        pure TransferOfferTrackingInfo { .. }
+        pure AcceptedTransferOffer_AbortResult with
+          trackingInfo = TransferOfferTrackingInfo { .. }
 
     -- these expire choices make a clearer transaction tree than reusing withdraw to expire the contracts
     -- we're not using the ExpiringContract interface because that one returns (), and we need the TrackingInfo

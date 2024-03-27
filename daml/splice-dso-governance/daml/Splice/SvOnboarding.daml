@@ -4,6 +4,10 @@ import Splice.Types
 
 import Splice.Util
 
+data SvOnboardingRequest_ExpireResult = SvOnboardingRequest_ExpireResult
+
+data SvOnboardingConfirmed_ExpireResult = SvOnboardingConfirmed_ExpireResult
+
 -- | Template used by the SVs to collect confirmations for the onboarding of an SV candidate.
 -- The existence of this contract triggers SV automation that creates confirmation contracts for
 -- the candidate if the token is a valid `SvOnboardingToken` and matches an `ApprovedSvIdentity`.
@@ -20,12 +24,12 @@ template SvOnboardingRequest with
     observer candidateParty
 
     -- Archive if we are past the `expiresAt`.
-    choice SvOnboardingRequest_Expire : ()
+    choice SvOnboardingRequest_Expire : SvOnboardingRequest_ExpireResult
       controller dso
       do
         now <- getTime
         require "Onboarding has expired" (now >= expiresAt)
-        pure ()
+        pure SvOnboardingRequest_ExpireResult
 
 -- | A confirmation for approval of a candidate SV.
 --
@@ -43,12 +47,12 @@ template SvOnboardingConfirmed with
     observer svParty
 
     -- Archive if we are past the `expiresAt`.
-    choice SvOnboardingConfirmed_Expire : ()
+    choice SvOnboardingConfirmed_Expire : SvOnboardingConfirmed_ExpireResult
       controller dso
       do
         now <- getTime
         require "SV candidate confirmation has expired" (now >= expiresAt)
-        pure ()
+        pure SvOnboardingConfirmed_ExpireResult
 
 
 -- instances

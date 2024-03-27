@@ -1,6 +1,5 @@
 package com.daml.network.wallet.store
 
-import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   install as installCodegen,
@@ -15,7 +14,7 @@ import com.daml.network.util.ExerciseNodeCompanion
 object WalletAppInstall_ExecuteBatch extends ExerciseNodeCompanion {
   override type Tpl = installCodegen.WalletAppInstall
   override type Arg = installCodegen.WalletAppInstall_ExecuteBatch
-  override type Res = installCodegen.ExecuteBatchResult
+  override type Res = installCodegen.WalletAppInstall_ExecuteBatchResult
 
   override val template = installCodegen.WalletAppInstall.COMPANION
   override val choice = installCodegen.WalletAppInstall.CHOICE_WalletAppInstall_ExecuteBatch
@@ -23,7 +22,7 @@ object WalletAppInstall_ExecuteBatch extends ExerciseNodeCompanion {
   override val argDecoder = installCodegen.WalletAppInstall_ExecuteBatch.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder = installCodegen.ExecuteBatchResult.valueDecoder()
+  override val resDecoder = installCodegen.WalletAppInstall_ExecuteBatchResult.valueDecoder()
   override def resToValue(res: Res) = res.toValue
 }
 
@@ -141,7 +140,7 @@ case object AcceptedTransferOffer_Expire extends ExerciseNodeCompanion {
 case object AcceptedTransferOffer_Abort extends ExerciseNodeCompanion {
   override type Tpl = transferCodegen.AcceptedTransferOffer
   override type Arg = transferCodegen.AcceptedTransferOffer_Abort
-  override type Res = transferCodegen.TransferOfferTrackingInfo
+  override type Res = transferCodegen.AcceptedTransferOffer_AbortResult
 
   override val template = transferCodegen.AcceptedTransferOffer.COMPANION
   override val choice = transferCodegen.AcceptedTransferOffer.CHOICE_AcceptedTransferOffer_Abort
@@ -150,7 +149,7 @@ case object AcceptedTransferOffer_Abort extends ExerciseNodeCompanion {
 
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder = transferCodegen.TransferOfferTrackingInfo.valueDecoder()
+  override val resDecoder = transferCodegen.AcceptedTransferOffer_AbortResult.valueDecoder()
 
   override def resToValue(res: Res) = res.toValue
 }
@@ -189,7 +188,7 @@ object AppPaymentRequest_Accept extends ExerciseNodeCompanion {
 object AcceptedAppPayment_Collect extends ExerciseNodeCompanion {
   override type Tpl = paymentCodegen.AcceptedAppPayment
   override type Arg = paymentCodegen.AcceptedAppPayment_Collect
-  override type Res = paymentCodegen.AcceptedAppPayment_Collect_Result
+  override type Res = paymentCodegen.AcceptedAppPayment_CollectResult
 
   override val template = paymentCodegen.AcceptedAppPayment.COMPANION
   override val choice = paymentCodegen.AcceptedAppPayment.CHOICE_AcceptedAppPayment_Collect
@@ -197,7 +196,7 @@ object AcceptedAppPayment_Collect extends ExerciseNodeCompanion {
   override val argDecoder = paymentCodegen.AcceptedAppPayment_Collect.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder = paymentCodegen.AcceptedAppPayment_Collect_Result.valueDecoder()
+  override val resDecoder = paymentCodegen.AcceptedAppPayment_CollectResult.valueDecoder()
   override def resToValue(res: Res) = res.toValue
 }
 
@@ -332,7 +331,7 @@ object SubscriptionInitialPayment_Collect extends ExerciseNodeCompanion {
 object SubscriptionInitialPayment_Reject extends ExerciseNodeCompanion {
   override type Tpl = subsCodegen.SubscriptionInitialPayment
   override type Arg = subsCodegen.SubscriptionInitialPayment_Reject
-  override type Res = amuletCodegen.AmuletCreateSummary[amuletCodegen.Amulet.ContractId]
+  override type Res = subsCodegen.SubscriptionInitialPayment_RejectResult
 
   override val template = subsCodegen.SubscriptionInitialPayment.COMPANION
   override val choice =
@@ -341,17 +340,14 @@ object SubscriptionInitialPayment_Reject extends ExerciseNodeCompanion {
   override val argDecoder = subsCodegen.SubscriptionInitialPayment_Reject.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder =
-    amuletCodegen.AmuletCreateSummary.valueDecoder(cid =>
-      new amuletCodegen.Amulet.ContractId(cid.asContractId().get().getValue)
-    )
-  override def resToValue(res: Res) = res.toValue(_.toValue)
+  override val resDecoder = subsCodegen.SubscriptionInitialPayment_RejectResult.valueDecoder()
+  override def resToValue(res: Res) = res.toValue
 }
 
 object SubscriptionInitialPayment_Expire extends ExerciseNodeCompanion {
   override type Tpl = subsCodegen.SubscriptionInitialPayment
   override type Arg = subsCodegen.SubscriptionInitialPayment_Expire
-  override type Res = amuletCodegen.AmuletCreateSummary[amuletCodegen.Amulet.ContractId]
+  override type Res = subsCodegen.SubscriptionInitialPayment_ExpireResult
 
   override val template = subsCodegen.SubscriptionInitialPayment.COMPANION
   override val choice =
@@ -360,11 +356,8 @@ object SubscriptionInitialPayment_Expire extends ExerciseNodeCompanion {
   override val argDecoder = subsCodegen.SubscriptionInitialPayment_Expire.valueDecoder()
   override def argToValue(arg: Arg) = arg.toValue
 
-  override val resDecoder =
-    amuletCodegen.AmuletCreateSummary.valueDecoder(cid =>
-      new amuletCodegen.Amulet.ContractId(cid.asContractId().get().getValue)
-    )
-  override def resToValue(res: Res) = res.toValue(_.toValue)
+  override val resDecoder = subsCodegen.SubscriptionInitialPayment_ExpireResult.valueDecoder()
+  override def resToValue(res: Res) = res.toValue
 }
 
 object SubscriptionIdleState_MakePayment extends ExerciseNodeCompanion {

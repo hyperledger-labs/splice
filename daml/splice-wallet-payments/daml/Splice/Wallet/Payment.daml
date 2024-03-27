@@ -188,7 +188,7 @@ mkReceiverOutput receiverAmount =
     receiverFeeRatio = 0.0
     lock = None
 
-data AcceptedAppPayment_Collect_Result = AcceptedAppPayment_Collect_Result with
+data AcceptedAppPayment_CollectResult = AcceptedAppPayment_CollectResult with
   receiverAmulets: [(Party, ContractId Amulet)]
 
 template AcceptedAppPayment
@@ -203,7 +203,7 @@ template AcceptedAppPayment
   where
     signatory sender, provider, map (\r -> r.receiver) ccReceiverAmounts
 
-    choice AcceptedAppPayment_Collect : AcceptedAppPayment_Collect_Result
+    choice AcceptedAppPayment_Collect : AcceptedAppPayment_CollectResult
       with
         context : AppTransferContext
       controller signatory this
@@ -211,17 +211,17 @@ template AcceptedAppPayment
         contextRound <- exercise context.openMiningRound (OpenMiningRound_Fetch provider)
         require ("Round at payment acceptance " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- unlock amulet and transfer the remainder to the receiver
-        ccsum <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
+        result <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
         let transfer = Transfer with
               sender
               provider
-              inputs = [InputAmulet ccsum.amulet]
+              inputs = [InputAmulet result.amuletSum.amulet]
               outputs = map mkReceiverOutput ccReceiverAmounts
         result <- exerciseAppTransfer context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
         let amulets = map (\(TransferResultAmulet amuletCid) -> amuletCid) result.createdAmulets
         let receivers = map (\r -> r.receiver) ccReceiverAmounts
-        pure AcceptedAppPayment_Collect_Result with
+        pure AcceptedAppPayment_CollectResult with
             receiverAmulets = zip receivers amulets
 
     choice AcceptedAppPayment_Reject : AcceptedAppPayment_RejectResult
@@ -229,8 +229,9 @@ template AcceptedAppPayment
         context : AppTransferContext
       controller map (\r -> r.receiver) ccReceiverAmounts
       do create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
-         amulet <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
-         return AcceptedAppPayment_RejectResult with ..
+         result <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
+         return AcceptedAppPayment_RejectResult with
+            amulet = result.amuletSum
 
     choice AcceptedAppPayment_Expire : AcceptedAppPayment_ExpireResult
       with
@@ -238,5 +239,6 @@ template AcceptedAppPayment
       controller sender
       do -- TODO(#3152) Split out amulet unlocking from payment expiry
          create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
-         amulet <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock context.openMiningRound)
-         return AcceptedAppPayment_ExpireResult with ..
+         result <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock context.openMiningRound)
+         return AcceptedAppPayment_ExpireResult with
+            amulet = result.amuletSum
