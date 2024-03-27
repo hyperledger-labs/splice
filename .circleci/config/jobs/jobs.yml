@@ -557,6 +557,23 @@ jobs:
               "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
               << parameters.max_pipeline_age_secs >> cancel_pipeline
 
+  cancel_if_current_commit_is_base_version:
+    docker:
+      - image: cimg/base:2024.01
+    environment:
+      <<: *env
+    steps:
+      - run:
+          name: Cancel the entire workflow if the current commit is a base version
+          command: |
+            latest_base_version=$(build-tools/find_latest_base_version.sh)
+            if [[ "${CIRCLE_SHA1}" == "${latest_base_version}" ]]; then
+              echo "Cancelling the entire workflow because the current commit is a base version."
+              curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"
+            else
+              echo "Current commit is ${CIRCLE_SHA1}, latest base version is ${latest_base_version}."
+            fi
+
   backup_cluster:
     parameters:
       <<: *cluster-parameter

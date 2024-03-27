@@ -3,6 +3,8 @@ workflow:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
+      - cancel_if_current_commit_is_base_version:
+          <<: *main-branch-only
       - wait_for_previous_pipeline:
           <<: *notify-fail
           <<: *main-branch-only
@@ -10,6 +12,8 @@ workflow:
             - artifactory
             - slack-context
           workflow_names: "deploy_ciupgrade"
+          requires:
+            - cancel_if_current_commit_is_base_version
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           <<: *main-branch-only
@@ -24,6 +28,7 @@ workflow:
           requires:
             - wait_for_previous_pipeline
       - preflight_check:
+          name: "preflight_check_initial"
           <<: *main-branch-only
           get_snapshot_version_override: "latest_base"
           context:
@@ -48,7 +53,7 @@ workflow:
           requires:
             - deploy_cluster_for_migration
       - preflight_sv_check:
-           name: "preflight_sv_check_before_migration"
+           name: "preflight_sv_check_initial"
            <<: *main-branch-only
            get_snapshot_version_override: "latest_base"
            context:
@@ -69,7 +74,7 @@ workflow:
           requires:
             - deploy_cluster_for_migration
       - preflight_validator_check:
-          name: "preflight_validator_check_before_migration"
+          name: "preflight_validator_initial"
           <<: *main-branch-only
           get_snapshot_version_override: "latest_base"
           context:
@@ -79,6 +84,106 @@ workflow:
           cluster: "ciupgrade"
           requires:
             - deploy_cluster_for_migration
+      - docker_images_push:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - deploy_partial_upgrade:
+          name: "deploy_partial_upgrade"
+          cluster: "ciupgrade"
+          context:
+            - artifactory
+            - slack-context
+          <<: *main-branch-only
+          requires:
+            - docker_images_push
+            - preflight_check_initial
+            - preflight_sv_check_initial
+            - preflight_validator_initial
+      - preflight_check:
+          name: "preflight_check_partial_upgrade"
+          <<: *main-branch-only
+          get_snapshot_version_override: "latest_base" # the /version endpoint is not served by sv1 nor validator1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          wait_for_sv: false
+          parallelism: 1
+          requires:
+            - deploy_partial_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_partial_upgrade"
+          <<: *main-branch-only
+          get_snapshot_version_override: "latest_base"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_partial_upgrade
+      - preflight_validator_check:
+          name: "preflight_validator_partial_upgrade"
+          <<: *main-branch-only
+          get_snapshot_version_override: "latest_base"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_partial_upgrade
+      - deploy_cluster:
+          name: "deploy_final_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciupgrade"
+          reset_cluster: false
+          send_deployment_notification: false
+          update_deployment_branch: false
+          cancel_workflow_on_failure: true
+          requires:
+            - preflight_check_partial_upgrade
+            - preflight_sv_check_partial_upgrade
+            - preflight_validator_partial_upgrade
+      - preflight_check:
+          name: "preflight_check_final_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          wait_for_sv: false
+          parallelism: 1
+          requires:
+            - deploy_final_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_final_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_final_upgrade
+      - preflight_validator_check:
+          name: "preflight_validator_final_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_final_upgrade
 # TODO (#9917): these steps (roughly) are needed for a domain migration test.
 #      - backup_cluster:
 #          name: "backup_cluster_before_migration"
@@ -105,8 +210,8 @@ workflow:
 #          wait_for_sv: false
 #          requires:
 #            - preflight_check
-#            - preflight_sv_check_before_migration
-#            - preflight_validator_check_before_migration
+#            - preflight_sv_check_initial
+#            - preflight_validator_initial
 #            - backup_cluster_before_migration
 #      - deploy_cluster:
 #          name: "prepare_cluster_for_migration"

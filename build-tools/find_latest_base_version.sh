@@ -3,7 +3,8 @@
 set -euo pipefail
 
 # TODO (#10966): remove daml file from here
-file_paths=("nix/canton-sources.json" "daml/dars.lock")
+# TODO (#11199): Remove pulumi and helm from here
+file_paths=("$REPO_ROOT/nix/canton-sources.json" "$REPO_ROOT/daml/dars.lock" "$REPO_ROOT/cluster/pulumi" "$REPO_ROOT/cluster/helm")
 
 # Find latest commit where canton version or daml lock were modified
 changed_files_commit=$(git log -n 1 --format="%H %cI" -- "${file_paths[@]}")

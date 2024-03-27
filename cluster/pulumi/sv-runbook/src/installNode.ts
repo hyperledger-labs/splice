@@ -135,6 +135,7 @@ export async function installNode(
     defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installCNRunbookHelmChartByNamespaceName(
     xns.logicalName,
+    xns.logicalName,
     'cluster-ingress-sv',
     'cn-cluster-ingress-runbook',
     {
@@ -153,6 +154,7 @@ export async function installNode(
   );
   installMigrationIdSpecificComponent(globalDomainMigrationConfig, (migrationId, _, version) => {
     installCNRunbookHelmChartByNamespaceName(
+      xns.logicalName,
       xns.logicalName,
       `cluster-ingress-sv-domain-${migrationId}`,
       'cn-cluster-ingress-runbook',

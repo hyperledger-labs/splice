@@ -12,6 +12,7 @@ import {
   ExactNamespace,
   fixedTokens,
   HELM_CHART_TIMEOUT_SEC,
+  loadJsonFromFile,
   loadYamlFromFile,
   REPO_ROOT,
   requireEnv,
@@ -33,9 +34,25 @@ export const defaultVersion: CnChartVersion =
     ? { type: 'remote', version: CHARTS_VERSION }
     : { type: 'local' };
 
+const imageTagsFile: string | undefined = process.env['IMAGE_VERSIONS_FILE'];
+const jsonImageVersions: undefined | { [key: string]: { [key: string]: string } } =
+  imageTagsFile && loadJsonFromFile(imageTagsFile);
+const imageTagOverride: string | undefined = process.env['IMAGE_TAG'];
+
+function getVersionOverrideFromVersionsFile(
+  nsLogicalName: string,
+  chartName: string
+): string | undefined {
+  return (
+    jsonImageVersions &&
+    jsonImageVersions[nsLogicalName] &&
+    jsonImageVersions[nsLogicalName][chartName]
+  );
+}
+
 export function installCNHelmChartByNamespaceName(
-  prefix: string,
-  nsName: pulumi.Output<string>,
+  nsLogicalName: string,
+  nsMetadataName: pulumi.Output<string>,
   name: string,
   chartName: string,
   values: ChartValues = {},
@@ -43,14 +60,14 @@ export function installCNHelmChartByNamespaceName(
   opts?: CNCustomResourceOptions
 ): Release {
   const release = new k8s.helm.v3.Release(
-    `${prefix}-${name}`,
+    `${nsLogicalName}-${name}`,
     {
       name,
-      namespace: nsName,
+      namespace: nsMetadataName,
       chart: chartPath(chartName, version),
-      version: versionString(version),
+      version: versionString(version, nsLogicalName, chartName),
       repositoryOpts: repositoryOpts(version),
-      values: cnChartValues(version, chartName, values),
+      values: cnChartValues(nsLogicalName, version, chartName, values),
       timeout: HELM_CHART_TIMEOUT_SEC,
     },
     opts
@@ -78,6 +95,7 @@ export function installCNHelmChart(
 }
 
 function cnChartValues(
+  nsLogicalName: string,
   version: CnChartVersion,
   chartPath: string,
   overrideValues: ChartValues = {}
@@ -88,7 +106,8 @@ function cnChartValues(
       ? loadYamlFromFile(process.env.REPO_ROOT + '/cluster/helm/' + chartPath + '/values.yaml')
       : {};
 
-  const imageTagOverride = process.env['IMAGE_TAG'];
+  const imageVersionFromFile = getVersionOverrideFromVersionsFile(nsLogicalName, chartPath);
+  const finalOverride = imageVersionFromFile || imageTagOverride;
 
   if (imageTagOverride && version.type == 'remote' && version.version != imageTagOverride) {
     // Mixing versions like this sounds like something that is always a bad idea.
@@ -112,10 +131,10 @@ function cnChartValues(
       clusterUrl: `${CLUSTER_BASENAME}.network.canton.global`,
     },
     overrideValues,
-    imageTagOverride
+    finalOverride
       ? {
           cluster: {
-            imageTag: imageTagOverride,
+            imageTag: finalOverride,
           },
         }
       : {},
@@ -126,7 +145,8 @@ function cnChartValues(
 }
 
 export function installCNRunbookHelmChartByNamespaceName(
-  ns: pulumi.Output<string> | string,
+  nsMetadataName: pulumi.Output<string> | string,
+  nsLogicalName: string,
   name: string,
   chartName: string,
   values: ChartValues,
@@ -137,9 +157,9 @@ export function installCNRunbookHelmChartByNamespaceName(
     name,
     {
       name: name,
-      namespace: ns,
+      namespace: nsMetadataName,
       chart: chartPath(chartName, version),
-      version: versionString(version),
+      version: versionString(version, nsLogicalName, chartName),
       repositoryOpts: repositoryOpts(version),
       values: {
         ...values,
@@ -167,6 +187,7 @@ export function installCNRunbookHelmChart(
 ): k8s.helm.v3.Release {
   return installCNRunbookHelmChartByNamespaceName(
     ns.ns.metadata.name,
+    ns.logicalName,
     name,
     chartName,
     values,
@@ -179,8 +200,13 @@ function chartPath(chartName: string, version: CnChartVersion): string {
   return version.type === 'local' ? REPO_ROOT + '/cluster/helm/' + chartName + '/' : chartName;
 }
 
-function versionString(version: CnChartVersion) {
-  return version.type === 'local' ? undefined : version.version;
+function versionString(version: CnChartVersion, nsLogicalName: string, chartPath: string) {
+  if (version.type === 'local') {
+    return undefined;
+  } else {
+    const versionOverride = getVersionOverrideFromVersionsFile(nsLogicalName, chartPath);
+    return versionOverride || version.version;
+  }
 }
 
 function repositoryOpts(version: CnChartVersion) {

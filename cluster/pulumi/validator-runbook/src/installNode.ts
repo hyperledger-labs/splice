@@ -105,6 +105,7 @@ export async function installNode(auth0Client: Auth0Client): Promise<void> {
   const ingressImagePullDeps =
     defaultVersion.type === 'local' ? [] : imagePullSecretByNamespaceName('cluster-ingress');
   installCNRunbookHelmChartByNamespaceName(
+    xns.ns.metadata.name,
     xns.logicalName,
     'cluster-ingress-validator',
     'cn-cluster-ingress-runbook',

@@ -1399,6 +1399,7 @@ jobs:
       - run:
           name: Find latest base version
           command: |
+            source .envrc.vars
             LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
             echo "Latest base version is $LATEST_BASE_VERSION"
             echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
@@ -1511,6 +1512,7 @@ jobs:
       - run:
           name: Find latest base version
           command: |
+            source .envrc.vars
             LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
             echo "Latest base version is $LATEST_BASE_VERSION"
             echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
@@ -1671,6 +1673,7 @@ jobs:
       - run:
           name: Find latest base version
           command: |
+            source .envrc.vars
             LATEST_BASE_VERSION=$(build-tools/find_latest_base_version.sh)
             echo "Latest base version is $LATEST_BASE_VERSION"
             echo "export LATEST_BASE_VERSION=$LATEST_BASE_VERSION" >> "$BASH_ENV"
@@ -1785,6 +1788,68 @@ jobs:
                     echo "NOTE: skipping deployment branch update for scratchnet cluster << parameters.cluster >>"
                   fi
                 cmd_retry_count: 5
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.send_deployment_notification >>
+          steps:
+            - notify-cluster-deployment:
+                cluster: << parameters.cluster >>
+      - when:
+          condition: << parameters.cancel_workflow_on_failure >>
+          steps:
+            - cancel_entire_workflow_if_this_job_failed
+
+  deploy_partial_upgrade:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2024.01
+    resource_class: xlarge
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      <<: *cluster-parameter
+      send_deployment_notification:
+        type: boolean
+        default: true
+      cancel_workflow_on_failure:
+        type: boolean
+        default: false
+    steps:
+      - checkout_with_retry
+      - setup_nix
+      - run_bash_command_in_nix:
+          cmd_name: Build Helm & Pulumi artifacts
+          # When nix packages changed, nix will rebuild stuff here, and sometimes go silent for long periods of time
+          no_output_timeout: "20m"
+          cluster: << parameters.cluster >>
+          cmd: |
+            make cluster/build
+          cmd_retry_count: 2
+      - run_bash_command_in_nix:
+          cmd_name: Apply Pulumi configuration to cluster
+          cluster: << parameters.cluster >>
+          additional_nix_args: >
+            --keep GITHUB_TOKEN
+            --keep AUTH0_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_CN_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_SV_MANAGEMENT_API_CLIENT_SECRET
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_ID
+            --keep AUTH0_VALIDATOR_MANAGEMENT_API_CLIENT_SECRET
+            --keep CIRCLECI_TOKEN
+            --keep CIRCLE_WORKFLOW_ID
+            --keep K6_USERS_PASSWORD
+            --keep K6_VALIDATOR_ADMIN_USERNAME
+            --keep K6_VALIDATOR_ADMIN_PASSWORD
+            --keep SLACK_ACCESS_TOKEN
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster partial_upgrade $(get-snapshot-version latest_main)
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - when:
@@ -2435,6 +2500,23 @@ jobs:
             .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
               "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
               << parameters.max_pipeline_age_secs >> cancel_pipeline
+
+  cancel_if_current_commit_is_base_version:
+    docker:
+      - image: cimg/base:2024.01
+    environment:
+      <<: *env
+    steps:
+      - run:
+          name: Cancel the entire workflow if the current commit is a base version
+          command: |
+            latest_base_version=$(build-tools/find_latest_base_version.sh)
+            if [[ "${CIRCLE_SHA1}" == "${latest_base_version}" ]]; then
+              echo "Cancelling the entire workflow because the current commit is a base version."
+              curl -fsSL -X POST -H "Circle-Token: ${CIRCLECI_TOKEN}" "https://circleci.com/api/v2/workflow/${CIRCLE_WORKFLOW_ID}/cancel"
+            else
+              echo "Current commit is ${CIRCLE_SHA1}, latest base version is ${latest_base_version}."
+            fi
 
   backup_cluster:
     parameters:
@@ -4012,6 +4094,8 @@ workflows:
     when:
       equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
+      - cancel_if_current_commit_is_base_version:
+          <<: *main-branch-only
       - wait_for_previous_pipeline:
           <<: *notify-fail
           <<: *main-branch-only
@@ -4019,6 +4103,8 @@ workflows:
             - artifactory
             - slack-context
           workflow_names: "deploy_ciupgrade"
+          requires:
+            - cancel_if_current_commit_is_base_version
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           <<: *main-branch-only
@@ -4033,6 +4119,7 @@ workflows:
           requires:
             - wait_for_previous_pipeline
       - preflight_check:
+          name: "preflight_check_initial"
           <<: *main-branch-only
           get_snapshot_version_override: "latest_base"
           context:
@@ -4057,7 +4144,7 @@ workflows:
           requires:
             - deploy_cluster_for_migration
       - preflight_sv_check:
-           name: "preflight_sv_check_before_migration"
+           name: "preflight_sv_check_initial"
            <<: *main-branch-only
            get_snapshot_version_override: "latest_base"
            context:
@@ -4078,7 +4165,7 @@ workflows:
           requires:
             - deploy_cluster_for_migration
       - preflight_validator_check:
-          name: "preflight_validator_check_before_migration"
+          name: "preflight_validator_initial"
           <<: *main-branch-only
           get_snapshot_version_override: "latest_base"
           context:
@@ -4088,6 +4175,106 @@ workflows:
           cluster: "ciupgrade"
           requires:
             - deploy_cluster_for_migration
+      - docker_images_push:
+          <<: *notify-fail
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+      - deploy_partial_upgrade:
+          name: "deploy_partial_upgrade"
+          cluster: "ciupgrade"
+          context:
+            - artifactory
+            - slack-context
+          <<: *main-branch-only
+          requires:
+            - docker_images_push
+            - preflight_check_initial
+            - preflight_sv_check_initial
+            - preflight_validator_initial
+      - preflight_check:
+          name: "preflight_check_partial_upgrade"
+          <<: *main-branch-only
+          get_snapshot_version_override: "latest_base" # the /version endpoint is not served by sv1 nor validator1
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          wait_for_sv: false
+          parallelism: 1
+          requires:
+            - deploy_partial_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_partial_upgrade"
+          <<: *main-branch-only
+          get_snapshot_version_override: "latest_base"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_partial_upgrade
+      - preflight_validator_check:
+          name: "preflight_validator_partial_upgrade"
+          <<: *main-branch-only
+          get_snapshot_version_override: "latest_base"
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_partial_upgrade
+      - deploy_cluster:
+          name: "deploy_final_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - slack-context
+          cluster: "ciupgrade"
+          reset_cluster: false
+          send_deployment_notification: false
+          update_deployment_branch: false
+          cancel_workflow_on_failure: true
+          requires:
+            - preflight_check_partial_upgrade
+            - preflight_sv_check_partial_upgrade
+            - preflight_validator_partial_upgrade
+      - preflight_check:
+          name: "preflight_check_final_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          wait_for_sv: false
+          parallelism: 1
+          requires:
+            - deploy_final_upgrade
+      - preflight_sv_check:
+          name: "preflight_sv_check_final_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_final_upgrade
+      - preflight_validator_check:
+          name: "preflight_validator_final_upgrade"
+          <<: *main-branch-only
+          context:
+            - artifactory
+            - canton-network-vpn
+            - slack-context
+          cluster: "ciupgrade"
+          requires:
+            - deploy_final_upgrade
 # TODO (#9917): these steps (roughly) are needed for a domain migration test.
 #      - backup_cluster:
 #          name: "backup_cluster_before_migration"
@@ -4114,8 +4301,8 @@ workflows:
 #          wait_for_sv: false
 #          requires:
 #            - preflight_check
-#            - preflight_sv_check_before_migration
-#            - preflight_validator_check_before_migration
+#            - preflight_sv_check_initial
+#            - preflight_validator_initial
 #            - backup_cluster_before_migration
 #      - deploy_cluster:
 #          name: "prepare_cluster_for_migration"

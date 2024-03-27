@@ -1461,7 +1461,7 @@ function subcmd_apply() {
 
     if [ -n "${1-}" ]; then
         VERSION_NUMBER=$(get-snapshot-version)
-        IMAGE_TAG=$1
+        local -x IMAGE_TAG=$1
         _warning "Overriding image tag: ${IMAGE_TAG} (was: ${VERSION_NUMBER})"
     fi
 
@@ -1495,6 +1495,26 @@ function subcmd_apply() {
         fi
         subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
     fi
+}
+
+###
+
+subcommand_whitelist[partial_upgrade]="Upgrades SV-1's sv-app and validator1's validator-app to the version passed"
+
+function subcmd_partial_upgrade() {
+    local -x IMAGE_VERSIONS_FILE="/tmp/partial_upgrade_versions.json"
+    template_file="${REPO_ROOT}/build-tools/partial_upgrade_versions_template.json"
+    new_version=$1
+
+    sed -e "s/NEW_VERSION/${new_version}/g" "$template_file" > "$IMAGE_VERSIONS_FILE"
+
+    # Everything else should stay in the base version.
+    IMAGE_TAG=$("$REPO_ROOT"/build-tools/get-snapshot-version latest_base)
+    local -x IMAGE_TAG=$IMAGE_TAG
+
+    _info "Upgrading sv-1 sv-app & validator1 validator-app to version $new_version"
+
+    subcmd_pulumi canton-network up --yes --skip-preview "${args[@]}"
 }
 
 ###

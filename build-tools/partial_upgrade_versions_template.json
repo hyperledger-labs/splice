@@ -1,0 +1,10 @@
+{
+  "validator1": {
+    "cn-validator": "NEW_VERSION"
+  },
+  "sv-1": {
+    "cn-sv-node": "NEW_VERSION",
+    "cn-scan": "NEW_VERSION",
+    "cn-validator": "NEW_VERSION"
+  }
+}
