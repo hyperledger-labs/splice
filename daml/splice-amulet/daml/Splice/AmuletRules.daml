@@ -200,7 +200,7 @@ template AmuletRules
     -------------
 
     -- A choice for the DSO to mint amulet for the cases where the
-    -- collective rules allow for that; e.g., when redeeming DSO rewards.
+    -- DSO rules allow for that; e.g., when redeeming DSO rewards.
     nonconsuming choice AmuletRules_Mint: AmuletCreateSummary (ContractId Amulet)
       with
         receiver: Party

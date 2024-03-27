@@ -22,8 +22,7 @@ import Splice.Types
 
 testOnboardValidator : Script ()
 testOnboardValidator = do
-  (app, dso, (_, sv2, _, _)) <- initMainNetCollective
-  -- we now have a collective with BFT for f = 1
+  (app, dso, (_, sv2, _, _)) <- initMainNetDSO
 
   -- a new validator prepares his participant
   v1 <- allocateParty "v1"
@@ -44,8 +43,8 @@ testOnboardValidator = do
 
 testSvOnboarding : Script ()
 testSvOnboarding = do
-  (app, dso, (_, sv2, sv3, sv4)) <- initMainNetCollective
-  -- we now have a collective with BFT for f = 1
+  (app, dso, (_, sv2, sv3, sv4)) <- initMainNetDSO
+  -- we now have a DSO with BFT for f = 1
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -187,8 +186,7 @@ testSvOnboarding = do
 
 testSvOnboardingRequestExpiry : Script ()
 testSvOnboardingRequestExpiry = do
-  (app, _, (_, sv2, _, _)) <- initMainNetCollective
-  -- we now have a collective with BFT for f = 1
+  (app, _, (_, sv2, _, _)) <- initMainNetDSO
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -217,8 +215,7 @@ testSvOnboardingRequestExpiry = do
 
 testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember : Script ()
 testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
-  (app, dso, (_, sv2, _, _)) <- initMainNetCollective
-  -- we now have a collective with BFT for f = 1
+  (app, dso, (_, sv2, _, _)) <- initMainNetDSO
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -255,8 +252,7 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
 
 testSvOnboardingConfirmedExpiry : Script ()
 testSvOnboardingConfirmedExpiry = do
-  (app, dso, (_, sv2, sv3, sv4)) <- initMainNetCollective
-  -- we now have a collective with BFT for f = 1
+  (app, dso, (_, sv2, sv3, sv4)) <- initMainNetDSO
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -297,7 +293,7 @@ testSvOnboardingConfirmedExpiry = do
 testSvNameUniquenessNotInDevNet : Script ()
 testSvNameUniquenessNotInDevNet = do
   -- When it is not in devnet, new member cannot be added to DSO if its name is already used by any existing member.
-  (_, dso, (_, sv2, _, _)) <- initMainNetCollective
+  (_, dso, (_, sv2, _, _)) <- initMainNetDSO
 
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
 
@@ -309,7 +305,7 @@ testSvNameUniquenessNotInDevNet = do
 
 testSvMemberOverwriteInDevNet : Script ()
 testSvMemberOverwriteInDevNet = do
-  (app, dso, (sv1, sv2, _, _)) <- initDevNetCollective
+  (app, dso, (sv1, sv2, _, _)) <- initDevNetDSO
 
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
 
@@ -346,7 +342,7 @@ testSvMemberOverwriteInDevNet = do
 
 testSvMemberReonboarding : Script ()
 testSvMemberReonboarding = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNetCollective
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNetDSO
 
   [(_, dsoRules)] <- query @DsoRules dso
 

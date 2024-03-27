@@ -51,7 +51,7 @@ genericSetupApp dsoPrefix = do
   -- use a time that is easy to reason about in script outputs
   setTime demoTime
 
-  -- In this model the SV Collective is not decentralized.
+  -- In this model the DSO is not decentralized.
   dso <- allocateParty (dsoPrefix <> "DSO")
   dsoUser <- validateUserId (dsoPrefix <> "dso")
   _ <- createUser (User dsoUser (Some dso)) []

@@ -5,14 +5,14 @@ import qualified DA.Map as Map
 
 import Splice.CometBft
 
--- Collective-level configuration
+-- DSO-level configuration
 -- ==============================
 
 -- | The global domain consists of a series of actual domains.
--- New domains are created by the collective for the rare case of needing to roll-out
+-- New domains are created by the SVs for the rare case of needing to roll-out
 -- a BFT protocol upgrade that cannot be rolled out in a backwards compatible fashion.
 --
--- Note that domains themselves are formed by a cluster of nodes run by the collective members.
+-- Note that domains themselves are formed by a cluster of nodes run by the SVs.
 -- As can be seen form `DomainNodeConfig` each member runs multiple different kinds of
 -- physical nodes.
 data DsoGlobalDomainConfig = DsoGlobalDomainConfig with
@@ -24,11 +24,11 @@ data DsoGlobalDomainConfig = DsoGlobalDomainConfig with
     -- ^ The domain to be used for managing all DSO and CC workflows.
   deriving (Eq, Show)
 
--- | The collective-level configuration of a domain. This contains the shared parameters
+-- | The DSO-level configuration of a domain. This contains the shared parameters
 -- of the domain.
 data DomainConfig = DomainConfig with
     state : DomainState
-    -- ^ The state of this domain as seen from the perspective of the collective.
+    -- ^ The state of this synchronizer
     cometBftGenesisJson : Text
     -- ^ The CometBftGenesis json value required for new members to bring up
     -- their CometBft nodes for this domain.
@@ -37,10 +37,10 @@ data DomainConfig = DomainConfig with
 -- | The state of a domain.
 data DomainState
   = DS_Bootstrapping
-    -- ^ The collective is bootstrapping this domain, and members are required to
+    -- ^ The synchronizer is still being bootstrapped, and SVs are required to
     -- provision their nodes for it.
   | DS_Operational
-    -- ^ The collective considers this domain operational, and thus can use it as
+    -- ^ The domain is operational, and thus can be used as
     -- the active domain.
   | DS_Decomissioned
     -- ^ The domain has been decommissioned and members are now allowed to shutdown

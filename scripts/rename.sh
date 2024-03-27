@@ -616,7 +616,7 @@ function subcmd_all_packages() {
 
 subcommand_whitelist[no_illegal_daml_references]='Check for illegal daml references'
 function subcmd_no_illegal_daml_references() {
-    illegal_words=(currency founder founding)
+    illegal_words=(currency founder founding collective consortium)
     for word in "${illegal_words[@]}"; do
         echo "Checking for occurences of $word"
         if rg -i "$word" daml/; then

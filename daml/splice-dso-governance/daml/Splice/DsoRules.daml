@@ -108,10 +108,10 @@ data AnsEntryContext_ActionRequiringConfirmation
     -- ^ Automated action to reject initial payment of an ans entry.
   deriving (Eq, Show)
 
--- | Information about members relevant to collective governance.
+-- | Information about members relevant to DSO governance.
 data MemberInfo = MemberInfo with
     name : Text -- ^ Human-readable name; must be unique.
-    joinedAsOfRound : Round -- ^ Round in which the member joined the collective.
+    joinedAsOfRound : Round -- ^ Round in which the member joined the DSO.
     svRewardWeight : Int -- ^ Weight of the SV in the DSO reward distribution.
     participantId : Text -- ^ Participant ID of the SV, stored here as PartyToParticipant mappings are tracked via state on the DsoRules + SvOnboardingConfirmed contracts.
   deriving (Eq, Show)
@@ -122,7 +122,7 @@ data OffboardedMemberInfo = OffboardedMemberInfo with
     participantId : Text -- ^ Participant ID of the offboarded SV.
   deriving (Eq, Show)
 
-data CollectiveSummary = CollectiveSummary with
+data DSOSummary = DSOSummary with
     leader : Party
     numMembers : Int
     requiredNumVotes : Int
@@ -255,8 +255,8 @@ template ElectionRequest with
     reason : ElectionRequestReason -- reason for electing a new leader
     ranking : [Party] -- preference ranking for new leaders
   where
-    -- NOTE: we expect the requester to observe this contract through being
-    -- a backing member of the 'dso' collective party. The requester can in
+    -- NOTE: we expect the requester to observe this contract by hosting the
+    -- 'dso' party (as all SVs do). The requester can in
     -- particular not be a signatory, as otherwise fetching and archiving of
     -- the request would require the requesters confirmation instead of only
     -- the confirmation of the 'dso'.
@@ -342,9 +342,6 @@ data Reason = Reason with
   deriving (Eq, Show)
 
 
--- SV Collective rules
-----------------------
-
 data DsoRulesConfig = DsoRulesConfig with
     numUnclaimedRewardsThreshold : Int -- ^ The minimum number of unclaimed rewards required for merging
     numMemberTrafficContractsThreshold : Int -- ^ The minimum number of member traffic contracts required for merging
@@ -370,9 +367,8 @@ data TrafficState = TrafficState with
     consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the DSO was founded.
   deriving (Eq, Show)
 
--- | Rules governing the collective.
 template DsoRules with
-    dso : Party        -- ^ The collective party representing this collective
+    dso : Party        -- ^ The party representing the DSO
     epoch : Int        -- ^ The number of leaders that have already been elected.
     members : Map.Map Party MemberInfo
     offboardedMembers : Map.Map Party OffboardedMemberInfo
@@ -388,7 +384,7 @@ template DsoRules with
 
     -- NOTE: the members are not direct signatories as that would not give us the right fault-tolerance wrt
     -- validating choices on this contract. Instead, the members are indirect signatories by being
-    -- part of the confirmers for the 'dso' collective party.
+    -- hosting the `dso` party with confirmation rights.
     signatory dso
 
 
@@ -449,7 +445,7 @@ template DsoRules with
       controller sv
       do
         newReport <- case Map.lookup sv members of
-          None -> fail "SV is not a collective member"
+          None -> fail "SV is not a DSO member"
           Some info -> do
             previousReport <- fetchAndArchive (ForSvNode with dso; sv; svName = info.name) previousReportCid
             create SvStatusReport with
@@ -534,7 +530,7 @@ template DsoRules with
       controller requester
       do
         -- TODO(#7649): consider interaction with concurrent membership changes
-        require "Requester is a collective member" (requester `Map.member` members)
+        require "Requester is a DSO member" (requester `Map.member` members)
         require "All members are ranked exactly once" (sort ranking == sort (Map.keys members))
         electionRequestCid <- create ElectionRequest with
           ..
@@ -547,12 +543,12 @@ template DsoRules with
         requestCids : [ContractId ElectionRequest]
       controller actor
       do
-        let summary = summarizeCollective this
+        let summary = summarizeDSO this
         -- fetch, check, and archive all requests
         reqs <- forA requestCids $ \requestCid -> do
           req <- fetchAndArchive (ForDso with dso) requestCid
           require "Request is for this epoch" (req.epoch == epoch)
-          require "Requestor is a collective member" (req.requester `Map.member` members)
+          require "Requester is a DSO member" (req.requester `Map.member` members)
           pure req
         let numVotes = length reqs
             numVoters = numVotes
@@ -585,7 +581,7 @@ template DsoRules with
         action : ActionRequiringConfirmation
       controller confirmer
       do
-        require "Confirmer is a collective member" (confirmer `Map.member` members)
+        require "Confirmer is a DSO member" (confirmer `Map.member` members)
         now <- getTime
         let expiresAt = now `addRelTime` config.actionConfirmationTimeout
         confirmation <- create Confirmation with
@@ -602,12 +598,12 @@ template DsoRules with
         confirmationCids : [ContractId Confirmation]
       controller leader
       do
-        let s = summarizeCollective this
+        let s = summarizeDSO this
         let forDso = ForDso with dso
         require "Enough confirmations" (length confirmationCids >= s.requiredNumVotes)
         confirmers <- forA confirmationCids $ \confirmationCid -> do
           confirmation <- fetchAndArchive forDso confirmationCid
-          require "Confirmer is a collective member" (confirmation.confirmer `Map.member` members)
+          require "Confirmer is a DSO member" (confirmation.confirmer `Map.member` members)
           require "Confirmed action matches" (confirmation.action == action)
           pure confirmation.confirmer
         require "No duplicate confirmers" (unique confirmers)
@@ -628,7 +624,7 @@ template DsoRules with
       controller requester
       do
         requesterName <- case requester `Map.lookup` members of
-          None -> fail "Requester is not a collective member"
+          None -> fail "Requester is not a DSO member"
           Some info -> pure (info.name)
         requireWellformedReason config reason
         now <- getTime
@@ -664,7 +660,7 @@ template DsoRules with
         -- validate vote parameters
         requireWellformedVote config vote
         voterName <- case Map.lookup vote.sv members of
-          None -> fail "Voter is not a collective member"
+          None -> fail "Voter is not a DSO member"
           Some info -> pure info.name
         -- validate and archive request
         now <- getTime
@@ -695,7 +691,7 @@ template DsoRules with
               ]
         let abstainingMembers = [ name | name <- activeMembers, not (name `Map.member` request.votes) ]
         let (yays, nays) = partition (.accept) validVotes
-        let s = summarizeCollective this
+        let s = summarizeDSO this
         outcome <-
           if length yays >= s.requiredNumVotes
             then do
@@ -754,7 +750,7 @@ template DsoRules with
     -- happen due to a too quick removal and re-addition of a member.
     -- We expect this to be run as an OnAssignedContractTrigger for the DsoRules contract.
     --
-    -- Note: we do not archive the AmuletPriceVote of a member on its removal from the collective,
+    -- Note: we do not archive the AmuletPriceVote of a member on its removal from the DSO,
     -- as that would allow that member to block the removal via updating its AmuletPriceVote at the right time.
     --
     -- TODO(#10063): drop this code in favor of just keeping AmuletPriceVotes around.
@@ -799,7 +795,7 @@ template DsoRules with
         newConfig : DsoRulesConfig
       controller dso
       do
-        -- TODO(M3-57): sanity check the newConfig to avoid locking up the consortium, e.g., by setting `maxTextLength = -1`
+        -- TODO(M3-57): sanity check the newConfig to avoid locking up operations, e.g., by setting `maxTextLength = -1`
         newDsoRules <- create this with config = newConfig
         return DsoRules_SetConfigResult with ..
 
@@ -835,7 +831,7 @@ template DsoRules with
         validator : Party
       controller sponsor
       do
-        require "Sponsor is a collective member" (sponsor `Map.member` members)
+        require "Sponsor is a DSO member" (sponsor `Map.member` members)
         -- create license that records in particular which SV sponsored the onboarding of the validator
         validatorLicense <- create ValidatorLicense with
           dso
@@ -857,7 +853,7 @@ template DsoRules with
         sponsor : Party
       controller sponsor
       do
-        require "Sponsor is a collective member" (sponsor `Map.member` members)
+        require "Sponsor is a DSO member" (sponsor `Map.member` members)
         now <- getTime
         let expiresAt = now `addRelTime` config.svOnboardingRequestTimeout
         onboardingRequest <- create SvOnboardingRequest with ..
@@ -880,7 +876,7 @@ template DsoRules with
         -- TODO(#3756) Enable archiving also before the member is added, after a matching `SvOnboardingConfirmed` contract is created.
         svOnboardingRequest <- fetchAndArchive (ForDso with dso) svOnboardingRequestCid
         let maybeMember = Map.lookup svOnboardingRequest.candidateParty members
-        require "member party is already added to the DSO collective" (isSome maybeMember)
+        require "member party is already added to the DSO" (isSome maybeMember)
         require "member name matches" ((fromSome maybeMember).name == svOnboardingRequest.candidateName)
         return DsoRules_ArchiveSvOnboardingRequestResult
 
@@ -1022,7 +1018,7 @@ template DsoRules with
       controller sv
       do
         case Map.lookup sv members of
-          None -> fail "SV is not a collective member"
+          None -> fail "SV is not a DSO member"
           Some info -> do
             -- check round
             now <- getTime
@@ -1124,7 +1120,8 @@ template DsoRules with
         return DsoRules_MergeMemberTrafficContractsResult with
           memberTraffic = result.mergedTrafficCid
 
-summarizeCollective dsoRules = CollectiveSummary with
+summarizeDSO : DsoRules -> DSOSummary
+summarizeDSO dsoRules = DSOSummary with
     leader = dsoRules.leader
     numMembers
     requiredNumVotes =

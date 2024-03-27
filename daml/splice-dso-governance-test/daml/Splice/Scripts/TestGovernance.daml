@@ -24,7 +24,7 @@ import Splice.Scripts.DsoTestUtils
 -- | Tests vote request machinery on featured app right granting and revoking.
 testVoteRequest : Script ()
 testVoteRequest = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
@@ -116,7 +116,7 @@ testVoteRequest = do
 
 testVoteRequestRejection : Script ()
 testVoteRequestRejection = do
-  (_app, dso, (sv1, sv2, _sv3, sv4)) <- initMainNetCollective
+  (_app, dso, (sv1, sv2, _sv3, sv4)) <- initMainNetDSO
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
@@ -166,7 +166,7 @@ testVoteRequestRejection = do
 
 testRacingMembershipRemoval : Script ()
 testRacingMembershipRemoval = do
-  (_, dso, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  (_, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
@@ -313,7 +313,7 @@ testRacingMembershipRemoval = do
 -- | Test DsoRules configuration changes.
 testDsoRulesConfigChange : Script ()
 testDsoRulesConfigChange = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
 
   [(_, dsoRules)] <- query @DsoRules dso
 
@@ -332,7 +332,7 @@ testDsoRulesConfigChange = do
 -- | Test membership removal and GC of AmuletPriceVotes
 testOffboardMemberAndAmuletPriceVotes : Script ()
 testOffboardMemberAndAmuletPriceVotes = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
 
   -- check that the leader is currently sv1
   [(_, dsoRules)] <- query @DsoRules dso
@@ -386,7 +386,7 @@ testOffboardMemberAndAmuletPriceVotes = do
 -- | vote request contract is archived if it has expired
 testVoteRequestExpire : Script ()
 testVoteRequestExpire = do
-  (_, dso, (sv1, _, _, _)) <- initMainNetCollective
+  (_, dso, (sv1, _, _, _)) <- initMainNetDSO
   provider <- allocateParty "provider"
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
@@ -436,7 +436,7 @@ unitTestMedian = do
 testAmuletPriceVoting : Script ()
 testAmuletPriceVoting = do
 
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
 
   -- run a normal issuance so time advances and the amulet price is set to 1.2 for everybody
   runNextIssuanceD app 1.2

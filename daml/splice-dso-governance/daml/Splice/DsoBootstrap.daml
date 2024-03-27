@@ -14,7 +14,7 @@ import Splice.DsoRules
 
 data DsoBootstrap_BootstrapResult = DsoBootstrap_BootstrapResult
 
--- | A template for bootstrapping the collective and AmuletRules.
+-- | A template for bootstrapping DsoRules and AmuletRules.
 template DsoBootstrap with
     dso : Party
     sv1Party : Party -- ^ the SV that bootstraps the network

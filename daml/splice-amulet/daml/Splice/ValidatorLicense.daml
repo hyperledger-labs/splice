@@ -26,7 +26,7 @@ data ValidatorFaucetCoupon_DsoExpireResult = ValidatorFaucetCoupon_DsoExpireResu
 template ValidatorLicense with
     validator : Party           -- ^ The validator (party) that this license is about.
     sponsor : Party             -- ^ The SV node that sponsored the onboarding.
-    dso : Party                 -- ^ The party representing the network's SV collective.
+    dso : Party                 -- ^ The party representing the operations of the decentralized synchronizer.
     faucetState : Optional FaucetState
   where
     signatory dso -- sponsor is not a signatory as that complicates re-issuing crates

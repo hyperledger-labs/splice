@@ -12,7 +12,7 @@ import Splice.Scripts.DsoTestUtils
 
 testDomainMigration : Script ()
 testDomainMigration = do
-  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNetCollective
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
   let svs = [sv1, sv2, sv3, sv4]
       domainId = "domain-id"
 
