@@ -2511,6 +2511,7 @@ jobs:
       - run:
           name: Cancel the entire workflow if the current commit is a base version
           command: |
+            source .envrc.vars
             latest_base_version=$(build-tools/find_latest_base_version.sh)
             if [[ "${CIRCLE_SHA1}" == "${latest_base_version}" ]]; then
               echo "Cancelling the entire workflow because the current commit is a base version."
