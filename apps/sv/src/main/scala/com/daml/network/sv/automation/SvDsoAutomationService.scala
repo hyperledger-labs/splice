@@ -306,6 +306,13 @@ class SvDsoAutomationService(
       )
     }
 
+    registerTrigger(
+      new ReconcileDomainFeesConfigTrigger(
+        triggerContext,
+        dsoStore,
+        participantAdminConnection,
+      )
+    )
   }
 
   private val localSequencerClientContext: Option[LocalSequencerClientContext] =
@@ -422,5 +429,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SequencerPruningTrigger],
       aTrigger[SubmitSvStatusReportTrigger],
       aTrigger[SvStatusReportMetricsExportTrigger],
+      aTrigger[ReconcileDomainFeesConfigTrigger],
     )
 }

@@ -247,5 +247,4 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       }
     }
   }
-
 }
