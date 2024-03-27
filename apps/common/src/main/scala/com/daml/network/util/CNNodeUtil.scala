@@ -197,14 +197,10 @@ object CNNodeUtil {
 
   val defaultLockHolderFee = new splice.fees.FixedFee(damlDecimal(0.005))
 
-  // TODO(#6032): determine the best defaults here
-  val defaultExtraTrafficPrice = BigDecimal(1.0) // extraTrafficPrice (in $/MB)
-  // TODO(#9537): reduce minTopupAmount once more
-  val defaultMinTopupAmount =
-    10_000_000L // minTopupAmount chosen such that at least 1$ is spent per top-up (too low and the output fees for its corresponding transfer can't even be paid)
-
   // These are dummy values only made use of by some unit tests.
   // The traffic control parameters are provided in the founding SV App config with the defaults in TrafficControlConfig
+  private val dummyExtraTrafficPrice = BigDecimal(1.0) // extraTrafficPrice (in $/MB)
+  private val dummyMinTopupAmount = 1_000_000L
   private val dummyBaseRateBurstAmount = 10 * 20 * 1000L
   private val dummyBaseRateBurstWindow = NonNegativeFiniteDuration.ofMinutes(10)
   private val dummyReadVsWriteScalingFactor = 200
@@ -215,6 +211,8 @@ object CNNodeUtil {
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
       initialDomainId: DomainId,
+      initialExtraTrafficPrice: BigDecimal = dummyExtraTrafficPrice,
+      initialMinTopupAmount: Long = dummyMinTopupAmount,
       initialBaseRateBurstAmount: Long = dummyBaseRateBurstAmount,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
@@ -226,6 +224,8 @@ object CNNodeUtil {
       initialTickDuration,
       initialMaxNumInputs,
       initialDomainId,
+      initialExtraTrafficPrice,
+      initialMinTopupAmount,
       initialBaseRateBurstAmount,
       initialBaseRateBurstWindow,
       initialReadVsWriteScalingFactor,
@@ -238,6 +238,8 @@ object CNNodeUtil {
       initialTickDuration: NonNegativeFiniteDuration,
       initialMaxNumInputs: Int,
       initialDomainId: DomainId,
+      initialExtraTrafficPrice: BigDecimal = dummyExtraTrafficPrice,
+      initialMinTopupAmount: Long = dummyMinTopupAmount,
       initialBaseRateBurstAmount: Long = dummyBaseRateBurstAmount,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
       initialReadVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
@@ -255,6 +257,8 @@ object CNNodeUtil {
       defaultGlobalDomainConfig(
         initialDomainId,
         nextDomainId,
+        initialExtraTrafficPrice,
+        initialMinTopupAmount,
         initialBaseRateBurstAmount,
         initialBaseRateBurstWindow,
         initialReadVsWriteScalingFactor,
@@ -287,6 +291,8 @@ object CNNodeUtil {
   private def defaultGlobalDomainConfig(
       initialDomainId: DomainId,
       nextDomainId: Option[DomainId],
+      initialExtraTrafficPrice: BigDecimal,
+      initialMinTopupAmount: Long,
       initialBaseRateBurstAmount: Long,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration,
       initialReadVsWriteScalingFactor: Int,
@@ -307,6 +313,8 @@ object CNNodeUtil {
         baseRateBurstAmount = initialBaseRateBurstAmount,
         baseRateBurstWindow = initialBaseRateBurstWindow,
         readVsWriteScalingFactor = initialReadVsWriteScalingFactor,
+        extraTrafficPrice = initialExtraTrafficPrice,
+        minTopupAmount = initialMinTopupAmount,
       ),
     )
   }
@@ -359,11 +367,11 @@ object CNNodeUtil {
   }
 
   def domainFeesConfig(
-      baseRateBurstAmount: Long,
-      baseRateBurstWindow: NonNegativeFiniteDuration,
+      baseRateBurstAmount: Long = dummyBaseRateBurstAmount,
+      baseRateBurstWindow: NonNegativeFiniteDuration = dummyBaseRateBurstWindow,
       readVsWriteScalingFactor: Int = dummyReadVsWriteScalingFactor,
-      minTopupAmount: Long = defaultMinTopupAmount,
-      extraTrafficPrice: BigDecimal = defaultExtraTrafficPrice,
+      extraTrafficPrice: BigDecimal = dummyExtraTrafficPrice,
+      minTopupAmount: Long = dummyMinTopupAmount,
   ) = {
     new DomainFeesConfig(
       baseRateLimits(baseRateBurstAmount, baseRateBurstWindow),

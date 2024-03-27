@@ -235,6 +235,17 @@ spec:
               value: |
                 canton.sv-apps.sv.onboarding-polling-interval = {{ . }}
             {{- end }}
+            {{- with .Values.initialDomainFeesConfig }}
+            - name: ADDITIONAL_CONFIG_DOMAIN_FEES
+              value: |
+               canton.sv-apps.sv.onboarding.initial-domain-fees-config {
+                 extra-traffic-price = {{ printf "%f" .extraTrafficPrice }}
+                 min-topup-amount = {{ printf "%.0f" .minTopupAmount }}
+                 base-rate-burst-amount = {{ printf "%.0f" .baseRateBurstAmount }}
+                 base-rate-burst-window = {{ printf "%.0fm" .baseRateBurstWindowMins | quote }}
+                 read-vs-write-scaling-factor = {{ printf "%.0f" .readVsWriteScalingFactor }}
+               }
+            {{- end }}
             - name: FAIL_ON_APP_VERSION_MISMATCH
               value: {{ .Values.failOnAppVersionMismatch | quote }}
           ports:

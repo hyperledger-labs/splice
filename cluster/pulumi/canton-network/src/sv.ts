@@ -20,6 +20,7 @@ import {
   ExpectedValidatorOnboarding,
   fetchAndInstallParticipantBootstrapDump,
   GlobalDomainMigrationConfig,
+  initialDomainFeesConfig,
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
@@ -483,6 +484,8 @@ function installSvApp(
       config.onboarding.type == 'found-collective'
         ? config.onboarding.initialHoldingFee
         : undefined,
+    initialDomainFeesConfig:
+      config.onboarding.type == 'found-collective' ? initialDomainFeesConfig : undefined,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     cometBFT: {
       enabled: true,

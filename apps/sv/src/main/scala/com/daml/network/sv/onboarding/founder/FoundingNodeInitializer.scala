@@ -235,11 +235,11 @@ class FoundingNodeInitializer(
 
   private def initialTrafficControlParameters: TrafficControlParameters = {
     TrafficControlParameters(
-      foundingConfig.initialTrafficControlConfig.baseRateBurstAmount,
-      foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor,
+      foundingConfig.initialDomainFeesConfig.baseRateBurstAmount,
+      foundingConfig.initialDomainFeesConfig.readVsWriteScalingFactor,
       // have to convert canton.config.NonNegativeDuration to canton.time.NonNegativeDuration
       NonNegativeFiniteDuration.tryOfMillis(
-        foundingConfig.initialTrafficControlConfig.baseRateBurstWindow.duration.toMillis
+        foundingConfig.initialDomainFeesConfig.baseRateBurstWindow.duration.toMillis
       ),
     )
   }
@@ -449,9 +449,11 @@ class FoundingNodeInitializer(
                   foundingConfig.initialTickDuration,
                   foundingConfig.initialMaxNumInputs,
                   domainId,
-                  foundingConfig.initialTrafficControlConfig.baseRateBurstAmount.value,
-                  foundingConfig.initialTrafficControlConfig.baseRateBurstWindow,
-                  foundingConfig.initialTrafficControlConfig.readVsWriteScalingFactor.value,
+                  foundingConfig.initialDomainFeesConfig.extraTrafficPrice.value,
+                  foundingConfig.initialDomainFeesConfig.minTopupAmount.value,
+                  foundingConfig.initialDomainFeesConfig.baseRateBurstAmount.value,
+                  foundingConfig.initialDomainFeesConfig.baseRateBurstWindow,
+                  foundingConfig.initialDomainFeesConfig.readVsWriteScalingFactor.value,
                   foundingConfig.initialHoldingFee,
                 )
                 for {

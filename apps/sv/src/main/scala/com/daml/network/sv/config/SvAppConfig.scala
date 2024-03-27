@@ -79,7 +79,7 @@ object SvOnboardingConfig {
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
-      initialTrafficControlConfig: TrafficControlConfig = TrafficControlConfig(),
+      initialDomainFeesConfig: DomainFeesConfig = DomainFeesConfig(),
       isDevNet: Boolean = false,
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
   ) extends SvOnboardingConfig
@@ -116,7 +116,10 @@ final case class InitialAnsConfig(
     entryFee: Double = 1.0,
 )
 
-final case class TrafficControlConfig(
+final case class DomainFeesConfig(
+    extraTrafficPrice: NonNegativeNumeric[BigDecimal] =
+      NonNegativeNumeric.tryCreate(BigDecimal(1.0)),
+    minTopupAmount: NonNegativeLong = NonNegativeLong.tryCreate(10_000_000L),
     baseRateBurstAmount: NonNegativeLong =
       NonNegativeLong.tryCreate(100 * 20 * 1000L), // 100 txs of 20KB each (over the burst window)
     baseRateBurstWindow: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),

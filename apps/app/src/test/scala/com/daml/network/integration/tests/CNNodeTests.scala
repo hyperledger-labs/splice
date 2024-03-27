@@ -17,7 +17,7 @@ import com.daml.network.integration.plugins.{
   WaitForPorts,
 }
 import com.daml.network.metrics.CNNodeMetricsFactory
-import com.daml.network.sv.config.{SvOnboardingConfig, TrafficControlConfig}
+import com.daml.network.sv.config.{SvOnboardingConfig, DomainFeesConfig}
 import com.daml.network.util.{Auth0Util, CommonCNNodeAppInstanceReferences}
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -261,12 +261,12 @@ object CNNodeTests {
     def tickDurationWithBuffer(implicit env: CNNodeTestConsoleEnvironment) =
       defaultTickDuration.asJava.plus(java.time.Duration.ofSeconds(10))
 
-    def defaultTrafficControlConfig(implicit
+    def defaultDomainFeesConfig(implicit
         env: CNNodeTestConsoleEnvironment
-    ): TrafficControlConfig =
+    ): DomainFeesConfig =
       sv1Backend.config.onboarding match {
         case Some(foundCollective: SvOnboardingConfig.FoundCollective) =>
-          foundCollective.initialTrafficControlConfig
+          foundCollective.initialDomainFeesConfig
         case Some(_: SvOnboardingConfig.JoinWithKey) | Some(_: SvOnboardingConfig.DomainMigration) |
             None =>
           fail("Failed to retrieve defaultTrafficControlConfig from sv1.")

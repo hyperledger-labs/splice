@@ -47,14 +47,16 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
         .getConfigAsOf(env.environment.clock.now)
         .globalDomain
         .activeDomain
-    val trafficControlConfig = defaultTrafficControlConfig
+    val domainFeesConfig = defaultDomainFeesConfig
     defaultAmuletConfig(
       tickDuration,
       maxNumInputs,
       DomainId.tryFromString(activeDomainId),
-      trafficControlConfig.baseRateBurstAmount.value,
-      trafficControlConfig.baseRateBurstWindow,
-      trafficControlConfig.readVsWriteScalingFactor.value,
+      domainFeesConfig.extraTrafficPrice.value,
+      domainFeesConfig.minTopupAmount.value,
+      domainFeesConfig.baseRateBurstAmount.value,
+      domainFeesConfig.baseRateBurstWindow,
+      domainFeesConfig.readVsWriteScalingFactor.value,
       holdingFee,
       nextDomainId = nextDomainId,
     )

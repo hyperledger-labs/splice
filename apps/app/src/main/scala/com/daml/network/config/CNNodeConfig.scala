@@ -413,8 +413,8 @@ object CNNodeConfig {
       new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val initialAnsConfigReader: ConfigReader[InitialAnsConfig] =
       deriveReader[InitialAnsConfig]
-    implicit val trafficControlConfigReader: ConfigReader[TrafficControlConfig] =
-      deriveReader[TrafficControlConfig]
+    implicit val domainFeesConfigReader: ConfigReader[DomainFeesConfig] =
+      deriveReader[DomainFeesConfig]
     implicit val svOnboardingFoundCollectiveReader
         : ConfigReader[SvOnboardingConfig.FoundCollective] =
       deriveReader[SvOnboardingConfig.FoundCollective]
@@ -659,8 +659,8 @@ object CNNodeConfig {
       new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val initialAnsConfigWriter: ConfigWriter[InitialAnsConfig] =
       deriveWriter[InitialAnsConfig]
-    implicit val trafficControlConfigWriter: ConfigWriter[TrafficControlConfig] =
-      deriveWriter[TrafficControlConfig]
+    implicit val domainFeesConfigWriter: ConfigWriter[DomainFeesConfig] =
+      deriveWriter[DomainFeesConfig]
     implicit val svOnboardingFoundCollectiveWriter
         : ConfigWriter[SvOnboardingConfig.FoundCollective] =
       deriveWriter[SvOnboardingConfig.FoundCollective]
