@@ -15,7 +15,7 @@ const transferOfferPayload = z.object({
   receiver: z.string(),
   amount: z.object({
     amount: z.string(),
-    currency: z.enum(['CC', 'USD']),
+    unit: z.enum(['CC', 'USD']),
   }),
   sender: z.string(),
   dso: z.string(),
