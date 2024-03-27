@@ -6,6 +6,17 @@ Release Notes
 2024-04-01
 ----------
 
+* Renamed the following terms in our underlying Daml models and the apps' APIs to prepare for open-sourcing
+  their code in a form that does not use the term "Canton" or "collective":
+
+  * Coin -> Amulet
+  * CNS -> ANS (Amulet Name Service)
+  * SVC -> DSO (Decentralized Synchronizer Operations)
+  * Note that for technical reasons the URLs for networks still include the term "svc" for now;
+    e.g., ``https://wallet.sv.svc.YOUR_HOSTNAME``.
+    Furthermore, some URLs and UIs may refer to the terms Amulet or ANS, but should actually be specialized
+    to the term CNS or Canton Coin. This will be fixed in a future release.
+
 * Added an option to disable the Validator apps' wallet. This can be done by setting ``enableWallet`` to ``false`` in the ``validator-values.yaml`` file.
 
 * Added ANS name resolution (formally known as CNS) for ``dso.ans`` to the DSO party and ``<sv-name>.sv.ans`` to all SV members parties.
