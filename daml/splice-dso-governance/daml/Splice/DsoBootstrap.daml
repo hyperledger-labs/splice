@@ -9,7 +9,7 @@ import Splice.Schedule
 import Splice.Types
 
 import Splice.Ans
-import Splice.DSO.GlobalDomain
+import Splice.DSO.DecentralizedSynchronizer
 import Splice.DsoRules
 
 data DsoBootstrap_BootstrapResult = DsoBootstrap_BootstrapResult
@@ -21,7 +21,7 @@ template DsoBootstrap with
     sv1Name : Text -- ^ human-readable name of SV1
     sv1RewardWeight : Int -- ^ the weight of SV1 in the reward distribution
     sv1ParticipantId : Text -- ^ the id of the participant of the SV that bootstraps the synchronizer
-    sv1DomainNodes : DomainNodeConfigMap -- ^ Domain nodes on which this workflow runs
+    sv1SynchronizerNodes : SynchronizerNodeConfigMap -- ^ Synchronizer nodes on which this workflow runs
     round0Duration : RelTime
     amuletConfig : AmuletConfig USD
     amuletPrice : Decimal
@@ -74,5 +74,5 @@ template DsoBootstrap with
               joinedAsOfRound = Round 0
               newSvRewardWeight = sv1RewardWeight
         createPerSvContracts dsoRules addSvChoiceArgs
-        createPerSvPartyContracts dso sv1Party sv1Name sv1DomainNodes (Some amuletPrice)
+        createPerSvPartyContracts dso sv1Party sv1Name sv1SynchronizerNodes (Some amuletPrice)
         return DsoBootstrap_BootstrapResult

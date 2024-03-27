@@ -14,7 +14,7 @@ import java.nio.file.Path
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 
-final class GlobalDomainMigrationTrigger(
+final class DecentralizedSynchronizerMigrationTrigger(
     override protected val currentMigrationId: Long,
     override protected val context: TriggerContext,
     override protected val participantAdminConnection: ParticipantAdminConnection,

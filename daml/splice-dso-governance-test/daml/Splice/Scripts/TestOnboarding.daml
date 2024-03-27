@@ -11,7 +11,7 @@ import Splice.ValidatorLicense
 
 import Splice.CometBft
 import Splice.DsoRules
-import Splice.DSO.GlobalDomain
+import Splice.DSO.DecentralizedSynchronizer
 import Splice.SvOnboarding
 
 import Splice.Scripts.Util
@@ -167,18 +167,18 @@ testSvOnboarding = do
   let scanConfig = Some ScanConfig with
         publicUrl = "https://scan1234.example.com"
 
-  let newNodeConfig = DomainNodeConfig with
+  let newNodeConfig = SynchronizerNodeConfig with
         cometBft = cometBftConfig
         sequencer = sequencerConfig
         mediator = mediatorConfig
         scan = scanConfig
 
-  setDomainNodeConfig app svX dsoRules.config.globalDomain.lastDomainId newNodeConfig
+  setSynchronizerNodeConfig app svX dsoRules.config.decentralizedSynchronizer.lastSynchronizerId newNodeConfig
 
   -- check that the config was actually set
   (_, nodeState) <- getSvNodeState app svX
   let actualConfig =
-        Map.lookup dsoRules.config.globalDomain.lastDomainId nodeState.state.domainNodes
+        Map.lookup dsoRules.config.decentralizedSynchronizer.lastSynchronizerId nodeState.state.synchronizerNodes
   actualConfig === Some newNodeConfig
 
   pure ()

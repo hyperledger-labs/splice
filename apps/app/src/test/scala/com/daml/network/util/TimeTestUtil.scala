@@ -333,7 +333,7 @@ trait TimeTestUtil extends CNNodeTestCommon {
   ) = {
     val now = sv1Backend.participantClient.ledger_api.time.get()
     val validatorTopupParameters = ExtraTrafficTopupParameters(
-      sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.fees,
+      sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.fees,
       validatorAppRef.config.domains.global.buyExtraTraffic,
       validatorAppRef.config.automation.pollingInterval,
     )

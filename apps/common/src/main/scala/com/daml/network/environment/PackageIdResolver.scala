@@ -195,7 +195,7 @@ object PackageIdResolver {
     "Splice.Amulet" -> Package.SpliceAmulet,
     "Splice.AmuletRules" -> Package.SpliceAmulet,
     "Splice.AmuletImport" -> Package.SpliceAmulet,
-    "Splice.GlobalDomain" -> Package.SpliceAmulet,
+    "Splice.DecentralizedSynchronizer" -> Package.SpliceAmulet,
     "Splice.ValidatorLicense" -> Package.SpliceAmulet,
     "Splice.Round" -> Package.SpliceAmulet,
     "Splice.Ans" -> Package.SpliceAmuletNameService,

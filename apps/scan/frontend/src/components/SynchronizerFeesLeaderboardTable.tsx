@@ -5,7 +5,7 @@ import { useGetTopValidatorsByPurchasedTraffic } from 'common-frontend/scan-api'
 
 import { Stack, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
-export const DomainFeesLeaderboardTable: React.FC = () => {
+export const SynchronizerFeesLeaderboardTable: React.FC = () => {
   const topValidatorsQuery = useGetTopValidatorsByPurchasedTraffic();
 
   switch (topValidatorsQuery.status) {
@@ -50,7 +50,7 @@ export const DomainFeesLeaderboardTable: React.FC = () => {
   }
 };
 
-export default DomainFeesLeaderboardTable;
+export default SynchronizerFeesLeaderboardTable;
 
 const ValidatorRow: React.FC<{
   validator: {

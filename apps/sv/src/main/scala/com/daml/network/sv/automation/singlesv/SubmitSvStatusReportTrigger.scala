@@ -45,13 +45,13 @@ class SubmitSvStatusReportTrigger(
       openMiningRounds <- store.getOpenMiningRoundTriple()
       cometBftHeight <- cometBft.traverse(_.getLatestBlockHeight())
       // TODO(#10297): make this code work properly with multiple mediators in the case of soft-domain migration
-      mediatorDomainTimeLb <- mediatorAdminConnection.traverse(
+      mediatorSynchronizerTimeLb <- mediatorAdminConnection.traverse(
         _.getDomainTimeLowerBound(
           dsoRules.domain,
           maxDomainTimeLag = context.config.pollingInterval,
         )
       )
-      participantDomainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
+      participantSynchronizerTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
         dsoRules.domain,
         maxDomainTimeLag = context.config.pollingInterval,
       )
@@ -61,8 +61,8 @@ class SubmitSvStatusReportTrigger(
         // Production deployments always define all of these values, which is why we don't embed the 'Option' value
         // into the status report. We'll only see the magic default values in our tests.
         cometBftHeight.getOrElse[Long](-1L),
-        mediatorDomainTimeLb.fold(CantonTimestamp.MinValue)(_.timestamp).toInstant,
-        participantDomainTimeLb.timestamp.toInstant,
+        mediatorSynchronizerTimeLb.fold(CantonTimestamp.MinValue)(_.timestamp).toInstant,
+        participantSynchronizerTimeLb.timestamp.toInstant,
         openMiningRounds.newest.payload.round,
       )
       cmd = dsoRules.exercise(

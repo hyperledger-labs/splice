@@ -23,9 +23,9 @@ class SequencerPruningIntegrationTest
       .addConfigTransform((_, config) =>
         CNNodeConfigTransforms.updateAllSvAppConfigs { (_, config) =>
           config.copy(
-            localDomainNode = config.localDomainNode.map(domainNode =>
-              domainNode.copy(
-                sequencer = domainNode.sequencer.copy(
+            localSynchronizerNode = config.localSynchronizerNode.map(synchronizerNode =>
+              synchronizerNode.copy(
+                sequencer = synchronizerNode.sequencer.copy(
                   pruning = Some(
                     SequencerPruningConfig(
                       pruningInterval = NonNegativeFiniteDuration(2.seconds),

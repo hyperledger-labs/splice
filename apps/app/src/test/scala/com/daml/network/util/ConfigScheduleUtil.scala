@@ -31,7 +31,7 @@ import scala.jdk.CollectionConverters.*
 trait ConfigScheduleUtil extends CNNodeTestCommon {
 
   /** Helper function to create AmuletConfig's in tests for amulet config changes. Uses the `currentSchedule` as a reference
-    * to fill in the id of the activeDomain.
+    * to fill in the id of the activeSynchronizer.
     */
   protected def mkUpdatedAmuletConfig(
       currentSchedule: Schedule[Instant, AmuletConfig[USD]],
@@ -42,16 +42,16 @@ trait ConfigScheduleUtil extends CNNodeTestCommon {
   )(implicit
       env: CNNodeTests.CNNodeTestConsoleEnvironment
   ): splice.amuletconfig.AmuletConfig[splice.amuletconfig.USD] = {
-    val activeDomainId =
+    val activeSynchronizerId =
       AmuletConfigSchedule(currentSchedule)
         .getConfigAsOf(env.environment.clock.now)
-        .globalDomain
-        .activeDomain
-    val domainFeesConfig = defaultDomainFeesConfig
+        .decentralizedSynchronizer
+        .activeSynchronizer
+    val domainFeesConfig = defaultSynchronizerFeesConfig
     defaultAmuletConfig(
       tickDuration,
       maxNumInputs,
-      DomainId.tryFromString(activeDomainId),
+      DomainId.tryFromString(activeSynchronizerId),
       domainFeesConfig.extraTrafficPrice.value,
       domainFeesConfig.minTopupAmount.value,
       domainFeesConfig.baseRateBurstAmount.value,

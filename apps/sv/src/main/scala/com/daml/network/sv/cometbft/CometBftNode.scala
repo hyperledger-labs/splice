@@ -56,7 +56,7 @@ class CometBftNode(
     val keepsOurOwnGovernanceKey = targetNodeStates
       .find(state => state.svName == owningSvNode)
       .exists(state =>
-        state.state.domainNodes.asScala
+        state.state.synchronizerNodes.asScala
           .get(domainId.toProtoPrimitive)
           .exists(config =>
             config.cometBft.governanceKeys.asScala.exists(_.pubKey == ourGovernanceKey.pubKey)
@@ -357,17 +357,17 @@ object CometBftNode {
   ): immutable.Map[String, proto.cometbft.SvNodeConfig] =
     memberNodeStates
       .flatMap(state =>
-        extractDomainNodeConfig(state, domainId).map(domainNode =>
-          state.svName -> svNodeConfigToProto(domainNode.cometBft)
+        extractSynchronizerNodeConfig(state, domainId).map(synchronizerNode =>
+          state.svName -> svNodeConfigToProto(synchronizerNode.cometBft)
         )
       )
       .toMap
-  private def extractDomainNodeConfig(
+  private def extractSynchronizerNodeConfig(
       nodeState: daml.dso.svstate.SvNodeState,
       domainId: DomainId,
   ) = {
     // TODO(#4901): reconcile all configured CometBFT networks
-    nodeState.state.domainNodes.asScala.get(domainId.toProtoPrimitive)
+    nodeState.state.synchronizerNodes.asScala.get(domainId.toProtoPrimitive)
   }
 
   /** Used only for pretty-printing a summary. */

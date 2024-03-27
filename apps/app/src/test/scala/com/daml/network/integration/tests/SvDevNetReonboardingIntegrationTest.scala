@@ -48,7 +48,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
       def checkPartyToParticipantX(expected: Seq[ParticipantId]) = {
         eventually() {
           val mapping = sv1Backend.appState.participantAdminConnection
-            .getPartyToParticipant(globalDomainId, sv1Backend.getDsoInfo().dsoParty)
+            .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)
             .futureValue
             .mapping
           mapping.threshold shouldBe PositiveInt.tryCreate(2)
@@ -61,7 +61,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
           val decentralizedNamespaces =
             sv1Backend.participantClient.topology.decentralized_namespaces
               .list(
-                filterStore = globalDomainId.filterString,
+                filterStore = decentralizedSynchronizerId.filterString,
                 filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
               )
           inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
@@ -120,7 +120,7 @@ class SvDevNetReonboardingIntegrationTest extends SvIntegrationTestBase {
         "old SV from PartyToParticipantX is removed and sv3 is overwritten with different party id",
         _ => {
           val mapping = sv1Backend.appState.participantAdminConnection
-            .getPartyToParticipant(globalDomainId, sv1Backend.getDsoInfo().dsoParty)
+            .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)
             .futureValue
             .mapping
           mapping.threshold shouldBe PositiveInt.tryCreate(2)

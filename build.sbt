@@ -1293,15 +1293,15 @@ printTests := {
     isPreflightIntegrationTest(name) && name.contains("RunbookSv")
   def isRunbookValidatorPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("RunbookValidator")
-  def isGlobalDomainDeploymentPreflightIntegrationTest(name: String): Boolean =
+  def isDecentralizedSynchronizerDeploymentPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(
       name
-    ) && name.contains("GlobalDomainUpgradeCluster")
+    ) && name.contains("DecentralizedSynchronizerUpgradeCluster")
   def isAuth0CredentialsPreflightIntegrationTest(name: String): Boolean =
     isPreflightIntegrationTest(name) && name.contains("Auth0Credentials")
 
   def isGlobalSoftMigrationTest(name: String): Boolean =
-    name contains "GlobalDomainSoftDomainMigration"
+    name contains "DecentralizedSynchronizerSoftDomainMigration"
   def isAppManagerTest(name: String): Boolean = name contains "AppManager"
   def isDisasterRecoveryTest(name: String): Boolean = name contains "DisasterRecovery"
   def isAppUpgradeTest(name: String): Boolean = name contains "AppUpgrade"
@@ -1318,7 +1318,7 @@ printTests := {
     (
       "Global domain upgrade cluster preflight",
       "test-full-class-names-global-domain-upgrade-preflight.log",
-      (t: String) => isGlobalDomainDeploymentPreflightIntegrationTest(t),
+      (t: String) => isDecentralizedSynchronizerDeploymentPreflightIntegrationTest(t),
     ),
     (
       "Fetch UI credentials from Auth0 and store them in a k8s secret",

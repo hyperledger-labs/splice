@@ -1,4 +1,4 @@
-export type DomainFeesConfig = {
+export type SynchronizerFeesConfig = {
   extraTrafficPrice: number;
   minTopupAmount: number;
   baseRateBurstAmount: number;
@@ -7,8 +7,8 @@ export type DomainFeesConfig = {
 };
 
 // default values for domain fees parameters within our clusters.
-// These should generally be kept in sync with the values defined in the DomainFeesConfig in SvAppConfig.scala
-const domainFeesDefaults: DomainFeesConfig = {
+// These should generally be kept in sync with the values defined in the SynchronizerFeesConfig in SvAppConfig.scala
+const domainFeesDefaults: SynchronizerFeesConfig = {
   extraTrafficPrice: 1.0,
   minTopupAmount: 10_000_000,
   baseRateBurstAmount: 100 * 20 * 1000,
@@ -21,7 +21,7 @@ function parseNumFromEnv(envVar: string, otherwise: number): number {
   return isNaN(val) ? otherwise : val;
 }
 
-export const initialDomainFeesConfig: DomainFeesConfig = {
+export const initialSynchronizerFeesConfig: SynchronizerFeesConfig = {
   extraTrafficPrice: parseNumFromEnv(
     'DOMAIN_FEES_EXTRA_TRAFFIC_PRICE',
     domainFeesDefaults.extraTrafficPrice

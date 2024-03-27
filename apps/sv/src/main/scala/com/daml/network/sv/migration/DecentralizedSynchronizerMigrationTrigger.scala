@@ -5,7 +5,7 @@ import com.daml.network.automation.TriggerContext
 import com.daml.network.environment.{ParticipantAdminConnection, SequencerAdminConnection}
 import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.migration.{AcsExporter, DomainMigrationTrigger}
-import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
@@ -19,11 +19,11 @@ import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 
-final class GlobalDomainMigrationTrigger(
+final class DecentralizedSynchronizerMigrationTrigger(
     override protected val currentMigrationId: Long,
     override protected val context: TriggerContext,
     domainAlias: DomainAlias,
-    localDomainNode: LocalDomainNode,
+    localSynchronizerNode: LocalSynchronizerNode,
     dsoStore: SvDsoStore,
     protected val participantAdminConnection: ParticipantAdminConnection,
     sequencerAdminConnection0: SequencerAdminConnection,
@@ -48,7 +48,7 @@ final class GlobalDomainMigrationTrigger(
     for {
       dsoRules <- OptionT(dsoStore.lookupDsoRules())
       schedule <- OptionT.fromOption[Future](
-        dsoRules.contract.payload.config.nextScheduledDomainUpgrade.toScala
+        dsoRules.contract.payload.config.nextScheduledSynchronizerUpgrade.toScala
       )
     } yield DomainMigrationTrigger.ScheduledMigration(schedule.time, schedule.migrationId)
   }
@@ -71,12 +71,12 @@ final class GlobalDomainMigrationTrigger(
   } yield dump
 
   private def ensureDomainIsPaused(
-      globalDomainId: DomainId
+      decentralizedSynchronizerId: DomainId
   )(implicit tc: TraceContext): Future[TopologyResult[DomainParametersStateX]] = for {
     id <- participantAdminConnection.getId()
     domainParamsTopologyResult <- participantAdminConnection
       .ensureDomainParameters(
-        globalDomainId,
+        decentralizedSynchronizerId,
         _.tryUpdate(confirmationRequestsMaxRate = NonNegativeInt.zero),
         signedBy = id.namespace.fingerprint,
       )
@@ -90,7 +90,7 @@ final class GlobalDomainMigrationTrigger(
       .getDomainMigrationDump(
         domainAlias,
         participantAdminConnection,
-        localDomainNode,
+        localSynchronizerNode,
         loggerFactory,
         dsoStore,
         migrationId,

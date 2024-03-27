@@ -4,5 +4,5 @@
 {{ $_ := required ".Values.cluster.svNamespace is required." (.Values.cluster).svNamespace }}
 #  if ingress.splitwell is set to true then require the active migration id
 {{- if .Values.ingress.splitwell }}
-{{ $_ := required ".Values.ingress.globalDomain.activeMigrationId is required." ((.Values.ingress).globalDomain).activeMigrationId }}
+{{ $_ := required ".Values.ingress.decentralizedSynchronizer.activeMigrationId is required." ((.Values.ingress).decentralizedSynchronizer).activeMigrationId }}
 {{- end }}

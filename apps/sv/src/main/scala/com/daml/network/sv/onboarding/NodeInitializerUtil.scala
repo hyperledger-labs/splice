@@ -2,7 +2,7 @@ package com.daml.network.sv.onboarding
 
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvAppBackendConfig
@@ -88,7 +88,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
   protected def newSvDsoAutomationService(
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
-      localDomainNode: Option[LocalDomainNode],
+      localSynchronizerNode: Option[LocalSynchronizerNode],
   )(implicit
       ec: ExecutionContextExecutor,
       mat: Materializer,
@@ -105,7 +105,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
       participantAdminConnection,
       retryProvider,
       cometBftNode,
-      localDomainNode,
+      localSynchronizerNode,
       loggerFactory,
     )
 

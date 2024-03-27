@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.splice.cometbft.{
   GovernanceKeyConfig,
   SequencingKeyConfig,
 }
-import com.daml.network.codegen.java.splice.dso.globaldomain.DomainNodeConfig
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
 import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
 import com.digitalasset.canton.{BaseTest, drivers as proto}
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfigChange
@@ -98,7 +98,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
         mkSvNodeId(svNodeNr),
         new daml.dso.svstate.NodeState(
           Map(
-            dummyDsoDomainId.toProtoPrimitive -> new DomainNodeConfig(
+            dummyDsoDomainId.toProtoPrimitive -> new SynchronizerNodeConfig(
               new CometBftConfig(
                 Map(
                   mkCometBftNodeName(svNodeNr) -> new CometBftNodeConfig(

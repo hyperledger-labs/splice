@@ -3,7 +3,7 @@ package com.daml.network.sv.migration
 import com.daml.network.environment.{ParticipantAdminConnection, TopologyAdminConnection}
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.{NodeIdentitiesDump, NodeIdentitiesStore}
-import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.Codec
 import com.digitalasset.canton.DomainAlias
@@ -13,7 +13,7 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
-case class DomainNodeIdentities(
+case class SynchronizerNodeIdentities(
     svPartyId: PartyId,
     dsoPartyId: PartyId,
     domainAlias: DomainAlias,
@@ -22,7 +22,7 @@ case class DomainNodeIdentities(
     sequencer: NodeIdentitiesDump,
     mediator: NodeIdentitiesDump,
 ) {
-  def toHttp(): http.DomainNodeIdentities = http.DomainNodeIdentities(
+  def toHttp(): http.SynchronizerNodeIdentities = http.SynchronizerNodeIdentities(
     svPartyId.toProtoPrimitive,
     dsoPartyId.toProtoPrimitive,
     domainAlias.toProtoPrimitive,
@@ -33,10 +33,10 @@ case class DomainNodeIdentities(
   )
 }
 
-object DomainNodeIdentities {
+object SynchronizerNodeIdentities {
   def fromHttp(
-      src: http.DomainNodeIdentities
-  ): Either[String, DomainNodeIdentities] = for {
+      src: http.SynchronizerNodeIdentities
+  ): Either[String, SynchronizerNodeIdentities] = for {
     svPartyId <- Codec.decode(Codec.Party)(src.svPartyId)
     dsoPartyId <- Codec.decode(Codec.Party)(src.dsoPartyId)
     domainAlias <- DomainAlias.create(src.domainAlias)
@@ -54,7 +54,7 @@ object DomainNodeIdentities {
       src.mediator,
     )
   } yield {
-    DomainNodeIdentities(
+    SynchronizerNodeIdentities(
       svPartyId,
       dsoPartyId,
       domainAlias,
@@ -65,13 +65,13 @@ object DomainNodeIdentities {
     )
   }
 
-  def getDomainNodeIdentities(
+  def getSynchronizerNodeIdentities(
       participantAdminConnection: ParticipantAdminConnection,
-      domainNode: LocalDomainNode,
+      synchronizerNode: LocalSynchronizerNode,
       dsoStore: SvDsoStore,
       domainAlias: DomainAlias,
       loggerFactory: NamedLoggerFactory,
-  )(implicit ec: ExecutionContext, tc: TraceContext): Future[DomainNodeIdentities] = {
+  )(implicit ec: ExecutionContext, tc: TraceContext): Future[SynchronizerNodeIdentities] = {
     def getNodeIdentitiesDump(adminConnection: TopologyAdminConnection) =
       new NodeIdentitiesStore(
         adminConnection,
@@ -80,15 +80,15 @@ object DomainNodeIdentities {
       ).getNodeIdentitiesDump()
 
     for {
-      globalDomain <- dsoStore.getDsoRules().map(_.domain)
+      decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
       participant <- getNodeIdentitiesDump(participantAdminConnection)
-      sequencer <- getNodeIdentitiesDump(domainNode.sequencerAdminConnection)
-      mediator <- getNodeIdentitiesDump(domainNode.mediatorAdminConnection)
-    } yield DomainNodeIdentities(
+      sequencer <- getNodeIdentitiesDump(synchronizerNode.sequencerAdminConnection)
+      mediator <- getNodeIdentitiesDump(synchronizerNode.mediatorAdminConnection)
+    } yield SynchronizerNodeIdentities(
       dsoStore.key.svParty,
       dsoStore.key.dsoParty,
       domainAlias,
-      globalDomain,
+      decentralizedSynchronizer,
       participant,
       sequencer,
       mediator,

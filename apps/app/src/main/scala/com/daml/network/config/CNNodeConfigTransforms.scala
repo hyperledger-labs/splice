@@ -339,7 +339,7 @@ object CNNodeConfigTransforms {
     updateAllSvAppConfigs_(
       _.focus(_.domains.global.url)
         .modify(bumpUrl(bump, _))
-        .focus(_.localDomainNode)
+        .focus(_.localSynchronizerNode)
         .modify(
           _.map(d =>
             d.copy(
@@ -373,7 +373,7 @@ object CNNodeConfigTransforms {
       updateAllSvAppConfigs_(
         _.focus(_.participantClient)
           .modify(portTransform(bump, _))
-          .focus(_.localDomainNode)
+          .focus(_.localSynchronizerNode)
           .modify(_.map(portTransform(bump, _)))
       ),
       updateAllScanAppConfigs_(_.focus(_.participantClient).modify(portTransform(bump, _))),
@@ -396,7 +396,7 @@ object CNNodeConfigTransforms {
         config
           .focus(_.participantClient)
           .modify(portTransform(bump, _))
-          .focus(_.localDomainNode)
+          .focus(_.localSynchronizerNode)
           .modify(_.map(portTransform(bump, _)))
           .focus(_.adminApi)
           .modify(portTransform(bump, _))
@@ -412,7 +412,7 @@ object CNNodeConfigTransforms {
         config
           .focus(_.domains.global.url)
           .modify(bumpUrl(bump, _))
-          .focus(_.localDomainNode)
+          .focus(_.localSynchronizerNode)
           .modify(
             _.map(d =>
               d.copy(
@@ -448,7 +448,7 @@ object CNNodeConfigTransforms {
           .modify(setPortPrefix(range))
           .focus(_.participantClient.adminApi.port)
           .modify(setPortPrefix(range))
-          .focus(_.localDomainNode)
+          .focus(_.localSynchronizerNode)
           .modify(_.map(c => {
             c
               .focus(_.sequencer.internalApi.port)
@@ -581,8 +581,8 @@ object CNNodeConfigTransforms {
 
   private def portTransform(
       bump: Int,
-      c: SvDomainNodeConfig,
-  ): SvDomainNodeConfig =
+      c: SvSynchronizerNodeConfig,
+  ): SvSynchronizerNodeConfig =
     c.focus(_.sequencer)
       .modify(portTransform(bump, _))
       .focus(_.mediator)
@@ -637,21 +637,21 @@ object CNNodeConfigTransforms {
       c.copy(
         domains = c.domains.copy(
           splitwell = SplitwellDomains(
-            DomainConfig(DomainAlias.tryCreate("splitwellUpgrade")),
+            SynchronizerConfig(DomainAlias.tryCreate("splitwellUpgrade")),
             Seq(
-              DomainConfig(DomainAlias.tryCreate("splitwell"))
+              SynchronizerConfig(DomainAlias.tryCreate("splitwell"))
             ),
           )
         )
       )
     })
 
-  def useGlobalDomainSplitwell(): CNNodeConfigTransform =
+  def useDecentralizedSynchronizerSplitwell(): CNNodeConfigTransform =
     updateAllSplitwellAppConfigs_(c => {
       c.copy(
         domains = c.domains.copy(
           splitwell = SplitwellDomains(
-            DomainConfig(DomainAlias.tryCreate("global")),
+            SynchronizerConfig(DomainAlias.tryCreate("global")),
             Seq.empty,
           )
         )

@@ -184,8 +184,8 @@
               },
               "maxNumOutputs": "100"
             },
-            "globalDomain": {
-              "requiredDomains": {
+            "decentralizedSynchronizer": {
+              "requiredSynchronizers": {
                 "map": [
                   [
                     "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -193,7 +193,7 @@
                   ]
                 ]
               },
-              "activeDomain": "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
+              "activeSynchronizer": "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
               "fees": {
                 "baseRateTrafficLimits": {
                   "burstAmount": "2000000",
@@ -290,7 +290,7 @@
       "created_at": "1970-01-01T00:02:40Z"
     },
     {
-      "template_id": "deadbeef001:Splice.GlobalDomain:MemberTraffic",
+      "template_id": "deadbeef001:Splice.DecentralizedSynchronizer:MemberTraffic",
       "contract_id": "00c53f0347c1358274ed80da4f7d8b219576621f19ea5b84ca2d463c41bb171c11ca021220538fb1993f44202002e9ad18ddcb49b5f6b0cbc6de8660759d34ba3d2b63305b",
       "payload": {
         "usdSpent": "0.0",
@@ -636,7 +636,7 @@
           "voteRequestTimeout": {
             "microseconds": "604800000000"
           },
-          "domainNodeConfigLimits": {
+          "synchronizerNodeConfigLimits": {
             "cometBft": {
               "maxNumSequencingKeys": "2",
               "maxNodeIdLength": "50",
@@ -650,7 +650,7 @@
           "svOnboardingConfirmedTimeout": {
             "microseconds": "3600000000"
           },
-          "globalDomain": {
+          "decentralizedSynchronizer": {
             "domains": [
               [
                 "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
@@ -661,7 +661,7 @@
               ]
             ],
             "lastDomainId": "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
-            "activeDomainId": "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"
+            "activeSynchronizerId": "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b"
           },
           "maxTextLength": "1024"
         },
@@ -675,7 +675,7 @@
               "joinedAsOfRound": {
                 "number": "0"
               },
-              "domainNodes": [
+              "synchronizerNodes": [
                 [
                   "global-domain::1220e2144a42f86a6e99c7b2dfae3bac9e18019e9ca2b1e1eaab04138ac00844277b",
                   {

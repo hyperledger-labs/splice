@@ -110,10 +110,11 @@ abstract class ValidatorAppReference(
     }
   }
 
-  def globalDomainConnectionConfig(): definitions.GetGlobalDomainConnectionConfigResponse = {
+  def decentralizedSynchronizerConnectionConfig()
+      : definitions.GetDecentralizedSynchronizerConnectionConfigResponse = {
     consoleEnvironment.run {
       httpCommand(
-        HttpValidatorAdminAppClient.GetGlobalDomainConnectionConfig()
+        HttpValidatorAdminAppClient.GetDecentralizedSynchronizerConnectionConfig()
       )
     }
   }

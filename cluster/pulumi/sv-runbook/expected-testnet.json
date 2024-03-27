@@ -155,7 +155,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "ans": false,
-          "globalDomain": {
+          "decentralizedSynchronizer": {
             "migrationId": "0"
           },
           "scan": false,
@@ -185,7 +185,7 @@
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
-          "globalDomain": {
+          "decentralizedSynchronizer": {
             "activeMigrationId": "0"
           }
         }
@@ -634,6 +634,7 @@
           "connectionUri": "http://global-domain-0-cometbft-cometbft-rpc:26657",
           "enabled": true
         },
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
           "mediatorAddress": "global-domain-0-mediator",
@@ -651,7 +652,6 @@
           }
         ],
         "failOnAppVersionMismatch": true,
-        "globalDomainUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "joinWithKeyOnboarding": {
           "sponsorApiUrl": "https://sv.sv-1.svc.svrun.network.com.network.canton.global"
@@ -747,8 +747,8 @@
           "ledgerApiAudience": "https://ledger_api.example.com"
         },
         "clusterUrl": "svrun.network.com.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
         "enableWallet": true,
-        "globalDomainUrl": "https://sequencer-0.sv-1.svc.svrun.network.com.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true

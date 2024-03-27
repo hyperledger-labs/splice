@@ -28,7 +28,7 @@ import {
   imagePullSecret,
   CnInput,
   sequencerPruningConfig,
-  GlobalDomainMigrationConfig,
+  DecentralizedSynchronizerMigrationConfig,
   ValidatorTopupConfig,
   svValidatorTopupConfig,
   svOnboardingPollingInterval,
@@ -40,7 +40,7 @@ import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 import fetch from 'node-fetch';
 
 import { SvAppConfig, ValidatorAppConfig } from './config';
-import { installGlobalDomainNode } from './globalDomain';
+import { installDecentralizedSynchronizerNode } from './decentralizedSynchronizer';
 import { installPostgres } from './postgres';
 import { CLUSTER_BASENAME, TARGET_CLUSTER } from './utils';
 
@@ -68,7 +68,7 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   : undefined;
 
 const participantIdentitiesFile = process.env.PARTICIPANT_IDENTITIES_FILE;
-const globalDomainMigrationConfig = GlobalDomainMigrationConfig.fromEnv();
+const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
 
 const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
@@ -89,7 +89,9 @@ export async function installNode(
 
   const xns = exactNamespace(svNamespaceStr, true);
 
-  console.error(`Using migration config: ${JSON.stringify(globalDomainMigrationConfig)}`);
+  console.error(
+    `Using migration config: ${JSON.stringify(decentralizedSynchronizerMigrationConfig)}`
+  );
 
   const { participantBootstrapDumpSecret, backupConfigSecret, backupConfig } =
     await setupBootstrapping({
@@ -113,7 +115,7 @@ export async function installNode(
   const { sv, validator } = await installSvAndValidator(
     {
       xns,
-      globalDomainMigrationConfig,
+      decentralizedSynchronizerMigrationConfig,
       participantBootstrapDumpSecret,
       auth0Client,
       imagePullDeps,
@@ -144,46 +146,49 @@ export async function installNode(
         svNamespace: svNamespaceStr,
       },
       ingress: {
-        globalDomain: {
-          activeMigrationId: globalDomainMigrationConfig.active.migrationId.toString(),
+        decentralizedSynchronizer: {
+          activeMigrationId: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
         },
       },
     },
     defaultVersion,
     ingressImagePullDeps.concat([sv, validator])
   );
-  installMigrationIdSpecificComponent(globalDomainMigrationConfig, (migrationId, _, version) => {
-    installCNRunbookHelmChartByNamespaceName(
-      xns.logicalName,
-      xns.logicalName,
-      `cluster-ingress-sv-domain-${migrationId}`,
-      'cn-cluster-ingress-runbook',
-      {
-        cluster: {
-          hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-          svNamespace: svNamespaceStr,
-        },
-        ingress: {
-          wallet: false,
-          ans: false,
-          scan: false,
-          sequencer: true,
-          sv: false,
-          globalDomain: {
-            migrationId: migrationId.toString(),
+  installMigrationIdSpecificComponent(
+    decentralizedSynchronizerMigrationConfig,
+    (migrationId, _, version) => {
+      installCNRunbookHelmChartByNamespaceName(
+        xns.logicalName,
+        xns.logicalName,
+        `cluster-ingress-sv-domain-${migrationId}`,
+        'cn-cluster-ingress-runbook',
+        {
+          cluster: {
+            hostname: `${CLUSTER_BASENAME}.network.canton.global`,
+            svNamespace: svNamespaceStr,
+          },
+          ingress: {
+            wallet: false,
+            ans: false,
+            scan: false,
+            sequencer: true,
+            sv: false,
+            decentralizedSynchronizer: {
+              migrationId: migrationId.toString(),
+            },
           },
         },
-      },
-      version,
-      ingressImagePullDeps.concat([sv])
-    );
-  });
+        version,
+        ingressImagePullDeps.concat([sv])
+      );
+    }
+  );
 }
 
 type SvConfig = {
   auth0Client: Auth0Client;
   xns: ExactNamespace;
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig;
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig;
   onboarding?: ExpectedValidatorOnboarding;
   backupConfig?: BackupConfig;
   participantBootstrapDumpSecret?: pulumi.Resource;
@@ -203,7 +208,7 @@ async function installSvAndValidator(
 ) {
   const {
     xns,
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     participantBootstrapDumpSecret,
     topupConfig,
     auth0Client,
@@ -217,10 +222,10 @@ async function installSvAndValidator(
     disableOnboardingParticipantPromotionDelay,
   } = config;
 
-  const globalDomain = installGlobalDomainNode(
+  const decentralizedSynchronizer = installDecentralizedSynchronizerNode(
     xns,
     onboardingName,
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     imagePullDeps
   );
 
@@ -251,7 +256,7 @@ async function installSvAndValidator(
   );
 
   const participant = installMigrationIdSpecificComponent(
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     (migrationId, isActive, version) => {
       const participantValues: ChartValues = {
         ...loadYamlFromFile(
@@ -268,7 +273,7 @@ async function installSvAndValidator(
         disableAutoInit:
           disableCantonAutoInit ||
           !!participantBootstrapDumpSecret ||
-          globalDomainMigrationConfig.isRunningMigration() ||
+          decentralizedSynchronizerMigrationConfig.isRunningMigration() ||
           !isActive,
       };
 
@@ -325,7 +330,7 @@ async function installSvAndValidator(
       YOUR_SV_NAME: onboardingName,
       OIDC_AUTHORITY_URL: auth0Client.getCfg().auth0Domain,
       YOUR_HOSTNAME: `${CLUSTER_BASENAME}.network.canton.global`,
-      MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString(),
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
     }
   );
 
@@ -342,7 +347,7 @@ async function installSvAndValidator(
     },
     migration: {
       ...valuesFromYamlFile.migration,
-      migrating: globalDomainMigrationConfig.isRunningMigration()
+      migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
         ? true
         : valuesFromYamlFile.migration.migrating,
     },
@@ -396,7 +401,7 @@ async function installSvAndValidator(
     fixedTokens() ? svValuesWithFixedTokens : svValuesWithSpecifiedAud,
     defaultVersion,
     imagePullDeps
-      .concat([participant, globalDomain])
+      .concat([participant, decentralizedSynchronizer])
       .concat([svAppSecret, svAppUISecret, appsPg])
       .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
   );
@@ -404,7 +409,7 @@ async function installSvAndValidator(
   const scanValues: ChartValues = {
     ...loadYamlFromFile(`${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/scan-values.yaml`, {
       TARGET_CLUSTER: TARGET_CLUSTER,
-      MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString(),
+      MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
     }),
     metrics: {
       enable: true,
@@ -436,7 +441,7 @@ async function installSvAndValidator(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/sv-validator-values.yaml`,
       {
         TARGET_CLUSTER: TARGET_CLUSTER,
-        MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString(),
+        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
       }
     ),
     metrics: {

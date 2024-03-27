@@ -513,7 +513,7 @@ class HttpScanHandler(
       store
         .listFromSvNodeStates { nodeState =>
           for {
-            (domainId, domainConfig) <- nodeState.state.domainNodes.asScala.toVector
+            (domainId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
             sequencer <- domainConfig.sequencer.toScala
             availableAfter <- sequencer.availableAfter.toScala
           } yield domainId -> definitions.DsoSequencer(
@@ -956,7 +956,7 @@ class HttpScanHandler(
       OptionT(store.lookupDsoRules())
         .map(_.payload)
         .subflatMap { dsoRules =>
-          dsoRules.config.nextScheduledDomainUpgrade.toScala.map { nextUpgrade =>
+          dsoRules.config.nextScheduledSynchronizerUpgrade.toScala.map { nextUpgrade =>
             definitions.MigrationSchedule(
               java.time.OffsetDateTime
                 .ofInstant(nextUpgrade.time, ZoneOffset.UTC),

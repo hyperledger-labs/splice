@@ -29,15 +29,15 @@ class DomainDataSnapshotGenerator(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[DomainDataSnapshot] = for {
-    globalDomain <- dsoStore.getDsoRules().map(_.domain)
+    decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
     cantonTimestamp = CantonTimestamp.tryFromInstant(timestamp)
     topologySnapshot <- sequencerAdminConnection.traverse(_.getGenesisState(cantonTimestamp))
     vettedPackages <- sequencerAdminConnection.traverse(
-      _.getVettedPackagesSnapshot(globalDomain, cantonTimestamp)
+      _.getVettedPackagesSnapshot(decentralizedSynchronizer, cantonTimestamp)
     )
     acsSnapshot <- acsExporter
       .exportAcsAtTimestamp(
-        globalDomain,
+        decentralizedSynchronizer,
         timestamp,
         partyId.fold(Seq(dsoStore.key.dsoParty, dsoStore.key.svParty))(Seq(_))*
       )
@@ -55,17 +55,19 @@ class DomainDataSnapshotGenerator(
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[DomainDataSnapshot] = for {
-    globalDomain <- dsoStore.getDsoRules().map(_.domain)
-    domainParamsStateTopology <- participantAdminConnection.getDomainParametersState(globalDomain)
+    decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
+    domainParamsStateTopology <- participantAdminConnection.getDomainParametersState(
+      decentralizedSynchronizer
+    )
     timestamp = CantonTimestamp.tryFromInstant(domainParamsStateTopology.base.validFrom)
     genesisState <- sequencerAdminConnection.traverse(
       _.getGenesisState(timestamp)
     )
     vettedPackages <- sequencerAdminConnection.traverse(
-      _.getVettedPackagesSnapshot(globalDomain, timestamp)
+      _.getVettedPackagesSnapshot(decentralizedSynchronizer, timestamp)
     )
     (acsSnapshot, acsTimestamp) <- acsExporter
-      .safeExportParticipantPartiesAcsFromPausedDomain(globalDomain)
+      .safeExportParticipantPartiesAcsFromPausedDomain(decentralizedSynchronizer)
       .leftMap(failure =>
         Status.FAILED_PRECONDITION.withDescription(failure.toString).asRuntimeException()
       )

@@ -197,7 +197,7 @@ class SvTimeBasedRoundMgmtIntegrationTest
 
     val reducedTickDuration = NonNegativeFiniteDuration.ofSeconds(75)
     val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
-    sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.activeDomain
+    sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.activeSynchronizer
     setFutureConfigSchedule(
       createConfigSchedule(
         currentConfigSchedule,

@@ -1,6 +1,6 @@
 import { CnChartVersion, defaultVersion } from './helm';
 
-export class GlobalDomainMigrationConfig {
+export class DecentralizedSynchronizerMigrationConfig {
   // the current running migration, to which the ingresses point, and it's expected to be the active CN network
   // this is the only migration that contains the CN apps
   active: MigrationInfo;
@@ -26,8 +26,8 @@ export class GlobalDomainMigrationConfig {
   }
 
   // TODO(#10074) read this from current deployment if available
-  static fromEnv(): GlobalDomainMigrationConfig {
-    return new GlobalDomainMigrationConfig(
+  static fromEnv(): DecentralizedSynchronizerMigrationConfig {
+    return new DecentralizedSynchronizerMigrationConfig(
       new MigrationInfo(
         processMigrationId(process.env.GLOBAL_DOMAIN_ACTIVE_MIGRATION_ID) || DefaultMigrationId,
         defaultVersion
@@ -116,7 +116,7 @@ function processVersion(maybeValue?: string): CnChartVersion {
 export const DefaultMigrationId = 0;
 
 export function installMigrationIdSpecificComponent<T>(
-  globalDomainUpgradeConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig,
   component: (migrationId: DomainMigrationIndex, isActive: boolean, version: CnChartVersion) => T
 ): {
   activeComponent: T;
@@ -125,24 +125,24 @@ export function installMigrationIdSpecificComponent<T>(
 } {
   return {
     activeComponent: component(
-      globalDomainUpgradeConfig.active.migrationId,
+      decentralizedSynchronizerUpgradeConfig.active.migrationId,
       true,
-      globalDomainUpgradeConfig.active.version
+      decentralizedSynchronizerUpgradeConfig.active.version
     ),
     legacyComponent:
-      globalDomainUpgradeConfig.legacy != undefined
+      decentralizedSynchronizerUpgradeConfig.legacy != undefined
         ? component(
-            globalDomainUpgradeConfig.legacy.migrationId,
+            decentralizedSynchronizerUpgradeConfig.legacy.migrationId,
             false,
-            globalDomainUpgradeConfig.legacy.version
+            decentralizedSynchronizerUpgradeConfig.legacy.version
           )
         : undefined,
     upgradeComponent:
-      globalDomainUpgradeConfig.upgrade != undefined
+      decentralizedSynchronizerUpgradeConfig.upgrade != undefined
         ? component(
-            globalDomainUpgradeConfig.upgrade.migrationId,
+            decentralizedSynchronizerUpgradeConfig.upgrade.migrationId,
             false,
-            globalDomainUpgradeConfig.upgrade.version
+            decentralizedSynchronizerUpgradeConfig.upgrade.version
           )
         : undefined,
   };

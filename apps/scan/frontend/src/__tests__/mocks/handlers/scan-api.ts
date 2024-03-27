@@ -187,8 +187,8 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                     ],
                   },
 
-                  globalDomain: {
-                    requiredDomains: {
+                  decentralizedSynchronizer: {
+                    requiredSynchronizers: {
                       map: damlTypes
                         .emptyMap<string, object>()
                         .set(
@@ -196,7 +196,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                           {}
                         ),
                     },
-                    activeDomain:
+                    activeSynchronizer:
                       'global-domain::1220af85fa0c58e7f551de289be22793993ce7672cb0751afa2f2de397ce4a695677',
                     fees: {
                       baseRateTrafficLimits: {

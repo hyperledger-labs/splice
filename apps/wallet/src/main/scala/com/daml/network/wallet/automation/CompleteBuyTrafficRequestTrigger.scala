@@ -61,8 +61,11 @@ class CompleteBuyTrafficRequestTrigger(
                   s"Insufficient funds to purchase traffic $missingStr, cancelling traffic request"
                 )
                 cancelTrafficRequest(trafficRequest, s"out of funds $missingStr")
-              case domainError: invalidtransferreason.ITR_UnknownDomain =>
-                cancelTrafficRequest(trafficRequest, s"unknown domainId ${domainError.domainId}")
+              case domainError: invalidtransferreason.ITR_UnknownSynchronizer =>
+                cancelTrafficRequest(
+                  trafficRequest,
+                  s"unknown domainId ${domainError.synchronizerId}",
+                )
               case topupAmountError: invalidtransferreason.ITR_InsufficientTopupAmount =>
                 cancelTrafficRequest(
                   trafficRequest,

@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class ParticipantPartyMigrator(
     connection: BaseLedgerConnection,
     participantAdminConnection: ParticipantAdminConnection,
-    globalDomainAlias: DomainAlias,
+    decentralizedSynchronizerAlias: DomainAlias,
     retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -146,7 +146,7 @@ class ParticipantPartyMigrator(
       acsSnapshot <- getAcsSnapshot(partyId)
       _ <- participantAdminConnection.uploadAcsSnapshot(acsSnapshot)
       _ <- participantAdminConnection.reconnectAllDomains()
-      _ <- participantAdminConnection.connectDomain(globalDomainAlias)
+      _ <- participantAdminConnection.connectDomain(decentralizedSynchronizerAlias)
       _ = logger.info("ACS import complete")
     } yield ()
   }

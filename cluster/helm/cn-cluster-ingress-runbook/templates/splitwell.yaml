@@ -18,7 +18,7 @@ spec:
         - destination:
             port:
               number: 7575
-            host: participant-{{ ((.Values.ingress).globalDomain).activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: participant-{{ ((.Values.ingress).decentralizedSynchronizer).activeMigrationId }}.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
       rewrite:
         uri: "/"
     - match:

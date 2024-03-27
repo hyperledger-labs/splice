@@ -45,15 +45,15 @@ describe('SV user can', () => {
     expect(dropdown).toBeDefined();
     fireEvent.change(dropdown!, { target: { value: 'SRARC_SetConfig' } });
 
-    expect(screen.queryByText('nextScheduledDomainUpgrade.time')).toBeNull();
-    expect(await screen.findByText('nextScheduledDomainUpgrade')).toBeDefined();
+    expect(screen.queryByText('nextScheduledSynchronizerUpgrade.time')).toBeNull();
+    expect(await screen.findByText('nextScheduledSynchronizerUpgrade')).toBeDefined();
 
     // const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
     const checkBox = screen.getByTestId('enable-next-scheduled-domain-upgrade');
     await user.click(checkBox);
 
-    expect(screen.queryByText('nextScheduledDomainUpgrade')).toBeNull();
-    expect(await screen.findByText('nextScheduledDomainUpgrade.time')).toBeDefined();
+    expect(screen.queryByText('nextScheduledSynchronizerUpgrade')).toBeNull();
+    expect(await screen.findByText('nextScheduledSynchronizerUpgrade.time')).toBeDefined();
   });
 
   test('AddFutureAmuletConfigSchedule defaults to the current amulet configuration', async () => {

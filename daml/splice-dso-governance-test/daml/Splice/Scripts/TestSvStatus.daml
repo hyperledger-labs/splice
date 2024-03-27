@@ -26,8 +26,8 @@ testStatusReportSubmission = do
   let dummyStatus dummyNr = SvStatus with
         createdAt = now
         cometBftHeight = dummyNr + 1
-        mediatorDomainTime = mkTime $ dummyNr + 2
-        participantDomainTime = mkTime $ dummyNr + 3
+        mediatorSynchronizerTime = mkTime $ dummyNr + 2
+        participantSynchronizerTime = mkTime $ dummyNr + 3
         latestOpenRound = Round (dummyNr + 4)
   let getStatusReport sv = do
         [report] <- queryFilter @SvStatusReport dso (\report -> report.sv == sv)

@@ -10,7 +10,7 @@ import {
   exactNamespace,
   ExactNamespace,
   fixedTokens,
-  GlobalDomainMigrationConfig,
+  DecentralizedSynchronizerMigrationConfig,
   imagePullSecret,
   imagePullSecretByNamespaceName,
   installCNRunbookHelmChart,
@@ -49,7 +49,7 @@ const VALIDATOR_WALLET_USER_ID =
   process.env.VALIDATOR_WALLET_USER_ID || 'auth0|6526fab5214c99a9a8e1e3cc'; // Default to admin@validator.com at the validator-test tenant by default
 const DEFAULT_AUDIENCE = 'https://canton.network.global';
 
-const globalDomainMigrationConfig = GlobalDomainMigrationConfig.fromEnv();
+const decentralizedSynchronizerMigrationConfig = DecentralizedSynchronizerMigrationConfig.fromEnv();
 
 export async function installNode(auth0Client: Auth0Client): Promise<void> {
   console.error(
@@ -165,13 +165,14 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     }),
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-participant-values.yaml`,
-      { MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString() }
+      { MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString() }
     ),
     metrics: {
       enable: true,
     },
     disableAutoInit:
-      !!participantBootstrapDumpSecret || globalDomainMigrationConfig.isRunningMigration(),
+      !!participantBootstrapDumpSecret ||
+      decentralizedSynchronizerMigrationConfig.isRunningMigration(),
   };
 
   const participantValuesWithSpecifiedAud: ChartValues = {
@@ -222,7 +223,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...loadYamlFromFile(
       `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/standalone-validator-values.yaml`,
       {
-        MIGRATION_ID: globalDomainMigrationConfig.active.migrationId.toString(),
+        MIGRATION_ID: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
         SPONSOR_SV_URL: `https://sv.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`,
       }
     ),
@@ -231,7 +232,7 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     ...validatorValuesFromYamlFiles,
     migration: {
       ...validatorValuesFromYamlFiles.migration,
-      migrating: globalDomainMigrationConfig.isRunningMigration()
+      migrating: decentralizedSynchronizerMigrationConfig.isRunningMigration()
         ? true
         : validatorValuesFromYamlFiles.migration.migrating,
     },

@@ -154,7 +154,7 @@ class UpdateHistoryIntegrationTest
       )(
         "alice sees payment request on global domain",
         _ => {
-          getSingleRequestOnGlobalDomain(aliceWalletClient)
+          getSingleRequestOnDecentralizedSynchronizer(aliceWalletClient)
         },
       )
 

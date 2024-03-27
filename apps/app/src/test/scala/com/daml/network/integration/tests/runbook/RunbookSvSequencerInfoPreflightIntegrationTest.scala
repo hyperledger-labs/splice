@@ -30,7 +30,7 @@ class RunbookSvSequencerInfoPreflightIntegrationTest
     val sv = sv_client("sv")
     val dsoInfo = sv.getDsoInfo()
     val nodeState: SvNodeState = dsoInfo.svNodeStates.get(dsoInfo.svParty).value.payload
-    val domainConfig = nodeState.state.domainNodes.asScala.values.headOption.value
+    val domainConfig = nodeState.state.synchronizerNodes.asScala.values.headOption.value
     val sequencer = domainConfig.sequencer.toScala.value
     sequencer.migrationId shouldBe migrationId
     sequencer.url shouldBe s"https://sequencer-${migrationId}.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"

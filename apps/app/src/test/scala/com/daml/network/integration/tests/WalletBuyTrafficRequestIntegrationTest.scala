@@ -6,7 +6,7 @@ import com.daml.network.http.v0.definitions as d0
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
-import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
+import com.daml.network.util.{SynchronizerFeesTestUtil, WalletTestUtil}
 import com.daml.network.validator.automation.TopupMemberTrafficTrigger
 import com.daml.network.wallet.automation.{
   CompleteBuyTrafficRequestTrigger,
@@ -26,7 +26,7 @@ class WalletBuyTrafficRequestIntegrationTest
     with HasExecutionContext
     with WalletTestUtil
     with WalletTxLogTestUtil
-    with DomainFeesTestUtil {
+    with SynchronizerFeesTestUtil {
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
     CNNodeEnvironmentDefinition
@@ -61,7 +61,7 @@ class WalletBuyTrafficRequestIntegrationTest
         val badPartyId = PartyId.tryFromProtoPrimitive("badValidator::dummy")
         val errorString = {
           s"HTTP 400 Bad Request POST at '/api/validator/v0/wallet/buy-traffic-requests'. " +
-            s"Command failed, message: Could not find participant hosting $badPartyId on domain $activeDomainId"
+            s"Command failed, message: Could not find participant hosting $badPartyId on domain $activeSynchronizerId"
         }
         failCreatingInvalidTrafficRequest(aliceWalletClient, badPartyId, errorString)
       }
@@ -169,17 +169,17 @@ class WalletBuyTrafficRequestIntegrationTest
               val expectedTotalPurchasedTraffic = (initialTrafficAmount + minTopupAmount)
               getTotalPurchasedTraffic(
                 aliceValidatorBackend.participantClient.id,
-                activeDomainId,
+                activeSynchronizerId,
               ) shouldBe expectedTotalPurchasedTraffic
               // double-check that scan returns the same result
               val participantId = sv1ScanBackend.getPartyToParticipant(
-                activeDomainId,
+                activeSynchronizerId,
                 aliceValidatorBackend.getValidatorPartyId(),
               )
               eventually()(
                 sv1ScanBackend
                   .getMemberTrafficStatus(
-                    activeDomainId,
+                    activeSynchronizerId,
                     participantId,
                   )
                   .target
@@ -194,16 +194,16 @@ class WalletBuyTrafficRequestIntegrationTest
           eventually() {
             getSequencerTrafficLimit(
               aliceValidatorBackend,
-              activeDomainId,
+              activeSynchronizerId,
             ) shouldBe expectedTrafficLimit
             // double-check that scan returns the same result
             val participantId = sv1ScanBackend.getPartyToParticipant(
-              activeDomainId,
+              activeSynchronizerId,
               aliceValidatorBackend.getValidatorPartyId(),
             )
             sv1ScanBackend
               .getMemberTrafficStatus(
-                activeDomainId,
+                activeSynchronizerId,
                 participantId,
               )
               .actual
@@ -304,21 +304,24 @@ class WalletBuyTrafficRequestIntegrationTest
     ) {
       // on-ledger state of traffic for member on domain - sum of MemberTraffic contracts
       def purchasedTraffic =
-        getTotalPurchasedTraffic(validatorApp.participantClient.id, activeDomainId)
+        getTotalPurchasedTraffic(validatorApp.participantClient.id, activeSynchronizerId)
       // double-check that scan returns the same result
       val participantId =
-        sv1ScanBackend.getPartyToParticipant(activeDomainId, validatorApp.getValidatorPartyId())
+        sv1ScanBackend.getPartyToParticipant(
+          activeSynchronizerId,
+          validatorApp.getValidatorPartyId(),
+        )
       eventually()(
         sv1ScanBackend
-          .getMemberTrafficStatus(activeDomainId, participantId)
+          .getMemberTrafficStatus(activeSynchronizerId, participantId)
           .target
           .totalPurchased shouldBe purchasedTraffic
       )
       // topology state of traffic for member on domain
-      def sequencerTrafficLimit = getSequencerTrafficLimit(validatorApp, activeDomainId)
+      def sequencerTrafficLimit = getSequencerTrafficLimit(validatorApp, activeSynchronizerId)
       // double-check that scan returns the same result
       sv1ScanBackend
-        .getMemberTrafficStatus(activeDomainId, participantId)
+        .getMemberTrafficStatus(activeSynchronizerId, participantId)
         .actual
         .totalLimit shouldBe sequencerTrafficLimit
 
@@ -363,7 +366,7 @@ class WalletBuyTrafficRequestIntegrationTest
         "Alice creates a buy traffic request",
         buyer.createBuyTrafficRequest(
           trafficRecipient.getValidatorPartyId(),
-          domainId.getOrElse(activeDomainId),
+          domainId.getOrElse(activeSynchronizerId),
           trafficAmount.getOrElse(minTopupAmount),
           trackingId.getOrElse(defaultTrackingId),
           expiresAt.getOrElse(now.plus(Duration.ofMinutes(1))),
@@ -397,7 +400,7 @@ class WalletBuyTrafficRequestIntegrationTest
     assertThrowsAndLogsCommandFailures(
       buyer.createBuyTrafficRequest(
         trafficRecipient,
-        domainId.getOrElse(activeDomainId),
+        domainId.getOrElse(activeSynchronizerId),
         trafficAmount.getOrElse(minTopupAmount),
         tid,
         expiresAt.getOrElse(now.plus(Duration.ofMinutes(1))),
@@ -417,5 +420,9 @@ class WalletBuyTrafficRequestIntegrationTest
   private val defaultTrackingId = "myTrackingId"
 
   private def minTopupAmount(implicit env: CNNodeTests.CNNodeTestConsoleEnvironment) =
-    sv1ScanBackend.getAmuletConfigAsOf(env.environment.clock.now).globalDomain.fees.minTopupAmount
+    sv1ScanBackend
+      .getAmuletConfigAsOf(env.environment.clock.now)
+      .decentralizedSynchronizer
+      .fees
+      .minTopupAmount
 }

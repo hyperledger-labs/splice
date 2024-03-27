@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.splice.amuletrules.invalidtransferreason.{
   ITR_InsufficientFunds,
   ITR_InsufficientTopupAmount,
   ITR_Other,
-  ITR_UnknownDomain,
+  ITR_UnknownSynchronizer,
 }
 import com.daml.network.codegen.java.splice.wallet.buytrafficrequest.BuyTrafficRequestTrackingInfo
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.{
@@ -215,8 +215,8 @@ class UserWalletTxLogParser(
                   val details = reason match {
                     case r: ITR_InsufficientFunds =>
                       s"ITR_InsufficientFunds: missing ${r.missingAmount} CC"
-                    case r: ITR_UnknownDomain =>
-                      s"ITR_UnknownDomain: domainId ${r.domainId}"
+                    case r: ITR_UnknownSynchronizer =>
+                      s"ITR_UnknownSynchronizer: domainId ${r.synchronizerId}"
                     case r: ITR_InsufficientTopupAmount =>
                       s"ITR_InsufficientTopupAmount: requested ${r.requestedTopupAmount}, minimum required ${r.minTopupAmount}"
                     case r: ITR_Other => s"ITR_Other: ${r.description}"

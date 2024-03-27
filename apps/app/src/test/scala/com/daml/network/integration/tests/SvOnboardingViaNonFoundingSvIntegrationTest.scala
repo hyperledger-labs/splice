@@ -162,7 +162,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
             val decentralizedNamespaces =
               sv2Backend.participantClient.topology.decentralized_namespaces
                 .list(
-                  filterStore = globalDomainId.filterString,
+                  filterStore = decentralizedSynchronizerId.filterString,
                   filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
                 )
             inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>

@@ -16,7 +16,7 @@ import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.splitwell.config.{
   SplitwellAppBackendConfig,
   SplitwellAppClientConfig,
-  SplitwellDomainConfig,
+  SplitwellSynchronizerConfig,
   SplitwellDomains,
 }
 import com.daml.network.sv.config.*
@@ -25,7 +25,7 @@ import com.daml.network.validator.config.*
 import com.daml.network.wallet.config.{
   TreasuryConfig,
   WalletAppClientConfig,
-  WalletDomainConfig,
+  WalletSynchronizerConfig,
   WalletValidatorAppClientConfig,
 }
 import com.daml.nonempty.NonEmpty
@@ -374,8 +374,8 @@ object CNNodeConfig {
       deriveReader[BftScanClientConfig]
     implicit val scanClientConfigReader: ConfigReader[ScanAppClientConfig] =
       deriveReader[ScanAppClientConfig]
-    implicit val domainConfigReader: ConfigReader[DomainConfig] =
-      deriveReader[DomainConfig]
+    implicit val domainConfigReader: ConfigReader[SynchronizerConfig] =
+      deriveReader[SynchronizerConfig]
     implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
       deriveReader[ScanAppBackendConfig]
 
@@ -413,8 +413,8 @@ object CNNodeConfig {
       new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val initialAnsConfigReader: ConfigReader[InitialAnsConfig] =
       deriveReader[InitialAnsConfig]
-    implicit val domainFeesConfigReader: ConfigReader[DomainFeesConfig] =
-      deriveReader[DomainFeesConfig]
+    implicit val domainFeesConfigReader: ConfigReader[SynchronizerFeesConfig] =
+      deriveReader[SynchronizerFeesConfig]
     implicit val svOnboardingFoundCollectiveReader
         : ConfigReader[SvOnboardingConfig.FoundCollective] =
       deriveReader[SvOnboardingConfig.FoundCollective]
@@ -439,12 +439,13 @@ object CNNodeConfig {
       deriveReader[SvMediatorConfig]
     implicit val svScanConfig: ConfigReader[SvScanConfig] =
       deriveReader[SvScanConfig]
-    implicit val svDomainNodeConfig: ConfigReader[SvDomainNodeConfig] =
-      deriveReader[SvDomainNodeConfig]
-    implicit val svGlobalDomainConfigReader: ConfigReader[SvGlobalDomainConfig] =
-      deriveReader[SvGlobalDomainConfig]
-    implicit val svDomainConfigReader: ConfigReader[SvDomainConfig] =
-      deriveReader[SvDomainConfig]
+    implicit val svSynchronizerNodeConfig: ConfigReader[SvSynchronizerNodeConfig] =
+      deriveReader[SvSynchronizerNodeConfig]
+    implicit val svDecentralizedSynchronizerConfigReader
+        : ConfigReader[SvDecentralizedSynchronizerConfig] =
+      deriveReader[SvDecentralizedSynchronizerConfig]
+    implicit val svSynchronizerConfigReader: ConfigReader[SvSynchronizerConfig] =
+      deriveReader[SvSynchronizerConfig]
     implicit val backupDumpConfigHint: FieldCoproductHint[PeriodicBackupDumpConfig] =
       new FieldCoproductHint[PeriodicBackupDumpConfig]("type")
     implicit val backupDumpConfigDirectoryReader: ConfigReader[BackupDumpConfig.Directory] =
@@ -465,15 +466,15 @@ object CNNodeConfig {
       deriveReader[SvAppBackendConfig].emap { conf =>
         // We support joining nodes without sequencers/mediators but
         // the founding node must alway configure one to bootstrap the domain.
-        val foundingNodeHasDomainConfig = conf.onboarding.fold(true) {
+        val foundingNodeHasSynchronizerConfig = conf.onboarding.fold(true) {
           _ match {
-            case _: SvOnboardingConfig.FoundCollective => conf.localDomainNode.isDefined
+            case _: SvOnboardingConfig.FoundCollective => conf.localSynchronizerNode.isDefined
             case _: SvOnboardingConfig.JoinWithKey => true
             case _: SvOnboardingConfig.DomainMigration => true
           }
         }
         Either.cond(
-          foundingNodeHasDomainConfig,
+          foundingNodeHasSynchronizerConfig,
           conf,
           ConfigValidationFailed("Founding node must always specify a domain config"),
         )
@@ -487,8 +488,9 @@ object CNNodeConfig {
       deriveReader[TreasuryConfig]
     implicit val buyExtraTrafficConfigReader: ConfigReader[BuyExtraTrafficConfig] =
       deriveReader[BuyExtraTrafficConfig]
-    implicit val validatorGlobalDomainConfigReader: ConfigReader[ValidatorGlobalDomainConfig] =
-      deriveReader[ValidatorGlobalDomainConfig].emap(config => {
+    implicit val validatorDecentralizedSynchronizerConfigReader
+        : ConfigReader[ValidatorDecentralizedSynchronizerConfig] =
+      deriveReader[ValidatorDecentralizedSynchronizerConfig].emap(config => {
         val trafficPurchasedOnEachTopup =
           config.buyExtraTraffic.targetThroughput.value * config.buyExtraTraffic.minTopupInterval.duration.toSeconds
         val trafficReservedForTopups = config.trafficReservedForTopupsO.fold(0L)(_.value)
@@ -503,10 +505,11 @@ object CNNodeConfig {
           ),
         )
       })
-    implicit val validatorExtraDomainConfigReader: ConfigReader[ValidatorExtraDomainConfig] =
-      deriveReader[ValidatorExtraDomainConfig]
-    implicit val validatorDomainConfigReader: ConfigReader[ValidatorDomainConfig] =
-      deriveReader[ValidatorDomainConfig]
+    implicit val validatorExtraSynchronizerConfigReader
+        : ConfigReader[ValidatorExtraSynchronizerConfig] =
+      deriveReader[ValidatorExtraSynchronizerConfig]
+    implicit val validatorSynchronizerConfigReader: ConfigReader[ValidatorSynchronizerConfig] =
+      deriveReader[ValidatorSynchronizerConfig]
     implicit val offsetDateTimeConfigurationReader: ConfigReader[java.time.OffsetDateTime] =
       implicitly[ConfigReader[String]].map(java.time.OffsetDateTime.parse)
     implicit val timespanConfigurationReader: ConfigReader[Timespan] = deriveReader[Timespan]
@@ -529,8 +532,8 @@ object CNNodeConfig {
       deriveReader[ValidatorAppClientConfig]
     implicit val walletvalidatorClientConfigReader: ConfigReader[WalletValidatorAppClientConfig] =
       deriveReader[WalletValidatorAppClientConfig]
-    implicit val walletDomainConfigReader: ConfigReader[WalletDomainConfig] =
-      deriveReader[WalletDomainConfig]
+    implicit val walletSynchronizerConfigReader: ConfigReader[WalletSynchronizerConfig] =
+      deriveReader[WalletSynchronizerConfig]
     implicit val WalletAppClientConfigReader: ConfigReader[WalletAppClientConfig] =
       deriveReader[WalletAppClientConfig]
     implicit val AppManagerAppClientConfigReader: ConfigReader[AppManagerAppClientConfig] =
@@ -539,8 +542,8 @@ object CNNodeConfig {
       deriveReader[AnsAppExternalClientConfig]
     implicit val splitwellDomainsReader: ConfigReader[SplitwellDomains] =
       deriveReader[SplitwellDomains]
-    implicit val splitwellDomainConfigReader: ConfigReader[SplitwellDomainConfig] =
-      deriveReader[SplitwellDomainConfig]
+    implicit val splitwellSynchronizerConfigReader: ConfigReader[SplitwellSynchronizerConfig] =
+      deriveReader[SplitwellSynchronizerConfig]
     implicit val splitwellConfigReader: ConfigReader[SplitwellAppBackendConfig] =
       deriveReader[SplitwellAppBackendConfig]
     implicit val splitwellClientConfigReader: ConfigReader[SplitwellAppClientConfig] =
@@ -659,8 +662,8 @@ object CNNodeConfig {
       new FieldCoproductHint[SvOnboardingConfig]("type")
     implicit val initialAnsConfigWriter: ConfigWriter[InitialAnsConfig] =
       deriveWriter[InitialAnsConfig]
-    implicit val domainFeesConfigWriter: ConfigWriter[DomainFeesConfig] =
-      deriveWriter[DomainFeesConfig]
+    implicit val domainFeesConfigWriter: ConfigWriter[SynchronizerFeesConfig] =
+      deriveWriter[SynchronizerFeesConfig]
     implicit val svOnboardingFoundCollectiveWriter
         : ConfigWriter[SvOnboardingConfig.FoundCollective] =
       deriveWriter[SvOnboardingConfig.FoundCollective]
@@ -688,12 +691,13 @@ object CNNodeConfig {
       deriveWriter[SvMediatorConfig]
     implicit val svScanConfig: ConfigWriter[SvScanConfig] =
       deriveWriter[SvScanConfig]
-    implicit val svDomainNodeConfig: ConfigWriter[SvDomainNodeConfig] =
-      deriveWriter[SvDomainNodeConfig]
-    implicit val svGlobalDomainConfigWriter: ConfigWriter[SvGlobalDomainConfig] =
-      deriveWriter[SvGlobalDomainConfig]
-    implicit val svDomainConfigWriter: ConfigWriter[SvDomainConfig] =
-      deriveWriter[SvDomainConfig]
+    implicit val svSynchronizerNodeConfig: ConfigWriter[SvSynchronizerNodeConfig] =
+      deriveWriter[SvSynchronizerNodeConfig]
+    implicit val svDecentralizedSynchronizerConfigWriter
+        : ConfigWriter[SvDecentralizedSynchronizerConfig] =
+      deriveWriter[SvDecentralizedSynchronizerConfig]
+    implicit val svSynchronizerConfigWriter: ConfigWriter[SvSynchronizerConfig] =
+      deriveWriter[SvSynchronizerConfig]
     implicit val backupDumpConfigHint: FieldCoproductHint[PeriodicBackupDumpConfig] =
       new FieldCoproductHint[PeriodicBackupDumpConfig]("type")
     implicit val backupDumpConfigDirectoryWriter: ConfigWriter[BackupDumpConfig.Directory] =
@@ -715,19 +719,21 @@ object CNNodeConfig {
 
     implicit val cnNodeAppParametersWriter: ConfigWriter[SharedCNNodeAppParameters] =
       deriveWriter[SharedCNNodeAppParameters]
-    implicit val domainConfigWriter: ConfigWriter[DomainConfig] =
-      deriveWriter[DomainConfig]
+    implicit val domainConfigWriter: ConfigWriter[SynchronizerConfig] =
+      deriveWriter[SynchronizerConfig]
 
     implicit val validatorOnboardingConfigWriter: ConfigWriter[ValidatorOnboardingConfig] =
       confidentialWriter[ValidatorOnboardingConfig](ValidatorOnboardingConfig.hideConfidential)
     implicit val buyExtraTrafficWriter: ConfigWriter[BuyExtraTrafficConfig] =
       deriveWriter[BuyExtraTrafficConfig]
-    implicit val validatorGlobalDomainConfigWriter: ConfigWriter[ValidatorGlobalDomainConfig] =
-      deriveWriter[ValidatorGlobalDomainConfig]
-    implicit val validatorExtraDomainConfigWriter: ConfigWriter[ValidatorExtraDomainConfig] =
-      deriveWriter[ValidatorExtraDomainConfig]
-    implicit val validatorDomainConfigWriter: ConfigWriter[ValidatorDomainConfig] =
-      deriveWriter[ValidatorDomainConfig]
+    implicit val validatorDecentralizedSynchronizerConfigWriter
+        : ConfigWriter[ValidatorDecentralizedSynchronizerConfig] =
+      deriveWriter[ValidatorDecentralizedSynchronizerConfig]
+    implicit val validatorExtraSynchronizerConfigWriter
+        : ConfigWriter[ValidatorExtraSynchronizerConfig] =
+      deriveWriter[ValidatorExtraSynchronizerConfig]
+    implicit val validatorSynchronizerConfigWriter: ConfigWriter[ValidatorSynchronizerConfig] =
+      deriveWriter[ValidatorSynchronizerConfig]
     implicit val offsetDateTimeConfigurationWriter: ConfigWriter[java.time.OffsetDateTime] =
       implicitly[ConfigWriter[String]].contramap(_.toString)
     implicit val timespanConfigurationWriter: ConfigWriter[Timespan] = deriveWriter[Timespan]
@@ -752,8 +758,8 @@ object CNNodeConfig {
       deriveWriter[WalletValidatorAppClientConfig]
     implicit val treasuryConfigWriter: ConfigWriter[TreasuryConfig] =
       deriveWriter[TreasuryConfig]
-    implicit val walletDomainConfigWriter: ConfigWriter[WalletDomainConfig] =
-      deriveWriter[WalletDomainConfig]
+    implicit val walletSynchronizerConfigWriter: ConfigWriter[WalletSynchronizerConfig] =
+      deriveWriter[WalletSynchronizerConfig]
     implicit val WalletAppClientConfigWriter: ConfigWriter[WalletAppClientConfig] =
       deriveWriter[WalletAppClientConfig]
     implicit val AppManagerAppClientConfigWriter: ConfigWriter[AppManagerAppClientConfig] =
@@ -762,8 +768,8 @@ object CNNodeConfig {
       deriveWriter[AnsAppExternalClientConfig]
     implicit val splitwellDomains: ConfigWriter[SplitwellDomains] =
       deriveWriter[SplitwellDomains]
-    implicit val splitwellDomainConfigWriter: ConfigWriter[SplitwellDomainConfig] =
-      deriveWriter[SplitwellDomainConfig]
+    implicit val splitwellSynchronizerConfigWriter: ConfigWriter[SplitwellSynchronizerConfig] =
+      deriveWriter[SplitwellSynchronizerConfig]
     implicit val splitwellConfigWriter: ConfigWriter[SplitwellAppBackendConfig] =
       deriveWriter[SplitwellAppBackendConfig]
     implicit val splitwellClientConfigWriter: ConfigWriter[SplitwellAppClientConfig] =

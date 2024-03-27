@@ -30,7 +30,7 @@ class DistributedDomainIntegrationTest
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
       .withManualStart
 
-  private val globalDomain = DomainAlias.tryCreate("global")
+  private val decentralizedSynchronizer = DomainAlias.tryCreate("global")
 
   "SV onboarding on distributed domain" in { implicit env =>
     initDso()
@@ -45,7 +45,7 @@ class DistributedDomainIntegrationTest
       eventually() {
         inside(
           sv1Backend.participantClient.domains
-            .config(globalDomain)
+            .config(decentralizedSynchronizer)
             .value
             .sequencerConnections
             .connections
@@ -57,7 +57,7 @@ class DistributedDomainIntegrationTest
         }
         inside(
           sv2Backend.participantClient.domains
-            .config(globalDomain)
+            .config(decentralizedSynchronizer)
             .value
             .sequencerConnections
             .connections
@@ -72,7 +72,7 @@ class DistributedDomainIntegrationTest
         }
         inside(
           sv3Backend.participantClient.domains
-            .config(globalDomain)
+            .config(decentralizedSynchronizer)
             .value
             .sequencerConnections
             .connections
@@ -87,7 +87,7 @@ class DistributedDomainIntegrationTest
         }
         inside(
           sv4Backend.participantClient.domains
-            .config(globalDomain)
+            .config(decentralizedSynchronizer)
             .value
             .sequencerConnections
             .connections
@@ -113,7 +113,7 @@ class DistributedDomainIntegrationTest
     clue("DSO party is bootstrapped as a decentralized namespace with SVs as owners") {
       val dsoParty = sv1Backend.getDsoInfo().dsoParty
       val domainId =
-        sv1Backend.participantClient.domains.id_of(globalDomain)
+        sv1Backend.participantClient.domains.id_of(decentralizedSynchronizer)
       val decentralizedNamespaces = sv1Backend.participantClient.topology.decentralized_namespaces
         .list(
           filterStore = domainId.filterString,

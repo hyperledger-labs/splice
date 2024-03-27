@@ -34,7 +34,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   * Note that this is optional. An SV app can run without a dedicated domain node.
   * TODO(#5195) Consider making this mandatory.
   */
-final class LocalDomainNode(
+final class LocalSynchronizerNode(
     participantAdminConnection: ParticipantAdminConnection,
     val sequencerAdminConnection: SequencerAdminConnection,
     val mediatorAdminConnection: MediatorAdminConnection,
@@ -56,7 +56,7 @@ final class LocalDomainNode(
 
   val sequencerConnection =
     new GrpcSequencerConnection(
-      LocalDomainNode.toEndpoints(sequencerInternalConfig),
+      LocalSynchronizerNode.toEndpoints(sequencerInternalConfig),
       transportSecurity = sequencerInternalConfig.tls.isDefined,
       customTrustCertificates = None,
       SequencerAlias.Default,
@@ -387,7 +387,7 @@ final class LocalDomainNode(
   }
 }
 
-object LocalDomainNode {
+object LocalSynchronizerNode {
   def toEndpoint(config: ClientConfig): Endpoint = Endpoint(config.address, config.port)
 
   // TODO(#5107) Consider using something other than a ClientConfig in the config file

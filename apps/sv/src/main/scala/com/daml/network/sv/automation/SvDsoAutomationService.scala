@@ -8,7 +8,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.automation.AutomationServiceCompanion.{aTrigger, TriggerClass}
 import com.daml.network.environment.*
-import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.SvDsoAutomationService.{
   LocalSequencerClientConfig,
   LocalSequencerClientContext,
@@ -24,7 +24,7 @@ import com.daml.network.sv.automation.singlesv.membership.offboarding.{
 import com.daml.network.sv.automation.singlesv.membership.onboarding.*
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SequencerPruningConfig, SvAppBackendConfig}
-import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
+import com.daml.network.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import com.daml.network.sv.store.{SvDsoStore, SvSvStore}
 import com.daml.network.util.{QualifiedName, TemplateJsonDecoder}
 import com.digitalasset.canton.DomainAlias
@@ -48,7 +48,7 @@ class SvDsoAutomationService(
     participantAdminConnection: ParticipantAdminConnection,
     retryProvider: RetryProvider,
     cometBft: Option[CometBftNode],
-    localDomainNode: Option[LocalDomainNode],
+    localSynchronizerNode: Option[LocalSynchronizerNode],
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -161,7 +161,7 @@ class SvDsoAutomationService(
         dsoStore,
         connection,
         cometBft,
-        localDomainNode.map(_.mediatorAdminConnection),
+        localSynchronizerNode.map(_.mediatorAdminConnection),
         participantAdminConnection,
       )
     )
@@ -202,7 +202,7 @@ class SvDsoAutomationService(
       new SvOnboardingUnlimitedTrafficTrigger(
         onboardingTriggerContext,
         dsoStore,
-        localDomainNode.map(_.sequencerAdminConnection),
+        localSynchronizerNode.map(_.sequencerAdminConnection),
         config.trafficBalanceReconciliationDelay,
       )
     )
@@ -217,7 +217,7 @@ class SvDsoAutomationService(
       new ReconcileSequencerLimitWithMemberTrafficTrigger(
         triggerContext,
         dsoStore,
-        localDomainNode.map(_.sequencerAdminConnection),
+        localSynchronizerNode.map(_.sequencerAdminConnection),
         config.trafficBalanceReconciliationDelay,
       )
     )
@@ -258,17 +258,17 @@ class SvDsoAutomationService(
       )
     )
 
-    (localDomainNode, config.domainMigrationDumpPath) match {
-      case (Some(domainNode), Some(dumpPath)) =>
+    (localSynchronizerNode, config.domainMigrationDumpPath) match {
+      case (Some(synchronizerNode), Some(dumpPath)) =>
         registerTrigger(
-          new GlobalDomainMigrationTrigger(
+          new DecentralizedSynchronizerMigrationTrigger(
             config.domainMigrationId,
             triggerContext,
             config.domains.global.alias,
-            domainNode,
+            synchronizerNode,
             dsoStore,
             participantAdminConnection,
-            domainNode.sequencerAdminConnection,
+            synchronizerNode.sequencerAdminConnection,
             dumpPath: Path,
           )
         )
@@ -307,7 +307,7 @@ class SvDsoAutomationService(
     }
 
     registerTrigger(
-      new ReconcileDomainFeesConfigTrigger(
+      new ReconcileSynchronizerFeesConfigTrigger(
         triggerContext,
         dsoStore,
         participantAdminConnection,
@@ -316,7 +316,7 @@ class SvDsoAutomationService(
   }
 
   private val localSequencerClientContext: Option[LocalSequencerClientContext] =
-    localDomainNode.map(cfg =>
+    localSynchronizerNode.map(cfg =>
       LocalSequencerClientContext(
         cfg.sequencerAdminConnection,
         cfg.mediatorAdminConnection,
@@ -340,7 +340,7 @@ class SvDsoAutomationService(
       new LocalSequencerConnectionsTrigger(
         triggerContext,
         participantAdminConnection,
-        internalClientConfig.globalDomainAlias,
+        internalClientConfig.decentralizedSynchronizerAlias,
         dsoStore,
         internalClientConfig.sequencerInternalConfig,
         config.domainMigrationId,
@@ -381,7 +381,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
 
   case class LocalSequencerClientConfig(
       sequencerInternalConfig: ClientConfig,
-      globalDomainAlias: DomainAlias,
+      decentralizedSynchronizerAlias: DomainAlias,
   )
 
   private[automation] def bootstrapPackageIdResolver(template: QualifiedName): Option[String] =
@@ -421,7 +421,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SvOnboardingPartyToParticipantProposalTrigger],
       aTrigger[SvOnboardingSequencerTrigger],
       aTrigger[SvOnboardingMediatorProposalTrigger],
-      aTrigger[GlobalDomainMigrationTrigger],
+      aTrigger[DecentralizedSynchronizerMigrationTrigger],
       aTrigger[PublishLocalCometBftNodeConfigTrigger],
       aTrigger[PublishScanConfigTrigger],
       aTrigger[ReconcileCometBftNetworkConfigWithDsoRulesTrigger],
@@ -429,6 +429,6 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       aTrigger[SequencerPruningTrigger],
       aTrigger[SubmitSvStatusReportTrigger],
       aTrigger[SvStatusReportMetricsExportTrigger],
-      aTrigger[ReconcileDomainFeesConfigTrigger],
+      aTrigger[ReconcileSynchronizerFeesConfigTrigger],
     )
 }

@@ -9,7 +9,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice as daml
 import com.daml.network.codegen.java.splice.cometbft.SequencingKeyConfig
-import com.daml.network.codegen.java.splice.dso.globaldomain.{
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
   MediatorConfig,
   ScanConfig,
   SequencerConfig,
@@ -52,7 +52,9 @@ class PublishLocalCometBftNodeConfigTrigger(
       rulesAndState <- OptionT.liftF(store.getDsoRulesWithSvNodeState(store.key.svParty))
       domainId = rulesAndState.dsoRules.domain
       nodeState = rulesAndState.svNodeState.payload
-      domainNodeConfig = nodeState.state.domainNodes.asScala.get(domainId.toProtoPrimitive)
+      synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala.get(
+        domainId.toProtoPrimitive
+      )
       localSvNodeConfig <- OptionT.liftF(cometBftNode.getLocalNodeConfig())
       // TODO (#4901) reconcile cometBft networks for multiple domains instead using one default domain id here.
       domainId = rulesAndState.dsoRules.domain
@@ -60,15 +62,17 @@ class PublishLocalCometBftNodeConfigTrigger(
       // or if no domain bft is configured
       if
       // "TODO(#4901): reconcile all configured CometBFT networks"
-      !domainNodeConfig
-        .map(domainNodeConfig => CometBftNode.svNodeConfigToProto(domainNodeConfig.cometBft))
+      !synchronizerNodeConfig
+        .map(synchronizerNodeConfig =>
+          CometBftNode.svNodeConfigToProto(synchronizerNodeConfig.cometBft)
+        )
         .contains(localSvNodeConfig)
     } yield PublishLocalCometBftNodeConfigTrigger.PublishLocalConfigTask(
       nodeState.svName,
       rulesAndState,
-      domainNodeConfig.flatMap(_.sequencer.toScala).toJava,
-      domainNodeConfig.flatMap(_.mediator.toScala).toJava,
-      domainNodeConfig.flatMap(_.scan.toScala).toJava,
+      synchronizerNodeConfig.flatMap(_.sequencer.toScala).toJava,
+      synchronizerNodeConfig.flatMap(_.mediator.toScala).toJava,
+      synchronizerNodeConfig.flatMap(_.scan.toScala).toJava,
       localSvNodeConfig,
       domainId,
     )).value
@@ -80,7 +84,7 @@ class PublishLocalCometBftNodeConfigTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = {
     val cmd = task.dsoRulesAndState.dsoRules.exercise(
-      _.exerciseDsoRules_SetDomainNodeConfig(
+      _.exerciseDsoRules_SetSynchronizerNodeConfig(
         store.key.svParty.toProtoPrimitive,
         task.domainId.toProtoPrimitive,
         task.damlSvNodeConfig,
@@ -128,8 +132,8 @@ object PublishLocalCometBftNodeConfigTrigger {
     )
 
     // TODO(#5889): unify or align with CometBftNode.getLocalNodeConfig and the functions backing `diffNetworkConfig`
-    val damlSvNodeConfig: daml.dso.globaldomain.DomainNodeConfig =
-      new daml.dso.globaldomain.DomainNodeConfig(
+    val damlSvNodeConfig: daml.dso.decentralizedsynchronizer.SynchronizerNodeConfig =
+      new daml.dso.decentralizedsynchronizer.SynchronizerNodeConfig(
         new daml.cometbft.CometBftConfig(
           localSvNodeConfig.cometbftNodes.map { case (nodeId, config) =>
             (

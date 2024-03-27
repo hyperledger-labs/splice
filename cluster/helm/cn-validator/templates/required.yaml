@@ -7,7 +7,7 @@
 {{ $_ := required ".Values.scanAddress is required." .Values.scanAddress }}
 
 {{- if .Values.svValidator }}
-{{ $_ := required ".Values.globalDomainUrl is required." .Values.globalDomainUrl }}
+{{ $_ := required ".Values.decentralizedSynchronizerUrl is required." .Values.decentralizedSynchronizerUrl }}
 {{- end }}
 
 {{- if (.Values.topup).enabled }}

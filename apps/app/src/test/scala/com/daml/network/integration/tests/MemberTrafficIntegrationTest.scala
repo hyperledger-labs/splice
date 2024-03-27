@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.http.v0.definitions as d0
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.{
   CNNodeIntegrationTestWithSharedEnvironment,
   CNNodeTestConsoleEnvironment,
 }
-import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
+import com.daml.network.util.{SynchronizerFeesTestUtil, WalletTestUtil}
 import com.daml.network.wallet.store.TxLogEntry.Http.BuyTrafficRequestStatus
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.logging.SuppressionRule
@@ -17,7 +17,7 @@ import org.slf4j.event.Level
 class MemberTrafficIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
-    with DomainFeesTestUtil
+    with SynchronizerFeesTestUtil
     with WalletTestUtil {
 
   override def environmentDefinition: CNNodeEnvironmentDefinition = {
@@ -31,8 +31,10 @@ class MemberTrafficIntegrationTest
 
     "handle contracts with an invalid member id" in { implicit env =>
       val now = env.environment.clock.now
-      val globalDomainConfig = sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain
-      val trafficAmount = Math.max(globalDomainConfig.fees.minTopupAmount.toLong, 1_000_000L)
+      val decentralizedSynchronizerConfig =
+        sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer
+      val trafficAmount =
+        Math.max(decentralizedSynchronizerConfig.fees.minTopupAmount.toLong, 1_000_000L)
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(100)
 
@@ -76,7 +78,7 @@ class MemberTrafficIntegrationTest
 
     "merge duplicate member traffic contracts" in { implicit env =>
       val now = env.environment.clock.now
-      val domainFeesConfig = sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.fees
+      val domainFeesConfig = sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount.toLong, 1_000_000L)
       val participantId = aliceValidatorBackend.participantClient.id
       val trafficContractsMergeThreshold =
@@ -123,11 +125,11 @@ class MemberTrafficIntegrationTest
     "serve a member's traffic status as reported by the sequencer" in { implicit env =>
       val memberId = aliceValidatorBackend.participantClient.id
 
-      val actualStateAsPerSequencer = getTrafficState(aliceValidatorBackend, activeDomainId)
+      val actualStateAsPerSequencer = getTrafficState(aliceValidatorBackend, activeSynchronizerId)
       val actualTotalPurchasedAsPerDso =
         listMemberTrafficContracts(memberId).map(_.data.totalPurchased.toLong).sum
 
-      val statusAsPerScan = sv1ScanBackend.getMemberTrafficStatus(activeDomainId, memberId)
+      val statusAsPerScan = sv1ScanBackend.getMemberTrafficStatus(activeSynchronizerId, memberId)
 
       statusAsPerScan.actual.totalConsumed shouldBe actualStateAsPerSequencer.extraTrafficConsumed.value
       statusAsPerScan.actual.totalLimit shouldBe actualStateAsPerSequencer.extraTrafficLimit.fold(

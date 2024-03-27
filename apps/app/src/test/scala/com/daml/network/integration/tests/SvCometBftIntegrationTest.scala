@@ -103,7 +103,7 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
       Seq(sv1Backend, sv2Backend, sv3Backend).foreach { sv =>
         sv.participantClient.topology.decentralized_namespaces
           .list(
-            filterStore = globalDomainId.filterString,
+            filterStore = decentralizedSynchronizerId.filterString,
             filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
           )
           .loneElement

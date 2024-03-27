@@ -8,7 +8,7 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.sv.automation.singlesv.ReconcileDomainFeesConfigTrigger.Task
+import com.daml.network.sv.automation.singlesv.ReconcileSynchronizerFeesConfigTrigger.Task
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.util.AmuletConfigSchedule
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -22,7 +22,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** A trigger to reconcile the domain fees configuration from the AmuletConfig to the domain parameters
   */
-class ReconcileDomainFeesConfigTrigger(
+class ReconcileSynchronizerFeesConfigTrigger(
     override protected val context: TriggerContext,
     store: SvDsoStore,
     participantAdminConnection: ParticipantAdminConnection,
@@ -35,10 +35,10 @@ class ReconcileDomainFeesConfigTrigger(
       tc: TraceContext
   ): Future[Seq[Task]] = {
     for {
-      globalDomainId <- store.getAmuletRulesDomain()(tc)
+      decentralizedSynchronizerId <- store.getAmuletRulesDomain()(tc)
       amuletRules <- store.getAmuletRules()
       amuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(context.clock.now)
-      state <- participantAdminConnection.getDomainParametersState(globalDomainId)
+      state <- participantAdminConnection.getDomainParametersState(decentralizedSynchronizerId)
       updatedConfig = updateDomainParameter(state.mapping.parameters, amuletConfig)
 
     } yield if (state.mapping.parameters != updatedConfig) Seq(Task(amuletConfig)) else Seq.empty
@@ -48,16 +48,16 @@ class ReconcileDomainFeesConfigTrigger(
       task: Task
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
-      globalDomainId <- store.getAmuletRulesDomain()(tc)
+      decentralizedSynchronizerId <- store.getAmuletRulesDomain()(tc)
       participantId <- participantAdminConnection.getId()
       _ <- participantAdminConnection.ensureDomainParameters(
-        globalDomainId,
+        decentralizedSynchronizerId,
         updateDomainParameter(_, task.amuletConfig),
         participantId.namespace.fingerprint,
       )
     } yield {
       TaskSuccess(
-        s"Successfully reconcile DomainFeesConfig $task"
+        s"Successfully reconcile SynchronizerFeesConfig $task"
       )
     }
   }
@@ -72,7 +72,7 @@ class ReconcileDomainFeesConfigTrigger(
       existingDomainParameter: DynamicDomainParameters,
       amuletConfig: AmuletConfig[USD],
   ): DynamicDomainParameters = {
-    val domainFeesConfig = amuletConfig.globalDomain.fees
+    val domainFeesConfig = amuletConfig.decentralizedSynchronizer.fees
     existingDomainParameter.tryUpdate(
       trafficControlParameters =
         existingDomainParameter.trafficControlParameters.map { trafficControl =>
@@ -89,11 +89,11 @@ class ReconcileDomainFeesConfigTrigger(
     )
   }
 }
-object ReconcileDomainFeesConfigTrigger {
+object ReconcileSynchronizerFeesConfigTrigger {
   case class Task(amuletConfig: AmuletConfig[USD]) extends PrettyPrinting {
     import com.daml.network.util.PrettyInstances.*
     override def pretty: Pretty[this.type] = {
-      prettyOfClass(param("globalFeesConfig", _.amuletConfig.globalDomain.fees))
+      prettyOfClass(param("globalFeesConfig", _.amuletConfig.decentralizedSynchronizer.fees))
     }
   }
 }

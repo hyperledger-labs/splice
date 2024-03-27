@@ -25,7 +25,7 @@ import Splice.CometBft
 import Splice.DsoRules
 import Splice.DsoBootstrap
 import Splice.DSO.AmuletPrice
-import Splice.DSO.GlobalDomain
+import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
 import Splice.Scripts.AnsRulesParameters
 
@@ -45,13 +45,13 @@ initDSO isDevNet = do
 
   dso <- allocateParty "DSO"
 
-  let initialDomainConfig = DomainConfig with
+  let initialSynchronizerConfig = SynchronizerConfig with
         state = DS_Operational
         cometBftGenesisJson = "<genesis-json>"
-  let initialDsoGlobalDomainConfig =  DsoGlobalDomainConfig with
-        domains = Map.fromList [("domain-id", initialDomainConfig)]
-        lastDomainId = "domain-id"
-        activeDomainId = "domain-id"
+  let initialDsoDecentralizedSynchronizerConfig =  DsoDecentralizedSynchronizerConfig with
+        synchronizers = Map.fromList [("synchronizer-id", initialSynchronizerConfig)]
+        lastSynchronizerId = "synchronizer-id"
+        activeSynchronizerId = "synchronizer-id"
 
   let config = DsoRulesConfig with
         numUnclaimedRewardsThreshold = 5
@@ -61,10 +61,10 @@ initDSO isDevNet = do
         svOnboardingConfirmedTimeout = hours 1
         voteRequestTimeout = days 7
         dsoDelegateInactiveTimeout = seconds 70
-        domainNodeConfigLimits = defaultDomainNodeConfigLimits
+        synchronizerNodeConfigLimits = defaultSynchronizerNodeConfigLimits
         maxTextLength = 1024
-        globalDomain = initialDsoGlobalDomainConfig
-        nextScheduledDomainUpgrade = None
+        decentralizedSynchronizer = initialDsoDecentralizedSynchronizerConfig
+        nextScheduledSynchronizerUpgrade = None
   let amuletConfig = defaultAmuletConfig
   let ansRulesConfig = defaultAnsRulesConfig
 
@@ -76,8 +76,8 @@ initDSO isDevNet = do
       sv1Name = "sv1"
       sv1RewardWeight = 10 * bpsMultiplier -- Tier 1 SVs get weight 10, and weights are recorded in basis-points, i.e., 1/10000ths
       sv1ParticipantId = "sv1-participant-id"
-      sv1DomainNodes = Map.fromList
-        [("domain-id",  DomainNodeConfig with
+      sv1SynchronizerNodes = Map.fromList
+        [("synchronizer-id",  SynchronizerNodeConfig with
                 cometBft = CometBftConfig with
                   nodes = Map.fromList
                     [("node-id-1", CometBftNodeConfig "validatorPubKey" 1)]
@@ -351,13 +351,13 @@ getSvNodeState app sv = do
   [result] <- queryFilter @SvNodeState app.dso (\state -> state.sv == sv)
   pure result
 
-setDomainNodeConfig : AmuletApp -> Party -> Text -> DomainNodeConfig -> Script (ContractId SvNodeState)
-setDomainNodeConfig app sv domainId newNodeConfig = do
+setSynchronizerNodeConfig : AmuletApp -> Party -> Text -> SynchronizerNodeConfig -> Script (ContractId SvNodeState)
+setSynchronizerNodeConfig app sv synchronizerId newNodeConfig = do
   (nodeStateCid, _) <- getSvNodeState app sv
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
-  result <- submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_SetDomainNodeConfig with
+  result <- submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_SetSynchronizerNodeConfig with
     sv
-    domainId
+    synchronizerId
     nodeStateCid
     newNodeConfig
   pure result.svNodeState

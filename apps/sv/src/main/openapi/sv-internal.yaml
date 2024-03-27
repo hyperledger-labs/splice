@@ -163,7 +163,7 @@ paths:
     get:
       tags: [sv]
       x-jvm-package: sv_admin
-      operationId: "pauseGlobalDomain"
+      operationId: "pauseDecentralizedSynchronizer"
       responses:
         "200":
           description: ok
@@ -172,7 +172,7 @@ paths:
     post:
       tags: [sv]
       x-jvm-package: sv_admin
-      operationId: "unpauseGlobalDomain"
+      operationId: "unpauseDecentralizedSynchronizer"
       responses:
         "200":
           description: ok
@@ -210,14 +210,14 @@ paths:
     get:
       tags: [ sv ]
       x-jvm-package: sv_admin
-      operationId: "getDomainNodeIdentitiesDump"
+      operationId: "getSynchronizerNodeIdentitiesDump"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetDomainNodeIdentitiesDumpResponse"
+                "$ref": "#/components/schemas/GetSynchronizerNodeIdentitiesDumpResponse"
         "500":
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/responses/500"
   /v0/admin/domain/data-snapshot:
@@ -1088,7 +1088,7 @@ components:
           items:
             $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
 
-    DomainNodeIdentities:
+    SynchronizerNodeIdentities:
       type: object
       required:
         - sv_party_id
@@ -1177,19 +1177,19 @@ components:
           type: integer
           format: int64
         identities:
-          $ref: "#/components/schemas/DomainNodeIdentities"
+          $ref: "#/components/schemas/SynchronizerNodeIdentities"
         data_snapshot:
           $ref: "#/components/schemas/DomainDataSnapshot"
         created_at:
           type: string
 
-    GetDomainNodeIdentitiesDumpResponse:
+    GetSynchronizerNodeIdentitiesDumpResponse:
       type: object
       required:
         - identities
       properties:
         identities:
-          $ref: "#/components/schemas/DomainNodeIdentities"
+          $ref: "#/components/schemas/SynchronizerNodeIdentities"
 
     GetDomainDataSnapshotRequest:
       type: object

@@ -20,7 +20,7 @@ import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
 
-class GlobalDomainUpgradeClusterPreflightIntegrationTest
+class DecentralizedSynchronizerUpgradeClusterPreflightIntegrationTest
     extends FrontendIntegrationTestWithSharedEnvironment("sv1", "sv2", "sv3", "sv4")
     with SvUiIntegrationTestUtil
     with SvFrontendTestUtil {
@@ -62,15 +62,16 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
         val scheduledUpgradeTime = DateTimeFormatter.ISO_INSTANT.format(
           now.plusSeconds(80).truncatedTo(ChronoUnit.SECONDS)
         )
-        inside(find(id("nextScheduledDomainUpgrade.time-value"))) { case Some(element) =>
+        inside(find(id("nextScheduledSynchronizerUpgrade.time-value"))) { case Some(element) =>
           element.underlying.clear()
           element.underlying.sendKeys(scheduledUpgradeTime)
         }
 
         // We hard-coded 1 here for now. It should be more robust to calculated from the migration id of node currently deployed.
-        inside(find(id("nextScheduledDomainUpgrade.migrationId-value"))) { case Some(element) =>
-          element.underlying.clear()
-          element.underlying.sendKeys("1")
+        inside(find(id("nextScheduledSynchronizerUpgrade.migrationId-value"))) {
+          case Some(element) =>
+            element.underlying.clear()
+            element.underlying.sendKeys("1")
         }
 
         inside(find(id("create-reason-summary"))) { case Some(element) =>
@@ -181,14 +182,14 @@ class GlobalDomainUpgradeClusterPreflightIntegrationTest
       // - 30s polling interval for the trigger to kick in
       // - general slowness
       eventuallySucceeds(timeUntilSuccess = 240.seconds) {
-        val nextScheduledDomainUpgrade = sv1
+        val nextScheduledSynchronizerUpgrade = sv1
           .getDsoInfo()
           .dsoRules
           .payload
           .config
-          .nextScheduledDomainUpgrade
+          .nextScheduledSynchronizerUpgrade
           .toScala
-        nextScheduledDomainUpgrade.value.migrationId shouldBe 1L
+        nextScheduledSynchronizerUpgrade.value.migrationId shouldBe 1L
       }
     }
   }

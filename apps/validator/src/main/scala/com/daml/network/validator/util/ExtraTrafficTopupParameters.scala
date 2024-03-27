@@ -1,6 +1,6 @@
 package com.daml.network.validator.util
 
-import com.daml.network.codegen.java.splice.globaldomain.DomainFeesConfig
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.SynchronizerFeesConfig
 import com.daml.network.validator.config.BuyExtraTrafficConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
 
@@ -22,7 +22,7 @@ case class ExtraTrafficTopupParameters(
 
 object ExtraTrafficTopupParameters {
   def apply(
-      globalConfig: DomainFeesConfig,
+      globalConfig: SynchronizerFeesConfig,
       validatorConfig: BuyExtraTrafficConfig,
       topupTriggerPollingInterval: NonNegativeFiniteDuration,
   ): ExtraTrafficTopupParameters = {

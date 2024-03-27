@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice.dso.globaldomain.DomainNodeConfig
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig
 import com.daml.network.environment.{ParticipantAdminConnection, RetryFor}
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.topology.SequencerId
@@ -47,7 +47,9 @@ class SvOffboardingSequencerTrigger(
       )
     } yield {
       val dsoRulesCurrentSequencers = getSequencerIds(
-        rulesAndStates.svNodeStates.values.flatMap(_.payload.state.domainNodes.values().asScala)
+        rulesAndStates.svNodeStates.values.flatMap(
+          _.payload.state.synchronizerNodes.values().asScala
+        )
       )
       if (dsoRulesCurrentSequencers.isEmpty) {
         // Prudent engineering: always keep at least one sequencer active
@@ -101,7 +103,7 @@ class SvOffboardingSequencerTrigger(
   }
 
   private def getSequencerIds(
-      members: Iterable[DomainNodeConfig]
+      members: Iterable[SynchronizerNodeConfig]
   )(implicit tc: TraceContext) = {
     members
       .flatMap(_.sequencer.toScala)

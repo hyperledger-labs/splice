@@ -28,7 +28,7 @@ class UserWalletAutomationService(
     store: UserWalletStore,
     treasury: TreasuryService,
     ledgerClient: CNLedgerClient,
-    globalDomain: GetTargetDomain,
+    decentralizedSynchronizer: GetTargetDomain,
     automationConfig: AutomationConfig,
     clock: Clock,
     scanConnection: BftScanConnection,
@@ -81,7 +81,7 @@ class UserWalletAutomationService(
       triggerContext,
       store,
       connection,
-      globalDomain,
+      decentralizedSynchronizer,
       store.key.endUserParty,
       paymentCodegen.AppPaymentRequest.COMPANION,
     )

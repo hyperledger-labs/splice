@@ -337,7 +337,7 @@ object ValidatorStore {
         ) { contract =>
           ValidatorAcsStoreRowData(
             contract = contract,
-            trafficDomainId = Some(DomainId.tryFromString(contract.payload.domainId)),
+            trafficDomainId = Some(DomainId.tryFromString(contract.payload.synchronizerId)),
           )
         },
         mkFilter(amuletCodegen.Amulet.COMPANION)(co =>

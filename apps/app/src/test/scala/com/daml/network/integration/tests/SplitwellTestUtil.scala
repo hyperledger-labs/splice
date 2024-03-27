@@ -150,18 +150,18 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       receiverAmounts: Seq[ReceiverCCAmount],
   )(implicit env: CNNodeTestConsoleEnvironment): AcceptedAppPayment.ContractId = {
     senderSplitwell.initiateTransfer(key, receiverAmounts)
-    val request = eventually()(getSingleRequestOnGlobalDomain(senderWallet))
+    val request = eventually()(getSingleRequestOnDecentralizedSynchronizer(senderWallet))
     senderWallet.acceptAppPaymentRequest(request.contractId)
   }
 
-  protected def getSingleRequestOnGlobalDomain(
+  protected def getSingleRequestOnDecentralizedSynchronizer(
       walletClient: WalletAppClientReference
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val request = walletClient
       .listAppPaymentRequests()
       .loneElement
     inside(request.state) { case ContractState.Assigned(domain) =>
-      domain should be(globalDomainId)
+      domain should be(decentralizedSynchronizerId)
     }
     request
   }

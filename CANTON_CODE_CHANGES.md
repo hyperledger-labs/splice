@@ -9,7 +9,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 # Changes
 
 ## Methods or classes with changed visibility
-* `idHelper`, `tryDomainNodeParametersByString`, `tryParticipantNodeParametersByString`,
+* `idHelper`, `tryParticipantNodeParametersByString`,
     `MetricsFactory.registerReporter`, `BaseIntegrationTest` made public
 * `testingTimeService` made protected
 * `PrettyInstances.treeOfIterable` and `PrettyInstances.prettyUidString` made public

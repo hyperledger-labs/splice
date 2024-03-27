@@ -2,7 +2,7 @@ module Splice.Wallet.BuyTrafficRequest where
 
 import Splice.Amulet
 import Splice.AmuletRules
-import Splice.GlobalDomain (MemberTraffic)
+import Splice.DecentralizedSynchronizer (MemberTraffic)
 import Splice.Util
 
 
@@ -33,7 +33,7 @@ template BuyTrafficRequest
     trackingId : Text -- ^ Used to deduplicate requests
     trafficAmount : Int
     memberId : Text
-    domainId : Text
+    synchronizerId : Text
     migrationId : Int
   where
     signatory endUserParty
@@ -47,7 +47,7 @@ template BuyTrafficRequest
       do
         now <- getTime
         require "Contract has not expired" (now < expiresAt)
-        result <- exercise context.amuletRules (AmuletRules_BuyMemberTraffic inputs context.context endUserParty memberId domainId migrationId trafficAmount)
+        result <- exercise context.amuletRules (AmuletRules_BuyMemberTraffic inputs context.context endUserParty memberId synchronizerId migrationId trafficAmount)
         let trackingInfo = BuyTrafficRequestTrackingInfo with ..
         pure BuyTrafficRequest_CompleteResult with
           purchasedTraffic = result.purchasedTraffic

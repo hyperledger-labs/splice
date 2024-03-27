@@ -8,7 +8,7 @@ import {
   defaultVersion,
   exactNamespace,
   ExactNamespace,
-  GlobalDomainMigrationConfig,
+  DecentralizedSynchronizerMigrationConfig,
   installAuth0Secret,
   installCNHelmChart,
   ValidatorTopupConfig,
@@ -26,7 +26,7 @@ export async function installSplitwell(
   validatorWalletUser: string,
   onboardingSecret: string,
   splitPostgresInstances: boolean,
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
   participantBootstrapDump?: BootstrappingDumpConfig,
@@ -54,7 +54,7 @@ export async function installSplitwell(
   installIngress(xns);
 
   const participant = installMigrationSpecificValidatorParticipant(
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     xns,
     sharedPostgres,
     participantBootstrapDump,
@@ -76,7 +76,7 @@ export async function installSplitwell(
         enable: true,
       },
       migration: {
-        id: globalDomainMigrationConfig.active.migrationId,
+        id: decentralizedSynchronizerMigrationConfig.active.migrationId,
       },
       scanAddress: scanAddress,
       participantHost: participant.name,
@@ -105,7 +105,7 @@ export async function installSplitwell(
     xns,
     extraDependsOn,
     participant,
-    ...globalDomainMigrationConfig.migratingNodeConfig(),
+    ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     additionalUsers: [
       auth0UserNameEnvVar('splitwell'),
       { name: 'CN_APP_SPLITWELL_PROVIDER_WALLET_USER_NAME', value: providerWalletUser },

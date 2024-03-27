@@ -16,7 +16,7 @@ import { installCometBftNode } from './cometbft';
 import { Postgres, installPostgresMetrics } from './postgres';
 import { StaticCometBftConfigWithNodeName } from './svConfigs';
 
-export class GlobalDomainNode extends ComponentResource {
+export class DecentralizedSynchronizerNode extends ComponentResource {
   migrationId: number;
   name: string;
   cometbft: {
@@ -73,7 +73,7 @@ export class GlobalDomainNode extends ComponentResource {
 
     this.cometbftRpcService = cometBftService;
 
-    const domainNodeRelease = installCNHelmChart(
+    const synchronizerNodeRelease = installCNHelmChart(
       xns,
       this.name,
       'cn-global-domain',
@@ -109,8 +109,8 @@ export class GlobalDomainNode extends ComponentResource {
       { dependsOn: [cometBftService], parent: this }
     );
 
-    installPostgresMetrics(mediatorPostgres, mediatorDbName, [domainNodeRelease]);
-    installPostgresMetrics(sequencerPostgres, sequencerDbName, [domainNodeRelease]);
+    installPostgresMetrics(mediatorPostgres, mediatorDbName, [synchronizerNodeRelease]);
+    installPostgresMetrics(sequencerPostgres, sequencerDbName, [synchronizerNodeRelease]);
   }
 
   get namespaceInternalSequencerAddress(): string {

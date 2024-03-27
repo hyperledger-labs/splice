@@ -5,25 +5,25 @@ import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_AmuletRules
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
-import com.daml.network.codegen.java.splice.globaldomain.{
-  AmuletGlobalDomainConfig,
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.{
+  AmuletDecentralizedSynchronizerConfig,
   BaseRateTrafficLimits,
-  DomainFeesConfig,
+  SynchronizerFeesConfig,
 }
 import com.daml.network.util.AmuletConfigSchedule
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
-class SvReconcileDomainConfigIntegrationTest extends SvIntegrationTestBase {
+class SvReconcileSynchronizerConfigIntegrationTest extends SvIntegrationTestBase {
 
   "SV automation reconcile amulet config change to domain parameter" in { implicit env =>
     initDso()
 
-    val globalDomainId = inside(sv1Backend.participantClient.domains.list_connected()) {
-      case Seq(domain) =>
+    val decentralizedSynchronizerId =
+      inside(sv1Backend.participantClient.domains.list_connected()) { case Seq(domain) =>
         domain.domainId
-    }
+      }
 
     val amuletConfig: AmuletConfig[USD] =
       sv1ScanBackend.getAmuletRules().payload.configSchedule.initialValue
@@ -32,25 +32,25 @@ class SvReconcileDomainConfigIntegrationTest extends SvIntegrationTestBase {
       eventually() {
         val trafficControlParameters =
           sv1Backend.participantClientWithAdminToken.topology.domain_parameters
-            .get_dynamic_domain_parameters(globalDomainId)
+            .get_dynamic_domain_parameters(decentralizedSynchronizerId)
             .trafficControlParameters
             .value
         trafficControlParameters.maxBaseTrafficAmount.value shouldBe
-          amuletConfig.globalDomain.fees.baseRateTrafficLimits.burstAmount
+          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount
         trafficControlParameters.maxBaseTrafficAccumulationDuration.underlying.toMicros shouldBe
-          amuletConfig.globalDomain.fees.baseRateTrafficLimits.burstWindow.microseconds
+          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds
         trafficControlParameters.readVsWriteScalingFactor.value.toLong shouldBe
-          amuletConfig.globalDomain.fees.readVsWriteScalingFactor
+          amuletConfig.decentralizedSynchronizer.fees.readVsWriteScalingFactor
       }
     }
 
     val newAmuletConfig = createAmuletConfig(
       amuletConfig,
-      amuletConfig.globalDomain.fees.baseRateTrafficLimits.burstAmount + 1,
+      amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount + 1,
       new RelTime(
-        amuletConfig.globalDomain.fees.baseRateTrafficLimits.burstWindow.microseconds + 1
+        amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds + 1
       ),
-      amuletConfig.globalDomain.fees.readVsWriteScalingFactor + 1,
+      amuletConfig.decentralizedSynchronizer.fees.readVsWriteScalingFactor + 1,
     )
     val configChangeAction = new ARC_AmuletRules(
       new CRARC_AddFutureAmuletConfigSchedule(
@@ -95,13 +95,14 @@ class SvReconcileDomainConfigIntegrationTest extends SvIntegrationTestBase {
       _ => {
         val newAmuletRules = sv1Backend.getDsoInfo().amuletRules
         val now = env.environment.clock.now
-        val config = AmuletConfigSchedule(newAmuletRules).getConfigAsOf(now).globalDomain.fees
+        val config =
+          AmuletConfigSchedule(newAmuletRules).getConfigAsOf(now).decentralizedSynchronizer.fees
         config.baseRateTrafficLimits.burstAmount shouldBe
-          amuletConfig.globalDomain.fees.baseRateTrafficLimits.burstAmount + 1
+          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount + 1
         config.baseRateTrafficLimits.burstWindow shouldBe new RelTime(
-          amuletConfig.globalDomain.fees.baseRateTrafficLimits.burstWindow.microseconds + 1
+          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds + 1
         )
-        config.readVsWriteScalingFactor shouldBe amuletConfig.globalDomain.fees.readVsWriteScalingFactor + 1
+        config.readVsWriteScalingFactor shouldBe amuletConfig.decentralizedSynchronizer.fees.readVsWriteScalingFactor + 1
       },
     )
 
@@ -109,15 +110,15 @@ class SvReconcileDomainConfigIntegrationTest extends SvIntegrationTestBase {
       eventually() {
         val trafficControlParameters =
           sv1Backend.participantClientWithAdminToken.topology.domain_parameters
-            .get_dynamic_domain_parameters(globalDomainId)
+            .get_dynamic_domain_parameters(decentralizedSynchronizerId)
             .trafficControlParameters
             .value
         trafficControlParameters.maxBaseTrafficAmount.value shouldBe
-          amuletConfig.globalDomain.fees.baseRateTrafficLimits.burstAmount + 1
+          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstAmount + 1
         trafficControlParameters.maxBaseTrafficAccumulationDuration.underlying.toMicros shouldBe
-          amuletConfig.globalDomain.fees.baseRateTrafficLimits.burstWindow.microseconds + 1
+          amuletConfig.decentralizedSynchronizer.fees.baseRateTrafficLimits.burstWindow.microseconds + 1
         trafficControlParameters.readVsWriteScalingFactor.value.toLong shouldBe
-          amuletConfig.globalDomain.fees.readVsWriteScalingFactor + 1
+          amuletConfig.decentralizedSynchronizer.fees.readVsWriteScalingFactor + 1
       }
     }
   }
@@ -130,17 +131,17 @@ class SvReconcileDomainConfigIntegrationTest extends SvIntegrationTestBase {
   ) = new AmuletConfig(
     amuletConfig.transferConfig,
     amuletConfig.issuanceCurve,
-    new AmuletGlobalDomainConfig(
-      amuletConfig.globalDomain.requiredDomains,
-      amuletConfig.globalDomain.activeDomain,
-      new DomainFeesConfig(
+    new AmuletDecentralizedSynchronizerConfig(
+      amuletConfig.decentralizedSynchronizer.requiredSynchronizers,
+      amuletConfig.decentralizedSynchronizer.activeSynchronizer,
+      new SynchronizerFeesConfig(
         new BaseRateTrafficLimits(
           burstAmount,
           burstWindow,
         ),
-        amuletConfig.globalDomain.fees.extraTrafficPrice,
+        amuletConfig.decentralizedSynchronizer.fees.extraTrafficPrice,
         readVsWriteScalingFactor,
-        amuletConfig.globalDomain.fees.minTopupAmount,
+        amuletConfig.decentralizedSynchronizer.fees.minTopupAmount,
       ),
     ),
     amuletConfig.tickDuration,

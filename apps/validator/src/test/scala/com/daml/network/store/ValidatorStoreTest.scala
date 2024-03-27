@@ -11,7 +11,10 @@ import com.daml.network.codegen.java.splice.wallet.topupstate as topUpCodegen
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
 import com.daml.network.util.{AssignedContract, ResourceTemplateDecoder, TemplateJsonDecoder}
-import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
+import com.daml.network.validator.config.{
+  ValidatorSynchronizerConfig,
+  ValidatorDecentralizedSynchronizerConfig,
+}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.store.db.DbValidatorStore
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -581,8 +584,8 @@ abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
 
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val domainAlias = DomainAlias.tryCreate(domain)
-  lazy val domainConfig = ValidatorDomainConfig(
-    global = ValidatorGlobalDomainConfig(
+  lazy val domainConfig = ValidatorSynchronizerConfig(
+    global = ValidatorDecentralizedSynchronizerConfig(
       domainAlias
     )
   )

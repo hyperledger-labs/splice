@@ -137,7 +137,7 @@ class AppUpgradeIntegrationTest
           val newAmuletConfig = new splice.amuletconfig.AmuletConfig(
             amuletConfig.transferConfig,
             amuletConfig.issuanceCurve,
-            amuletConfig.globalDomain,
+            amuletConfig.decentralizedSynchronizer,
             amuletConfig.tickDuration,
             new splice.amuletconfig.PackageConfig(
               "0.1.1",

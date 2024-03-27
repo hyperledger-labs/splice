@@ -427,15 +427,15 @@ object BftScanConnection {
 
     private def getScansInDsoRules(connection: BftScanConnection)(implicit tc: TraceContext) = {
       for {
-        globalDomainId <- connection.getAmuletRulesDomain()(tc)
+        decentralizedSynchronizerId <- connection.getAmuletRulesDomain()(tc)
         scans <- connection.listDsoScans()
         domainScans <- scans
-          .find(_.domainId == globalDomainId)
+          .find(_.domainId == decentralizedSynchronizerId)
           .map(e => Future.successful(e.scans))
           .getOrElse(
             Future.failed(
               new IllegalStateException(
-                s"The global domain $globalDomainId is not present in the scans response: $scans"
+                s"The global domain $decentralizedSynchronizerId is not present in the scans response: $scans"
               )
             )
           )

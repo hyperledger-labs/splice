@@ -3,7 +3,7 @@ module Splice.DSO.SvState where
 
 import Splice.Types
 
-import Splice.DSO.GlobalDomain
+import Splice.DSO.DecentralizedSynchronizer
 import Splice.Util
 
 
@@ -50,8 +50,8 @@ template SvRewardState with
 ------------------------
 
 data NodeState = NodeState with
-    domainNodes : DomainNodeConfigMap
-    -- ^ The config for a domain's CometBFT, sequencer, mediator and scan nodes under control of an SV party.
+    synchronizerNodes : SynchronizerNodeConfigMap
+    -- ^ The config for a synchronizer's CometBFT, sequencer, mediator and scan nodes under control of an SV party.
   deriving (Eq, Show)
 
 -- | State of a node managed by an SV operator party.
@@ -81,10 +81,10 @@ data SvStatus = SvStatus with
     -- gather the data points in this report to submit them.
     cometBftHeight : Int
     -- ^ The height of the CometBFT chain at the time of submission
-    mediatorDomainTime : Time
-    -- ^ The latest domain time observed on the mediator at the time of submission
-    participantDomainTime : Time
-    -- ^ The latest domain time observed on the participant at the time of submission
+    mediatorSynchronizerTime : Time
+    -- ^ The latest synchronizer time observed on the mediator at the time of submission
+    participantSynchronizerTime : Time
+    -- ^ The latest synchronizer time observed on the participant at the time of submission
     latestOpenRound : Round
     -- ^ The maximum round number of the OpenMiningRound contracts at the time of submission
   deriving (Eq, Show)

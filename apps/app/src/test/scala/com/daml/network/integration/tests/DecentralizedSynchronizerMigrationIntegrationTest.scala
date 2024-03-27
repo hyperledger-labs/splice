@@ -5,14 +5,14 @@ import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.splitwell.Group
 import com.daml.network.codegen.java.splice.splitwell.balanceupdatetype.Transfer
-import com.daml.network.codegen.java.splice.dsorules.{DomainUpgradeSchedule, DsoRules_AddSv}
+import com.daml.network.codegen.java.splice.dsorules.{SynchronizerUpgradeSchedule, DsoRules_AddSv}
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
 import com.daml.network.codegen.java.splice.wallet.payment.ReceiverCCAmount
 import com.daml.network.config.{
   CNNodeConfigTransforms,
   CNParticipantClientConfig,
-  DomainConfig,
+  SynchronizerConfig,
   NetworkAppClientConfig,
 }
 import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
@@ -35,15 +35,15 @@ import com.daml.network.integration.tests.CNNodeTests.{
 }
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
-import com.daml.network.integration.tests.GlobalDomainMigrationIntegrationTest.migrationDumpDir
+import com.daml.network.integration.tests.DecentralizedSynchronizerMigrationIntegrationTest.migrationDumpDir
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
-import com.daml.network.splitwell.config.{SplitwellDomainConfig, SplitwellDomains}
+import com.daml.network.splitwell.config.{SplitwellSynchronizerConfig, SplitwellDomains}
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
-import com.daml.network.sv.migration.GlobalDomainMigrationTrigger
+import com.daml.network.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   CNNodeUtil,
@@ -55,7 +55,10 @@ import com.daml.network.util.{
   WalletTestUtil,
 }
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
-import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
+import com.daml.network.validator.config.{
+  ValidatorSynchronizerConfig,
+  ValidatorDecentralizedSynchronizerConfig,
+}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -86,7 +89,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
-class GlobalDomainMigrationIntegrationTest
+class DecentralizedSynchronizerMigrationIntegrationTest
     extends CNNodeIntegrationTest
     with ProcessTestUtil
     with SvTestUtil
@@ -106,7 +109,9 @@ class GlobalDomainMigrationIntegrationTest
     CNNodeEnvironmentDefinition
       .simpleTopology4Svs(this.getClass.getSimpleName)
       .unsafeWithSequencerAvailabilityDelay(NonNegativeFiniteDuration.ofSeconds(5))
-      .addConfigTransform((_, config) => CNNodeConfigTransforms.useGlobalDomainSplitwell()(config))
+      .addConfigTransform((_, config) =>
+        CNNodeConfigTransforms.useDecentralizedSynchronizerSplitwell()(config)
+      )
       .addConfigTransforms((_, config) => {
         config.copy(
           svApps = config.svApps ++
@@ -144,8 +149,8 @@ class GlobalDomainMigrationIntegrationTest
                 .validatorApps(InstanceName.tryCreate("sv1Validator"))
                 .copy(
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
-                  domains = ValidatorDomainConfig(global =
-                    ValidatorGlobalDomainConfig(
+                  domains = ValidatorSynchronizerConfig(global =
+                    ValidatorDecentralizedSynchronizerConfig(
                       alias = DomainAlias.tryCreate("global"),
                       url = Some("http://localhost:27109"),
                     )
@@ -178,8 +183,8 @@ class GlobalDomainMigrationIntegrationTest
                   adminApi =
                     aliceValidatorConfig.adminApi.copy(internalPort = Some(Port.tryCreate(27603))),
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
-                  domains = ValidatorDomainConfig(global =
-                    ValidatorGlobalDomainConfig(
+                  domains = ValidatorSynchronizerConfig(global =
+                    ValidatorDecentralizedSynchronizerConfig(
                       alias = DomainAlias.tryCreate("global"),
                       url = None,
                     )
@@ -217,8 +222,8 @@ class GlobalDomainMigrationIntegrationTest
                     Some(Port.tryCreate(27703))
                   ),
                   scanClient = TrustSingle(url = "http://127.0.0.1:27012"),
-                  domains = ValidatorDomainConfig(global =
-                    ValidatorGlobalDomainConfig(
+                  domains = ValidatorSynchronizerConfig(global =
+                    ValidatorDecentralizedSynchronizerConfig(
                       alias = DomainAlias.tryCreate("global"),
                       url = Some("http://localhost:27108"),
                     )
@@ -301,9 +306,9 @@ class GlobalDomainMigrationIntegrationTest
                         )
                     ),
                   ),
-                  domains = SplitwellDomainConfig(
+                  domains = SplitwellSynchronizerConfig(
                     splitwell = SplitwellDomains(
-                      preferred = DomainConfig(
+                      preferred = SynchronizerConfig(
                         alias = DomainAlias.tryCreate("global")
                       ),
                       others = Seq.empty,
@@ -440,7 +445,7 @@ class GlobalDomainMigrationIntegrationTest
       eventually() {
         inside(sv1ScanBackend.listDsoSequencers()) {
           case Seq(DomainSequencers(domainId, sequencers)) =>
-            domainId shouldBe globalDomainId
+            domainId shouldBe decentralizedSynchronizerId
             sequencers should have size 4
             sequencers.foreach { sequencer =>
               sequencer.migrationId shouldBe 0
@@ -529,7 +534,7 @@ class GlobalDomainMigrationIntegrationTest
           val urlSet =
             getSequencerUrlSet(
               aliceValidatorBackend.participantClientWithAdminToken,
-              globalDomainAlias,
+              decentralizedSynchronizerAlias,
             )
           urlSet should have size 4
           urlSet
@@ -565,369 +570,381 @@ class GlobalDomainMigrationIntegrationTest
           retryProvider,
           env.environment.config.monitoring.logging.api,
         ),
-      ) { case (upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4) =>
-        val allNodes =
-          Seq(upgradeDomainNode1, upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
-        val dsoPartyDecentralizedNamespace =
-          sv1Backend.appState.dsoStore.key.dsoParty.uid.namespace
-
-        val domainDynamicParams =
-          sv1Backend.participantClientWithAdminToken.topology.domain_parameters
-            .list(
-              globalDomainId.filterString
+      ) {
+        case (
+              upgradeSynchronizerNode1,
+              upgradeSynchronizerNode2,
+              upgradeSynchronizerNode3,
+              upgradeSynchronizerNode4,
+            ) =>
+          val allNodes =
+            Seq(
+              upgradeSynchronizerNode1,
+              upgradeSynchronizerNode2,
+              upgradeSynchronizerNode3,
+              upgradeSynchronizerNode4,
             )
-            .headOption
-            .value
-            .item
-        val majorityUpgradeNodes = Seq(upgradeDomainNode2, upgradeDomainNode3, upgradeDomainNode4)
+          val dsoPartyDecentralizedNamespace =
+            sv1Backend.appState.dsoStore.key.dsoParty.uid.namespace
 
-        val sv1Party = sv1Backend.appState.svStore.key.svParty
-
-        bracket(
-          withClueAndLog(
-            s"schedule domain migration"
-          ) {
-            // Ideally we'd like the config to take effect immediately. However, we
-            // can only schedule configs in the future and this is enforced at the Daml level.
-            // So we pick a date that is far enough in the future that we can complete the voting process
-            // before it is reached but close enough that we don't need to wait for long.
-            // 12 seconds seems to work well empirically.
-            val scheduledTime = Instant
-              .now()
-              .truncatedTo(
-                ChronoUnit.MICROS
+          val domainDynamicParams =
+            sv1Backend.participantClientWithAdminToken.topology.domain_parameters
+              .list(
+                decentralizedSynchronizerId.filterString
               )
-              .plus(12, ChronoUnit.SECONDS)
-            scheduleDomainMigration(
-              sv1Backend,
-              Seq(sv2Backend, sv3Backend, sv4Backend),
-              Some(new DomainUpgradeSchedule(scheduledTime, 1L)),
-            )
-          },
-          // reset to not crash other tests
-          {
-            // pausing DomainUpgradeTrigger of all all old SV to avoid them from setting the confirmationRequestsMaxRate back to zero.
-            allNodes.foreach { node =>
-              node.oldBackend.dsoAutomation
-                .trigger[GlobalDomainMigrationTrigger]
-                .pause()
-                .futureValue
-            }
-            clue(
-              s"reset confirmationRequestsMaxRate to ${domainDynamicParams.confirmationRequestsMaxRate} to not crash other tests"
+              .headOption
+              .value
+              .item
+          val majorityUpgradeNodes =
+            Seq(upgradeSynchronizerNode2, upgradeSynchronizerNode3, upgradeSynchronizerNode4)
+
+          val sv1Party = sv1Backend.appState.svStore.key.svParty
+
+          bracket(
+            withClueAndLog(
+              s"schedule domain migration"
             ) {
-              changeDomainRatePerParticipant(
-                allNodes.map(_.oldBackend.appState.participantAdminConnection),
-                domainDynamicParams.confirmationRequestsMaxRate,
+              // Ideally we'd like the config to take effect immediately. However, we
+              // can only schedule configs in the future and this is enforced at the Daml level.
+              // So we pick a date that is far enough in the future that we can complete the voting process
+              // before it is reached but close enough that we don't need to wait for long.
+              // 12 seconds seems to work well empirically.
+              val scheduledTime = Instant
+                .now()
+                .truncatedTo(
+                  ChronoUnit.MICROS
+                )
+                .plus(12, ChronoUnit.SECONDS)
+              scheduleDomainMigration(
+                sv1Backend,
+                Seq(sv2Backend, sv3Backend, sv4Backend),
+                Some(new SynchronizerUpgradeSchedule(scheduledTime, 1L)),
+              )
+            },
+            // reset to not crash other tests
+            {
+              // pausing SynchronizerUpgradeTrigger of all all old SV to avoid them from setting the confirmationRequestsMaxRate back to zero.
+              allNodes.foreach { node =>
+                node.oldBackend.dsoAutomation
+                  .trigger[DecentralizedSynchronizerMigrationTrigger]
+                  .pause()
+                  .futureValue
+              }
+              clue(
+                s"reset confirmationRequestsMaxRate to ${domainDynamicParams.confirmationRequestsMaxRate} to not crash other tests"
+              ) {
+                changeDomainRatePerParticipant(
+                  allNodes.map(_.oldBackend.appState.participantAdminConnection),
+                  domainDynamicParams.confirmationRequestsMaxRate,
+                )
+              }
+              deleteDirectoryRecursively(migrationDumpDir.toFile)
+            },
+          ) {
+
+            withClueAndLog("dump has been written in the configured location for the sv.") {
+              eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
+                allNodes.foreach { node =>
+                  (migrationDumpDir(
+                    node.oldBackend.name
+                  ) / "domain_migration_dump.json").path.exists shouldBe true
+                }
+              }
+            }
+
+            withClueAndLog("dump has been written in the configured location for the validator.") {
+              eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
+                Seq(aliceValidatorBackend, splitwellValidatorBackend).foreach { validator =>
+                  (migrationDumpDir(
+                    validator.name
+                  ) / "domain_migration_dump.json").path.exists shouldBe true
+                }
+              }
+            }
+
+            withClueAndLog("starting sv2-4 upgraded nodes") {
+              startAllSync(
+                sv2LocalBackend,
+                sv3LocalBackend,
+                sv4LocalBackend,
               )
             }
-            deleteDirectoryRecursively(migrationDumpDir.toFile)
-          },
-        ) {
 
-          withClueAndLog("dump has been written in the configured location for the sv.") {
-            eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
-              allNodes.foreach { node =>
-                (migrationDumpDir(
-                  node.oldBackend.name
-                ) / "domain_migration_dump.json").path.exists shouldBe true
+            checkMigrateDomainOnNodes(majorityUpgradeNodes)
+
+            val namespaceChangeResult =
+              withClueAndLog("decentralized namespace can be modified on the new domain") {
+                majorityUpgradeNodes.parTraverse { upgradeNode =>
+                  val connection = upgradeNode.newParticipantConnection
+                  for {
+                    id <- connection.getId()
+                    result <- connection
+                      .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
+                        "keep just sv1",
+                        decentralizedSynchronizerId,
+                        dsoPartyDecentralizedNamespace,
+                        _ => NonEmpty(Set, sv1Party.uid.namespace),
+                        id.namespace.fingerprint,
+                        RetryFor.WaitingOnInitDependency,
+                      )
+                  } yield result
+                }.futureValue
               }
-            }
-          }
 
-          withClueAndLog("dump has been written in the configured location for the validator.") {
-            eventually(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
-              Seq(aliceValidatorBackend, splitwellValidatorBackend).foreach { validator =>
-                (migrationDumpDir(
-                  validator.name
-                ) / "domain_migration_dump.json").path.exists shouldBe true
+            withClueAndLog("migrate the late joining node") {
+              // sv1 is the founder so specifically join it later to validate our replay
+              sv1LocalBackend.startSync()
+
+              val changeSerial = namespaceChangeResult.map(_.base.serial).max
+              // reconciliation loops will restore the removed namespaces once the sv1 starts
+              eventuallySucceeds(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
+                upgradeSynchronizerNode1.newParticipantConnection
+                  .getDecentralizedNamespaceDefinition(
+                    decentralizedSynchronizerId,
+                    dsoPartyDecentralizedNamespace,
+                  )
+                  .futureValue
+                  .base
+                  .serial should be >= changeSerial
               }
-            }
-          }
-
-          withClueAndLog("starting sv2-4 upgraded nodes") {
-            startAllSync(
-              sv2LocalBackend,
-              sv3LocalBackend,
-              sv4LocalBackend,
-            )
-          }
-
-          checkMigrateDomainOnNodes(majorityUpgradeNodes)
-
-          val namespaceChangeResult =
-            withClueAndLog("decentralized namespace can be modified on the new domain") {
-              majorityUpgradeNodes.parTraverse { upgradeNode =>
-                val connection = upgradeNode.newParticipantConnection
-                for {
-                  id <- connection.getId()
-                  result <- connection
-                    .ensureDecentralizedNamespaceDefinitionOwnerChangeProposalAccepted(
-                      "keep just sv1",
-                      globalDomainId,
-                      dsoPartyDecentralizedNamespace,
-                      _ => NonEmpty(Set, sv1Party.uid.namespace),
-                      id.namespace.fingerprint,
-                      RetryFor.WaitingOnInitDependency,
+              withClueAndLog("domain is unpaused on the new node") {
+                eventuallySucceeds() {
+                  upgradeSynchronizerNode1.newParticipantConnection
+                    .getDomainParametersState(
+                      decentralizedSynchronizerId
                     )
-                } yield result
-              }.futureValue
+                    .futureValue
+                    .mapping
+                    .parameters
+                    .confirmationRequestsMaxRate should be > NonNegativeInt.zero
+                }
+              }
             }
 
-          withClueAndLog("migrate the late joining node") {
-            // sv1 is the founder so specifically join it later to validate our replay
-            sv1LocalBackend.startSync()
-
-            val changeSerial = namespaceChangeResult.map(_.base.serial).max
-            // reconciliation loops will restore the removed namespaces once the sv1 starts
-            eventuallySucceeds(timeUntilSuccess = 2.minute, maxPollInterval = 2.second) {
-              upgradeDomainNode1.newParticipantConnection
-                .getDecentralizedNamespaceDefinition(
-                  globalDomainId,
-                  dsoPartyDecentralizedNamespace,
-                )
-                .futureValue
-                .base
-                .serial should be >= changeSerial
-            }
-            withClueAndLog("domain is unpaused on the new node") {
+            withClueAndLog("domain is unchanged on the old nodes") {
               eventuallySucceeds() {
-                upgradeDomainNode1.newParticipantConnection
-                  .getDomainParametersState(
-                    globalDomainId
+                sv1Backend.appState.participantAdminConnection
+                  .getDecentralizedNamespaceDefinition(
+                    decentralizedSynchronizerId,
+                    dsoPartyDecentralizedNamespace,
                   )
                   .futureValue
                   .mapping
-                  .parameters
-                  .confirmationRequestsMaxRate should be > NonNegativeInt.zero
-              }
-            }
-          }
-
-          withClueAndLog("domain is unchanged on the old nodes") {
-            eventuallySucceeds() {
-              sv1Backend.appState.participantAdminConnection
-                .getDecentralizedNamespaceDefinition(
-                  globalDomainId,
-                  dsoPartyDecentralizedNamespace,
-                )
-                .futureValue
-                .mapping
-                .owners
-                .forgetNE should have size 4
-              sv1Backend.appState.participantAdminConnection
-                .getDomainParametersState(
-                  globalDomainId
-                )
-                .futureValue
-                .mapping
-                .parameters
-                .confirmationRequestsMaxRate should be(NonNegativeInt.zero)
-            }
-          }
-
-          startAllSync(
-            sv1ScanLocalBackend,
-            sv1ValidatorLocalBackend,
-            v("splitwellValidatorLocal"),
-            sw("providerSplitwellBackendLocal"),
-          )
-
-          val aliceValidatorLocal = v("aliceValidatorLocal")
-          withClueAndLog("validator can migrate to the new domain") {
-            val validatorThatMigrates = aliceValidatorLocal
-            startValidatorAndTapAmulet(
-              validatorThatMigrates,
-              uwc("aliceWalletLocal"),
-              // tap 2 times (100) minus splitwell transfer (42)
-              expectedAmulets = 57 to 58,
-            )
-          }
-
-          val charlieUserParty = onboardWalletUser(uwc("charlieWalletLocal"), aliceValidatorLocal)
-
-          clue(s"validator should connect to sequencers in upgraded domain $charlieUserParty") {
-            eventually() {
-              inside(sv1ScanLocalBackend.listDsoSequencers()) {
-                case Seq(DomainSequencers(domainId, sequencers)) =>
-                  domainId shouldBe globalDomainId
-                  sequencers.foreach { sequencer =>
-                    if (sequencer.migrationId != 1)
-                      throw new RuntimeException(
-                        s"Expected sequencer migrationId to be 1, but got ${sequencer.migrationId}"
-                      )
-                    sequencers should have size 4
-                  }
-              }
-              val sequencerUrlSet = getSequencerUrlSet(
-                aliceValidatorLocal.participantClientWithAdminToken,
-                globalDomainAlias,
-              )
-              sequencerUrlSet should have size 4
-              sequencerUrlSet.intersect(sequencerUrlSetBeforeUpgrade) shouldBe Set.empty
-            }
-          }
-
-          startValidatorAndTapAmulet(
-            v("splitwellValidatorLocal"),
-            uwc("splitwellProviderWalletLocal"),
-          )
-
-          startAllSync(
-            sw("providerSplitwellBackendLocal")
-          )
-
-          sv1LocalBackend.getDsoInfo().dsoRules.payload.svs.size() shouldBe 4
-
-          clue("Old wallet balance is recorded") {
-            eventually() {
-              assertInRange(sv1WalletLocalClient.balance().unlockedQty, (1000, 2000))
-            }
-          }
-          clue("Old scan transaction history is recorded") {
-            eventually() {
-              countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
-              countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 0
-            }
-          }
-          actAndCheck("Create some new transaction history", sv1WalletLocalClient.tap(1338))(
-            "New transaction history is recorded and balance is updated",
-            _ => {
-              countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
-              countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 1
-              assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 4000))
-              inside(listTapsFromScan(sv1ScanLocalBackend, sv1Party, 1337, 1338)) {
-                case Seq(formerTap, laterTap) =>
-                  BigDecimal(formerTap.amuletAmount) shouldBe BigDecimal(1337)
-                  BigDecimal(laterTap.amuletAmount) shouldBe BigDecimal(1338)
-              }
-            },
-          )
-
-          actAndCheck(
-            "validate domain with create VoteRequest",
-            sv1LocalBackend.createVoteRequest(
-              sv1Party.toProtoPrimitive,
-              new ARC_DsoRules(
-                new SRARC_AddSv(
-                  new DsoRules_AddSv(
-                    "bob",
-                    "Bob",
-                    SvUtil.DefaultFoundingNodeWeight,
-                    "bob-participant-id",
-                    new Round(42),
-                  )
-                )
-              ),
-              "url",
-              "description",
-              sv1LocalBackend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-            ),
-          )(
-            "VoteRequest and Vote should be there",
-            _ =>
-              inside(sv1LocalBackend.listVoteRequests()) { case Seq(onlyReq) =>
-                sv1LocalBackend
-                  .lookupVoteRequest(
-                    onlyReq.contractId
-                  )
-                  .payload
-                  .votes should have size 1
-              },
-          )
-
-          withClueAndLog("3rd party app works after domain migration") {
-            val (_, paymentRequest) =
-              actAndCheck(timeUntilSuccess = 40.seconds, maxPollInterval = 1.second)(
-                "alice initiates transfer after domain migration",
-                rsw("aliceSplitwellLocal").initiateTransfer(
-                  splitwellGroupKey,
-                  Seq(
-                    new ReceiverCCAmount(
-                      charlieUserParty.toProtoPrimitive,
-                      BigDecimal(43.0).bigDecimal,
-                    )
-                  ),
-                ),
-              )(
-                "alice sees payment request",
-                _ => {
-                  getSingleRequestOnGlobalDomain(uwc("aliceWalletLocal"))
-                },
-              )
-
-            actAndCheck(
-              "alice initiates payment accept request after domain migration",
-              uwc("aliceWalletLocal").acceptAppPaymentRequest(paymentRequest.contractId),
-            )(
-              "alice sees balance update",
-              _ =>
-                inside(rsw("aliceSplitwellLocal").listBalanceUpdates(splitwellGroupKey)) {
-                  case Seq(update1, update2) =>
-                    Seq(update1, update2).foreach { update =>
-                      aliceValidatorLocal.participantClient.ledger_api_extensions.acs
-                        .lookup_contract_domain(
-                          aliceUserParty,
-                          Set(update.contractId.contractId),
-                        ) shouldBe Map(
-                        update.contractId.contractId -> globalDomainId
-                      )
-                    }
-                    inside(update1.payload.update) { case transfer: Transfer =>
-                      transfer.amount shouldBe BigDecimal("43.0000000000").bigDecimal
-                    }
-                    inside(update2.payload.update) { case transfer: Transfer =>
-                      transfer.amount shouldBe BigDecimal("42.0000000000").bigDecimal
-                    }
-                },
-            )
-          }
-
-          withClueAndLog("apps can be restarted") {
-            withClueAndLog("sv1 restarts with dump onboarding type") {
-              sv1LocalBackend.stop()
-              sv1LocalBackend.startSync()
-            }
-
-            withClueAndLog("sv1 restarts without any onboarding type") {
-              sv1LocalBackend.stop()
-              svb("sv1LocalOnboarded").startSync()
-            }
-          }
-
-          withClueAndLog("old domain can be unpaused") {
-            clue("old domain is paused") {
-              sv1Backend.appState.participantAdminConnection
-                .getDomainParametersState(
-                  globalDomainId
-                )
-                .futureValue
-                .mapping
-                .parameters
-                .confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
-            }
-
-            actAndCheck(
-              "all sv propose to unpause the old domain",
-              Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { svBackend =>
-                Future {
-                  svBackend.unpauseGlobalDomain()
-                }
-              }.futureValue,
-            )(
-              "old domain is un-paused",
-              _ =>
+                  .owners
+                  .forgetNE should have size 4
                 sv1Backend.appState.participantAdminConnection
                   .getDomainParametersState(
-                    globalDomainId
+                    decentralizedSynchronizerId
                   )
                   .futureValue
                   .mapping
                   .parameters
-                  .confirmationRequestsMaxRate should be > NonNegativeInt.zero,
+                  .confirmationRequestsMaxRate should be(NonNegativeInt.zero)
+              }
+            }
+
+            startAllSync(
+              sv1ScanLocalBackend,
+              sv1ValidatorLocalBackend,
+              v("splitwellValidatorLocal"),
+              sw("providerSplitwellBackendLocal"),
             )
+
+            val aliceValidatorLocal = v("aliceValidatorLocal")
+            withClueAndLog("validator can migrate to the new domain") {
+              val validatorThatMigrates = aliceValidatorLocal
+              startValidatorAndTapAmulet(
+                validatorThatMigrates,
+                uwc("aliceWalletLocal"),
+                // tap 2 times (100) minus splitwell transfer (42)
+                expectedAmulets = 57 to 58,
+              )
+            }
+
+            val charlieUserParty = onboardWalletUser(uwc("charlieWalletLocal"), aliceValidatorLocal)
+
+            clue(s"validator should connect to sequencers in upgraded domain $charlieUserParty") {
+              eventually() {
+                inside(sv1ScanLocalBackend.listDsoSequencers()) {
+                  case Seq(DomainSequencers(domainId, sequencers)) =>
+                    domainId shouldBe decentralizedSynchronizerId
+                    sequencers.foreach { sequencer =>
+                      if (sequencer.migrationId != 1)
+                        throw new RuntimeException(
+                          s"Expected sequencer migrationId to be 1, but got ${sequencer.migrationId}"
+                        )
+                      sequencers should have size 4
+                    }
+                }
+                val sequencerUrlSet = getSequencerUrlSet(
+                  aliceValidatorLocal.participantClientWithAdminToken,
+                  decentralizedSynchronizerAlias,
+                )
+                sequencerUrlSet should have size 4
+                sequencerUrlSet.intersect(sequencerUrlSetBeforeUpgrade) shouldBe Set.empty
+              }
+            }
+
+            startValidatorAndTapAmulet(
+              v("splitwellValidatorLocal"),
+              uwc("splitwellProviderWalletLocal"),
+            )
+
+            startAllSync(
+              sw("providerSplitwellBackendLocal")
+            )
+
+            sv1LocalBackend.getDsoInfo().dsoRules.payload.svs.size() shouldBe 4
+
+            clue("Old wallet balance is recorded") {
+              eventually() {
+                assertInRange(sv1WalletLocalClient.balance().unlockedQty, (1000, 2000))
+              }
+            }
+            clue("Old scan transaction history is recorded") {
+              eventually() {
+                countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
+                countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 0
+              }
+            }
+            actAndCheck("Create some new transaction history", sv1WalletLocalClient.tap(1338))(
+              "New transaction history is recorded and balance is updated",
+              _ => {
+                countTapsFromScan(sv1ScanLocalBackend, 1337) shouldEqual 1
+                countTapsFromScan(sv1ScanLocalBackend, 1338) shouldEqual 1
+                assertInRange(sv1WalletLocalClient.balance().unlockedQty, (2000, 4000))
+                inside(listTapsFromScan(sv1ScanLocalBackend, sv1Party, 1337, 1338)) {
+                  case Seq(formerTap, laterTap) =>
+                    BigDecimal(formerTap.amuletAmount) shouldBe BigDecimal(1337)
+                    BigDecimal(laterTap.amuletAmount) shouldBe BigDecimal(1338)
+                }
+              },
+            )
+
+            actAndCheck(
+              "validate domain with create VoteRequest",
+              sv1LocalBackend.createVoteRequest(
+                sv1Party.toProtoPrimitive,
+                new ARC_DsoRules(
+                  new SRARC_AddSv(
+                    new DsoRules_AddSv(
+                      "bob",
+                      "Bob",
+                      SvUtil.DefaultFoundingNodeWeight,
+                      "bob-participant-id",
+                      new Round(42),
+                    )
+                  )
+                ),
+                "url",
+                "description",
+                sv1LocalBackend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
+              ),
+            )(
+              "VoteRequest and Vote should be there",
+              _ =>
+                inside(sv1LocalBackend.listVoteRequests()) { case Seq(onlyReq) =>
+                  sv1LocalBackend
+                    .lookupVoteRequest(
+                      onlyReq.contractId
+                    )
+                    .payload
+                    .votes should have size 1
+                },
+            )
+
+            withClueAndLog("3rd party app works after domain migration") {
+              val (_, paymentRequest) =
+                actAndCheck(timeUntilSuccess = 40.seconds, maxPollInterval = 1.second)(
+                  "alice initiates transfer after domain migration",
+                  rsw("aliceSplitwellLocal").initiateTransfer(
+                    splitwellGroupKey,
+                    Seq(
+                      new ReceiverCCAmount(
+                        charlieUserParty.toProtoPrimitive,
+                        BigDecimal(43.0).bigDecimal,
+                      )
+                    ),
+                  ),
+                )(
+                  "alice sees payment request",
+                  _ => {
+                    getSingleRequestOnDecentralizedSynchronizer(uwc("aliceWalletLocal"))
+                  },
+                )
+
+              actAndCheck(
+                "alice initiates payment accept request after domain migration",
+                uwc("aliceWalletLocal").acceptAppPaymentRequest(paymentRequest.contractId),
+              )(
+                "alice sees balance update",
+                _ =>
+                  inside(rsw("aliceSplitwellLocal").listBalanceUpdates(splitwellGroupKey)) {
+                    case Seq(update1, update2) =>
+                      Seq(update1, update2).foreach { update =>
+                        aliceValidatorLocal.participantClient.ledger_api_extensions.acs
+                          .lookup_contract_domain(
+                            aliceUserParty,
+                            Set(update.contractId.contractId),
+                          ) shouldBe Map(
+                          update.contractId.contractId -> decentralizedSynchronizerId
+                        )
+                      }
+                      inside(update1.payload.update) { case transfer: Transfer =>
+                        transfer.amount shouldBe BigDecimal("43.0000000000").bigDecimal
+                      }
+                      inside(update2.payload.update) { case transfer: Transfer =>
+                        transfer.amount shouldBe BigDecimal("42.0000000000").bigDecimal
+                      }
+                  },
+              )
+            }
+
+            withClueAndLog("apps can be restarted") {
+              withClueAndLog("sv1 restarts with dump onboarding type") {
+                sv1LocalBackend.stop()
+                sv1LocalBackend.startSync()
+              }
+
+              withClueAndLog("sv1 restarts without any onboarding type") {
+                sv1LocalBackend.stop()
+                svb("sv1LocalOnboarded").startSync()
+              }
+            }
+
+            withClueAndLog("old domain can be unpaused") {
+              clue("old domain is paused") {
+                sv1Backend.appState.participantAdminConnection
+                  .getDomainParametersState(
+                    decentralizedSynchronizerId
+                  )
+                  .futureValue
+                  .mapping
+                  .parameters
+                  .confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
+              }
+
+              actAndCheck(
+                "all sv propose to unpause the old domain",
+                Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { svBackend =>
+                  Future {
+                    svBackend.unpauseDecentralizedSynchronizer()
+                  }
+                }.futureValue,
+              )(
+                "old domain is un-paused",
+                _ =>
+                  sv1Backend.appState.participantAdminConnection
+                    .getDomainParametersState(
+                      decentralizedSynchronizerId
+                    )
+                    .futureValue
+                    .mapping
+                    .parameters
+                    .confirmationRequestsMaxRate should be > NonNegativeInt.zero,
+              )
+            }
           }
-        }
       }
     }
   }
@@ -944,7 +961,7 @@ class GlobalDomainMigrationIntegrationTest
         val id = node.getId().futureValue
         node
           .ensureDomainParameters(
-            globalDomainId,
+            decentralizedSynchronizerId,
             _.tryUpdate(confirmationRequestsMaxRate = rate),
             signedBy = id.namespace.fingerprint,
           )
@@ -1087,7 +1104,7 @@ class GlobalDomainMigrationIntegrationTest
         )(
           "alice sees payment request",
           _ => {
-            getSingleRequestOnGlobalDomain(aliceWalletClient)
+            getSingleRequestOnDecentralizedSynchronizer(aliceWalletClient)
           },
         )
 
@@ -1103,7 +1120,7 @@ class GlobalDomainMigrationIntegrationTest
                 aliceUserParty,
                 Set(update.contractId.contractId),
               ) shouldBe Map(
-              update.contractId.contractId -> globalDomainId
+              update.contractId.contractId -> decentralizedSynchronizerId
             )
           },
       )
@@ -1112,7 +1129,7 @@ class GlobalDomainMigrationIntegrationTest
   }
 }
 
-object GlobalDomainMigrationIntegrationTest extends OptionValues {
+object DecentralizedSynchronizerMigrationIntegrationTest extends OptionValues {
   val migrationDumpDir: Path = testDumpDir.resolve(s"domain-migration-dump")
   // Not using temp-files so test-generated outputs are easy to inspect.
   def migrationDumpDir(node: String): Path = {

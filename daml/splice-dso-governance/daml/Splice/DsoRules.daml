@@ -18,13 +18,13 @@ import Splice.Round
 import Splice.Types
 import Splice.ValidatorLicense
 import Splice.Wallet.Subscriptions
-import Splice.GlobalDomain (MemberTraffic)
+import Splice.DecentralizedSynchronizer (MemberTraffic)
 
 import qualified Splice.CometBft as CometBft
 import Splice.Ans
 import Splice.SvOnboarding
 import Splice.DSO.AmuletPrice
-import Splice.DSO.GlobalDomain
+import Splice.DSO.DecentralizedSynchronizer
 import Splice.DSO.SvState
 import Splice.Util
 
@@ -149,7 +149,7 @@ data DsoRules_SubmitStatusReportResult = DsoRules_SubmitStatusReportResult with
 data DsoRules_AddConfirmedSvResult = DsoRules_AddConfirmedSvResult with
     newDsoRules : ContractId DsoRules
 
-data DsoRules_SetDomainNodeConfigResult = DsoRules_SetDomainNodeConfigResult with
+data DsoRules_SetSynchronizerNodeConfigResult = DsoRules_SetSynchronizerNodeConfigResult with
     svNodeState : ContractId SvNodeState
 
 data DsoRules_RequestElectionResult = DsoRules_RequestElectionResult with
@@ -356,13 +356,13 @@ data DsoRulesConfig = DsoRulesConfig with
     svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing an SV confirmation
     voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote`s.
     dsoDelegateInactiveTimeout: RelTime -- ^ The amount of time given to the DsoDelegate to complete an action it should take care of
-    domainNodeConfigLimits : DomainNodeConfigLimits  -- ^ Limits to enforce on the svs' `DomainNodeConfig`
+    synchronizerNodeConfigLimits : SynchronizerNodeConfigLimits  -- ^ Limits to enforce on the svs' `SynchronizerNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
-    globalDomain : DsoGlobalDomainConfig
-    nextScheduledDomainUpgrade: Optional DomainUpgradeSchedule
+    decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
+    nextScheduledSynchronizerUpgrade: Optional SynchronizerUpgradeSchedule
   deriving (Eq, Show)
 
-data DomainUpgradeSchedule = DomainUpgradeSchedule with
+data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
     time : Time
     -- ^ The time at which the migration is scheduled to start.
     migrationId : Int
@@ -496,22 +496,22 @@ template DsoRules with
           newDsoRules = addSvResult.newDsoRules
 
 
-    -- Global domain config management
+    -- Decentralized synchronizer config management
     -----------------------------------
 
-    -- Every SV can change their own domain node's config within the configured limits.
-    nonconsuming choice DsoRules_SetDomainNodeConfig : DsoRules_SetDomainNodeConfigResult
+    -- Every SV can change their own synchronizer node's config within the configured limits.
+    nonconsuming choice DsoRules_SetSynchronizerNodeConfig : DsoRules_SetSynchronizerNodeConfigResult
       with
         sv : Party
-        domainId : Text
-        newNodeConfig : DomainNodeConfig
+        synchronizerId : Text
+        newNodeConfig : SynchronizerNodeConfig
         nodeStateCid : ContractId SvNodeState
       controller sv
       do
-        -- check that the domain is known
-        require "Domain with this id is configured" (domainId `Map.member` config.globalDomain.domains)
+        -- check that the synchronizer is known
+        require "Synchronizer with this id is configured" (synchronizerId `Map.member` config.decentralizedSynchronizer.synchronizers)
         -- check validity of config and constraint on voting power
-        require "Valid configuration" (validDomainNodeConfig config.domainNodeConfigLimits newNodeConfig)
+        require "Valid configuration" (validSynchronizerNodeConfig config.synchronizerNodeConfigLimits newNodeConfig)
         unless isDevNet $
           require "CometBft voting power <= 1" (CometBft.totalVotingPower newNodeConfig.cometBft <= 1)
         -- update the SV operator node's state
@@ -521,8 +521,8 @@ template DsoRules with
         let state = nodeState.state
         svNodeState <- create nodeState with
           state = state with
-            domainNodes = Map.insert domainId newNodeConfig state.domainNodes
-        return DsoRules_SetDomainNodeConfigResult with ..
+            synchronizerNodes = Map.insert synchronizerId newNodeConfig state.synchronizerNodes
+        return DsoRules_SetSynchronizerNodeConfigResult with ..
 
 
     -- Automation DsoDelegate election
@@ -1324,7 +1324,7 @@ dsoRules_addSv this0 arg@DsoRules_AddSv{..} = do
     createPerSvContracts this arg
   -- create per SV party contracts
   let initialAmuletPriceVote = None
-  createPerSvPartyContracts dso newSvParty newSvName noDomainNodes initialAmuletPriceVote
+  createPerSvPartyContracts dso newSvParty newSvName noSynchronizerNodes initialAmuletPriceVote
   -- register the new operator in the DsoRules
   let svInfo = SvInfo with
         name = newSvName
@@ -1345,8 +1345,8 @@ createPerSvContracts DsoRules{..} DsoRules_AddSv{..} = do
       numRoundsCollected = 0
       numCouponsIssued = 0
 
-createPerSvPartyContracts : Party -> Party -> Text -> DomainNodeConfigMap -> Optional Decimal -> Update ()
-createPerSvPartyContracts dso newSvParty newSvName domainNodes amuletPrice = do
+createPerSvPartyContracts : Party -> Party -> Text -> SynchronizerNodeConfigMap -> Optional Decimal -> Update ()
+createPerSvPartyContracts dso newSvParty newSvName synchronizerNodes amuletPrice = do
   now <- getTime
   -- Note: we currently track the amulet-price vote on a per operator basis.
   -- This implies it will be reset when an operator is offboarded and re-onboarded.
@@ -1366,7 +1366,7 @@ createPerSvPartyContracts dso newSvParty newSvName domainNodes amuletPrice = do
     sv = newSvParty
     svName = newSvName
     state = NodeState with
-      domainNodes
+      synchronizerNodes
 
 
 -- instances

@@ -1,9 +1,9 @@
 package com.daml.network.sv.automation.singlesv
 
 import com.daml.network.automation.{PollingTrigger, TriggerContext}
-import com.daml.network.codegen.java.splice.dso.globaldomain.SequencerConfig
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.SequencerConfig
 import com.daml.network.environment.ParticipantAdminConnection
-import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.ClientConfig
@@ -22,7 +22,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class LocalSequencerConnectionsTrigger(
     override protected val context: TriggerContext,
     participantAdminConnection: ParticipantAdminConnection,
-    globalDomainAlias: DomainAlias,
+    decentralizedSynchronizerAlias: DomainAlias,
     store: SvDsoStore,
     sequencerInternalConfig: ClientConfig,
     migrationId: Long,
@@ -35,14 +35,14 @@ class LocalSequencerConnectionsTrigger(
     for {
       rulesAndState <- store.getDsoRulesWithSvNodeState(svParty)
       // TODO(#4906): double-check that the right domain-ids are used in the right place to make this work with soft-domain migration
-      domainId <- participantAdminConnection.getDomainId(globalDomainAlias)
+      domainId <- participantAdminConnection.getDomainId(decentralizedSynchronizerAlias)
       domainTimeLb <- participantAdminConnection.getDomainTimeLowerBound(
         domainId,
         maxDomainTimeLag = context.config.pollingInterval,
       )
-      globalDomainId <- store.getAmuletRulesDomain()(traceContext)
+      decentralizedSynchronizerId <- store.getAmuletRulesDomain()(traceContext)
       dsoRulesActiveSequencerConfig = rulesAndState.lookupSequencerConfigFor(
-        globalDomainId,
+        decentralizedSynchronizerId,
         domainTimeLb.timestamp.toInstant,
         migrationId,
       )
@@ -53,7 +53,7 @@ class LocalSequencerConnectionsTrigger(
         Future.unit
       } { publishedSequencerInfo =>
         participantAdminConnection.modifyDomainConnectionConfigAndReconnect(
-          globalDomainAlias,
+          decentralizedSynchronizerAlias,
           setLocalSequencerConnection(
             publishedSequencerInfo,
             sequencerInternalConfig,
@@ -77,7 +77,7 @@ class LocalSequencerConnectionsTrigger(
           // connect to the sequencer with internal client config here instead of the public url to avoid
           // - installing loopback in each SV namespace to work around traffic being blocked by cluster whitelisting
           // - network traffic going all the way through cluster load balancer / ingress routing while the sequencer is in the same namespace
-          val localEndpoint = LocalDomainNode.toEndpoint(internalSequencerClientConfig)
+          val localEndpoint = LocalSynchronizerNode.toEndpoint(internalSequencerClientConfig)
           val localSequencerConnection =
             new GrpcSequencerConnection(
               NonEmpty.mk(Seq, localEndpoint),

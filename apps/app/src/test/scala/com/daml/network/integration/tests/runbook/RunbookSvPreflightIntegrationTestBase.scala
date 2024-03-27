@@ -298,12 +298,18 @@ abstract class RunbookSvPreflightIntegrationTestBase
     val participantId = clue("Can dump participant identities from SV validator") {
       svValidatorClient.dumpParticipantIdentities().id
     }
-    val activeDomain = clue("Can get active domain from Scan") {
+    val activeSynchronizer = clue("Can get active domain from Scan") {
       val svActiveDomain = DomainId.tryFromString(
-        svScanClient.getAmuletConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
+        svScanClient
+          .getAmuletConfigAsOf(env.environment.clock.now)
+          .decentralizedSynchronizer
+          .activeSynchronizer
       )
       val sv1ActiveDomain = DomainId.tryFromString(
-        sv1ScanClient.getAmuletConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
+        sv1ScanClient
+          .getAmuletConfigAsOf(env.environment.clock.now)
+          .decentralizedSynchronizer
+          .activeSynchronizer
       )
       svActiveDomain shouldBe sv1ActiveDomain
       svActiveDomain
@@ -311,11 +317,11 @@ abstract class RunbookSvPreflightIntegrationTestBase
     clue("Can get hosting participant id for a party from Scan") {
       eventually() {
         val participantIdFromSv = svScanClient.getPartyToParticipant(
-          activeDomain,
+          activeSynchronizer,
           svValidatorClient.getValidatorPartyId(),
         )
         val participantIdFromSv1 = sv1ScanClient.getPartyToParticipant(
-          activeDomain,
+          activeSynchronizer,
           svValidatorClient.getValidatorPartyId(),
         )
         participantIdFromSv shouldBe participantIdFromSv1
@@ -324,9 +330,9 @@ abstract class RunbookSvPreflightIntegrationTestBase
     clue("Can get member traffic status from Scan") {
       eventually() {
         val svTrafficStatus =
-          svScanClient.getMemberTrafficStatus(activeDomain, participantId.member)
+          svScanClient.getMemberTrafficStatus(activeSynchronizer, participantId.member)
         val sv1TrafficStatus =
-          sv1ScanClient.getMemberTrafficStatus(activeDomain, participantId.member)
+          sv1ScanClient.getMemberTrafficStatus(activeSynchronizer, participantId.member)
         svTrafficStatus shouldBe sv1TrafficStatus
       }
     }

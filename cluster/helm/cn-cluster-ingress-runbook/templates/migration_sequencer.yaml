@@ -1,5 +1,5 @@
 {{- if and .Values.ingress.sequencer .Values.withSvIngress }}
-  {{- if ((.Values.ingress).globalDomain).activeMigrationId }}
+  {{- if ((.Values.ingress).decentralizedSynchronizer).activeMigrationId }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
@@ -17,18 +17,18 @@ spec:
         - destination:
             port:
               number: 5008
-            host: global-domain-{{ .Values.ingress.globalDomain.activeMigrationId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: global-domain-{{ .Values.ingress.decentralizedSynchronizer.activeMigrationId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
-  {{- if ((.Values.ingress).globalDomain).migrationId }}
+  {{- if ((.Values.ingress).decentralizedSynchronizer).migrationId }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: sequencer-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.globalDomain.migrationId }}
+  name: sequencer-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.decentralizedSynchronizer.migrationId }}
   namespace: {{ .Release.Namespace }}
 spec:
   hosts:
-    - "sequencer-{{ .Values.ingress.globalDomain.migrationId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "sequencer-{{ .Values.ingress.decentralizedSynchronizer.migrationId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -38,7 +38,7 @@ spec:
         - destination:
             port:
               number: 5008
-            host: global-domain-{{ .Values.ingress.globalDomain.migrationId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: global-domain-{{ .Values.ingress.decentralizedSynchronizer.migrationId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
 ---
   {{- end }}
 {{- end }}

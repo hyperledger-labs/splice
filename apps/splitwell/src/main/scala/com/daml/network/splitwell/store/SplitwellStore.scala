@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.splitwell.config.SplitwellDomainConfig
+import com.daml.network.splitwell.config.SplitwellSynchronizerConfig
 import com.daml.network.splitwell.store.db.DbSplitwellStore
 import com.daml.network.splitwell.store.db.SplitwellTables.SplitwellAcsStoreRowData
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, MultiDomainAcsStore}
@@ -26,7 +26,7 @@ trait SplitwellStore extends CNNodeAppStoreWithoutHistory {
   /** The key identifying the parties considered by this store. */
   val key: SplitwellStore.Key
 
-  protected[this] def domainConfig: SplitwellDomainConfig
+  protected[this] def domainConfig: SplitwellSynchronizerConfig
 
   private[this] final def defaultAcsDomain = domainConfig.splitwell.preferred.alias
 
@@ -175,7 +175,7 @@ object SplitwellStore {
   def apply(
       key: Key,
       storage: Storage,
-      domainConfig: SplitwellDomainConfig,
+      domainConfig: SplitwellSynchronizerConfig,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
       domainMigrationInfo: DomainMigrationInfo,

@@ -6,7 +6,7 @@ import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
-import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
+import com.daml.network.sv.config.{SvSynchronizerConfig, SvDecentralizedSynchronizerConfig}
 import com.daml.network.sv.store.db.DbSvSvStore
 import com.daml.network.sv.store.{SvStore, SvSvStore}
 import com.daml.network.util.{ResourceTemplateDecoder, TemplateJsonDecoder}
@@ -123,8 +123,8 @@ abstract class SvSvStoreTest extends StoreTest with HasExecutionContext {
   lazy val acsOffset = nextOffset()
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val storeSvParty = providerParty(42)
-  lazy val svDomainConfig = SvDomainConfig(
-    SvGlobalDomainConfig(DomainAlias.tryCreate(domain), "https://example.com")
+  lazy val svSynchronizerConfig = SvSynchronizerConfig(
+    SvDecentralizedSynchronizerConfig(DomainAlias.tryCreate(domain), "https://example.com")
   )
 }
 

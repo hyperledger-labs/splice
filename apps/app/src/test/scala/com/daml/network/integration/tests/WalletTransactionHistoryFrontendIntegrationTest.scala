@@ -6,7 +6,7 @@ import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
 import com.daml.network.util.{
   CNNodeUtil,
-  DomainFeesTestUtil,
+  SynchronizerFeesTestUtil,
   FrontendLoginUtil,
   WalletFrontendTestUtil,
   WalletTestUtil,
@@ -27,7 +27,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
     with WalletTestUtil
     with WalletTxLogTestUtil
     with WalletFrontendTestUtil
-    with DomainFeesTestUtil
+    with SynchronizerFeesTestUtil
     with FrontendLoginUtil {
 
   private val amuletPrice = 2
@@ -173,7 +173,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
         val sv1WalletUser = sv1ValidatorBackend.config.validatorWalletUser.value
         browseToSv1Wallet(sv1WalletUser)
         val trafficAmount = 10_000_000L
-        val (_, trafficCostCc) = computeDomainFees(trafficAmount, env.environment.clock.now)
+        val (_, trafficCostCc) = computeSynchronizerFees(trafficAmount, env.environment.clock.now)
         actAndCheck(
           "SV1 purchases extra traffic",
           buyMemberTraffic(sv1ValidatorBackend, trafficAmount, env.environment.clock.now),

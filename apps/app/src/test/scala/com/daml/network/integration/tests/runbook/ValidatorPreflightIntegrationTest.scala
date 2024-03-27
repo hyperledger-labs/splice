@@ -362,7 +362,7 @@ abstract class ValidatorPreflightIntegrationTestBase
           .fromUris(NonEmpty.from(availableConnections.map(conn => new URI(conn.url))).value)
           .value
 
-      val domainConnectionConfig = validatorClient.globalDomainConnectionConfig()
+      val domainConnectionConfig = validatorClient.decentralizedSynchronizerConnectionConfig()
       val connectedEndpointSet =
         domainConnectionConfig.sequencerConnections.connections.flatMap(_.endpoints).toSet
 

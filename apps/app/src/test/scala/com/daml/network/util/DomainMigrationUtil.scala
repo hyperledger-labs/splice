@@ -5,7 +5,7 @@ import com.daml.network.admin.api.client.{DamlGrpcClientMetrics, GrpcClientMetri
 import com.daml.network.console.SvAppBackendReference
 import com.daml.network.environment.{ParticipantAdminConnection, RetryProvider}
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestConsoleEnvironment
-import com.daml.network.util.DomainMigrationUtil.UpgradeDomainNode
+import com.daml.network.util.DomainMigrationUtil.UpgradeSynchronizerNode
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, Port}
 import com.digitalasset.canton.BaseTest
 import com.daml.network.integration.tests.CNNodeTests.CNNodeTestCommon
@@ -32,7 +32,7 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
   }
 
   def checkMigrateDomainOnNodes(
-      nodes: Seq[UpgradeDomainNode]
+      nodes: Seq[UpgradeSynchronizerNode]
   )(implicit env: CNNodeTestConsoleEnvironment, traceContext: TraceContext): Unit = {
 
     val domainId = nodes.head.newParticipantConnection
@@ -77,7 +77,7 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
     }
 
     withClueAndLog("decentralized namespace is replicated on the new global domain") {
-      val globalDomainDecentralizedNamespaceDefinition =
+      val decentralizedSynchronizerDecentralizedNamespaceDefinition =
         sv1Backend.appState.participantAdminConnection
           .getDecentralizedNamespaceDefinition(domainId, dsoParty.uid.namespace)
           .futureValue
@@ -89,7 +89,7 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
               dsoParty.uid.namespace,
             )
             .futureValue
-            .mapping shouldBe globalDomainDecentralizedNamespaceDefinition.mapping
+            .mapping shouldBe decentralizedSynchronizerDecentralizedNamespaceDefinition.mapping
         }
       }
     }
@@ -121,8 +121,10 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
   ) = {
     val loggerFactoryWithKey = loggerFactory.append("updateNode", sv.toString)
     val port = Port.tryCreate(portRange * 1000 + sv * 100 + 2)
-    logger.debug(s"Creating upgradeDomainNode for SV ${sv.toString} with participant port $port")
-    UpgradeDomainNode(
+    logger.debug(
+      s"Creating upgradeSynchronizerNode for SV ${sv.toString} with participant port $port"
+    )
+    UpgradeSynchronizerNode(
       new ParticipantAdminConnection(
         ClientConfig(port = port),
         apiLoggingConfig,
@@ -138,14 +140,14 @@ trait DomainMigrationUtil extends BaseTest with CNNodeTestCommon {
 }
 
 object DomainMigrationUtil {
-  case class UpgradeDomainNode(
+  case class UpgradeSynchronizerNode(
       newParticipantConnection: ParticipantAdminConnection,
       oldBackend: SvAppBackendReference,
       newBackend: SvAppBackendReference,
   )
 
-  implicit val upgradeDomainNodeReleasable: Using.Releasable[UpgradeDomainNode] =
-    (resource: UpgradeDomainNode) => {
+  implicit val upgradeSynchronizerNodeReleasable: Using.Releasable[UpgradeSynchronizerNode] =
+    (resource: UpgradeSynchronizerNode) => {
       resource.newParticipantConnection.close()
     }
 

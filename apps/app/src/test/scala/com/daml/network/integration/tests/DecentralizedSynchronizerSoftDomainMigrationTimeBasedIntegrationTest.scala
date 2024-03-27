@@ -49,7 +49,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
 /** You must `start-canton` with `-g` to run this test locally. */
-class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
+class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
     extends SvTimeBasedIntegrationTestBaseWithIsolatedEnvironment
     with ConfigScheduleUtil {
 
@@ -129,11 +129,14 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         case ContractWithState(firstAmuletRules, Assigned(global1)) =>
           val now = sv1Backend.participantClientWithAdminToken.ledger_api.time.get()
           val currentSchedule = firstAmuletRules.payload.configSchedule
-          val activeDomainId =
-            AmuletConfigSchedule(currentSchedule).getConfigAsOf(now).globalDomain.activeDomain
+          val activeSynchronizerId =
+            AmuletConfigSchedule(currentSchedule)
+              .getConfigAsOf(now)
+              .decentralizedSynchronizer
+              .activeSynchronizer
 
-          globalUpgradeId.toProtoPrimitive should not be activeDomainId
-          global1.toProtoPrimitive shouldBe activeDomainId
+          globalUpgradeId.toProtoPrimitive should not be activeSynchronizerId
+          global1.toProtoPrimitive shouldBe activeSynchronizerId
 
           val upgradeAfterTick = new Tuple2(
             env.environment.clock.now.add(timeUntilNewRule.asJava).toInstant,

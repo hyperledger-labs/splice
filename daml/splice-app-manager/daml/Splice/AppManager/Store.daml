@@ -4,7 +4,7 @@ module Splice.AppManager.Store where
 
 -- | The configuration of an app which defines the
 -- release versions that need to be
--- installed as well as the domains that users need to
+-- installed as well as the synchronizers that users need to
 -- be connected to.
 -- The latest version is the active one.
 -- This is used both on the provider's side to store the registered applications

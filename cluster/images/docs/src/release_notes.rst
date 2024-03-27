@@ -12,6 +12,8 @@ Release Notes
   * Coin -> Amulet
   * CNS -> ANS (Amulet Name Service)
   * SVC -> DSO (Decentralized Synchronizer Operations)
+  * Domain -> Synchronizer
+  * Global Domain (whenever it refers to the more generic concept) -> Decentralized Synchronizer
   * Note that for technical reasons the URLs for networks still include the term "svc" for now;
     e.g., ``https://wallet.sv.svc.YOUR_HOSTNAME``.
     Furthermore, some URLs and UIs may refer to the terms Amulet or ANS, but should actually be specialized

@@ -4,7 +4,7 @@ import {
   ChartValues,
   CnInput,
   ExactNamespace,
-  GlobalDomainMigrationConfig,
+  DecentralizedSynchronizerMigrationConfig,
   REPO_ROOT,
   installCNRunbookHelmChart,
   installMigrationIdSpecificComponent,
@@ -15,16 +15,16 @@ import {
 import { installCometBftNode } from './cometbft';
 import { installPostgres } from './postgres';
 
-export function installGlobalDomainNode(
+export function installDecentralizedSynchronizerNode(
   svNamespace: ExactNamespace,
   svName: string,
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
   const cometbft = installCometBftNode(
     svNamespace,
     svName,
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     dependencies
   );
 
@@ -48,9 +48,9 @@ export function installGlobalDomainNode(
   );
 
   return installMigrationIdSpecificComponent(
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     (migrationId, isActive, version) => {
-      const globalDomainValues: ChartValues = {
+      const decentralizedSynchronizerValues: ChartValues = {
         ...loadYamlFromFile(
           `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/global-domain-values.yaml`,
           {
@@ -61,7 +61,7 @@ export function installGlobalDomainNode(
         metrics: {
           enable: true,
         },
-        disableAutoInit: globalDomainMigrationConfig.isRunningMigration() || !isActive,
+        disableAutoInit: decentralizedSynchronizerMigrationConfig.isRunningMigration() || !isActive,
       };
 
       return installCNRunbookHelmChart(
@@ -69,9 +69,9 @@ export function installGlobalDomainNode(
         `global-domain-${migrationId}`,
         'cn-global-domain',
         {
-          ...globalDomainValues,
+          ...decentralizedSynchronizerValues,
           sequencer: {
-            ...globalDomainValues.sequencer,
+            ...decentralizedSynchronizerValues.sequencer,
             ...sequencerResources,
           },
         },

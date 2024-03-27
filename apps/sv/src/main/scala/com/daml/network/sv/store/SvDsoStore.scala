@@ -739,7 +739,10 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
   def listMemberTrafficContracts(memberId: Member, domainId: DomainId, limit: Limit)(implicit
       tc: TraceContext
   ): Future[
-    Seq[Contract[splice.globaldomain.MemberTraffic.ContractId, splice.globaldomain.MemberTraffic]]
+    Seq[Contract[
+      splice.decentralizedsynchronizer.MemberTraffic.ContractId,
+      splice.decentralizedsynchronizer.MemberTraffic,
+    ]]
   ]
 
   /** List issuing mining rounds past their targetClosesAt */
@@ -1306,7 +1309,7 @@ object SvDsoStore {
           validator = Some(PartyId.tryFromProtoPrimitive(contract.payload.validator)),
         )
       },
-      mkFilter(splice.globaldomain.MemberTraffic.COMPANION)(vt =>
+      mkFilter(splice.decentralizedsynchronizer.MemberTraffic.COMPANION)(vt =>
         vt.payload.dso == dso && vt.payload.migrationId == domainMigrationId
       ) { contract =>
         DsoAcsStoreRowData(
@@ -1449,10 +1452,11 @@ object SvDsoStore {
         param("svNodeStates", _.svNodeStates),
       )
 
-    def currentDomainNodeConfigs(): Seq[splice.dso.globaldomain.DomainNodeConfig] = {
+    def currentSynchronizerNodeConfigs()
+        : Seq[splice.dso.decentralizedsynchronizer.SynchronizerNodeConfig] = {
       // TODO(#4906): make its callers work with soft-domain migration
       svNodeStates.values
-        .flatMap(_.payload.state.domainNodes.asScala.get(dsoRules.domain.toProtoPrimitive))
+        .flatMap(_.payload.state.synchronizerNodes.asScala.get(dsoRules.domain.toProtoPrimitive))
         .toSeq
     }
 
@@ -1470,7 +1474,7 @@ object SvDsoStore {
         .toSeq
         .map(ParticipantId.tryFromProtoPrimitive)
       val svMediators = svNodeStates.values
-        .flatMap(_.payload.state.domainNodes.values().asScala)
+        .flatMap(_.payload.state.synchronizerNodes.values().asScala)
         .flatMap(_.mediator.toScala)
         .map(m =>
           MediatorId
@@ -1522,14 +1526,14 @@ object SvDsoStore {
       } yield checkDsoRules.isEmpty || checkSvNodeState.isEmpty
 
     def lookupSequencerConfigFor(
-        globalDomainId: DomainId,
+        decentralizedSynchronizerId: DomainId,
         domainTimeLowerBound: Instant,
         migrationId: Long,
-    ): Option[splice.dso.globaldomain.SequencerConfig] = {
+    ): Option[splice.dso.decentralizedsynchronizer.SequencerConfig] = {
       for {
-        domainNodeConfig <- svNodeState.payload.state.domainNodes.asScala
-          .get(globalDomainId.toProtoPrimitive)
-        sequencerConfig <- domainNodeConfig.sequencer.toScala
+        synchronizerNodeConfig <- svNodeState.payload.state.synchronizerNodes.asScala
+          .get(decentralizedSynchronizerId.toProtoPrimitive)
+        sequencerConfig <- synchronizerNodeConfig.sequencer.toScala
         if sequencerConfig.migrationId == migrationId && sequencerConfig.url.nonEmpty && sequencerConfig.availableAfter.toScala
           .exists(availableAfter => domainTimeLowerBound.isAfter(availableAfter))
       } yield sequencerConfig

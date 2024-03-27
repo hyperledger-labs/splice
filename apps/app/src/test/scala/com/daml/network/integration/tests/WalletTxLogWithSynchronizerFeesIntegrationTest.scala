@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcome.COO_Error
 import com.daml.network.config.CNNodeConfigTransforms
-import com.daml.network.util.{DomainFeesTestUtil, WalletTestUtil}
+import com.daml.network.util.{SynchronizerFeesTestUtil, WalletTestUtil}
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.integration.tests.CNNodeTests.CNNodeIntegrationTestWithSharedEnvironment
 import com.daml.network.wallet.store.{
@@ -12,11 +12,11 @@ import com.daml.network.wallet.store.{
 }
 import com.digitalasset.canton.HasExecutionContext
 
-class WalletTxLogWithDomainFeesIntegrationTest
+class WalletTxLogWithSynchronizerFeesIntegrationTest
     extends CNNodeIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil
-    with DomainFeesTestUtil
+    with SynchronizerFeesTestUtil
     with WalletTxLogTestUtil {
 
   private val amuletPrice = BigDecimal(1.25).setScale(10)
@@ -34,9 +34,9 @@ class WalletTxLogWithDomainFeesIntegrationTest
 
     "handle domain fees that have been paid (in a DevNet cluster)" in { implicit env =>
       val now = env.environment.clock.now
-      val domainFeesConfig = sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.fees
+      val domainFeesConfig = sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.fees
       val trafficAmount = Math.max(domainFeesConfig.minTopupAmount, 1_000_000L)
-      val (_, totalCostCc) = computeDomainFees(trafficAmount, now)
+      val (_, totalCostCc) = computeSynchronizerFees(trafficAmount, now)
 
       actAndCheck(
         "Fail to purchase extra traffic for SV1", {

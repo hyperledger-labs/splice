@@ -79,7 +79,7 @@ object SvOnboardingConfig {
       initialAmuletPrice: BigDecimal = 0.005,
       initialHoldingFee: BigDecimal = CNNodeUtil.defaultHoldingFee.rate,
       initialAnsConfig: InitialAnsConfig = InitialAnsConfig(),
-      initialDomainFeesConfig: DomainFeesConfig = DomainFeesConfig(),
+      initialSynchronizerFeesConfig: SynchronizerFeesConfig = SynchronizerFeesConfig(),
       isDevNet: Boolean = false,
       bootstrappingDump: Option[SvBootstrapDumpConfig] = None,
   ) extends SvOnboardingConfig
@@ -116,7 +116,7 @@ final case class InitialAnsConfig(
     entryFee: Double = 1.0,
 )
 
-final case class DomainFeesConfig(
+final case class SynchronizerFeesConfig(
     extraTrafficPrice: NonNegativeNumeric[BigDecimal] =
       NonNegativeNumeric.tryCreate(BigDecimal(1.0)),
     minTopupAmount: NonNegativeLong = NonNegativeLong.tryCreate(10_000_000L),
@@ -127,7 +127,7 @@ final case class DomainFeesConfig(
       PositiveNumeric.tryCreate(200), // charge 200 per 10,000, i.e., 2% of write cost for every read
 )
 
-final case class SvGlobalDomainConfig(
+final case class SvDecentralizedSynchronizerConfig(
     alias: DomainAlias,
     url: String,
 
@@ -146,8 +146,8 @@ final case class SvGlobalDomainConfig(
       NonNegativeFiniteDuration.ofSeconds(1),
 )
 
-final case class SvDomainConfig(
-    global: SvGlobalDomainConfig
+final case class SvSynchronizerConfig(
+    global: SvDecentralizedSynchronizerConfig
 )
 
 final case class MigrateSvPartyConfig(
@@ -168,7 +168,7 @@ case class SvAppBackendConfig(
     auth: AuthConfig,
     participantClient: CNParticipantClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
-    domains: SvDomainConfig,
+    domains: SvSynchronizerConfig,
     expectedValidatorOnboardings: List[ExpectedValidatorOnboardingConfig] = Nil,
     approvedSvIdentities: List[ApprovedSvIdentityConfig] = Nil,
     // If not set the onboarding name is used. We set this in our tests
@@ -177,7 +177,7 @@ case class SvAppBackendConfig(
     onboarding: Option[SvOnboardingConfig] = None,
     initialAmuletPriceVote: Option[BigDecimal] = None,
     cometBftConfig: Option[CometBftConfig] = None,
-    localDomainNode: Option[SvDomainNodeConfig],
+    localSynchronizerNode: Option[SvSynchronizerNodeConfig],
     scan: Option[SvScanConfig],
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
     // Migrate the SV party from an existing participant with the same namespace.
@@ -249,7 +249,7 @@ final case class SvScanConfig(
     internalUrl: Uri,
 )
 
-final case class SvDomainNodeConfig(
+final case class SvSynchronizerNodeConfig(
     sequencer: SvSequencerConfig,
     mediator: SvMediatorConfig,
     parameters: DomainParametersConfig = DomainParametersConfig(

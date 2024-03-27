@@ -10,7 +10,7 @@ import {
   loadYamlFromFile,
   REPO_ROOT,
   CnInput,
-  GlobalDomainMigrationConfig,
+  DecentralizedSynchronizerMigrationConfig,
   disableCometBftStateSync,
 } from 'cn-pulumi-common';
 import { cometbftRetainBlocks } from 'cn-pulumi-common/src/deployment_config';
@@ -29,7 +29,7 @@ const privValidatorKeyContent = fs.readFileSync(
 export function installCometBftNode(
   xns: ExactNamespace,
   svName: string,
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   dependencies: CnInput<Resource>[]
 ): k8s.helm.v3.Release {
   new k8s.core.v1.Secret(
@@ -48,7 +48,7 @@ export function installCometBftNode(
     { dependsOn: dependencies.concat([xns.ns]) }
   );
   return installMigrationIdSpecificComponent(
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     (migrationId, isActive, version) => {
       const cometBftValues = loadYamlFromFile(
         `${REPO_ROOT}/apps/app/src/pack/examples/sv-helm/cometbft-values.yaml`,
@@ -84,7 +84,7 @@ export function installCometBftNode(
             ...cometBftValues.stateSync,
             enable:
               !disableCometBftStateSync &&
-              !globalDomainMigrationConfig.isRunningMigration() &&
+              !decentralizedSynchronizerMigrationConfig.isRunningMigration() &&
               isActive
                 ? cometBftValues.stateSync.enable
                 : false,

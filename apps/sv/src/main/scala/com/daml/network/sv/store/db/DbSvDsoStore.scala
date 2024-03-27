@@ -8,7 +8,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.automation.MultiDomainExpiredContractTrigger.ListExpiredContracts
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.amulet.*
-import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.round.ClosedMiningRound
 import com.daml.network.codegen.java.splice.validatorlicense.{
   ValidatorFaucetCoupon,

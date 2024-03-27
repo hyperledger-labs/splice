@@ -106,14 +106,14 @@ paths:
     get:
       tags: [ validator ]
       x-jvm-package: validator_admin
-      operationId: "getGlobalDomainConnectionConfig"
+      operationId: "getDecentralizedSynchronizerConnectionConfig"
       responses:
         "200":
           description: ok
           content:
             application/json:
               schema:
-                "$ref": "#/components/schemas/GetGlobalDomainConnectionConfigResponse"
+                "$ref": "#/components/schemas/GetDecentralizedSynchronizerConnectionConfigResponse"
 
   /v0/app-manager/apps/installed/{provider}/authorize:
     post:
@@ -513,7 +513,7 @@ components:
         featured:
           type: boolean
 
-    GetGlobalDomainConnectionConfigResponse:
+    GetDecentralizedSynchronizerConnectionConfigResponse:
       type: object
       required:
         - sequencer_connections

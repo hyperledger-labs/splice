@@ -3,7 +3,7 @@ package com.daml.network.wallet.config
 import com.daml.network.config.{HttpCNNodeClientConfig, NetworkAppClientConfig}
 import com.digitalasset.canton.DomainAlias
 
-case class WalletDomainConfig(
+case class WalletSynchronizerConfig(
     global: DomainAlias
 )
 

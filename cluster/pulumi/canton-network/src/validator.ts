@@ -75,7 +75,7 @@ export type ValidatorConfig = BasicValidatorConfig & {
 
 type SvValidatorConfig = BasicValidatorConfig & {
   svValidator: true;
-  globalDomainUrl: string;
+  decentralizedSynchronizerUrl: string;
   migration: {
     id: DomainMigrationIndex;
   };
@@ -137,7 +137,9 @@ export async function installValidatorApp(
       additionalUsers: config.additionalUsers || [],
       validatorPartyHint: config.validatorPartyHint,
       appDars: config.appDars || [],
-      globalDomainUrl: config.svValidator ? config.globalDomainUrl : undefined,
+      decentralizedSynchronizerUrl: config.svValidator
+        ? config.decentralizedSynchronizerUrl
+        : undefined,
       scanAddress: config.scanAddress,
       extraDomains: config.extraDomains,
       validatorWalletUser: config.validatorWalletUser,

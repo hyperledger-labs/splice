@@ -12,7 +12,7 @@ import com.daml.network.environment.TopologyAdminConnection.TopologyResult
 import com.daml.network.http.v0.{definitions, sv as v0}
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.{LocalDomainNode, SvApp}
+import com.daml.network.sv.{LocalSynchronizerNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.onboarding.DsoPartyHosting
@@ -45,7 +45,7 @@ class HttpSvHandler(
     config: SvAppBackendConfig,
     clock: Clock,
     participantAdminConnection: ParticipantAdminConnection,
-    localDomainNode: Option[LocalDomainNode],
+    localSynchronizerNode: Option[LocalSynchronizerNode],
     retryProvider: RetryProvider,
     dsoPartyMigration: DsoPartyMigration,
     cometBftClient: Option[CometBftClient],
@@ -430,7 +430,7 @@ class HttpSvHandler(
     withSpan(s"$workflowId.onboardSvSequencer") { _ => _ =>
       (for {
         sequencerId <- Codec.decode(Codec.Sequencer)(body.sequencerId)
-        sequencerConnection <- localDomainNode
+        sequencerConnection <- localSynchronizerNode
           .map(_.sequencerAdminConnection)
           .toRight("Onboarding sequencer configured to use X nodes but sponsoring SV is not")
       } yield {
@@ -491,13 +491,13 @@ class HttpSvHandler(
       sequencerId: SequencerId,
   )(implicit traceContext: TraceContext): Future[CantonTimestamp] = {
     for {
-      globalDomain <- dsoStore.getDsoRules().map(_.domain)
+      decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
       sequenced <- retryProvider.getValueWithRetries(
         RetryFor.WaitingOnInitDependency, // the trigger runs every 30s, so this should be enough to observe the new sequencer
         "sequencer_added_to_topology_state",
         "New sequencer is observed in SequencerDomainState through existing sequencer",
         sequencerAdminConnection
-          .listSequencerDomainState(globalDomain, store.TimeQuery.Range(None, None))
+          .listSequencerDomainState(decentralizedSynchronizer, store.TimeQuery.Range(None, None))
           .map { result =>
             result
               .sortBy(_.base.serial)
@@ -538,7 +538,7 @@ class HttpSvHandler(
         sequencerAdminConnection,
         sequencerId,
       )
-      globalDomain <- dsoStore.getDsoRules().map(_.domain)
+      decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
       _ = logger.info(s"Downloading sequencer onboarding state for $sequencerId")
       onboardingState <- sequencerAdminConnection.getOnboardingState(sequencerId)
     } yield onboardingState

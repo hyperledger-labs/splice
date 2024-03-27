@@ -2,7 +2,7 @@ package com.daml.network.util
 
 import com.daml.ledger.javaapi
 import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.buytrafficrequest.BuyTrafficRequest
@@ -31,7 +31,7 @@ import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
 
-trait DomainFeesTestUtil extends CNNodeTestCommon {
+trait SynchronizerFeesTestUtil extends CNNodeTestCommon {
   this: CommonCNNodeAppInstanceReferences =>
 
   private def listValidatorContracts[
@@ -58,7 +58,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
       .filterJava(MemberTraffic.COMPANION)(
         sv1Backend.getDsoInfo().dsoParty,
-        co => co.data.domainId == domainId.toProtoPrimitive && co.data.memberId == memberId.toProtoPrimitive,
+        co => co.data.synchronizerId == domainId.toProtoPrimitive && co.data.memberId == memberId.toProtoPrimitive,
       )
       .map(_.data.totalPurchased.toLong)
       .sum
@@ -109,7 +109,9 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     val memberId = validatorApp.participantClient.id
     val validatorParty = validatorApp.getValidatorPartyId()
     val domainId =
-      DomainId.tryFromString(sv1ScanBackend.getAmuletConfigAsOf(ts).globalDomain.activeDomain)
+      DomainId.tryFromString(
+        sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.activeSynchronizer
+      )
     val transferContext = sv1ScanBackend.getTransferContextWithInstances(ts)
     val topupStateCid = getOrCreateTopupStateCid(validatorApp, memberId, domainId)
     val walletInstall = inside(
@@ -178,7 +180,9 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
   ): BuyTrafficRequest.ContractId = {
     val now = env.environment.clock.now
     val domainId =
-      DomainId.tryFromString(sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.activeDomain)
+      DomainId.tryFromString(
+        sv1ScanBackend.getAmuletConfigAsOf(now).decentralizedSynchronizer.activeSynchronizer
+      )
     val validatorParty = validatorApp.getValidatorPartyId()
     val walletInstall = inside(
       validatorApp.participantClientWithAdminToken.ledger_api_extensions.acs
@@ -214,16 +218,17 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       env: CNNodeTestConsoleEnvironment
   ): ExtraTrafficTopupParameters = {
     ExtraTrafficTopupParameters(
-      sv1ScanBackend.getAmuletConfigAsOf(ts).globalDomain.fees,
+      sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.fees,
       validatorApp.config.domains.global.buyExtraTraffic,
       validatorApp.config.automation.pollingInterval,
     )
   }
 
-  def computeDomainFees(trafficAmount: Long, ts: CantonTimestamp)(implicit
+  def computeSynchronizerFees(trafficAmount: Long, ts: CantonTimestamp)(implicit
       env: CNNodeTestConsoleEnvironment
   ): (BigDecimal, BigDecimal) = {
-    val trafficPriceUsd = sv1ScanBackend.getAmuletConfigAsOf(ts).globalDomain.fees.extraTrafficPrice
+    val trafficPriceUsd =
+      sv1ScanBackend.getAmuletConfigAsOf(ts).decentralizedSynchronizer.fees.extraTrafficPrice
     val totalCostUsd = BigDecimal(trafficAmount) / 1e6 * trafficPriceUsd
     val amuletPrice = sv1ScanBackend.getLatestOpenMiningRound(ts).contract.payload.amuletPrice
     val totalCostCc = totalCostUsd / amuletPrice
@@ -246,8 +251,11 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
     getTrafficState(validatorApp, domainId).extraTrafficLimit.fold(0L)(_.value)
   }
 
-  def activeDomainId(implicit env: CNNodeTestConsoleEnvironment) =
+  def activeSynchronizerId(implicit env: CNNodeTestConsoleEnvironment) =
     DomainId.tryFromString(
-      sv1ScanBackend.getAmuletConfigAsOf(env.environment.clock.now).globalDomain.activeDomain
+      sv1ScanBackend
+        .getAmuletConfigAsOf(env.environment.clock.now)
+        .decentralizedSynchronizer
+        .activeSynchronizer
     )
 }

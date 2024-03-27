@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_SetConfig
 import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
-  DomainUpgradeSchedule,
+  SynchronizerUpgradeSchedule,
   DsoRulesConfig,
   DsoRules_SetConfig,
   VoteRequest,
@@ -90,7 +90,7 @@ trait SvTestUtil extends CNNodeTestCommon {
   def scheduleDomainMigration(
       svToCreateVoteRequest: SvAppReference,
       svsToCastVotes: Seq[SvAppReference],
-      domainUpgradeSchedule: Option[DomainUpgradeSchedule],
+      domainUpgradeSchedule: Option[SynchronizerUpgradeSchedule],
   )(implicit
       ec: ExecutionContextExecutor
   ): Unit = {
@@ -98,7 +98,7 @@ trait SvTestUtil extends CNNodeTestCommon {
     val action = new ARC_DsoRules(
       new SRARC_SetConfig(
         new DsoRules_SetConfig(
-          updateNextScheduledDomainUpgrade(dsoRules.payload.config, domainUpgradeSchedule)
+          updateNextScheduledSynchronizerUpgrade(dsoRules.payload.config, domainUpgradeSchedule)
         )
       )
     )
@@ -162,7 +162,7 @@ trait SvTestUtil extends CNNodeTestCommon {
       "observing DsoRules with changed config",
       _ => {
         val newDsoRules = svToCreateVoteRequest.getDsoInfo().dsoRules
-        newDsoRules.payload.config.nextScheduledDomainUpgrade.toScala shouldBe domainUpgradeSchedule
+        newDsoRules.payload.config.nextScheduledSynchronizerUpgrade.toScala shouldBe domainUpgradeSchedule
       },
     )
   }
@@ -191,9 +191,9 @@ trait SvTestUtil extends CNNodeTestCommon {
     }
   }
 
-  private def updateNextScheduledDomainUpgrade(
+  private def updateNextScheduledSynchronizerUpgrade(
       dsoRulesConfig: DsoRulesConfig,
-      domainUpgradeSchedule: Option[DomainUpgradeSchedule],
+      domainUpgradeSchedule: Option[SynchronizerUpgradeSchedule],
   ) = new DsoRulesConfig(
     dsoRulesConfig.numUnclaimedRewardsThreshold,
     dsoRulesConfig.numMemberTrafficContractsThreshold,
@@ -202,9 +202,9 @@ trait SvTestUtil extends CNNodeTestCommon {
     dsoRulesConfig.svOnboardingConfirmedTimeout,
     dsoRulesConfig.voteRequestTimeout,
     dsoRulesConfig.dsoDelegateInactiveTimeout,
-    dsoRulesConfig.domainNodeConfigLimits,
+    dsoRulesConfig.synchronizerNodeConfigLimits,
     dsoRulesConfig.maxTextLength,
-    dsoRulesConfig.globalDomain,
+    dsoRulesConfig.decentralizedSynchronizer,
     domainUpgradeSchedule.toJava,
   )
 

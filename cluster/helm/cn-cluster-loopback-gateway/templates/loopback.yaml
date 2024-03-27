@@ -20,11 +20,11 @@ spec:
     name: grpc-domain
     protocol: GRPC
   {{- $domains := untilStep 0 (int .Values.cometbftPorts.domains) 1 -}}
-  {{- $domainNodes := untilStep 0 (int .Values.cometbftPorts.nodes) 1 -}}
+  {{- $synchronizerNodes := untilStep 0 (int .Values.cometbftPorts.nodes) 1 -}}
   {{- range $index, $domain := $domains }}
-  {{- range $index, $domainNode := $domainNodes }}
-  - number: 26{{ $domain }}{{ $domainNode }}6
-    name: cometbft-{{ $domain }}-{{ $domainNode }}-p2p
+  {{- range $index, $synchronizerNode := $synchronizerNodes }}
+  - number: 26{{ $domain }}{{ $synchronizerNode }}6
+    name: cometbft-{{ $domain }}-{{ $synchronizerNode }}-p2p
     protocol: TCP
   {{- end }}
   {{- end }}

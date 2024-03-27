@@ -53,29 +53,32 @@ class TopupMemberTrafficTrigger(
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
       amuletRules <- scanConnection.getAmuletRulesWithState()
-      globalDomainConfig = AmuletConfigSchedule(amuletRules)
+      decentralizedSynchronizerConfig = AmuletConfigSchedule(amuletRules)
         .getConfigAsOf(clock.now)
-        .globalDomain
+        .decentralizedSynchronizer
       topupParameters = ExtraTrafficTopupParameters(
-        globalDomainConfig.fees,
+        decentralizedSynchronizerConfig.fees,
         buyExtraTrafficConfig,
         context.config.pollingInterval,
       )
       result <- {
         assert(topupParameters.topupAmount > 0, "topupAmount must be positive")
-        val activeDomainId = DomainId.tryFromString(globalDomainConfig.activeDomain)
-        checkAndTopupIfNeeded(topupParameters, activeDomainId)
+        val activeSynchronizerId =
+          DomainId.tryFromString(decentralizedSynchronizerConfig.activeSynchronizer)
+        checkAndTopupIfNeeded(topupParameters, activeSynchronizerId)
       }
     } yield result
   }
 
   private def checkAndTopupIfNeeded(
       topupParameters: ExtraTrafficTopupParameters,
-      activeDomainId: DomainId,
+      activeSynchronizerId: DomainId,
   )(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      topupState <- getOrCreateValidatorTopupState(activeDomainId)
-      currentTrafficState <- participantAdminConnection.getParticipantTrafficState(activeDomainId)
+      topupState <- getOrCreateValidatorTopupState(activeSynchronizerId)
+      currentTrafficState <- participantAdminConnection.getParticipantTrafficState(
+        activeSynchronizerId
+      )
       result <-
         if (shouldTopup(currentTrafficState, topupState, topupParameters))
           topUpValidatorTraffic(
@@ -116,7 +119,7 @@ class TopupMemberTrafficTrigger(
     val coBuyMemberTraffic = new CO_BuyMemberTraffic(
       topupParameters.topupAmount,
       topupState.payload.memberId,
-      topupState.payload.domainId,
+      topupState.payload.synchronizerId,
       topupState.payload.migrationId,
       new RelTime(topupParameters.minTopupInterval.duration.toMillis * 1000),
       Optional.of(topupState.contractId),
@@ -170,11 +173,11 @@ class TopupMemberTrafficTrigger(
   }
 
   private def getOrCreateValidatorTopupState(
-      activeDomainId: DomainId
+      activeSynchronizerId: DomainId
   )(implicit
       traceContext: TraceContext
   ): Future[Contract[ValidatorTopUpState.ContractId, ValidatorTopUpState]] = {
-    store.lookupValidatorTopUpStateWithOffset(activeDomainId).flatMap {
+    store.lookupValidatorTopUpStateWithOffset(activeSynchronizerId).flatMap {
       case QueryResult(_, Some(topupState)) =>
         Future.successful(topupState)
       case QueryResult(dedupOffset, None) =>
@@ -188,7 +191,7 @@ class TopupMemberTrafficTrigger(
                 store.key.dsoParty.toProtoPrimitive,
                 validator.toProtoPrimitive,
                 participantId.toProtoPrimitive,
-                activeDomainId.toProtoPrimitive,
+                activeSynchronizerId.toProtoPrimitive,
                 domainMigrationId,
                 Instant.ofEpochSecond(0),
               ),
@@ -198,17 +201,17 @@ class TopupMemberTrafficTrigger(
               CNLedgerConnection.CommandId(
                 "com.daml.network.validator.automation.TopupMemberTrafficTrigger.getOrCreateValidatorTopupState",
                 Seq(validator),
-                activeDomainId.toProtoPrimitive,
+                activeSynchronizerId.toProtoPrimitive,
               ),
               DedupOffset(dedupOffset),
             )
-            .withDomainId(activeDomainId)
+            .withDomainId(activeSynchronizerId)
             .yieldResult()
             .flatMap(ev =>
               // topping up is tied to the domain in scope here, which was
               // picked from the on-ledger domain config
               store.multiDomainAcsStore.getContractByIdOnDomain(ValidatorTopUpState.COMPANION)(
-                activeDomainId,
+                activeSynchronizerId,
                 ev.contractId,
               )
             )

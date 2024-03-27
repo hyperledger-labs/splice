@@ -87,10 +87,10 @@ object HttpValidatorAdminAppClient {
     }
   }
 
-  case class GetGlobalDomainConnectionConfig()
+  case class GetDecentralizedSynchronizerConnectionConfig()
       extends BaseCommand[
-        http.GetGlobalDomainConnectionConfigResponse,
-        definitions.GetGlobalDomainConnectionConfigResponse,
+        http.GetDecentralizedSynchronizerConnectionConfigResponse,
+        definitions.GetDecentralizedSynchronizerConnectionConfigResponse,
       ] {
 
     override def submitRequest(
@@ -99,15 +99,15 @@ object HttpValidatorAdminAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.GetGlobalDomainConnectionConfigResponse] =
-      client.getGlobalDomainConnectionConfig(headers = headers)
+    ], http.GetDecentralizedSynchronizerConnectionConfigResponse] =
+      client.getDecentralizedSynchronizerConnectionConfig(headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
     ): PartialFunction[
-      http.GetGlobalDomainConnectionConfigResponse,
-      Either[String, definitions.GetGlobalDomainConnectionConfigResponse],
-    ] = { case http.GetGlobalDomainConnectionConfigResponse.OK(response) =>
+      http.GetDecentralizedSynchronizerConnectionConfigResponse,
+      Either[String, definitions.GetDecentralizedSynchronizerConnectionConfigResponse],
+    ] = { case http.GetDecentralizedSynchronizerConnectionConfigResponse.OK(response) =>
       Right(response)
     }
   }

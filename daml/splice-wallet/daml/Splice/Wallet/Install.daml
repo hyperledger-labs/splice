@@ -9,7 +9,7 @@ import DA.Optional (isSome)
 import Splice.Amulet
 import Splice.Types
 import Splice.AmuletRules
-import Splice.GlobalDomain
+import Splice.DecentralizedSynchronizer
 
 import Splice.Wallet.Payment
 import Splice.Wallet.Subscriptions
@@ -53,8 +53,8 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
     CO_SubscriptionMakePayment cid -> do
       resultE <- catchAll $ exercise cid (SubscriptionIdleState_MakePayment inputs execContext.paymentContext execContext.validator)
       handleResultSubscriptionMakePayment resultE
-    CO_BuyMemberTraffic trafficAmount memberId domainId migrationId minTopupInterval topupStateCid -> do
-      resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId domainId migrationId minTopupInterval topupStateCid
+    CO_BuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCid -> do
+      resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCid
       handleResult COO_BuyMemberTraffic resultE
     CO_CompleteBuyTrafficRequest cid -> do
       resultE <- catchAll $ exercise cid (BuyTrafficRequest_Complete inputs execContext.paymentContext execContext.validator)
@@ -137,11 +137,11 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
         executeAmuletOperationRec execContext inputAmulets (COO_SubscriptionPayment (subscriptionPayment) :: prevResults) remainingOperations
 
     handleBuyMemberTraffic: Int -> Text -> Text -> Int -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId Amulet))
-    handleBuyMemberTraffic trafficAmount memberId domainId migrationId minTopupInterval topupStateCidO = do
+    handleBuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCidO = do
       now <- getTime
       -- validate and update topupState if provided
       forA_ topupStateCidO $ \topupStateCid -> do
-        topupState <- fetchAndArchive (ForMemberTraffic with dso = execContext.dso; memberId, domainId, migrationId)  topupStateCid
+        topupState <- fetchAndArchive (ForMemberTraffic with dso = execContext.dso; memberId, synchronizerId, migrationId)  topupStateCid
         require "validator party and ValidatorTopUpState match" (execContext.validator== topupState.validator)
         -- protect against successive topups being too close together
         require "enough time has elapsed since the last topup" (addRelTime topupState.lastPurchasedAt minTopupInterval <= now)
@@ -156,7 +156,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
         if (amuletRules.isDevNet && isSome topupStateCidO)
           then do
             -- Calculate CC required to buy extra traffic
-            (trafficCostCc, _) <- computeDomainFees execContext.validator trafficAmount amuletRules context.context
+            (trafficCostCc, _) <- computeSynchronizerFees execContext.validator trafficAmount amuletRules context.context
             -- Tap enough CC to cover extra traffic purchase
             result <- exercise amuletRulesCid (AmuletRules_DevNet_Tap execContext.validator trafficCostCc context.context.openMiningRound)
             -- Use only the newly created amulet as input to avoid amulet merges and having to pay for a new change amulet
@@ -165,7 +165,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
             pure inputs
       -- purchase extra traffic for sequencer member
       result <- exercise amuletRulesCid
-        (AmuletRules_BuyMemberTraffic newInputs context.context execContext.validator memberId domainId migrationId trafficAmount)
+        (AmuletRules_BuyMemberTraffic newInputs context.context execContext.validator memberId synchronizerId migrationId trafficAmount)
       pure (result.purchasedTraffic, result.senderChangeAmulet)
 
 executeAmuletOperationRec _execContext _inputs prevResults [] = do
@@ -193,7 +193,7 @@ data AmuletOperation
   | CO_BuyMemberTraffic with
       trafficAmount : Int
       memberId : Text
-      domainId : Text
+      synchronizerId : Text
       migrationId : Int
       minTopupInterval: RelTime
       topupStateCid : Optional (ContractId ValidatorTopUpState)
@@ -432,7 +432,7 @@ template WalletAppInstall
     nonconsuming choice WalletAppInstall_CreateBuyTrafficRequest : WalletAppInstall_CreateBuyTrafficRequestResult
       with
         memberId : Text
-        domainId : Text
+        synchronizerId : Text
         migrationId : Int
         trafficAmount : Int
         expiresAt : Time

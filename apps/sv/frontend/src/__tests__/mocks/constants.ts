@@ -145,7 +145,7 @@ export const dsoInfo: GetDsoInfoResponse = {
         voteRequestTimeout: {
           microseconds: '604800000000',
         },
-        domainNodeConfigLimits: {
+        synchronizerNodeConfigLimits: {
           cometBft: {
             maxNumSequencingKeys: '2',
             maxNodeIdLength: '50',
@@ -159,10 +159,10 @@ export const dsoInfo: GetDsoInfoResponse = {
         svOnboardingConfirmedTimeout: {
           microseconds: '3600000000',
         },
-        globalDomain: {
-          domains: [
+        decentralizedSynchronizer: {
+          synchronizers: [
             [
-              'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
+              'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
               {
                 state: 'DS_Operational',
                 cometBftGenesisJson:
@@ -170,10 +170,10 @@ export const dsoInfo: GetDsoInfoResponse = {
               },
             ],
           ],
-          lastDomainId:
-            'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
-          activeDomainId:
-            'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
+          lastSynchronizerId:
+            'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
+          activeSynchronizerId:
+            'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
         },
         maxTextLength: '1024',
       },
@@ -192,9 +192,9 @@ export const dsoInfo: GetDsoInfoResponse = {
             svRewardWeight: '10',
             participantId:
               'PAR::participant-1::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
-            domainNodes: [
+            synchronizerNodes: [
               [
-                'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
+                'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
                 {
                   cometBft: {
                     nodes: [
@@ -243,9 +243,9 @@ export const dsoInfo: GetDsoInfoResponse = {
             svRewardWeight: '12345',
             participantId:
               'PAR::participant-2::12205ab9210b258422a251d6148b031d71147405948c92bf9c4bc78029c5479aed75',
-            domainNodes: [
+            synchronizerNodes: [
               [
-                'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
+                'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
                 {
                   cometBft: {
                     nodes: [
@@ -294,9 +294,9 @@ export const dsoInfo: GetDsoInfoResponse = {
             svRewardWeight: '12345',
             participantId:
               'PAR::participant-3::12203cb019c9986425861c91685d9b7c0068cf48abb8dff8e20f166501f7f677dce7',
-            domainNodes: [
+            synchronizerNodes: [
               [
-                'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
+                'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
                 {
                   cometBft: {
                     nodes: [
@@ -345,9 +345,9 @@ export const dsoInfo: GetDsoInfoResponse = {
             svRewardWeight: '12345',
             participantId:
               'PAR::participant-4::122070fc4bb3519a4f39f5919b5a166e30794733e56ad9fba2157f7208ff458f7dc7',
-            domainNodes: [
+            synchronizerNodes: [
               [
-                'global-domain::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
+                'global-synchronizer::1220a555ecceed7fef445c7ec333c14449d981fb6595be218c5d701eef5ea63a1bca',
                 {
                   cometBft: {
                     nodes: [
@@ -423,17 +423,17 @@ function getAmuletConfig(createFee: string) {
       },
       maxNumOutputs: '100',
     },
-    globalDomain: {
-      requiredDomains: {
+    decentralizedSynchronizer: {
+      requiredSynchronizers: {
         map: [
           [
-            'global-domain::1220d12352e0839d9aac0a1c0c05b0eaaeb44f0aa19958cca2db37ae22c7817949a7',
+            'global-synchronizer::1220d12352e0839d9aac0a1c0c05b0eaaeb44f0aa19958cca2db37ae22c7817949a7',
             {},
           ],
         ],
       },
-      activeDomain:
-        'global-domain::1220d12352e0839d9aac0a1c0c05b0eaaeb44f0aa19958cca2db37ae22c7817949a7',
+      activeSynchronizer:
+        'global-synchronizer::1220d12352e0839d9aac0a1c0c05b0eaaeb44f0aa19958cca2db37ae22c7817949a7',
       fees: {
         baseRateTrafficLimits: {
           burstAmount: '2000000',

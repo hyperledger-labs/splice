@@ -15,13 +15,13 @@ import com.daml.network.http.v0.{definitions, sv_admin as v0}
 import com.daml.network.http.v0.definitions.TriggerDomainMigrationDumpRequest
 import com.daml.network.http.v0.sv_admin.SvAdminResource
 import com.daml.network.store.{CNNodeAppStoreWithIngestion, PageLimit}
-import com.daml.network.sv.{LocalDomainNode, SvApp}
+import com.daml.network.sv.{LocalSynchronizerNode, SvApp}
 import com.daml.network.sv.cometbft.CometBftClient
 import com.daml.network.sv.config.SvAppBackendConfig
 import com.daml.network.sv.migration.{
   DomainDataSnapshotGenerator,
   DomainMigrationDump,
-  DomainNodeIdentities,
+  SynchronizerNodeIdentities,
 }
 import com.daml.network.sv.store.{SvSvStore, SvDsoStore}
 import com.daml.network.sv.util.SvUtil.generateRandomOnboardingSecret
@@ -47,7 +47,7 @@ class HttpSvAdminHandler(
     svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
     dsoStoreWithIngestion: CNNodeAppStoreWithIngestion[SvDsoStore],
     cometBftClient: Option[CometBftClient],
-    localDomainNode: Option[LocalDomainNode],
+    localSynchronizerNode: Option[LocalSynchronizerNode],
     participantAdminConnection: ParticipantAdminConnection,
     domainDataSnapshotGenerator: DomainDataSnapshotGenerator,
     clock: Clock,
@@ -416,30 +416,34 @@ class HttpSvAdminHandler(
     }
   }
 
-  override def pauseGlobalDomain(respond: v0.SvAdminResource.PauseGlobalDomainResponse.type)()(
+  override def pauseDecentralizedSynchronizer(
+      respond: v0.SvAdminResource.PauseDecentralizedSynchronizerResponse.type
+  )()(
       tuser: TracedUser
-  ): Future[v0.SvAdminResource.PauseGlobalDomainResponse] = {
+  ): Future[v0.SvAdminResource.PauseDecentralizedSynchronizerResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.pauseGlobalDomain") { _ => _ =>
+    withSpan(s"$workflowId.pauseDecentralizedSynchronizer") { _ => _ =>
       for {
-        globalDomain <- dsoStore.getDsoRules().map(_.domain)
-        _ <- changeDomainRatePerParticipant(globalDomain, NonNegativeInt.zero)
-      } yield v0.SvAdminResource.PauseGlobalDomainResponseOK
+        decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
+        _ <- changeDomainRatePerParticipant(decentralizedSynchronizer, NonNegativeInt.zero)
+      } yield v0.SvAdminResource.PauseDecentralizedSynchronizerResponseOK
     }
   }
 
-  override def unpauseGlobalDomain(respond: v0.SvAdminResource.UnpauseGlobalDomainResponse.type)()(
+  override def unpauseDecentralizedSynchronizer(
+      respond: v0.SvAdminResource.UnpauseDecentralizedSynchronizerResponse.type
+  )()(
       tuser: TracedUser
-  ): Future[v0.SvAdminResource.UnpauseGlobalDomainResponse] = {
+  ): Future[v0.SvAdminResource.UnpauseDecentralizedSynchronizerResponse] = {
     implicit val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.unpauseGlobalDomain") { _ => _ =>
+    withSpan(s"$workflowId.unpauseDecentralizedSynchronizer") { _ => _ =>
       for {
-        globalDomain <- dsoStore.getDsoRules().map(_.domain)
+        decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
         _ <- changeDomainRatePerParticipant(
-          globalDomain,
+          decentralizedSynchronizer,
           DynamicDomainParameters.defaultConfirmationRequestsMaxRate,
         )
-      } yield v0.SvAdminResource.UnpauseGlobalDomainResponseOK
+      } yield v0.SvAdminResource.UnpauseDecentralizedSynchronizerResponseOK
     }
   }
 
@@ -448,16 +452,16 @@ class HttpSvAdminHandler(
   )()(tuser: TracedUser): Future[v0.SvAdminResource.GetDomainMigrationDumpResponse] = {
     val TracedUser(_, traceContext) = tuser
     withSpan(s"$workflowId.getDomainMigrationDump") { implicit tc => _ =>
-      localDomainNode match {
-        case Some(domainNode) =>
+      localSynchronizerNode match {
+        case Some(synchronizerNode) =>
           dsoStore.getDsoRules().flatMap { dsoRules =>
-            dsoRules.payload.config.nextScheduledDomainUpgrade.toScala match {
+            dsoRules.payload.config.nextScheduledSynchronizerUpgrade.toScala match {
               case Some(scheduled) =>
                 DomainMigrationDump
                   .getDomainMigrationDump(
                     config.domains.global.alias,
                     participantAdminConnection,
-                    domainNode,
+                    synchronizerNode,
                     loggerFactory,
                     dsoStore,
                     scheduled.migrationId,
@@ -504,30 +508,30 @@ class HttpSvAdminHandler(
     }(traceContext, tracer)
   }
 
-  override def getDomainNodeIdentitiesDump(
-      respond: v0.SvAdminResource.GetDomainNodeIdentitiesDumpResponse.type
-  )()(tuser: TracedUser): Future[v0.SvAdminResource.GetDomainNodeIdentitiesDumpResponse] = {
+  override def getSynchronizerNodeIdentitiesDump(
+      respond: v0.SvAdminResource.GetSynchronizerNodeIdentitiesDumpResponse.type
+  )()(tuser: TracedUser): Future[v0.SvAdminResource.GetSynchronizerNodeIdentitiesDumpResponse] = {
     val TracedUser(_, traceContext) = tuser
-    withSpan(s"$workflowId.getDomainNodeIdentitiesDump") { implicit tc => _ =>
-      localDomainNode match {
-        case Some(domainNode) =>
-          DomainNodeIdentities
-            .getDomainNodeIdentities(
+    withSpan(s"$workflowId.getSynchronizerNodeIdentitiesDump") { implicit tc => _ =>
+      localSynchronizerNode match {
+        case Some(synchronizerNode) =>
+          SynchronizerNodeIdentities
+            .getSynchronizerNodeIdentities(
               participantAdminConnection,
-              domainNode,
+              synchronizerNode,
               dsoStore,
               config.domains.global.alias,
               loggerFactory,
             )
             .map { response =>
-              SvAdminResource.GetDomainNodeIdentitiesDumpResponse.OK(
-                definitions.GetDomainNodeIdentitiesDumpResponse(response.toHttp())
+              SvAdminResource.GetSynchronizerNodeIdentitiesDumpResponse.OK(
+                definitions.GetSynchronizerNodeIdentitiesDumpResponse(response.toHttp())
               )
             }
         case None =>
           Future.failed(
             HttpErrorHandler.internalServerError(
-              s"Could not prepare DomainNodeIdentitiesDump because domain node is not configured"
+              s"Could not prepare SynchronizerNodeIdentitiesDump because domain node is not configured"
             )
           )
       }
@@ -544,7 +548,7 @@ class HttpSvAdminHandler(
 
   private def withSequencerConnectionOrNotFound[T](
       notFound: definitions.ErrorResponse => T
-  )(call: SequencerAdminConnection => Future[T]) = localDomainNode
+  )(call: SequencerAdminConnection => Future[T]) = localSynchronizerNode
     .map(_.sequencerAdminConnection)
     .fold {
       notFound(definitions.ErrorResponse("Sequencer is not configured."))
@@ -553,20 +557,23 @@ class HttpSvAdminHandler(
 
   private def withMediatorConnectionOrNotFound[T](
       notFound: definitions.ErrorResponse => T
-  )(call: MediatorAdminConnection => Future[T]) = localDomainNode
+  )(call: MediatorAdminConnection => Future[T]) = localSynchronizerNode
     .map(_.mediatorAdminConnection)
     .fold {
       notFound(definitions.ErrorResponse("Mediator is not configured."))
         .pure[Future]
     } { call }
 
-  private def changeDomainRatePerParticipant(globalDomainId: DomainId, rate: NonNegativeInt)(
-      implicit tc: TraceContext
+  private def changeDomainRatePerParticipant(
+      decentralizedSynchronizerId: DomainId,
+      rate: NonNegativeInt,
+  )(implicit
+      tc: TraceContext
   ) = for {
     id <- participantAdminConnection.getId()
     result <- participantAdminConnection
       .ensureDomainParameters(
-        globalDomainId,
+        decentralizedSynchronizerId,
         _.tryUpdate(confirmationRequestsMaxRate = rate),
         signedBy = id.namespace.fingerprint,
       )
@@ -578,8 +585,8 @@ class HttpSvAdminHandler(
       request: TriggerDomainMigrationDumpRequest
   )(extracted: TracedUser): Future[SvAdminResource.TriggerDomainMigrationDumpResponse] = {
     withSpan(s"$workflowId.triggerDomainMigrationDump") { implicit tc => _ =>
-      localDomainNode match {
-        case Some(domainNode) =>
+      localSynchronizerNode match {
+        case Some(synchronizerNode) =>
           optDomainMigrationDumpConfig match {
             case Some(dumpPath) =>
               for {
@@ -587,7 +594,7 @@ class HttpSvAdminHandler(
                   .getDomainMigrationDump(
                     config.domains.global.alias,
                     participantAdminConnection,
-                    domainNode,
+                    synchronizerNode,
                     loggerFactory,
                     dsoStore,
                     request.migrationId,

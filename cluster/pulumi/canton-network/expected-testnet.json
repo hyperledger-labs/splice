@@ -628,7 +628,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "ans": true,
-          "globalDomain": {
+          "decentralizedSynchronizer": {
             "activeMigrationId": "",
             "migrationId": ""
           },
@@ -1238,7 +1238,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "ans": false,
-          "globalDomain": {
+          "decentralizedSynchronizer": {
             "activeMigrationId": "",
             "migrationId": "0"
           },
@@ -1280,7 +1280,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "ans": true,
-          "globalDomain": {
+          "decentralizedSynchronizer": {
             "activeMigrationId": "0",
             "migrationId": ""
           },
@@ -1741,6 +1741,7 @@
           "connectionUri": "http://undefined:26657",
           "enabled": true
         },
+        "decentralizedSynchronizerUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "defaultJvmOptions": "-Xms3072M -Xmx3072M -Dscala.concurrent.context.minThreads=8",
         "disableOnboardingParticipantPromotionDelay": false,
         "domain": {
@@ -1785,7 +1786,6 @@
         ],
         "failOnAppVersionMismatch": true,
         "fixedTokens": false,
-        "globalDomainUrl": "http://global-domain-0-sequencer.sv-1:5008",
         "identitiesExport": {
           "bucket": {
             "bucketName": "da-cn-data-dumps",
@@ -1796,14 +1796,14 @@
           "prefix": "mock/sv-1"
         },
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "initialDomainFeesConfig": {
+        "initialHoldingFee": 0.0000192901,
+        "initialSynchronizerFeesConfig": {
           "baseRateBurstAmount": 2000000,
           "baseRateBurstWindowMins": 10,
           "extraTrafficPrice": 1,
           "minTopupAmount": 10000000,
           "readVsWriteScalingFactor": 200
         },
-        "initialHoldingFee": 0.0000192901,
         "initialTickDuration": "600 seconds",
         "isDevNet": false,
         "metrics": {
@@ -1871,12 +1871,12 @@
           "name": "cn-mocknet"
         },
         "clusterUrl": "mock.network.canton.global",
+        "decentralizedSynchronizerUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "defaultJvmOptions": "-Xms5g -Xmx5g -Dscala.concurrent.context.minThreads=8",
         "disableAllocateLedgerApiUserParty": true,
         "enableWallet": true,
         "failOnAppVersionMismatch": true,
         "fixedTokens": false,
-        "globalDomainUrl": "https://sequencer-0.sv-1.svc.mock.network.canton.global",
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "metrics": {
           "enable": true,
@@ -1978,7 +1978,7 @@
         "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
         "ingress": {
           "ans": true,
-          "globalDomain": {
+          "decentralizedSynchronizer": {
             "activeMigrationId": "0",
             "migrationId": ""
           },

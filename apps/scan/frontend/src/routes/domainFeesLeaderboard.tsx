@@ -1,9 +1,9 @@
 import * as React from 'react';
 
-import DomainFeesLeaderboardTable from '../components/DomainFeesLeaderboardTable';
+import SynchronizerFeesLeaderboardTable from '../components/SynchronizerFeesLeaderboardTable';
 
-const DomainFeesLeaderboard: React.FC = () => {
-  return <DomainFeesLeaderboardTable />;
+const SynchronizerFeesLeaderboard: React.FC = () => {
+  return <SynchronizerFeesLeaderboardTable />;
 };
 
-export default DomainFeesLeaderboard;
+export default SynchronizerFeesLeaderboard;

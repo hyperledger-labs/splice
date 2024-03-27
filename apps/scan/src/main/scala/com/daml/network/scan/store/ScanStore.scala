@@ -115,7 +115,7 @@ trait ScanStore
   def listDsoScans()(implicit tc: TraceContext): Future[Vector[(String, Vector[ScanInfo])]] = {
     listFromSvNodeStates { nodeState =>
       for {
-        (domainId, domainConfig) <- nodeState.state.domainNodes.asScala.toVector
+        (domainId, domainConfig) <- nodeState.state.synchronizerNodes.asScala.toVector
         scan <- domainConfig.scan.toScala
       } yield domainId -> ScanInfo(scan.publicUrl, nodeState.svName)
     }
@@ -125,7 +125,7 @@ trait ScanStore
   ): Future[Contract[splice.amuletrules.AmuletRules.ContractId, splice.amuletrules.AmuletRules]] =
     getAmuletRulesWithState().map(_.contract)
 
-  def getGlobalDomainId()(implicit
+  def getDecentralizedSynchronizerId()(implicit
       tc: TraceContext
   ): Future[DomainId] =
     getAmuletRulesWithState()
@@ -207,11 +207,11 @@ trait ScanStore
 
   def getBaseRateTrafficLimitsAsOf(t: CantonTimestamp)(implicit
       tc: TraceContext
-  ): Future[splice.globaldomain.BaseRateTrafficLimits] =
+  ): Future[splice.decentralizedsynchronizer.BaseRateTrafficLimits] =
     getAmuletRulesWithState().map(cr =>
       AmuletConfigSchedule(cr)
         .getConfigAsOf(t)
-        .globalDomain
+        .decentralizedSynchronizer
         .fees
         .baseRateTrafficLimits
     )
@@ -402,7 +402,7 @@ object ScanStore {
             ansEntryOwner = Some(PartyId.tryFromProtoPrimitive(contract.payload.user)),
           )
         },
-        mkFilter(splice.globaldomain.MemberTraffic.COMPANION)(vt =>
+        mkFilter(splice.decentralizedsynchronizer.MemberTraffic.COMPANION)(vt =>
           vt.payload.dso == dso && vt.payload.migrationId == domainMigrationId
         ) { contract =>
           ScanAcsStoreRowData(

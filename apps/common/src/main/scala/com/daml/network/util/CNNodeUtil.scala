@@ -6,10 +6,10 @@ import com.daml.lf.data.Ref.PackageVersion
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.amulet.Amulet
-import com.daml.network.codegen.java.splice.globaldomain.{
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.{
   BaseRateTrafficLimits,
-  AmuletGlobalDomainConfig,
-  DomainFeesConfig,
+  AmuletDecentralizedSynchronizerConfig,
+  SynchronizerFeesConfig,
 }
 import com.daml.network.codegen.java.splice.issuance.IssuanceConfig
 import com.daml.network.codegen.java.splice.schedule.Schedule
@@ -254,7 +254,7 @@ object CNNodeUtil {
       defaultIssuanceCurve,
 
       // global domain config
-      defaultGlobalDomainConfig(
+      defaultDecentralizedSynchronizerConfig(
         initialDomainId,
         nextDomainId,
         initialExtraTrafficPrice,
@@ -288,7 +288,7 @@ object CNNodeUtil {
     damlDecimal(entryFee),
   )
 
-  private def defaultGlobalDomainConfig(
+  private def defaultDecentralizedSynchronizerConfig(
       initialDomainId: DomainId,
       nextDomainId: Option[DomainId],
       initialExtraTrafficPrice: BigDecimal,
@@ -296,17 +296,17 @@ object CNNodeUtil {
       initialBaseRateBurstAmount: Long,
       initialBaseRateBurstWindow: NonNegativeFiniteDuration,
       initialReadVsWriteScalingFactor: Int,
-  ): AmuletGlobalDomainConfig = {
+  ): AmuletDecentralizedSynchronizerConfig = {
     val domainId = initialDomainId.toProtoPrimitive
     val next = nextDomainId.map(_.toProtoPrimitive)
-    new AmuletGlobalDomainConfig(
-      // requiredDomains
+    new AmuletDecentralizedSynchronizerConfig(
+      // requiredSynchronizers
       new DamlSet(
         (Map(domainId -> DamlUnit.getInstance) ++ next
           .map(_ -> DamlUnit.getInstance)
           .toList).asJava
       ),
-      // activeDomain
+      // activeSynchronizer
       next getOrElse domainId,
       // fees
       domainFeesConfig(
@@ -373,7 +373,7 @@ object CNNodeUtil {
       extraTrafficPrice: BigDecimal = dummyExtraTrafficPrice,
       minTopupAmount: Long = dummyMinTopupAmount,
   ) = {
-    new DomainFeesConfig(
+    new SynchronizerFeesConfig(
       baseRateLimits(baseRateBurstAmount, baseRateBurstWindow),
       damlDecimal(extraTrafficPrice.toDouble),
       readVsWriteScalingFactor,

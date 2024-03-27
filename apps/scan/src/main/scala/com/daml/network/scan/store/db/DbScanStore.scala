@@ -6,7 +6,7 @@ import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsRules}
-import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
 import com.daml.network.codegen.java.splice.dsorules.DsoRules

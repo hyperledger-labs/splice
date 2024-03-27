@@ -31,16 +31,16 @@ final class DsoRulesTransferTrigger(
       dsoRules <- OptionT(store.lookupDsoRules())
       amuletRules <- OptionT(store.lookupAmuletRules())
       config = AmuletConfigSchedule(amuletRules.payload.configSchedule) getConfigAsOf now
-      activeDomain <- OptionT.fromOption[Future](
-        DomainId.fromString(config.globalDomain.activeDomain).toOption
+      activeSynchronizer <- OptionT.fromOption[Future](
+        DomainId.fromString(config.decentralizedSynchronizer.activeSynchronizer).toOption
       )
       _ <-
-        if (activeDomain == dsoRules.domain) OptionT.none[Future, Unit]
+        if (activeSynchronizer == dsoRules.domain) OptionT.none[Future, Unit]
         else OptionT.pure[Future](())
     } yield ReassignmentCommand.Unassign(
       contractId = dsoRules.contractId,
       source = dsoRules.domain,
-      target = activeDomain,
+      target = activeSynchronizer,
     )
     run.value.map(_.toList)
   }

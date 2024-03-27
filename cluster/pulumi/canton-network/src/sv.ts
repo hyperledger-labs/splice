@@ -19,8 +19,8 @@ import {
   exactNamespace,
   ExpectedValidatorOnboarding,
   fetchAndInstallParticipantBootstrapDump,
-  GlobalDomainMigrationConfig,
-  initialDomainFeesConfig,
+  DecentralizedSynchronizerMigrationConfig,
+  initialSynchronizerFeesConfig,
   installAuth0Secret,
   installAuth0UISecret,
   installBootstrapDataBucketSecret,
@@ -38,7 +38,7 @@ import { jmxOptions } from 'cn-pulumi-common/src/jmx';
 import { failOnAppVersionMismatch } from 'cn-pulumi-common/src/upgrades';
 
 import * as postgres from './postgres';
-import { GlobalDomainNode } from './globalDomainNode';
+import { DecentralizedSynchronizerNode } from './decentralizedSynchronizerNode';
 import { installParticipant } from './participant';
 import { installPostgresMetrics, Postgres } from './postgres';
 import { StaticCometBftConfigWithNodeName, StaticSvConfig } from './svConfigs';
@@ -124,7 +124,7 @@ export interface SvConfig extends StaticSvConfig {
 
 type InstalledMigrationSpecificSv = {
   ingress: Release;
-  globalDomain: GlobalDomainNode;
+  decentralizedSynchronizer: DecentralizedSynchronizerNode;
   participant: Release;
 };
 
@@ -134,14 +134,14 @@ export type InstalledSv = {
   validatorApp: Resource;
   svApp: Release;
   scan: Release;
-  globalDomain: GlobalDomainNode;
+  decentralizedSynchronizer: DecentralizedSynchronizerNode;
   participant: Release;
   ingress: Resource;
 };
 
 export async function installSvNode(
   baseConfig: SvConfig,
-  globalDomainUpgradeConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig,
   cometBftSyncSource?: k8s.helm.v3.Release
 ): Promise<InstalledSv> {
   const xns = exactNamespace(baseConfig.nodeName, true);
@@ -229,7 +229,7 @@ export async function installSvNode(
   const appsPostgres = defaultPostgres || postgres.installPostgres(xns, `cn-apps-pg`, true);
   const activeMigrationComponents = installMigrationIdSpecificComponents(
     xns,
-    globalDomainUpgradeConfig,
+    decentralizedSynchronizerUpgradeConfig,
     defaultPostgres,
     {
       name: config.nodeName,
@@ -244,22 +244,22 @@ export async function installSvNode(
   ).activeComponent;
 
   const svApp = installSvApp(
-    globalDomainUpgradeConfig,
+    decentralizedSynchronizerUpgradeConfig,
     config,
     xns,
     dependsOn,
     activeMigrationComponents.participant,
-    activeMigrationComponents.globalDomain,
+    activeMigrationComponents.decentralizedSynchronizer,
     appsPostgres
   );
 
   const scan = installScan(
     xns,
     config.isFounder,
-    globalDomainUpgradeConfig,
+    decentralizedSynchronizerUpgradeConfig,
     config.nodeName,
     config.onboarding.type,
-    activeMigrationComponents.globalDomain,
+    activeMigrationComponents.decentralizedSynchronizer,
     svApp,
     activeMigrationComponents.participant,
     appsPostgres
@@ -268,7 +268,7 @@ export async function installSvNode(
   const validatorApp = await installValidator(
     appsPostgres,
     xns,
-    globalDomainUpgradeConfig,
+    decentralizedSynchronizerUpgradeConfig,
     baseConfig,
     backupConfigSecret,
     activeMigrationComponents,
@@ -283,8 +283,8 @@ export async function installSvNode(
     {
       withSvIngress: true,
       ingress: {
-        globalDomain: {
-          activeMigrationId: globalDomainUpgradeConfig.active.migrationId.toString(),
+        decentralizedSynchronizer: {
+          activeMigrationId: decentralizedSynchronizerUpgradeConfig.active.migrationId.toString(),
         },
       },
       cluster: {
@@ -314,7 +314,7 @@ function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): Persi
 async function installValidator(
   postgres: Postgres,
   xns: ExactNamespace,
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   svConfig: SvConfig,
   backupConfigSecret: Resource | undefined,
   sv: InstalledMigrationSpecificSv,
@@ -328,12 +328,12 @@ async function installValidator(
   });
 
   const validatorDbName = `validator_${sanitizedForPostgres(svConfig.nodeName)}`;
-  const globalDomainUrl = `https://sequencer-${globalDomainMigrationConfig.active.migrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
+  const decentralizedSynchronizerUrl = `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.sv-1.svc.${CLUSTER_BASENAME}.network.canton.global`;
 
   const validator = await installValidatorApp({
     xns,
     migration: {
-      id: globalDomainMigrationConfig.active.migrationId,
+      id: decentralizedSynchronizerMigrationConfig.active.migrationId,
     },
     validatorWalletUser: svConfig.validatorWalletUser,
     participant: sv.participant,
@@ -350,7 +350,7 @@ async function installValidator(
     extraDependsOn: [svApp, postgres, scan],
     svValidator: true,
     participantAddress: sv.participant.name,
-    globalDomainUrl: globalDomainUrl,
+    decentralizedSynchronizerUrl: decentralizedSynchronizerUrl,
     scanAddress: internalScanUrl(svConfig),
     secrets: validatorSecrets,
   });
@@ -362,7 +362,7 @@ async function installValidator(
 
 function installMigrationIdSpecificComponents(
   xns: ExactNamespace,
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   defaultPostgres: Postgres | undefined,
   cometbft: {
     name: string;
@@ -377,7 +377,7 @@ function installMigrationIdSpecificComponents(
   svConfig: SvConfig
 ) {
   return installMigrationIdSpecificComponent(
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     (migrationId, isActive, version) => {
       const sequencerPostgres =
         defaultPostgres || postgres.installPostgres(xns, `sequencer-${migrationId}-pg`, true);
@@ -387,14 +387,18 @@ function installMigrationIdSpecificComponents(
         defaultPostgres || postgres.installPostgres(xns, `participant-${migrationId}-pg`, true);
 
       const mustBeManuallyInitialized =
-        disableCantonAutoInit || !isActive || globalDomainMigrationConfig.isRunningMigration();
+        disableCantonAutoInit ||
+        !isActive ||
+        decentralizedSynchronizerMigrationConfig.isRunningMigration();
       // legacy domains don't need cometbft state sync because no new nodes will join
       // upgrade domains don't need cometbft state sync because until they are active cometbft will not really progress its height a lot
       // also for upgrade domains we first deploy the domain and then redeploy the sv app, and as we proxy the calls for state sync through the
       // sv-app we cannot configure state sync until the sv app has migrated
       // if a migration is running we must not configure state sync because that will also add a pulumi dependency and our migrate flow will break (sv2-4 depending on sv1)
       const canSyncFromCometBft =
-        !disableCometBftStateSync && isActive && !globalDomainMigrationConfig.isRunningMigration();
+        !disableCometBftStateSync &&
+        isActive &&
+        !decentralizedSynchronizerMigrationConfig.isRunningMigration();
       // If we have a dump, we disable auto init.
       const isParticipantRestoringFromDump = !!svConfig.bootstrappingDumpConfig;
       const participant = installParticipant(
@@ -406,7 +410,7 @@ function installMigrationIdSpecificComponents(
         svConfig.onboardingName,
         version
       );
-      const globalDomainNode = new GlobalDomainNode(
+      const decentralizedSynchronizerNode = new DecentralizedSynchronizerNode(
         migrationId,
         xns,
         sequencerPostgres,
@@ -428,7 +432,7 @@ function installMigrationIdSpecificComponents(
             scan: false,
             sequencer: true,
             sv: false,
-            globalDomain: {
+            decentralizedSynchronizer: {
               migrationId: migrationId.toString(),
             },
           },
@@ -441,7 +445,7 @@ function installMigrationIdSpecificComponents(
         { dependsOn: [xns.ns] }
       );
       return {
-        globalDomain: globalDomainNode,
+        decentralizedSynchronizer: decentralizedSynchronizerNode,
         participant: participant,
         ingress: migrationIngress,
       };
@@ -454,18 +458,18 @@ function internalScanUrl(config: SvConfig): pulumi.Output<string> {
 }
 
 function installSvApp(
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   config: SvConfig,
   xns: ExactNamespace,
   dependsOn: CnInput<Resource>[],
   participant: Release,
-  globalDomain: GlobalDomainNode,
+  decentralizedSynchronizer: DecentralizedSynchronizerNode,
   postgres: Postgres
 ) {
   const svDbName = `sv_${sanitizedForPostgres(config.nodeName)}`;
 
   const svValues = {
-    ...globalDomainMigrationConfig.migratingNodeConfig(),
+    ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     onboardingType: config.onboarding.type,
     onboardingName: config.onboardingName,
     onboardingFoundingSvRewardWeightBps:
@@ -484,23 +488,23 @@ function installSvApp(
       config.onboarding.type == 'found-collective'
         ? config.onboarding.initialHoldingFee
         : undefined,
-    initialDomainFeesConfig:
-      config.onboarding.type == 'found-collective' ? initialDomainFeesConfig : undefined,
+    initialSynchronizerFeesConfig:
+      config.onboarding.type == 'found-collective' ? initialSynchronizerFeesConfig : undefined,
     disableOnboardingParticipantPromotionDelay: config.disableOnboardingParticipantPromotionDelay,
     cometBFT: {
       enabled: true,
-      connectionUri: pulumi.interpolate`http://${globalDomain.cometbftRpcService.metadata.name}:26657`,
+      connectionUri: pulumi.interpolate`http://${decentralizedSynchronizer.cometbftRpcService.metadata.name}:26657`,
     },
-    globalDomainUrl: globalDomain.founderInternalSequencerAddress,
+    decentralizedSynchronizerUrl: decentralizedSynchronizer.founderInternalSequencerAddress,
     domain:
       // defaults for ports and address are fine,
       // we need to include a dummy value though
       // because helm does not distinguish between an empty object and unset.
       {
-        sequencerAddress: globalDomain.namespaceInternalSequencerAddress,
-        mediatorAddress: globalDomain.namespaceInternalMediatorAddress,
+        sequencerAddress: decentralizedSynchronizer.namespaceInternalSequencerAddress,
+        mediatorAddress: decentralizedSynchronizer.namespaceInternalMediatorAddress,
         // required to prevent participants from using new nodes when the domain is upgraded
-        sequencerPublicUrl: `https://sequencer-${globalDomainMigrationConfig.active.migrationId}.${config.nodeName}.svc.${CLUSTER_BASENAME}.network.canton.global`,
+        sequencerPublicUrl: `https://sequencer-${decentralizedSynchronizerMigrationConfig.active.migrationId}.${config.nodeName}.svc.${CLUSTER_BASENAME}.network.canton.global`,
         sequencerPruningConfig: config.sequencerPruningConfig,
       },
     scan: {
@@ -540,7 +544,7 @@ function installSvApp(
   }
 
   const svApp = installCNHelmChart(xns, `sv-app`, 'cn-sv-node', svValues, defaultVersion, {
-    dependsOn: dependsOn.concat([participant, postgres, globalDomain]),
+    dependsOn: dependsOn.concat([participant, postgres, decentralizedSynchronizer]),
   });
   installPostgresMetrics(postgres, svDbName, [svApp]);
   return svApp;
@@ -549,10 +553,10 @@ function installSvApp(
 function installScan(
   xns: ExactNamespace,
   isFounder: boolean,
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   nodename: string,
   svConfigOnboardingType: string,
-  globalDomainNode: GlobalDomainNode,
+  decentralizedSynchronizerNode: DecentralizedSynchronizerNode,
   svApp: Release,
   participant: Release,
   postgres: Postgres
@@ -568,14 +572,14 @@ function installScan(
     persistence: persistenceConfig(postgres, scanDbName),
     additionalJvmOptions: jmxOptions(),
     failOnAppVersionMismatch: failOnAppVersionMismatch(),
-    sequencerAddress: globalDomainNode.namespaceInternalSequencerAddress,
+    sequencerAddress: decentralizedSynchronizerNode.namespaceInternalSequencerAddress,
     participantAddress: participant.name,
     migration: {
-      id: globalDomainMigrationConfig.active.migrationId,
+      id: decentralizedSynchronizerMigrationConfig.active.migrationId,
     },
   };
   const scan = installCNHelmChart(xns, `scan`, 'cn-scan', scanValues, defaultVersion, {
-    dependsOn: [svApp, globalDomainNode],
+    dependsOn: [svApp, decentralizedSynchronizerNode],
   });
   installPostgresMetrics(postgres, scanDbName, [scan]);
   return scan;

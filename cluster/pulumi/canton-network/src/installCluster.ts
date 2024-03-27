@@ -5,7 +5,7 @@ import {
   bootstrapDataBucketSpec,
   BootstrappingDumpConfig,
   envFlag,
-  GlobalDomainMigrationConfig,
+  DecentralizedSynchronizerMigrationConfig,
   isDevNet,
   requireEnv,
   sequencerPruningConfig,
@@ -57,8 +57,8 @@ const bootstrappingConfig: BootstrapCliConfig = process.env.BOOTSTRAPPING_CONFIG
   ? JSON.parse(process.env.BOOTSTRAPPING_CONFIG)
   : undefined;
 
-const globalDomainUpgradeConfig: GlobalDomainMigrationConfig =
-  GlobalDomainMigrationConfig.fromEnv();
+const decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig =
+  DecentralizedSynchronizerMigrationConfig.fromEnv();
 
 const mustInstallValidator1 = envFlag('CN_INSTALL_VALIDATOR1', true);
 
@@ -164,7 +164,7 @@ export async function installCluster(
     topupConfig: svValidatorTopupConfig,
     splitPostgresInstances,
     sequencerPruningConfig,
-    globalDomainUpgradeConfig,
+    decentralizedSynchronizerUpgradeConfig,
     onboardingPollingInterval: svOnboardingPollingInterval,
     disableOnboardingParticipantPromotionDelay,
   });
@@ -183,7 +183,7 @@ export async function installCluster(
       validator1Onboarding.secret,
       'auth0|63e3d75ff4114d87a2c1e4f5',
       splitPostgresInstances,
-      globalDomainUpgradeConfig,
+      decentralizedSynchronizerUpgradeConfig,
       mustInstallSplitwell,
       nonSvComponentsDependencies,
       periodicBackupConfig,
@@ -203,7 +203,7 @@ export async function installCluster(
       'auth0|65de04b385816c4a38cc044f',
       splitwellOnboarding.secret,
       splitPostgresInstances,
-      globalDomainUpgradeConfig,
+      decentralizedSynchronizerUpgradeConfig,
       nonSvComponentsDependencies,
       periodicBackupConfig,
       bootstrappingDumpConfig,

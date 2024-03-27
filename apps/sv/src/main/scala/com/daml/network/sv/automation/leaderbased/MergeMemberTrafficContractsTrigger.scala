@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.dsorules.DsoRules_MergeMemberTrafficContracts
 import com.daml.network.store.PageLimit
 import com.daml.network.util.{AssignedContract, Contract}
@@ -47,7 +47,7 @@ class MergeMemberTrafficContractsTrigger(
           for {
             dsoRules <- store.getDsoRules()
             threshold = dsoRules.payload.config.numMemberTrafficContractsThreshold
-            domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
+            domainId = DomainId.tryFromString(memberTraffic.payload.synchronizerId)
             memberTraffics <- store.listMemberTrafficContracts(
               memberId,
               domainId,

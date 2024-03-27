@@ -334,10 +334,10 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           sv1Backend.getDsoInfo().dsoRules.payload.config.svOnboardingConfirmedTimeout,
           sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
           sv1Backend.getDsoInfo().dsoRules.payload.config.dsoDelegateInactiveTimeout,
-          sv1Backend.getDsoInfo().dsoRules.payload.config.domainNodeConfigLimits,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.synchronizerNodeConfigLimits,
           sv1Backend.getDsoInfo().dsoRules.payload.config.maxTextLength,
-          sv1Backend.getDsoInfo().dsoRules.payload.config.globalDomain,
-          sv1Backend.getDsoInfo().dsoRules.payload.config.nextScheduledDomainUpgrade,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.decentralizedSynchronizer,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.nextScheduledSynchronizerUpgrade,
         )
 
         val action: ActionRequiringConfirmation =
@@ -440,7 +440,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
             new AmuletConfig[USD](
               newTransferConfig,
               initialValue.issuanceCurve,
-              initialValue.globalDomain,
+              initialValue.decentralizedSynchronizer,
               initialValue.tickDuration,
               initialValue.packageConfig,
             ),

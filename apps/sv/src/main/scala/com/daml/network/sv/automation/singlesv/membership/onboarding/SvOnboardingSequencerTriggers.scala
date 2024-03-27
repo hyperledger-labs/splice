@@ -33,9 +33,9 @@ class SequencerOnboarding(
     val dsoRules = dsoRulesAndState.dsoRules
     participantAdminConnection.getSequencerDomainState(dsoRules.domain).map {
       sequencerDomainState =>
-        val currentDomainConfigs = dsoRulesAndState.currentDomainNodeConfigs()
+        val currentSynchronizerConfigs = dsoRulesAndState.currentSynchronizerNodeConfigs()
         val configuredSequencers =
-          currentDomainConfigs
+          currentSynchronizerConfigs
             .flatMap(_.sequencer.toScala)
             .map(_.sequencerId)
             .flatMap(sequencerId =>

@@ -89,7 +89,7 @@ final case class BuyExtraTrafficConfig(
     minTopupInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
 )
 
-case class ValidatorGlobalDomainConfig(
+case class ValidatorDecentralizedSynchronizerConfig(
     alias: DomainAlias,
     /** An optional statically specified URL for a sequencer to use to connect to the domain.
       * By default (when a URL is not specified), the list of sequencer URLs will be read from Scan.
@@ -119,15 +119,15 @@ case class ValidatorGlobalDomainConfig(
     if (buyExtraTraffic.targetThroughput.value <= 0L) None else Some(trafficReservedForTopups)
 }
 
-// Validators are responsible for establishing connections to domains and so need more information than just a `DomainConfig`
-case class ValidatorExtraDomainConfig(
+// Validators are responsible for establishing connections to domains and so need more information than just a `SynchronizerConfig`
+case class ValidatorExtraSynchronizerConfig(
     alias: DomainAlias,
     url: String,
 )
 
-case class ValidatorDomainConfig(
-    global: ValidatorGlobalDomainConfig,
-    extra: Seq[ValidatorExtraDomainConfig] = Seq(),
+case class ValidatorSynchronizerConfig(
+    global: ValidatorDecentralizedSynchronizerConfig,
+    extra: Seq[ValidatorExtraSynchronizerConfig] = Seq(),
 )
 
 final case class MigrateValidatorPartyConfig(
@@ -155,7 +155,7 @@ case class ValidatorAppBackendConfig(
     participantClient: CNParticipantClientConfig,
     scanClient: BftScanClientConfig,
     override val automation: AutomationConfig = AutomationConfig(),
-    domains: ValidatorDomainConfig,
+    domains: ValidatorSynchronizerConfig,
     onboarding: Option[ValidatorOnboardingConfig],
     treasury: TreasuryConfig = TreasuryConfig(),
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,

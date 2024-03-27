@@ -13,17 +13,17 @@ import com.daml.network.environment.*
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.*
-import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.onboarding.{
-  DomainNodeReconciler,
+  SynchronizerNodeReconciler,
   NodeInitializerUtil,
   SetupUtil,
   DsoPartyHosting,
 }
-import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
+import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer.bootstrapTransactionOrdering
 import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
 import com.daml.network.sv.util.SvUtil
@@ -71,7 +71,7 @@ import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize the founding SV node. */
 class FoundingNodeInitializer(
-    localDomainNode: LocalDomainNode,
+    localSynchronizerNode: LocalSynchronizerNode,
     foundingConfig: SvOnboardingConfig.FoundCollective,
     requiredDars: Seq[UploadablePackage],
     participantId: ParticipantId,
@@ -110,7 +110,7 @@ class FoundingNodeInitializer(
     )
 
     for {
-      (namespace, domainId) <- bootstrapDomain(localDomainNode)
+      (namespace, domainId) <- bootstrapDomain(localSynchronizerNode)
       _ = logger.info("Domain is bootstrapped, connecting founding participant to domain")
       _ <- participantAdminConnection.ensureDomainRegisteredAndConnected(
         DomainConnectionConfig(
@@ -154,7 +154,7 @@ class FoundingNodeInitializer(
         dsoStore,
         ledgerClient,
       )
-      (_, globalDomain) <- (
+      (_, decentralizedSynchronizer) <- (
         SetupUtil.ensureDsoPartyMetadataAnnotation(svAutomation.connection, config, dsoParty),
         svStore.domains.waitForDomainConnection(config.domains.global.alias),
       ).tupled
@@ -170,10 +170,10 @@ class FoundingNodeInitializer(
       _ <- retryProvider.waitUntil(
         RetryFor.WaitingOnInitDependency,
         "dso_party_allocation",
-        show"DSO party $dsoParty is allocated on participant $participantId and domain $globalDomain",
+        show"DSO party $dsoParty is allocated on participant $participantId and domain $decentralizedSynchronizer",
         for {
           dsoPartyIsAuthorized <- dsoPartyHosting.isDsoPartyAuthorizedOn(
-            globalDomain,
+            decentralizedSynchronizer,
             participantId,
           )
         } yield {
@@ -181,7 +181,7 @@ class FoundingNodeInitializer(
           else
             throw Status.FAILED_PRECONDITION
               .withDescription(
-                s"DSO party is allocated on participant $participantId and domain $globalDomain"
+                s"DSO party is allocated on participant $participantId and domain $decentralizedSynchronizer"
               )
               .asRuntimeException()
         },
@@ -191,10 +191,10 @@ class FoundingNodeInitializer(
       dsoAutomation = newSvDsoAutomationService(
         svStore,
         dsoStore,
-        Some(localDomainNode),
+        Some(localSynchronizerNode),
       )
       _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
-      withDsoStore = new WithDsoStore(dsoAutomation, globalDomain)
+      withDsoStore = new WithDsoStore(dsoAutomation, decentralizedSynchronizer)
       _ <- retryProvider.ensureThatB(
         RetryFor.WaitingOnInitDependency,
         "bootstrap_dso_rules",
@@ -211,11 +211,11 @@ class FoundingNodeInitializer(
       // for example if the founding SV node restarted after bootstrapping the DsoRules.
       // We only set the domain sequencer config if the existing one is different here.
       _ <- withDsoStore.reconcileSequencerConfigIfRequired(
-        Some(localDomainNode),
+        Some(localSynchronizerNode),
         config.domainMigrationId,
       )
     } yield (
-      globalDomain,
+      decentralizedSynchronizer,
       dsoPartyHosting,
       svStore,
       svAutomation,
@@ -248,16 +248,16 @@ class FoundingNodeInitializer(
 
   private def initialTrafficControlParameters: TrafficControlParameters = {
     TrafficControlParameters(
-      foundingConfig.initialDomainFeesConfig.baseRateBurstAmount,
-      foundingConfig.initialDomainFeesConfig.readVsWriteScalingFactor,
+      foundingConfig.initialSynchronizerFeesConfig.baseRateBurstAmount,
+      foundingConfig.initialSynchronizerFeesConfig.readVsWriteScalingFactor,
       // have to convert canton.config.NonNegativeDuration to canton.time.NonNegativeDuration
       NonNegativeFiniteDuration.tryOfMillis(
-        foundingConfig.initialDomainFeesConfig.baseRateBurstWindow.duration.toMillis
+        foundingConfig.initialSynchronizerFeesConfig.baseRateBurstWindow.duration.toMillis
       ),
     )
   }
 
-  private def bootstrapDomain(domainNode: LocalDomainNode)(implicit
+  private def bootstrapDomain(synchronizerNode: LocalSynchronizerNode)(implicit
       tc: TraceContext
   ): Future[(Namespace, DomainId)] = {
     withSpan("bootstrapDomain") { implicit tc => _ =>
@@ -265,8 +265,8 @@ class FoundingNodeInitializer(
 
       (
         participantAdminConnection.getParticipantId(),
-        domainNode.mediatorAdminConnection.getMediatorId,
-        domainNode.sequencerAdminConnection.getSequencerId,
+        synchronizerNode.mediatorAdminConnection.getMediatorId,
+        synchronizerNode.sequencerAdminConnection.getSequencerId,
       ).flatMapN { case (participantId, mediatorId, sequencerId) =>
         val namespace =
           DecentralizedNamespaceDefinitionX.computeNamespace(Set(participantId.uid.namespace))
@@ -287,7 +287,8 @@ class FoundingNodeInitializer(
             RetryFor.WaitingOnInitDependency,
             "init_sequencer",
             "sequencer is initialized",
-            domainNode.sequencerAdminConnection.getStatus.map(_.successOption.map(_.domainId)),
+            synchronizerNode.sequencerAdminConnection.getStatus
+              .map(_.successOption.map(_.domainId)),
             for {
               (
                 identityTransactions,
@@ -298,8 +299,8 @@ class FoundingNodeInitializer(
               ) <- (
                 List(
                   participantAdminConnection,
-                  domainNode.mediatorAdminConnection,
-                  domainNode.sequencerAdminConnection,
+                  synchronizerNode.mediatorAdminConnection,
+                  synchronizerNode.sequencerAdminConnection,
                 ).traverse { con =>
                   con.getId().flatMap(con.getIdentityTransactions(_, domainId = None))
                 }.map(_.flatten),
@@ -317,7 +318,11 @@ class FoundingNodeInitializer(
                   signedBy = participantId.uid.namespace.fingerprint,
                 ),
                 TopologyAdminConnection.proposeCollectively(
-                  NonEmpty.mk(List, participantAdminConnection, domainNode.sequencerAdminConnection)
+                  NonEmpty.mk(
+                    List,
+                    participantAdminConnection,
+                    synchronizerNode.sequencerAdminConnection,
+                  )
                 ) { case (con, id) =>
                   con.proposeInitialSequencerDomainState(
                     domainId,
@@ -327,7 +332,11 @@ class FoundingNodeInitializer(
                   )
                 },
                 TopologyAdminConnection.proposeCollectively(
-                  NonEmpty.mk(List, participantAdminConnection, domainNode.mediatorAdminConnection)
+                  NonEmpty.mk(
+                    List,
+                    participantAdminConnection,
+                    synchronizerNode.mediatorAdminConnection,
+                  )
                 ) { case (con, id) =>
                   con.proposeInitialMediatorDomainState(
                     domainId,
@@ -354,9 +363,9 @@ class FoundingNodeInitializer(
                       signed.copy(isProposal = false),
                     )
                   )
-              _ <- domainNode.sequencerAdminConnection.initializeFromBeginning(
+              _ <- synchronizerNode.sequencerAdminConnection.initializeFromBeginning(
                 StoredTopologyTransactionsX(bootstrapTransactions),
-                domainNode.staticDomainParameters,
+                synchronizerNode.staticDomainParameters,
               )
             } yield (),
             logger,
@@ -365,11 +374,11 @@ class FoundingNodeInitializer(
             RetryFor.WaitingOnInitDependency,
             "init_mediator",
             "mediator is initialized",
-            domainNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
-            domainNode.mediatorAdminConnection.initialize(
+            synchronizerNode.mediatorAdminConnection.getStatus.map(_.successOption.isDefined),
+            synchronizerNode.mediatorAdminConnection.initialize(
               domainId,
-              domainNode.staticDomainParameters,
-              domainNode.sequencerConnection,
+              synchronizerNode.staticDomainParameters,
+              synchronizerNode.sequencerConnection,
             ),
             logger,
           )
@@ -389,7 +398,7 @@ class FoundingNodeInitializer(
     private val dsoStore = dsoStoreWithIngestion.store
     private val dsoParty = dsoStore.key.dsoParty
     private val svParty = dsoStore.key.svParty
-    private val domainNodeReconciler = new DomainNodeReconciler(
+    private val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
       dsoStore,
       dsoStoreWithIngestion.connection,
       clock = clock,
@@ -409,15 +418,15 @@ class FoundingNodeInitializer(
     )
 
     def reconcileSequencerConfigIfRequired(
-        localDomainNode: Option[LocalDomainNode],
+        localSynchronizerNode: Option[LocalSynchronizerNode],
         migrationId: Long,
     )(implicit
         tc: TraceContext
     ): Future[Unit] = {
-      domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
-        localDomainNode,
+      synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
+        localSynchronizerNode,
         domainId,
-        DomainNodeState.Onboarded,
+        SynchronizerNodeState.Onboarded,
         migrationId,
       )
     }
@@ -430,8 +439,8 @@ class FoundingNodeInitializer(
       for {
         (participantId, mediatorId, trafficStateForAllMembers, amuletRules, dsoRules) <- (
           participantAdminConnection.getParticipantId(),
-          localDomainNode.mediatorAdminConnection.getMediatorId,
-          localDomainNode.sequencerAdminConnection.listSequencerTrafficControlState(),
+          localSynchronizerNode.mediatorAdminConnection.getMediatorId,
+          localSynchronizerNode.sequencerAdminConnection.listSequencerTrafficControlState(),
           dsoStore.lookupAmuletRules(),
           dsoStore.lookupDsoRulesWithOffset(),
         ).tupled
@@ -462,17 +471,17 @@ class FoundingNodeInitializer(
                   foundingConfig.initialTickDuration,
                   foundingConfig.initialMaxNumInputs,
                   domainId,
-                  foundingConfig.initialDomainFeesConfig.extraTrafficPrice.value,
-                  foundingConfig.initialDomainFeesConfig.minTopupAmount.value,
-                  foundingConfig.initialDomainFeesConfig.baseRateBurstAmount.value,
-                  foundingConfig.initialDomainFeesConfig.baseRateBurstWindow,
-                  foundingConfig.initialDomainFeesConfig.readVsWriteScalingFactor.value,
+                  foundingConfig.initialSynchronizerFeesConfig.extraTrafficPrice.value,
+                  foundingConfig.initialSynchronizerFeesConfig.minTopupAmount.value,
+                  foundingConfig.initialSynchronizerFeesConfig.baseRateBurstAmount.value,
+                  foundingConfig.initialSynchronizerFeesConfig.baseRateBurstWindow,
+                  foundingConfig.initialSynchronizerFeesConfig.readVsWriteScalingFactor.value,
                   foundingConfig.initialHoldingFee,
                 )
                 for {
-                  founderDomainNodes <- SvUtil.getFounderDomainNodeConfig(
+                  founderSynchronizerNodes <- SvUtil.getFounderSynchronizerNodeConfig(
                     cometBftNode,
-                    localDomainNode,
+                    localSynchronizerNode,
                     config.scan,
                     domainId,
                     clock,
@@ -480,7 +489,7 @@ class FoundingNodeInitializer(
                   )
                   _ = logger
                     .info(
-                      s"Bootstrapping DSO as $dsoParty and BFT nodes $founderDomainNodes"
+                      s"Bootstrapping DSO as $dsoParty and BFT nodes $founderSynchronizerNodes"
                     )
                   _ <- dsoStoreWithIngestion.connection
                     .submit(
@@ -492,7 +501,7 @@ class FoundingNodeInitializer(
                         foundingConfig.name,
                         foundingConfig.founderSvRewardWeightBps,
                         participantId.toProtoPrimitive,
-                        founderDomainNodes,
+                        founderSynchronizerNodes,
                         new RelTime(
                           TimeUnit.NANOSECONDS.toMicros(
                             foundingConfig.roundZeroDuration

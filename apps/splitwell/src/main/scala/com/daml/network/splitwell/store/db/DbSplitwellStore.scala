@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo
-import com.daml.network.splitwell.config.SplitwellDomainConfig
+import com.daml.network.splitwell.config.SplitwellSynchronizerConfig
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.{LimitHelpers, MultiDomainAcsStore}
@@ -29,7 +29,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class DbSplitwellStore(
     override val key: SplitwellStore.Key,
-    override protected[this] val domainConfig: SplitwellDomainConfig,
+    override protected[this] val domainConfig: SplitwellSynchronizerConfig,
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,

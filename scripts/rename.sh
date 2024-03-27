@@ -199,16 +199,25 @@ function rename() {
 
   # We are not adjusting lock files, as they are regenerated in the cleanup step
   if [ -z "$extra_includes" ]; then
-    run_and_commit "renaming $description: daml files"      "gsr -i 'daml/**' $DAML      -f $pattern"
-  fi
-  run_and_commit "renaming $description: app files"       "gsr $extra_includes $APP       -f $pattern"
-  run_and_commit "renaming $description: api files"       "gsr $extra_includes $API       -f $pattern"
-  run_and_commit "renaming $description: frontend files"  "gsr $extra_includes $FRONTEND  -f $pattern"
-  run_and_commit "renaming $description: cluster files"   "gsr $extra_includes $CLUSTER   -f $pattern"
-  run_and_commit "renaming $description: crypto files"    "gsr $extra_includes $CRYPTO    -f $pattern"
-  run_and_commit "renaming $description: doc files"       "gsr $extra_includes $DOCS      -f $pattern"
-  run_and_commit "renaming $description: special files"   "gsr $extra_includes $SPECIAL   -f $pattern"
+    run_and_commit_rename "$description: daml files"    "$pattern" "-i 'daml/**'" "$DAML"
 
+  fi
+  run_and_commit_rename "$description: app files"       "$pattern" "$extra_includes" "$APP"
+  run_and_commit_rename "$description: api files"       "$pattern" "$extra_includes" "$API"
+  run_and_commit_rename "$description: frontend files"  "$pattern" "$extra_includes" "$FRONTEND"
+  run_and_commit_rename "$description: cluster files"   "$pattern" "$extra_includes" "$CLUSTER"
+  run_and_commit_rename "$description: crypto files"    "$pattern" "$extra_includes" "$CRYPTO"
+  run_and_commit_rename "$description: doc files"       "$pattern" "$extra_includes" "$DOCS"
+  run_and_commit_rename "$description: special files"   "$pattern" "$extra_includes" "$SPECIAL"
+}
+
+function run_and_commit_rename() {
+  local description=$1
+  local pattern=$2
+  shift 2
+  local gsr_args=("$@")
+
+  run_and_commit "renaming: $description" "gsr ${gsr_args[*]} -f $pattern"
 }
 
 function commit_occurrences() {
@@ -394,10 +403,7 @@ function subcmd_coin_amulet() {
   subcmd_internal_coin_amulet_occs
 }
 
-
 ### CNS
-
-# TODO(#11111): complete this part of the script
 
 subcommand_whitelist[internal_cns_ans]='Rename: cns to ans'
 
@@ -407,23 +413,36 @@ function subcmd_internal_cns_ans() {
   assert_no_usage 'ans|Ans|ANS'
   assert_no_canton_usage 'ans|Ans|ANS'
 
-  # Rename cns and CNS
+  # Pretty sure there are no English words that contain `cns`, and luckily none of our committed public keys and hashes toes either.
   rename "cns to ans" \
-    "'\bcns\b///ans'" \
+    "'cns///ans'" \
     "" \
     ""
   rename "Cns to Ans" \
-    "'\bCns\b///Ans'" \
+    "'Cns///Ans'" \
     "" \
     ""
   rename "CNS to ANS" \
-    "'\bCNS\b///ANS'" \
+    "'CNS///ANS'" \
     "" \
     ""
+
+  rename "Canton Name to Amulet Name" \
+    "'\bCanton Name\b///Amulet Name'" \
+    "" \
+    ""
+
+  rename "Canton name to Amulet name" \
+    "'\bCanton name\b///Amulet name'" \
+    "" \
+    ""
+
+  run_and_commit_rename "cns to ans: auth0.ts" "'cns///ans'" "-i '**/auth0.ts'"
+  run_and_commit_rename "Cns to Ans: auth0.ts" "'Cns///Ans'" "-i '**/auth0.ts'"
+  run_and_commit_rename "CNS to ANS: auth0.ts" "'CNS///ANS'" "-i '**/auth0.ts'"
+
+  run_and_commit_rename "Fix docs link in release notes" "'helm-cns-web-ui///helm-ans-web-ui'" "-i '**/release_notes.rst'"
 }
-
-
-subcommand_whitelist[internal_cns_occs]='Check and store occurrences for: cns'
 
 function subcmd_internal_cns_occs() {
   assert_clean_working_dir
@@ -432,8 +451,15 @@ function subcmd_internal_cns_occs() {
   commit_occurrences "Cns"
   commit_occurrences "CNS"
   commit_occurrences "Canton Name"
+  commit_occurrences "Canton name"
+}
 
-  # TODO(#11111): check for Canton Name
+subcommand_whitelist[cns_ans]='Rename: CNS to ANS'
+
+function subcmd_cns_ans() {
+  subcmd_internal_cns_ans
+  subcmd_internal_cleanup
+  subcmd_internal_cns_occs
 }
 
 ### CCApp and CCUser
@@ -683,6 +709,135 @@ function subcmd_all_packages() {
   rename_daml_package 'canton-amulet' 'splice-amulet' 'CantonAmulet' 'SpliceAmulet'
   rename_daml_package 'app-manager' 'splice-app-manager' 'AppManager' 'SpliceAppManager'
   rename_daml_package 'canton-name-service' 'splice-amulet-name-service' 'CantonNameService' 'SpliceAmuletNameService'
+}
+
+# Domain -> Synchronizer
+
+subcommand_whitelist[internal_global_domain_synchronizer]='Rename: GlobalDomain to something with Synchronizer (mainly Daml)'
+
+function subcmd_internal_global_domain_synchronizer() {
+  assert_clean_working_dir
+
+  # We can't assert this because we already say this in the docs in a few places
+  assert_no_usage 'decentralizedSynchronizer|DecentralizedSynchronizer|synchronizerId|activeSynchronizer|requiredSynchronizers|SynchronizerFee|UnknownSynchronizer'
+  assert_no_canton_usage 'decentralizedSynchronizer|DecentralizedSynchronizer|synchronizerId|activeSynchronizer|requiredSynchronizers|SynchronizerFee|UnknownSynchronizer'
+
+  # stuff used in daml
+  rename "globalDomain to decentralizedSynchronizer" \
+    "'globalDomain///decentralizedSynchronizer'" \
+    "" \
+    ""
+  rename "GlobalDomain to DecentralizedSynchronizer" \
+    "'GlobalDomain///DecentralizedSynchronizer'" \
+    "" \
+    ""
+  rename "DomainState to SynchronizerState" \
+    "'\bDomainState\b///SynchronizerState'" \
+    "" \
+    ""
+  rename "domainNode to synchronizerNode" \
+    "'domainNode///synchronizerNode'" \
+    "" \
+    ""
+  rename "DomainNode to SynchronizerNode" \
+    "'DomainNode///SynchronizerNode'" \
+    "" \
+    ""
+  rename "domain-node to synchronizer-node" \
+    "'domain-node///synchronizer-node'" \
+    "" \
+    ""
+  rename "DomainConfig to SynchronizerConfig" \
+    "'DomainConfig///SynchronizerConfig'" \
+    "" \
+    ""
+  rename "participantDomainTime to participantSynchronizerTime" \
+    "'participantDomainTime///participantSynchronizerTime'" \
+    "" \
+    ""
+  rename "mediatorDomainTime to mediatorSynchronizerTime" \
+    "'mediatorDomainTime///mediatorSynchronizerTime'" \
+    "" \
+    ""
+  rename "DomainUpgrade to SynchronizerUpgrade" \
+    "'DomainUpgrade///SynchronizerUpgrade'" \
+    "" \
+    ""
+  rename "activeDomain to activeSynchronizer" \
+    "'activeDomain///activeSynchronizer'" \
+    "" \
+    ""
+  rename "requiredDomains to requiredSynchronizers" \
+    "'requiredDomains///requiredSynchronizers'" \
+    "" \
+    ""
+  rename "DomainFee to SynchronizerFee" \
+    "'DomainFee///SynchronizerFee'" \
+    "" \
+    ""
+  rename "initial-domain-fees-config to initial-synchronizer-fees-config" \
+    "'initial-domain-fees-config///initial-synchronizer-fees-config'" \
+    "" \
+    ""
+  rename "UnknownDomain to UnknownSynchronizer" \
+    "'UnknownDomain///UnknownSynchronizer'" \
+    "" \
+    ""
+  rename "DSO.GlobalDomain to DSO.DecentralizedSynchronizer" \
+    "'DSO.GlobalDomain///DSO.DecentralizedSynchronizer'" \
+    "" \
+    ""
+  rename "Splice.GlobalDomain to Splice.DecentralizedSynchronizer" \
+    "'Splice.GlobalDomain///Splice.DecentralizedSynchronizer'" \
+    "" \
+    ""
+  rename "globaldomain to decentralizedsynchronizer" \
+    "'globaldomain///decentralizedsynchronizer'" \
+    "" \
+    ""
+
+  # domain id hacks; they work! + easier than manual fixes
+  run_and_commit_rename "payload.domainId to payload.synchronizerId: scala files" \
+    "'payload.domainId///payload.synchronizerId'" \
+    "-i '*.scala' -e 'canton/**'"
+  run_and_commit_rename "data.domainId to data.synchronizerId: scala files" \
+    "'data.domainId///data.synchronizerId'" \
+    "-i '*.scala' -e 'canton/**'"
+  run_and_commit_rename "r.domainId} to r.synchronizerId}: scala files" \
+    "'r.domainId}///r.synchronizerId}'" \
+    "-i '*.scala' -e 'canton/**'"
+
+  # dso info mock for sv ui tests
+  run_and_commit_rename "globalDomain to decentralizedSynchronizer: sv constants.ts" \
+    "'globalDomain///decentralizedSynchronizer'" \
+    "-i 'apps/sv/**/constants.ts'"
+  run_and_commit_rename "domain to synchronizer: sv constants.ts" \
+    "'domain///synchronizer'" \
+    "-i 'apps/sv/**/constants.ts'"
+  run_and_commit_rename "Domain to Synchronizer: sv constants.ts" \
+    "'Domain///Synchronizer'" \
+    "-i 'apps/sv/**/constants.ts'"
+
+  # remaining stuff in daml (mostly comments, but also fixes domainId)
+  run_and_commit_rename "Global to Decentralized: daml files (mostly comments)" \
+    "'Global///Decentralized'" \
+    "-i 'daml/**'"
+  run_and_commit_rename "global to decentralized: daml files (mostly comments)" \
+    "'global///decentralized'" \
+    "-i 'daml/**'"
+  run_and_commit_rename "Domain to Synchronizer: daml files (mostly comments)" \
+    "'Domain///Synchronizer'" \
+    "-i 'daml/**'"
+  run_and_commit_rename "domain to synchronizer: daml files (mostly comments)" \
+    "'domain///synchronizer'" \
+    "-i 'daml/**'"
+}
+
+subcommand_whitelist[global_domain_synchronizer]='Rename: GlobalDomain to something with Synchronizer'
+
+function subcmd_global_domain_synchronizer() {
+  subcmd_internal_global_domain_synchronizer
+  subcmd_internal_cleanup
 }
 
 ### Remove usage of Canton

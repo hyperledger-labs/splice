@@ -1,13 +1,13 @@
 package com.daml.network.sv.onboarding
 
-import com.daml.network.codegen.java.splice.dso.globaldomain.{
-  DomainNodeConfig,
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
+  SynchronizerNodeConfig,
   MediatorConfig,
   SequencerConfig,
 }
 import com.daml.network.environment.{CNLedgerConnection, RetryFor, RetryProvider}
-import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState
+import com.daml.network.sv.LocalSynchronizerNode
+import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState
 import com.daml.network.sv.store.SvDsoStore
 import com.daml.network.sv.store.SvDsoStore.DsoRulesWithSvNodeState
 import com.daml.network.sv.util.SvUtil
@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.MapHasAsScala
 import scala.jdk.OptionConverters.{RichOption, RichOptional}
 
-class DomainNodeReconciler(
+class SynchronizerNodeReconciler(
     dsoStore: SvDsoStore,
     connection: CNLedgerConnection,
     clock: Clock,
@@ -37,11 +37,11 @@ class DomainNodeReconciler(
   private def setConfig(
       domainId: DomainId,
       rulesAndState: DsoRulesWithSvNodeState,
-      nodeConfig: DomainNodeConfig,
+      nodeConfig: SynchronizerNodeConfig,
   )(implicit tc: TraceContext) = {
     logger.info(show"Setting domain node config to $nodeConfig")
     val cmd = rulesAndState.dsoRules.exercise(
-      _.exerciseDsoRules_SetDomainNodeConfig(
+      _.exerciseDsoRules_SetSynchronizerNodeConfig(
         svParty.toProtoPrimitive,
         domainId.toProtoPrimitive,
         nodeConfig,
@@ -54,35 +54,36 @@ class DomainNodeReconciler(
       .yieldResult()
   }
 
-  def reconcileDomainNodeConfigIfRequired(
-      localDomainNode: Option[LocalDomainNode],
+  def reconcileSynchronizerNodeConfigIfRequired(
+      localSynchronizerNode: Option[LocalSynchronizerNode],
       domainId: DomainId,
-      state: DomainNodeState,
+      state: SynchronizerNodeState,
       migrationId: Long,
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[Unit] = {
     def setConfigIfRequired() = for {
-      localSequencerConfig <- SvUtil.getSequencerConfig(localDomainNode, migrationId)
-      localMediatorConfig <- SvUtil.getMediatorConfig(localDomainNode)
+      localSequencerConfig <- SvUtil.getSequencerConfig(localSynchronizerNode, migrationId)
+      localMediatorConfig <- SvUtil.getMediatorConfig(localSynchronizerNode)
       rulesAndState <- dsoStore.getDsoRulesWithSvNodeState(svParty)
       nodeState = rulesAndState.svNodeState.payload
       // TODO(#4901): do not use default, but reconcile all configured domains
-      domainNodeConfig = nodeState.state.domainNodes.asScala.get(domainId.toProtoPrimitive)
-      sequencerConfig = domainNodeConfig.flatMap(_.sequencer.toScala)
-      mediatorConfig = domainNodeConfig.flatMap(_.mediator.toScala)
-      existingScanConfig = domainNodeConfig.flatMap(_.scan.toScala).toJava
+      synchronizerNodeConfig = nodeState.state.synchronizerNodes.asScala
+        .get(domainId.toProtoPrimitive)
+      sequencerConfig = synchronizerNodeConfig.flatMap(_.sequencer.toScala)
+      mediatorConfig = synchronizerNodeConfig.flatMap(_.mediator.toScala)
+      existingScanConfig = synchronizerNodeConfig.flatMap(_.scan.toScala).toJava
       existingSequencerConfig = sequencerConfig.map(c =>
         LocalSequencerConfig(c.sequencerId, c.url, c.migrationId)
       )
       existingMediatorConfig = mediatorConfig.map(c => LocalMediatorConfig(c.mediatorId))
       shouldMarkSequencerAsOnboarded = state match {
-        case DomainNodeState.Onboarded => sequencerConfig.exists(_.availableAfter.isEmpty)
-        case DomainNodeState.Onboarding =>
+        case SynchronizerNodeState.Onboarded => sequencerConfig.exists(_.availableAfter.isEmpty)
+        case SynchronizerNodeState.Onboarding =>
           false
       }
-      _ = ensureSequencerUrlIsDifferentWhenDomainUpgraded(
+      _ = ensureSequencerUrlIsDifferentWhenSynchronizerUpgraded(
         existingSequencerConfig,
         localSequencerConfig,
       )
@@ -92,15 +93,15 @@ class DomainNodeReconciler(
           existingMediatorConfig != localMediatorConfig ||
           shouldMarkSequencerAsOnboarded
         ) {
-          val nodeConfig = new DomainNodeConfig(
-            domainNodeConfig.map(_.cometBft).getOrElse(SvUtil.emptyCometBftConfig),
+          val nodeConfig = new SynchronizerNodeConfig(
+            synchronizerNodeConfig.map(_.cometBft).getOrElse(SvUtil.emptyCometBftConfig),
             localSequencerConfig.map { c =>
               val sequencerAvailabilityDelay =
-                localDomainNode
+                localSynchronizerNode
                   .map(_.sequencerAvailabilityDelay)
                   .getOrElse(
                     sys.error(
-                      "localDomainNode is not expected to be empty."
+                      "localSynchronizerNode is not expected to be empty."
                     )
                   )
               new SequencerConfig(
@@ -108,9 +109,9 @@ class DomainNodeReconciler(
                 c.sequencerId,
                 c.url,
                 (state match {
-                  case DomainNodeState.Onboarded =>
+                  case SynchronizerNodeState.Onboarded =>
                     Some(clock.now.toInstant.plus(sequencerAvailabilityDelay))
-                  case DomainNodeState.Onboarding =>
+                  case SynchronizerNodeState.Onboarding =>
                     None
                 }).toJava,
               )
@@ -141,7 +142,7 @@ class DomainNodeReconciler(
       )
   }
 
-  private def ensureSequencerUrlIsDifferentWhenDomainUpgraded(
+  private def ensureSequencerUrlIsDifferentWhenSynchronizerUpgraded(
       existingSequencerConfigOpt: Option[LocalSequencerConfig],
       sequencerConfigOpt: Option[LocalSequencerConfig],
   ): Unit = {
@@ -158,15 +159,15 @@ class DomainNodeReconciler(
   }
 }
 
-object DomainNodeReconciler {
+object SynchronizerNodeReconciler {
 
-  sealed trait DomainNodeState
+  sealed trait SynchronizerNodeState
 
-  object DomainNodeState {
+  object SynchronizerNodeState {
 
-    case object Onboarded extends DomainNodeState
+    case object Onboarded extends SynchronizerNodeState
 
-    case object Onboarding extends DomainNodeState
+    case object Onboarding extends SynchronizerNodeState
 
   }
 

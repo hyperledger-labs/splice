@@ -41,8 +41,8 @@ class BftScanConnectionIntegrationTest
       val dsoInfo = sv1Backend.getDsoInfo()
       val scans = for {
         (_, nodeState) <- dsoInfo.svNodeStates
-        (_, domainNode) <- nodeState.payload.state.domainNodes.asScala
-        scan <- domainNode.scan.toScala
+        (_, synchronizerNode) <- nodeState.payload.state.synchronizerNodes.asScala
+        scan <- synchronizerNode.scan.toScala
       } yield scan
       scans should have size 2 // sv1&2's scans
     }

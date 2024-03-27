@@ -172,13 +172,13 @@ class ValidatorApp(
             )
             _ <- readRestoreDump match {
               case Some(migrationDump) =>
-                val globalDomainInitializer = new DomainDataRestorer(
+                val decentralizedSynchronizerInitializer = new DomainDataRestorer(
                   participantAdminConnection,
                   loggerFactory,
                 )
-                domainConnector.getGlobalDomainSequencerConnections.flatMap {
+                domainConnector.getDecentralizedSynchronizerSequencerConnections.flatMap {
                   sequencerConnections =>
-                    globalDomainInitializer.connectDomainAndRestoreData(
+                    decentralizedSynchronizerInitializer.connectDomainAndRestoreData(
                       connection,
                       config.ledgerApiUser,
                       config.domains.global.alias,
@@ -189,7 +189,7 @@ class ValidatorApp(
                     )
                 }
               case None =>
-                domainConnector.ensureGlobalDomainRegistered()
+                domainConnector.ensureDecentralizedSynchronizerRegistered()
             }
             _ <- domainConnector.ensureExtraDomainsRegistered()
             _ <- config.migrateValidatorParty match {
@@ -453,7 +453,8 @@ class ValidatorApp(
             amuletRules <- scanConnection.getAmuletRulesWithState()
             amuletConfig = AmuletConfigSchedule(amuletRules).getConfigAsOf(clock.now)
             reservedTraffic = Option.when(
-              amuletConfig.globalDomain.requiredDomains.map.containsKey(domainId.toProtoPrimitive)
+              amuletConfig.decentralizedSynchronizer.requiredSynchronizers.map
+                .containsKey(domainId.toProtoPrimitive)
             )(trafficReservedForTopups)
           } yield reservedTraffic
         })

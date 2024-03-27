@@ -11,7 +11,7 @@ ingress:
   scan: true
   sequencer: true
   splitwell: false
-  globalDomain:
+  decentralizedSynchronizer:
     migrationId: ""
     activeMigrationId: ""
 

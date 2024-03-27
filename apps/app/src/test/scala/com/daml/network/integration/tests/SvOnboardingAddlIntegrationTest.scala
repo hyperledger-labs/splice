@@ -181,9 +181,9 @@ class SvOnboardingAddlIntegrationTest
 
       forAll(Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)) { svBackend =>
         val svParty = svBackend.getDsoInfo().svParty
-        val globalDomain = svBackend.config.domains.global.alias
+        val decentralizedSynchronizer = svBackend.config.domains.global.alias
         val sequencerConnections = svBackend.participantClient.domains
-          .config(globalDomain)
+          .config(decentralizedSynchronizer)
           .value
           .sequencerConnections
           .connections
@@ -202,9 +202,9 @@ class SvOnboardingAddlIntegrationTest
         }
 
         val nodeState = sv1NodeStates.get(svParty).value.payload
-        forAll(nodeState.state.domainNodes.values()) { domainNode =>
-          domainNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
-          domainNode.mediator.toScala.value.mediatorId should not be empty
+        forAll(nodeState.state.synchronizerNodes.values()) { synchronizerNode =>
+          synchronizerNode.sequencer.toScala.value.url shouldBe localSequencerUrl.toString
+          synchronizerNode.mediator.toScala.value.mediatorId should not be empty
         }
 
         clue("published sequencer information can be seen via scan") {
@@ -396,7 +396,7 @@ class SvOnboardingAddlIntegrationTest
 
       inside(
         sv1Backend.participantClientWithAdminToken.topology.party_to_participant_mappings.list(
-          domain = globalDomainId,
+          domain = decentralizedSynchronizerId,
           filterParty = dsoParty.toProtoPrimitive,
         )
       ) { case Seq(mapping) =>

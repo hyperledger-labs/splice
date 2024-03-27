@@ -212,7 +212,7 @@ case class CNNodeEnvironmentDefinition(
   ): CNNodeEnvironmentDefinition =
     addConfigTransform((_, config) =>
       CNNodeConfigTransforms.updateAllSvAppConfigs_(
-        _.focus(_.localDomainNode)
+        _.focus(_.localSynchronizerNode)
           .modify(
             _.map(d =>
               d.focus(_.sequencer.sequencerAvailabilityDelay)

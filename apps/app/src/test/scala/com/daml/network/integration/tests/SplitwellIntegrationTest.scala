@@ -105,7 +105,7 @@ class SplitwellIntegrationTest
         )(
           "alice sees payment request on global domain",
           _ => {
-            getSingleRequestOnGlobalDomain(aliceWalletClient)
+            getSingleRequestOnDecentralizedSynchronizer(aliceWalletClient)
           },
         )
 
@@ -306,7 +306,7 @@ class SplitwellIntegrationTest
             )
           ),
         )
-        val request = eventually()(getSingleRequestOnGlobalDomain(bobWalletClient))
+        val request = eventually()(getSingleRequestOnDecentralizedSynchronizer(bobWalletClient))
         // to avoid the automation triggering before the round change
         setTriggersWithin(
           triggersToPauseAtStart = Seq(splitwellAcceptedAppPaymentRequestsTrigger),

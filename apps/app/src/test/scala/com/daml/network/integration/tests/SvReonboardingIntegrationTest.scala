@@ -241,7 +241,7 @@ class SvReonboardingIntegrationTest
         val (sv1MediatorId, sv2MediatorId, sv3MediatorId, sv4MediatorId) =
           inside(
             Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map(
-              _.appState.localDomainNode.value.mediatorAdminConnection.getMediatorId.futureValue
+              _.appState.localSynchronizerNode.value.mediatorAdminConnection.getMediatorId.futureValue
             )
           ) { case Seq(sv1, sv2, sv3, sv4) =>
             (sv1, sv2, sv3, sv4)
@@ -249,7 +249,7 @@ class SvReonboardingIntegrationTest
         val (sv1SequencerId, sv2SequencerId, sv3SequencerId, sv4SequencerId) =
           inside(
             Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map(
-              _.appState.localDomainNode.value.sequencerAdminConnection.getSequencerId.futureValue
+              _.appState.localSynchronizerNode.value.sequencerAdminConnection.getSequencerId.futureValue
             )
           ) { case Seq(sv1, sv2, sv3, sv4) =>
             (sv1, sv2, sv3, sv4)
@@ -263,7 +263,7 @@ class SvReonboardingIntegrationTest
         ).map(_.toProtoPrimitive)
 
         sv1Backend.appState.participantAdminConnection
-          .getMediatorDomainState(globalDomainId)
+          .getMediatorDomainState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -274,7 +274,7 @@ class SvReonboardingIntegrationTest
           sv4MediatorId,
         )
         sv1Backend.appState.participantAdminConnection
-          .getSequencerDomainState(globalDomainId)
+          .getSequencerDomainState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -322,7 +322,7 @@ class SvReonboardingIntegrationTest
               sv3Party,
             ).map(_.toProtoPrimitive)
             val mapping = sv1Backend.appState.participantAdminConnection
-              .getPartyToParticipant(globalDomainId, sv1Backend.getDsoInfo().dsoParty)
+              .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)
               .futureValue
               .mapping
             mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
@@ -331,7 +331,7 @@ class SvReonboardingIntegrationTest
               sv3Backend.participantClient.id,
             )
             sv1Backend.appState.participantAdminConnection
-              .getMediatorDomainState(globalDomainId)
+              .getMediatorDomainState(decentralizedSynchronizerId)
               .futureValue
               .mapping
               .active
@@ -341,7 +341,7 @@ class SvReonboardingIntegrationTest
               sv3MediatorId,
             )
             sv1Backend.appState.participantAdminConnection
-              .getSequencerDomainState(globalDomainId)
+              .getSequencerDomainState(decentralizedSynchronizerId)
               .futureValue
               .mapping
               .active
@@ -422,7 +422,7 @@ class SvReonboardingIntegrationTest
           .name shouldBe sv4Name
 
         val mapping = sv1Backend.appState.participantAdminConnection
-          .getPartyToParticipant(globalDomainId, sv1Backend.getDsoInfo().dsoParty)
+          .getPartyToParticipant(decentralizedSynchronizerId, sv1Backend.getDsoInfo().dsoParty)
           .futureValue
           .mapping
         mapping.participants.map(_.participantId) should contain theSameElementsAs Seq(
@@ -432,11 +432,11 @@ class SvReonboardingIntegrationTest
           sv4ReonboardBackend.participantClient.id,
         )
         val sv4MediatorIdNew =
-          sv4ReonboardBackend.appState.localDomainNode.value.mediatorAdminConnection.getMediatorId.futureValue
+          sv4ReonboardBackend.appState.localSynchronizerNode.value.mediatorAdminConnection.getMediatorId.futureValue
         val sv4SequencerIdNew =
-          sv4ReonboardBackend.appState.localDomainNode.value.sequencerAdminConnection.getSequencerId.futureValue
+          sv4ReonboardBackend.appState.localSynchronizerNode.value.sequencerAdminConnection.getSequencerId.futureValue
         sv1Backend.appState.participantAdminConnection
-          .getMediatorDomainState(globalDomainId)
+          .getMediatorDomainState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -447,7 +447,7 @@ class SvReonboardingIntegrationTest
           sv4MediatorIdNew,
         )
         sv1Backend.appState.participantAdminConnection
-          .getSequencerDomainState(globalDomainId)
+          .getSequencerDomainState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .active
@@ -494,7 +494,7 @@ class SvReonboardingIntegrationTest
         val sv4PartyToParticipantMapping =
           validatorLocalBackend.appState.participantAdminConnection
             .getPartyToParticipant(
-              globalDomainId,
+              decentralizedSynchronizerId,
               sv4Party,
             )
             .futureValue

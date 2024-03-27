@@ -26,16 +26,19 @@ import com.daml.network.sv.cometbft.{
   CometBftNode,
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
-import com.daml.network.sv.onboarding.DomainNodeReconciler.DomainNodeState.{Onboarded, Onboarding}
+import com.daml.network.sv.onboarding.SynchronizerNodeReconciler.SynchronizerNodeState.{
+  Onboarded,
+  Onboarding,
+}
 import com.daml.network.sv.onboarding.{
-  DomainNodeReconciler,
+  SynchronizerNodeReconciler,
   NodeInitializerUtil,
   SetupUtil,
   DsoPartyHosting,
 }
 import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
 import com.daml.network.sv.util.{SvOnboardingToken, SvUtil}
-import com.daml.network.sv.{LocalDomainNode, SvApp}
+import com.daml.network.sv.{LocalSynchronizerNode, SvApp}
 import com.daml.network.util.{Contract, PackageVetting, TemplateJsonDecoder, UploadablePackage}
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -57,7 +60,7 @@ import scala.jdk.CollectionConverters.*
 
 /** Container for the methods required by the SvApp to initialize a joining SV node. */
 class JoiningNodeInitializer(
-    localDomainNode: Option[LocalDomainNode],
+    localSynchronizerNode: Option[LocalSynchronizerNode],
     joiningConfig: Option[SvOnboardingConfig.JoinWithKey],
     participantId: ParticipantId,
     requiredDars: Seq[UploadablePackage],
@@ -161,7 +164,9 @@ class JoiningNodeInitializer(
         config.ledgerApiUser,
         migrationInfo,
       )
-      globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
+      decentralizedSynchronizer <- svStore.domains.waitForDomainConnection(
+        config.domains.global.alias
+      )
       _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
       dsoPartyHosting = newDsoPartyHosting(storeKey)
       // We need to first wait to ensure the CometBFT node is caught up
@@ -169,7 +174,7 @@ class JoiningNodeInitializer(
       // fault tolerance then it might be blocked until the CometBFT node is caught up.
       _ <- waitUntilCometBftNodeHasCaughtUp
       dsoPartyIsAuthorized <- dsoPartyHosting.isDsoPartyAuthorizedOn(
-        globalDomain,
+        decentralizedSynchronizer,
         participantId,
       )
       withSvStore = new WithSvStore(
@@ -182,7 +187,7 @@ class JoiningNodeInitializer(
           retryProvider,
           loggerFactory,
         ),
-        globalDomain,
+        decentralizedSynchronizer,
       )
       dsoAutomation <-
         if (dsoPartyIsAuthorized) {
@@ -197,7 +202,7 @@ class JoiningNodeInitializer(
               newSvDsoAutomationService(
                 svStore,
                 dsoStore,
-                localDomainNode,
+                localSynchronizerNode,
               )
             _ <- dsoStore.domains.waitForDomainConnection(config.domains.global.alias)
             _ <- retryProvider.ensureThatB(
@@ -238,10 +243,10 @@ class JoiningNodeInitializer(
         config.domains.global.alias,
         config => if (config.manualConnect) Some(config.copy(manualConnect = false)) else None,
       )
-      _ <- onboard(globalDomain, dsoAutomation, svAutomation)
+      _ <- onboard(decentralizedSynchronizer, dsoAutomation, svAutomation)
     } yield {
       (
-        globalDomain,
+        decentralizedSynchronizer,
         dsoPartyHosting,
         svStore,
         svAutomation,
@@ -252,13 +257,13 @@ class JoiningNodeInitializer(
   }
 
   def onboard(
-      globalDomain: DomainId,
+      decentralizedSynchronizer: DomainId,
       dsoAutomationService: SvDsoAutomationService,
       svSvAutomationService: SvSvAutomationService,
   ): Future[Unit] = {
     val dsoStore = dsoAutomationService.store
     val dsoPartyId = dsoStore.key.dsoParty
-    val domainNodeReconciler = new DomainNodeReconciler(
+    val synchronizerNodeReconciler = new SynchronizerNodeReconciler(
       dsoStore,
       dsoAutomationService.connection,
       clock,
@@ -279,7 +284,7 @@ class JoiningNodeInitializer(
       // to the decentralized namespace so we depend on our own automation promoting us to
       // submission rights.
       _ <- (
-        waitForSvParticipantToHaveSubmissionRights(dsoPartyId, globalDomain),
+        waitForSvParticipantToHaveSubmissionRights(dsoPartyId, decentralizedSynchronizer),
         waitForDsoMembership(dsoStore),
         SetupUtil.ensureDsoPartyMetadataAnnotation(
           svSvAutomationService.connection,
@@ -287,37 +292,37 @@ class JoiningNodeInitializer(
           dsoPartyId,
         ),
       ).tupled
-      _ <- localDomainNode.traverse_ { localDomainNode =>
+      _ <- localSynchronizerNode.traverse_ { localSynchronizerNode =>
         for {
           // First, make sure the identity of the new domain nodes is known on the domain
           _ <-
             (
-              localDomainNode.addLocalSequencerIdentityIfRequired(
+              localSynchronizerNode.addLocalSequencerIdentityIfRequired(
                 config.domains.global.alias,
-                globalDomain,
+                decentralizedSynchronizer,
               ),
-              localDomainNode.addLocalMediatorIdentityIfRequired(globalDomain),
+              localSynchronizerNode.addLocalMediatorIdentityIfRequired(decentralizedSynchronizer),
             ).tupled
           // Then, add the new local domain node to the DSO rules with an "onboarding" status
           // This triggers automation in other SV apps, that's why we make sure the sequencer is known first
-          _ <- domainNodeReconciler.reconcileDomainNodeConfigIfRequired(
-            Some(localDomainNode),
-            globalDomain,
+          _ <- synchronizerNodeReconciler.reconcileSynchronizerNodeConfigIfRequired(
+            Some(localSynchronizerNode),
+            decentralizedSynchronizer,
             Onboarding,
             config.domainMigrationId,
           )
           // Finally, fully onboard the sequencer and mediator
           _ <-
-            localDomainNode.onboardLocalSequencerIfRequired(svConnection.map(_._2))
-          _ <- localDomainNode.initializeLocalMediatorIfRequired(
-            globalDomain
+            localSynchronizerNode.onboardLocalSequencerIfRequired(svConnection.map(_._2))
+          _ <- localSynchronizerNode.initializeLocalMediatorIfRequired(
+            decentralizedSynchronizer
           )
         } yield ()
       }
-      _ <- domainNodeReconciler
-        .reconcileDomainNodeConfigIfRequired(
-          localDomainNode,
-          globalDomain,
+      _ <- synchronizerNodeReconciler
+        .reconcileSynchronizerNodeConfigIfRequired(
+          localSynchronizerNode,
+          decentralizedSynchronizer,
           Onboarded,
           config.domainMigrationId,
         )
@@ -551,7 +556,7 @@ class JoiningNodeInitializer(
                   Seq(svStore.key.dsoParty),
                 )
                 _ = logger.info(s"granted ${config.ledgerApiUser} readAs rights for dsoParty")
-                dsoAutomation = newSvDsoAutomationService(svStore, dsoStore, localDomainNode)
+                dsoAutomation = newSvDsoAutomationService(svStore, dsoStore, localSynchronizerNode)
                 _ <- dsoAutomation.store.domains.waitForDomainConnection(
                   config.domains.global.alias
                 )
@@ -744,12 +749,14 @@ class JoiningNodeInitializer(
   }
 
   private def connectToDomainUnlessMigratingDsoParty(dsoPartyId: PartyId): Future[Unit] = for {
-    globalDomainId <- participantAdminConnection.getDomainId(config.domains.global.alias)
+    decentralizedSynchronizerId <- participantAdminConnection.getDomainId(
+      config.domains.global.alias
+    )
     participantId <- participantAdminConnection.getParticipantId()
     // Check if we have a proposal for hosting the DSO party signed by our particpant. If so,
     // we are in the middle of an DSO party migration so don't reconnect to the domain.
     proposals <- participantAdminConnection.listPartyToParticipant(
-      TopologyStoreId.DomainStore(globalDomainId).filterName,
+      TopologyStoreId.DomainStore(decentralizedSynchronizerId).filterName,
       filterParty = dsoPartyId.filterString,
       filterParticipant = participantId.filterString,
       proposals = TopologyTransactionType.ProposalSignedBy(participantId.uid.namespace.fingerprint),

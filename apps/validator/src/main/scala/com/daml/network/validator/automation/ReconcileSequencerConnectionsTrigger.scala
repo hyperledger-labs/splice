@@ -24,7 +24,7 @@ class ReconcileSequencerConnectionsTrigger(
     override protected val context: TriggerContext,
     participantAdminConnection: ParticipantAdminConnection,
     scanConnection: BftScanConnection,
-    globalDomainAlias: DomainAlias,
+    decentralizedSynchronizerAlias: DomainAlias,
     domainConnector: DomainConnector,
 )(implicit
     override val ec: ExecutionContext,
@@ -32,9 +32,12 @@ class ReconcileSequencerConnectionsTrigger(
 ) extends PollingTrigger {
   override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] = {
     for {
-      globalDomain <- amuletRulesDomain()
+      decentralizedSynchronizer <- amuletRulesDomain()
       maybeDomainTime <- participantAdminConnection
-        .getDomainTimeLowerBound(globalDomain, maxDomainTimeLag = context.config.pollingInterval)
+        .getDomainTimeLowerBound(
+          decentralizedSynchronizer,
+          maxDomainTimeLag = context.config.pollingInterval,
+        )
         .map(domainTime => Some(domainTime.timestamp))
         .recover {
           // Time tracker for domain not found. the domainTime is not yet available.
@@ -48,7 +51,7 @@ class ReconcileSequencerConnectionsTrigger(
           for {
             sequencerConnections <- domainConnector.getSequencerConnectionsFromScan(domainTime)
             _ <- participantAdminConnection.modifyDomainConnectionConfigAndReconnect(
-              globalDomainAlias, // TODO (#8450) how?
+              decentralizedSynchronizerAlias, // TODO (#8450) how?
               modifySequencerConnections(sequencerConnections),
             )
           } yield ()

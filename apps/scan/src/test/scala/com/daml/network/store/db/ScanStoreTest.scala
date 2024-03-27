@@ -11,7 +11,7 @@ import com.daml.network.codegen.java.splice.amuletrules.{
   AmuletRules_BuyMemberTrafficResult,
   AmuletRules_MintResult,
 }
-import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.validatorlicense.FaucetState
 import com.daml.network.codegen.java.splice.{amulet as amuletCodegen, round as roundCodegen}
@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.splice.{
   cometbft as cometbftCodegen,
   dsorules as dsorulesCodegen,
 }
-import com.daml.network.codegen.java.splice.dso.globaldomain as globaldomainCodegen
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer as decentralizedsynchronizerCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.history.{AmuletExpire, LockedAmuletExpireAmulet, Transfer}
@@ -1350,11 +1350,11 @@ trait AmuletTransferUtil { self: StoreTest =>
         new RelTime(1),
         new RelTime(1),
         new RelTime(1),
-        new globaldomainCodegen.DomainNodeConfigLimits(
+        new decentralizedsynchronizerCodegen.SynchronizerNodeConfigLimits(
           new cometbftCodegen.CometBftConfigLimits(1, 1, 1, 1, 1)
         ),
         1,
-        new globaldomainCodegen.DsoGlobalDomainConfig(
+        new decentralizedsynchronizerCodegen.DsoDecentralizedSynchronizerConfig(
           Collections.emptyMap(),
           newDomainId,
           newDomainId,

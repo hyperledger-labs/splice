@@ -18,12 +18,12 @@ import org.scalatest.wordspec.AnyWordSpec
   *
   *  Grep for 'templatesMoved' to find the appropriate locations.
   */
-class GlobalDomainMigrationCoverageTest
+class DecentralizedSynchronizerMigrationCoverageTest
     extends AnyWordSpec
     with AppendedClues
     with Matchers
     with TableDrivenPropertyChecks {
-  import GlobalDomainMigrationCoverageTest.*
+  import DecentralizedSynchronizerMigrationCoverageTest.*
 
   filtersAndMoveLists.foreach { case (label, filtered, rawHandled) =>
     s"${label.getClass.getSimpleName}" should {
@@ -97,7 +97,7 @@ class GlobalDomainMigrationCoverageTest
   }
 }
 
-object GlobalDomainMigrationCoverageTest {
+object DecentralizedSynchronizerMigrationCoverageTest {
   import scan.store.ScanStore
   import sv.store.{SvStore, SvSvStore, SvDsoStore}
   import validator.store.ValidatorStore
@@ -154,11 +154,11 @@ object GlobalDomainMigrationCoverageTest {
   // and (hopefully) forestall overlooked required changes that way.
 
   private val knownNotHandled = {
-    import codegen.java.splice.globaldomain
+    import codegen.java.splice.decentralizedsynchronizer
     import codegen.java.splice.wallet.topupstate as topUpCodegen
     import codegen.java.splice.wallet.buytrafficrequest as trafficRequestCodegen
     Seq(
-      globaldomain.MemberTraffic.COMPANION ->
+      decentralizedsynchronizer.MemberTraffic.COMPANION ->
         reason("tied to a specific domainId, never migrated", ScanStore, SvDsoStore),
       topUpCodegen.ValidatorTopUpState.COMPANION ->
         reason("tied to a specific domainId, never migrated", ValidatorStore),

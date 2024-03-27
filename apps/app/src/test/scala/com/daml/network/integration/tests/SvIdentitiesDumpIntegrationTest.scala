@@ -14,7 +14,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens.*
 import better.files.*
 import com.daml.network.http.v0.definitions as http
-import com.daml.network.sv.migration.DomainNodeIdentities
+import com.daml.network.sv.migration.SynchronizerNodeIdentities
 
 import java.nio.file.{Path, Paths}
 
@@ -37,14 +37,14 @@ class SvIdentitiesDumpIntegrationTest extends CNNodeIntegrationTestWithSharedEnv
       {
         val backends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
         backends.foreach(backend => {
-          val ids = backend.getDomainNodeIdentitiesDump()
+          val ids = backend.getSynchronizerNodeIdentitiesDump()
           val dir = File(testDumpOutputDir(backend.config))
           val files = dir.list
           files should not be empty
           files.foreach(file => {
             val jsonString = file.contentAsString
-            val parsed = DomainNodeIdentities
-              .fromHttp(io.circe.parser.decode[http.DomainNodeIdentities](jsonString).value)
+            val parsed = SynchronizerNodeIdentities
+              .fromHttp(io.circe.parser.decode[http.SynchronizerNodeIdentities](jsonString).value)
               .value
             ids shouldBe parsed withClue s"Identities dump for sv ${backend.name} is consistent with identities fetched through the endpoint"
           })

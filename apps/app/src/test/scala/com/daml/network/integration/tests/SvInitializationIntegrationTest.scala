@@ -61,10 +61,10 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     initDso()
     sv4Backend.stop()
 
-    val globalDomainId = inside(sv4Backend.participantClient.domains.list_connected()) {
-      case Seq(domain) =>
+    val decentralizedSynchronizerId =
+      inside(sv4Backend.participantClient.domains.list_connected()) { case Seq(domain) =>
         domain.domainId
-    }
+      }
 
     clue("simulate the domain was left disconnected when error occur during party migration.") {
       sv4Backend.participantClient.domains.disconnect_all()
@@ -75,7 +75,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       sv4Backend.startSync()
       inside(sv4Backend.participantClient.domains.list_connected()) {
         case Seq(listConnectedDomainsResult) =>
-          listConnectedDomainsResult.domainId shouldBe globalDomainId
+          listConnectedDomainsResult.domainId shouldBe decentralizedSynchronizerId
       }
     }
   }
@@ -107,7 +107,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
     // Increase the decentralized namespace threshold to 3 to require more than the candidate and sponsor to authorize the party to participant mapping. This ensures that the party to participant reconciliation loops work as expected.
     // do this by falsely adding the sequencer namespace to the decentralized namespace
     val sv1SequencerAdminConnection =
-      sv1Backend.appState.localDomainNode.value.sequencerAdminConnection
+      sv1Backend.appState.localSynchronizerNode.value.sequencerAdminConnection
     val sv1SequencerId = sv1SequencerAdminConnection.getSequencerId.futureValue
     val newDecentralizedNamespace = Seq(
       sv1SequencerAdminConnection,
@@ -117,7 +117,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       val id = connection.getId().futureValue
       connection
         .ensureDecentralizedNamespaceDefinitionProposalAccepted(
-          globalDomainId,
+          decentralizedSynchronizerId,
           dsoParty.uid.namespace,
           sv1SequencerId.uid.namespace,
           id.namespace.fingerprint,
@@ -136,7 +136,12 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
           val rulesAndState =
             sv1Backend.appState.dsoStore.getDsoRulesWithMemberNodeStates().futureValue
           rulesAndState.svNodeStates.values
-            .flatMap(_.payload.state.domainNodes.get(globalDomainId.toProtoPrimitive).scan.toScala)
+            .flatMap(
+              _.payload.state.synchronizerNodes
+                .get(decentralizedSynchronizerId.toProtoPrimitive)
+                .scan
+                .toScala
+            )
             // onle sv1 and sv2 have scan apps
             .map(_.publicUrl) should contain theSameElementsAs Seq(
             "http://localhost:5012",
@@ -156,7 +161,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         val id = connection.getId().futureValue
         connection
           .ensureDecentralizedNamespaceDefinitionRemovalProposal(
-            globalDomainId,
+            decentralizedSynchronizerId,
             dsoParty.uid.namespace,
             sv1SequencerId.uid.namespace,
             id.namespace.fingerprint,
@@ -197,24 +202,24 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
         val participantAdminConnection = sv1Backend.appState.participantAdminConnection
         participantAdminConnection
           .getDecentralizedNamespaceDefinition(
-            globalDomainId,
+            decentralizedSynchronizerId,
             dsoParty.uid.namespace,
           )
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(3)
         participantAdminConnection
-          .getSequencerDomainState(globalDomainId)
+          .getSequencerDomainState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)
         participantAdminConnection
-          .getMediatorDomainState(globalDomainId)
+          .getMediatorDomainState(decentralizedSynchronizerId)
           .futureValue
           .mapping
           .threshold shouldBe PositiveInt.tryCreate(2)
         participantAdminConnection
-          .getPartyToParticipant(globalDomainId, dsoParty)
+          .getPartyToParticipant(decentralizedSynchronizerId, dsoParty)
           .futureValue
           .mapping
           .threshold
@@ -225,7 +230,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       eventually() {
         val participantAdminConnection = sv1Backend.appState.participantAdminConnection
         val dsoHostingParticipants = participantAdminConnection
-          .getPartyToParticipant(globalDomainId, dsoParty)
+          .getPartyToParticipant(decentralizedSynchronizerId, dsoParty)
           .futureValue
           .mapping
           .participants

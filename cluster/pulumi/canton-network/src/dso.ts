@@ -12,7 +12,7 @@ import {
   ValidatorTopupConfig,
   loadYamlFromFile,
   svKeyFromSecret,
-  GlobalDomainMigrationConfig,
+  DecentralizedSynchronizerMigrationConfig,
 } from 'cn-pulumi-common';
 import _ from 'lodash';
 
@@ -38,7 +38,7 @@ interface DsoArgs {
   topupConfig?: ValidatorTopupConfig;
   splitPostgresInstances: boolean;
   sequencerPruningConfig: SequencerPruningConfig;
-  globalDomainUpgradeConfig: GlobalDomainMigrationConfig;
+  decentralizedSynchronizerUpgradeConfig: DecentralizedSynchronizerMigrationConfig;
   onboardingPollingInterval?: string;
   disableOnboardingParticipantPromotionDelay: boolean;
 }
@@ -112,7 +112,7 @@ export class Dso extends pulumi.ComponentResource {
           this.args.disableOnboardingParticipantPromotionDelay,
         onboardingPollingInterval: this.args.onboardingPollingInterval,
       },
-      this.args.globalDomainUpgradeConfig,
+      this.args.decentralizedSynchronizerUpgradeConfig,
       cometBftSyncSource
     );
   }
@@ -148,7 +148,7 @@ export class Dso extends pulumi.ComponentResource {
       Math.round((100000_00000 * 1.0) / 360.0 / ((24.0 * 60.0 * 60.0) / initialTickDurationS)) /
       100000_00000;
 
-    const runningMigration = this.args.globalDomainUpgradeConfig.isRunningMigration();
+    const runningMigration = this.args.decentralizedSynchronizerUpgradeConfig.isRunningMigration();
     const founder = await this.installSvNode(
       founderConf,
       runningMigration

@@ -10,7 +10,7 @@ import Splice.Amulet
 import Splice.AmuletRules
 import Splice.Types
 import Splice.Schedule
-import Splice.GlobalDomain
+import Splice.DecentralizedSynchronizer
 import Splice.Wallet.Install
 import Splice.Wallet.Payment
 import Splice.Wallet.Subscriptions
@@ -536,8 +536,8 @@ testBuyMemberTraffic = script do
 
   now <- getTime
   [(amuletRulesCid, amuletRules)] <- query @AmuletRules app.dso
-  let globalDomainConfig = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).globalDomain
-  let domainId = globalDomainConfig.activeDomain
+  let decentralizedSynchronizerConfig = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).decentralizedSynchronizer
+  let synchronizerId = decentralizedSynchronizerConfig.activeSynchronizer
   let migrationId = 0
   let testParticipantId = "alice_validator_participant_id"
 
@@ -552,33 +552,33 @@ testBuyMemberTraffic = script do
 
   -- create initial validator top-up state contract
   topupStateCid <- submit aliceValidator.primaryParty $
-    createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId domainId)
+    createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId synchronizerId)
 
   -- test that buying less extra traffic than the configured min topup amount fails
-  let minTopupAmount = globalDomainConfig.fees.minTopupAmount
+  let minTopupAmount = decentralizedSynchronizerConfig.fees.minTopupAmount
   outcome <- executeAmuletOperation app aliceValidator $
-    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId domainId migrationId (minutes 1) (Some topupStateCid)
+    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid)
   outcome === COO_Error (ITR_InsufficientTopupAmount (minTopupAmount-1) minTopupAmount)
 
-  -- test that providing an invalid global domain ID fails
-  let invalidDomainId = domainId <> "_invalid"
+  -- test that providing an invalid decentralized synchronizer ID fails
+  let invalidSynchronizerId = synchronizerId <> "_invalid"
   invalidTopupStateCid <- submit aliceValidator.primaryParty $
-    createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId invalidDomainId)
+    createCmd (initialValidatorTopUpState app.dso aliceValidator.primaryParty testParticipantId invalidSynchronizerId)
   outcome <- executeAmuletOperation app aliceValidator $
-    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidDomainId migrationId (minutes 1) (Some invalidTopupStateCid)
-  outcome === COO_Error (ITR_UnknownDomain invalidDomainId)
+    CO_BuyMemberTraffic (minTopupAmount-1) testParticipantId invalidSynchronizerId migrationId (minutes 1) (Some invalidTopupStateCid)
+  outcome === COO_Error (ITR_UnknownSynchronizer invalidSynchronizerId)
   submit aliceValidator.primaryParty $ archiveCmd invalidTopupStateCid
 
   -- test that creating the initial traffic contract works
   before <- query @Amulet aliceValidator.primaryParty
   COO_BuyMemberTraffic trafficCid1 <- executeAmuletOperation app aliceValidator $
-    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId migrationId (minutes 1) (Some topupStateCid)
+    CO_BuyMemberTraffic minTopupAmount testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid)
   after <- query @Amulet aliceValidator.primaryParty
   before === after
 
   -- validate the state of the member traffic contract
   Some traffic1 <- queryContractId @MemberTraffic app.dso trafficCid1
-  (ccSpent, usdSpent) <- calculateDomainFees app minTopupAmount
+  (ccSpent, usdSpent) <- calculateSynchronizerFees app minTopupAmount
   traffic1.totalPurchased === minTopupAmount
   traffic1.numPurchases === 1
   traffic1.ccSpent === ccSpent
@@ -602,13 +602,13 @@ testBuyMemberTraffic = script do
 
   -- topping up too soon fails
   outcome <- executeAmuletOperation app aliceValidator $
-    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId migrationId (minutes 1) (Some topupStateCid2)
+    CO_BuyMemberTraffic minTopupAmount testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid2)
   outcome === COO_Error (ITR_Other ("The requirement 'enough time has elapsed since the last topup' was not met."))
 
   -- once a minute has passed, the same topup succeeds
   passTime (minutes 1)
   COO_BuyMemberTraffic trafficCid2 <- executeAmuletOperation app aliceValidator $
-    CO_BuyMemberTraffic minTopupAmount testParticipantId domainId migrationId (minutes 1) (Some topupStateCid2)
+    CO_BuyMemberTraffic minTopupAmount testParticipantId synchronizerId migrationId (minutes 1) (Some topupStateCid2)
   Some traffic2 <- queryContractId @MemberTraffic app.dso trafficCid2
 
   -- check the app reward coupons once more
@@ -631,12 +631,12 @@ testBuyMemberTraffic = script do
 
   -- provider1 purchases extra traffic for the same participant
   COO_BuyMemberTraffic providerTrafficCid <- executeAmuletOperation app provider1Validator $
-    CO_BuyMemberTraffic (minTopupAmount + 1) testParticipantId domainId migrationId (minutes 1) None
+    CO_BuyMemberTraffic (minTopupAmount + 1) testParticipantId synchronizerId migrationId (minutes 1) None
 
   -- validate the state of the member traffic contract
   Some providerTraffic <- queryContractId @MemberTraffic app.dso providerTrafficCid
   let totalPurchased = minTopupAmount + 1
-  (ccSpent, usdSpent) <- calculateDomainFees app totalPurchased
+  (ccSpent, usdSpent) <- calculateSynchronizerFees app totalPurchased
   providerTraffic.totalPurchased === totalPurchased
   providerTraffic.numPurchases === 1
   providerTraffic.ccSpent === ccSpent
@@ -660,12 +660,12 @@ testBuyMemberTraffic = script do
       validatorParty = provider2Validator.primaryParty
   _ <- tap app provider2 10.0
 
-  let createTrafficRequest amount memberId domainId trackingId expiresAt = do
+  let createTrafficRequest amount memberId synchronizerId trackingId expiresAt = do
       result <- submitMulti [provider2Validator.primaryParty] [provider2.primaryParty] $
           exerciseCmd provider2Install $ WalletAppInstall_CreateBuyTrafficRequest with
             trafficAmount = amount
             memberId = memberId
-            domainId = domainId
+            synchronizerId = synchronizerId
             migrationId = 0
             trackingId = trackingId
             expiresAt = expiresAt
@@ -673,7 +673,7 @@ testBuyMemberTraffic = script do
 
   now <- getTime
   -- time-expired traffic requests cannot be completed or cancelled, only archived
-  request1 <- createTrafficRequest minTopupAmount testParticipantId domainId "request1" now
+  request1 <- createTrafficRequest minTopupAmount testParticipantId synchronizerId "request1" now
   COO_Error (ITR_Other ("The requirement 'Contract has not expired' was not met.")) <- executeAmuletOperation app provider2 $
     CO_CompleteBuyTrafficRequest request1
   submitMustFail provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Cancel with reason = "not required"
@@ -683,20 +683,20 @@ testBuyMemberTraffic = script do
   trackingInfo.trackingId === "request1"
 
   -- unexpired traffic requests are completed successfully
-  request2 <- createTrafficRequest minTopupAmount testParticipantId domainId "request2" (now `addRelTime` minutes 1)
+  request2 <- createTrafficRequest minTopupAmount testParticipantId synchronizerId "request2" (now `addRelTime` minutes 1)
   COO_CompleteBuyTrafficRequest (requestTrafficCid, trackingInfo) <- executeAmuletOperation app provider2 $
     CO_CompleteBuyTrafficRequest request2
   Some requestedTraffic <- queryContractId @MemberTraffic app.dso requestTrafficCid
   requestedTraffic.totalPurchased === minTopupAmount
   requestedTraffic.memberId === testParticipantId
-  requestedTraffic.domainId === domainId
+  requestedTraffic.synchronizerId === synchronizerId
   trackingInfo.trackingId === "request2"
   trackingInfo.endUserParty === provider2.primaryParty
   -- check that no app reward coupons were issued to the provider
   [] <- query @AppRewardCoupon provider2.primaryParty
 
   -- check that traffic requests can be cancelled by the requester
-  request3 <- createTrafficRequest minTopupAmount testParticipantId domainId "request3" (now `addRelTime` minutes 1)
+  request3 <- createTrafficRequest minTopupAmount testParticipantId synchronizerId "request3" (now `addRelTime` minutes 1)
   result <- submit provider2.primaryParty $
     exerciseCmd request3 BuyTrafficRequest_Cancel with reason = "not required"
   let trackingInfo = result.trackingInfo
@@ -822,12 +822,12 @@ executeAmuletOperation app user op = do
   let [outcome] = result.outcomes
   pure outcome
 
-calculateDomainFees : AmuletApp -> Int -> Script (Decimal, Decimal)
-calculateDomainFees app trafficAmount = do
+calculateSynchronizerFees : AmuletApp -> Int -> Script (Decimal, Decimal)
+calculateSynchronizerFees app trafficAmount = do
   now <- getTime
   [(_, amuletRules)] <- query @AmuletRules app.dso
-  let globalDomainConfig = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).globalDomain
-  let extraTrafficPrice = globalDomainConfig.fees.extraTrafficPrice
+  let decentralizedSynchronizerConfig = (Splice.Schedule.getValueAsOf now amuletRules.configSchedule).decentralizedSynchronizer
+  let extraTrafficPrice = decentralizedSynchronizerConfig.fees.extraTrafficPrice
   (_, openRound) <- getLatestOpenRound app
   let amuletPrice = openRound.amuletPrice
   let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice

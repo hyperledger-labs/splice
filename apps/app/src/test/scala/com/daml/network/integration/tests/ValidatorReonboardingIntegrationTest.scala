@@ -145,7 +145,7 @@ class ValidatorReonboardingIntegrationTest
       aliceValidatorLocalBackend.startSync()
       val mapping = aliceValidatorLocalBackend.appState.participantAdminConnection
         .getPartyToParticipant(
-          globalDomainId,
+          decentralizedSynchronizerId,
           aliceValidatorWalletParty,
         )
         .futureValue

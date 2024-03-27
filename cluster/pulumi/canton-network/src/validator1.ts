@@ -7,7 +7,7 @@ import {
   defaultVersion,
   ExactNamespace,
   exactNamespace,
-  GlobalDomainMigrationConfig,
+  DecentralizedSynchronizerMigrationConfig,
   installAuth0UISecret,
   installCNHelmChart,
   ValidatorTopupConfig,
@@ -24,7 +24,7 @@ export async function installValidator1(
   onboardingSecret: string,
   validatorWalletUser: string,
   splitPostgresInstances: boolean,
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   installSplitwell: boolean,
   dependsOn: pulumi.Resource[],
   backupConfig?: BackupConfig,
@@ -60,7 +60,7 @@ export async function installValidator1(
   });
 
   const participant = installMigrationSpecificValidatorParticipant(
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     xns,
     defaultPostgres,
     participantBootstrapDump,
@@ -75,7 +75,7 @@ export async function installValidator1(
     validatorWalletUser,
     xns,
     participant,
-    ...globalDomainMigrationConfig.migratingNodeConfig(),
+    ...decentralizedSynchronizerMigrationConfig.migratingNodeConfig(),
     // We vet both versions to easily test upgrades.
     appDars: ['cn-node-0.1.0-SNAPSHOT/dars/splitwell-0.1.0.dar'],
     validatorPartyHint: `${name}_validator_service_user`,
@@ -100,7 +100,7 @@ export async function installValidator1(
   });
 
   installPostgresMetrics(validatorPostgres, validatorDbName, [validator]);
-  installIngress(xns, installSplitwell, globalDomainMigrationConfig);
+  installIngress(xns, installSplitwell, decentralizedSynchronizerMigrationConfig);
 
   if (installSplitwell) {
     installCNHelmChart(xns, 'splitwell-web-ui', 'cn-splitwell-web-ui', {}, defaultVersion, {
@@ -114,7 +114,7 @@ export async function installValidator1(
 function installIngress(
   xns: ExactNamespace,
   splitwell: boolean,
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig
 ) {
   installCNHelmChart(xns, `cluster-ingress-${xns.logicalName}`, 'cn-cluster-ingress-runbook', {
     cluster: {
@@ -125,8 +125,8 @@ function installIngress(
     withSvIngress: false,
     ingress: {
       splitwell: splitwell,
-      globalDomain: {
-        activeMigrationId: globalDomainMigrationConfig.active.migrationId.toString(),
+      decentralizedSynchronizer: {
+        activeMigrationId: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
       },
     },
   });

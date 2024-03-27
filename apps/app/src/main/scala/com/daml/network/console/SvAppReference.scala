@@ -17,7 +17,7 @@ import com.daml.network.sv.{SvApp, SvAppBootstrap, SvAppClientConfig}
 import com.daml.network.sv.admin.api.client.commands.{HttpSvAdminAppClient, HttpSvAppClient}
 import com.daml.network.sv.automation.{LeaderBasedAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.config.SvAppBackendConfig
-import com.daml.network.sv.migration.{DomainDataSnapshot, DomainNodeIdentities}
+import com.daml.network.sv.migration.{DomainDataSnapshot, SynchronizerNodeIdentities}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help}
 import com.digitalasset.canton.health.admin.data.NodeStatus
@@ -106,19 +106,19 @@ abstract class SvAppReference(
       .fold(throw _, identity)
 
   @Help.Summary("Pause the global domain")
-  def pauseGlobalDomain(): Unit =
+  def pauseDecentralizedSynchronizer(): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.PauseGlobalDomain())
+      httpCommand(HttpSvAdminAppClient.PauseDecentralizedSynchronizer())
     }
 
   @Help.Summary("Unpause the global domain")
-  def unpauseGlobalDomain(): Unit =
+  def unpauseDecentralizedSynchronizer(): Unit =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.UnpauseGlobalDomain())
+      httpCommand(HttpSvAdminAppClient.UnpauseDecentralizedSynchronizer())
     }
 
   @Help.Summary("Dump all the required data for domain migration to the configured location")
-  def triggerGlobalDomainMigrationDump(migrationId: Long): Unit =
+  def triggerDecentralizedSynchronizerMigrationDump(migrationId: Long): Unit =
     consoleEnvironment.run {
       httpCommand(HttpSvAdminAppClient.TriggerDomainMigrationDump(migrationId))
     }
@@ -133,9 +133,9 @@ abstract class SvAppReference(
     }
 
   @Help.Summary("Get identities of all domain node components")
-  def getDomainNodeIdentitiesDump(): DomainNodeIdentities =
+  def getSynchronizerNodeIdentitiesDump(): SynchronizerNodeIdentities =
     consoleEnvironment.run {
-      httpCommand(HttpSvAdminAppClient.GetDomainNodeIdentitiesDump())
+      httpCommand(HttpSvAdminAppClient.GetSynchronizerNodeIdentitiesDump())
     }
 
   @Help.Summary("Create a vote request")

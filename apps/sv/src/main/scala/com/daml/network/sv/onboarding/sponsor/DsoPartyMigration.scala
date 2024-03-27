@@ -67,7 +67,7 @@ class DsoPartyMigration(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   private def downloadSnapshotFromTime(
       authorizedAt: Instant,
-      globalDomain: DomainId,
+      decentralizedSynchronizer: DomainId,
   )(implicit tc: TraceContext): Future[ByteString] = {
     def submitDummyTransaction(): Future[Unit] =
       svStoreWithIngestion.connection
@@ -79,7 +79,7 @@ class DsoPartyMigration(
           new FeaturedAppRight(svParty.toProtoPrimitive, svParty.toProtoPrimitive).createAnd
             .exerciseArchive(),
         )
-        .withDomainId(globalDomain)
+        .withDomainId(decentralizedSynchronizer)
         .noDedup
         .yieldUnit()
     // Acquiring the ACS snapshot is tricky due to two issues:
@@ -96,7 +96,7 @@ class DsoPartyMigration(
           participantAdminConnection
             .downloadAcsSnapshot(
               Set(dsoParty),
-              filterDomainId = Some(globalDomain),
+              filterDomainId = Some(decentralizedSynchronizer),
               timestamp = Some(authorizedAt),
             )
             .recoverWith { case ex: StatusRuntimeException =>

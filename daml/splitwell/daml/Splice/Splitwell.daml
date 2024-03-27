@@ -64,7 +64,7 @@ template SplitwellInstallRequest
       controller provider
       do pure ()
 
--- TODO(#7411) Remove this once the domain migration automation
+-- TODO(#7411) Remove this once the synchronizer migration automation
 -- no longer relies on it.
 template SplitwellInstall
   with

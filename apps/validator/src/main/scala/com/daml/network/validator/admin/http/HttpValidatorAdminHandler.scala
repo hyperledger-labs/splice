@@ -24,7 +24,7 @@ class HttpValidatorAdminHandler(
     validatorWalletUserName: Option[String],
     getAmuletRulesDomain: GetAmuletRulesDomain,
     participantAdminConnection: ParticipantAdminConnection,
-    globalDomainAlias: DomainAlias,
+    decentralizedSynchronizerAlias: DomainAlias,
     retryProvider: RetryProvider,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -92,17 +92,19 @@ class HttpValidatorAdminHandler(
     }
   }
 
-  override def getGlobalDomainConnectionConfig(
-      respond: v0.ValidatorAdminResource.GetGlobalDomainConnectionConfigResponse.type
+  override def getDecentralizedSynchronizerConnectionConfig(
+      respond: v0.ValidatorAdminResource.GetDecentralizedSynchronizerConnectionConfigResponse.type
   )()(
       tuser: TracedUser
-  ): Future[v0.ValidatorAdminResource.GetGlobalDomainConnectionConfigResponse] = {
+  ): Future[v0.ValidatorAdminResource.GetDecentralizedSynchronizerConnectionConfigResponse] = {
     implicit val TracedUser(_, tracedContext) = tuser
-    withSpan(s"$workflowId.getGlobalDomainConnectionConfig") { _ => _ =>
+    withSpan(s"$workflowId.getDecentralizedSynchronizerConnectionConfig") { _ => _ =>
       for {
-        connectionConfig <- participantAdminConnection.getDomainConnectionConfig(globalDomainAlias)
-      } yield v0.ValidatorAdminResource.GetGlobalDomainConnectionConfigResponse.OK(
-        definitions.GetGlobalDomainConnectionConfigResponse(
+        connectionConfig <- participantAdminConnection.getDomainConnectionConfig(
+          decentralizedSynchronizerAlias
+        )
+      } yield v0.ValidatorAdminResource.GetDecentralizedSynchronizerConnectionConfigResponse.OK(
+        definitions.GetDecentralizedSynchronizerConnectionConfigResponse(
           definitions.SequencerConnections(
             connectionConfig.sequencerConnections.aliasToConnection.values.map {
               case GrpcSequencerConnection(

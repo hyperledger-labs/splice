@@ -14,7 +14,7 @@ import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.QualifiedName
 import com.daml.network.validator.config.{AppManagerConfig, BuyExtraTrafficConfig}
 import com.daml.network.validator.domain.DomainConnector
-import com.daml.network.validator.migration.GlobalDomainMigrationTrigger
+import com.daml.network.validator.migration.DecentralizedSynchronizerMigrationTrigger
 import com.daml.network.validator.store.{AppManagerStore, ValidatorStore}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.automation.{OffboardUsersTrigger, WalletAppInstallTrigger}
@@ -37,7 +37,7 @@ class ValidatorAutomationService(
     appManagerConfig: Option[AppManagerConfig],
     sequencerConnectionFromScan: Boolean,
     prevetDuration: NonNegativeFiniteDuration,
-    globalDomainAlias: DomainAlias,
+    decentralizedSynchronizerAlias: DomainAlias,
     isSvValidator: Boolean,
     clock: Clock,
     walletManagerOpt: Option[UserWalletManager], // None when config.enableWallet=false
@@ -167,7 +167,7 @@ class ValidatorAutomationService(
         triggerContext,
         participantAdminConnection,
         scanConnection,
-        globalDomainAlias,
+        decentralizedSynchronizerAlias,
         domainConnector,
       )
     )
@@ -184,11 +184,11 @@ class ValidatorAutomationService(
   if (!svValidator) {
     domainMigrationDumpPath.fold(
       logger.info(
-        "Not starting DomainUpgradeTrigger, as no domain migration dump path is configured."
+        "Not starting SynchronizerUpgradeTrigger, as no domain migration dump path is configured."
       )(TraceContext.empty)
     ) { path =>
       registerTrigger(
-        new GlobalDomainMigrationTrigger(
+        new DecentralizedSynchronizerMigrationTrigger(
           domainMigrationId,
           triggerContext,
           participantAdminConnection,

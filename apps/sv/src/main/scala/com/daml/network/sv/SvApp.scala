@@ -36,7 +36,7 @@ import com.daml.network.sv.cometbft.{
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.metrics.SvAppMetrics
-import com.daml.network.sv.migration.{DomainDataSnapshotGenerator, DomainNodeIdentities}
+import com.daml.network.sv.migration.{DomainDataSnapshotGenerator, SynchronizerNodeIdentities}
 import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
 import com.daml.network.sv.onboarding.founder.FoundingNodeInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
@@ -176,9 +176,9 @@ class SvApp(
       retryProvider,
     )
 
-    val localDomainNode = config.localDomainNode
+    val localSynchronizerNode = config.localSynchronizerNode
       .map(config =>
-        new LocalDomainNode(
+        new LocalSynchronizerNode(
           participantAdminConnection,
           new SequencerAdminConnection(
             config.sequencer.adminApi,
@@ -212,13 +212,13 @@ class SvApp(
     initialize(
       participantAdminConnection,
       ledgerClient,
-      localDomainNode,
+      localSynchronizerNode,
     )
       .recoverWith { case err =>
         // TODO(#3474) Replace this by a more general solution for closing resources on
         // init failures.
         participantAdminConnection.close()
-        localDomainNode.foreach(_.close())
+        localSynchronizerNode.foreach(_.close())
         Future.failed(err)
       }
   }
@@ -226,7 +226,7 @@ class SvApp(
   private def initialize(
       participantAdminConnection: ParticipantAdminConnection,
       ledgerClient: CNLedgerClient,
-      localDomainNode: Option[LocalDomainNode],
+      localSynchronizerNode: Option[LocalSynchronizerNode],
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     val cometBftClient = newCometBftClient
     val cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
@@ -258,7 +258,7 @@ class SvApp(
       ).tupled
       newJoiningNodeInitializer = (joiningConfig: Option[SvOnboardingConfig.JoinWithKey]) =>
         new JoiningNodeInitializer(
-          localDomainNode,
+          localSynchronizerNode,
           joiningConfig,
           participantId,
           darFilesToUploadDuringInit,
@@ -274,7 +274,7 @@ class SvApp(
       // Ensure DSO party, DsoRules, AmuletRules, Mediator, and Sequencer nodes are setup
       // -------------------------------------------------------------------------------
       case (
-        globalDomain,
+        decentralizedSynchronizer,
         dsoPartyHosting,
         svStore,
         svAutomation,
@@ -287,7 +287,7 @@ class SvApp(
         case Some(foundingConfig: SvOnboardingConfig.FoundCollective) =>
           appInitStep("FoundingNodeInitializer founding collective") {
             val initializer = new FoundingNodeInitializer(
-              localDomainNode.getOrElse(
+              localSynchronizerNode.getOrElse(
                 sys.error("Founding node must always specify a domain config")
               ),
               foundingConfig,
@@ -313,7 +313,7 @@ class SvApp(
           appInitStep("DomainMigrationInitializer initializing node from dump") {
             val joiningNodeInitializer = newJoiningNodeInitializer(None)
             new DomainMigrationInitializer(
-              localDomainNode.getOrElse(
+              localSynchronizerNode.getOrElse(
                 sys.error("It must always specify a domain config for Domain Migration")
               ),
               domainMigrationConfig,
@@ -355,7 +355,7 @@ class SvApp(
         appInitStep("Expect configured validator onboardings") {
           expectConfiguredValidatorOnboardings(
             svAutomation,
-            globalDomain,
+            decentralizedSynchronizer,
             clock,
           )
         },
@@ -382,7 +382,7 @@ class SvApp(
         appInitStep("Dump identities") {
           SvApp.backupNodeIdentities(
             config,
-            localDomainNode,
+            localSynchronizerNode,
             dsoStore,
             participantAdminConnection,
             clock,
@@ -416,7 +416,7 @@ class SvApp(
         config,
         clock,
         participantAdminConnection,
-        localDomainNode,
+        localSynchronizerNode,
         retryProvider,
         new DsoPartyMigration(
           svAutomation,
@@ -436,12 +436,12 @@ class SvApp(
         svAutomation,
         dsoAutomation,
         cometBftClient,
-        localDomainNode,
+        localSynchronizerNode,
         participantAdminConnection,
         new DomainDataSnapshotGenerator(
           participantAdminConnection,
           Some(
-            localDomainNode
+            localSynchronizerNode
               .getOrElse(
                 sys.error("SV app should always have a sequencer connection for domain migrations")
               )
@@ -516,7 +516,7 @@ class SvApp(
     } yield {
       SvApp.State(
         participantAdminConnection,
-        localDomainNode,
+        localSynchronizerNode,
         storage,
         svStore,
         dsoStore,
@@ -605,7 +605,7 @@ class SvApp(
 
   private def expectConfiguredValidatorOnboardings(
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      globalDomain: DomainId,
+      decentralizedSynchronizer: DomainId,
       clock: Clock,
   )(implicit tc: TraceContext): Future[List[Unit]] = {
     if (
@@ -621,7 +621,7 @@ class SvApp(
         c.secret,
         c.expiresIn,
         svStoreWithIngestion,
-        globalDomain,
+        decentralizedSynchronizer,
         clock,
       )
     )
@@ -631,7 +631,7 @@ class SvApp(
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      globalDomain: DomainId,
+      decentralizedSynchronizer: DomainId,
       clock: Clock,
   )(implicit tc: TraceContext): Future[Unit] =
     retryProvider.retry(
@@ -643,7 +643,7 @@ class SvApp(
           secret,
           expiresIn,
           svStoreWithIngestion,
-          globalDomain,
+          decentralizedSynchronizer,
           clock,
           logger,
         )
@@ -682,7 +682,7 @@ class SvApp(
 object SvApp {
   case class State(
       participantAdminConnection: ParticipantAdminConnection,
-      localDomainNode: Option[LocalDomainNode],
+      localSynchronizerNode: Option[LocalSynchronizerNode],
       storage: Storage,
       svStore: SvSvStore,
       dsoStore: SvDsoStore,
@@ -708,7 +708,7 @@ object SvApp {
         ),
         SyncCloseable(
           s"Domain connections",
-          localDomainNode.foreach(_.close()),
+          localSynchronizerNode.foreach(_.close()),
         ),
         SyncCloseable(
           s"Participant Admin connection",
@@ -727,7 +727,7 @@ object SvApp {
       secret: String,
       expiresIn: NonNegativeFiniteDuration,
       svStoreWithIngestion: CNNodeAppStoreWithIngestion[SvSvStore],
-      globalDomain: DomainId,
+      decentralizedSynchronizer: DomainId,
       clock: Clock,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Either[String, Unit]] = {
@@ -764,7 +764,7 @@ object SvApp {
                       ),
                     deduplicationOffset = offset,
                   )
-                  .withDomainId(domainId = globalDomain)
+                  .withDomainId(domainId = decentralizedSynchronizer)
                   .yieldUnit()
               } yield {
                 logger.info("Created new ValidatorOnboarding contract.")
@@ -1183,7 +1183,7 @@ object SvApp {
 
   private def backupNodeIdentities(
       config: SvAppBackendConfig,
-      localDomainNode: Option[LocalDomainNode],
+      localSynchronizerNode: Option[LocalSynchronizerNode],
       dsoStore: SvDsoStore,
       participantAdminConnection: ParticipantAdminConnection,
       clock: Clock,
@@ -1199,10 +1199,10 @@ object SvApp {
         s"Attempting to write node identities to ${backupConfig.locationDescription} at path: $filename"
       )
       for {
-        identities <- DomainNodeIdentities.getDomainNodeIdentities(
+        identities <- SynchronizerNodeIdentities.getSynchronizerNodeIdentities(
           participantAdminConnection,
-          localDomainNode.getOrElse(
-            sys.error("Cannot dump identities with no localDomainNode")
+          localSynchronizerNode.getOrElse(
+            sys.error("Cannot dump identities with no localSynchronizerNode")
           ),
           dsoStore,
           config.domains.global.alias,

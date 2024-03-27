@@ -359,9 +359,10 @@ class WalletIntegrationTest
       val splitwellDomainId = aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
         DomainAlias.tryCreate("splitwell")
       )
-      val globalDomainId = aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
-        DomainAlias.tryCreate("global")
-      )
+      val decentralizedSynchronizerId =
+        aliceValidatorBackend.participantClientWithAdminToken.domains.id_of(
+          DomainAlias.tryCreate("global")
+        )
       val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
       aliceWalletClient.tap(50)
       val (_, requestId) = actAndCheck(
@@ -379,7 +380,7 @@ class WalletIntegrationTest
             aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
               .lookup_contract_domain(aliceParty, Set(request.contractId))
           domains shouldBe Map[String, DomainId](
-            request.contractId -> globalDomainId
+            request.contractId -> decentralizedSynchronizerId
           )
           request
         },

@@ -3,8 +3,8 @@ package com.daml.network.sv.migration
 import cats.implicits.toBifunctorOps
 import com.daml.network.environment.ParticipantAdminConnection
 import com.daml.network.http.v0.definitions as http
-import com.daml.network.sv.LocalDomainNode
-import com.daml.network.sv.migration.DomainNodeIdentities.getDomainNodeIdentities
+import com.daml.network.sv.LocalSynchronizerNode
+import com.daml.network.sv.migration.SynchronizerNodeIdentities.getSynchronizerNodeIdentities
 import com.daml.network.sv.store.SvDsoStore
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -18,7 +18,7 @@ import scala.util.Try
 
 case class DomainMigrationDump(
     migrationId: Long,
-    nodeIdentities: DomainNodeIdentities,
+    nodeIdentities: SynchronizerNodeIdentities,
     domainDataSnapshot: DomainDataSnapshot,
     createdAt: Instant,
 ) {
@@ -45,7 +45,7 @@ object DomainMigrationDump {
   def fromHttp(
       response: http.GetDomainMigrationDumpResponse
   ): Either[String, DomainMigrationDump] = for {
-    identities <- DomainNodeIdentities.fromHttp(response.identities)
+    identities <- SynchronizerNodeIdentities.fromHttp(response.identities)
     snapshot <- DomainDataSnapshot.fromHttp(response.dataSnapshot)
     timestamp <- Try(Instant.parse(response.createdAt)).toEither.leftMap(_.getMessage)
   } yield DomainMigrationDump(
@@ -58,7 +58,7 @@ object DomainMigrationDump {
   def getDomainMigrationDump(
       domainAlias: DomainAlias,
       participantAdminConnection: ParticipantAdminConnection,
-      domainNode: LocalDomainNode,
+      synchronizerNode: LocalSynchronizerNode,
       loggerFactory: NamedLoggerFactory,
       dsoStore: SvDsoStore,
       migrationId: Long,
@@ -68,9 +68,9 @@ object DomainMigrationDump {
       tc: TraceContext,
   ): Future[DomainMigrationDump] = {
     for {
-      identities <- getDomainNodeIdentities(
+      identities <- getSynchronizerNodeIdentities(
         participantAdminConnection,
-        domainNode,
+        synchronizerNode,
         dsoStore,
         domainAlias,
         loggerFactory,

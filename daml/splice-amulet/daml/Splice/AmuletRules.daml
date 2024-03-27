@@ -22,7 +22,7 @@ import Splice.Fees
 import Splice.Issuance
 import Splice.Round
 import Splice.Types
-import Splice.GlobalDomain
+import Splice.DecentralizedSynchronizer
 import Splice.ValidatorLicense
 
 import Splice.Util
@@ -106,7 +106,7 @@ template AmuletRules
               issueValidatorRewards = True
         executeTransfer rewardsConfig context dso transfer
 
-    -- Global domain usage
+    -- Decentralized synchronizer usage
     ----------------------
 
     -- Returns a `AmuletRules_BuyMemberTrafficResult` to aid parsing the transaction in Scan
@@ -116,7 +116,7 @@ template AmuletRules
         context : TransferContext
         provider : Party
         memberId : Text
-        domainId : Text
+        synchronizerId : Text
         migrationId : Int
         trafficAmount : Int
       controller provider
@@ -124,10 +124,10 @@ template AmuletRules
         -- validate choice parameters
         now <- getTime
         let configUsd = getValueAsOf now configSchedule
-        case validateBuyMemberTrafficInputs configUsd domainId trafficAmount of
+        case validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount of
           Left err -> throw (InvalidTransfer err)
           Right _ -> pure ()
-        (trafficCostCc, trafficCostUsd) <- computeDomainFees provider trafficAmount this context
+        (trafficCostCc, trafficCostUsd) <- computeSynchronizerFees provider trafficAmount this context
         let transfer = Transfer with
               sender = provider
               provider
@@ -156,7 +156,7 @@ template AmuletRules
         purchasedTraffic <- create MemberTraffic with
           dso
           memberId
-          domainId
+          synchronizerId
           migrationId
           totalPurchased = trafficAmount
           numPurchases = 1
@@ -183,7 +183,7 @@ template AmuletRules
           let expectedTrafficContract = ForMemberTraffic with
                 dso
                 memberId = first.memberId
-                domainId = first.domainId
+                synchronizerId = first.synchronizerId
                 migrationId = first.migrationId
           fetchAndArchive expectedTrafficContract trafficCid
         let traffics = first::rest
@@ -192,13 +192,13 @@ template AmuletRules
         let mergedTraffic = foldl (\acc traffic -> MemberTraffic with
                 dso
                 memberId = acc.memberId
-                domainId = acc.domainId
+                synchronizerId = acc.synchronizerId
                 migrationId = acc.migrationId
                 totalPurchased = acc.totalPurchased + traffic.totalPurchased
                 numPurchases = acc.numPurchases + traffic.numPurchases
                 usdSpent = acc.usdSpent + traffic.usdSpent
                 ccSpent = acc.ccSpent + traffic.ccSpent
-              ) (initialMemberTraffic dso first.memberId first.domainId first.migrationId) traffics
+              ) (initialMemberTraffic dso first.memberId first.synchronizerId first.migrationId) traffics
         mergedTrafficCid <- create mergedTraffic
         return AmuletRules_MergeMemberTrafficContractsResult with ..
 
@@ -547,7 +547,7 @@ transferControllers t =
 scaleAmuletConfig : Decimal -> AmuletConfig USD -> AmuletConfig CC
 scaleAmuletConfig amuletPrice config = AmuletConfig with
   transferConfig = scaleFees (1.0 / amuletPrice) config.transferConfig
-  globalDomain = config.globalDomain
+  decentralizedSynchronizer = config.decentralizedSynchronizer
   issuanceCurve = config.issuanceCurve
   tickDuration = config.tickDuration
   packageConfig = config.packageConfig
@@ -569,7 +569,7 @@ computeOutputFee transferConfigAmulet sender out =
 
 data InvalidTransferReason
   = ITR_InsufficientFunds with missingAmount : Decimal
-  | ITR_UnknownDomain with domainId : Text
+  | ITR_UnknownSynchronizer with synchronizerId : Text
   | ITR_InsufficientTopupAmount with
       requestedTopupAmount : Int
       minTopupAmount : Int
@@ -954,20 +954,20 @@ transferConfigAmuletFromOpenRound : OpenMiningRound -> TransferConfig CC
 transferConfigAmuletFromOpenRound openRound = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
 
 validateBuyMemberTrafficInputs : AmuletConfig USD -> Text -> Int -> Either InvalidTransferReason ()
-validateBuyMemberTrafficInputs configUsd domainId trafficAmount
-  | not (domainId `Set.member` configUsd.globalDomain.requiredDomains) = Left $ ITR_UnknownDomain with domainId
-  | trafficAmount < configUsd.globalDomain.fees.minTopupAmount = Left $ ITR_InsufficientTopupAmount with
+validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount
+  | not (synchronizerId `Set.member` configUsd.decentralizedSynchronizer.requiredSynchronizers) = Left $ ITR_UnknownSynchronizer with synchronizerId
+  | trafficAmount < configUsd.decentralizedSynchronizer.fees.minTopupAmount = Left $ ITR_InsufficientTopupAmount with
       requestedTopupAmount = trafficAmount
-      minTopupAmount = configUsd.globalDomain.fees.minTopupAmount
+      minTopupAmount = configUsd.decentralizedSynchronizer.fees.minTopupAmount
   | otherwise = Right ()
 
--- | Computing domain fees
-computeDomainFees : Party -> Int -> AmuletRules -> TransferContext -> Update (Decimal, Decimal)
-computeDomainFees validator trafficAmount amuletRules context = do
+-- | Computing synchronizer fees
+computeSynchronizerFees : Party -> Int -> AmuletRules -> TransferContext -> Update (Decimal, Decimal)
+computeSynchronizerFees validator trafficAmount amuletRules context = do
   -- compute traffic cost in USD
   now <- getTime
   let configUsd = getValueAsOf now amuletRules.configSchedule
-  let extraTrafficPrice = configUsd.globalDomain.fees.extraTrafficPrice
+  let extraTrafficPrice = configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
   let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
   -- compute traffic cost in CC
   contextMiningRound <- exercise context.openMiningRound (OpenMiningRound_Fetch validator)

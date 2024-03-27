@@ -5,7 +5,7 @@ import DA.Time
 
 import Splice.AmuletConfig
 import Splice.Fees
-import Splice.GlobalDomain
+import Splice.DecentralizedSynchronizer
 import Splice.Issuance
 import Splice.Schedule
 
@@ -45,12 +45,12 @@ defaultTransferConfig = TransferConfig with
     -- Chosen conservatively, but high enough to invite thinking about what's possible.
     maxNumLockHolders = 10
 
--- | Global domain config to use for testing.
-defaultAmuletGlobalDomainConfig : AmuletGlobalDomainConfig
-defaultAmuletGlobalDomainConfig = AmuletGlobalDomainConfig with
-  requiredDomains = Set.fromList ["global-domain-id-0"]
-  activeDomain = "global-domain-id-0"
-  fees = defaultDomainFeesConfig
+-- | Decentralized synchronizer config to use for testing.
+defaultAmuletDecentralizedSynchronizerConfig : AmuletDecentralizedSynchronizerConfig
+defaultAmuletDecentralizedSynchronizerConfig = AmuletDecentralizedSynchronizerConfig with
+  requiredSynchronizers = Set.fromList ["decentralized-synchronizer-id-0"]
+  activeSynchronizer = "decentralized-synchronizer-id-0"
+  fees = defaultSynchronizerFeesConfig
 
 
 -- | Default proposal for issuance curve and tickDuration
@@ -60,7 +60,7 @@ defaultAmuletConfig = AmuletConfig with
 
   issuanceCurve = defaultIssuanceCurve
 
-  globalDomain = defaultAmuletGlobalDomainConfig
+  decentralizedSynchronizer = defaultAmuletDecentralizedSynchronizerConfig
 
   -- Duration of one tick, which is half the target duration of one round
   tickDuration = minutes 10
@@ -132,7 +132,7 @@ defaultIssuanceCurve =
     hoursPerYear = 24 * 365
 
 
--- | Default domain fees configuration
+-- | Default synchronizer fees configuration
 
 defaultBaseRateTrafficLimits : BaseRateTrafficLimits
 defaultBaseRateTrafficLimits = BaseRateTrafficLimits with
@@ -140,8 +140,8 @@ defaultBaseRateTrafficLimits = BaseRateTrafficLimits with
     burstAmount = 10 * 20 * 1000
     burstWindow = minutes 10
 
-defaultDomainFeesConfig : DomainFeesConfig
-defaultDomainFeesConfig = DomainFeesConfig with
+defaultSynchronizerFeesConfig : SynchronizerFeesConfig
+defaultSynchronizerFeesConfig = SynchronizerFeesConfig with
     baseRateTrafficLimits = defaultBaseRateTrafficLimits
     minTopupAmount = 1_000_000 -- 1MB
     extraTrafficPrice = 1.0

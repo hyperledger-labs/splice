@@ -26,7 +26,11 @@ import com.daml.network.http.v0.sv_admin.{
   TriggerDomainMigrationDumpResponse,
 }
 import com.daml.network.http.v0.{definitions, sv_admin as http}
-import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
+import com.daml.network.sv.migration.{
+  DomainDataSnapshot,
+  DomainMigrationDump,
+  SynchronizerNodeIdentities,
+}
 import com.daml.network.util.{Codec, Contract, TemplateJsonDecoder}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.logging.ErrorLoggingContext
@@ -420,7 +424,8 @@ object HttpSvAdminAppClient {
     }
   }
 
-  case class PauseGlobalDomain() extends BaseCommand[http.PauseGlobalDomainResponse, Unit] {
+  case class PauseDecentralizedSynchronizer()
+      extends BaseCommand[http.PauseDecentralizedSynchronizerResponse, Unit] {
 
     override def submitRequest(
         client: Client,
@@ -428,17 +433,18 @@ object HttpSvAdminAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.PauseGlobalDomainResponse] =
-      client.pauseGlobalDomain(headers = headers)
+    ], http.PauseDecentralizedSynchronizerResponse] =
+      client.pauseDecentralizedSynchronizer(headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.PauseGlobalDomainResponse.OK =>
+    ) = { case http.PauseDecentralizedSynchronizerResponse.OK =>
       Right(())
     }
   }
 
-  case class UnpauseGlobalDomain() extends BaseCommand[http.UnpauseGlobalDomainResponse, Unit] {
+  case class UnpauseDecentralizedSynchronizer()
+      extends BaseCommand[http.UnpauseDecentralizedSynchronizerResponse, Unit] {
 
     override def submitRequest(
         client: Client,
@@ -446,12 +452,12 @@ object HttpSvAdminAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.UnpauseGlobalDomainResponse] =
-      client.unpauseGlobalDomain(headers = headers)
+    ], http.UnpauseDecentralizedSynchronizerResponse] =
+      client.unpauseDecentralizedSynchronizer(headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.UnpauseGlobalDomainResponse.OK =>
+    ) = { case http.UnpauseDecentralizedSynchronizerResponse.OK =>
       Right(())
     }
   }
@@ -528,10 +534,10 @@ object HttpSvAdminAppClient {
 
   }
 
-  case class GetDomainNodeIdentitiesDump()
+  case class GetSynchronizerNodeIdentitiesDump()
       extends BaseCommand[
-        http.GetDomainNodeIdentitiesDumpResponse,
-        DomainNodeIdentities,
+        http.GetSynchronizerNodeIdentitiesDumpResponse,
+        SynchronizerNodeIdentities,
       ] {
     override def submitRequest(
         client: Client,
@@ -539,13 +545,13 @@ object HttpSvAdminAppClient {
     ): EitherT[Future, Either[
       Throwable,
       HttpResponse,
-    ], http.GetDomainNodeIdentitiesDumpResponse] =
-      client.getDomainNodeIdentitiesDump(headers = headers)
+    ], http.GetSynchronizerNodeIdentitiesDumpResponse] =
+      client.getSynchronizerNodeIdentitiesDump(headers = headers)
 
     override def handleOk()(implicit
         decoder: TemplateJsonDecoder
-    ) = { case http.GetDomainNodeIdentitiesDumpResponse.OK(response) =>
-      DomainNodeIdentities.fromHttp(response.identities)
+    ) = { case http.GetSynchronizerNodeIdentitiesDumpResponse.OK(response) =>
+      SynchronizerNodeIdentities.fromHttp(response.identities)
     }
   }
 }

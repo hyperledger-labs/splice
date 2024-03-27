@@ -21,9 +21,9 @@ import com.digitalasset.canton.DomainAlias
 // however, this is likely only possible once we depend on Canton as a library
 trait CommonCNNodeAppInstanceReferences {
 
-  def globalDomainId(implicit env: CNNodeTestConsoleEnvironment): DomainId =
+  def decentralizedSynchronizerId(implicit env: CNNodeTestConsoleEnvironment): DomainId =
     sv1Backend.participantClientWithAdminToken.domains.id_of(sv1Backend.config.domains.global.alias)
-  def globalDomainAlias(implicit env: CNNodeTestConsoleEnvironment): DomainAlias =
+  def decentralizedSynchronizerAlias(implicit env: CNNodeTestConsoleEnvironment): DomainAlias =
     sv1Backend.config.domains.global.alias
 
   def dsoParty(implicit env: CNNodeTestConsoleEnvironment): PartyId = sv1ScanBackend.getDsoPartyId()

@@ -133,7 +133,10 @@ class SvOffboardingIntegrationTest
           suppressFailedClues(loggerFactory) {
             clue("Check partyToParticipant offboarding") {
               val mapping = sv3Backend.appState.participantAdminConnection
-                .getPartyToParticipant(globalDomainId, sv3Backend.getDsoInfo().dsoParty)
+                .getPartyToParticipant(
+                  decentralizedSynchronizerId,
+                  sv3Backend.getDsoInfo().dsoParty,
+                )
                 .futureValue
                 .mapping
               mapping.threshold shouldBe PositiveInt.tryCreate(2)
@@ -151,7 +154,7 @@ class SvOffboardingIntegrationTest
               val decentralizedNamespaces =
                 sv1Backend.participantClient.topology.decentralized_namespaces
                   .list(
-                    filterStore = globalDomainId.filterString,
+                    filterStore = decentralizedSynchronizerId.filterString,
                     filterNamespace = dsoParty.uid.namespace.toProtoPrimitive,
                   )
               inside(decentralizedNamespaces) { case Seq(decentralizedNamespace) =>
@@ -168,7 +171,7 @@ class SvOffboardingIntegrationTest
             clue("Check mediator offboarding") {
               val mediators =
                 sv3Backend.appState.participantAdminConnection
-                  .getMediatorDomainState(globalDomainId)
+                  .getMediatorDomainState(decentralizedSynchronizerId)
                   .futureValue
                   .mapping
                   .active
@@ -180,7 +183,7 @@ class SvOffboardingIntegrationTest
                 .getDsoInfo()
                 .svNodeStates
                 .values
-                .flatMap(_.payload.state.domainNodes.values().asScala)
+                .flatMap(_.payload.state.synchronizerNodes.values().asScala)
                 .flatMap(_.mediator.toScala)
                 .map(_.mediatorId)
                 .flatMap(mediatorId =>
@@ -200,7 +203,7 @@ class SvOffboardingIntegrationTest
             clue("Check sequencer offboarding") {
               val sequencers =
                 sv3Backend.appState.participantAdminConnection
-                  .getSequencerDomainState(globalDomainId)
+                  .getSequencerDomainState(decentralizedSynchronizerId)
                   .futureValue
                   .mapping
                   .active
@@ -212,7 +215,7 @@ class SvOffboardingIntegrationTest
                 .getDsoInfo()
                 .svNodeStates
                 .values
-                .flatMap(_.payload.state.domainNodes.values().asScala)
+                .flatMap(_.payload.state.synchronizerNodes.values().asScala)
                 .flatMap(_.sequencer.toScala)
                 .map(_.sequencerId)
                 .flatMap(sequencerId =>

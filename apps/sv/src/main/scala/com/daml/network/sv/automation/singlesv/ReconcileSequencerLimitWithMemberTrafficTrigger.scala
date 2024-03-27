@@ -36,17 +36,17 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
     mat: Materializer,
     tracer: Tracer,
 ) extends OnAssignedContractTrigger.Template[
-      splice.globaldomain.MemberTraffic.ContractId,
-      splice.globaldomain.MemberTraffic,
+      splice.decentralizedsynchronizer.MemberTraffic.ContractId,
+      splice.decentralizedsynchronizer.MemberTraffic,
     ](
       store,
-      splice.globaldomain.MemberTraffic.COMPANION,
+      splice.decentralizedsynchronizer.MemberTraffic.COMPANION,
     ) {
 
   override def completeTask(
       memberTraffic: AssignedContract[
-        splice.globaldomain.MemberTraffic.ContractId,
-        splice.globaldomain.MemberTraffic,
+        splice.decentralizedsynchronizer.MemberTraffic.ContractId,
+        splice.decentralizedsynchronizer.MemberTraffic,
       ]
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     Member
@@ -57,7 +57,7 @@ class ReconcileSequencerLimitWithMemberTrafficTrigger(
           Future.successful(TaskSuccess(s"Skipping MemberTraffic with invalid memberId: ${err}"))
         },
         memberId => {
-          val domainId = DomainId.tryFromString(memberTraffic.payload.domainId)
+          val domainId = DomainId.tryFromString(memberTraffic.payload.synchronizerId)
           sequencerAdminConnection.getStatus
             .map(_.successOption.map(_.domainId))
             .flatMap {

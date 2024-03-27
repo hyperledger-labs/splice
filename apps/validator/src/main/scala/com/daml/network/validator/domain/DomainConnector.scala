@@ -29,12 +29,14 @@ class DomainConnector(
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
 
-  def ensureGlobalDomainRegistered()(implicit tc: TraceContext): Future[Unit] = {
-    val globalDomainAlias = config.domains.global.alias
-    getGlobalDomainSequencerConnections.flatMap(ensureDomainRegistered(globalDomainAlias, _))
+  def ensureDecentralizedSynchronizerRegistered()(implicit tc: TraceContext): Future[Unit] = {
+    val decentralizedSynchronizerAlias = config.domains.global.alias
+    getDecentralizedSynchronizerSequencerConnections.flatMap(
+      ensureDomainRegistered(decentralizedSynchronizerAlias, _)
+    )
   }
 
-  def getGlobalDomainSequencerConnections(implicit
+  def getDecentralizedSynchronizerSequencerConnections(implicit
       tc: TraceContext
   ): Future[SequencerConnections] = {
     // TODO (#8450) config.domains.global.alias and config.domains.global.url are wrong if global has migrated
@@ -112,9 +114,9 @@ class DomainConnector(
       traceContext: TraceContext
   ): Future[Seq[GrpcSequencerConnection]] = {
     for {
-      globalDomainId <- scanConnection.getAmuletRulesDomain()(traceContext)
+      decentralizedSynchronizerId <- scanConnection.getAmuletRulesDomain()(traceContext)
       domainSequencers <- scanConnection.listDsoSequencers()
-      maybeSequencers = domainSequencers.find(_.domainId == globalDomainId)
+      maybeSequencers = domainSequencers.find(_.domainId == decentralizedSynchronizerId)
     } yield maybeSequencers.fold {
       logger.warn("global domain sequencer list not found.")
       Seq.empty[GrpcSequencerConnection]

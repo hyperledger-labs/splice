@@ -6,19 +6,19 @@ import com.daml.network.codegen.java.splice.cometbft.{
   CometBftConfigLimits,
   CometBftNodeConfig,
 }
-import com.daml.network.codegen.java.splice.dso.globaldomain.{
-  DomainConfig,
-  DomainNodeConfig,
-  DomainNodeConfigLimits,
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
+  SynchronizerConfig,
+  SynchronizerNodeConfig,
+  SynchronizerNodeConfigLimits,
   MediatorConfig,
   ScanConfig,
   SequencerConfig,
-  DsoGlobalDomainConfig,
+  DsoDecentralizedSynchronizerConfig,
 }
 import com.daml.network.codegen.java.splice.dsorules.DsoRulesConfig
 import com.daml.network.codegen.java.splice.{cometbft, dso}
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.sv.LocalDomainNode
+import com.daml.network.sv.LocalSynchronizerNode
 import com.daml.network.sv.cometbft.CometBftNode
 import com.daml.network.sv.config.SvScanConfig
 import com.digitalasset.canton.config.NonNegativeFiniteDuration
@@ -75,9 +75,10 @@ object SvUtil {
     256, // maxPubKeyLength
   )
 
-  private def defaultDomainNodeConfigLimits: DomainNodeConfigLimits = new DomainNodeConfigLimits(
-    defaultCometBftNetworkLimits // cometBft
-  )
+  private def defaultSynchronizerNodeConfigLimits: SynchronizerNodeConfigLimits =
+    new SynchronizerNodeConfigLimits(
+      defaultCometBftNetworkLimits // cometBft
+    )
 
   val emptyCometBftConfig = new CometBftConfig(
     Map.empty[String, CometBftNodeConfig].asJava,
@@ -85,26 +86,28 @@ object SvUtil {
     List.empty.asJava,
   )
 
-  private def defaultDsoGlobalDomainConfig(domainId: DomainId) = new DsoGlobalDomainConfig(
-    // domains
-    Map(
-      domainId.toProtoPrimitive -> new DomainConfig(
-        dso.globaldomain.DomainState.DS_OPERATIONAL,
-        "TODO(#4900): share CometBFT genesis.json of founding SV node via DsoRules config.",
-        // TODO(M3-47): also share the Canton DomainId of the decentralized domain here
-      )
-    ).asJava,
-    domainId.toProtoPrimitive, // lastDomainId
-    domainId.toProtoPrimitive, // activeDomain
+  private def defaultDsoDecentralizedSynchronizerConfig(domainId: DomainId) =
+    new DsoDecentralizedSynchronizerConfig(
+      // domains
+      Map(
+        domainId.toProtoPrimitive -> new SynchronizerConfig(
+          dso.decentralizedsynchronizer.SynchronizerState.DS_OPERATIONAL,
+          "TODO(#4900): share CometBFT genesis.json of founding SV node via DsoRules config.",
+          // TODO(M3-47): also share the Canton DomainId of the decentralized domain here
+        )
+      ).asJava,
+      domainId.toProtoPrimitive, // lastDomainId
+      domainId.toProtoPrimitive, // activeSynchronizer
 
-  )
+    )
 
   case class LocalSequencerConfig(sequencerId: String, url: String, migrationId: Long)
 
-  def getSequencerConfig(localDomainNode: Option[LocalDomainNode], migrationId: Long)(implicit
+  def getSequencerConfig(localSynchronizerNode: Option[LocalSynchronizerNode], migrationId: Long)(
+      implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Option[LocalSequencerConfig]] = localDomainNode.map { node =>
+  ): Future[Option[LocalSequencerConfig]] = localSynchronizerNode.map { node =>
     node.sequencerAdminConnection.getSequencerId.map { sequencerId =>
       LocalSequencerConfig(
         sequencerId.toProtoPrimitive,
@@ -116,10 +119,10 @@ object SvUtil {
 
   case class LocalMediatorConfig(mediatorId: String)
 
-  def getMediatorConfig(localDomainNode: Option[LocalDomainNode])(implicit
+  def getMediatorConfig(localSynchronizerNode: Option[LocalSynchronizerNode])(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[Option[LocalMediatorConfig]] = localDomainNode.map { node =>
+  ): Future[Option[LocalMediatorConfig]] = localSynchronizerNode.map { node =>
     node.mediatorAdminConnection.getMediatorId.map { mediatorId =>
       LocalMediatorConfig(
         mediatorId.toProtoPrimitive
@@ -127,9 +130,9 @@ object SvUtil {
     }
   }.sequence
 
-  def getFounderDomainNodeConfig(
+  def getFounderSynchronizerNodeConfig(
       cometBftNode: Option[CometBftNode],
-      localDomainNode: LocalDomainNode,
+      localSynchronizerNode: LocalSynchronizerNode,
       scanConfig: Option[SvScanConfig],
       domainId: DomainId,
       clock: Clock,
@@ -137,7 +140,7 @@ object SvUtil {
   )(implicit
       ec: ExecutionContext,
       tc: TraceContext,
-  ): Future[java.util.Map[String, DomainNodeConfig]] = {
+  ): Future[java.util.Map[String, SynchronizerNodeConfig]] = {
     for {
       nodeConfigOpt <- cometBftNode
         .map(_.getLocalNodeConfig())
@@ -163,7 +166,7 @@ object SvUtil {
           )
         }
         .getOrElse(SvUtil.emptyCometBftConfig)
-      localSequencerConfig <- getSequencerConfig(Some(localDomainNode), migrationId)
+      localSequencerConfig <- getSequencerConfig(Some(localSynchronizerNode), migrationId)
       sequencerConfig = localSequencerConfig.map(c =>
         new SequencerConfig(
           migrationId,
@@ -172,7 +175,7 @@ object SvUtil {
           Some(clock.now.toInstant).toJava,
         )
       )
-      localMediatorConfig <- getMediatorConfig(Some(localDomainNode))
+      localMediatorConfig <- getMediatorConfig(Some(localSynchronizerNode))
       mediatorConfig = localMediatorConfig.map(c =>
         new MediatorConfig(
           c.mediatorId
@@ -180,7 +183,7 @@ object SvUtil {
       )
     } yield {
       Map(
-        domainId.toProtoPrimitive -> new DomainNodeConfig(
+        domainId.toProtoPrimitive -> new SynchronizerNodeConfig(
           cometBftConfig,
           sequencerConfig.toJava,
           mediatorConfig.toJava,
@@ -198,9 +201,9 @@ object SvUtil {
     new RelTime(TimeUnit.HOURS.toMicros(1)), // svOnboardingConfirmedTimeout
     new RelTime(TimeUnit.HOURS.toMicros(7 * 24)), // voteRequestTimeout
     new RelTime(TimeUnit.SECONDS.toMicros(70)), // dsoDelegateInactiveTimeout
-    defaultDomainNodeConfigLimits,
+    defaultSynchronizerNodeConfigLimits,
     1024, // maxTextLength
-    defaultDsoGlobalDomainConfig(domainId), // globalDomainConfig
+    defaultDsoDecentralizedSynchronizerConfig(domainId), // decentralizedSynchronizerConfig
     Optional.empty(), // nextScheduledHardDomainMigration
   )
 

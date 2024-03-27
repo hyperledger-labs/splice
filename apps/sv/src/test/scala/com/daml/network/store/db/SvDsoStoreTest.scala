@@ -7,14 +7,14 @@ import com.daml.network.codegen.java.splice.amuletrules.{
   AppTransferContext,
   AmuletRules_MiningRound_Archive,
 }
-import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
+import com.daml.network.codegen.java.splice.decentralizedsynchronizer.MemberTraffic
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.ans.*
 import com.daml.network.codegen.java.splice.cometbft.CometBftConfigLimits
-import com.daml.network.codegen.java.splice.dso.globaldomain.{
-  DomainNodeConfigLimits,
-  DsoGlobalDomainConfig,
+import com.daml.network.codegen.java.splice.dso.decentralizedsynchronizer.{
+  SynchronizerNodeConfigLimits,
+  DsoDecentralizedSynchronizerConfig,
 }
 import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
@@ -51,7 +51,7 @@ import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
-import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
+import com.daml.network.sv.config.{SvSynchronizerConfig, SvDecentralizedSynchronizerConfig}
 import com.daml.network.sv.history.DsoRulesCloseVoteRequest
 import com.daml.network.sv.store.db.DbSvDsoStore
 import com.daml.network.sv.store.SvDsoStore.IdleAnsSubscription
@@ -1079,9 +1079,9 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         new RelTime(1),
         new RelTime(1),
         new RelTime(1),
-        new DomainNodeConfigLimits(new CometBftConfigLimits(1, 1, 1, 1, 1)),
+        new SynchronizerNodeConfigLimits(new CometBftConfigLimits(1, 1, 1, 1, 1)),
         1,
-        new DsoGlobalDomainConfig(Collections.emptyMap(), newDomainId, newDomainId),
+        new DsoDecentralizedSynchronizerConfig(Collections.emptyMap(), newDomainId, newDomainId),
         Optional.empty(),
       ),
       Collections.emptyMap(),
@@ -1255,8 +1255,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
   lazy val acsOffset = nextOffset()
   lazy val domain = dummyDomain.toProtoPrimitive
   lazy val storeSvParty = providerParty(42)
-  lazy val svDomainConfig = SvDomainConfig(
-    SvGlobalDomainConfig(DomainAlias.tryCreate(domain), "https://example.com")
+  lazy val svSynchronizerConfig = SvSynchronizerConfig(
+    SvDecentralizedSynchronizerConfig(DomainAlias.tryCreate(domain), "https://example.com")
   )
 }
 

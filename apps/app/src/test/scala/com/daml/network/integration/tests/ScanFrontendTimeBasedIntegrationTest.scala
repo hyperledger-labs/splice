@@ -17,7 +17,7 @@ class ScanFrontendTimeBasedIntegrationTest
     with ConfigScheduleUtil
     with WalletTestUtil
     with TimeTestUtil
-    with DomainFeesTestUtil
+    with SynchronizerFeesTestUtil
     with TriggerTestUtil {
 
   val amuletPrice = 2
@@ -240,7 +240,7 @@ class ScanFrontendTimeBasedIntegrationTest
           bobValidatorWalletClient.tap(100.0)
           val trafficAmount = sv1ScanBackend
             .getAmuletConfigAsOf(env.environment.clock.now)
-            .globalDomain
+            .decentralizedSynchronizer
             .fees
             .minTopupAmount
           buyMemberTraffic(

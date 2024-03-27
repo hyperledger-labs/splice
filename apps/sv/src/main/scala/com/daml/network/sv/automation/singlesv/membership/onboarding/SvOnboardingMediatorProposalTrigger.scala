@@ -49,8 +49,8 @@ class SvOnboardingMediatorProposalTrigger(
       domainId = rulesAndStates.dsoRules.domain
       currentMediatorState <- participantAdminConnection.getMediatorDomainState(domainId)
     } yield {
-      val currentDomainConfigs = rulesAndStates.currentDomainNodeConfigs()
-      val domainNodeConfiguredNodes = currentDomainConfigs
+      val currentSynchronizerConfigs = rulesAndStates.currentSynchronizerNodeConfigs()
+      val synchronizerNodeConfiguredNodes = currentSynchronizerConfigs
         .flatMap(domainConfigs =>
           (domainConfigs.mediator.toScala -> domainConfigs.sequencer.toScala).tupled
         )
@@ -62,7 +62,7 @@ class SvOnboardingMediatorProposalTrigger(
               .tryFromProtoPrimitive(sequencerConfig.sequencerId, "sequencerId")
         }
       val mediatorsToAdd =
-        domainNodeConfiguredNodes
+        synchronizerNodeConfiguredNodes
           .filterNot { case (mediatorId, _) =>
             currentMediatorState.mapping.active.contains(mediatorId)
           }

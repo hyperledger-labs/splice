@@ -72,11 +72,11 @@ class SvStatusReportMetricsExportTrigger(
           metrics.creationTime.updateValue(
             CantonTimestamp.assertFromInstant(task.payload.status.get().createdAt).toMicros
           )
-          metrics.mediatorDomainTime.updateValue(
-            CantonTimestamp.assertFromInstant(status.mediatorDomainTime).toMicros
+          metrics.mediatorSynchronizerTime.updateValue(
+            CantonTimestamp.assertFromInstant(status.mediatorSynchronizerTime).toMicros
           )
-          metrics.participantDomainTime.updateValue(
-            CantonTimestamp.assertFromInstant(status.participantDomainTime).toMicros
+          metrics.participantSynchronizerTime.updateValue(
+            CantonTimestamp.assertFromInstant(status.participantSynchronizerTime).toMicros
           )
           metrics.cometBftHeight.updateValue(status.cometBftHeight)
           metrics.latestOpenRound.updateValue(status.latestOpenRound.number)
@@ -118,11 +118,11 @@ object SvStatusReportMetricsExportTrigger {
     val reportNumber: Gauge[Long] = gauge("number", initial = 0L)
     val creationTime: Gauge[Long] = gauge("creation_time_us", initial = minTimestampValue)
     val cometBftHeight: Gauge[Long] = gauge("cometbft_height", initial = -1L)
-    val mediatorDomainTime: Gauge[Long] =
+    val mediatorSynchronizerTime: Gauge[Long] =
       gauge("domain_time_us", initial = minTimestampValue)(
         mc.withExtraLabels("target_node" -> "mediator")
       )
-    val participantDomainTime: Gauge[Long] =
+    val participantSynchronizerTime: Gauge[Long] =
       gauge("domain_time_us", initial = minTimestampValue)(
         mc.withExtraLabels("target_node" -> "participant")
       )
@@ -132,8 +132,8 @@ object SvStatusReportMetricsExportTrigger {
       reportNumber.close()
       creationTime.close()
       cometBftHeight.close()
-      mediatorDomainTime.close()
-      participantDomainTime.close()
+      mediatorSynchronizerTime.close()
+      participantSynchronizerTime.close()
       latestOpenRound.close()
     }
   }

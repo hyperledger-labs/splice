@@ -14,9 +14,13 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
-import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
+import com.daml.network.sv.config.{SvSynchronizerConfig, SvDecentralizedSynchronizerConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
-import com.daml.network.sv.migration.{DomainDataSnapshot, DomainMigrationDump, DomainNodeIdentities}
+import com.daml.network.sv.migration.{
+  DomainDataSnapshot,
+  DomainMigrationDump,
+  SynchronizerNodeIdentities,
+}
 import com.daml.network.util.{
   DomainMigrationUtil,
   ProcessTestUtil,
@@ -25,7 +29,10 @@ import com.daml.network.util.{
   WalletTestUtil,
 }
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
-import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
+import com.daml.network.validator.config.{
+  ValidatorSynchronizerConfig,
+  ValidatorDecentralizedSynchronizerConfig,
+}
 import com.daml.network.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.DomainAlias
@@ -107,8 +114,8 @@ class DisasterRecoveryIntegrationTest
                             dumpFilePath = migrationDumpFilePath(s"sv${sv}").path,
                           )
                         ),
-                        domains = SvDomainConfig(global =
-                          SvGlobalDomainConfig(
+                        domains = SvSynchronizerConfig(global =
+                          SvDecentralizedSynchronizerConfig(
                             alias = DomainAlias.tryCreate("global"),
                             // changing the domain config since for a domain migration SVs connect directly to their own sequencer instead of SV1's sequencer.
                             url = s"http://localhost:28${sv}08",
@@ -130,8 +137,8 @@ class DisasterRecoveryIntegrationTest
                   .validatorApps(InstanceName.tryCreate("sv1Validator"))
                   .copy(
                     scanClient = TrustSingle(url = "http://127.0.0.1:28012"),
-                    domains = ValidatorDomainConfig(global =
-                      ValidatorGlobalDomainConfig(
+                    domains = ValidatorSynchronizerConfig(global =
+                      ValidatorDecentralizedSynchronizerConfig(
                         alias = DomainAlias.tryCreate("global"),
                         url = Some("http://localhost:28109"),
                       )
@@ -194,7 +201,7 @@ class DisasterRecoveryIntegrationTest
 
   private def runTest(
       cantonInstanceSuffix: String,
-      getAndWriteDumps: (Seq[DomainNodeIdentities], Instant) => Unit,
+      getAndWriteDumps: (Seq[SynchronizerNodeIdentities], Instant) => Unit,
   )(implicit env: CNNodeTestConsoleEnvironment): Unit = {
     import env.environment.scheduler
     import env.executionContext
@@ -228,7 +235,7 @@ class DisasterRecoveryIntegrationTest
         )
 
         val identities = withClueAndLog("Getting node identities dump") {
-          svBackends.map(_.getDomainNodeIdentitiesDump())
+          svBackends.map(_.getSynchronizerNodeIdentitiesDump())
         }
 
         actAndCheck("Create some transaction history", sv1WalletClient.tap(1337))(
@@ -335,65 +342,78 @@ class DisasterRecoveryIntegrationTest
             env.environment.config.monitoring.logging.api,
             28,
           ),
-        ) { case (newDomainNode1, newDomainNode2, newDomainNode3, newDomainNode4) =>
-          val allNodes =
-            Seq(newDomainNode1, newDomainNode2, newDomainNode3, newDomainNode4)
+        ) {
+          case (
+                newSynchronizerNode1,
+                newSynchronizerNode2,
+                newSynchronizerNode3,
+                newSynchronizerNode4,
+              ) =>
+            val allNodes =
+              Seq(
+                newSynchronizerNode1,
+                newSynchronizerNode2,
+                newSynchronizerNode3,
+                newSynchronizerNode4,
+              )
 
-          withClueAndLog("Starting new SV apps") {
-            // UpdateHistory and DbMultiDomainAcsStore warn about deleting historical data
-            // after a rollback, which is expected in this test.
-            loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-              startAllSync(
-                sv1LocalBackend,
-                sv2LocalBackend,
-                sv3LocalBackend,
-                sv4LocalBackend,
-                sv1ScanLocalBackend,
-                sv1ValidatorLocalBackend,
-              ),
-              entries => {
-                entries should not be empty
-                // Both UpdateHistory and DbMultiDomainAcsStore should roll back data
-                forAtLeast(1, entries) { _.loggerName should include("UpdateHistory") }
-                forAtLeast(1, entries) { _.loggerName should include("DbMultiDomainAcsStore") }
-                // This part of the warning message is shared between UpdateHistory and DbMultiDomainAcsStore
-                forAll(entries) {
-                  _.warningMessage should include(
-                    "This is expected during a disaster recovery, where we are rolling back the domain to a previous state"
-                  )
-                }
-              },
-            )
-          }
+            withClueAndLog("Starting new SV apps") {
+              // UpdateHistory and DbMultiDomainAcsStore warn about deleting historical data
+              // after a rollback, which is expected in this test.
+              loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+                startAllSync(
+                  sv1LocalBackend,
+                  sv2LocalBackend,
+                  sv3LocalBackend,
+                  sv4LocalBackend,
+                  sv1ScanLocalBackend,
+                  sv1ValidatorLocalBackend,
+                ),
+                entries => {
+                  entries should not be empty
+                  // Both UpdateHistory and DbMultiDomainAcsStore should roll back data
+                  forAtLeast(1, entries) { _.loggerName should include("UpdateHistory") }
+                  forAtLeast(1, entries) { _.loggerName should include("DbMultiDomainAcsStore") }
+                  // This part of the warning message is shared between UpdateHistory and DbMultiDomainAcsStore
+                  forAll(entries) {
+                    _.warningMessage should include(
+                      "This is expected during a disaster recovery, where we are rolling back the domain to a previous state"
+                    )
+                  }
+                },
+              )
+            }
 
-          checkMigrateDomainOnNodes(allNodes)
+            checkMigrateDomainOnNodes(allNodes)
 
-          withClueAndLog("Old balance has been transferred to new domain") {
-            assertInRange(
-              sv1WalletLocalClient.balance().unlockedQty,
-              (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
-            )
-          }
-          // TODO(#10449): this won't work until the validator also supports disaster recovery
-          /* withClueAndLog("Only one tap visible in the wallet transaction history on the new domain") {
+            withClueAndLog("Old balance has been transferred to new domain") {
+              assertInRange(
+                sv1WalletLocalClient.balance().unlockedQty,
+                (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
+              )
+            }
+            // TODO(#10449): this won't work until the validator also supports disaster recovery
+            /* withClueAndLog("Only one tap visible in the wallet transaction history on the new domain") {
             val balanceChanges = sv1WalletLocalClient.listTransactions(None, 100).collect {
               case e: BalanceChangeTxLogEntry => e.amount
             }
             balanceChanges should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
           } */
-          withClueAndLog("Only one tap visible in the scan transaction history on the new domain") {
-            val taps = sv1ScanLocalBackend
-              .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
-              .flatMap(_.tap.map(t => BigDecimal(t.amuletAmount)))
-            taps should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
-          }
-          withClueAndLog("New domain is functional") {
-            sv1WalletLocalClient.tap(1337)
-            assertInRange(
-              sv1WalletLocalClient.balance().unlockedQty,
-              (walletUsdToAmulet(2000), walletUsdToAmulet(3000)),
-            )
-          }
+            withClueAndLog(
+              "Only one tap visible in the scan transaction history on the new domain"
+            ) {
+              val taps = sv1ScanLocalBackend
+                .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
+                .flatMap(_.tap.map(t => BigDecimal(t.amuletAmount)))
+              taps should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
+            }
+            withClueAndLog("New domain is functional") {
+              sv1WalletLocalClient.tap(1337)
+              assertInRange(
+                sv1WalletLocalClient.balance().unlockedQty,
+                (walletUsdToAmulet(2000), walletUsdToAmulet(3000)),
+              )
+            }
         }
       }
     }
@@ -413,7 +433,7 @@ class DisasterRecoveryIntegrationTest
 
   private def writeMigrationDumpFile(
       sv: SvAppBackendReference,
-      ids: DomainNodeIdentities,
+      ids: SynchronizerNodeIdentities,
       dump: DomainDataSnapshot,
   ): Unit = {
 

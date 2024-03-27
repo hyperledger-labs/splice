@@ -119,10 +119,12 @@ object ScanAggregatesReader {
         traceContext: TraceContext
     ): Future[ScanAggregatesConnection] = {
       for {
-        globalDomainId <- store.getGlobalDomainId().map(_.unwrap.toProtoPrimitive)
+        decentralizedSynchronizerId <- store
+          .getDecentralizedSynchronizerId()
+          .map(_.unwrap.toProtoPrimitive)
         scans <- store.listDsoScans()
         scanUrls = scans
-          .filter(_._1 == globalDomainId)
+          .filter(_._1 == decentralizedSynchronizerId)
           .flatMap { case (_, scans) =>
             scans.map(si => Uri.parseAbsolute(si.publicUrl))
           }

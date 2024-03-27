@@ -237,8 +237,8 @@ object ScanConnection {
         assignment =>
           AmuletConfigSchedule(amuletRules)
             .getConfigAsOf(now)
-            .globalDomain
-            .activeDomain == assignment.toProtoPrimitive,
+            .decentralizedSynchronizer
+            .activeSynchronizer == assignment.toProtoPrimitive,
         false,
       )
   }
@@ -252,8 +252,8 @@ object ScanConnection {
         assignment =>
           AmuletConfigSchedule(amuletRules)
             .getConfigAsOf(now)
-            .globalDomain
-            .activeDomain == assignment.toProtoPrimitive,
+            .decentralizedSynchronizer
+            .activeSynchronizer == assignment.toProtoPrimitive,
         false,
       )
   }
@@ -274,8 +274,8 @@ object ScanConnection {
             assignment =>
               AmuletConfigSchedule(amuletRules)
                 .getConfigAsOf(now)
-                .globalDomain
-                .activeDomain == assignment.toProtoPrimitive,
+                .decentralizedSynchronizer
+                .activeSynchronizer == assignment.toProtoPrimitive,
             false,
           )
         )

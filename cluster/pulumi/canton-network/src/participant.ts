@@ -7,7 +7,7 @@ import {
   CnChartVersion,
   disableCantonAutoInit,
   ExactNamespace,
-  GlobalDomainMigrationConfig,
+  DecentralizedSynchronizerMigrationConfig,
   installCNHelmChart,
   installMigrationIdSpecificComponent,
   jmxOptions,
@@ -18,7 +18,7 @@ import * as postgres from './postgres';
 import { installPostgresMetrics, Postgres } from './postgres';
 
 export function installMigrationSpecificValidatorParticipant(
-  globalDomainMigrationConfig: GlobalDomainMigrationConfig,
+  decentralizedSynchronizerMigrationConfig: DecentralizedSynchronizerMigrationConfig,
   xns: ExactNamespace,
   defaultPostgres: postgres.Postgres | undefined,
   participantBootstrapDump: BootstrappingDumpConfig | undefined,
@@ -26,7 +26,7 @@ export function installMigrationSpecificValidatorParticipant(
   dependsOn: pulumi.Resource[] = []
 ): Release {
   return installMigrationIdSpecificComponent(
-    globalDomainMigrationConfig,
+    decentralizedSynchronizerMigrationConfig,
     (migrationId, isActive, version) => {
       const participantPostgres =
         defaultPostgres || postgres.installPostgres(xns, `participant-${migrationId}-pg`, true);
@@ -40,7 +40,7 @@ export function installMigrationSpecificValidatorParticipant(
         disableCantonAutoInit ||
           !!participantBootstrapDump ||
           !isActive ||
-          globalDomainMigrationConfig.isRunningMigration(),
+          decentralizedSynchronizerMigrationConfig.isRunningMigration(),
         nodeIdentifier,
         version,
         dependsOn
