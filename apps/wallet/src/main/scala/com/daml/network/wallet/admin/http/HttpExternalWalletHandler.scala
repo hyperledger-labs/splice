@@ -81,7 +81,9 @@ class HttpExternalWalletHandler(
                     )
                     .map { cid =>
                       r0.CreateTransferOfferResponse.OK(
-                        d0.CreateTransferOfferResponse(Codec.encodeContractId(cid.exerciseResult))
+                        d0.CreateTransferOfferResponse(
+                          Codec.encodeContractId(cid.exerciseResult.transferOffer)
+                        )
                       )
                     }
                 )
@@ -228,7 +230,7 @@ class HttpExternalWalletHandler(
                         .map { cid =>
                           r0.CreateBuyTrafficRequestResponse.OK(
                             d0.CreateBuyTrafficRequestResponse(
-                              Codec.encodeContractId(cid.exerciseResult)
+                              Codec.encodeContractId(cid.exerciseResult.buyTrafficRequest)
                             )
                           )
                         }

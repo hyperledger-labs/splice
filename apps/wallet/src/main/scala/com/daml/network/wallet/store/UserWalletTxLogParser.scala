@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.splice.amuletrules.invalidtransferreason.{
   ITR_Other,
   ITR_UnknownDomain,
 }
+import com.daml.network.codegen.java.splice.wallet.buytrafficrequest.BuyTrafficRequestTrackingInfo
 import com.daml.network.codegen.java.splice.wallet.install.amuletoperation.{
   CO_AppPayment,
   CO_BuyMemberTraffic,
@@ -29,6 +30,7 @@ import com.daml.network.codegen.java.splice.wallet.install.amuletoperationoutcom
   COO_Error,
   COO_MergeTransferInputs,
 }
+import com.daml.network.codegen.java.splice.wallet.transferoffer.TransferOfferTrackingInfo
 import com.daml.network.codegen.java.splice.wallet.{
   buytrafficrequest as trafficRequestCodegen,
   transferoffer as transferCodegen,
@@ -277,7 +279,7 @@ class UserWalletTxLogParser(
             now(
               State.fromTransferOfferFailure(
                 TransferOfferTxLogEntry.Status.Rejected(TransferOfferStatusRejected()),
-                node,
+                node.result.value.trackingInfo,
               )
             )
 
@@ -287,7 +289,7 @@ class UserWalletTxLogParser(
                 TransferOfferTxLogEntry.Status.Withdrawn(
                   TransferOfferStatusWithdrawn(node.argument.value.reason)
                 ),
-                node,
+                node.result.value.trackingInfo,
               )
             )
 
@@ -295,7 +297,7 @@ class UserWalletTxLogParser(
             now(
               State.fromTransferOfferFailure(
                 TransferOfferTxLogEntry.Status.Expired(TransferOfferStatusExpired()),
-                node,
+                node.result.value.trackingInfo,
               )
             )
 
@@ -325,7 +327,7 @@ class UserWalletTxLogParser(
                 TransferOfferTxLogEntry.Status.Withdrawn(
                   TransferOfferStatusWithdrawn(node.argument.value.reason)
                 ),
-                node,
+                node.result.value,
               )
             )
 
@@ -335,7 +337,7 @@ class UserWalletTxLogParser(
                 TransferOfferTxLogEntry.Status.Expired(
                   TransferOfferStatusExpired()
                 ),
-                node,
+                node.result.value.trackingInfo,
               )
             )
 
@@ -345,7 +347,7 @@ class UserWalletTxLogParser(
                 TransferOfferTxLogEntry.Status.Withdrawn(
                   TransferOfferStatusWithdrawn(node.argument.value.reason)
                 ),
-                node,
+                node.result.value.trackingInfo,
               )
             )
 
@@ -378,7 +380,7 @@ class UserWalletTxLogParser(
                 BuyTrafficRequestTxLogEntry.Status.Rejected(
                   BuyTrafficRequestStatusRejected(node.argument.value.reason)
                 ),
-                node,
+                node.result.value.trackingInfo,
               )
             )
 
@@ -388,7 +390,7 @@ class UserWalletTxLogParser(
                 BuyTrafficRequestTxLogEntry.Status.Expired(
                   BuyTrafficRequestStatusExpired()
                 ),
-                node,
+                node.result.value.trackingInfo,
               )
             )
 
@@ -421,7 +423,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value,
+                node.result.value.amulet,
                 BalanceChangeTransactionSubtype.AppPaymentRejected,
               )
             )
@@ -431,7 +433,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value,
+                node.result.value.amulet,
                 BalanceChangeTransactionSubtype.AppPaymentExpired,
               )
             )
@@ -525,7 +527,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value._2,
+                node.result.value.amuletSum,
                 BalanceChangeTransactionSubtype.SubscriptionPaymentRejected,
               )
             )
@@ -535,7 +537,7 @@ class UserWalletTxLogParser(
               State.fromAmuletCreateSummary(
                 tree,
                 root,
-                node.result.value._2,
+                node.result.value.amuletSum,
                 BalanceChangeTransactionSubtype.SubscriptionPaymentExpired,
               )
             )
@@ -935,9 +937,8 @@ object UserWalletTxLogParser {
 
     def fromTransferOfferFailure(
         failureReason: TransferOfferTxLogEntry.Status,
-        node: ExerciseNode[?, transferCodegen.TransferOfferTrackingInfo],
+        trackingInfo: TransferOfferTrackingInfo,
     ): State = {
-      val trackingInfo = node.result.value
       fromTransferOfferOperation(
         trackingInfo.trackingId,
         failureReason,
@@ -950,15 +951,16 @@ object UserWalletTxLogParser {
         tx: TransactionTree,
         node: ExerciseNode[?, AcceptedTransferOffer_Complete.Res],
     ): State = {
-      val trackingInfo = node.result.value._1._2
-      val receiverAmuletContractId = node.result.value._1._1.createdAmulets.asScala.toList match {
-        case (amulet: splice.amuletrules.createdamulet.TransferResultAmulet) :: Nil =>
-          amulet.contractIdValue.contractId
-        case x =>
-          throw new RuntimeException(
-            s"Expected createdAmulets to contain a single TransferResultAmulet, but was $x"
-          )
-      }
+      val trackingInfo = node.result.value.trackingInfo
+      val receiverAmuletContractId =
+        node.result.value.transferResult.createdAmulets.asScala.toList match {
+          case (amulet: splice.amuletrules.createdamulet.TransferResultAmulet) :: Nil =>
+            amulet.contractIdValue.contractId
+          case x =>
+            throw new RuntimeException(
+              s"Expected createdAmulets to contain a single TransferResultAmulet, but was $x"
+            )
+        }
       fromTransferOfferOperation(
         trackingInfo.trackingId,
         TransferOfferTxLogEntry.Status.Completed(
@@ -1070,7 +1072,7 @@ object UserWalletTxLogParser {
         tx: TransactionTree,
         node: ExerciseNode[?, BuyTrafficRequest_Complete.Res],
     ): State = {
-      val trackingInfo = node.result.value._1._2
+      val trackingInfo = node.result.value.trackingInfo
       fromBuyTrafficRequestOperation(
         trackingInfo.trackingId,
         BuyTrafficRequestTxLogEntry.Status.Completed(
@@ -1084,9 +1086,8 @@ object UserWalletTxLogParser {
 
     def fromBuyTrafficRequestFailure(
         failureReason: BuyTrafficRequestTxLogEntry.Status,
-        node: ExerciseNode[?, trafficRequestCodegen.BuyTrafficRequestTrackingInfo],
+        trackingInfo: BuyTrafficRequestTrackingInfo,
     ): State = {
-      val trackingInfo = node.result.value
       fromBuyTrafficRequestOperation(
         trackingInfo.trackingId,
         failureReason,

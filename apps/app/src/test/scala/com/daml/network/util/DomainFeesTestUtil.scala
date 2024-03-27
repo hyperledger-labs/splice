@@ -175,7 +175,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       trackingId: String,
   )(implicit
       env: CNNodeTestConsoleEnvironment
-  ): Contract[BuyTrafficRequest.ContractId, BuyTrafficRequest] = {
+  ): BuyTrafficRequest.ContractId = {
     val now = env.environment.clock.now
     val domainId =
       DomainId.tryFromString(sv1ScanBackend.getAmuletConfigAsOf(now).globalDomain.activeDomain)
@@ -195,8 +195,8 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
       now.plus(java.time.Duration.ofMinutes(1)).toInstant,
       trackingId,
     )
-    validatorApp.participantClientWithAdminToken.ledger_api_extensions.commands
-      .submitWithCreate(BuyTrafficRequest.COMPANION)(
+    val result = validatorApp.participantClientWithAdminToken.ledger_api_extensions.commands
+      .submitWithResult(
         validatorApp.config.ledgerApiUser,
         Seq(validatorParty),
         Seq(buyer),
@@ -207,6 +207,7 @@ trait DomainFeesTestUtil extends CNNodeTestCommon {
           sv1ScanBackend.getLatestOpenMiningRound(now),
         ).toLedgerApiDisclosedContracts,
       )
+    result.exerciseResult.buyTrafficRequest
   }
 
   def getTopupParameters(validatorApp: ValidatorAppBackendReference, ts: CantonTimestamp)(implicit

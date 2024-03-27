@@ -100,10 +100,11 @@ template AnsRules
         payment <- fetchAndValidateInitialPayment paymentCid (ExpectedPayment with dso, sender = user)
         context <- fetchAndValidateEntryContext entryContext (ExpectedEntryContext with dso, user, reference = payment.reference)
         -- accept payment which creates the subscription
-        (_, subscriptionStateCid, amuletCid) <- exercise paymentCid SubscriptionInitialPayment_Collect with
+        collectResult <- exercise paymentCid SubscriptionInitialPayment_Collect with
           transferContext
         -- burn the amulet created for the DSO (using fetchAndArchive for extra safety)
-        void $ fetchAndArchive (ForOwner with dso; owner = dso) amuletCid
+        void $ fetchAndArchive (ForOwner with dso; owner = dso) collectResult.amulet
+        let subscriptionStateCid = collectResult.subscriptionState
         subscriptionState <- fetchUncheckedReferenceData subscriptionStateCid
         -- deliver the promised good: create the ans entry
         entryCid <- case context of
@@ -135,8 +136,9 @@ template AnsRules
         require "Subscription entry renewal times are in sync"
           (payment.thisPaymentDueAt == entry.expiresAt)
         -- accept payment
-        (subscriptionStateCid, amuletCid) <- exercise paymentCid SubscriptionPayment_Collect with
+        result <- exercise paymentCid SubscriptionPayment_Collect with
           transferContext
+        let (subscriptionStateCid, amuletCid) = (result.subscriptionState, result.amulet)
         -- burn the amulet created for the DSO (using fetchAndArchive for extra safety)
         void $ fetchAndArchive (ForOwner with dso; owner = dso) amuletCid
         -- renew entry

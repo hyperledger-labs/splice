@@ -43,11 +43,11 @@ acceptPaymentRequest : AmuletApp -> AmuletUser -> Party -> Optional(ContractId F
 acceptPaymentRequest app sender walletProvider providerFeaturedAppRight transferRequest amulet = do
   context <- getPaymentTransferContextFeaturedApp app sender providerFeaturedAppRight
   -- TODO(#2957): remove read-as DSO.
-  (accept, _change) <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
+  result <- submitMulti [sender.primaryParty, walletProvider] [app.dso] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [InputAmulet amulet]
     context
     walletProvider
-  return accept
+  return result.acceptedPayment
 
 collectAcceptedPayment : AmuletApp -> AmuletUser -> ContractId AcceptedAppPayment -> Script AcceptedAppPayment_Collect_Result
 collectAcceptedPayment app provider acceptedAppPayment = do
@@ -660,14 +660,16 @@ testBuyMemberTraffic = script do
       validatorParty = provider2Validator.primaryParty
   _ <- tap app provider2 10.0
 
-  let createTrafficRequest amount memberId domainId trackingId expiresAt = submitMulti [provider2Validator.primaryParty] [provider2.primaryParty] $
-        exerciseCmd provider2Install $ WalletAppInstall_CreateBuyTrafficRequest with
-          trafficAmount = amount
-          memberId = memberId
-          domainId = domainId
-          migrationId = 0
-          trackingId = trackingId
-          expiresAt = expiresAt
+  let createTrafficRequest amount memberId domainId trackingId expiresAt = do
+      result <- submitMulti [provider2Validator.primaryParty] [provider2.primaryParty] $
+          exerciseCmd provider2Install $ WalletAppInstall_CreateBuyTrafficRequest with
+            trafficAmount = amount
+            memberId = memberId
+            domainId = domainId
+            migrationId = 0
+            trackingId = trackingId
+            expiresAt = expiresAt
+      return result.buyTrafficRequest
 
   now <- getTime
   -- time-expired traffic requests cannot be completed or cancelled, only archived
@@ -675,7 +677,8 @@ testBuyMemberTraffic = script do
   COO_Error (ITR_Other ("The requirement 'Contract has not expired' was not met.")) <- executeAmuletOperation app provider2 $
     CO_CompleteBuyTrafficRequest request1
   submitMustFail provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Cancel with reason = "not required"
-  trackingInfo <- submit provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Expire
+  result <- submit provider2.primaryParty $ exerciseCmd request1 BuyTrafficRequest_Expire
+  let trackingInfo = result.trackingInfo
   trackingInfo.endUserParty === provider2.primaryParty
   trackingInfo.trackingId === "request1"
 
@@ -694,8 +697,9 @@ testBuyMemberTraffic = script do
 
   -- check that traffic requests can be cancelled by the requester
   request3 <- createTrafficRequest minTopupAmount testParticipantId domainId "request3" (now `addRelTime` minutes 1)
-  trackingInfo <- submit provider2.primaryParty $
+  result <- submit provider2.primaryParty $
     exerciseCmd request3 BuyTrafficRequest_Cancel with reason = "not required"
+  let trackingInfo = result.trackingInfo
   trackingInfo.trackingId === "request3"
   trackingInfo.endUserParty === provider2.primaryParty
   None <- queryContractId @BuyTrafficRequest provider2.primaryParty request3

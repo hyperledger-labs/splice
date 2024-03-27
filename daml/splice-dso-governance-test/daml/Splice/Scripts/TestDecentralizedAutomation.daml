@@ -250,10 +250,11 @@ testDecentralizedAns = do
   amulet <- tap app alice 1.5
 
   paymentContext <- getPaymentTransferContext app alice
-  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd ansSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd ansSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
+  let initialPaymentCid = result.subscriptionPayment
 
   -- SVs create confirmations for DSO to collect initial payment of the requested ans entry.
   appContext <- getAppTransferContext app app.dsoUser
@@ -291,10 +292,11 @@ testDecentralizedAns = do
   appContext <- getAppTransferContext app app.dsoUser
 
   amulet <- tap app alice 1.5
-  (paymentCid, _) <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
+  let paymentCid = result.subscriptionPayment
 
   submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid
     DsoRules_CollectEntryRenewalPayment with
@@ -322,10 +324,11 @@ testDecentralizedAns = do
   amulet <- tap app alice 1.5
 
   paymentContext <- getPaymentTransferContext app alice
-  (initialPaymentCid, _) <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd rejectedSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
+  result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd rejectedSummary.requestCid SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
     walletProvider = app.dso
+  let initialPaymentCid = result.subscriptionPayment
 
   -- SVs create confirmations for DSO to reject initial payment of the requested ans entry.
   appContext <- getAppTransferContext app app.dsoUser
@@ -374,9 +377,9 @@ terminatedSubscriptionCanBeCleanedUp = script do
     description = "Darth Vader's ANS Description"
     user = alice.primaryParty
 
-  aborted <- submit alice.primaryParty $ exerciseCmd ansSummary.requestCid SubscriptionRequest_Reject
+  result <- submit alice.primaryParty $ exerciseCmd ansSummary.requestCid SubscriptionRequest_Reject
 
-  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid (DsoRules_TerminateSubscription ansSummary.entryCid aborted)
+  submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid (DsoRules_TerminateSubscription ansSummary.entryCid result.terminatedSubscription)
 
   entryContexts <- query @AnsEntryContext app.dso
   entryContexts === []

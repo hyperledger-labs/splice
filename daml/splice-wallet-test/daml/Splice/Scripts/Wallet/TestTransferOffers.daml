@@ -32,13 +32,15 @@ testTransferOffers = script do
     dsoParty = app.dso
     validatorParty = bobValidator.primaryParty
 
-  let createOffer amount description curTime trackingId = submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall
-        WalletAppInstall_CreateTransferOffer with
-          receiver = bob.primaryParty
-          amount = PaymentAmount amount CC
-          description = description
-          expiresAt = curTime `addRelTime` minutes 5
-          trackingId = trackingId
+  let createOffer amount description curTime trackingId = do
+      createResult <-submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall
+            WalletAppInstall_CreateTransferOffer with
+                  receiver = bob.primaryParty
+                  amount = PaymentAmount amount CC
+                  description = description
+                  expiresAt = curTime `addRelTime` minutes 5
+                  trackingId = trackingId
+      return createResult.transferOffer
 
 -- TODO(#2957): remove read-as DSO.
   let completeTransfer accepted amulet transferContext = submitMulti [aliceValidator.primaryParty] [alice.primaryParty, aliceValidator.primaryParty, app.dso] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
@@ -47,8 +49,9 @@ testTransferOffers = script do
         context = transferContext
 
   offer <- createOffer 2.0 " transfer test" t "transfer_test"
-  accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
+  acceptResult <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
+  let accepted = acceptResult.acceptedTransferOffer
   [(amulet, _)] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount > 2.5)
   transferContext <- getPaymentTransferContext app alice
   _ <- completeTransfer accepted amulet transferContext
@@ -67,16 +70,18 @@ testTransferOffers = script do
 
   t <- getTime
   offer <- createOffer 8.0 "To abort post-acceptance" t "to_abort"
-  accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
+  acceptResult <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
+  let accepted = acceptResult.acceptedTransferOffer
   submitMulti [aliceValidator.primaryParty] [alice.primaryParty] $ exerciseCmd aliceInstall
         WalletAppInstall_AcceptedTransferOffer_Abort with
           cid = accepted
           reason = "test abort"
 
   offer <- createOffer 8.5 "To withdraw acceptance" t "to_withdraw_acceptance"
-  accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
+  acceptResult <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
+  let accepted = acceptResult.acceptedTransferOffer
   submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_AcceptedTransferOffer_Withdraw with
           cid = accepted
@@ -84,8 +89,9 @@ testTransferOffers = script do
 
   t <- getTime
   offer <- createOffer 100.0 "Insufficient funds" t "insufficient_funds"
-  accepted <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
+  accept <- submitMulti [bobValidator.primaryParty] [bob.primaryParty] $ exerciseCmd bobInstall
         WalletAppInstall_TransferOffer_Accept with cid = offer
+  let accepted = accept.acceptedTransferOffer
   transferContext <- getPaymentTransferContext app alice
   [(amulet, _)] <- queryFilter @Amulet alice.primaryParty (\c -> c.amount.initialAmount > 1.0)
   ExecuteBatchResult { outcomes } <- completeTransfer accepted amulet transferContext

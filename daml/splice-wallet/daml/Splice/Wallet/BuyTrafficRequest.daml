@@ -12,6 +12,17 @@ data BuyTrafficRequestTrackingInfo = BuyTrafficRequestTrackingInfo
     endUserParty : Party -- ^ used in UserWalletTxLogParser's filterByParty
   deriving (Eq, Show)
 
+data BuyTrafficRequest_CompleteResult = BuyTrafficRequest_CompleteResult with
+  purchasedTraffic : ContractId MemberTraffic
+  trackingInfo : BuyTrafficRequestTrackingInfo
+  senderChangeAmulet : Optional (ContractId Amulet)
+
+data BuyTrafficRequest_CancelResult = BuyTrafficRequest_CancelResult with
+  trackingInfo : BuyTrafficRequestTrackingInfo
+
+data BuyTrafficRequest_ExpireResult = BuyTrafficRequest_ExpireResult with
+  trackingInfo : BuyTrafficRequestTrackingInfo
+
 -- | A request by an end-user to the wallet's automation to buy traffic
 -- for a member of a domain.
 template BuyTrafficRequest
@@ -27,8 +38,7 @@ template BuyTrafficRequest
   where
     signatory endUserParty
 
-    choice BuyTrafficRequest_Complete
-      : ((ContractId MemberTraffic, BuyTrafficRequestTrackingInfo), Optional (ContractId Amulet))
+    choice BuyTrafficRequest_Complete : BuyTrafficRequest_CompleteResult
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -39,21 +49,26 @@ template BuyTrafficRequest
         require "Contract has not expired" (now < expiresAt)
         result <- exercise context.amuletRules (AmuletRules_BuyMemberTraffic inputs context.context endUserParty memberId domainId migrationId trafficAmount)
         let trackingInfo = BuyTrafficRequestTrackingInfo with ..
-        pure ((result.purchasedTraffic, trackingInfo), result.senderChangeAmulet)
+        pure BuyTrafficRequest_CompleteResult with
+          purchasedTraffic = result.purchasedTraffic
+          trackingInfo
+          senderChangeAmulet = result.senderChangeAmulet
 
-    choice BuyTrafficRequest_Cancel : BuyTrafficRequestTrackingInfo
+    choice BuyTrafficRequest_Cancel : BuyTrafficRequest_CancelResult
       with
         reason : Text
       controller endUserParty
       do
         now <- getTime
         require "Contract has not expired" (now < expiresAt)
-        pure BuyTrafficRequestTrackingInfo with ..
+        let trackingInfo = BuyTrafficRequestTrackingInfo with ..
+        return BuyTrafficRequest_CancelResult with ..
 
-    choice BuyTrafficRequest_Expire : BuyTrafficRequestTrackingInfo
+    choice BuyTrafficRequest_Expire : BuyTrafficRequest_ExpireResult
       with
       controller endUserParty
       do
         now <- getTime
         require "Contract has expired" (now >= expiresAt)
-        pure BuyTrafficRequestTrackingInfo with ..
+        let trackingInfo = BuyTrafficRequestTrackingInfo with ..
+        return BuyTrafficRequest_ExpireResult with ..

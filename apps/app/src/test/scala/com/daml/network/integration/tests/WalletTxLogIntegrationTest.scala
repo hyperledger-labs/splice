@@ -1370,7 +1370,7 @@ class WalletTxLogIntegrationTest
               aliceValidatorBackend.participantClientWithAdminToken,
               charlieUserId,
               charlieUserParty,
-              subscriptionResult._2,
+              subscriptionResult.subscriptionState,
             ),
           )(
             "Alice doesn't see any subscription",

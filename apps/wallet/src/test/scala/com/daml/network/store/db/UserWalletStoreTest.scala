@@ -14,6 +14,7 @@ import com.daml.network.codegen.java.splice.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.codegen.java.splice.ans as ansCodegen
+import com.daml.network.codegen.java.splice.wallet.install
 import com.daml.network.codegen.java.splice.wallet.install.WalletAppInstall_CreateBuyTrafficRequest
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.wallet.store.{
@@ -1268,7 +1269,9 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(60),
           trackingId,
         ).toValue,
-        new transferOffersCodegen.TransferOffer.ContractId(transferOfferCid).toValue,
+        new installCodegen.WalletAppInstall_CreateTransferOfferResult(
+          new transferOffersCodegen.TransferOffer.ContractId(transferOfferCid)
+        ).toValue,
       ),
       Seq(
         toCreatedEvent(
@@ -1305,7 +1308,9 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         transferOffersCodegen.TransferOffer.CHOICE_TransferOffer_Accept.name,
         consuming = false,
         new transferOffersCodegen.TransferOffer_Accept().toValue,
-        new transferOffersCodegen.AcceptedTransferOffer.ContractId(acceptedTransferOfferCid).toValue,
+        new transferOffersCodegen.TransferOffer_AcceptResult(
+          new transferOffersCodegen.AcceptedTransferOffer.ContractId(acceptedTransferOfferCid)
+        ).toValue,
       ),
       Seq(
         toCreatedEvent(
@@ -1352,7 +1357,9 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(60),
           trackingId,
         ).toValue,
-        new trafficRequestCodegen.BuyTrafficRequest.ContractId(trafficRequestCid).toValue,
+        new install.WalletAppInstall_CreateBuyTrafficRequestResult(
+          new trafficRequestCodegen.BuyTrafficRequest.ContractId(trafficRequestCid)
+        ).toValue,
       ),
       Seq(
         toCreatedEvent(
@@ -1387,9 +1394,11 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         trafficRequestCodegen.BuyTrafficRequest.CHOICE_BuyTrafficRequest_Cancel.name,
         consuming = false,
         new trafficRequestCodegen.BuyTrafficRequest_Cancel(reason).toValue,
-        new trafficRequestCodegen.BuyTrafficRequestTrackingInfo(
-          trackingId,
-          buyer.toProtoPrimitive,
+        new trafficRequestCodegen.BuyTrafficRequest_CancelResult(
+          new trafficRequestCodegen.BuyTrafficRequestTrackingInfo(
+            trackingId,
+            buyer.toProtoPrimitive,
+          )
         ).toValue,
       ),
       Seq(),

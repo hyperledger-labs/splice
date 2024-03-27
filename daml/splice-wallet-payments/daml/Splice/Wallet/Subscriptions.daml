@@ -48,7 +48,48 @@ data SubscriptionData = SubscriptionData
 subscriptionSignatories : SubscriptionData -> [Party]
 subscriptionSignatories SubscriptionData{sender, receiver, provider} = [sender, receiver, provider]
 
+data Subscription_ArchiveResult = Subscription_ArchiveResult with
+  terminatedSubscription : ContractId TerminatedSubscription
+
+data SubscriptionRequest_AcceptAndMakePaymentResult = SubscriptionRequest_AcceptAndMakePaymentResult with
+  subscriptionPayment : ContractId SubscriptionInitialPayment
+  senderChange : Optional (ContractId Amulet)
+
+data SubscriptionRequest_WithdrawResult = SubscriptionRequest_WithdrawResult with
+  terminatedSubscription : ContractId TerminatedSubscription
+
+data SubscriptionRequest_RejectResult = SubscriptionRequest_RejectResult with
+  terminatedSubscription : ContractId TerminatedSubscription
+
+data SubscriptionInitialPayment_CollectResult = SubscriptionInitialPayment_CollectResult with
+  subscription : ContractId Subscription
+  subscriptionState : ContractId SubscriptionIdleState
+  amulet : ContractId Amulet
+
+data SubscriptionIdleState_ExpireSubscriptionResult = SubscriptionIdleState_ExpireSubscriptionResult with
+  terminatedSubscription : ContractId TerminatedSubscription
+
+data SubscriptionIdleState_CancelSubscriptionResult = SubscriptionIdleState_CancelSubscriptionResult with
+  terminatedSubscription : ContractId TerminatedSubscription
+
+data SubscriptionIdleState_MakePaymentResult = SubscriptionIdleState_MakePaymentResult with
+  subscriptionPayment : ContractId SubscriptionPayment
+  senderChange : Optional (ContractId Amulet)
+
+data SubscriptionPayment_CollectResult = SubscriptionPayment_CollectResult with
+  subscriptionState : ContractId SubscriptionIdleState
+  amulet : ContractId Amulet
+
+data SubscriptionPayment_RejectResult = SubscriptionPayment_RejectResult with
+  subscriptionState : ContractId SubscriptionIdleState
+  amuletSum : AmuletCreateSummary (ContractId Amulet)
+
+data SubscriptionPayment_ExpireResult = SubscriptionPayment_ExpireResult with
+  subscriptionState : ContractId SubscriptionIdleState
+  amuletSum : AmuletCreateSummary (ContractId Amulet)
+
 -- | Main subscription object.
+
 --   Usually created in `SubscriptionInitialPayment_Collect`.
 --   Immutable per subscription and passed around from state to state for convenience.
 --   Can be nicely expired via the `SubscriptionIdleState`.
@@ -61,9 +102,10 @@ template Subscription
   where
     signatory subscriptionSignatories subscriptionData
 
-    choice Subscription_Archive : ContractId TerminatedSubscription
+    choice Subscription_Archive : Subscription_ArchiveResult
       controller signatory this
-      do create TerminatedSubscription with ..
+      do terminatedSubscription <- create TerminatedSubscription with ..
+         return Subscription_ArchiveResult with ..
 
 -- | An aborted subscription. Subscriptions should usually be archived together with
 -- the context contract of the app that makes the subscription, e.g., AnsEntryContext.
@@ -99,8 +141,7 @@ template SubscriptionRequest
     signatory subscriptionSignatories subscriptionData
     ensure payDataIsValid payData
 
-    choice SubscriptionRequest_AcceptAndMakePayment
-      : (ContractId SubscriptionInitialPayment, Optional (ContractId Amulet))
+    choice SubscriptionRequest_AcceptAndMakePayment : SubscriptionRequest_AcceptAndMakePaymentResult
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -112,15 +153,17 @@ template SubscriptionRequest
 
         subscriptionPayment <- create SubscriptionInitialPayment with reference = self, ..
 
-        return (subscriptionPayment, senderChange)
+        return SubscriptionRequest_AcceptAndMakePaymentResult with ..
 
-    choice SubscriptionRequest_Withdraw : ContractId TerminatedSubscription
+    choice SubscriptionRequest_Withdraw : SubscriptionRequest_WithdrawResult
       controller subscriptionData.receiver
-      do create TerminatedSubscription with reference = self, subscriptionData
+      do terminatedSubscription <- create TerminatedSubscription with reference = self, subscriptionData
+         return SubscriptionRequest_WithdrawResult with ..
 
-    choice SubscriptionRequest_Reject : ContractId TerminatedSubscription
+    choice SubscriptionRequest_Reject : SubscriptionRequest_RejectResult
       controller subscriptionData.sender
-      do create TerminatedSubscription with reference = self, subscriptionData
+      do terminatedSubscription <- create TerminatedSubscription with reference = self, subscriptionData
+         return SubscriptionRequest_RejectResult with ..
 
 
 -- | The initial payment on a subscription.
@@ -138,7 +181,7 @@ template SubscriptionInitialPayment
     signatory subscriptionSignatories subscriptionData
     ensure payDataIsValid payData
 
-    choice SubscriptionInitialPayment_Collect : (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Amulet)
+    choice SubscriptionInitialPayment_Collect : SubscriptionInitialPayment_CollectResult
       with
         transferContext : AppTransferContext
       controller signatory this
@@ -148,13 +191,13 @@ template SubscriptionInitialPayment
 
         now <- getTime
         subscription <- create Subscription with subscriptionData, reference
-        state <- create SubscriptionIdleState with
+        subscriptionState <- create SubscriptionIdleState with
           nextPaymentDueAt = now `addRelTime` payData.paymentInterval
           ..
 
         amulet <- unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet
 
-        pure (subscription, state, amulet)
+        pure SubscriptionInitialPayment_CollectResult with ..
 
     choice SubscriptionInitialPayment_Reject : AmuletCreateSummary (ContractId Amulet)
       with
@@ -190,8 +233,7 @@ template SubscriptionIdleState
     signatory subscriptionSignatories subscriptionData
     ensure payDataIsValid payData
 
-    choice SubscriptionIdleState_MakePayment
-      : (ContractId SubscriptionPayment, Optional (ContractId Amulet))
+    choice SubscriptionIdleState_MakePayment : SubscriptionIdleState_MakePaymentResult
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -206,14 +248,14 @@ template SubscriptionIdleState
 
         (lockedAmulet, senderChange, targetAmount, round) <- lockAndMakeChange context subscriptionData payData inputs now walletProvider
 
-        payment <- create SubscriptionPayment with
+        subscriptionPayment <- create SubscriptionPayment with
           thisPaymentDueAt = nextPaymentDueAt
           ..
 
-        return (payment, senderChange)
+        return SubscriptionIdleState_MakePaymentResult with ..
 
     -- Any of the signatories can expire a subscription if one or more due payments is missing.
-    choice SubscriptionIdleState_ExpireSubscription : ContractId TerminatedSubscription
+    choice SubscriptionIdleState_ExpireSubscription : SubscriptionIdleState_ExpireSubscriptionResult
       with
         actor : Party
       controller actor
@@ -222,14 +264,18 @@ template SubscriptionIdleState
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
         require "Last subscription payment was missed" (nextPaymentDueAt < time)
-        exercise subscription Subscription_Archive
+        result <- exercise subscription Subscription_Archive
+        return SubscriptionIdleState_ExpireSubscriptionResult with
+          terminatedSubscription = result.terminatedSubscription
 
     -- The sender can cancel a subscription at any time (unless there is an in-flight payment).
-    choice SubscriptionIdleState_CancelSubscription : ContractId TerminatedSubscription
+    choice SubscriptionIdleState_CancelSubscription : SubscriptionIdleState_CancelSubscriptionResult
       controller subscriptionData.sender
       do
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
-        exercise subscription Subscription_Archive
+        result <- exercise subscription Subscription_Archive
+        return SubscriptionIdleState_CancelSubscriptionResult with
+          terminatedSubscription = result.terminatedSubscription
 
 
 -- | An in-flight (yet to be collected) payment on an existing subscription.
@@ -248,7 +294,7 @@ template SubscriptionPayment
     signatory subscriptionSignatories subscriptionData
     ensure payDataIsValid payData
 
-    choice SubscriptionPayment_Collect : (ContractId SubscriptionIdleState, ContractId Amulet)
+    choice SubscriptionPayment_Collect : SubscriptionPayment_CollectResult
       with
         transferContext : AppTransferContext
       controller signatory this
@@ -257,25 +303,25 @@ template SubscriptionPayment
         require ("Round at subscription payment " <> show round.number <> " matches round at collection " <> show contextRound.round.number) (round.number == contextRound.round.number)
         -- TODO(#9465): look into why we even need the separate subscription contract given that we duplicate all its data
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
-        state <- create SubscriptionIdleState with
+        subscriptionState <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
           ..
         amulet <- unlockAndTransfer transferContext subscriptionData targetAmount lockedAmulet
-        pure (state, amulet)
+        pure SubscriptionPayment_CollectResult with ..
 
-    choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, AmuletCreateSummary (ContractId Amulet))
+    choice SubscriptionPayment_Reject : SubscriptionPayment_RejectResult
       with
         transferContext : AppTransferContext
       controller subscriptionData.receiver
       do
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
-        state <- create SubscriptionIdleState with
+        subscriptionState <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        ccsum <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
-        pure (state, ccsum)
+        amuletSum <- exercise lockedAmulet (LockedAmulet_Unlock transferContext.openMiningRound)
+        pure SubscriptionPayment_RejectResult with ..
 
-    choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, AmuletCreateSummary (ContractId Amulet))
+    choice SubscriptionPayment_Expire : SubscriptionPayment_ExpireResult
       with
         actor : Party
         transferContext : AppTransferContext
@@ -284,11 +330,11 @@ template SubscriptionPayment
         -- TODO(#3822): use ExpiringContractInterface, once we decouple expiry of the delivery offer, lockedAmulet, and the AcceptedAppPayment in #3152
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         requireMatchingContract subscription (Subscription with subscriptionData, reference)
-        state <- create SubscriptionIdleState with
+        subscriptionState <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        ccsum <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
-        pure (state, ccsum)
+        amuletSum <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock transferContext.openMiningRound) -- would fail if we can't expire yet
+        pure SubscriptionPayment_ExpireResult with ..
 
 
 lockAndMakeChange

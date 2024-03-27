@@ -278,7 +278,7 @@ class HttpWalletHandler(
               .exerciseWalletAppInstall_FeaturedAppRights_SelfGrant(
                 amuletRules.contractId
               )
-              .map(_.exerciseResult)
+              .map(_.exerciseResult.featuredAppRight)
           )
         )(user, dislosedContracts = DisclosedContracts(amuletRules))
       } yield d0.SelfGrantFeaturedAppRightResponse(Codec.encodeContractId(result))
@@ -302,7 +302,7 @@ class HttpWalletHandler(
               .exerciseWalletAppInstall_TransferOffer_Accept(requestCid)
               .map { cid =>
                 d0.AcceptTransferOfferResponse(
-                  Codec.encodeContractId(cid.exerciseResult)
+                  Codec.encodeContractId(cid.exerciseResult.acceptedTransferOffer)
                 ): r0.AcceptTransferOfferResponse
               }
           )

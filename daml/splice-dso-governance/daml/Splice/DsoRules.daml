@@ -993,8 +993,8 @@ template DsoRules with
         choiceArg : SubscriptionIdleState_ExpireSubscription
       controller dsoDelegate
       do
-        aborted <- exercise subscriptionIdleStateCid choiceArg
-        exercise ansEntryContextCid (AnsEntryContext_Terminate dso aborted)
+        result <- exercise subscriptionIdleStateCid choiceArg
+        exercise ansEntryContextCid (AnsEntryContext_Terminate dso result.terminatedSubscription)
         pure DsoRules_ExpireSubscriptionResult
 
     nonconsuming choice DsoRules_TerminateSubscription : DsoRules_TerminateSubscriptionResult
