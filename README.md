@@ -708,6 +708,22 @@ To add a new library as a dependency for some module:
 - add the library name as a constant in `CantonDependencies.scala` or `Dependencies.scala` as appropriate
 - add the library to the list of `libraryDependencies` within the build definition of the required module in `BuildCommon.scala` or `build.sbt`
 
+##### Triggering a daml snapshot release
+
+In the [daml](https://github.com/digital-asset/daml/) repository:
+
+1. Create a PR that changes the LATEST file on the main branch
+   (i.e., the PR should be against the main branch).
+   To prepare a change that requests a snapshot release from the `origin/release/3.0.x` branch,
+   run `git fetch && ./release.sh snapshot origin/release/3.0.x 3.0.0`.
+   The resulting release version should be something like `3.0.0-snapshot.20240327.12947.0.vdef6b798`.
+2. Wait for CI to get green, rerun as necessary.
+3. Merge the PR. Anyone with write access to the repo can merge the PR.
+4. Wait for release to be published.
+
+Once the release is published, update `CantonDependencies.scala`.
+
+
 ### Message Definitions
 
 * All Protobuf definitions should be using [`proto3`](https://developers.google.com/protocol-buffers/docs/proto3)
