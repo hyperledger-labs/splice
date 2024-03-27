@@ -55,19 +55,19 @@ testRewardComputation = do
   let alice2Weight = 3 * 1000
   let bob2Weight = 3 * 2000
   let provider2Weight = svNode2Weight - alice2Weight - bob2Weight
-  let createSvCoupon provider beneficiary weight = submitMulti [app.dso] [] $ createCmd SvRewardCoupon with
+  let createSvRewardCoupon provider beneficiary weight = submitMulti [app.dso] [] $ createCmd SvRewardCoupon with
         dso = app.dso
         sv = provider.primaryParty
         beneficiary = beneficiary.primaryParty
         weight
         round = Round 0
   -- note: we use aliceValidator as the representation of alice due to the joint testing of ValidatorRewards and others
-  svRewardAlice1 <- createSvCoupon provider1 aliceValidator alice1Weight
-  _svRewardProvider1 <- createSvCoupon provider1 provider1 provider1Weight
+  svRewardAlice1 <- createSvRewardCoupon provider1 aliceValidator alice1Weight
+  _svRewardProvider1 <- createSvRewardCoupon provider1 provider1 provider1Weight
 
-  svRewardAlice2 <- createSvCoupon provider2 aliceValidator alice2Weight
-  svRewardBob2 <- createSvCoupon provider2 bob bob2Weight
-  _svRewardProvider2 <- createSvCoupon provider2 provider2 provider2Weight
+  svRewardAlice2 <- createSvRewardCoupon provider2 aliceValidator alice2Weight
+  svRewardBob2 <- createSvRewardCoupon provider2 bob bob2Weight
+  _svRewardProvider2 <- createSvRewardCoupon provider2 provider2 provider2Weight
 
 
   -- Advance until issuing mining round 0 is opened.

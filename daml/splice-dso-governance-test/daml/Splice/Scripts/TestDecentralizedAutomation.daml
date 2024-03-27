@@ -205,7 +205,7 @@ testConfirmationExpiry = do
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
   -- create a single confirmation which will not suffice to initiate an action
-  svConfirmationResult <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+  confirmationResult <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
     confirmer = sv1
     action = ARC_DsoRules with
       dsoAction = SRARC_AddMember $ DsoRules_AddMember with
@@ -217,14 +217,14 @@ testConfirmationExpiry = do
 
   -- leader tries to expire the confirmation, but it's too early
   leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
-    DsoRules_ExpireStaleConfirmation svConfirmationResult.confirmation
+    DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
 
   -- wait for the confirmation TTL to pass
   passTime (minutes 5)
 
   -- leader expires the confirmation
   leaderSubmits app $ \cid -> exerciseCmd cid $
-    DsoRules_ExpireStaleConfirmation svConfirmationResult.confirmation
+    DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
 
   pure ()
 
