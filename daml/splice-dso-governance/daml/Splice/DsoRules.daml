@@ -42,18 +42,18 @@ import Splice.Util
 -- 2. Some of the actions that require confirmations should be executed automatically
 --    once the ledger and the wall-clocks of the SV nodes are in a particular state.
 --    These actions are confirmed by each SV node automatically once the action's precondition is met.
---    Once 2 * f + 1 confirmations* are visible to the leader it executes them.
+--    Once 2 * f + 1 confirmations* are visible to the DsoDelegate it executes them.
 --
 -- * Simplified for clarity; see `requiredNumVotes` for exact formula.
 --
 -- Process 2 is an optimization of Process 1 for the case where no disagreement to the
 -- action is expected. It avoids the extra round-trip and the complications of having
--- the leader to reliably initiate the vote when it is time to execute an automated action
+-- the DsoDelegate to reliably initiate the vote when it is time to execute an automated action
 -- that requires confirmation.
 --
 -- We expect honest SV nodes to only create confirmations for actions
 -- whose preconditions are met. We also rely on the execution of these actions to be
--- idempotent, as more than the required number of confirmations can be created and the leader could
+-- idempotent, as more than the required number of confirmations can be created and the DsoDelegate could
 -- thus in principle execute the corresponding action multiple times.
 --
 -- Note also that having these two processes also aids in distinguishing between manually initiated
@@ -123,11 +123,11 @@ data OffboardedMemberInfo = OffboardedMemberInfo with
   deriving (Eq, Show)
 
 data DSOSummary = DSOSummary with
-    leader : Party
+    dsoDelegate : Party
     numMembers : Int
     requiredNumVotes : Int
     -- | The number of votes required for considering a confirmation, a request for a vote, or
-    -- a leader election definitive.
+    -- a DsoDelegate election definitive.
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -155,7 +155,7 @@ data DsoRules_SetDomainNodeConfigResult = DsoRules_SetDomainNodeConfigResult wit
 data DsoRules_RequestElectionResult = DsoRules_RequestElectionResult with
     electionRequestCid : ContractId ElectionRequest
 
-data DsoRules_ElectLeaderResult = DsoRules_ElectLeaderResult with
+data DsoRules_ElectDsoDelegateResult = DsoRules_ElectDsoDelegateResult with
     newDsoRules : ContractId DsoRules
 
 data DsoRules_ArchiveOutdatedElectionRequestResult = DsoRules_ArchiveOutdatedElectionRequestResult
@@ -238,22 +238,22 @@ data DsoRules_MergeMemberTrafficContractsResult = DsoRules_MergeMemberTrafficCon
 
 -- TODO(#7649) revise and/or remove
 data ElectionRequestReason
-  = ERR_LeaderUnavailable
-  -- TODO(#7649): add case for leader asking to be relieved for a graceful shutdown
+  = ERR_DsoDelegateUnavailable
+  -- TODO(#7649): add case for DsoDelegate asking to be relieved for a graceful shutdown
   | ERR_OtherReason Text
   | ExtElectionRequestReason with
       dummyUnitField : ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Ord, Show)
 
--- | A request to elect a new leader for the DSO.
+-- | A request to elect a new DsoDelegate for the DSO.
 -- TODO(#7649) revise and/or remove
 template ElectionRequest with
     dso : Party
     requester : Party
-    epoch : Int  -- current epoch whose leader should be replaced
-    reason : ElectionRequestReason -- reason for electing a new leader
-    ranking : [Party] -- preference ranking for new leaders
+    epoch : Int  -- current epoch whose DsoDelegate should be replaced
+    reason : ElectionRequestReason -- reason for electing a new DsoDelegate
+    ranking : [Party] -- preference ranking for new DsoDelegates
   where
     -- NOTE: we expect the requester to observe this contract by hosting the
     -- 'dso' party (as all SVs do). The requester can in
@@ -263,7 +263,7 @@ template ElectionRequest with
     signatory dso
 
 
--- | A confirmation for the leader to take an action in the name of the DSO.
+-- | A confirmation for the DsoDelegate to take an action in the name of the DSO.
 -- Used for executing automated actions in a shortened process.
 -- See the comments on `ActionRequiringConfirmation` for details.
 template Confirmation with
@@ -349,7 +349,7 @@ data DsoRulesConfig = DsoRulesConfig with
     svOnboardingRequestTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
     svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing a SV confirmation
     voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote`s.
-    leaderInactiveTimeout: RelTime -- ^ The amount of time given to the leader to complete an action it should take care of
+    dsoDelegateInactiveTimeout: RelTime -- ^ The amount of time given to the DsoDelegate to complete an action it should take care of
     domainNodeConfigLimits : DomainNodeConfigLimits  -- ^ Limits to enforce on the members' `DomainNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
     globalDomain : DsoGlobalDomainConfig
@@ -369,16 +369,16 @@ data TrafficState = TrafficState with
 
 template DsoRules with
     dso : Party        -- ^ The party representing the DSO
-    epoch : Int        -- ^ The number of leaders that have already been elected.
+    epoch : Int        -- ^ The number of DsoDelegates that have already been elected.
     members : Map.Map Party MemberInfo
     offboardedMembers : Map.Map Party OffboardedMemberInfo
-    leader : Party
+    dsoDelegate : Party
     config : DsoRulesConfig
     initialTrafficState: Map.Map Text TrafficState -- ^ Map from participant/mediator ID to its traffic state at the time of synchronizer bootstrapping. Used for testing, empty in prod.
     isDevNet : Bool
   where
     ensure
-      leader `Map.member` members &&
+      dsoDelegate `Map.member` members &&
         unique (map (.name) (Map.values members)) &&
         config.numUnclaimedRewardsThreshold > 0
 
@@ -415,11 +415,11 @@ template DsoRules with
             -- and drops their CommetBFT config, which will in turn lead to the SV apps of the remaining members
             -- revoking that member's rights in the CometBFT network.
             let newMembers = Map.delete member members
-            -- We optimize for prompt removal of a member if the vote said so. We can thus not wait for a leader-election
+            -- We optimize for prompt removal of a member if the vote said so. We can thus not wait for a DsoDelegate-election
             -- and instead just choose the member with the lexicographically smallest name.
-            let (newLeader, newEpoch)
-                  | member == leader = (head (Map.keys newMembers), epoch + 1)
-                  | otherwise        = (leader, epoch)
+            let (newDsoDelegate, newEpoch)
+                  | member == dsoDelegate = (head (Map.keys newMembers), epoch + 1)
+                  | otherwise        = (dsoDelegate, epoch)
             let offboardedMemberInfo = OffboardedMemberInfo with
                     name = info.name
                     participantId = info.participantId
@@ -427,7 +427,7 @@ template DsoRules with
             newDsoRules <- create DsoRules with
               dso
               epoch = newEpoch
-              leader = newLeader
+              dsoDelegate = newDsoDelegate
               members = newMembers
               offboardedMembers = Map.insert member offboardedMemberInfo offboardedMembers
               config
@@ -519,7 +519,7 @@ template DsoRules with
         return DsoRules_SetDomainNodeConfigResult with ..
 
 
-    -- Automation leader election
+    -- Automation DsoDelegate election
     ------------------------------
     -- TODO(#7649) revise and/or remove
     nonconsuming choice DsoRules_RequestElection : DsoRules_RequestElectionResult
@@ -537,7 +537,7 @@ template DsoRules with
         return DsoRules_RequestElectionResult with ..
 
     -- TODO(#7649) revise and/or remove
-    choice DsoRules_ElectLeader : DsoRules_ElectLeaderResult
+    choice DsoRules_ElectDsoDelegate : DsoRules_ElectDsoDelegateResult
       with
         actor : Party
         requestCids : [ContractId ElectionRequest]
@@ -558,14 +558,15 @@ template DsoRules with
         require "Requests are from different members" (unique $ map (.requester) reqs)
         require "There are enough requests" (numVotes >= summary.requiredNumVotes)
         let rankings = [ (req.requester, req.ranking) | req <- reqs ]
-            newLeader = instantRunOffVoting numVotesForMajority (numVoters - 1) rankings
-        newDsoRules <- create DsoRules with epoch = epoch + 1, leader = newLeader, ..
-        return DsoRules_ElectLeaderResult with ..
+            newDsoDelegate = instantRunOffVoting numVotesForMajority (numVoters - 1) rankings
+        let newDsoRules = DsoRules with epoch = epoch + 1, dsoDelegate = newDsoDelegate, ..
+        newDsoRules <- create newDsoRules
+        return DsoRules_ElectDsoDelegateResult with ..
 
     nonconsuming choice DsoRules_ArchiveOutdatedElectionRequest : DsoRules_ArchiveOutdatedElectionRequestResult
       with
         requestCid : ContractId ElectionRequest
-      controller leader
+      controller dsoDelegate
       do
         request <- fetchAndArchive (ForDso with dso) requestCid
         require "Election request is outdated" (request.epoch < epoch)
@@ -596,7 +597,7 @@ template DsoRules with
         action : ActionRequiringConfirmation
         amuletRulesCid : Optional( ContractId AmuletRules )
         confirmationCids : [ContractId Confirmation]
-      controller leader
+      controller dsoDelegate
       do
         let s = summarizeDSO this
         let forDso = ForDso with dso
@@ -678,7 +679,7 @@ template DsoRules with
       with
         requestCid : ContractId VoteRequest
         amuletRulesCid : Optional (ContractId AmuletRules)
-      controller leader
+      controller dsoDelegate
       do
         request <- fetchAndArchive (ForDso with dso) requestCid
         -- count the votes
@@ -758,7 +759,7 @@ template DsoRules with
       with
         nonMemberVoteCids : [ContractId AmuletPriceVote]
         duplicateVoteCids : [[ContractId AmuletPriceVote]]
-      controller leader
+      controller dsoDelegate
       do
         let forDso = ForDso with dso
         -- validate and archive non-member votes
@@ -862,7 +863,7 @@ template DsoRules with
     nonconsuming choice DsoRules_ExpireSvOnboardingRequest : DsoRules_ExpireSvOnboardingRequestResult
       with
         cid: ContractId SvOnboardingRequest
-      controller leader
+      controller dsoDelegate
       do
         exercise cid SvOnboardingRequest_Expire
         return DsoRules_ExpireSvOnboardingRequestResult
@@ -870,7 +871,7 @@ template DsoRules with
     nonconsuming choice DsoRules_ArchiveSvOnboardingRequest : DsoRules_ArchiveSvOnboardingRequestResult
       with
         svOnboardingRequestCid: ContractId SvOnboardingRequest
-      controller leader
+      controller dsoDelegate
       do
         -- require that the member is already added to the DSO
         -- TODO(#3756) Enable archiving also before the member is added, after a matching `SvOnboardingConfirmed` contract is created.
@@ -909,7 +910,7 @@ template DsoRules with
     choice DsoRules_ExpireSvOnboardingConfirmed : DsoRules_ExpireSvOnboardingConfirmedResult
       with
         cid: ContractId SvOnboardingConfirmed
-      controller leader
+      controller dsoDelegate
       do
         svOnboardingConfirmed <- fetchButArchiveLater (ForDso with dso) cid
         exercise cid SvOnboardingConfirmed_Expire
@@ -923,14 +924,14 @@ template DsoRules with
         return DsoRules_ExpireSvOnboardingConfirmedResult with ..
 
 
-    -- Amulet management driven directly by the leader
-    --------------------------------------------------
+    -- Amulet management driven directly by the DsoDelegate
+    -------------------------------------------------------
 
     nonconsuming choice DsoRules_Amulet_Expire : AmuletExpireSummary
       with
         cid : ContractId Amulet
         choiceArg : Amulet_Expire
-      controller leader
+      controller dsoDelegate
       do
         exercise cid choiceArg
 
@@ -938,13 +939,13 @@ template DsoRules with
       with
         cid : ContractId LockedAmulet
         choiceArg : LockedAmulet_ExpireAmulet
-      controller leader
+      controller dsoDelegate
       do
         exercise cid choiceArg
 
 
-    -- Round management driven directly by the leader
-    -------------------------------------------------
+    -- Round management driven directly by the DsoDelegate
+    ------------------------------------------------------
 
     nonconsuming choice DsoRules_AdvanceOpenMiningRounds : DsoRules_AdvanceOpenMiningRoundsResult
       with
@@ -953,7 +954,7 @@ template DsoRules with
         middleRoundCid : ContractId OpenMiningRound
         latestRoundCid : ContractId OpenMiningRound
         amuletPriceVoteCids : [ContractId AmuletPriceVote]
-      controller leader
+      controller dsoDelegate
       do
         amuletPrice <- fetchMedianAmuletPrice dso (Map.keys members) amuletPriceVoteCids
         result <- exercise amuletRulesCid AmuletRules_AdvanceOpenMiningRounds with ..
@@ -962,14 +963,14 @@ template DsoRules with
           openRound = result.openRoundCid
 
 
-    -- ANS entry and payment management driven directly by the leader
+    -- ANS entry and payment management driven directly by the DsoDelegate
     -----------------------------------------------
 
     nonconsuming choice DsoRules_CollectEntryRenewalPayment : DsoRules_CollectEntryRenewalPaymentResult
       with
         ansEntryContextCid : ContractId AnsEntryContext
         choiceArg : AnsEntryContext_CollectEntryRenewalPayment
-      controller leader
+      controller dsoDelegate
       do
         summary <- exercise ansEntryContextCid choiceArg
         return DsoRules_CollectEntryRenewalPaymentResult with
@@ -980,7 +981,7 @@ template DsoRules with
       with
         ansEntryCid : ContractId AnsEntry
         choiceArg : AnsEntry_Expire
-      controller leader
+      controller dsoDelegate
       do
         exercise ansEntryCid choiceArg
         pure DsoRules_ExpireAnsEntryResult
@@ -990,7 +991,7 @@ template DsoRules with
         ansEntryContextCid : ContractId AnsEntryContext
         subscriptionIdleStateCid: ContractId SubscriptionIdleState
         choiceArg : SubscriptionIdleState_ExpireSubscription
-      controller leader
+      controller dsoDelegate
       do
         aborted <- exercise subscriptionIdleStateCid choiceArg
         exercise ansEntryContextCid (AnsEntryContext_Terminate dso aborted)
@@ -1000,14 +1001,14 @@ template DsoRules with
       with
         ansEntryContextCid : ContractId AnsEntryContext
         terminatedSubscriptionCid : ContractId TerminatedSubscription
-      controller leader
+      controller dsoDelegate
       do
         exercise ansEntryContextCid (AnsEntryContext_Terminate dso terminatedSubscriptionCid)
         pure DsoRules_TerminateSubscriptionResult
 
 
-    -- Reward management driven directly by the leader
-    --------------------------------------------------
+    -- Reward management driven directly by the DsoDelegate
+    -------------------------------------------------------
 
     nonconsuming choice DsoRules_ReceiveSvRewardCoupon : DsoRules_ReceiveSvRewardCouponResult
       with
@@ -1064,7 +1065,7 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         choiceArg : AmuletRules_ClaimExpiredRewards
-      controller leader
+      controller dsoDelegate
       do
         result <- exercise amuletRulesCid choiceArg
         return DsoRules_ClaimExpiredRewardsResult with
@@ -1075,7 +1076,7 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         unclaimedRewardCids : [ContractId UnclaimedReward]
-      controller leader
+      controller dsoDelegate
       do
         require "Number of unclaimed rewards is above the configured threshold" $ length unclaimedRewardCids > config.numUnclaimedRewardsThreshold
         result <- exercise amuletRulesCid AmuletRules_MergeUnclaimedRewards with ..
@@ -1086,7 +1087,7 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         issuingRoundCid : ContractId IssuingMiningRound
-      controller leader
+      controller dsoDelegate
       do
         result <- exercise amuletRulesCid AmuletRules_MiningRound_Close with ..
         return DsoRules_MiningRound_CloseResult with
@@ -1100,7 +1101,7 @@ template DsoRules with
     nonconsuming choice DsoRules_ExpireStaleConfirmation : DsoRules_ExpireStaleConfirmationResult
       with
         staleConfirmationCid : ContractId Confirmation
-      controller leader
+      controller dsoDelegate
       do
         now <- getTime
         staleConfirmation <- fetchAndArchive (ForDso with dso) staleConfirmationCid
@@ -1113,7 +1114,7 @@ template DsoRules with
       with
         amuletRulesCid : ContractId AmuletRules
         trafficCids : [ContractId MemberTraffic]
-      controller leader
+      controller dsoDelegate
       do
         require "Number of member traffic contracts is above the configured threshold" $ length trafficCids > config.numMemberTrafficContractsThreshold
         result <- exercise amuletRulesCid AmuletRules_MergeMemberTrafficContracts with ..
@@ -1122,14 +1123,14 @@ template DsoRules with
 
 summarizeDSO : DsoRules -> DSOSummary
 summarizeDSO dsoRules = DSOSummary with
-    leader = dsoRules.leader
+    dsoDelegate = dsoRules.dsoDelegate
     numMembers
     requiredNumVotes =
       -- NOTE:
       --   For a vote with n members and f = floor((n - 1) /3) byzantine members, we want to have the following properties:
       --     *availability*: f operators abstaining, won’t stop the vote
       --        ⇒ numRequiredVotes <= n - f
-      --     *tolerate leader selecting the votes*: the threshold must be independent of the number of votes cast
+      --     *tolerate DsoDelegate selecting the votes*: the threshold must be independent of the number of votes cast
       --     *integrity*: f operators cannot boost their voting power for future votes by collaborating
       --        ⇒ implies f < threshold-for-accepting-an-action
       --     *result acceptance*: outcome is accepted by SV operators

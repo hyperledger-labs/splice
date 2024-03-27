@@ -27,7 +27,7 @@ testOnboardValidator = do
   -- a new validator prepares his participant
   v1 <- allocateParty "v1"
 
-  -- sv2 (not the leader) onboards the new validator
+  -- sv2 (not the DsoDelegate) onboards the new validator
   onboardValidator app sv2 v1
 
   -- v1 received a validator license
@@ -52,7 +52,7 @@ testSvOnboarding = do
   -- we can't test token validity in Daml (it's a JWT)
   let token = "mock-token"
 
-  -- sv2 (not the leader) initiates the onboarding of the new sv
+  -- sv2 (not the DsoDelegate) initiates the onboarding of the new sv
   svSubmits app sv2 $ \cid -> exerciseCmd cid $
     DsoRules_StartSvOnboarding "svX" svX "svX-participant-id" token sv2
 
@@ -194,20 +194,20 @@ testSvOnboardingRequestExpiry = do
   -- we can't test token validity in Daml (it's a JWT)
   let token = "mock-token"
 
-  -- sv2 (not the leader) initiates the onboarding of the new sv
+  -- sv2 (not the DsoDelegate) initiates the onboarding of the new sv
   result <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
     DsoRules_StartSvOnboarding "svX" svX "svX-participant-id" token sv2
   let svOnboardingRequestCid = result.onboardingRequest
 
-  -- leader tries to expire the onboarding, but it's too early
-  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+  -- DsoDelegate tries to expire the onboarding, but it's too early
+  dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireSvOnboardingRequest svOnboardingRequestCid
 
   -- wait for the onboarding to expire
   passTime (hours 25)
 
-  -- leader expires the onboarding
-  leaderSubmits app $ \cid -> exerciseCmd cid $
+  -- DsoDelegate expires the onboarding
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireSvOnboardingRequest svOnboardingRequestCid
 
   pure ()
@@ -223,15 +223,15 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
   -- we can't test token validity in Daml (it's a JWT)
   let token = "mock-token"
 
-  -- sv2 (not the leader) initiates the onboarding of the new sv
+  -- sv2 (not the DsoDelegate) initiates the onboarding of the new sv
   onboardingResult <- svSubmits app sv2 $ \cid -> exerciseCmd cid $
     DsoRules_StartSvOnboarding "svX" svX "svx-participant-id" token sv2
   let svOnboardingRequestCid = onboardingResult.onboardingRequest
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
-  -- leader cannot archive the onboarding as svX is not yet added as member
-  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+  -- DsoDelegate cannot archive the onboarding as svX is not yet added as member
+  dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
     DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
   -- create a SvOnboardingConfirmed contract
@@ -242,8 +242,8 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
     newMemberParticipantId = "svX-participant-id"
     joinedAsOfRound = (Round 3)
 
-  -- leader can archive the onboarding as svX is added as member
-  leaderSubmits app $ \cid -> exerciseCmd cid $
+  -- DsoDelegate can archive the onboarding as svX is added as member
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
   -- check status report invaraints
@@ -274,15 +274,15 @@ testSvOnboardingConfirmedExpiry = do
 
   [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed dso
 
-  -- leader tries to expire the confirmation but it's too early
-  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+  -- DsoDelegate tries to expire the confirmation but it's too early
+  dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireSvOnboardingConfirmed svOnboardingConfirmedCid
 
   -- wait for the confirmation to expire
   passTime (hours 25)
 
-  -- leader expires the confirmation
-  _ <- leaderSubmits app $ \cid -> exerciseCmd cid $
+  -- DsoDelegate expires the confirmation
+  _ <- dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireSvOnboardingConfirmed with
         cid = svOnboardingConfirmedCid
 
@@ -313,7 +313,7 @@ testSvMemberOverwriteInDevNet = do
   (fromSome (Map.lookup sv2 dsoRules.members)).name === "sv2"
   svX <- allocateParty "svX"
 
-  -- Failing the template precondition check if the existing member being overwritten is the current leader.
+  -- Failing the template precondition check if the existing member being overwritten is the current DsoDelegaten.
   submitMustFail dso $ exerciseCmd dsoRulesCid $ DsoRules_AddMember svX "sv1" 19 "sv1-participant-id" (Round 3)
 
   -- overwriting existing member successfully (using a new participant node)

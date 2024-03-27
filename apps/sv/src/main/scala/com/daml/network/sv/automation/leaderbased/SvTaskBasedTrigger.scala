@@ -29,7 +29,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
     for {
       dsoRules <- store.getDsoRules()
       sameEpoch = dsoRules.payload.epoch == svTaskContext.epoch
-      isLeader = dsoRules.payload.leader == store.key.svParty.toProtoPrimitive
+      isLeader = dsoRules.payload.dsoDelegate == store.key.svParty.toProtoPrimitive
       result <-
         if (sameEpoch) {
           if (isLeader) {
@@ -76,7 +76,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
           val cmd = dsoRules.exercise(
             _.exerciseDsoRules_RequestElection(
               self,
-              new splice.dsorules.electionrequestreason.ERR_LeaderUnavailable(
+              new splice.dsorules.electionrequestreason.ERR_DsoDelegateUnavailable(
                 com.daml.ledger.javaapi.data.Unit.getInstance()
               ),
               ranking.asJava,
@@ -119,7 +119,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
     for {
       dsoRules <- store.getDsoRules()
       monitoredEpoch = dsoRules.payload.epoch
-      monitoredLeader = dsoRules.payload.leader
+      monitoredLeader = dsoRules.payload.dsoDelegate
       timer <- context.retryProvider
         .waitUnlessShutdown(
           context.clock
@@ -128,9 +128,9 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
                 // No work done here, as we are only interested in the scheduling notification
                 ()
               },
-              // NOTE: We don't restart existing inactivity checks when the leaderInactiveTimeout changes
+              // NOTE: We don't restart existing inactivity checks when the dsoDelegateInactiveTimeout changes
               SvUtil
-                .fromRelTime(dsoRules.payload.config.leaderInactiveTimeout)
+                .fromRelTime(dsoRules.payload.config.dsoDelegateInactiveTimeout)
                 .plus(context.config.pollingInterval.asJava),
             )
         )

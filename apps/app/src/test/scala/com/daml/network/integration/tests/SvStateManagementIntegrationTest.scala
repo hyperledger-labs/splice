@@ -333,7 +333,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
           sv1Backend.getDsoInfo().dsoRules.payload.config.svOnboardingRequestTimeout,
           sv1Backend.getDsoInfo().dsoRules.payload.config.svOnboardingConfirmedTimeout,
           sv1Backend.getDsoInfo().dsoRules.payload.config.voteRequestTimeout,
-          sv1Backend.getDsoInfo().dsoRules.payload.config.leaderInactiveTimeout,
+          sv1Backend.getDsoInfo().dsoRules.payload.config.dsoDelegateInactiveTimeout,
           sv1Backend.getDsoInfo().dsoRules.payload.config.domainNodeConfigLimits,
           sv1Backend.getDsoInfo().dsoRules.payload.config.maxTextLength,
           sv1Backend.getDsoInfo().dsoRules.payload.config.globalDomain,

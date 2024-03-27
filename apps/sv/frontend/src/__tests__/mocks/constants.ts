@@ -139,7 +139,7 @@ export const dsoInfo: GetDsoInfoResponse = {
         actionConfirmationTimeout: {
           microseconds: '300000000',
         },
-        leaderInactiveTimeout: {
+        dsoDelegateInactiveTimeout: {
           microseconds: '70000000',
         },
         voteRequestTimeout: {
@@ -177,7 +177,7 @@ export const dsoInfo: GetDsoInfoResponse = {
         },
         maxTextLength: '1024',
       },
-      leader:
+      dsoDelegate:
         'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
       isDevNet: true,
       members: [
@@ -515,7 +515,7 @@ const result = jtv.Result.andThen(
   DsoRules.decoder.run(dsoInfo.dso_rules.payload)
 );
 if (!result.ok) {
-  throw new Error(`Invalid DsoInfo mock: ${result.error}`);
+  throw new Error(`Invalid DsoInfo mock: ${JSON.stringify(result.error)}`);
 }
 
 export const svPartyId = dsoInfo.sv_party_id;

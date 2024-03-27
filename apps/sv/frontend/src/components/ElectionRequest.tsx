@@ -101,7 +101,7 @@ const ElectionRequests: React.FC = () => {
           <TableRow>
             <TableCell>Leader:</TableCell>
             <TableCell id={'leader-election-current-leader'}>
-              {dsoInfosQuery.data?.dsoRules.payload.leader}
+              {dsoInfosQuery.data?.dsoRules.payload.dsoDelegate}
             </TableCell>
           </TableRow>
         </TableBody>

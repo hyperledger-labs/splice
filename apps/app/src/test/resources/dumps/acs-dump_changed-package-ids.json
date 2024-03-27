@@ -630,7 +630,7 @@
           "actionConfirmationTimeout": {
             "microseconds": "300000000"
           },
-          "leaderInactiveTimeout": {
+          "dsoDelegateInactiveTimeout": {
             "microseconds": "70000000"
           },
           "voteRequestTimeout": {

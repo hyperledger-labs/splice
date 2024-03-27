@@ -82,7 +82,7 @@ class SvFrontendTimeBasedIntegrationTest
       clue("stop the leader sv1 long enough for an election to occur") {
         val automationConfig = sv2Backend.config.automation
         val effectiveTimeoutPlusBuffer = SvUtil
-          .fromRelTime(SvUtil.defaultDsoRulesConfig(dummyDsoDomainId).leaderInactiveTimeout)
+          .fromRelTime(SvUtil.defaultDsoRulesConfig(dummyDsoDomainId).dsoDelegateInactiveTimeout)
           .plus(automationConfig.pollingInterval.asJava)
           .plus(JavaDuration.ofSeconds(5))
         sv1Backend.stop()

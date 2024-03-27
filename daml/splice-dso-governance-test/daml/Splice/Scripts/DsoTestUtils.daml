@@ -60,7 +60,7 @@ initDSO isDevNet = do
         svOnboardingRequestTimeout = hours 1
         svOnboardingConfirmedTimeout = hours 1
         voteRequestTimeout = days 7
-        leaderInactiveTimeout = seconds 70
+        dsoDelegateInactiveTimeout = seconds 70
         domainNodeConfigLimits = defaultDomainNodeConfigLimits
         maxTextLength = 1024
         globalDomain = initialDsoGlobalDomainConfig
@@ -152,15 +152,15 @@ generateUnclaimedReward app provider1 = do
   pure ()
 
 
-leaderSubmits : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script a
-leaderSubmits app mkCommands = do
+dsoDelegateSubmits : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script a
+dsoDelegateSubmits app mkCommands = do
   [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
-  submitMulti [dsoRules.leader] [app.dso] $ mkCommands dsoRulesCid
+  submitMulti [dsoRules.dsoDelegate] [app.dso] $ mkCommands dsoRulesCid
 
-leaderSubmitsMustFail : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script ()
-leaderSubmitsMustFail app mkCommands = do
+dsoDelegateSubmitsMustFail : AmuletApp -> (ContractId DsoRules -> Commands a) -> Script ()
+dsoDelegateSubmitsMustFail app mkCommands = do
   [(dsoRulesCid, dsoRules)] <- query @DsoRules app.dso
-  submitMultiMustFail [dsoRules.leader] [app.dso] $ mkCommands dsoRulesCid
+  submitMultiMustFail [dsoRules.dsoDelegate] [app.dso] $ mkCommands dsoRulesCid
 
 svSubmits : AmuletApp -> Party -> (ContractId DsoRules -> Commands a) -> Script a
 svSubmits app sv mkCommands = do
@@ -188,7 +188,7 @@ runNextIssuanceD app amuletPrice = do
       appRewards <- queryFilter @AppRewardCoupon app.dso (\r -> r.round == miningRound.round)
       svRewards <- queryFilter @SvRewardCoupon app.dso (\r -> r.round == miningRound.round)
       validatorFaucetCoupons <- queryFilter @ValidatorFaucetCoupon app.dso (\r -> r.round == miningRound.round)
-      leaderSubmits app $ \cid -> exerciseCmd cid $
+      dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
         DsoRules_ClaimExpiredRewards with
           amuletRulesCid = amuletRulesCid
           choiceArg = AmuletRules_ClaimExpiredRewards with
@@ -218,7 +218,7 @@ runNextIssuanceD app amuletPrice = do
     -- set the new agreed price. This should be done with confirmation
     amuletPriceVoteCids <- updateAgreedAmuletPrice app.dso amuletPrice
 
-    advanceResult <- leaderSubmits app $ \cid -> exerciseCmd cid $
+    advanceResult <- dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
         DsoRules_AdvanceOpenMiningRounds with
           amuletRulesCid
           roundToArchiveCid
@@ -280,7 +280,7 @@ executeAllConfirmedActions app = do
           filter (const True) -- (\cs -> s.requiredNumConfirmations <= length cs)
         $ groupEqualOn (\c -> c._2.action) confirmations0
   forA_ executableConfirmations $ \cs -> do
-    submitMulti [s.leader] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExecuteConfirmedAction with
+    submitMulti [s.dsoDelegate] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ExecuteConfirmedAction with
       action = (head cs)._2.action
       amuletRulesCid = Some amuletRulesCid
       confirmationCids = map fst cs
@@ -299,7 +299,7 @@ executeAllDefinitiveVotes app = do
     let execute = request.voteBefore <= now ||
           (activeMembers == Set.fromList (Map.keys request.votes))
     when execute $ do
-      void $ submitMulti [s.leader] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
+      void $ submitMulti [s.dsoDelegate] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
         requestCid
         amuletRulesCid = Some amuletRulesCid
 

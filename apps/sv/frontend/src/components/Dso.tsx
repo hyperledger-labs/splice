@@ -69,7 +69,7 @@ const GeneralInformationView: React.FC = () => {
       membersInfos.push(createRow(member.value, member.key, true));
     }
     const dsoInfos = [
-      createRow('dsoLeaderPartyId', data.dsoRules.payload.leader.toString(), true),
+      createRow('dsoLeaderPartyId', data.dsoRules.payload.dsoDelegate.toString(), true),
       createRow('dsoPartyId', data.dsoPartyId, true),
       createRow('dsoEpoch', data.dsoRules.payload.epoch.toString()),
     ];

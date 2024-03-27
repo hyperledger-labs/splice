@@ -181,7 +181,7 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       sv1Backend.getDsoInfo().dsoRules.payload.members.keySet() should equal(svParties.toSet.asJava)
     }
     clue("The founding SV app (sv1) is the first leader") {
-      sv1Backend.getDsoInfo().dsoRules.payload.leader should equal(
+      sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate should equal(
         dsoRules.svParty.toProtoPrimitive
       )
     }

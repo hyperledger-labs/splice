@@ -201,7 +201,7 @@ trait SvTestUtil extends CNNodeTestCommon {
     dsoRulesConfig.svOnboardingRequestTimeout,
     dsoRulesConfig.svOnboardingConfirmedTimeout,
     dsoRulesConfig.voteRequestTimeout,
-    dsoRulesConfig.leaderInactiveTimeout,
+    dsoRulesConfig.dsoDelegateInactiveTimeout,
     dsoRulesConfig.domainNodeConfigLimits,
     dsoRulesConfig.maxTextLength,
     dsoRulesConfig.globalDomain,

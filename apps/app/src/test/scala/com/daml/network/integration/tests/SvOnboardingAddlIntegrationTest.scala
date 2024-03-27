@@ -308,7 +308,7 @@ class SvOnboardingAddlIntegrationTest
       )(
         "the epoch stays the same",
         _ => {
-          sv1Backend.getDsoInfo().dsoRules.payload.leader shouldBe currentLeader
+          sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate shouldBe currentLeader
         },
       )
 
@@ -332,7 +332,7 @@ class SvOnboardingAddlIntegrationTest
           "the epoch increased and sv2 is the new leader",
           _ => {
             sv1Backend.getDsoInfo().dsoRules.payload.epoch shouldBe 1
-            sv1Backend.getDsoInfo().dsoRules.payload.leader shouldBe newLeader
+            sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate shouldBe newLeader
           },
         ),
         logEntries => {

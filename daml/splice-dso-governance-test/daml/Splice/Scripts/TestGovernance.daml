@@ -247,10 +247,10 @@ testRacingMembershipRemoval = do
   result.abstainingMembers === ["sv1"]
   result.outcome === VRO_Accepted with effectiveAt = now
 
-  -- There are only two members left, and sv3 is the new leader
+  -- There are only two members left, and sv3 is the new DsoDelegate
   [(_, dsoRules)] <- query @DsoRules dso
   Map.keys dsoRules.members === [sv3, sv4]
-  dsoRules.leader === sv3
+  dsoRules.dsoDelegate === sv3
 
   -- The story continues: sv3 tries to remove sv4
   [(dsoRulesCid, _)] <- query @DsoRules dso
@@ -334,11 +334,11 @@ testOffboardMemberAndAmuletPriceVotes : Script ()
 testOffboardMemberAndAmuletPriceVotes = do
   (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
 
-  -- check that the leader is currently sv1
+  -- check that the DsoDelegate is currently sv1
   [(_, dsoRules)] <- query @DsoRules dso
-  dsoRules.leader === sv1
+  dsoRules.dsoDelegate === sv1
 
-  -- run the voting process to change the config and remove the current leader 'sv1'
+  -- run the voting process to change the config and remove the current DsoDelegate 'sv1'
   initiateAndAcceptVote app [sv2, sv3, sv4] $
     ARC_DsoRules with
       dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
@@ -352,11 +352,11 @@ testOffboardMemberAndAmuletPriceVotes = do
   passTime (dsoRules.config.voteRequestTimeout)
   executeAllDefinitiveVotes app
 
-  -- check that the member was removed and the leader changed to sv2
+  -- check that the member was removed and the DsoDelegate changed to sv2
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
   Map.keys (dsoRules.members) === [sv2, sv3, sv4]
   Map.keys (dsoRules.offboardedMembers) === [sv1]
-  dsoRules.leader === sv2
+  dsoRules.dsoDelegate === sv2
 
   -- duplicate the AmuletPriceVote for sv2 to test duplicate removal
   amuletPriceVotes <- query @AmuletPriceVote dso

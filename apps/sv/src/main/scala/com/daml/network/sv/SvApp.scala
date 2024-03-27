@@ -845,7 +845,7 @@ object SvApp {
         case QueryResult(_, Some(_)) =>
           Future.successful(
             Left(
-              s"already voted in an election for epoch ${dsoRules.payload.epoch} to replace inactive leader ${dsoRules.payload.leader}"
+              s"already voted in an election for epoch ${dsoRules.payload.epoch} to replace inactive leader ${dsoRules.payload.dsoDelegate}"
             )
           )
         case QueryResult(offset, None) =>
@@ -853,7 +853,7 @@ object SvApp {
           val cmd = dsoRules.exercise(
             _.exerciseDsoRules_RequestElection(
               self,
-              new splice.dsorules.electionrequestreason.ERR_LeaderUnavailable(
+              new splice.dsorules.electionrequestreason.ERR_DsoDelegateUnavailable(
                 com.daml.ledger.javaapi.data.Unit.getInstance()
               ),
               ranking.asJava,

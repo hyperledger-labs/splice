@@ -42,7 +42,7 @@ class ElectionRequestTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       dsoRules <- store.getDsoRules()
-      currentLeader = dsoRules.payload.leader
+      currentLeader = dsoRules.payload.dsoDelegate
       self = store.key.svParty.toProtoPrimitive
 
       requiredNumRequests = CNThresholds.requiredNumVotes(dsoRules)
@@ -50,7 +50,7 @@ class ElectionRequestTrigger(
       taskOutcome <-
         if (requestCids.size >= requiredNumRequests) {
           val cmd = dsoRules.exercise(
-            _.exerciseDsoRules_ElectLeader(
+            _.exerciseDsoRules_ElectDsoDelegate(
               self,
               requestCids.asJava,
             )
@@ -67,7 +67,7 @@ class ElectionRequestTrigger(
             .map(dsoRules => {
 
               TaskSuccess(
-                show"Successfully completed a leader election to replace the leader $currentLeader with ${dsoRules.payload.leader}"
+                show"Successfully completed a leader election to replace the leader $currentLeader with ${dsoRules.payload.dsoDelegate}"
               )
             })
         } else

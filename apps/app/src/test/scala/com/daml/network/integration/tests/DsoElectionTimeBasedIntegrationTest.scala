@@ -67,7 +67,7 @@ class DsoElectionTimeBasedIntegrationTest
       )
 
       clue("remove current leader such that dsoRules epoch is incremented") {
-        val currentLeader = sv1Backend.getDsoInfo().dsoRules.payload.leader
+        val currentLeader = sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate
         val leaderBackend = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
           .find(
             _.getDsoInfo().svParty.toProtoPrimitive == currentLeader
@@ -122,7 +122,7 @@ class DsoElectionTimeBasedIntegrationTest
               }
             },
           )
-          sv2Backend.getDsoInfo().dsoRules.payload.leader should not be currentLeader
+          sv2Backend.getDsoInfo().dsoRules.payload.dsoDelegate should not be currentLeader
         }
       }
 
@@ -211,7 +211,7 @@ class DsoElectionTimeBasedIntegrationTest
         "A new leader is elected and leader-based triggers resume operating normally"
       ) {
         val effectiveTimeout = SvUtil
-          .fromRelTime(SvUtil.defaultDsoRulesConfig(dummyDsoDomainId).leaderInactiveTimeout)
+          .fromRelTime(SvUtil.defaultDsoRulesConfig(dummyDsoDomainId).dsoDelegateInactiveTimeout)
           .plus(pollingIntervalDuration)
 
         val bufferDuration = JavaDuration.ofSeconds(5)
@@ -232,7 +232,7 @@ class DsoElectionTimeBasedIntegrationTest
             .head
             .data
         dsoRulesAfterElection.epoch shouldBe dsoRulesBeforeElection.epoch + 1
-        dsoRulesAfterElection.leader should not be dsoRulesBeforeElection.leader
+        dsoRulesAfterElection.dsoDelegate should not be dsoRulesBeforeElection.dsoDelegate
 
         eventually() {
           val newRounds = sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs

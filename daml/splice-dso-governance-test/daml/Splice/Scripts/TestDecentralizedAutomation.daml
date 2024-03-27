@@ -23,11 +23,11 @@ import Splice.Scripts.AnsRulesParameters
 import Splice.Wallet.Subscriptions
 
 
--- Automation leader election
+-- Automation DsoDelegate election
 -----------------------------
 
-unitTestLeaderElectionVoting : Script ()
-unitTestLeaderElectionVoting = do
+unitTestDsoDelegateElectionVoting : Script ()
+unitTestDsoDelegateElectionVoting = do
   let rankings =
         [ ("A",   ["A",   "D", "B", "bad"])
         , ("B",   ["B",   "D", "A", "bad"])
@@ -41,8 +41,8 @@ unitTestLeaderElectionVoting = do
     instantRunOffVoting 2 2 rankings === "B"
 
 
-testLeaderElection : Script ()
-testLeaderElection = do
+testDsoDelegateElection : Script ()
+testDsoDelegateElection = do
 
   (app, dso, (mallory, sv2, sv3, sv4)) <- initMainNetDSO
 
@@ -54,27 +54,27 @@ testLeaderElection = do
   req1 <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
     requester = sv2
     ranking = [sv2, sv3, sv4, mallory]
-    reason = ERR_LeaderUnavailable
+    reason = ERR_DsoDelegateUnavailable
   req2 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
     requester = sv3
     ranking = [sv3, sv4, sv2, mallory]
-    reason = ERR_LeaderUnavailable
+    reason = ERR_DsoDelegateUnavailable
   req3 <- submitMulti [sv4] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
     requester = sv4
     ranking = [sv4, sv3, sv2, mallory]
-    reason = ERR_LeaderUnavailable
+    reason = ERR_DsoDelegateUnavailable
   -- mallory tries to get himself re-elected
   req4 <- submitMulti [mallory] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestElection with
     requester = mallory
     ranking = [mallory, sv2, sv3, sv4]
-    reason = ERR_LeaderUnavailable
+    reason = ERR_DsoDelegateUnavailable
   -- mallory does not get re-elected, as sv1 reaches a weak majority first
-  _ <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_ElectLeader with
+  _ <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_ElectDsoDelegate with
     actor = sv3
     requestCids = [req1.electionRequestCid, req2.electionRequestCid, req3.electionRequestCid, req4.electionRequestCid]
 
   [(_, dsoRules)] <- query @DsoRules dso
-  require "SV2 got elected" (dsoRules.leader == sv2)
+  require "SV2 got elected" (dsoRules.dsoDelegate == sv2)
 
   -- run a few more issuances
   runNextIssuanceD app 1.1
@@ -86,10 +86,10 @@ testLeaderElection = do
   trace openRounds $ return ()
 
 
--- | An example of an impersonation attack on the leader election protected for
+-- | An example of an impersonation attack on the DsoDelegate election protected for
 -- via checked fetches.
-testLeaderElection_ImpersonationAttack : Script ()
-testLeaderElection_ImpersonationAttack = do
+testDsoDelegateElection_ImpersonationAttack : Script ()
+testDsoDelegateElection_ImpersonationAttack = do
   (_app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
 
   -- SV2 attempts to get himself elected w/o any action from the others
@@ -101,28 +101,28 @@ testLeaderElection_ImpersonationAttack = do
     epoch
     requester = sv2
     ranking = [sv2, sv3, sv4, sv1]
-    reason = ERR_LeaderUnavailable
+    reason = ERR_DsoDelegateUnavailable
   req2 <- submitMulti [sv2] [] $ createCmd ElectionRequest with
     dso = sv2
     epoch
     requester = sv3
     ranking = [sv2, sv3, sv4, sv1]
-    reason = ERR_LeaderUnavailable
+    reason = ERR_DsoDelegateUnavailable
   req3 <- submitMulti [sv2] [] $ createCmd ElectionRequest with
     dso = sv2
     epoch
     requester = sv4
     ranking = [sv2, sv4, sv3, sv1]
-    reason = ERR_LeaderUnavailable
+    reason = ERR_DsoDelegateUnavailable
 
   -- sv2 has created enough requests and submits them
-  submitMultiMustFail [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_ElectLeader with
+  submitMultiMustFail [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_ElectDsoDelegate with
     actor = sv2
     requestCids = [req1, req2, req3]
 
   -- Before #2109 introduced checked fetches, this would have succeeded.
   -- [(_, dsoRules)] <- query @DsoRules dso
-  -- require "Show that SV2 got elected (wrongfully!)" (dsoRules.leader == sv2)
+  -- require "Show that SV2 got elected (wrongfully!)" (dsoRules.DsoDelegate == sv2)
 
 
 
@@ -138,7 +138,7 @@ testUnclaimedRewardsMerging = do
 
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   unclaimedRewards <- query @UnclaimedReward app.dso
-  leaderSubmits app $ \cid -> exerciseCmd cid $
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_MergeUnclaimedRewards with
       amuletRulesCid
       unclaimedRewardCids = (fmap fst unclaimedRewards)
@@ -215,15 +215,15 @@ testConfirmationExpiry = do
         newMemberParticipantId = "svX-participant-id"
         joinedAsOfRound = (Round 3)
 
-  -- leader tries to expire the confirmation, but it's too early
-  leaderSubmitsMustFail app $ \cid -> exerciseCmd cid $
+  -- DsoDelegate tries to expire the confirmation, but it's too early
+  dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
 
   -- wait for the confirmation TTL to pass
   passTime (minutes 5)
 
-  -- leader expires the confirmation
-  leaderSubmits app $ \cid -> exerciseCmd cid $
+  -- DsoDelegate expires the confirmation
+  dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
 
   pure ()

@@ -3,8 +3,8 @@ daml/splice-amulet-name-service/.daml/dist/splice-amulet-name-service-0.1.0.dar 
 daml/splice-amulet-test/.daml/dist/splice-amulet-test-0.1.0.dar 1765cfaa572a12ffe29e24b0781f360b25db292a9d963797a359b1f7fba54943
 daml/splice-amulet/.daml/dist/splice-amulet-0.1.0.dar c02df9387fb78173bdf93bee3c7e0683600099e9d596df6ed546b00e4e25ad23
 daml/splice-app-manager/.daml/dist/splice-app-manager-0.1.0.dar e3605e0112595187ec963700d28f17fe042f3b80c862363e299003b9423a1844
-daml/splice-dso-governance-test/.daml/dist/splice-dso-governance-test-0.1.0.dar e96fd3eb1763e0dd51f45a1ccf958d40b810cad21f8a79fe49620d87a7a4ea22
-daml/splice-dso-governance/.daml/dist/splice-dso-governance-0.1.0.dar e79014d05e5055721e7eaff589a1c782c4c295db43a375e6029d0ba9a010892f
+daml/splice-dso-governance-test/.daml/dist/splice-dso-governance-test-0.1.0.dar db3b0e73aae1d396c8019358a26b61f90e32eb9bead30d17deb8791180fb7e37
+daml/splice-dso-governance/.daml/dist/splice-dso-governance-0.1.0.dar 190aae10778501edb4211a0c973e6c8745868c64d9f7fc5c80f1c852df3ab1d8
 daml/splice-util/.daml/dist/splice-util-0.1.0.dar 4820d3100d7496184e41df287f413793bcda9ed7e5b33c0f2b62a169fdf94a24
 daml/splice-validator-lifecycle-test/.daml/dist/splice-validator-lifecycle-test-0.1.0.dar f662bb30c9d0e91517a6aadae6ea101faa2790e83c5ad99a62b77baefae507aa
 daml/splice-validator-lifecycle/.daml/dist/splice-validator-lifecycle-0.1.0.dar ce7184c80a291bcaacb77e15cd1390dcdda08f7319fa739faeafda689af7df77

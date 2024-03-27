@@ -84,7 +84,7 @@ class RestartLeaderBasedAutomationTrigger(
 
       synchronized {
         val currentEpoch = dsoRules.payload.epoch
-        val currentLeader = PartyId.tryFromProtoPrimitive(dsoRules.payload.leader)
+        val currentLeader = PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate)
         val lastKnownEpoch = epochStateVar.map(_.epoch)
 
         epochStateVar match {
@@ -117,7 +117,7 @@ class RestartLeaderBasedAutomationTrigger(
       new SvTaskBasedTrigger.Context(
         store,
         connection,
-        PartyId.tryFromProtoPrimitive(dsoRules.payload.leader),
+        PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate),
         epoch,
       )
 
@@ -130,7 +130,7 @@ class RestartLeaderBasedAutomationTrigger(
 
        val leaderLoggerFactory = loggerFactory.appendUnnamedKey(
          "isLeader",
-         (dsoRules.contract.payload.leader == store.key.svParty.toProtoPrimitive).toString,
+         (dsoRules.contract.payload.dsoDelegate == store.key.svParty.toProtoPrimitive).toString,
        )
        val retryProvider =
          RetryProvider(
@@ -150,7 +150,7 @@ class RestartLeaderBasedAutomationTrigger(
        epochStateVar = Some(
          EpochState(
            epoch,
-           PartyId.tryFromProtoPrimitive(dsoRules.payload.leader),
+           PartyId.tryFromProtoPrimitive(dsoRules.payload.dsoDelegate),
            leaderBasedAutomation,
            retryProvider,
          )
