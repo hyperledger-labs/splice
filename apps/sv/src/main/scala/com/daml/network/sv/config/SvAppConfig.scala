@@ -117,23 +117,11 @@ final case class InitialAnsConfig(
 )
 
 final case class DomainFeesConfig(
-    // See https://github.com/DACH-NY/canton-network-node/issues/9377 for justification for the default values
-    // The traffic cost of various daml txs used for these computations are based on the observations in
-    // https://digitalasset.atlassian.net/wiki/spaces/CN/pages/3245768714/Lab+Log+-+Traffic+cost+of+p2p+transfers#Summary.
-    // Here, f is the f in 3f+1. We assume a default SVC size of 4 (f=1).
-    // - Cost of standard P2P transfer = 40_000 + 10_000 * f
-    // - Cost of validator reward coupon collection = 12_000 + 2_000 * f
-    // - Cost of faucet coupon collection = 9_000 + 2_000 * f
-    // - Cost of traffic purchase = 40_000 + 10_000 * f
-
-    extraTrafficPrice: NonNegativeNumeric[BigDecimal] = NonNegativeNumeric.tryCreate(
-      BigDecimal(1.0 / 0.05)
-    ), // $1 per p2p-trasfer-cc-cost (50kB) in $/MB
-    minTopupAmount: NonNegativeLong =
-      NonNegativeLong.tryCreate((1.1 * 75_0000).toLong), // same as baseRateBurstAmount
-    baseRateBurstAmount: NonNegativeLong = NonNegativeLong.tryCreate(
-      (1.1 * 75_0000).toLong
-    ), // 1.1 * (reward-collection + faucet-collection + traffic-purchase
+    extraTrafficPrice: NonNegativeNumeric[BigDecimal] =
+      NonNegativeNumeric.tryCreate(BigDecimal(1.0)),
+    minTopupAmount: NonNegativeLong = NonNegativeLong.tryCreate(10_000_000L),
+    baseRateBurstAmount: NonNegativeLong =
+      NonNegativeLong.tryCreate(100 * 20 * 1000L), // 100 txs of 20KB each (over the burst window)
     baseRateBurstWindow: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(10),
     readVsWriteScalingFactor: PositiveNumeric[Int] =
       PositiveNumeric.tryCreate(200), // charge 200 per 10,000, i.e., 2% of write cost for every read

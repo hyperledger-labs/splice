@@ -282,8 +282,8 @@ class ScanFrontendTimeBasedIntegrationTest
           compareLeaderboardTable(
             "domain-fees-leaderboard-row",
             Seq(
-              s"${aliceValidatorWalletParty} 2 1650000 16.5 CC ${(firstRound + 1).toString}",
-              s"${bobValidatorWalletParty} 1 825000 8.25 CC ${(firstRound + 1).toString}",
+              s"${aliceValidatorWalletParty} 2 20000000 10 CC ${(firstRound + 1).toString}",
+              s"${bobValidatorWalletParty} 1 10000000 5 CC ${(firstRound + 1).toString}",
             ),
           )
         }
