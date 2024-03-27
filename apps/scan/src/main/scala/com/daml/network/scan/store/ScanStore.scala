@@ -159,7 +159,10 @@ trait ScanStore
       )
     )
 
-  def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit tc: TraceContext): Future[BigDecimal]
+  def getTotalAmuletBalance(asOfEndOfRound: Long): Future[BigDecimal]
+  protected def getUncachedTotalAmuletBalance(asOfEndOfRound: Long)(implicit
+      tc: TraceContext
+  ): Future[BigDecimal]
 
   def getTotalRewardsCollectedEver()(implicit tc: TraceContext): Future[BigDecimal]
   def getRewardsCollectedInRound(round: Long)(implicit tc: TraceContext): Future[BigDecimal]

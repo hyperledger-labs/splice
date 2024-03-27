@@ -5,6 +5,7 @@ import com.daml.metrics.api.MetricHandle.Gauge
 import com.daml.metrics.api.{MetricsContext, MetricDoc, MetricName}
 import com.daml.network.environment.CNMetrics
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
+import com.daml.metrics.CacheMetrics
 
 class DbScanStoreMetrics(metricsFactory: CantonLabeledMetricsFactory) extends AutoCloseable {
 
@@ -25,6 +26,8 @@ class DbScanStoreMetrics(metricsFactory: CantonLabeledMetricsFactory) extends Au
   )
   val latestAggregatedRound: Gauge[Long] =
     metricsFactory.gauge(prefix :+ "latest-aggregated-round", -1L)(MetricsContext.Empty)
+
+  val cache = new CacheMetrics(prefix :+ "cache", metricsFactory)
 
   override def close() = {
     try earliestAggregatedRound.close()

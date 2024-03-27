@@ -27,23 +27,30 @@ import com.daml.network.util.{
   QualifiedName,
   TemplateJsonDecoder,
 }
+import com.digitalasset.canton.caching.CaffeineCache
+import com.digitalasset.canton.caching.CaffeineCache.FutureAsyncCacheLoader
+import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.lifecycle.SyncCloseable
 import com.digitalasset.canton.lifecycle.CloseContext
+import com.digitalasset.canton.lifecycle.FlagCloseableAsync
+import com.digitalasset.canton.lifecycle.AsyncCloseable
+import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.resource.DbStorage.Implicits.BuilderChain.toSQLActionBuilderChain
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.github.benmanes.caffeine.cache as caffeine
 import slick.jdbc.canton.ActionBasedSQLInterpolation.Implicits.actionBasedSQLInterpolationCanton
 
 import java.time.Instant
 import scala.concurrent.{ExecutionContext, Future}
-import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.FlagCloseableAsync
-import com.digitalasset.canton.lifecycle.AsyncCloseable
-import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
-import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.lifecycle.SyncCloseable
 
+object DbScanStore {
+  type CacheKey = java.lang.Long // caffeine metrics function demands AnyRefs
+  type CacheValue = BigDecimal
+}
 class DbScanStore(
     override val key: ScanStore.Key,
     storage: DbStorage,
@@ -423,18 +430,53 @@ class DbScanStore(
       } yield result
     }
 
-  override def getTotalAmuletBalance(asOfEndOfRound: Long)(implicit
+  private val totalAmuletBalanceCache
+      : CaffeineCache.AsyncLoadingCaffeineCache[DbScanStore.CacheKey, DbScanStore.CacheValue] = {
+    implicit val tc = TraceContext.empty
+    new CaffeineCache.AsyncLoadingCaffeineCache(
+      caffeine.Caffeine
+        .newBuilder()
+        .maximumSize(1000)
+        .buildAsync(
+          new FutureAsyncCacheLoader[DbScanStore.CacheKey, DbScanStore.CacheValue](key =>
+            getUncachedTotalAmuletBalance(key)
+          )
+        ),
+      storeMetrics.cache,
+    )
+  }
+  // TODO(#11312) remove when amulet expiry works again
+  def getTotalAmuletBalance(asOfEndOfRound: Long): Future[BigDecimal] = {
+    totalAmuletBalanceCache.get(asOfEndOfRound)
+  }
+
+  protected override def getUncachedTotalAmuletBalance(asOfEndOfRound: Long)(implicit
       tc: TraceContext
   ): Future[BigDecimal] =
     waitUntilAcsIngested {
       for {
         result <- ensureAggregated(asOfEndOfRound) {
+          // There exists no row for a (round, party) in round_party_totals where the party is not active in round,
+          // so it is necessary to find the most recent round where the party was active
+          // and sum the most recent total_amulet_balances for all parties.
+          // using greatest(0, ...) to handle negative balances caused by coins never expiring.
           storage.query(
+            // TODO(#11312) change to query from round_totals when amulet expiry works again
             sql"""
-              select total_amulet_balance
-              from   round_totals
-              where  store_id = $storeId
-              and    closed_round = $asOfEndOfRound;
+              with most_recent as (
+                select   max(closed_round) as closed_round,
+                         party
+                from     round_party_totals
+                where    store_id = $storeId
+                and      closed_round <= $asOfEndOfRound
+                group by party
+              )
+              select sum(greatest(0, rpt.cumulative_change_to_initial_amount_as_of_round_zero - rpt.cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)))
+              from   round_party_totals rpt,
+                     most_recent mr
+              where  rpt.store_id = $storeId
+              and    rpt.party = mr.party
+              and    rpt.closed_round = mr.closed_round;
               """.as[Option[BigDecimal]].headOption,
             "getTotalAmuletBalance",
           )
@@ -489,7 +531,7 @@ class DbScanStore(
           // in that case just take the most recent round.
           // This is also why the total_amulet_balance is calculated from the two cumulative fields.
           sql"""
-             select   cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1) as total_amulet_balance
+             select   greatest(0, cumulative_change_to_initial_amount_as_of_round_zero - cumulative_change_to_holding_fees_rate * ($asOfEndOfRound + 1)) as total_amulet_balance
              from     round_party_totals
              where    store_id = $storeId
              and      closed_round <= $asOfEndOfRound

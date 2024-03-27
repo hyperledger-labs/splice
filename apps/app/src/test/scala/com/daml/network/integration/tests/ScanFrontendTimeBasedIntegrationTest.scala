@@ -324,9 +324,9 @@ class ScanFrontendTimeBasedIntegrationTest
           "See valid total amulet balance",
           _ => {
             screenshot()
-            seleniumText(find(id("total-amulet-balance-cc"))) should matchText(
-              s"${sv1ScanBackend.getTotalAmuletBalance(firstRound + 1)} CC"
-            )
+            val totalText = seleniumText(find(id("total-amulet-balance-cc")))
+            val totalBalance = sv1ScanBackend.getTotalAmuletBalance(firstRound + 1)
+            BigDecimal(totalText.stripSuffix(" CC")) shouldBe totalBalance
           },
         )
       }
