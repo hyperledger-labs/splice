@@ -9,7 +9,7 @@ import com.daml.network.environment.{
 }
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.identities.NodeIdentitiesDump
-import com.daml.network.migration.DomainDataRestorer
+import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
 import com.daml.network.setup.NodeInitializer
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
@@ -24,6 +24,7 @@ import com.daml.network.sv.onboarding.domainmigration.DomainMigrationInitializer
 import com.daml.network.sv.onboarding.joining.JoiningNodeInitializer
 import com.daml.network.sv.store.{SvStore, SvDsoStore, SvSvStore}
 import com.daml.network.util.TemplateJsonDecoder
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.protocol.DynamicDomainParameters
@@ -113,8 +114,16 @@ class DomainMigrationInitializer(
         config.ledgerApiUser,
         storeKey.svParty,
       )
-      svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
-      dsoStore = newDsoStore(svStore.key, config.domainMigrationId, participantId)
+      migrationInfo =
+        DomainMigrationInfo(
+          currentMigrationId = config.domainMigrationId,
+          acsRecordTime = Some(
+            CantonTimestamp.assertFromInstant(migrationDump.domainDataSnapshot.acsTimestamp)
+          ),
+          domainWasPaused = migrationDump.domainDataSnapshot.domainWasPaused,
+        )
+      svStore = newSvStore(storeKey, migrationInfo, participantId)
+      dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
         dsoStore,
@@ -126,6 +135,11 @@ class DomainMigrationInitializer(
           config.ledgerApiUser,
           svStore.key.dsoParty,
         )
+      _ <- DomainMigrationInfo.saveToUserMetadata(
+        svAutomation.connection,
+        config.ledgerApiUser,
+        migrationInfo,
+      )
       dsoAutomationService =
         newSvDsoAutomationService(svStore, dsoStore, Some(localDomainNode))
       _ <- joiningNodeInitializer.onboard(

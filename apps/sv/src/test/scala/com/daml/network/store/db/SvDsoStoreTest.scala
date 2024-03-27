@@ -48,6 +48,7 @@ import com.daml.network.codegen.java.splice.wallet.subscriptions.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
@@ -1281,7 +1282,11 @@ class DbSvDsoStoreTest
       storage,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
+      DomainMigrationInfo(
+        domainMigrationId,
+        None,
+        true,
+      ),
       participantId = mkParticipantId("SvDsoStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)
     for {

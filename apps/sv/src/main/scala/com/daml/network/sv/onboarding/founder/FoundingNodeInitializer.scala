@@ -10,6 +10,7 @@ import cats.syntax.traverse.*
 import com.daml.network.codegen.java.splice
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.*
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.store.MultiDomainAcsStore.*
 import com.daml.network.sv.LocalDomainNode
@@ -139,8 +140,15 @@ class FoundingNodeInitializer(
         ),
       ).tupled
       storeKey = SvStore.Key(svParty, dsoParty)
-      svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
-      dsoStore = newDsoStore(svStore.key, config.domainMigrationId, participantId)
+      migrationInfo =
+        DomainMigrationInfo(
+          currentMigrationId =
+            config.domainMigrationId, // Note: not guaranteed to be 0 for the founding node
+          acsRecordTime = None, // No previous migration, we're starting the network
+          domainWasPaused = true,
+        )
+      svStore = newSvStore(storeKey, migrationInfo, participantId)
+      dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
         dsoStore,
@@ -150,6 +158,11 @@ class FoundingNodeInitializer(
         SetupUtil.ensureDsoPartyMetadataAnnotation(svAutomation.connection, config, dsoParty),
         svStore.domains.waitForDomainConnection(config.domains.global.alias),
       ).tupled
+      _ <- DomainMigrationInfo.saveToUserMetadata(
+        svAutomation.connection,
+        config.ledgerApiUser,
+        migrationInfo,
+      )
       dsoPartyHosting = newDsoPartyHosting(storeKey)
       // NOTE: we assume that DSO party, cometBft node, sequencer, and mediator nodes are initialized as
       // part of deployment and the running of bootstrap scripts. Here we just check that the DSO party

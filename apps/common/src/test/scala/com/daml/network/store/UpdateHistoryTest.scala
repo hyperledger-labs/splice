@@ -8,6 +8,7 @@ import com.daml.network.environment.ledger.api.{
   ReassignmentUpdate,
   TransactionTreeUpdate,
 }
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.db.{AcsJdbcTypes, AcsTables, CNPostgresTest}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.resource.DbStorage
@@ -343,7 +344,11 @@ class UpdateHistoryTest
   ): UpdateHistory = {
     new UpdateHistory(
       storage,
-      domainMigrationId,
+      DomainMigrationInfo(
+        domainMigrationId,
+        None,
+        true,
+      ),
       participantId,
       updateStreamParty,
       loggerFactory,

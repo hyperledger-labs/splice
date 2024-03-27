@@ -6,6 +6,7 @@ import com.daml.network.automation.TransferFollowTrigger.Task as FollowTask
 import com.daml.network.codegen.java.splice.validatoronboarding.ValidatorOnboarding
 import com.daml.network.codegen.java.splice.{svonboarding as so, validatoronboarding as vo}
 import com.daml.network.environment.RetryProvider
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore, PageLimit}
 import com.daml.network.sv.store.db.DbSvSvStore
@@ -100,8 +101,7 @@ object SvSvStore {
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
-      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-      domainMigrationId: Long,
+      domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
@@ -110,7 +110,7 @@ object SvSvStore {
   ): SvSvStore =
     storage match {
       case db: DbStorage =>
-        new DbSvSvStore(key, db, loggerFactory, retryProvider, domainMigrationId, participantId)
+        new DbSvSvStore(key, db, loggerFactory, retryProvider, domainMigrationInfo, participantId)
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")
     }
 

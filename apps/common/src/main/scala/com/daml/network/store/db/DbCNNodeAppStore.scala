@@ -1,6 +1,7 @@
 package com.daml.network.store.db
 
 import com.daml.network.environment.RetryProvider
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.*
 import com.daml.network.util.TemplateJsonDecoder
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -15,8 +16,7 @@ abstract class DbCNNodeAppStore[TXE](
     acsTableName: String,
     txLogTableName: String,
     storeDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     storeUpdateHistory: Boolean,
 )(implicit
@@ -34,12 +34,12 @@ abstract class DbCNNodeAppStore[TXE](
     new DbMultiDomainAcsStore(
       storage,
       acsTableName,
-      txLogTableName,
+      Some(txLogTableName),
       storeDescriptor,
       loggerFactory,
       acsContractFilter,
       txLogConfig,
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
       retryProvider,
       handleIngestionSummary,
@@ -60,7 +60,7 @@ abstract class DbCNNodeAppStore[TXE](
       Some(
         new UpdateHistory(
           storage,
-          domainMigrationId,
+          domainMigrationInfo,
           participantId,
           acsContractFilter.ingestionFilter.primaryParty,
           loggerFactory,
@@ -75,8 +75,7 @@ abstract class DbCNNodeAppStoreWithoutHistory(
     storage: DbStorage,
     acsTableName: String,
     storeDescriptor: DbMultiDomainAcsStore.StoreDescriptor,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
 )(implicit
     ec: ExecutionContext,
@@ -93,12 +92,12 @@ abstract class DbCNNodeAppStoreWithoutHistory(
     new DbMultiDomainAcsStore[Nothing](
       storage,
       acsTableName,
-      "THIS_STORE_DOES_NOT_HAVE_A_TXLOG",
+      None,
       storeDescriptor,
       loggerFactory,
       acsContractFilter,
       TxLogStore.Config.empty,
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
       retryProvider,
       handleIngestionSummary,

@@ -20,6 +20,7 @@ import com.daml.network.environment.{
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.external.scan.ScanResource as ExternalScanResource
 import com.daml.network.http.v0.scan.ScanResource as InternalScanResource
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.http.{HttpExternalScanHandler, HttpScanHandler}
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.ScanAppBackendConfig
@@ -85,14 +86,14 @@ class ScanApp(
       // which we read below.
       serviceUserPrimaryParty: PartyId,
   )(implicit tc: TraceContext): Future[ScanApp.State] = {
+    val appInitConnection = ledgerClient
+      .readOnlyConnection(
+        this.getClass.getSimpleName,
+        loggerFactory,
+      )
     for {
       dsoParty <- appInitStep("Get DSO party from user metadata") {
-        ledgerClient
-          .readOnlyConnection(
-            this.getClass.getSimpleName,
-            loggerFactory,
-          )
-          .getDsoPartyFromUserMetadata(config.svUser)
+        appInitConnection.getDsoPartyFromUserMetadata(config.svUser)
       }
       scanAggregatesReaderContext = new ScanAggregatesReaderContext(
         clock,
@@ -114,6 +115,19 @@ class ScanApp(
       participantId <- appInitStep("Get participant id") {
         participantAdminConnection.getParticipantId()
       }
+      migrationInfo <- appInitStep("Get domain migration info") {
+        DomainMigrationInfo.loadFromUserMetadata(
+          appInitConnection,
+          config.svUser,
+        )
+      }
+      _ = if (config.domainMigrationId != migrationInfo.currentMigrationId) {
+        throw Status.INVALID_ARGUMENT
+          .withDescription(
+            s"Migration id ${migrationInfo.currentMigrationId} from the the SV user metadata does not match the configured migration id ${config.domainMigrationId} in the scan app. Please check if the scan app is configured with the correct migration id"
+          )
+          .asRuntimeException()
+      }
       store = ScanStore(
         key = ScanStore.Key(dsoParty = dsoParty),
         storage,
@@ -123,7 +137,7 @@ class ScanApp(
         { store =>
           ScanAggregatesReader(store, scanAggregatesReaderContext)
         },
-        config.domainMigrationId,
+        migrationInfo,
         participantId,
       )
       sequencerAdminConnection = new SequencerAdminConnection(

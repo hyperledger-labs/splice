@@ -46,7 +46,9 @@ class DomainDataSnapshotGenerator(
     topologySnapshot,
     vettedPackages,
     acsSnapshot,
+    acsTimestamp = timestamp,
     dars,
+    domainWasPaused = false,
   )
 
   def getDomainMigrationSnapshot(implicit
@@ -62,7 +64,7 @@ class DomainDataSnapshotGenerator(
     vettedPackages <- sequencerAdminConnection.traverse(
       _.getVettedPackagesSnapshot(globalDomain, timestamp)
     )
-    acsSnapshot <- acsExporter
+    (acsSnapshot, acsTimestamp) <- acsExporter
       .safeExportParticipantPartiesAcsFromPausedDomain(globalDomain)
       .leftMap(failure =>
         Status.FAILED_PRECONDITION.withDescription(failure.toString).asRuntimeException()
@@ -73,6 +75,8 @@ class DomainDataSnapshotGenerator(
     genesisState,
     vettedPackages,
     acsSnapshot,
+    acsTimestamp,
     dars,
+    domainWasPaused = true,
   )
 }

@@ -1118,7 +1118,9 @@ components:
       type: object
       required:
         - acs_snapshot
+        - acs_timestamp
         - dars
+        - domain_was_halted
       properties:
         genesis_state:
           description: |
@@ -1132,10 +1134,14 @@ components:
           description: |
             base64 encoded string of acs snapshot for the requested party id, or for the dso and sv parties by default
           type: string
+        acs_timestamp:
+          type: string
         dars:
           type: array
           items:
             $ref: "#/components/schemas/Dar"
+        domain_was_halted:
+          type: boolean
 
     Dar:
       type: object

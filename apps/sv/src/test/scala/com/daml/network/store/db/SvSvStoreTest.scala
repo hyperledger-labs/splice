@@ -3,6 +3,7 @@ package com.daml.network.store.db
 import com.daml.network.codegen.java.splice.validatoronboarding as vo
 import com.daml.network.codegen.java.splice.validatoronboarding.UsedSecret
 import com.daml.network.environment.{DarResources, RetryProvider}
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.StoreTest
 import com.daml.network.sv.config.{SvDomainConfig, SvGlobalDomainConfig}
@@ -150,7 +151,11 @@ class DbSvSvStoreTest
       storage,
       loggerFactory,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId = 0,
+      DomainMigrationInfo(
+        0,
+        None,
+        true,
+      ),
       participantId = mkParticipantId("SvSvStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)
     for {

@@ -28,7 +28,7 @@ class DomainMigrationDumpGenerator(
       domain: DomainId,
   )(implicit tc: TraceContext): Future[DomainMigrationDump] = {
     for {
-      acsSnapshot <- acsExporter
+      (acsSnapshot, acsTimestamp) <- acsExporter
         .safeExportParticipantPartiesAcsFromPausedDomain(domain)
         .leftMap(failure =>
           Status.FAILED_PRECONDITION
@@ -45,6 +45,7 @@ class DomainMigrationDumpGenerator(
         migrationId = migrationId,
         participant = nodeIdentities,
         acsSnapshot = acsSnapshot,
+        acsTimestamp = acsTimestamp,
         dars = dars,
         createdAt = Instant.now(),
       )

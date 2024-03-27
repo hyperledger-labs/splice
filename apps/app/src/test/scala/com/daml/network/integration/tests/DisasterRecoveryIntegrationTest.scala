@@ -26,6 +26,7 @@ import com.daml.network.util.{
 }
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
 import com.daml.network.validator.config.{ValidatorDomainConfig, ValidatorGlobalDomainConfig}
+import com.daml.network.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -121,7 +122,7 @@ class DisasterRecoveryIntegrationTest
               InstanceName.tryCreate("sv1ScanLocal") ->
                 conf
                   .scanApps(InstanceName.tryCreate("sv1Scan"))
-                  .copy()
+                  .copy(domainMigrationId = 1L)
             ),
             validatorApps = conf.validatorApps + (
               InstanceName.tryCreate("sv1ValidatorLocal") ->
@@ -135,6 +136,7 @@ class DisasterRecoveryIntegrationTest
                         url = Some("http://localhost:28109"),
                       )
                     ),
+                    domainMigrationId = 1L,
                   )
             ),
             walletAppClients = conf.walletAppClients + (
@@ -159,27 +161,29 @@ class DisasterRecoveryIntegrationTest
 
   val dumpPath = Files.createTempFile("participant-dump", ".json")
 
-  // TODO(#10707) ignored, re-enable when fixed
-  "Recover from losing the domain" ignore { implicit env =>
+  "Recover from losing the domain" in { implicit env =>
     runTest(
       "lost-domain",
       (identities, timestampBeforeDisaster) => {
         val svBackends = Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend)
         val dumps = svBackends.map(_.getDomainDataSnapshot(timestampBeforeDisaster))
         svBackends.zip(identities.zip(dumps)).foreach { case (sv, (ids, dump)) =>
+          dump.domainWasPaused should be(false)
+          dump.acsTimestamp should be(timestampBeforeDisaster)
           writeMigrationDumpFile(sv, ids, dump)
         }
       },
     )
   }
-  // TODO(#10707) ignored, re-enable when fixed
-  "Recover from losing all sequencers and most participants" ignore { implicit env =>
+  "Recover from losing all sequencers and most participants" in { implicit env =>
     runTest(
       "lost-all-sequencers-most-participants",
       (identities, timestampBeforeDisaster) => {
         val dump =
           sv2Backend
             .getDomainDataSnapshot(timestampBeforeDisaster, Some(identities.head.dsoPartyId))
+        dump.domainWasPaused should be(false)
+        dump.acsTimestamp should be(timestampBeforeDisaster)
         Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).zip(identities).foreach {
           case (sv, ids) =>
             writeMigrationDumpFile(sv, ids, dump)
@@ -209,7 +213,7 @@ class DisasterRecoveryIntegrationTest
       sequencersMediators = false,
     )() {
 
-      val (identities, timestampBeforeDisaster) = withCantonSvNodes(
+      withCantonSvNodes(
         (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
         s"sequencers-mediators-before-disaster-$cantonInstanceSuffix",
         participants = false,
@@ -235,7 +239,7 @@ class DisasterRecoveryIntegrationTest
               sv1WalletClient.balance().unlockedQty,
               (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
             )
-            countTapsFromScan(sv1ScanBackend, 1337) shouldBe 1
+            countTapsFromScan(sv1ScanBackend, walletUsdToAmulet(1337)) shouldBe 1
           },
         )
 
@@ -249,18 +253,44 @@ class DisasterRecoveryIntegrationTest
         sv1WalletClient.tap(1338)
         val timestampAfterLostTap = Instant.now()
 
+        logger.debug(
+          s"timestampBeforeDisaster=$timestampBeforeDisaster, timestampAfterLostTap=$timestampAfterLostTap"
+        )
+
         // Tap yet more amulet without waiting for it to necessarily be ingested on all SVs
         sv1WalletClient.tap(1339)
 
         waitForSvParticipantsToCatchup(timestampAfterLostTap)
-        (identities, timestampBeforeDisaster)
+
+        withClueAndLog(
+          "More than one tap visible in the wallet transaction history on the old domain"
+        ) {
+          val balanceChanges = sv1WalletClient.listTransactions(None, 100).collect {
+            case e: BalanceChangeTxLogEntry => e.amount
+          }
+          balanceChanges should contain allElementsOf Seq(
+            walletUsdToAmulet(1337),
+            walletUsdToAmulet(1338),
+          )
+        }
+        withClueAndLog(
+          "More than one tap visible in the scan transaction history on the new domain"
+        ) {
+          val taps = sv1ScanBackend
+            .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
+            .flatMap(_.tap.map(t => BigDecimal(t.amuletAmount)))
+          taps should contain allElementsOf Seq(walletUsdToAmulet(1337), walletUsdToAmulet(1338))
+        }
+
+        // Note: the dumps contain data from the sequencers, need to get
+        // the dumps before shutting down canton nodes.
+        // TODO(#11099): Once taking the migration dump does not need sequencers to be running, move this further down.
+        withClueAndLog("Getting and writing disaster recovery dumps") {
+          getAndWriteDumps(identities, timestampBeforeDisaster)
+        }
       }
 
       // The sequencers and mediators have been shut down here, only participants are still alive
-
-      withClueAndLog("Getting and writing disaster recovery dumps") {
-        getAndWriteDumps(identities, timestampBeforeDisaster)
-      }
 
       withCantonSvNodes(
         (Some(sv1Backend), Some(sv2Backend), Some(sv3Backend), Some(sv4Backend)),
@@ -310,8 +340,9 @@ class DisasterRecoveryIntegrationTest
             Seq(newDomainNode1, newDomainNode2, newDomainNode3, newDomainNode4)
 
           withClueAndLog("Starting new SV apps") {
-            // TODO(#9977)
-            loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.ERROR))(
+            // UpdateHistory and DbMultiDomainAcsStore warn about deleting historical data
+            // after a rollback, which is expected in this test.
+            loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
               startAllSync(
                 sv1LocalBackend,
                 sv2LocalBackend,
@@ -320,12 +351,18 @@ class DisasterRecoveryIntegrationTest
                 sv1ScanLocalBackend,
                 sv1ValidatorLocalBackend,
               ),
-              entries =>
+              entries => {
+                entries should not be empty
+                // Both UpdateHistory and DbMultiDomainAcsStore should roll back data
+                forAtLeast(1, entries) { _.loggerName should include("UpdateHistory") }
+                forAtLeast(1, entries) { _.loggerName should include("DbMultiDomainAcsStore") }
+                // This part of the warning message is shared between UpdateHistory and DbMultiDomainAcsStore
                 forAll(entries) {
-                  _.errorMessage should include(
-                    "Unexpected amulet create event"
+                  _.warningMessage should include(
+                    "This is expected during a disaster recovery, where we are rolling back the domain to a previous state"
                   )
-                },
+                }
+              },
             )
           }
 
@@ -336,6 +373,19 @@ class DisasterRecoveryIntegrationTest
               sv1WalletLocalClient.balance().unlockedQty,
               (walletUsdToAmulet(1000), walletUsdToAmulet(2000)),
             )
+          }
+          // TODO(#10449): this won't work until the validator also supports disaster recovery
+          /* withClueAndLog("Only one tap visible in the wallet transaction history on the new domain") {
+            val balanceChanges = sv1WalletLocalClient.listTransactions(None, 100).collect {
+              case e: BalanceChangeTxLogEntry => e.amount
+            }
+            balanceChanges should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
+          } */
+          withClueAndLog("Only one tap visible in the scan transaction history on the new domain") {
+            val taps = sv1ScanLocalBackend
+              .listTransactions(None, TransactionHistoryRequest.SortOrder.Asc, 100)
+              .flatMap(_.tap.map(t => BigDecimal(t.amuletAmount)))
+            taps should contain theSameElementsAs Seq(walletUsdToAmulet(1337))
           }
           withClueAndLog("New domain is functional") {
             sv1WalletLocalClient.tap(1337)
@@ -387,9 +437,9 @@ class DisasterRecoveryIntegrationTest
     fullDumpFile.write(fullDump.asJson.spaces2)
   }
 
-  private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: Double) = {
+  private def countTapsFromScan(scan: ScanAppBackendReference, tapAmount: BigDecimal) = {
     listTransactionsFromScan(scan).count(
-      _.tap.map(a => BigDecimal(a.amuletAmount)).contains(BigDecimal(tapAmount))
+      _.tap.map(a => BigDecimal(a.amuletAmount)).contains(tapAmount)
     )
   }
 

@@ -2,6 +2,7 @@ package com.daml.network.wallet
 
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.*
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.util.{HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.automation.UserWalletAutomationService
@@ -30,8 +31,7 @@ class UserWalletService(
     override protected[this] val retryProvider: RetryProvider,
     override val loggerFactory: NamedLoggerFactory,
     scanConnection: BftScanConnection,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
 )(implicit
@@ -51,7 +51,7 @@ class UserWalletService(
       storage,
       loggerFactory,
       retryProvider,
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
     )
 

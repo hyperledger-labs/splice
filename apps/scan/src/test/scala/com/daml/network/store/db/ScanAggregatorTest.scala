@@ -21,6 +21,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.codegen.java.splice
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.store.TxLogEntry.EntryType
@@ -672,7 +673,11 @@ class ScanAggregatorTest
         NoOpMetricsFactory,
       ),
       createReader,
-      domainMigrationId = 0,
+      DomainMigrationInfo(
+        0,
+        None,
+        true,
+      ),
       participantId = mkParticipantId("ScanAggregatorTest"),
     )(parallelExecutionContext, implicitly, implicitly)
     for {

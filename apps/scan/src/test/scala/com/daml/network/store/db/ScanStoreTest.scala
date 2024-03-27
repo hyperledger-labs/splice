@@ -17,6 +17,7 @@ import com.daml.network.codegen.java.splice.dso.globaldomain as globaldomainCode
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.environment.{DarResources, RetryProvider}
 import com.daml.network.history.{AmuletExpire, LockedAmuletExpireAmulet, Transfer}
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.{
   OpenMiningRoundTxLogEntry,
@@ -1432,7 +1433,11 @@ class DbScanStoreTest
           ): Future[Option[ScanAggregator.RoundAggregate]] = Future.successful(None)
           def close(): Unit = ()
         },
-      domainMigrationId,
+      DomainMigrationInfo(
+        domainMigrationId,
+        None,
+        true,
+      ),
       participantId = mkParticipantId("ScanStoreTest"),
     )(parallelExecutionContext, implicitly, implicitly)
 

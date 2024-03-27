@@ -21,7 +21,7 @@ import com.daml.network.http.v0.validator_admin.ValidatorAdminResource
 import com.daml.network.http.v0.validator_public.ValidatorPublicResource
 import com.daml.network.http.v0.wallet.WalletResource as InternalWalletResource
 import com.daml.network.identities.NodeIdentitiesStore
-import com.daml.network.migration.DomainDataRestorer
+import com.daml.network.migration.{DomainDataRestorer, DomainMigrationInfo}
 import com.daml.network.scan.admin.api.client
 import com.daml.network.scan.admin.api.client.{
   BftScanConnection,
@@ -544,12 +544,18 @@ class ValidatorApp(
         dsoParty = dsoParty,
         appManagerEnabled = config.appManager.isDefined,
       )
+      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+      domainMigrationInfo = DomainMigrationInfo(
+        config.domainMigrationId,
+        None,
+        true,
+      )
       store = ValidatorStore(
         key,
         storage,
         loggerFactory,
         retryProvider,
-        config.domainMigrationId,
+        domainMigrationInfo,
         participantId,
       )
       walletManagerOpt =
@@ -566,7 +572,7 @@ class ValidatorApp(
               retryProvider,
               scanConnection,
               loggerFactory,
-              config.domainMigrationId,
+              domainMigrationInfo,
               participantId,
               config.ingestFromParticipantBegin,
             )

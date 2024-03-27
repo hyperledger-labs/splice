@@ -38,7 +38,7 @@ class AcsExporter(
   def safeExportParticipantPartiesAcsFromPausedDomain(domain: DomainId)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, AcsExportFailure, ByteString] = {
+  ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
     EitherT {
       for {
         participantId <- participantAdminConnection.getId()
@@ -57,7 +57,7 @@ class AcsExporter(
   private def safeExportAcsFromPausedDomain(domain: DomainId, parties: PartyId*)(implicit
       tc: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, AcsExportFailure, ByteString] = {
+  ): EitherT[Future, AcsExportFailure, (ByteString, Instant)] = {
     for {
       domainParamsStateTopology <- EitherT
         .liftF[Future, AcsExportFailure, TopologyResult[DomainParametersStateX]](
@@ -82,7 +82,7 @@ class AcsExporter(
         )
       )
     } yield {
-      snapshot
+      snapshot -> acsSnapshotTimestamp
     }
   }
 

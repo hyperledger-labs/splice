@@ -13,6 +13,7 @@ import com.daml.network.codegen.java.splice.wallet.{
 }
 import com.daml.network.environment.RetryProvider
 import com.daml.network.http.v0.definitions
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
 import com.daml.network.store.{CNNodeAppStoreWithoutHistory, Limit, MultiDomainAcsStore}
 import com.daml.network.util.*
@@ -233,8 +234,7 @@ object ValidatorStore {
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
-      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-      domainMigrationId: Long,
+      domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
@@ -248,7 +248,7 @@ object ValidatorStore {
           storage,
           loggerFactory,
           retryProvider,
-          domainMigrationId,
+          domainMigrationInfo,
           participantId,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")

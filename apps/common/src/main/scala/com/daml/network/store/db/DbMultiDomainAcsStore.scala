@@ -18,6 +18,7 @@ import com.daml.network.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdate,
 }
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.*
 import com.daml.network.util.{
   AssignedContract,
@@ -49,6 +50,7 @@ import com.daml.network.store.db.AcsQueries.SelectFromAcsTableWithStateResult
 import com.daml.network.store.db.AcsTables.ContractStateRowData
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.metrics.CantonLabeledMetricsFactory
 import io.circe.Json
 
@@ -58,13 +60,12 @@ import scala.reflect.ClassTag
 final class DbMultiDomainAcsStore[TXE](
     storage: DbStorage,
     acsTableName: String,
-    txLogTableName: String,
+    txLogTableNameOpt: Option[String],
     storeDescriptor: StoreDescriptor,
     override protected val loggerFactory: NamedLoggerFactory,
     contractFilter: MultiDomainAcsStore.ContractFilter[_ <: AcsRowData],
     txLogConfig: TxLogStore.Config[TXE],
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     retryProvider: RetryProvider,
     /** Allows processing the summary in a store-specific manner, e.g., to produce metrics
@@ -95,6 +96,10 @@ final class DbMultiDomainAcsStore[TXE](
       .get()
       .storeId
       .getOrElse(throw new RuntimeException("Using storeId before it was assigned"))
+  def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
+
+  private[this] def txLogTableName =
+    txLogTableNameOpt.getOrElse(throw new RuntimeException("This store doesn't use a TxLog"))
 
   // Some callers depend on all queries always returning sensible data, but may perform queries
   // before the ACS is fully ingested. We therefore delay all queries until the ACS is ingested.
@@ -484,7 +489,7 @@ final class DbMultiDomainAcsStore[TXE](
     }
   }
 
-  override def ingestionSink: IngestionSink = new MultiDomainAcsStore.IngestionSink {
+  override lazy val ingestionSink: IngestionSink = new MultiDomainAcsStore.IngestionSink {
     override def ingestionFilter: IngestionFilter = contractFilter.ingestionFilter
 
     override def initialize()(implicit traceContext: TraceContext): Future[Option[String]] = {
@@ -540,6 +545,9 @@ final class DbMultiDomainAcsStore[TXE](
           .getOrRaise(
             new RuntimeException(s"No row for $newStoreId found, which was just inserted!")
           )
+
+        _ <- cleanUpDataAfterDomainMigration(newStoreId)
+
         alreadyIngestedAcs = lastIngestedOffset.isDefined
         acsSizeInDb <-
           if (alreadyIngestedAcs) {
@@ -715,7 +723,16 @@ final class DbMultiDomainAcsStore[TXE](
                       } yield ()
                     }
                     ++ txLogEntries.map { case (domain, contractId, txe) =>
-                      doIngestTxLogInsert(domain, offset, contractId, txe, summaryState)
+                      doIngestTxLogInsert(
+                        domain,
+                        offset,
+                        // The ACS doesn't have a record time, but we're removing parser.parseAcs soon
+                        // we we'll use a random useless time for now
+                        CantonTimestamp.now(),
+                        contractId,
+                        txe,
+                        summaryState,
+                      )
                     }
                 ),
             ),
@@ -726,6 +743,7 @@ final class DbMultiDomainAcsStore[TXE](
         val summary = summaryState.toIngestionSummary(
           updateId = None,
           offset = offset,
+          recordTime = None,
           newAcsSize = newAcsSize,
         )
         state
@@ -762,6 +780,7 @@ final class DbMultiDomainAcsStore[TXE](
               summaryState.toIngestionSummary(
                 updateId = None,
                 offset = reassignment.offset.getOffset,
+                recordTime = Some(reassignment.recordTime),
                 newAcsSize = state.get().acsSize,
               )
             logger.debug(show"Ingested reassignment $summary")
@@ -781,6 +800,7 @@ final class DbMultiDomainAcsStore[TXE](
               summaryState.toIngestionSummary(
                 updateId = Some(tree.getUpdateId),
                 offset = tree.getOffset,
+                recordTime = Some(CantonTimestamp.assertFromInstant(tree.getRecordTime)),
                 newAcsSize = state.get().acsSize,
               )
             logger.debug(show"Ingested transaction $summary")
@@ -977,7 +997,14 @@ final class DbMultiDomainAcsStore[TXE](
                       doDeleteContract(exercisedEvent, summary)
                   }
                     ++ txLogEntries.map(txe =>
-                      doIngestTxLogInsert(domainId, tree.getOffset, None, txe, summary)
+                      doIngestTxLogInsert(
+                        domainId,
+                        tree.getOffset,
+                        CantonTimestamp.assertFromInstant(tree.getRecordTime),
+                        None,
+                        txe,
+                        summary,
+                      )
                     )
                 ),
             ),
@@ -1104,6 +1131,7 @@ final class DbMultiDomainAcsStore[TXE](
     private def doIngestTxLogInsert(
         domainId: DomainId,
         offset: String,
+        recordTime: CantonTimestamp,
         acsContractId: Option[ContractId[?]],
         txe: TXE,
         summary: MutableIngestionSummary,
@@ -1119,9 +1147,9 @@ final class DbMultiDomainAcsStore[TXE](
 
       summary.ingestedTxLogEntries.addOne((entryType, entryData))
       (sql"""
-      insert into #$txLogTableName(store_id, migration_id, transaction_offset, domain_id, acs_contract_id,
+      insert into #$txLogTableName(store_id, migration_id, transaction_offset, record_time, domain_id, acs_contract_id,
       entry_type, entry_data #$indexColumnNames)
-      values ($storeId, $domainMigrationId, $safeOffset, $domainId, $acsContractId,
+      values ($storeId, $domainMigrationId, $safeOffset, $recordTime, $domainId, $acsContractId,
               $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
     """).toActionBuilder.asUpdate
     }
@@ -1261,6 +1289,79 @@ final class DbMultiDomainAcsStore[TXE](
     case class Delete(evt: ExercisedEvent) extends OperationToDo
   }
 
+  private[this] def cleanUpDataAfterDomainMigration(
+      storeId: Int
+  )(implicit tc: TraceContext): Future[Unit] = {
+    txLogTableNameOpt.fold(Future.unit) { _ =>
+      val previousMigrationId = domainMigrationInfo.currentMigrationId - 1
+      domainMigrationInfo.acsRecordTime match {
+        case Some(acsRecordTime) =>
+          if (domainMigrationInfo.domainWasPaused) {
+            verifyNoRolledBackData(storeId, previousMigrationId, acsRecordTime)
+          } else {
+            deleteRolledBackTxLogEntries(storeId, previousMigrationId, acsRecordTime)
+          }
+        case _ =>
+          logger.debug("No previous domain migration, not checking or deleting txlog entries")
+          Future.unit
+      }
+    }
+  }
+
+  private[this] def verifyNoRolledBackData(
+      storeId: Int, // Not using the storeId from the state, as the state might not be updated yet
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext) = {
+    val action =
+      sql"""
+            select count(*) from #$txLogTableName
+            where store_id = $storeId and migration_id = $migrationId and record_time > $recordTime
+          """
+        .as[Long]
+        .head
+        .map(rows =>
+          if (rows > 0) {
+            logger.error(
+              s"Found $rows rows for $storeDescriptor where migration_id = $migrationId and record_time > $recordTime, " +
+                "but the configuration says the domain was paused during the migration. " +
+                "Check the domain migration configuration and the content of the txlog database."
+            )
+          } else {
+            logger.debug(
+              s"No txlog entries found for $storeDescriptor where migration_id = $migrationId and record_time > $recordTime"
+            )
+          }
+        )
+    storage.query(action, "deleteRolledBackTxLogEntries")
+  }
+
+  private[this] def deleteRolledBackTxLogEntries(
+      storeId: Int, // Not using the storeId from the state, as the state might not be updated yet
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext) = {
+    logger.info(
+      s"Deleting all txlog entries for $storeDescriptor where migration = $migrationId and record time > $recordTime"
+    )
+    val action =
+      sqlu"""
+            delete from #$txLogTableName
+            where store_id = $storeId and migration_id = $migrationId and record_time > $recordTime
+          """.map(rows =>
+        if (rows > 0) {
+          logger.warn(
+            s"Deleted $rows txlog entries for $storeDescriptor where migration_id = $migrationId and record_time > $recordTime. " +
+              "This is expected during a disaster recovery, where we are rolling back the domain to a previous state. " +
+              "In is NOT expected during regular hard domain migrations."
+          )
+        } else {
+          logger.debug(s"No entries deleted for $storeDescriptor.")
+        }
+      )
+    storage.update(action, "deleteRolledBackTxLogEntries")
+  }
+
   override def close(): Unit = ()
 
   @SuppressWarnings(Array("org.wartremover.warts.OptionPartial"))
@@ -1393,10 +1494,12 @@ object DbMultiDomainAcsStore {
     def toIngestionSummary(
         updateId: Option[String],
         offset: String,
+        recordTime: Option[CantonTimestamp],
         newAcsSize: Int,
     ): IngestionSummary = IngestionSummary(
       updateId = updateId,
       offset = Some(offset),
+      recordTime = recordTime,
       newAcsSize = newAcsSize,
       ingestedCreatedEvents = this.ingestedCreatedEvents.toVector,
       numFilteredCreatedEvents = this.numFilteredCreatedEvents,

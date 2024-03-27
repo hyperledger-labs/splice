@@ -5,12 +5,13 @@ import com.daml.network.codegen.java.splice.amulet as amuletCodegen
 import com.daml.network.codegen.java.splice.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CNLedgerClient, RetryProvider}
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.BftScanConnection
 import com.daml.network.store.Limit
 import com.daml.network.util.{Contract, HasHealth, TemplateJsonDecoder}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
-import com.digitalasset.canton.lifecycle.{RunOnShutdown, *}
+import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -35,8 +36,7 @@ class UserWalletManager(
     retryProvider: RetryProvider,
     scanConnection: BftScanConnection,
     override val loggerFactory: NamedLoggerFactory,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     ingestFromParticipantBegin: Boolean,
 )(implicit
@@ -188,7 +188,7 @@ class UserWalletManager(
       userRetryProvider,
       userLoggerFactory,
       scanConnection,
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
       ingestFromParticipantBegin,
     )

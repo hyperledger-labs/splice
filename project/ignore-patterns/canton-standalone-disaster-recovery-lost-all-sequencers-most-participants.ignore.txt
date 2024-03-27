@@ -1,0 +1,7 @@
+# TODO (#11294): suspicious warning, but doesn't fail tests
+The provided balance may not be up to date if a balance update is being processed.*TrafficBalanceManager.*StandaloneSequencer
+
+# TODO (#11294): suspicious warning, but doesn't fail tests
+Using approximate topology snapshot.*.*StandaloneSequencer
+
+# Make sure to have a trailing newline

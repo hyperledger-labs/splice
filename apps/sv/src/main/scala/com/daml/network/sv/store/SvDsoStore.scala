@@ -30,6 +30,7 @@ import com.daml.network.codegen.java.splice.svonboarding as so
 import com.daml.network.codegen.java.splice.wallet.subscriptions as sub
 import com.daml.network.codegen.java.splice
 import com.daml.network.environment.{PackageIdResolver, RetryProvider}
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.ScanConnection.GetAmuletRulesDomain
 import com.daml.network.store.*
 import com.daml.network.store.MultiDomainAcsStore.{ConstrainedTemplate, QueryResult, TemplateFilter}
@@ -1043,8 +1044,7 @@ object SvDsoStore {
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
-      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-      domainMigrationId: Long,
+      domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
@@ -1058,7 +1058,7 @@ object SvDsoStore {
           db,
           loggerFactory,
           retryProvider,
-          domainMigrationId,
+          domainMigrationInfo,
           participantId,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")

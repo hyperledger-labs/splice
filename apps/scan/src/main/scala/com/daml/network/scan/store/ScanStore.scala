@@ -6,6 +6,7 @@ import com.daml.network.environment.{PackageIdResolver, RetryProvider}
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.ValidatorPurchasedTraffic
 import com.daml.network.store.{CNNodeAppStore, Limit, MultiDomainAcsStore, PageLimit, TxLogStore}
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.store.db.{
   DbScanStore,
   ScanAggregatesReader,
@@ -296,8 +297,7 @@ object ScanStore {
       loggerFactory: NamedLoggerFactory,
       retryProvider: RetryProvider,
       createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
-      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-      domainMigrationId: Long,
+      domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
@@ -313,7 +313,7 @@ object ScanStore {
           loggerFactory,
           retryProvider,
           createScanAggregatesReader,
-          domainMigrationId,
+          domainMigrationInfo,
           participantId,
         )
       case storageType => throw new RuntimeException(s"Unsupported storage type $storageType")

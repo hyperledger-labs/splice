@@ -5,6 +5,7 @@ import com.daml.network.automation.TransferFollowTrigger
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.environment.RetryProvider
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.splitwell.config.SplitwellDomainConfig
 import com.daml.network.splitwell.store.SplitwellStore
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
@@ -32,8 +33,7 @@ class DbSplitwellStore(
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -53,7 +53,7 @@ class DbSplitwellStore(
           "providerParty" -> key.providerParty.toProtoPrimitive
         ),
       ),
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
     )
     with AcsTables
@@ -68,6 +68,7 @@ class DbSplitwellStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   private def storeId: Int = multiDomainAcsStore.storeId
+  def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
   override def lookupInstallWithOffset(
       domainId: DomainId,

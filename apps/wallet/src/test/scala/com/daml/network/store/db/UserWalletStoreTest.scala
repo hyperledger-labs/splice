@@ -27,6 +27,7 @@ import com.daml.network.wallet.store.{
 }
 import com.daml.network.wallet.store.db.DbUserWalletStore
 import com.daml.network.environment.{DarResources, RetryProvider}
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.{Limit, PageLimit, StoreTest}
 import com.daml.network.util.{
   Contract,
@@ -1430,7 +1431,11 @@ class DbUserWalletStoreTest
       loggerFactory = loggerFactory,
       retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
+      DomainMigrationInfo(
+        domainMigrationId,
+        None,
+        true,
+      ),
       participantId = mkParticipantId("UserWalletStoreTest"),
     )
     for {

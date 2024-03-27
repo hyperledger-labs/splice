@@ -21,6 +21,7 @@ import com.daml.network.environment.ledger.api.{
   TransactionTreeUpdate,
   TreeUpdate,
 }
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
 import com.daml.network.store.db.AcsJdbcTypes
 import com.digitalasset.canton.data.CantonTimestamp
@@ -42,8 +43,7 @@ import scala.jdk.CollectionConverters.*
 
 final class UpdateHistory(
     storage: DbStorage,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
     val updateStreamParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -58,6 +58,8 @@ final class UpdateHistory(
   import profile.api.jdbcActionExtensionMethods
   import UpdateHistory.*
 
+  private[this] def domainMigrationId = domainMigrationInfo.currentMigrationId
+
   private val state = new AtomicReference[State](State.empty())
   private def historyId: Long =
     state
@@ -65,204 +67,215 @@ final class UpdateHistory(
       .historyId
       .getOrElse(throw new RuntimeException("Using historyId before it was assigned"))
 
-  def ingestionSink: MultiDomainAcsStore.IngestionSink = new MultiDomainAcsStore.IngestionSink {
-    override def ingestionFilter: IngestionFilter = IngestionFilter(
-      primaryParty = updateStreamParty,
-      // Note: the template ids only determine which create events should include data
-      // for explicit contract disclosure. We don't store that data in the update history.
-      templateIds = Set.empty,
-    )
+  lazy val ingestionSink: MultiDomainAcsStore.IngestionSink =
+    new MultiDomainAcsStore.IngestionSink {
+      override def ingestionFilter: IngestionFilter = IngestionFilter(
+        primaryParty = updateStreamParty,
+        // Note: the template ids only determine which create events should include data
+        // for explicit contract disclosure. We don't store that data in the update history.
+        templateIds = Set.empty,
+      )
 
-    override def initialize()(implicit traceContext: TraceContext): Future[Option[String]] = {
-      logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
+      override def initialize()(implicit traceContext: TraceContext): Future[Option[String]] = {
+        logger.info(s"Initializing update history ingestion sink for party $updateStreamParty")
 
-      // Notes:
-      // - 'ON CONFLICT DO NOTHING RETURNING ...' does not return anything if the row already exists, that's why we are using two separate queries
-      for {
-        _ <- storage
-          .update(
-            sql"""
+        // Notes:
+        // - 'ON CONFLICT DO NOTHING RETURNING ...' does not return anything if the row already exists, that's why we are using two separate queries
+        for {
+          _ <- storage
+            .update(
+              sql"""
             insert into update_history_descriptors (party, participant_id)
             values ($updateStreamParty, $participantId)
             on conflict do nothing
            """.asUpdate,
-            "initialize.1",
-          )
+              "initialize.1",
+            )
 
-        newHistoryId <- storage
-          .querySingle(
-            sql"""
+          newHistoryId <- storage
+            .querySingle(
+              sql"""
              select id
              from update_history_descriptors
              where party = $updateStreamParty and participant_id = $participantId
              """.as[Long].headOption,
-            "initialize.2",
-          )
-          .getOrRaise(
-            new RuntimeException(
-              s"No row for ($updateStreamParty,$participantId) found, which was just inserted!"
+              "initialize.2",
             )
-          )
+            .getOrRaise(
+              new RuntimeException(
+                s"No row for ($updateStreamParty,$participantId) found, which was just inserted!"
+              )
+            )
 
-        _ <- storage
-          .update(
-            sql"""
+          _ <- storage
+            .update(
+              sql"""
              insert into update_history_last_ingested_offsets (history_id, migration_id)
              values ($newHistoryId, $domainMigrationId)
              on conflict do nothing
              """.asUpdate,
-            "initialize.3",
-          )
+              "initialize.3",
+            )
 
-        lastIngestedOffset <- storage
-          .querySingle(
-            sql"""
+          lastIngestedOffset <- storage
+            .querySingle(
+              sql"""
              select last_ingested_offset
              from update_history_last_ingested_offsets
              where history_id = $newHistoryId and migration_id = $domainMigrationId
              """.as[Option[String]].headOption,
-            "initialize.4",
+              "initialize.4",
+            )
+            .getOrRaise(
+              new RuntimeException(s"No row for $newHistoryId found, which was just inserted!")
+            )
+
+          _ <- cleanUpDataAfterDomainMigration(newHistoryId)
+        } yield {
+          state.updateAndGet(
+            _.copy(
+              historyId = Some(newHistoryId)
+            )
           )
-          .getOrRaise(
-            new RuntimeException(s"No row for $newHistoryId found, which was just inserted!")
-          )
-      } yield {
-        state.updateAndGet(
-          _.copy(
-            historyId = Some(newHistoryId)
-          )
-        )
-        lastIngestedOffset match {
-          case Some(offset) =>
-            logger.info(s"${description()} resumed at offset $offset")
-          case None =>
-            logger.info(s"${description()} initialized")
+          lastIngestedOffset match {
+            case Some(offset) =>
+              logger.info(s"${description()} resumed at offset $offset")
+            case None =>
+              logger.info(s"${description()} initialized")
+          }
+          lastIngestedOffset
         }
-        lastIngestedOffset
-      }
-    }
-
-    /** A description of this update history instance, to be used in log messages */
-    private def description() =
-      s"UpdateHistory(party=$updateStreamParty, participantId=$participantId, migrationId=$domainMigrationId, historyId=$historyId)"
-
-    override def ingestAcs(
-        offset: String,
-        acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-    )(implicit traceContext: TraceContext): Future[Unit] = {
-      if (acs.nonEmpty || incompleteIn.nonEmpty || incompleteOut.nonEmpty) {
-        logger.info(
-          s"${description()} started from the ACS at offset $offset, " +
-            s"but the ACS already contains (acs=${acs.size}, incompleteOut=${incompleteOut.size} incompleteIn=${incompleteIn.size}) elements at that point. " +
-            "This is only fine in the following cases:\n" +
-            "- This is a SV node that joined late, and has thus missed past updates for the multi-hosted SV party. " +
-            "In this case, the node needs to download the missing updates from other SV nodes.\n" +
-            "- This is a participant starting after a hard domain migration. " +
-            "In this case, all items in the ACS must come from the previous domain migration."
-        )
       }
 
-      // The update history only stores actual updates,
-      // it doesn't try to reconstruct past updates from the initial state.
-      Future.unit
-    }
+      /** A description of this update history instance, to be used in log messages */
+      private def description() =
+        s"UpdateHistory(party=$updateStreamParty, participantId=$participantId, migrationId=$domainMigrationId, historyId=$historyId)"
 
-    override def ingestUpdate(domain: DomainId, update: TreeUpdate)(implicit
-        traceContext: TraceContext
-    ): Future[Unit] = {
-      val offset = update match {
-        case ReassignmentUpdate(reassignment) => reassignment.offset.getOffset
-        case TransactionTreeUpdate(tree) => tree.getOffset
+      override def ingestAcs(
+          offset: String,
+          acs: Seq[ActiveContract],
+          incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
+          incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
+      )(implicit traceContext: TraceContext): Future[Unit] = {
+        if (acs.nonEmpty || incompleteIn.nonEmpty || incompleteOut.nonEmpty) {
+          logger.info(
+            s"${description()} started from the ACS at offset $offset, " +
+              s"but the ACS already contains (acs=${acs.size}, incompleteOut=${incompleteOut.size} incompleteIn=${incompleteIn.size}) elements at that point. " +
+              "This is only fine in the following cases:\n" +
+              "- This is a SV node that joined late, and has thus missed past updates for the multi-hosted SV party. " +
+              "In this case, the node needs to download the missing updates from other SV nodes.\n" +
+              "- This is a participant starting after a hard domain migration. " +
+              "In this case, all items in the ACS must come from the previous domain migration."
+          )
+        }
+
+        // The update history only stores actual updates,
+        // it doesn't try to reconstruct past updates from the initial state.
+        Future.unit
       }
 
-      // Note: in theory, it's enough if this action is atomic - there should only be a single
-      // ingestion sink storing updates for the given (participant, party, migrationId) tuple,
-      // so there should be no concurrent updates.
-      // In practice, we still want to have some protection against duplicate inserts, in case
-      // the ingestion service is buggy or there are two misconfigured apps trying to ingest the same updates.
-      // This is implemented with a unique index in the database schema.
-      val action = readOffset()
-        .flatMap({
-          case None =>
-            logger.debug(s"History $historyId ingesting None => $offset")
-            ingestUpdate_(update).andThen(updateOffset(offset))
-          case Some(lastIngestedOffset) =>
-            if (offset <= lastIngestedOffset) {
-              logger.warn(
-                s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
-                  "This is expected if the SQL query was automatically retried after a transient database error. " +
-                  "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
-                  "ingesting into the same logical database."
+      override def ingestUpdate(domain: DomainId, update: TreeUpdate)(implicit
+          traceContext: TraceContext
+      ): Future[Unit] = {
+        val offset = update match {
+          case ReassignmentUpdate(reassignment) => reassignment.offset.getOffset
+          case TransactionTreeUpdate(tree) => tree.getOffset
+        }
+        val recordTime = update match {
+          case ReassignmentUpdate(reassignment) => reassignment.recordTime
+          case TransactionTreeUpdate(tree) => CantonTimestamp.assertFromInstant(tree.getRecordTime)
+        }
+
+        // Note: in theory, it's enough if this action is atomic - there should only be a single
+        // ingestion sink storing updates for the given (participant, party, migrationId) tuple,
+        // so there should be no concurrent updates.
+        // In practice, we still want to have some protection against duplicate inserts, in case
+        // the ingestion service is buggy or there are two misconfigured apps trying to ingest the same updates.
+        // This is implemented with a unique index in the database schema.
+        val action = readOffset()
+          .flatMap({
+            case None =>
+              logger.debug(
+                s"History $historyId migration $domainMigrationId ingesting None => $offset @ $recordTime"
               )
-              DBIO.successful(())
-            } else {
-              logger.debug(s"History $historyId ingesting $lastIngestedOffset => $offset")
               ingestUpdate_(update).andThen(updateOffset(offset))
-            }
-        })
-        .map(_ => ())
-        .transactionally
+            case Some(lastIngestedOffset) =>
+              if (offset <= lastIngestedOffset) {
+                logger.warn(
+                  s"Update offset $offset <= last ingested offset $lastIngestedOffset for ${description()}, skipping database actions. " +
+                    "This is expected if the SQL query was automatically retried after a transient database error. " +
+                    "Otherwise, this is unexpected and most likely caused by two identical UpdateIngestionService instances " +
+                    "ingesting into the same logical database."
+                )
+                DBIO.successful(())
+              } else {
+                logger.debug(
+                  s"History $historyId migration $domainMigrationId ingesting $lastIngestedOffset => $offset @ $recordTime"
+                )
+                ingestUpdate_(update).andThen(updateOffset(offset))
+              }
+          })
+          .map(_ => ())
+          .transactionally
 
-      storage.queryAndUpdate(action, "ingestUpdate")
-    }
+        storage.queryAndUpdate(action, "ingestUpdate")
+      }
 
-    private def updateOffset(offset: String): DBIOAction[?, NoStream, Effect.Write] =
-      sqlu"""
+      private def updateOffset(offset: String): DBIOAction[?, NoStream, Effect.Write] =
+        sqlu"""
         update update_history_last_ingested_offsets
         set last_ingested_offset = ${lengthLimited(offset)}
         where history_id = $historyId and migration_id = $domainMigrationId
       """
 
-    private def readOffset(): DBIOAction[Option[String], NoStream, Effect.Read] =
-      sql"""
+      private def readOffset(): DBIOAction[Option[String], NoStream, Effect.Read] =
+        sql"""
         select last_ingested_offset
         from update_history_last_ingested_offsets
         where history_id = $historyId and migration_id = $domainMigrationId
       """
-        .as[Option[String]]
-        .head
+          .as[Option[String]]
+          .head
 
-    private def ingestUpdate_(
-        update: TreeUpdate
-    )(implicit tc: TraceContext): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
-      update match {
-        case ReassignmentUpdate(reassignment) =>
-          ingestReassignment(reassignment)
-        case TransactionTreeUpdate(tree) =>
-          if (tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX)) {
-            logger.debug(
-              s"Skipping update ${tree.getUpdateId} at offset ${tree.getOffset} for ${description()} because it is an ACS import workflow update."
-            )
-            DBIOAction.successful(())
-          } else {
-            ingestTransactionTree(tree)
-          }
+      private def ingestUpdate_(
+          update: TreeUpdate
+      )(implicit tc: TraceContext): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+        update match {
+          case ReassignmentUpdate(reassignment) =>
+            ingestReassignment(reassignment)
+          case TransactionTreeUpdate(tree) =>
+            if (tree.getWorkflowId.startsWith(IMPORT_ACS_WORKFLOW_ID_PREFIX)) {
+              logger.debug(
+                s"Skipping update ${tree.getUpdateId} at offset ${tree.getOffset} for ${description()} because it is an ACS import workflow update."
+              )
+              DBIOAction.successful(())
+            } else {
+              ingestTransactionTree(tree)
+            }
+        }
       }
-    }
 
-    private def ingestReassignment(
-        reassignment: Reassignment[ReassignmentEvent]
-    ): DBIOAction[?, NoStream, Effect.Write] = {
-      reassignment match {
-        case Reassignment(_, _, _, event: ReassignmentEvent.Assign) =>
-          ingestAssignment(reassignment, event)
-        case Reassignment(_, _, _, event: ReassignmentEvent.Unassign) =>
-          ingestUnassignment(reassignment, event)
+      private def ingestReassignment(
+          reassignment: Reassignment[ReassignmentEvent]
+      ): DBIOAction[?, NoStream, Effect.Write] = {
+        reassignment match {
+          case Reassignment(_, _, _, event: ReassignmentEvent.Assign) =>
+            ingestAssignment(reassignment, event)
+          case Reassignment(_, _, _, event: ReassignmentEvent.Unassign) =>
+            ingestUnassignment(reassignment, event)
+        }
       }
-    }
 
-    private def ingestUnassignment(
-        reassignment: Reassignment[?],
-        event: ReassignmentEvent.Unassign,
-    ): DBIOAction[?, NoStream, Effect.Write] = {
-      val safeUpdateId = lengthLimited(reassignment.updateId)
-      val safeRecordTime = reassignment.recordTime
-      val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
-      val safeUnassignId = lengthLimited(event.unassignId)
-      val safeContractId = lengthLimited(event.contractId.contractId)
-      sqlu"""
+      private def ingestUnassignment(
+          reassignment: Reassignment[?],
+          event: ReassignmentEvent.Unassign,
+      ): DBIOAction[?, NoStream, Effect.Write] = {
+        val safeUpdateId = lengthLimited(reassignment.updateId)
+        val safeRecordTime = reassignment.recordTime
+        val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
+        val safeUnassignId = lengthLimited(event.unassignId)
+        val safeContractId = lengthLimited(event.contractId.contractId)
+        sqlu"""
         insert into update_history_unassignments(
           history_id,update_id,record_time,
           participant_offset,domain_id,migration_id,
@@ -278,28 +291,28 @@ final class UpdateHistory(
           $safeContractId
         )
       """
-    }
+      }
 
-    private def ingestAssignment(
-        reassignment: Reassignment[?],
-        event: ReassignmentEvent.Assign,
-    ): DBIOAction[?, NoStream, Effect.Write] = {
-      val safeUpdateId = lengthLimited(reassignment.updateId)
-      val safeRecordTime = reassignment.recordTime
-      val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
-      val safeUnassignId = lengthLimited(event.unassignId)
-      val safeContractId = lengthLimited(event.createdEvent.getContractId)
-      val safeEventId = lengthLimited(event.createdEvent.getEventId)
-      val templateId = event.createdEvent.getTemplateId
-      val templateIdModuleName = lengthLimited(templateId.getModuleName)
-      val templateIdEntityName = lengthLimited(templateId.getEntityName)
-      val templateIdPackageId = lengthLimited(templateId.getPackageId)
-      val safePackageName = lengthLimited(event.createdEvent.getPackageName)
-      val createArguments = serializeValue(event.createdEvent.getArguments)
-      val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
+      private def ingestAssignment(
+          reassignment: Reassignment[?],
+          event: ReassignmentEvent.Assign,
+      ): DBIOAction[?, NoStream, Effect.Write] = {
+        val safeUpdateId = lengthLimited(reassignment.updateId)
+        val safeRecordTime = reassignment.recordTime
+        val safeParticipantOffset = lengthLimited(reassignment.offset.getOffset)
+        val safeUnassignId = lengthLimited(event.unassignId)
+        val safeContractId = lengthLimited(event.createdEvent.getContractId)
+        val safeEventId = lengthLimited(event.createdEvent.getEventId)
+        val templateId = event.createdEvent.getTemplateId
+        val templateIdModuleName = lengthLimited(templateId.getModuleName)
+        val templateIdEntityName = lengthLimited(templateId.getEntityName)
+        val templateIdPackageId = lengthLimited(templateId.getPackageId)
+        val safePackageName = lengthLimited(event.createdEvent.getPackageName)
+        val createArguments = serializeValue(event.createdEvent.getArguments)
+        val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
 
-      import storage.DbStorageConverters.setParameterByteArray
-      sqlu"""
+        import storage.DbStorageConverters.setParameterByteArray
+        sqlu"""
         insert into update_history_assignments(
           history_id,update_id,record_time,
           participant_offset,domain_id,migration_id,
@@ -319,38 +332,38 @@ final class UpdateHistory(
           $safePackageName, $createArguments
         )
       """
-    }
+      }
 
-    private def ingestTransactionTree(
-        tree: TransactionTree
-    ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
-      insertTransactionUpdateRow(tree).flatMap(updateRowId => {
-        // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
-        // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.
-        DBIOAction.seq[Effect.Write](
-          tree.getEventsById.values().asScala.toSeq.map {
-            case created: CreatedEvent =>
-              insertCreateEventRow(created, updateRowId)
-            case exercised: ExercisedEvent =>
-              insertExerciseEventRow(exercised, updateRowId)
-            case _ =>
-              throw new RuntimeException("Unsupported event type")
-          }*
-        )
-      })
-    }
+      private def ingestTransactionTree(
+          tree: TransactionTree
+      ): DBIOAction[?, NoStream, Effect.Read & Effect.Write] = {
+        insertTransactionUpdateRow(tree).flatMap(updateRowId => {
+          // Note: the order of elements in the eventsById map doesn't matter, and is not preserved here.
+          // The order of elements in the rootEventIds and childEventIds lists DOES matter, and needs to be preserved.
+          DBIOAction.seq[Effect.Write](
+            tree.getEventsById.values().asScala.toSeq.map {
+              case created: CreatedEvent =>
+                insertCreateEventRow(created, updateRowId)
+              case exercised: ExercisedEvent =>
+                insertExerciseEventRow(exercised, updateRowId)
+              case _ =>
+                throw new RuntimeException("Unsupported event type")
+            }*
+          )
+        })
+      }
 
-    private def insertTransactionUpdateRow(
-        tree: TransactionTree
-    ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
-      val safeUpdateId = lengthLimited(tree.getUpdateId)
-      val safeRecordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
-      val safeParticipantOffset = lengthLimited(tree.getOffset)
-      val safeDomainId = lengthLimited(tree.getDomainId)
-      val safeEffectiveAt = CantonTimestamp.assertFromInstant(tree.getEffectiveAt)
-      val safeRootEventIds = tree.getRootEventIds.asScala.toSeq.map(lengthLimited)
+      private def insertTransactionUpdateRow(
+          tree: TransactionTree
+      ): DBIOAction[Long, NoStream, Effect.Read & Effect.Write] = {
+        val safeUpdateId = lengthLimited(tree.getUpdateId)
+        val safeRecordTime = CantonTimestamp.assertFromInstant(tree.getRecordTime)
+        val safeParticipantOffset = lengthLimited(tree.getOffset)
+        val safeDomainId = lengthLimited(tree.getDomainId)
+        val safeEffectiveAt = CantonTimestamp.assertFromInstant(tree.getEffectiveAt)
+        val safeRootEventIds = tree.getRootEventIds.asScala.toSeq.map(lengthLimited)
 
-      (sql"""
+        (sql"""
           insert into update_history_transactions(
             history_id, update_id, record_time,
             participant_offset, domain_id, migration_id,
@@ -363,24 +376,24 @@ final class UpdateHistory(
           )
           returning row_id
         """.asUpdateReturning[Long].head)
-    }
+      }
 
-    private def insertCreateEventRow(
-        event: CreatedEvent,
-        updateRowId: Long,
-    ): DBIOAction[?, NoStream, Effect.Write] = {
-      val safeEventId = lengthLimited(event.getEventId)
-      val safeContractId = lengthLimited(event.getContractId)
-      val templateId = event.getTemplateId
-      val templateIdModuleName = lengthLimited(templateId.getModuleName)
-      val templateIdEntityName = lengthLimited(templateId.getEntityName)
-      val templateIdPackageId = lengthLimited(templateId.getPackageId)
-      val safePackageName = lengthLimited(event.getPackageName)
-      val createArguments = serializeValue(event.getArguments)
-      val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
+      private def insertCreateEventRow(
+          event: CreatedEvent,
+          updateRowId: Long,
+      ): DBIOAction[?, NoStream, Effect.Write] = {
+        val safeEventId = lengthLimited(event.getEventId)
+        val safeContractId = lengthLimited(event.getContractId)
+        val templateId = event.getTemplateId
+        val templateIdModuleName = lengthLimited(templateId.getModuleName)
+        val templateIdEntityName = lengthLimited(templateId.getEntityName)
+        val templateIdPackageId = lengthLimited(templateId.getPackageId)
+        val safePackageName = lengthLimited(event.getPackageName)
+        val createArguments = serializeValue(event.getArguments)
+        val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
 
-      import storage.DbStorageConverters.setParameterByteArray
-      sqlu"""
+        import storage.DbStorageConverters.setParameterByteArray
+        sqlu"""
           insert into update_history_creates(
             history_id, event_id, update_row_id,
             contract_id, created_at,
@@ -394,25 +407,25 @@ final class UpdateHistory(
             $safePackageName, $createArguments
           )
         """
-    }
+      }
 
-    private def insertExerciseEventRow(
-        event: ExercisedEvent,
-        updateRowId: Long,
-    ): DBIOAction[?, NoStream, Effect.Write] = {
-      val safeEventId = lengthLimited(event.getEventId)
-      val safeChoice = lengthLimited(event.getChoice)
-      val safeContractId = lengthLimited(event.getContractId)
-      val safeChildEventIds = event.getChildEventIds.asScala.toSeq.map(lengthLimited)
-      val templateId = event.getTemplateId
-      val templateIdModuleName = lengthLimited(templateId.getModuleName)
-      val templateIdEntityName = lengthLimited(templateId.getEntityName)
-      val templateIdPackageId = lengthLimited(templateId.getPackageId)
-      val choiceArguments = serializeValue(event.getChoiceArgument)
-      val exerciseResult = serializeValue(event.getExerciseResult)
+      private def insertExerciseEventRow(
+          event: ExercisedEvent,
+          updateRowId: Long,
+      ): DBIOAction[?, NoStream, Effect.Write] = {
+        val safeEventId = lengthLimited(event.getEventId)
+        val safeChoice = lengthLimited(event.getChoice)
+        val safeContractId = lengthLimited(event.getContractId)
+        val safeChildEventIds = event.getChildEventIds.asScala.toSeq.map(lengthLimited)
+        val templateId = event.getTemplateId
+        val templateIdModuleName = lengthLimited(templateId.getModuleName)
+        val templateIdEntityName = lengthLimited(templateId.getEntityName)
+        val templateIdPackageId = lengthLimited(templateId.getPackageId)
+        val choiceArguments = serializeValue(event.getChoiceArgument)
+        val exerciseResult = serializeValue(event.getExerciseResult)
 
-      import storage.DbStorageConverters.setParameterByteArray
-      sqlu"""
+        import storage.DbStorageConverters.setParameterByteArray
+        sqlu"""
           insert into update_history_exercises(
             history_id, event_id, update_row_id,
             child_event_ids, choice,
@@ -428,7 +441,132 @@ final class UpdateHistory(
             $choiceArguments, $exerciseResult
           )
         """
+      }
     }
+
+  private[this] def cleanUpDataAfterDomainMigration(
+      historyId: Long
+  )(implicit tc: TraceContext): Future[Unit] = {
+    val previousMigrationId = domainMigrationInfo.currentMigrationId - 1
+    domainMigrationInfo.acsRecordTime match {
+      case Some(acsRecordTime) =>
+        if (domainMigrationInfo.domainWasPaused) {
+          verifyNoRolledBackData(historyId, previousMigrationId, acsRecordTime)
+        } else {
+          deleteRolledBackUpdateHistory(historyId, previousMigrationId, acsRecordTime)
+        }
+      case _ =>
+        logger.debug("No previous domain migration, not checking or deleting updates")
+        Future.unit
+    }
+  }
+  private[this] def verifyNoRolledBackData(
+      historyId: Long, // Not using the storeId from the state, as the state might not be updated yet
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    val action = DBIO
+      .sequence(
+        Seq(
+          sql"""
+            select count(*) from update_history_creates
+            where update_row_id in (
+              select row_id
+              from update_history_transactions
+              where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+            )
+          """.as[Long].head,
+          sql"""
+            select count(*) from update_history_exercises
+            where update_row_id in (
+              select row_id
+              from update_history_transactions
+              where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+            )
+          """.as[Long].head,
+          sql"""
+            select count(*) from update_history_transactions
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """.as[Long].head,
+          sql"""
+            select count(*) from update_history_assignments
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """.as[Long].head,
+          sql"""
+            select count(*) from update_history_unassignments
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """.as[Long].head,
+        )
+      )
+      .map(rows =>
+        if (rows.sum > 0) {
+          logger.error(
+            s"Found $rows rows for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime, " +
+              "but the configuration says the domain was paused during the migration. " +
+              "Check the domain migration configuration and the content of the update history database."
+          )
+        } else {
+          logger.debug(
+            s"No updates found for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime"
+          )
+        }
+      )
+    storage.query(action, "deleteRolledBackUpdateHistory")
+  }
+
+  private[this] def deleteRolledBackUpdateHistory(
+      historyId: Long, // Not using the storeId from the state, as the state might not be updated yet
+      migrationId: Long,
+      recordTime: CantonTimestamp,
+  )(implicit tc: TraceContext): Future[Unit] = {
+    logger.info(
+      s"Deleting all updates for $updateStreamParty where migration = $migrationId and record time > $recordTime"
+    )
+    val action = DBIO
+      .sequence(
+        Seq(
+          sqlu"""
+            delete from update_history_creates
+            where update_row_id in (
+              select row_id
+              from update_history_transactions
+              where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+            )
+          """,
+          sqlu"""
+            delete from update_history_exercises
+            where update_row_id in (
+              select row_id
+              from update_history_transactions
+              where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+            )
+          """,
+          sqlu"""
+            delete from update_history_transactions
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """,
+          sqlu"""
+            delete from update_history_assignments
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """,
+          sqlu"""
+            delete from update_history_unassignments
+            where history_id = $historyId and migration_id = $migrationId and record_time > $recordTime
+          """,
+        )
+      )
+      .map(rows =>
+        if (rows.sum > 0) {
+          logger.warn(
+            s"Deleted $rows rows for $updateStreamParty where migration_id = $migrationId and record_time > $recordTime. " +
+              "This is expected during a disaster recovery, where we are rolling back the domain to a previous state. " +
+              "In is NOT expected during regular hard domain migrations."
+          )
+        } else {
+          logger.debug(s"No rows deleted for $updateStreamParty")
+        }
+      )
+    storage.update(action, "deleteRolledBackUpdateHistory")
   }
 
   private def queryTransactions(

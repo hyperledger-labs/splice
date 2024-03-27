@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.splice.round.IssuingMiningRound
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.subscriptions as subsCodegen
 import com.daml.network.environment.RetryProvider
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{ContractCompanion, QueryResult}
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
@@ -39,8 +40,7 @@ class DbUserWalletStore(
     storage: DbStorage,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    override val domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
 )(implicit
     ec: ExecutionContext,
@@ -65,7 +65,7 @@ class DbUserWalletStore(
           "dsoParty" -> key.dsoParty.toProtoPrimitive,
         ),
       ),
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
       // Note: this causes the app to persist the original update stream for each wallet end user.
       // The data in this stream overlaps with (but is not a subset of) the data in the validator operator
@@ -82,6 +82,7 @@ class DbUserWalletStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
+  override def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
   override def toString: String = show"DbUserWalletStore(endUserParty=${key.endUserParty})"
 

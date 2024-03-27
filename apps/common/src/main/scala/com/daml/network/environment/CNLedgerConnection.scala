@@ -326,7 +326,7 @@ class BaseLedgerConnection(
       logger,
     )
 
-  private def waitForUserMetadata(
+  def waitForUserMetadata(
       userId: String,
       key: String,
       identityProviderId: Option[String] = None,
@@ -982,6 +982,13 @@ object BaseLedgerConnection {
   val DSO_PARTY_USER_METADATA_KEY: String = "sv.app.network.canton.global/dso_party"
 
   val INITIAL_ACS_IMPORT_METADATA_KEY: String = "network.canton.global/initial_acs_import"
+
+  val DOMAIN_MIGRATION_CURRENT_MIGRATION_ID_METADATA_KEY: String =
+    "network.canton.global/domain_migration_current_migration_id"
+  val DOMAIN_MIGRATION_ACS_RECORD_TIME_METADATA_KEY: String =
+    "network.canton.global/domain_migration_acs_snapshot_time"
+  val DOMAIN_MIGRATION_DOMAIN_WAS_PAUSED_KEY: String =
+    "network.canton.global/domain_migration_domain_was_paused"
 
   val APP_MANAGER_IDENTITY_PROVIDER_ID: String = "app_manager"
 

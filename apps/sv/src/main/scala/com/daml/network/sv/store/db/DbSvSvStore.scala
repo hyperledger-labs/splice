@@ -2,6 +2,7 @@ package com.daml.network.sv.store.db
 
 import com.daml.network.codegen.java.splice.validatoronboarding.{UsedSecret, ValidatorOnboarding}
 import com.daml.network.environment.RetryProvider
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
 import com.daml.network.store.db.{AcsQueries, AcsTables, DbCNNodeAppStoreWithoutHistory}
@@ -22,8 +23,7 @@ class DbSvSvStore(
     storage: DbStorage,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -44,7 +44,7 @@ class DbSvSvStore(
           "dsoParty" -> key.dsoParty.toProtoPrimitive,
         ),
       ),
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
     )
     with SvSvStore
@@ -56,6 +56,7 @@ class DbSvSvStore(
   import multiDomainAcsStore.waitUntilAcsIngested
 
   def storeId: Int = multiDomainAcsStore.storeId
+  def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
   override def lookupValidatorOnboardingBySecretWithOffset(
       secret: String

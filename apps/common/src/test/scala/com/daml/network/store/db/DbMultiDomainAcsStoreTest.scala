@@ -4,6 +4,7 @@ import com.daml.lf.data.Time.Timestamp
 import com.daml.network.codegen.java.splice.amulet.AppRewardCoupon
 import com.daml.network.environment.ParticipantAdminConnection.IMPORT_ACS_WORKFLOW_ID_PREFIX
 import com.daml.network.environment.{DarResources, RetryProvider}
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.StoreTest.testTxLogConfig
 import com.daml.network.store.{
   HardLimit,
@@ -165,12 +166,16 @@ class DbMultiDomainAcsStoreTest
     new DbMultiDomainAcsStore(
       storage,
       acsTableName,
-      "txlog_store_template",
+      Some("txlog_store_template"),
       storeDescriptor(id, participantId),
       loggerFactory,
       filter,
       testTxLogConfig,
-      migrationId,
+      DomainMigrationInfo(
+        migrationId,
+        None,
+        true,
+      ),
       participantId,
       RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
     )

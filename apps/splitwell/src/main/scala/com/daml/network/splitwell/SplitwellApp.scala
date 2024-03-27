@@ -22,6 +22,7 @@ import com.daml.network.environment.{
 }
 import com.daml.network.http.v0.external.common_admin.CommonAdminResource
 import com.daml.network.http.v0.splitwell.SplitwellResource
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient.SplitwellDomains
 import com.daml.network.splitwell.admin.http.HttpSplitwellHandler
@@ -104,13 +105,19 @@ class SplitwellApp(
       participantAdminConnection.getParticipantId()
     }
     storeKey = SplitwellStore.Key(providerParty = partyId)
+    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
+    migrationInfo = DomainMigrationInfo(
+      config.domainMigrationId,
+      None,
+      true,
+    )
     store = SplitwellStore(
       storeKey,
       storage,
       config.domains,
       loggerFactory,
       retryProvider,
-      config.domainMigrationId,
+      migrationInfo,
       participantId,
     )
     automation = new SplitwellAutomationService(

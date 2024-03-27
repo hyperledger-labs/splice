@@ -18,6 +18,7 @@ case class DomainMigrationDump(
     migrationId: Long,
     participant: NodeIdentitiesDump,
     acsSnapshot: ByteString,
+    acsTimestamp: Instant,
     dars: Seq[Dar],
     createdAt: Instant,
 )

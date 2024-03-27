@@ -21,6 +21,7 @@ import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext
 
 import scala.concurrent.Future
 import com.daml.network.http.v0.definitions
+import com.daml.network.migration.DomainMigrationInfo
 import io.circe.syntax.*
 
 abstract class ValidatorStoreTest extends StoreTest with HasExecutionContext {
@@ -610,7 +611,11 @@ class DbValidatorStoreTest
       loggerFactory = loggerFactory,
       retryProvider =
         RetryProvider(loggerFactory, timeouts, FutureSupervisor.Noop, NoOpMetricsFactory),
-      domainMigrationId,
+      DomainMigrationInfo(
+        domainMigrationId,
+        None,
+        true,
+      ),
       participantId = mkParticipantId("ValidatorStoreTest"),
     )
     for {

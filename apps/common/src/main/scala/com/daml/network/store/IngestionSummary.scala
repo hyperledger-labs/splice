@@ -4,11 +4,13 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent}
 import com.daml.network.store.MultiDomainAcsStore.{ContractStateEvent, ReassignmentId}
 import com.digitalasset.canton.config.CantonRequireTypes.String3
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.Pretty
 
 final case class IngestionSummary(
     updateId: Option[String],
     offset: Option[String],
+    recordTime: Option[CantonTimestamp],
     newAcsSize: Int,
     ingestedCreatedEvents: Vector[CreatedEvent],
     numFilteredCreatedEvents: Int,
@@ -31,6 +33,7 @@ private[store] object IngestionSummary {
   private val Empty: IngestionSummary = IngestionSummary(
     updateId = None,
     offset = None,
+    recordTime = None,
     newAcsSize = 0,
     ingestedCreatedEvents = Vector.empty,
     updatedContractStates = Vector.empty,
@@ -58,6 +61,7 @@ private[store] object IngestionSummary {
       "", // intentionally left empty, as that worked better in the log messages above
       paramIfDefined("updateId", _.updateId.map(_.unquoted)),
       paramIfDefined("offset", _.offset.map(_.unquoted)),
+      paramIfDefined("recordTime", _.recordTime.map(_.toString.unquoted)),
       param("newAcsSize", _.newAcsSize),
       paramIfNonEmpty("ingestedCreatedEvents", _.ingestedCreatedEvents),
       paramIfNonZero("numFilteredCreatedEvents", _.numFilteredCreatedEvents),

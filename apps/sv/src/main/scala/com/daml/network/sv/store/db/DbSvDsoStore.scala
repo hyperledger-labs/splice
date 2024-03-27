@@ -29,6 +29,7 @@ import com.daml.network.codegen.java.splice.wallet.subscriptions.{
   SubscriptionRequest,
 }
 import com.daml.network.environment.RetryProvider
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.ContractCompanion
 import com.daml.network.store.db.AcsQueries.SelectFromAcsTableResult
 import com.daml.network.store.db.DbMultiDomainAcsStore.StoreDescriptor
@@ -65,8 +66,7 @@ class DbSvDsoStore(
     storage: DbStorage,
     override protected val outerLoggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    override val domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -88,7 +88,7 @@ class DbSvDsoStore(
           "svParty" -> key.svParty.toProtoPrimitive,
         ),
       ),
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
       // We disable the update history for the Sv app, as the same history is already persisted by the Scan app.
       storeUpdateHistory = false,
@@ -111,6 +111,8 @@ class DbSvDsoStore(
   }
 
   import multiDomainAcsStore.waitUntilAcsIngested
+
+  override def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
   def storeId: Int = multiDomainAcsStore.storeId
 

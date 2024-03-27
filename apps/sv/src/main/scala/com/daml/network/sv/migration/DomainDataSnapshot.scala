@@ -10,6 +10,7 @@ import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
 import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.google.protobuf.ByteString
 
+import java.time.Instant
 import java.util.Base64
 
 // TODO(#11100) Split domain data snapshots for validators and SVs to avoid
@@ -19,21 +20,26 @@ case class DomainDataSnapshot(
     // TODO(#11098) Stop replaying vetted packages separately.
     vettedPackages: Option[GenericStoredTopologyTransactionsX],
     acsSnapshot: ByteString,
+    acsTimestamp: Instant,
     dars: Seq[Dar],
+    domainWasPaused: Boolean,
 ) {
   def toHttp: http.DomainDataSnapshot = http.DomainDataSnapshot(
     genesisState.map(s => Base64.getEncoder.encodeToString(s.toByteArray)),
     vettedPackages.map(pkgs => Base64.getEncoder.encodeToString(pkgs.toProtoV30.toByteArray)),
     Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
+    acsTimestamp.toString,
     dars.map { dar =>
       val content = Base64.getEncoder.encodeToString(dar.content.toByteArray)
       http.Dar(dar.hash.toHexString, content)
     }.toVector,
+    domainWasPaused,
   )
 }
 
 object DomainDataSnapshot {
   private val base64Decoder = Base64.getDecoder()
+
   def fromHttp(
       src: http.DomainDataSnapshot
   ) = {
@@ -44,6 +50,7 @@ object DomainDataSnapshot {
         val decoded = base64Decoder.decode(dar.content)
         Dar(Hash.tryFromHexString(dar.hash), ByteString.copyFrom(decoded))
       }
+    val acsTimestamp = Instant.parse(src.acsTimestamp)
     for {
       vettedPackages <- src.vettedPackages.traverse { pkgs =>
         val decoded = base64Decoder.decode(pkgs)
@@ -56,7 +63,9 @@ object DomainDataSnapshot {
       genesisState,
       vettedPackages,
       acsSnapshot,
+      acsTimestamp,
       dars,
+      src.domainWasHalted,
     )
   }
 }

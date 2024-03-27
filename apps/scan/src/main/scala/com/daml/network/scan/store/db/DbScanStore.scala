@@ -11,6 +11,7 @@ import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
 import com.daml.network.codegen.java.splice.dso.memberstate.SvNodeState
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.environment.RetryProvider
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient
 import com.daml.network.scan.store.SortOrder.{Ascending, Descending}
 import com.daml.network.scan.store.TxLogEntry.EntryType
@@ -50,8 +51,7 @@ class DbScanStore(
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val retryProvider: RetryProvider,
     createScanAggregatesReader: DbScanStore => ScanAggregatesReader,
-    // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-    override val domainMigrationId: Long,
+    domainMigrationInfo: DomainMigrationInfo,
     participantId: ParticipantId,
 )(implicit
     override protected val ec: ExecutionContext,
@@ -72,7 +72,7 @@ class DbScanStore(
           "dsoParty" -> key.dsoParty.toProtoPrimitive
         ),
       ),
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
       storeUpdateHistory = true,
     )
@@ -136,6 +136,7 @@ class DbScanStore(
   }
 
   def storeId: Int = multiDomainAcsStore.storeId
+  override def domainMigrationId: Long = domainMigrationInfo.currentMigrationId
 
   override def lookupAmuletRules()(implicit
       tc: TraceContext

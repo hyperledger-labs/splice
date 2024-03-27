@@ -83,7 +83,7 @@ import org.apache.pekko.http.scaladsl.model.{HttpMethods, HttpRequest, HttpRespo
 import org.apache.pekko.http.scaladsl.server.Directives.*
 
 import java.nio.file.Paths
-import scala.concurrent.{blocking, ExecutionContext, ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, blocking}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 

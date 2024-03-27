@@ -14,6 +14,7 @@ import com.daml.network.codegen.java.splice.svonboarding.SvOnboardingConfirmed
 import com.daml.network.config.NetworkAppClientConfig
 import com.daml.network.environment.*
 import com.daml.network.environment.TopologyAdminConnection.TopologyTransactionType
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.CNNodeAppStoreWithIngestion
 import com.daml.network.sv.admin.api.client.SvConnection
 import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
@@ -142,12 +143,23 @@ class JoiningNodeInitializer(
       )
       _ <- darUploads
       storeKey = SvStore.Key(svParty, dsoPartyId)
-      svStore = newSvStore(storeKey, config.domainMigrationId, participantId)
-      dsoStore = newDsoStore(svStore.key, config.domainMigrationId, participantId)
+      migrationInfo =
+        DomainMigrationInfo(
+          currentMigrationId = config.domainMigrationId,
+          acsRecordTime = None, // This SV doesn't know about any migrations
+          domainWasPaused = true,
+        )
+      svStore = newSvStore(storeKey, migrationInfo, participantId)
+      dsoStore = newDsoStore(svStore.key, migrationInfo, participantId)
       svAutomation = newSvSvAutomationService(
         svStore,
         dsoStore,
         ledgerClient,
+      )
+      _ <- DomainMigrationInfo.saveToUserMetadata(
+        svAutomation.connection,
+        config.ledgerApiUser,
+        migrationInfo,
       )
       globalDomain <- svStore.domains.waitForDomainConnection(config.domains.global.alias)
       _ <- svStore.domains.waitForDomainConnection(config.domains.global.alias)

@@ -1,6 +1,7 @@
 package com.daml.network.sv.onboarding
 
 import com.daml.network.environment.{CNLedgerClient, ParticipantAdminConnection, RetryProvider}
+import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.sv.LocalDomainNode
 import com.daml.network.sv.automation.{SvSvAutomationService, SvDsoAutomationService}
 import com.daml.network.sv.cometbft.CometBftNode
@@ -31,8 +32,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
 
   protected def newSvStore(
       key: SvStore.Key,
-      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-      domainMigrationId: Long,
+      domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
@@ -43,7 +43,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
     storage,
     loggerFactory,
     retryProvider,
-    domainMigrationId,
+    domainMigrationInfo,
     participantId,
   )
 
@@ -68,8 +68,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
 
   protected def newDsoStore(
       key: SvStore.Key,
-      // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here
-      domainMigrationId: Long,
+      domainMigrationInfo: DomainMigrationInfo,
       participantId: ParticipantId,
   )(implicit
       ec: ExecutionContext,
@@ -81,7 +80,7 @@ trait NodeInitializerUtil extends NamedLogging with Spanning {
       storage,
       loggerFactory,
       retryProvider,
-      domainMigrationId,
+      domainMigrationInfo,
       participantId,
     )
   }
