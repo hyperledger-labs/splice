@@ -1132,6 +1132,18 @@ syncpackCheck := {
   runCommand(Seq("syncpack", "list-mismatches"), log, None, Some(baseDirectory.value / "apps"))
 }
 
+lazy val illegalDamlReferencesCheck =
+  taskKey[Unit]("Check that there are no illegal references in Daml code")
+illegalDamlReferencesCheck := {
+  val log = streams.value.log
+  runCommand(
+    Seq("./scripts/rename.sh", "no_illegal_daml_references"),
+    log,
+    None,
+    Some(baseDirectory.value),
+  )
+}
+
 lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `canton-amulet`")
 cleanCnDars := {
   val log = streams.value.log

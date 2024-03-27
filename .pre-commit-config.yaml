@@ -17,6 +17,13 @@ repos:
         require_serial: true
         entry: "bash -c 'sbt --client \"damlDarsLockFileUpdate $@\"' bash"
         files: '(daml\.yaml|.*\.daml)'
+      - id: no_illegal_daml_references
+        name: no_illegal_daml_references
+        language: system
+        pass_filenames: false
+        require_serial: true
+        entry: "./scripts/rename.sh no_illegal_daml_references"
+        files: '(daml\.yaml|.*\.daml)'
       - id: shellcheck
         name: shellcheck
         language: system
