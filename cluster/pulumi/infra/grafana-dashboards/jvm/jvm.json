@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 2,
-  "id": 34,
+  "id": 24,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -62,8 +62,7 @@
                 "value": 80
               }
             ]
-          },
-          "unitScale": true
+          }
         },
         "overrides": []
       },
@@ -89,7 +88,7 @@
         "showThresholdMarkers": true,
         "sizing": "auto"
       },
-      "pluginVersion": "10.3.3",
+      "pluginVersion": "10.4.0",
       "targets": [
         {
           "datasource": {
@@ -168,8 +167,7 @@
               }
             ]
           },
-          "unit": "percentunit",
-          "unitScale": true
+          "unit": "percentunit"
         },
         "overrides": []
       },
@@ -271,8 +269,7 @@
               }
             ]
           },
-          "unit": "s",
-          "unitScale": true
+          "unit": "s"
         },
         "overrides": []
       },
@@ -379,8 +376,7 @@
                 "value": 80
               }
             ]
-          },
-          "unitScale": true
+          }
         },
         "overrides": []
       },
@@ -492,8 +488,7 @@
                 "value": 80
               }
             ]
-          },
-          "unitScale": true
+          }
         },
         "overrides": []
       },
@@ -523,8 +518,8 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gc, container, pod) (rate(jvm_gc_duration_seconds_count{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
-          "legendFormat": "{{gc}} {{pod}} {{container}}",
+          "expr": "sum by(gc, container, pod, jvm_gc_name, jvm_gc_action, namespace) (rate(jvm_gc_duration_seconds_count{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
+          "legendFormat": "{{namespace}} {{jvm_gc_name}} {{jvm_gc_action}} {{pod}} {{container}}",
           "range": true,
           "refId": "A"
         }
@@ -588,8 +583,7 @@
               }
             ]
           },
-          "unit": "s",
-          "unitScale": true
+          "unit": "s"
         },
         "overrides": []
       },
@@ -619,10 +613,22 @@
             "uid": "${datasource}"
           },
           "editorMode": "code",
-          "expr": "sum by(gc, container, pod) (rate(jvm_gc_duration_seconds_sum{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
-          "legendFormat": "{{gc}} {{pod}} {{container}}",
+          "expr": "sum by(jvm_gc_action, jvm_gc_name, container, pod, namespace) (rate(jvm_gc_duration_seconds_sum{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
+          "legendFormat": "rate {{namespace}} {{jvm_gc_name}} {{jvm_gc_action}} {{pod}} {{container}}",
           "range": true,
           "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "editorMode": "code",
+          "expr": "sum by(jvm_gc_action, jvm_gc_name, container, pod, namespace) (rate(jvm_gc_duration_seconds_sum{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval])) / sum by(jvm_gc_action, jvm_gc_name, container, pod, namespace) (rate(jvm_gc_duration_seconds_count{namespace=~\"$namespace\", pod=~\"$pod\", container=~\"$container\"}[$__rate_interval]))",
+          "hide": false,
+          "legendFormat": "avg {{namespace}} {{jvm_gc_name}} {{jvm_gc_action}} {{pod}} {{container}}",
+          "range": true,
+          "refId": "B"
         }
       ],
       "title": "GC Timing",
@@ -697,8 +703,7 @@
               }
             ]
           },
-          "unit": "bytes",
-          "unitScale": true
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -793,8 +798,7 @@
               }
             ]
           },
-          "unit": "bytes",
-          "unitScale": true
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -889,8 +893,7 @@
               }
             ]
           },
-          "unit": "bytes",
-          "unitScale": true
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -985,8 +988,7 @@
               }
             ]
           },
-          "unit": "bytes",
-          "unitScale": true
+          "unit": "bytes"
         },
         "overrides": []
       },
@@ -1026,9 +1028,11 @@
       "type": "timeseries"
     }
   ],
-  "refresh": false,
+  "refresh": "",
   "schemaVersion": 39,
-  "tags": [],
+  "tags": [
+    "jvm"
+  ],
   "templating": {
     "list": [
       {
@@ -1050,9 +1054,13 @@
       },
       {
         "current": {
-          "selected": false,
-          "text": "sv",
-          "value": "sv"
+          "selected": true,
+          "text": [
+            "sv-3"
+          ],
+          "value": [
+            "sv-3"
+          ]
         },
         "datasource": {
           "type": "prometheus",
@@ -1082,10 +1090,10 @@
         "current": {
           "selected": true,
           "text": [
-            "All"
+            "global-domain-0-sequencer-8cdd75f66-zrgg2"
           ],
           "value": [
-            "$__all"
+            "global-domain-0-sequencer-8cdd75f66-zrgg2"
           ]
         },
         "datasource": {
@@ -1155,6 +1163,6 @@
   "timezone": "",
   "title": "JVM Metrics",
   "uid": "rgt7PhA4z",
-  "version": 3,
+  "version": 2,
   "weekStart": ""
 }
