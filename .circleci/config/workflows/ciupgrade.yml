@@ -90,6 +90,8 @@ workflow:
           context:
             - artifactory
             - slack-context
+          requires:
+            - wait_for_previous_pipeline
       - deploy_partial_upgrade:
           name: "deploy_partial_upgrade"
           cluster: "ciupgrade"

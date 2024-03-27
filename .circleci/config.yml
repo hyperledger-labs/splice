@@ -2507,6 +2507,7 @@ jobs:
     environment:
       <<: *env
     steps:
+      - checkout_with_retry
       - run:
           name: Cancel the entire workflow if the current commit is a base version
           command: |
@@ -4181,6 +4182,8 @@ workflows:
           context:
             - artifactory
             - slack-context
+          requires:
+            - wait_for_previous_pipeline
       - deploy_partial_upgrade:
           name: "deploy_partial_upgrade"
           cluster: "ciupgrade"

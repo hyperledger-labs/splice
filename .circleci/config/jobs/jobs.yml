@@ -563,6 +563,7 @@ jobs:
     environment:
       <<: *env
     steps:
+      - checkout_with_retry
       - run:
           name: Cancel the entire workflow if the current commit is a base version
           command: |
