@@ -13,7 +13,7 @@ import com.daml.network.codegen.java.splice.amuletrules.{
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.validatorlicense as vl
 import com.daml.network.codegen.java.splice.dso.amuletprice as cp
-import com.daml.network.codegen.java.splice.dso.memberstate.MemberRewardState
+import com.daml.network.codegen.java.splice.dso.svstate.SvRewardState
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.{
   ARC_AmuletRules,
   ARC_DsoRules,
@@ -120,7 +120,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
     for {
       // Note: at a certain size of the DSO, we'll be better off doing this join in the DB. We'll find out from our logs and performance tests.
       dsoRules <- getDsoRules()
-      memberSvParties = dsoRules.payload.members.keySet().asScala.toSeq
+      memberSvParties = dsoRules.payload.svs.keySet().asScala.toSeq
       svNodeStates <- Future
         .traverse(memberSvParties) { svPartyStr =>
           val svParty = PartyId.tryFromProtoPrimitive(svPartyStr)
@@ -143,8 +143,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       tc: TraceContext
   ): Future[Option[
     AssignedContract[
-      splice.dso.memberstate.SvNodeState.ContractId,
-      splice.dso.memberstate.SvNodeState,
+      splice.dso.svstate.SvNodeState.ContractId,
+      splice.dso.svstate.SvNodeState,
     ]
   ]]
 
@@ -152,8 +152,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       tc: TraceContext
   ): Future[
     AssignedContract[
-      splice.dso.memberstate.SvNodeState.ContractId,
-      splice.dso.memberstate.SvNodeState,
+      splice.dso.svstate.SvNodeState.ContractId,
+      splice.dso.svstate.SvNodeState,
     ]
   ] =
     lookupSvNodeState(svPartyId).map(
@@ -168,8 +168,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       tc: TraceContext
   ): Future[Option[
     AssignedContract[
-      splice.dso.memberstate.SvStatusReport.ContractId,
-      splice.dso.memberstate.SvStatusReport,
+      splice.dso.svstate.SvStatusReport.ContractId,
+      splice.dso.svstate.SvStatusReport,
     ]
   ]]
 
@@ -177,8 +177,8 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       tc: TraceContext
   ): Future[
     AssignedContract[
-      splice.dso.memberstate.SvStatusReport.ContractId,
-      splice.dso.memberstate.SvStatusReport,
+      splice.dso.svstate.SvStatusReport.ContractId,
+      splice.dso.svstate.SvStatusReport,
     ]
   ] =
     lookupSvStatusReport(svPartyId).map(
@@ -189,9 +189,9 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       )
     )
 
-  def lookupMemberRewardState(svName: String)(implicit
+  def lookupSvRewardState(svName: String)(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[MemberRewardState.ContractId, MemberRewardState]]]
+  ): Future[Option[AssignedContract[SvRewardState.ContractId, SvRewardState]]]
 
   def lookupAmuletRulesWithOffset()(implicit tc: TraceContext): Future[
     QueryResult[Option[
@@ -776,7 +776,7 @@ trait SvDsoStore extends CNNodeAppStore[TxLogEntry] with PackageIdResolver.HasAm
       )
     } yield votes map (_.contract)
 
-  /** List the current amulet price votes by the DSO members. */
+  /** List the current amulet price votes by the SVs. */
   def listMemberAmuletPriceVotes(limit: Limit = Limit.DefaultLimit)(implicit
       tc: TraceContext
   ): Future[
@@ -1075,9 +1075,9 @@ object SvDsoStore {
       dsorules.ElectionRequest.COMPANION,
       so.SvOnboardingRequest.COMPANION,
       so.SvOnboardingConfirmed.COMPANION,
-      splice.dso.memberstate.SvStatusReport.COMPANION,
-      splice.dso.memberstate.SvNodeState.COMPANION,
-      splice.dso.memberstate.MemberRewardState.COMPANION,
+      splice.dso.svstate.SvStatusReport.COMPANION,
+      splice.dso.svstate.SvNodeState.COMPANION,
+      splice.dso.svstate.SvRewardState.COMPANION,
     )
   }
 
@@ -1177,21 +1177,20 @@ object SvDsoStore {
       mkFilter(splice.dsorules.DsoRules.COMPANION)(co => co.payload.dso == dso)(
         DsoAcsStoreRowData(_)
       ),
-      mkFilter(splice.dso.memberstate.SvStatusReport.COMPANION)(co => co.payload.dso == dso) {
+      mkFilter(splice.dso.svstate.SvStatusReport.COMPANION)(co => co.payload.dso == dso) {
         contract =>
           DsoAcsStoreRowData(
             contract,
             svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
           )
       },
-      mkFilter(splice.dso.memberstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) {
-        contract =>
-          DsoAcsStoreRowData(
-            contract,
-            svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
-          )
+      mkFilter(splice.dso.svstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) { contract =>
+        DsoAcsStoreRowData(
+          contract,
+          svParty = Some(PartyId.tryFromProtoPrimitive(contract.payload.sv)),
+        )
       },
-      mkFilter(splice.dso.memberstate.MemberRewardState.COMPANION)(co => co.payload.dso == dso) {
+      mkFilter(splice.dso.svstate.SvRewardState.COMPANION)(co => co.payload.dso == dso) {
         contract =>
           DsoAcsStoreRowData(
             contract,
@@ -1440,7 +1439,7 @@ object SvDsoStore {
       dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       svNodeStates: Map[
         PartyId,
-        Contract[splice.dso.memberstate.SvNodeState.ContractId, splice.dso.memberstate.SvNodeState],
+        Contract[splice.dso.svstate.SvNodeState.ContractId, splice.dso.svstate.SvNodeState],
       ],
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
@@ -1458,13 +1457,13 @@ object SvDsoStore {
     }
 
     def activeSvParticipantAndMediatorIds(): Seq[Member] = {
-      val svParticipants = dsoRules.contract.payload.members
+      val svParticipants = dsoRules.contract.payload.svs
         .values()
         .asScala
         .map(_.participantId)
         .toSeq
         .map(ParticipantId.tryFromProtoPrimitive)
-      val offboardedSvParticipants = dsoRules.contract.payload.offboardedMembers
+      val offboardedSvParticipants = dsoRules.contract.payload.offboardedSvs
         .values()
         .asScala
         .map(_.participantId)
@@ -1482,12 +1481,12 @@ object SvDsoStore {
     }
 
     def getSvMemberName(svParty: PartyId): Future[String] =
-      dsoRules.contract.payload.members.asScala
+      dsoRules.contract.payload.svs.asScala
         .get(svParty.toProtoPrimitive)
         .fold(
           Future.failed[String](
             Status.NOT_FOUND
-              .withDescription(show"$svParty is not an active DSO member")
+              .withDescription(show"$svParty is not an active SV")
               .asRuntimeException()
           )
         )(info => Future.successful(info.name))
@@ -1498,8 +1497,8 @@ object SvDsoStore {
       dsoRules: AssignedContract[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
       svParty: PartyId,
       svNodeState: Contract[
-        splice.dso.memberstate.SvNodeState.ContractId,
-        splice.dso.memberstate.SvNodeState,
+        splice.dso.svstate.SvNodeState.ContractId,
+        splice.dso.svstate.SvNodeState,
       ],
   ) extends PrettyPrinting {
     override def pretty: Pretty[this.type] =
@@ -1519,7 +1518,7 @@ object SvDsoStore {
           dsoRules.contractId
         )
         checkSvNodeState <- store
-          .lookupContractById(splice.dso.memberstate.SvNodeState.COMPANION)(svNodeState.contractId)
+          .lookupContractById(splice.dso.svstate.SvNodeState.COMPANION)(svNodeState.contractId)
       } yield checkDsoRules.isEmpty || checkSvNodeState.isEmpty
 
     def lookupSequencerConfigFor(

@@ -24,7 +24,7 @@ data BuyTrafficRequest_ExpireResult = BuyTrafficRequest_ExpireResult with
   trackingInfo : BuyTrafficRequestTrackingInfo
 
 -- | A request by an end-user to the wallet's automation to buy traffic
--- for a member of a domain.
+-- for a sequencer member
 template BuyTrafficRequest
   with
     dso : Party

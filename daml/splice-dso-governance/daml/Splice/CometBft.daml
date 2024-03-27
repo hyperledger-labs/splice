@@ -17,10 +17,10 @@ General approach for CometBFT integration:
     - for mainnet, total voting power <= 1
 
 - SV nodes monitor whether
-  - SV members have sequencing, governance keys and CometBFT nodes registered
+  - SVs have sequencing, governance keys and CometBFT nodes registered
   - these keys and nodes are actually used
 
-- once we find that DsoRules becomes too heavy wrt MemberInfo, we factor that out into a separate contract, one per member
+- once we find that DsoRules becomes too heavy wrt SvInfo, we factor that out into a separate contract, one per sv
 
 - in DevNet, CometBFT validator nodes that are more likely to be available are given 100x voting power
   to minimize the impact of CometBFT validator nodes that get connected for testing, and disconnect afterwards w/o unregistering as a validator
@@ -37,7 +37,7 @@ General approach for CometBFT integration:
 -- See the comments there for details on the fields defined below.
 --
 -- The general idea is that we store the CometBFT network-relevant config of every SV node
--- in the DsoRules.MemberInfo record for the SV node; and have the SvApp run a reconciliation
+-- in the DsoRules.SvInfo record for the SV node; and have the SvApp run a reconciliation
 -- loop from that definition to the CometBFT nodes under its control.
 
 -- | Config for a single CometBFT node.

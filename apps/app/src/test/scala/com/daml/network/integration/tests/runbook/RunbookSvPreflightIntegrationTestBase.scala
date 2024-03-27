@@ -114,8 +114,8 @@ abstract class RunbookSvPreflightIntegrationTestBase
 
     val dsoInfo = svClient.getDsoInfo()
     val svParty = dsoInfo.svParty.toProtoPrimitive
-    val memberInfo = dsoInfo.dsoRules.payload.members.asScala.get(svParty).value
-    val joinedAsOfRound = memberInfo.joinedAsOfRound.number
+    val svInfo = dsoInfo.dsoRules.payload.svs.asScala.get(svParty).value
+    val joinedAsOfRound = svInfo.joinedAsOfRound.number
     val earliestOpenRound =
       sv1ScanClient.getOpenAndIssuingMiningRounds()._1.minBy(_.payload.opensAt).payload.round.number
 
@@ -213,8 +213,8 @@ abstract class RunbookSvPreflightIntegrationTestBase
     val sv1ScanClient = scancl("sv1Scan")
 
     val svParty = svClient.getDsoInfo().svParty.toProtoPrimitive
-    val memberInfo = svClient.getDsoInfo().dsoRules.payload.members.asScala.get(svParty).value
-    val joinedAsOfRound = memberInfo.joinedAsOfRound.number
+    val svInfo = svClient.getDsoInfo().dsoRules.payload.svs.asScala.get(svParty).value
+    val joinedAsOfRound = svInfo.joinedAsOfRound.number
     val lastAggregatedRoundSv = Try(sv1ScanClient.getRoundOfLatestData()._1).getOrElse(0L)
     logger.debug(
       s"last aggregated round from sv1: $lastAggregatedRoundSv, sv runbook joined as of round: $joinedAsOfRound"

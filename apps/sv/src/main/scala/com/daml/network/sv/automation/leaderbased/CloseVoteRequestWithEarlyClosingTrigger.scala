@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import com.daml.network.codegen.java.splice.dsorules.VoteRequest
 import com.daml.network.util.AssignedContract
 import com.digitalasset.canton.tracing.TraceContext
@@ -54,14 +54,12 @@ class CloseVoteRequestWithEarlyClosingTrigger(
           for {
             dsoRules <- store.getDsoRules()
             votes = voteRequestContract.payload.votes.values().asScala
-            defaultRequiredNumVotesForEarlyClosing = dsoRules.payload.members.size()
+            defaultRequiredNumVotesForEarlyClosing = dsoRules.payload.svs.size()
             requiredNumVotesForEarlyClosing = voteRequestContract.payload.action match {
               case arcDsoRules: ARC_DsoRules =>
                 arcDsoRules.dsoAction match {
-                  case action: SRARC_OffboardMember =>
-                    if (
-                      votes.map(_.sv).toSeq.contains(action.dsoRules_OffboardMemberValue.member)
-                    ) {
+                  case action: SRARC_OffboardSv =>
+                    if (votes.map(_.sv).toSeq.contains(action.dsoRules_OffboardSvValue.sv)) {
                       defaultRequiredNumVotesForEarlyClosing
                     } else {
                       defaultRequiredNumVotesForEarlyClosing - 1

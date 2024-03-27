@@ -45,10 +45,10 @@ class GarbageCollectAmuletPriceVotesTrigger(
   )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       amuletPriceVotes <- store.listAllAmuletPriceVotes()
-      (memberVotes, nonMemberVotes) = amuletPriceVotes.partition(v =>
-        dsoRules.payload.members.asScala.contains(v.payload.sv)
+      (memberVotes, nonSvVotes) = amuletPriceVotes.partition(v =>
+        dsoRules.payload.svs.asScala.contains(v.payload.sv)
       )
-      nonMemberVoteCids = nonMemberVotes.map(_.contractId)
+      nonSvVoteCids = nonSvVotes.map(_.contractId)
       memberDuplicatedVoteCids =
         memberVotes
           .groupBy(_.payload.sv)
@@ -57,10 +57,10 @@ class GarbageCollectAmuletPriceVotesTrigger(
           .map(_.map(_.contractId).asJava)
           .toSeq
       _ <-
-        if (nonMemberVoteCids.nonEmpty || memberDuplicatedVoteCids.nonEmpty) {
+        if (nonSvVoteCids.nonEmpty || memberDuplicatedVoteCids.nonEmpty) {
           val cmd = dsoRules.exercise(
             _.exerciseDsoRules_GarbageCollectAmuletPriceVotes(
-              nonMemberVoteCids.asJava,
+              nonSvVoteCids.asJava,
               memberDuplicatedVoteCids.asJava,
             )
           )
@@ -74,7 +74,7 @@ class GarbageCollectAmuletPriceVotesTrigger(
             .yieldUnit()
         } else Future.successful(())
     } yield TaskSuccess(
-      s"Archived ${nonMemberVoteCids.size} non member votes and deduplicated votes for ${memberDuplicatedVoteCids.size} SVs"
+      s"Archived ${nonSvVoteCids.size} non member votes and deduplicated votes for ${memberDuplicatedVoteCids.size} SVs"
     )
   }
 }

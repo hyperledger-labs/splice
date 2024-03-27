@@ -1,5 +1,5 @@
--- | Templates to track per-member state.
-module Splice.DSO.MemberState where
+-- | Templates to track per-sv state.
+module Splice.DSO.SvState where
 
 import Splice.Types
 
@@ -7,10 +7,10 @@ import Splice.DSO.GlobalDomain
 import Splice.Util
 
 
--- Checked fetches for per-member state
+-- Checked fetches for per-sv state
 ---------------------------------------
 
-data ForMember = ForMember with
+data ForSv = ForSv with
     dso : Party
     svName : Text
   deriving (Eq, Show)
@@ -25,7 +25,7 @@ data ForSvNode = ForSvNode with
 -- Reward collection
 --------------------
 
--- | Reward collection state of an DSO member.
+-- | Reward collection state of an SV.
 --
 -- Note that we keep some extra aggregates in this state to make it easier to interpret it.
 -- In principle, these could be derived from the transaction history, but that
@@ -37,8 +37,8 @@ data RewardState = RewardState with
     numCouponsIssued : Int -- ^ Number of SV reward coupons issued by them for their beneficiaries.
   deriving (Eq, Show)
 
--- | State of reward collection for a member identified by their member name.
-template MemberRewardState with
+-- | State of reward collection for a sv identified by their sv name.
+template SvRewardState with
     dso : Party
     svName : Text
     state : RewardState
@@ -57,13 +57,13 @@ data NodeState = NodeState with
 -- | State of a node managed by an SV operator party.
 --
 -- There is exactly one such state per SV operator party.
--- Even though every DSO member can operate at most one node at any one time,
--- there can though be multiple SV node states per DSO member, as the state of offboarded
+-- Even though every SV can operate at most one node at any one time,
+-- there can though be multiple SV node states per SV, as the state of offboarded
 -- nodes is kept around for debugging purposes.
 template SvNodeState with
     dso : Party
     sv : Party -- ^ The SV operator party identifying the node.
-    svName : Text -- ^ The DSO member name in whose name the node is operated.
+    svName : Text -- ^ The SV name in whose name the node is operated.
     state : NodeState
   where
     signatory dso
@@ -92,7 +92,7 @@ data SvStatus = SvStatus with
 -- | A singleton contract per SV party that is used to regularly submit status reports.
 --
 -- Individual status reports serve as a heartbeat for a specific SV party and its associoated SV node
--- ; and to distribute that SVs view on the network to all other DSO members.
+-- ; and to distribute that SVs view on the network to all other SVs.
 template SvStatusReport with
     dso : Party
     sv : Party
@@ -102,7 +102,7 @@ template SvStatusReport with
     number : Int
     -- ^ The number of this report, starting from 0.
     status : Optional SvStatus
-    -- ^ None is used when initially creating the contract upon member addition.
+    -- ^ None is used when initially creating the contract upon sv addition.
   where
     signatory dso
 
@@ -110,8 +110,8 @@ template SvStatusReport with
 -- instances
 ------------
 
-instance HasCheckedFetch MemberRewardState ForMember where
-  contractGroupId MemberRewardState {..} = ForMember with dso; svName
+instance HasCheckedFetch SvRewardState ForSv where
+  contractGroupId SvRewardState {..} = ForSv with dso; svName
 
 instance HasCheckedFetch SvNodeState ForSvNode where
   contractGroupId SvNodeState {..} = ForSvNode with dso; sv; svName

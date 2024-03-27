@@ -188,7 +188,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 .getDsoInfo()
                 .dsoRules
                 .payload
-                .members
+                .svs
                 .asScala
                 .get(sv1ValidatorParty)
                 .value

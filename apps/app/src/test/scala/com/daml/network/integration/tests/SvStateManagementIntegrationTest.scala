@@ -9,8 +9,8 @@ import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation
 }
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_AddFutureAmuletConfigSchedule
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
-  SRARC_AddMember,
-  SRARC_OffboardMember,
+  SRARC_AddSv,
+  SRARC_OffboardSv,
   SRARC_SetConfig,
 }
 import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.{
@@ -21,8 +21,8 @@ import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.{
 import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
   DsoRulesConfig,
-  DsoRules_AddMember,
-  DsoRules_OffboardMember,
+  DsoRules_AddSv,
+  DsoRules_OffboardSv,
   DsoRules_SetConfig,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -40,16 +40,16 @@ import scala.jdk.OptionConverters.*
 class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
 
   private def actionRequiring3VotesForEarlyClosing(member: String) = new ARC_DsoRules(
-    new SRARC_OffboardMember(
-      new DsoRules_OffboardMember(
+    new SRARC_OffboardSv(
+      new DsoRules_OffboardSv(
         member
       )
     )
   )
 
   private def actionRequiring4VotesForEarlyClosing() = new ARC_DsoRules(
-    new SRARC_AddMember(
-      new DsoRules_AddMember(
+    new SRARC_AddSv(
+      new DsoRules_AddSv(
         "alice:1234",
         "Alice",
         1234L,
@@ -269,8 +269,8 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     actAndCheck(
       "remove sv3 on dsoRules contract to trigger `GarbageCollectAmuletPriceVotesTrigger` to non member votes", {
         val removeAction = new ARC_DsoRules(
-          new SRARC_OffboardMember(
-            new DsoRules_OffboardMember(
+          new SRARC_OffboardSv(
+            new DsoRules_OffboardSv(
               svParties("sv3").toProtoPrimitive
             )
           )
@@ -320,7 +320,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     clue("Initialize DSO with 4 SVs") {
       initDso()
       eventually() {
-        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 4
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 4
       }
     }
 
@@ -414,7 +414,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
     clue("Initialize DSO with 4 SVs") {
       initDso()
       eventually() {
-        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 4
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 4
       }
     }
 
@@ -547,7 +547,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         sv2Backend,
       )
       eventually() {
-        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 2
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
       }
     }
     clue("Pausing vote request expiration automation") {
@@ -558,7 +558,7 @@ class SvStateManagementIntegrationTest extends SvIntegrationTestBase {
         val sv1Party = sv1Backend.getDsoInfo().svParty
         val sv2Party = sv2Backend.getDsoInfo().svParty
         val action: ActionRequiringConfirmation = new ARC_DsoRules(
-          new SRARC_OffboardMember(new DsoRules_OffboardMember(sv1Party.toProtoPrimitive))
+          new SRARC_OffboardSv(new DsoRules_OffboardSv(sv1Party.toProtoPrimitive))
         )
 
         sv2Backend.createVoteRequest(

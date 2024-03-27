@@ -50,7 +50,7 @@ validAmuletGlobalDomainConfig config =
 -- Per sequencer member domain traffic tracking
 ------------------------------------------------
 
--- | The state of the extra domain traffic purchases of a sequencer member.
+-- | The state of the extra domain traffic purchases of a sequencer sv.
 template MemberTraffic with
     dso : Party
     memberId : Text -- ^ The id of the sequencer member (participant or mediator) for which traffic has been purchased

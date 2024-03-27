@@ -532,9 +532,9 @@ class FoundingNodeInitializer(
           case QueryResult(_, Some(AssignedContract(dsoRules, _))) =>
             amuletRules match {
               case Some(amuletRules) =>
-                if (dsoRules.payload.members.keySet.contains(svParty.toProtoPrimitive)) {
+                if (dsoRules.payload.svs.keySet.contains(svParty.toProtoPrimitive)) {
                   logger.info(
-                    "AmuletRules and DsoRules already exist and founding party is an DSO member; doing nothing." +
+                    "AmuletRules and DsoRules already exist and founding party is an SV; doing nothing." +
                       show"\nAmuletRules: $amuletRules\nDsoRules: $dsoRules"
                   )
                   Future.successful(())

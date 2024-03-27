@@ -17,7 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.{CollectionHasAsScala}
 
 /** Offboard a participant from the hosting of the DSO party.
-  * - Runs when a member part of offboardedMembers still exist on the partyToParticipantX mapping
+  * - Runs when a member part of offboardedSvs still exist on the partyToParticipantX mapping
   */
 class SvOffboardingPartyToParticipantProposalTrigger(
     override protected val context: TriggerContext,
@@ -36,8 +36,8 @@ class SvOffboardingPartyToParticipantProposalTrigger(
   ): Future[Seq[ParticipantId]] = {
     for {
       dsoRules <- dsoStore.getDsoRules()
-      offboardedMembers = dsoRules.contract.payload.offboardedMembers
-      offboardedParticipants = offboardedMembers
+      offboardedSvs = dsoRules.contract.payload.offboardedSvs
+      offboardedParticipants = offboardedSvs
         .values()
         .asScala
         .map(_.participantId)

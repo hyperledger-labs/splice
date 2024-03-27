@@ -396,10 +396,10 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
     "sv member ans entries can be seen via scan api" in { implicit env =>
       val dsoRules = sv1Backend.getDsoInfo().dsoRules
-      dsoRules.payload.members.asScala.foreach { case (svParty, memberInfo) =>
-        val expectedSvEntry = svEntry(memberInfo.name, svParty)
+      dsoRules.payload.svs.asScala.foreach { case (svParty, svInfo) =>
+        val expectedSvEntry = svEntry(svInfo.name, svParty)
         sv1ScanBackend.lookupEntryByName(
-          s"${memberInfo.name.toLowerCase}${DsoAnsResolver.svAnsNameSuffix}"
+          s"${svInfo.name.toLowerCase}${DsoAnsResolver.svAnsNameSuffix}"
         ) shouldBe expectedSvEntry
         sv1ScanBackend
           .lookupEntryByParty(PartyId.tryFromProtoPrimitive(svParty))

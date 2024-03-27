@@ -41,7 +41,7 @@ class SvTimeBasedOnboardingIntegrationTest
               sv3ValidatorBackend,
             ): _*
         )
-        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 3
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 3
       }
 
       clue(

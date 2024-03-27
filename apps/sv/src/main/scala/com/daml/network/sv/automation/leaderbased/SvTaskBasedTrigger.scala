@@ -71,7 +71,7 @@ trait SvTaskBasedTrigger[T <: PrettyPrinting] { this: TaskbasedTrigger[T] =>
         case QueryResult(offset, None) => {
           val self = store.key.svParty.toProtoPrimitive
           val otherParties =
-            dsoRules.payload.members.keySet.asScala.to(Set) - currentLeader - self
+            dsoRules.payload.svs.keySet.asScala.to(Set) - currentLeader - self
           val ranking = self :: Random.shuffle(otherParties.toList) ++ List(currentLeader)
           val cmd = dsoRules.exercise(
             _.exerciseDsoRules_RequestElection(

@@ -13,7 +13,7 @@ import Splice.CometBft
 -- a BFT protocol upgrade that cannot be rolled out in a backwards compatible fashion.
 --
 -- Note that domains themselves are formed by a cluster of nodes run by the SVs.
--- As can be seen form `DomainNodeConfig` each member runs multiple different kinds of
+-- As can be seen form `DomainNodeConfig` each sv runs multiple different kinds of
 -- physical nodes.
 data DsoGlobalDomainConfig = DsoGlobalDomainConfig with
     domains : Map.Map Text DomainConfig
@@ -30,7 +30,7 @@ data DomainConfig = DomainConfig with
     state : DomainState
     -- ^ The state of this synchronizer
     cometBftGenesisJson : Text
-    -- ^ The CometBftGenesis json value required for new members to bring up
+    -- ^ The CometBftGenesis json value required for new svs to bring up
     -- their CometBft nodes for this domain.
   deriving (Eq, Show)
 
@@ -43,7 +43,7 @@ data DomainState
     -- ^ The domain is operational, and thus can be used as
     -- the active domain.
   | DS_Decomissioned
-    -- ^ The domain has been decommissioned and members are now allowed to shutdown
+    -- ^ The domain has been decommissioned and svs are now allowed to shutdown
     -- their nodes for that domain. We track this state explicitly instead of just
     -- deleting the domain config, as decomissioning likely takes a while, and we
     -- want to avoid confusion among SV operators when they see errors raised from
@@ -54,7 +54,7 @@ data DomainState
   deriving (Eq, Show)
 
 
--- Member-level configuration
+-- SV-level configuration
 -- ==========================
 
 -- | Config for a sequencer.
@@ -82,23 +82,23 @@ data ScanConfig = ScanConfig with
     -- ^ The publicly accessible URL of the Scan instance.
   deriving (Eq, Show)
 
--- | A map from domain-ids to the configuration of a member's node for this domain.
+-- | A map from domain-ids to the configuration of a sv's node for this domain.
 type DomainNodeConfigMap = Map.Map Text DomainNodeConfig
 
--- | The configuration of a member's node for a particular domain.
+-- | The configuration of a sv's node for a particular domain.
 data DomainNodeConfig = DomainNodeConfig with
 
     cometBft : CometBftConfig
-    -- ^ The configuration of this member's CometBFT nodes and keys.
+    -- ^ The configuration of this sv's CometBFT nodes and keys.
 
     sequencer : Optional SequencerConfig
-    -- ^ The configuration of this member's optional local sequencer.
+    -- ^ The configuration of this sv's optional local sequencer.
 
     mediator : Optional MediatorConfig
-    -- ^ The configuration of this member's optional local mediator.
+    -- ^ The configuration of this sv's optional local mediator.
 
     scan: Optional ScanConfig
-    -- ^ The configuration of this member's optional Scan instance.
+    -- ^ The configuration of this sv's optional Scan instance.
   deriving (Eq, Show)
 
 noDomainNodes : DomainNodeConfigMap

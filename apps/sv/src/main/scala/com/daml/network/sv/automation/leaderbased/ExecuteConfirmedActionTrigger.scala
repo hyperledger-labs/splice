@@ -145,19 +145,19 @@ class ExecuteConfirmedActionTrigger(
               isSvOnboardingConfirmed <- store
                 .lookupSvOnboardingConfirmedByParty(
                   PartyId.tryFromProtoPrimitive(
-                    confirmSvAction.dsoRules_ConfirmSvOnboardingValue.newMemberParty
+                    confirmSvAction.dsoRules_ConfirmSvOnboardingValue.newSvParty
                   )
                 )
                 .map(_.nonEmpty)
-              newMemberParty = PartyId.tryFromProtoPrimitive(
-                confirmSvAction.dsoRules_ConfirmSvOnboardingValue.newMemberParty
+              newSvParty = PartyId.tryFromProtoPrimitive(
+                confirmSvAction.dsoRules_ConfirmSvOnboardingValue.newSvParty
               )
-              newMemberName = confirmSvAction.dsoRules_ConfirmSvOnboardingValue.newMemberName
+              newSvName = confirmSvAction.dsoRules_ConfirmSvOnboardingValue.newSvName
               isSvPartOfDso <- store
                 .getDsoRules()
                 .map(dsoRules =>
-                  isDsoMemberParty(newMemberParty, dsoRules) || (
-                    !isDevNet(dsoRules) && isDsoMemberName(newMemberName, dsoRules)
+                  isDsoMemberParty(newSvParty, dsoRules) || (
+                    !isDevNet(dsoRules) && isDsoMemberName(newSvName, dsoRules)
                   )
                 )
             } yield isSvOnboardingConfirmed || isSvPartOfDso

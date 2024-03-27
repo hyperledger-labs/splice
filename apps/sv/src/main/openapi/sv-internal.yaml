@@ -1043,7 +1043,7 @@ components:
         # Contract IDs of the DsoRules contract associated with the DSO
         dso_rules:
           $ref: "../../../../common/src/main/openapi/common-external.yaml#/components/schemas/Contract"
-        # States the DSO members' nodes
+        # States the SVs' nodes
         sv_node_states:
           type: array
           items:

@@ -14,7 +14,7 @@ This overview is trimmed to what is most relevant for the operators of regular (
 For a more comprehensive overview, please refer to the :ref:`documentation for SV operators <sv-upgrades-overview>`.
 
 1. Canton releases containing breaking changes become available and Canton Network Node releases compatible with these Canton releases become available.
-2. DSO members agree and eventually confirm via an on-ledger vote on which specific date and time the network downtime necessary for the upgrade will start. Information about the downtime window is communicated to validators.
+2. SVs agree and eventually confirm via an on-ledger vote on which specific date and time the network downtime necessary for the upgrade will start. Information about the downtime window is communicated to validators.
 3. At the start of the downtime window, the DSO automatically pauses all traffic on the operating version of the global synchronizer.
 4. Shortly after traffic on the global synchronizer has been paused (there is a short delay to ensure that all components have synced up to the final state of the existing synchronizer), the validator node software automatically exports so-called migration dumps to attached Kubernetes volumes. See :ref:`validator-upgrades-dumps`.
 5. All SVs and validators previously using the now-paused global synchronizer create full backups of their nodes. (Both for disaster recovery and for supporting audit requirements). See :ref:`validator-backups`.

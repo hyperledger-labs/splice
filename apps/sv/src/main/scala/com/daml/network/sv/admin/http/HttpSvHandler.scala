@@ -551,7 +551,7 @@ class HttpSvHandler(
     Option.when(SvApp.isDsoMemberParty(svParty, dsoRules))(
       definitions.SvOnboardingStateCompleted(
         state = "completed",
-        name = dsoRules.payload.members.get(svParty.toProtoPrimitive).name,
+        name = dsoRules.payload.svs.get(svParty.toProtoPrimitive).name,
         contractId = Codec.encodeContractId(dsoRules.contractId),
       )
     )
@@ -610,7 +610,7 @@ class HttpSvHandler(
       )
       confirmedBy = confirmations
         .map(c =>
-          dsoRules.payload.members.asScala.get(c.payload.confirmer) match {
+          dsoRules.payload.svs.asScala.get(c.payload.confirmer) match {
             case Some(member) => member.name
             case None => c.payload.confirmer
           }

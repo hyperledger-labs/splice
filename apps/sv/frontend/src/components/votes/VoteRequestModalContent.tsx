@@ -58,7 +58,7 @@ const VoteRequestModalContent: React.FC<VoteRequestModalProps> = ({
 
   const getMemberName = useCallback(
     (partyId: string) => {
-      const member = dsoInfosQuery.data?.dsoRules.payload.members.get(partyId);
+      const member = dsoInfosQuery.data?.dsoRules.payload.svs.get(partyId);
       return member ? member.name : '';
     },
     [dsoInfosQuery.data]

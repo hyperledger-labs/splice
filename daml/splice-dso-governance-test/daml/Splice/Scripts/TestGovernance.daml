@@ -83,7 +83,7 @@ testVoteRequest = do
   let requestCid = castResult.voteRequest
 
   -- there are now three votes in favor of the change, which are enough to grant the right,
-  -- but the vote request can only be executed early if all members have voted
+  -- but the vote request can only be executed early if all svs have voted
   executeAllDefinitiveVotes app
   [] <- query @FeaturedAppRight provider
 
@@ -95,7 +95,7 @@ testVoteRequest = do
       accept = False
       reason = Reason with url = ""; body = "I agree!"
 
-  -- now all members have voted and the request can be closed
+  -- now all svs have voted and the request can be closed
   executeAllDefinitiveVotes app
   [(rightCid, right)] <- query @FeaturedAppRight provider
   right === FeaturedAppRight with dso; provider
@@ -104,7 +104,7 @@ testVoteRequest = do
   [] <- query @VoteRequest dso
 
   -- we can remove the granted right using a vote request, provided enough parties answer in time
-  -- This uses early closure of the vote request, which is only possible if all members have voted
+  -- This uses early closure of the vote request, which is only possible if all svs have voted
   initiateAndAcceptVote app [sv1, sv2, sv3, sv4] $
     ARC_DsoRules with
       dsoAction = SRARC_RevokeFeaturedAppRight DsoRules_RevokeFeaturedAppRight with
@@ -158,14 +158,14 @@ testVoteRequestRejection = do
 
   result.completedAt === now
   result.offboardedVoters === []
-  result.abstainingMembers === ["sv3"]
+  result.abstainingSvs === ["sv3"]
   result.outcome === VRO_Rejected
 
   pure ()
 
 
-testRacingMembershipRemoval : Script ()
-testRacingMembershipRemoval = do
+testRacingSvRemoval : Script ()
+testRacingSvRemoval = do
   (_, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
@@ -174,16 +174,16 @@ testRacingMembershipRemoval = do
   result1 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv1
     action = ARC_DsoRules with
-      dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
-        member = sv2
+      dsoAction = SRARC_OffboardSv DsoRules_OffboardSv with
+        sv = sv2
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
 
   result2 <- submitMulti [sv1] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv1
     action = ARC_DsoRules with
-      dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
-        member = sv2
+      dsoAction = SRARC_OffboardSv DsoRules_OffboardSv with
+        sv = sv2
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
 
@@ -191,8 +191,8 @@ testRacingMembershipRemoval = do
   result3 <- submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv2
     action = ARC_DsoRules with
-      dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
-        member = sv1
+      dsoAction = SRARC_OffboardSv DsoRules_OffboardSv with
+        sv = sv1
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (days 7) -- give everybody 7 days to vote
 
@@ -222,7 +222,7 @@ testRacingMembershipRemoval = do
 
   result.completedAt === now
   result.offboardedVoters === []
-  result.abstainingMembers === ["sv2"]
+  result.abstainingSvs === ["sv2"]
   result.outcome === VRO_Accepted with effectiveAt = now
 
   -- and it eagerly accepts its other vote request as well
@@ -233,8 +233,8 @@ testRacingMembershipRemoval = do
 
   result.completedAt === now
   result.offboardedVoters === []
-  result.abstainingMembers === []
-  result.outcome === VRO_AcceptedButActionFailed with description = "Not a member"
+  result.abstainingSvs === []
+  result.outcome === VRO_AcceptedButActionFailed with description = "Not a sv"
 
   -- and forgets to turn off automation, which now submits the closing of the vote request to remove SV1
   [(dsoRulesCid, _)] <- query @DsoRules dso
@@ -244,12 +244,12 @@ testRacingMembershipRemoval = do
 
   result.completedAt === now
   result.offboardedVoters === ["sv2"]
-  result.abstainingMembers === ["sv1"]
+  result.abstainingSvs === ["sv1"]
   result.outcome === VRO_Accepted with effectiveAt = now
 
-  -- There are only two members left, and sv3 is the new DsoDelegate
+  -- There are only two svs left, and sv3 is the new DsoDelegate
   [(_, dsoRules)] <- query @DsoRules dso
-  Map.keys dsoRules.members === [sv3, sv4]
+  Map.keys dsoRules.svs === [sv3, sv4]
   dsoRules.dsoDelegate === sv3
 
   -- The story continues: sv3 tries to remove sv4
@@ -257,8 +257,8 @@ testRacingMembershipRemoval = do
   result4 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv3
     action = ARC_DsoRules with
-      dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
-        member = sv4
+      dsoAction = SRARC_OffboardSv DsoRules_OffboardSv with
+        sv = sv4
     reason = Reason with url = ""; body = "they are not good for us!"
     voteRequestTimeout = Some (seconds 1) -- attempt to not give sv4 enough time to vote
   let req4 = result4.voteRequest
@@ -275,15 +275,15 @@ testRacingMembershipRemoval = do
     requestCid = req4
     amuletRulesCid = None
 
-  -- however sv4 is still here, as at least `numMembers / 2 + 1` members need to accept the offboarding
+  -- however sv4 is still here, as at least `numSvs / 2 + 1` svs need to accept the offboarding
   result.outcome === VRO_Expired
 
   -- Let's see if sv3 and sv4 can work together to also remove sv4
   result5 <- submitMulti [sv3] [dso] $ exerciseCmd dsoRulesCid DsoRules_RequestVote with
     requester = sv3
     action = ARC_DsoRules with
-      dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
-        member = sv4
+      dsoAction = SRARC_OffboardSv DsoRules_OffboardSv with
+        sv = sv4
     reason = Reason with url = ""; body = "they want to leave!"
     voteRequestTimeout = Some (days 1)
 
@@ -305,7 +305,7 @@ testRacingMembershipRemoval = do
 
   -- check the SV's are gone
   [(_, dsoRules)] <- query @DsoRules dso
-  Map.keys dsoRules.members === [sv3]
+  Map.keys dsoRules.svs === [sv3]
 
   pure ()
 
@@ -329,9 +329,9 @@ testDsoRulesConfigChange = do
   dsoRules.config === newConfig
 
 
--- | Test membership removal and GC of AmuletPriceVotes
-testOffboardMemberAndAmuletPriceVotes : Script ()
-testOffboardMemberAndAmuletPriceVotes = do
+-- | Test SV removal and GC of AmuletPriceVotes
+testOffboardSvAndAmuletPriceVotes : Script ()
+testOffboardSvAndAmuletPriceVotes = do
   (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
 
   -- check that the DsoDelegate is currently sv1
@@ -341,21 +341,21 @@ testOffboardMemberAndAmuletPriceVotes = do
   -- run the voting process to change the config and remove the current DsoDelegate 'sv1'
   initiateAndAcceptVote app [sv2, sv3, sv4] $
     ARC_DsoRules with
-      dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
-        member = sv1
+      dsoAction = SRARC_OffboardSv DsoRules_OffboardSv with
+        sv = sv1
 
   -- the voting process is only definitive after the timeout, so right now sv1 is still present
   [(_, dsoRules)] <- query @DsoRules dso
-  Map.keys (dsoRules.members) === [sv1, sv2, sv3, sv4]
+  Map.keys (dsoRules.svs) === [sv1, sv2, sv3, sv4]
 
   -- pass the default voting timeout
   passTime (dsoRules.config.voteRequestTimeout)
   executeAllDefinitiveVotes app
 
-  -- check that the member was removed and the DsoDelegate changed to sv2
+  -- check that the sv was removed and the DsoDelegate changed to sv2
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
-  Map.keys (dsoRules.members) === [sv2, sv3, sv4]
-  Map.keys (dsoRules.offboardedMembers) === [sv1]
+  Map.keys (dsoRules.svs) === [sv2, sv3, sv4]
+  Map.keys (dsoRules.offboardedSvs) === [sv1]
   dsoRules.dsoDelegate === sv2
 
   -- duplicate the AmuletPriceVote for sv2 to test duplicate removal
@@ -370,7 +370,7 @@ testOffboardMemberAndAmuletPriceVotes = do
   -- garbage collect the AmuletPriceVote of sv1
   let [(sv1VoteCid, _)] = filter (\(_, vote) -> vote.sv == sv1) amuletPriceVotes
   submitMulti [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_GarbageCollectAmuletPriceVotes with
-    nonMemberVoteCids = [sv1VoteCid]
+    nonSvVoteCids = [sv1VoteCid]
     duplicateVoteCids = [[sv2VoteCid1, sv2VoteCid2]]
 
   -- there should now be only three votes
@@ -380,7 +380,7 @@ testOffboardMemberAndAmuletPriceVotes = do
   -- one cannot archive a vote by listing it as a duplicate of its own
   let [(sv3VoteCid, _)] = filter (\(_, vote) -> vote.sv == sv3) amuletPriceVotes
   submitMultiMustFail [sv2] [dso] $ exerciseCmd dsoRulesCid DsoRules_GarbageCollectAmuletPriceVotes with
-    nonMemberVoteCids = []
+    nonSvVoteCids = []
     duplicateVoteCids = [[sv3VoteCid, sv3VoteCid]]
 
 -- | vote request contract is archived if it has expired
@@ -414,7 +414,7 @@ testVoteRequestExpire = do
   -- only sv1 voted to accept as they created the request
   result.completedAt === now
   result.offboardedVoters === []
-  result.abstainingMembers === ["sv2", "sv3", "sv4"]
+  result.abstainingSvs === ["sv2", "sv3", "sv4"]
   result.outcome === VRO_Expired
 
   return ()

@@ -5,9 +5,9 @@ import cats.implicits.catsSyntaxParallelTraverse1
 import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.splitwell.Group
 import com.daml.network.codegen.java.splice.splitwell.balanceupdatetype.Transfer
-import com.daml.network.codegen.java.splice.dsorules.{DomainUpgradeSchedule, DsoRules_AddMember}
+import com.daml.network.codegen.java.splice.dsorules.{DomainUpgradeSchedule, DsoRules_AddSv}
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddMember
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
 import com.daml.network.codegen.java.splice.wallet.payment.ReceiverCCAmount
 import com.daml.network.config.{
   CNNodeConfigTransforms,
@@ -777,7 +777,7 @@ class GlobalDomainMigrationIntegrationTest
             sw("providerSplitwellBackendLocal")
           )
 
-          sv1LocalBackend.getDsoInfo().dsoRules.payload.members.size() shouldBe 4
+          sv1LocalBackend.getDsoInfo().dsoRules.payload.svs.size() shouldBe 4
 
           clue("Old wallet balance is recorded") {
             eventually() {
@@ -809,8 +809,8 @@ class GlobalDomainMigrationIntegrationTest
             sv1LocalBackend.createVoteRequest(
               sv1Party.toProtoPrimitive,
               new ARC_DsoRules(
-                new SRARC_AddMember(
-                  new DsoRules_AddMember(
+                new SRARC_AddSv(
+                  new DsoRules_AddSv(
                     "bob",
                     "Bob",
                     SvUtil.DefaultFoundingNodeWeight,

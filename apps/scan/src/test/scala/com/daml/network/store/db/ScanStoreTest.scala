@@ -1319,7 +1319,7 @@ trait AmuletTransferUtil { self: StoreTest =>
 
   def dsoRules(
       party: PartyId,
-      members: java.util.Map[String, dsorulesCodegen.MemberInfo] = Collections.emptyMap(),
+      members: java.util.Map[String, dsorulesCodegen.SvInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
     val templateId = dsorulesCodegen.DsoRules.TEMPLATE_ID

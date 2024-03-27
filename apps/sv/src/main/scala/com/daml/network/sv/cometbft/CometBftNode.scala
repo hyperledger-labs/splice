@@ -206,7 +206,7 @@ object CometBftNode {
   def diffNetworkConfig(
       owningSvNode: String,
       signingKeyId: String,
-      targetNodeStates: Seq[daml.dso.memberstate.SvNodeState],
+      targetNodeStates: Seq[daml.dso.svstate.SvNodeState],
       currentNetworkConfig: proto.cometbft.GetNetworkConfigResponse,
       domainId: DomainId,
       logger: TracedLogger,
@@ -352,7 +352,7 @@ object CometBftNode {
     )
 
   private def memberNodeStatesToNetworkConfig(
-      memberNodeStates: Seq[daml.dso.memberstate.SvNodeState],
+      memberNodeStates: Seq[daml.dso.svstate.SvNodeState],
       domainId: DomainId,
   ): immutable.Map[String, proto.cometbft.SvNodeConfig] =
     memberNodeStates
@@ -363,7 +363,7 @@ object CometBftNode {
       )
       .toMap
   private def extractDomainNodeConfig(
-      nodeState: daml.dso.memberstate.SvNodeState,
+      nodeState: daml.dso.svstate.SvNodeState,
       domainId: DomainId,
   ) = {
     // TODO(#4901): reconcile all configured CometBFT networks
@@ -375,7 +375,7 @@ object CometBftNode {
   @SuppressWarnings(Array("org.wartremover.warts.Product"))
   private case class NetworkDiffSummary(
       actualConfig: proto.cometbft.GetNetworkConfigResponse,
-      memberNodeStates: Seq[daml.dso.memberstate.SvNodeState],
+      memberNodeStates: Seq[daml.dso.svstate.SvNodeState],
       changes: Seq[proto.cometbft.NetworkConfigChangeRequest],
       domainId: DomainId,
   ) extends PrettyPrinting {

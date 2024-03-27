@@ -2,7 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -88,8 +88,8 @@ class SvOffboardingIntegrationTest
         "SV1 create a vote request to remove sv4", {
           val action: ActionRequiringConfirmation =
             new ARC_DsoRules(
-              new SRARC_OffboardMember(
-                new DsoRules_OffboardMember(sv4Backend.getDsoInfo().svParty.toProtoPrimitive)
+              new SRARC_OffboardSv(
+                new DsoRules_OffboardSv(sv4Backend.getDsoInfo().svParty.toProtoPrimitive)
               )
             )
           sv1Backend.createVoteRequest(
@@ -118,7 +118,7 @@ class SvOffboardingIntegrationTest
       )(
         "The majority has voted but without an acceptance majority, the trigger should not remove sv4",
         _ => {
-          sv3Backend.getDsoInfo().dsoRules.payload.members should have size 4
+          sv3Backend.getDsoInfo().dsoRules.payload.svs should have size 4
         },
       )
 
@@ -129,7 +129,7 @@ class SvOffboardingIntegrationTest
       )(
         "The majority voted yet, thus the trigger should remove the dso party hosting for sv4",
         _ => {
-          sv3Backend.getDsoInfo().dsoRules.payload.members should have size 3
+          sv3Backend.getDsoInfo().dsoRules.payload.svs should have size 3
           suppressFailedClues(loggerFactory) {
             clue("Check partyToParticipant offboarding") {
               val mapping = sv3Backend.appState.participantAdminConnection
@@ -142,7 +142,7 @@ class SvOffboardingIntegrationTest
                 .svParty
                 .uid
                 .namespace
-              sv3Backend.getDsoInfo().dsoRules.payload.offboardedMembers.keySet() should contain(
+              sv3Backend.getDsoInfo().dsoRules.payload.offboardedSvs.keySet() should contain(
                 sv4Backend.getDsoInfo().svParty.toProtoPrimitive
               )
             }

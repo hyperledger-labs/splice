@@ -43,7 +43,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 import com.daml.lf.data.Numeric
 import com.daml.network.codegen.java.splice.amulet.FeaturedAppRight
 import com.daml.network.codegen.java.splice.amuletconfig.{AmuletConfig, USD}
-import com.daml.network.codegen.java.splice.dso.memberstate.{MemberRewardState, RewardState}
+import com.daml.network.codegen.java.splice.dso.svstate.{SvRewardState, RewardState}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.history.{AppRewardCreate, AmuletCreate}
 import com.daml.network.store.MultiDomainAcsStore.HasIngestionSink
@@ -352,15 +352,15 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
       ),
     )
 
-  protected def memberRewardState(
+  protected def svRewardState(
       svName: String,
       rewardState: RewardState = new RewardState(0L, 0L, new Round(0L), 0L),
       contractId: String = nextCid(),
-  ): Contract[MemberRewardState.ContractId, MemberRewardState] =
+  ): Contract[SvRewardState.ContractId, SvRewardState] =
     contract(
-      identifier = MemberRewardState.TEMPLATE_ID,
-      contractId = new MemberRewardState.ContractId(contractId),
-      payload = new MemberRewardState(
+      identifier = SvRewardState.TEMPLATE_ID,
+      contractId = new SvRewardState.ContractId(contractId),
+      payload = new SvRewardState(
         dsoParty.toProtoPrimitive,
         svName,
         rewardState,

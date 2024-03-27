@@ -163,7 +163,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
             pure $ [InputAmulet ccsum.amulet]
           else
             pure inputs
-      -- purchase extra traffic for given member
+      -- purchase extra traffic for sequencer member
       result <- exercise amuletRulesCid
         (AmuletRules_BuyMemberTraffic newInputs context.context execContext.validator memberId domainId migrationId trafficAmount)
       pure (result.purchasedTraffic, result.senderChangeAmulet)

@@ -2,9 +2,9 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
 import com.daml.network.codegen.java.splice
-import com.daml.network.codegen.java.splice.dsorules.DsoRules_OffboardMember
+import com.daml.network.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import com.daml.network.integration.tests.CNNodeTests.BracketSynchronous.bracket
 import com.daml.network.sv.automation.leaderbased.CloseVoteRequestWithEarlyClosingTrigger
 import com.daml.network.sv.util.SvUtil
@@ -37,7 +37,7 @@ class DsoElectionTimeBasedIntegrationTest
             .filterJava(splice.dsorules.DsoRules.COMPANION)(dsoParty)
             .head
             .data
-        dsoRulesBeforeElection.members should have size 4
+        dsoRulesBeforeElection.svs should have size 4
       }
 
       val pollingIntervalDuration = sv2Backend.config.automation.pollingInterval.asJava
@@ -74,8 +74,8 @@ class DsoElectionTimeBasedIntegrationTest
           )
           .value
         val removeAction = new ARC_DsoRules(
-          new SRARC_OffboardMember(
-            new DsoRules_OffboardMember(
+          new SRARC_OffboardSv(
+            new DsoRules_OffboardSv(
               currentLeader
             )
           )
@@ -154,7 +154,7 @@ class DsoElectionTimeBasedIntegrationTest
           .filterJava(splice.dsorules.DsoRules.COMPANION)(dsoParty)
           .head
           .data
-      dsoRulesBeforeElection.members should have size 4
+      dsoRulesBeforeElection.svs should have size 4
       dsoRulesBeforeElection
     }
 

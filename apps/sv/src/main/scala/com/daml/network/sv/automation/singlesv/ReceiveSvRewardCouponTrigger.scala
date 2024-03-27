@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   TaskSuccess,
   TriggerContext,
 }
-import com.daml.network.codegen.java.splice.dso.memberstate.MemberRewardState
+import com.daml.network.codegen.java.splice.dso.svstate.SvRewardState
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.CNLedgerConnection
@@ -49,10 +49,10 @@ class ReceiveSvRewardCouponTrigger(
     for {
       // Note that the DsoRules will be different for every task, so we have to return them one-by-one.
       dsoRules <- OptionT.liftF(store.getDsoRules())
-      memberInfo <- OptionT.fromOption[Future](
-        Option(dsoRules.payload.members.get(svParty.toProtoPrimitive))
+      svInfo <- OptionT.fromOption[Future](
+        Option(dsoRules.payload.svs.get(svParty.toProtoPrimitive))
       )
-      rewardState <- OptionT(store.lookupMemberRewardState(memberInfo.name))
+      rewardState <- OptionT(store.lookupSvRewardState(svInfo.name))
       openRounds <- OptionT.liftF(store.getOpenMiningRoundTriple())
       lastReceivedForOpt = memberLastReceivedFor(rewardState.payload)
       firstOpenNotClaimed <- OptionT.fromOption[Future](
@@ -65,13 +65,13 @@ class ReceiveSvRewardCouponTrigger(
       )
     } yield ReceiveSvRewardCouponTrigger.Task(
       dsoRules,
-      memberInfo.svRewardWeight,
+      svInfo.svRewardWeight,
       rewardState,
       firstOpenNotClaimed,
     )
   }
 
-  private def memberLastReceivedFor(rewardState: MemberRewardState): Option[Long] = {
+  private def memberLastReceivedFor(rewardState: SvRewardState): Option[Long] = {
     // -1 is the value set in DsoRules_ConfirmSvOnboarding for new SVs
     Option(rewardState.state.lastRoundCollected.number.longValue()).filter(_ > -1)
   }
@@ -138,7 +138,7 @@ object ReceiveSvRewardCouponTrigger {
   case class Task(
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules],
       svRewardWeight: Long,
-      rewardState: AssignedContract[MemberRewardState.ContractId, MemberRewardState],
+      rewardState: AssignedContract[SvRewardState.ContractId, SvRewardState],
       round: OpenMiningRoundContract,
   ) extends PrettyPrinting {
     import com.daml.network.util.PrettyInstances.*

@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsRules}
 import com.daml.network.codegen.java.splice.globaldomain.MemberTraffic
 import com.daml.network.codegen.java.splice.validatorlicense.ValidatorLicense
-import com.daml.network.codegen.java.splice.dso.memberstate.SvNodeState
+import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.environment.RetryProvider
 import com.daml.network.migration.DomainMigrationInfo

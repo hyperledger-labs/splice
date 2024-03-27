@@ -130,7 +130,7 @@ export const dsoInfo: GetDsoInfoResponse = {
           },
         ],
       ],
-      offboardedMembers: [],
+      offboardedSvs: [],
       config: {
         svOnboardingRequestTimeout: {
           microseconds: '3600000000',
@@ -180,7 +180,7 @@ export const dsoInfo: GetDsoInfoResponse = {
       dsoDelegate:
         'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
       isDevNet: true,
-      members: [
+      svs: [
         [
           'Digital-Asset-2::1220ed548efbcc22bb5097bd5a98303d1d64ab519f9568cdc1676ef1630da1fa6832',
           {

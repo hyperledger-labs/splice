@@ -1,8 +1,8 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.splice.dsorules.DsoRules_OffboardMember
+import com.daml.network.codegen.java.splice.dsorules.DsoRules_OffboardSv
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import com.daml.network.config.CNNodeConfigTransforms.bumpUrl
 import com.daml.network.config.{CNNodeConfigTransforms, NetworkAppClientConfig}
 import com.daml.network.environment.CNNodeEnvironmentImpl
@@ -116,7 +116,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .getDsoInfo()
               .dsoRules
               .payload
-              .members
+              .svs
               .keySet() should contain theSameElementsAs Seq(sv1Backend, sv2Backend).map(
               _.getDsoInfo().svParty.toProtoPrimitive
             )
@@ -127,8 +127,8 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
           sv2Backend.createVoteRequest(
             sv2Backend.getDsoInfo().svParty.toProtoPrimitive,
             new ARC_DsoRules(
-              new SRARC_OffboardMember(
-                new DsoRules_OffboardMember(sv1Backend.getDsoInfo().svParty.toProtoPrimitive)
+              new SRARC_OffboardSv(
+                new DsoRules_OffboardSv(sv1Backend.getDsoInfo().svParty.toProtoPrimitive)
               )
             ),
             "url",
@@ -151,7 +151,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .getDsoInfo()
               .dsoRules
               .payload
-              .members
+              .svs
               .keySet() should contain theSameElementsAs Seq(
               sv2Backend
             ).map(_.getDsoInfo().svParty.toProtoPrimitive)
@@ -187,7 +187,7 @@ class SvOnboardingViaNonFoundingSvIntegrationTest
               .getDsoInfo()
               .dsoRules
               .payload
-              .members
+              .svs
               .keySet() should contain theSameElementsAs Seq(sv2Backend, sv3Backend).map(
               _.getDsoInfo().svParty.toProtoPrimitive
             )

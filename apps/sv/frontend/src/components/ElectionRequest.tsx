@@ -45,7 +45,7 @@ const ElectionRequests: React.FC = () => {
   const electionContextQuery = useElectionContext();
 
   const cs: User[] = [];
-  dsoInfosQuery.data?.dsoRules.payload.members.forEach((_v, a) =>
+  dsoInfosQuery.data?.dsoRules.payload.svs.forEach((_v, a) =>
     cs.push({ id: cs.length + 1, name: a })
   );
 

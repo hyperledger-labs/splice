@@ -149,7 +149,7 @@ class SvOnboardingPromoteParticipantToSubmitterTrigger(
   private def getDsoMemberParticipants(
       dsoRules: AssignedContract[DsoRules.ContractId, DsoRules]
   )(implicit tc: TraceContext) = {
-    val dsoMembers = dsoRules.contract.payload.members
+    val dsoMembers = dsoRules.contract.payload.svs
       .keySet()
       .asScala
       .map(PartyId.tryFromProtoPrimitive)

@@ -47,7 +47,7 @@ object CNThresholds {
   def requiredNumVotes(
       dsoRules: Contract.Has[DsoRules.ContractId, DsoRules]
   ): Int = {
-    val memberNum = dsoRules.payload.members.size
+    val memberNum = dsoRules.payload.svs.size
     governanceThreshold(memberNum).value
   }
 

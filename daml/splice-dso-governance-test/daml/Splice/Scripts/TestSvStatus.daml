@@ -8,7 +8,7 @@ import Daml.Script
 import Splice.Types
 import Splice.Scripts.DsoTestUtils
 import Splice.DsoRules
-import Splice.DSO.MemberState
+import Splice.DSO.SvState
 
 
 -- test status report submission, as status report invariants are tested

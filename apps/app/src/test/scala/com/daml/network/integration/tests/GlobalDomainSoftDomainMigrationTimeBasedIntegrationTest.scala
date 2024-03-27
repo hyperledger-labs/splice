@@ -210,8 +210,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
         sv1Backend.createVoteRequest(
           sv1Party.toProtoPrimitive,
           new dsorules.actionrequiringconfirmation.ARC_DsoRules(
-            new dsorules.dsorules_actionrequiringconfirmation.SRARC_AddMember(
-              new dsorules.DsoRules_AddMember(
+            new dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv(
+              new dsorules.DsoRules_AddSv(
                 "alice",
                 "Alice",
                 SvUtil.DefaultFoundingNodeWeight,
@@ -249,8 +249,8 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           dsoRulesCid.exerciseDsoRules_ConfirmAction(
             sv1Party.toProtoPrimitive,
             new dsorules.actionrequiringconfirmation.ARC_DsoRules(
-              new dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember(
-                new dsorules.DsoRules_OffboardMember("nonsense")
+              new dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv(
+                new dsorules.DsoRules_OffboardSv("nonsense")
               )
             ),
           )
@@ -461,7 +461,7 @@ class GlobalDomainSoftDomainMigrationTimeBasedIntegrationTest
           sv1Party.toProtoPrimitive,
           sv1Party.toProtoPrimitive,
           dummyRound,
-          dsoRules.payload.members.get(sv1Party.toProtoPrimitive).svRewardWeight,
+          dsoRules.payload.svs.get(sv1Party.toProtoPrimitive).svRewardWeight,
         )
       )
 

@@ -29,8 +29,8 @@ import com.daml.network.codegen.java.splice.dsorules.ansentrycontext_actionrequi
 import com.daml.network.codegen.java.splice.dsorules.amuletrules_actionrequiringconfirmation.CRARC_MiningRound_Archive
 import com.daml.network.codegen.java.splice.dsorules.electionrequestreason.ERR_OtherReason
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.{
-  SRARC_AddMember,
-  SRARC_OffboardMember,
+  SRARC_AddSv,
+  SRARC_OffboardSv,
 }
 import com.daml.network.codegen.java.splice.dsorules.voterequestoutcome.VRO_Accepted
 import com.daml.network.codegen.java.splice.svonboarding.{
@@ -749,7 +749,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         val goodDsoRules = dsoRules(
           members = (1 to 3)
             .map { n =>
-              userParty(n).toProtoPrimitive -> memberInfo(n.toString)
+              userParty(n).toProtoPrimitive -> svInfo(n.toString)
             }
             .toMap
             .asJava,
@@ -846,8 +846,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
 
         val leaderContract = dsoRules()
         val followerContract1 = amuletRules()
-        val followerContract2 = memberRewardState("sv1")
-        val alreadyReassigned = memberRewardState("sv2")
+        val followerContract2 = svRewardState("sv1")
+        val alreadyReassigned = svRewardState("sv2")
         for {
           store <- mkStore()
           _ <- dummyDomain.create(leaderContract)(store.multiDomainAcsStore)
@@ -971,8 +971,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
   }
 
   lazy val addUser666Action = new ARC_DsoRules(
-    new SRARC_AddMember(
-      new DsoRules_AddMember(
+    new SRARC_AddSv(
+      new DsoRules_AddSv(
         userParty(666).toProtoPrimitive,
         "user666",
         SvUtil.DefaultFoundingNodeWeight,
@@ -983,8 +983,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
   )
 
   lazy val addUser667Action = new ARC_DsoRules(
-    new SRARC_AddMember(
-      new DsoRules_AddMember(
+    new SRARC_AddSv(
+      new DsoRules_AddSv(
         userParty(667).toProtoPrimitive,
         "user667",
         SvUtil.DefaultFoundingNodeWeight,
@@ -995,7 +995,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
   )
 
   lazy val removeUserAction = new ARC_DsoRules(
-    new SRARC_OffboardMember(new DsoRules_OffboardMember(userParty(666).toProtoPrimitive))
+    new SRARC_OffboardSv(new DsoRules_OffboardSv(userParty(666).toProtoPrimitive))
   )
 
   private def ansEntryContextPaymentAction(
@@ -1061,7 +1061,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
   }
 
   def dsoRules(
-      members: java.util.Map[String, MemberInfo] = Collections.emptyMap(),
+      members: java.util.Map[String, SvInfo] = Collections.emptyMap(),
       epoch: Long = 123,
   ) = {
     val newDomainId = "new-domain-id"
@@ -1095,8 +1095,8 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
     )
   }
 
-  private def memberInfo(name: String) = {
-    new MemberInfo(
+  private def svInfo(name: String) = {
+    new SvInfo(
       name,
       new Round(1L),
       789L,
@@ -1325,7 +1325,7 @@ class DbSvDsoStoreTest
       } yield {
         store
           .listVoteRequestResults(
-            Some("AddMember"),
+            Some("AddSv"),
             Some(true),
             None,
             None,
@@ -1337,7 +1337,7 @@ class DbSvDsoStoreTest
           .loneElement shouldBe result
         store
           .listVoteRequestResults(
-            Some("SRARC_AddMember"),
+            Some("SRARC_AddSv"),
             Some(false),
             None,
             None,

@@ -1053,7 +1053,7 @@ object SvApp {
       party: PartyId,
       dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   ): Boolean =
-    dsoRules.payload.members.asScala
+    dsoRules.payload.svs.asScala
       .get(party.toProtoPrimitive)
       .exists(_.name == name)
 
@@ -1093,7 +1093,7 @@ object SvApp {
   private[sv] def isDsoMemberParty(
       party: PartyId,
       dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
-  ): Boolean = dsoRules.payload.members.containsKey(party.toProtoPrimitive)
+  ): Boolean = dsoRules.payload.svs.containsKey(party.toProtoPrimitive)
 
   private[sv] def isDsoMemberName(
       name: String,
@@ -1104,8 +1104,8 @@ object SvApp {
       name: String,
       dsoRules: Contract.Has[splice.dsorules.DsoRules.ContractId, splice.dsorules.DsoRules],
   ): Option[String] = {
-    dsoRules.payload.members.asScala.collectFirst {
-      case (partyId, memberInfo) if memberInfo.name == name => partyId
+    dsoRules.payload.svs.asScala.collectFirst {
+      case (partyId, svInfo) if svInfo.name == name => partyId
     }
   }
 

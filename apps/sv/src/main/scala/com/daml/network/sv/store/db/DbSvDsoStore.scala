@@ -16,8 +16,8 @@ import com.daml.network.codegen.java.splice.validatorlicense.{
 }
 import com.daml.network.codegen.java.splice.ans.{AnsEntry, AnsEntryContext}
 import com.daml.network.codegen.java.splice.dso.amuletprice.AmuletPriceVote
-import com.daml.network.codegen.java.splice.dso.memberstate.{MemberRewardState, SvNodeState}
-import com.daml.network.codegen.java.splice.dso.memberstate.SvStatusReport
+import com.daml.network.codegen.java.splice.dso.svstate.{SvRewardState, SvNodeState}
+import com.daml.network.codegen.java.splice.dso.svstate.SvStatusReport
 import com.daml.network.codegen.java.splice.dsorules.*
 import com.daml.network.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,
@@ -656,7 +656,7 @@ class DbSvDsoStore(
   ): Future[Seq[Contract[SvOnboardingRequest.ContractId, SvOnboardingRequest]]] =
     waitUntilAcsIngested {
       import scala.jdk.CollectionConverters.*
-      val svCandidates = dsoRules.payload.members.asScala
+      val svCandidates = dsoRules.payload.svs.asScala
         .map { case (party, member) =>
           sql"(${lengthLimited(party)}, ${lengthLimited(member.name)})"
         }
@@ -745,7 +745,7 @@ class DbSvDsoStore(
     for {
       dsoRules <- getDsoRules()
       voterParties = inClause(
-        dsoRules.payload.members.asScala
+        dsoRules.payload.svs.asScala
           .map { case (party, _) =>
             lengthLimited(party)
           }
@@ -1028,7 +1028,7 @@ class DbSvDsoStore(
       tc: TraceContext
   ): Future[Seq[Contract[ElectionRequest.ContractId, ElectionRequest]]] = waitUntilAcsIngested {
     import scala.jdk.CollectionConverters.*
-    val requesters = inClause(dsoRules.payload.members.keySet().asScala.map(lengthLimited))
+    val requesters = inClause(dsoRules.payload.svs.keySet().asScala.map(lengthLimited))
     val electionRequestEpoch = dsoRules.payload.epoch.longValue()
     for {
       result <- storage
@@ -1282,10 +1282,10 @@ class DbSvDsoStore(
   ): Future[Option[AssignedContract[SvStatusReport.ContractId, SvStatusReport]]] =
     lookupContractBySvParty(SvStatusReport.COMPANION, svPartyId)
 
-  override def lookupMemberRewardState(svName: String)(implicit
+  override def lookupSvRewardState(svName: String)(implicit
       tc: TraceContext
-  ): Future[Option[AssignedContract[MemberRewardState.ContractId, MemberRewardState]]] =
-    lookupContractBySvName(MemberRewardState.COMPANION, svName)
+  ): Future[Option[AssignedContract[SvRewardState.ContractId, SvRewardState]]] =
+    lookupContractBySvName(SvRewardState.COMPANION, svName)
 
   private def lookupContractBySvParty[C, TCId <: ContractId[_], T](
       companion: C,

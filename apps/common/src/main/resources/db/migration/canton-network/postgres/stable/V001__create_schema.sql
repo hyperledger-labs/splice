@@ -678,7 +678,7 @@ create table dso_acs_store
     sv_party text,
 
     -- generic by-sv-name field for templates with one instance per svName
-    -- templates: MemberRewardState
+    -- templates: SvRewardState
     --
     -- Note: no index as the template_id_qualified_name index should be sufficient.
     sv_name text

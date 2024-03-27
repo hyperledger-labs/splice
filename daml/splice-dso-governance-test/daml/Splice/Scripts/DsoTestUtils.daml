@@ -26,7 +26,7 @@ import Splice.DsoRules
 import Splice.DsoBootstrap
 import Splice.DSO.AmuletPrice
 import Splice.DSO.GlobalDomain
-import Splice.DSO.MemberState
+import Splice.DSO.SvState
 import Splice.Scripts.AnsRulesParameters
 
 -- | Multiplier for the SV weights, which are recorded in basis-points, i.e., 1/10000ths
@@ -118,11 +118,11 @@ initDSO isDevNet = do
       sponsor = sv1
       validator = svParty
     (_, earliestOpenRound) <- head <$> getOpenRoundsSorted app
-    submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddMember with
-      newMemberParty = svParty
-      newMemberName = svName
-      newMemberRewardWeight = 3 * bpsMultiplier -- Simulate the new nodes being Tier 2 SV nodes
-      newMemberParticipantId = svName <> "-participant-id"
+    submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv with
+      newSvParty = svParty
+      newSvName = svName
+      newSvRewardWeight = 3 * bpsMultiplier -- Simulate the new nodes being Tier 2 SV nodes
+      newSvParticipantId = svName <> "-participant-id"
       joinedAsOfRound = earliestOpenRound.round
 
   -- check that the SvStatusReports are present
@@ -131,11 +131,11 @@ initDSO isDevNet = do
   pure (app, dso, (sv1, sv2, sv3, sv4))
 
 
-getMemberInfoByParty : AmuletApp -> Party -> Script MemberInfo
-getMemberInfoByParty app sv = do
+getSvInfoByParty : AmuletApp -> Party -> Script SvInfo
+getSvInfoByParty app sv = do
   [(_, rules)] <- query @DsoRules app.dso
-  case Map.lookup sv rules.members of
-    None -> fail $ "Not a member: " <> show sv
+  case Map.lookup sv rules.svs of
+    None -> fail $ "Not a sv: " <> show sv
     Some info -> pure info
 
 generateUnclaimedReward : AmuletApp -> AmuletUser -> Script ()
@@ -256,15 +256,15 @@ confirmAWC_MiningRound_Archive app = do
   rounds <- query @ClosedMiningRound app.dso
   -- confirm the archival of all closed rounds
   forA_ rounds $ \round ->
-    forA_ (Map.keys rules.members) $ \member -> do
+    forA_ (Map.keys rules.svs) $ \sv -> do
       -- mallory does not act
-      unless ("mallory" `T.isPrefixOf` partyToText member) $ do
-        submitMulti [member] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
+      unless ("mallory" `T.isPrefixOf` partyToText sv) $ do
+        submitMulti [sv] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_ConfirmAction with
           action = ARC_AmuletRules with
             amuletRulesAction = CRARC_MiningRound_Archive $
               AmuletRules_MiningRound_Archive with
                 closedRoundCid = round._1
-          confirmer = member
+          confirmer = sv
         pure ()
 
 executeAllConfirmedActions : AmuletApp -> Script ()
@@ -295,9 +295,9 @@ executeAllDefinitiveVotes app = do
   now <- getTime
   requests <- query @VoteRequest app.dso
   forA_ requests $ \(requestCid, request) -> do
-    let activeMembers = Set.fromList $ map (.name) $ Map.values rules.members
+    let activeSvs = Set.fromList $ map (.name) $ Map.values rules.svs
     let execute = request.voteBefore <= now ||
-          (activeMembers == Set.fromList (Map.keys request.votes))
+          (activeSvs == Set.fromList (Map.keys request.votes))
     when execute $ do
       void $ submitMulti [s.dsoDelegate] [app.dso] $ exerciseCmd dsoRulesCid DsoRules_CloseVoteRequest with
         requestCid
@@ -337,13 +337,13 @@ updateAgreedAmuletPrice dso amuletPrice = do
         submit dso $ createCmd $ vote with amuletPrice = Some amuletPrice
 
 
--- | Check that there's exactly one status report per SV member both off-boarded and onboarded.
+-- | Check that there's exactly one status report per SV both off-boarded and onboarded.
 checkSvStatusReports : AmuletApp -> Script ()
 checkSvStatusReports app = do
   [(_, dsoRules)] <- query @DsoRules app.dso
-  let memberParties = Map.keys dsoRules.members
-  let offboardedParties = Map.keys dsoRules.offboardedMembers
-  let expectedSvParties = Set.fromList $ memberParties ++ offboardedParties
+  let svParties = Map.keys dsoRules.svs
+  let offboardedParties = Map.keys dsoRules.offboardedSvs
+  let expectedSvParties = Set.fromList $ svParties ++ offboardedParties
   reports <- query @SvStatusReport app.dso
   let reportingParties = Set.fromList $ [ report.sv | (_, report) <- reports ]
   reportingParties === expectedSvParties

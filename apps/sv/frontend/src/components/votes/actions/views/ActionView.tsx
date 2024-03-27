@@ -39,13 +39,13 @@ const ActionView: React.FC<{ action: ActionRequiringConfirmation }> = ({ action 
   if (action.tag === 'ARC_DsoRules') {
     const dsoAction = action.value.dsoAction;
     switch (dsoAction.tag) {
-      case 'SRARC_OffboardMember': {
+      case 'SRARC_OffboardSv': {
         return (
           <ActionValueTable
             actionType={actionType}
             actionName={dsoAction.tag}
             valuesMap={{
-              Member: <PartyId partyId={dsoAction.value.member} />,
+              Member: <PartyId partyId={dsoAction.value.sv} />,
             }}
           />
         );

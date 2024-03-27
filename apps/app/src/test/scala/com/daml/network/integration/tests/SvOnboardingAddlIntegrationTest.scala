@@ -49,7 +49,7 @@ class SvOnboardingAddlIntegrationTest
         sv2ValidatorBackend,
         sv3ValidatorBackend,
       )
-      sv1Backend.getDsoInfo().dsoRules.payload.members should have size 3
+      sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 3
     }
     clue("Stop SV2 so that SV4 can't gather enough confirmations just yet") {
       sv2Backend.stop()
@@ -123,7 +123,7 @@ class SvOnboardingAddlIntegrationTest
             case a: ARC_DsoRules =>
               a.dsoAction match {
                 case confirm: SRARC_ConfirmSvOnboarding =>
-                  confirm.dsoRules_ConfirmSvOnboardingValue.newMemberName == getSvName(4)
+                  confirm.dsoRules_ConfirmSvOnboardingValue.newSvName == getSvName(4)
                 case _ => false
               }
             case _ => false
@@ -133,7 +133,7 @@ class SvOnboardingAddlIntegrationTest
         .getDsoInfo()
         .dsoRules
         .payload
-        .members
+        .svs
         .keySet should not contain sv4Party.toProtoPrimitive
     }
     clue("SV4's onboarding status is reported correctly.") {
@@ -155,7 +155,7 @@ class SvOnboardingAddlIntegrationTest
       { _ =>
         sv1Backend.participantClientWithAdminToken.ledger_api_extensions.acs
           .filterJava(splice.svonboarding.SvOnboardingRequest.COMPANION)(dsoParty) shouldBe empty
-        sv1Backend.getDsoInfo().dsoRules.payload.members.keySet should contain(
+        sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet should contain(
           sv4Party.toProtoPrimitive
         )
       },
@@ -225,7 +225,7 @@ class SvOnboardingAddlIntegrationTest
       // only 1 SV => slightly faster test
       clue("Initialize DSO with 1 SV") {
         startAllSync(sv1ScanBackend, sv1Backend)
-        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 1
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 1
       }
       // SV two’s party hasn't been allocated at this point because the SV app isn't running so we allocate it here.
       val (sv2Party, _) = actAndCheck(
@@ -292,7 +292,7 @@ class SvOnboardingAddlIntegrationTest
           sv1ValidatorBackend,
           sv2ValidatorBackend,
         )
-        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 2
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
       }
 
       val currentLeader = sv1Backend.getDsoInfo().svParty.toProtoPrimitive
@@ -317,7 +317,7 @@ class SvOnboardingAddlIntegrationTest
           sv3Backend,
           sv3ValidatorBackend,
         )
-        sv1Backend.getDsoInfo().dsoRules.payload.members should have size 3
+        sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 3
         sv1Backend.getDsoInfo().dsoRules.payload.epoch shouldBe 0
       }
 
@@ -352,7 +352,7 @@ class SvOnboardingAddlIntegrationTest
         sv1Backend,
         sv1ValidatorBackend,
       )
-      sv1Backend.getDsoInfo().dsoRules.payload.members should have size 1
+      sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 1
 
       val sv1UserId = sv1WalletClient.config.ledgerApiUser
       val sv1UserParty = onboardWalletUser(sv1WalletClient, sv1ValidatorBackend)
@@ -392,7 +392,7 @@ class SvOnboardingAddlIntegrationTest
         sv2Backend,
         sv2ValidatorBackend,
       )
-      sv1Backend.getDsoInfo().dsoRules.payload.members should have size 2
+      sv1Backend.getDsoInfo().dsoRules.payload.svs should have size 2
 
       inside(
         sv1Backend.participantClientWithAdminToken.topology.party_to_participant_mappings.list(

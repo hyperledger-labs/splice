@@ -59,7 +59,7 @@ const GeneralInformationView: React.FC = () => {
   if (!resp.isLoading) {
     const data = resp.data!;
     let cs: { key: string; value: string }[] = [];
-    data.dsoRules.payload.members.forEach((value, key) => cs.push(createRow(key, value.name)));
+    data.dsoRules.payload.svs.forEach((value, key) => cs.push(createRow(key, value.name)));
     const svInfos = [
       createRow('svUser', data.svUser),
       createRow('svPartyId', data.svPartyId, true),

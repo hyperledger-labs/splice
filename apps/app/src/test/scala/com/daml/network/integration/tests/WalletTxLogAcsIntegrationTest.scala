@@ -56,7 +56,7 @@ class WalletTxLogAcsIntegrationTest
       }
 
       // Note: this test uses an SV party, as it's easier to create
-      // amulets for parties hosted on a SV participant.
+      // amulets for parties hosted on an SV participant.
       val sv1UserParty = sv1Backend.getDsoInfo().svParty
 
       clue("SV1 has no amulets initially") {

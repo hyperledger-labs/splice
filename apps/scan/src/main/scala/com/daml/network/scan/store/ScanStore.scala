@@ -98,11 +98,11 @@ trait ScanStore
     * so that the order is deterministic.
     */
   def listFromSvNodeStates[T](
-      f: splice.dso.memberstate.SvNodeState => Vector[(String, T)]
+      f: splice.dso.svstate.SvNodeState => Vector[(String, T)]
   )(implicit tc: TraceContext): Future[Vector[(String, Vector[T])]] = {
     for {
       dsoRules <- getDsoRules()
-      nodeStates <- Future.traverse(dsoRules.payload.members.asScala.keys) { svPartyId =>
+      nodeStates <- Future.traverse(dsoRules.payload.svs.asScala.keys) { svPartyId =>
         getSvNodeState(PartyId.tryFromProtoPrimitive(svPartyId))
       }
     } yield {
@@ -257,8 +257,8 @@ trait ScanStore
       tc: TraceContext
   ): Future[Option[
     AssignedContract[
-      splice.dso.memberstate.SvNodeState.ContractId,
-      splice.dso.memberstate.SvNodeState,
+      splice.dso.svstate.SvNodeState.ContractId,
+      splice.dso.svstate.SvNodeState,
     ]
   ]]
 
@@ -266,8 +266,8 @@ trait ScanStore
       tc: TraceContext
   ): Future[
     AssignedContract[
-      splice.dso.memberstate.SvNodeState.ContractId,
-      splice.dso.memberstate.SvNodeState,
+      splice.dso.svstate.SvNodeState.ContractId,
+      splice.dso.svstate.SvNodeState,
     ]
   ] =
     lookupSvNodeState(svPartyId).map(
@@ -425,7 +425,7 @@ object ScanStore {
               validatorLicenseRoundsCollected = Some(roundsCollected.orElse(0L)),
             )
         },
-        mkFilter(splice.dso.memberstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) {
+        mkFilter(splice.dso.svstate.SvNodeState.COMPANION)(co => co.payload.dso == dso) {
           contract =>
             ScanAcsStoreRowData(
               contract,

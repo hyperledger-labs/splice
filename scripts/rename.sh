@@ -172,6 +172,13 @@ NO_FRONTEND=$(exclude_all "${frontend_files[@]}")
 NO_API=$(exclude_all "${api_files[@]}")
 
 
+function simple_rename() {
+  local pattern=$1
+  local extra_args=${2:-""}
+
+  run_and_commit "rename: $pattern" "gsr -f $extra_args $NO_PROTECTED $NO_LOCKS $NO_CANTON '$pattern'"
+}
+
 function rename() {
   local description=$1
   local pattern=$2
@@ -447,6 +454,72 @@ function subcmd_cc_app_and_user() {
     ""
 }
 
+## Dso Member
+
+
+subcommand_whitelist[dso_member]='Rename: DSO member usages to SV'
+
+function subcmd_dso_member() {
+  assert_clean_working_dir
+
+  # Ignore files with unrelated mentions of 'member'
+  local ignore_unrelated=" \
+    -e '*/splitwell/*' \
+    -e '*/splitwell-test/*' \
+    -e '**/AppUpgradeIntegrationTest.scala' \
+    -e '**/Wallet/TopUpState.daml' \
+    -e '**/Wallet/BuyTrafficRequest.daml' \
+    -e '**/Wallet/Install.daml'"
+  local daml_only="-i 'daml/**' $ignore_unrelated"
+
+  # Rename instances of 'Member' that are not related to 'Traffic'
+  simple_rename "\bMemberState\b///SvState" "$ignore_unrelated"
+  simple_rename "\bmemberstate\b///svstate" "$ignore_unrelated"
+  simple_rename "MemberRewardState///SvRewardState" "$ignore_unrelated"
+  simple_rename "\bForMember\b///ForSv" "$ignore_unrelated"
+  simple_rename "MemberInfo///SvInfo" "$ignore_unrelated"
+  simple_rename "\bOffboardedMemberInfo\b///OffboardedSvInfo" "$ignore_unrelated"
+  simple_rename "AddMember///AddSv" "$ignore_unrelated"
+  simple_rename "OffboardMember///OffboardSv" "$ignore_unrelated"
+  simple_rename "_AddConfirmedMember///_AddConfirmedSv" "$ignore_unrelated"
+  simple_rename "(?<=offboarded|abstaining)Members///Svs" "$ignore_unrelated"
+  simple_rename "(?<=(new|per|num|Per|add|non))Member(?!.*affic)///Sv" "$ignore_unrelated"
+  simple_rename "(?<=\bmaybe)Member///Sv" "$ignore_unrelated"
+  simple_rename "(?<=\bactive)Member///Sv" "$ignore_unrelated"
+  simple_rename "member(?=(Reward|Info))///sv" "$ignore_unrelated"
+
+  # Targeted fixups
+  simple_rename "DSO member///SV" "$ignore_unrelated"
+  simple_rename "SV member///SV" "$ignore_unrelated"
+  simple_rename "collective member///SV" "$ignore_unrelated"
+
+  simple_rename "Membership///Sv" "$daml_only"
+  simple_rename "SvMember///Sv" "$daml_only"
+  simple_rename "membership///SV" "$daml_only"
+
+  # A hard one: members field of DsoRules
+  simple_rename "members///svs" "$daml_only"
+
+  simple_rename "members(?=(Map[.]Map| &&| of| =))$///svs" "-i 'daml/splice-dso-governance/**' $ignore_unrelated"
+  simple_rename "(?<=[.])members\b///svs" "-i 'daml/**' $ignore_unrelated"
+  simple_rename "(?<=payload[.])members///svs" "$ignore_unrelated"
+  simple_rename "payload\n\s*\.members///payload.svs" "$ignore_unrelated"
+  simple_rename "dsoRulesBeforeElection.members///dsoRulesBeforeElection.svs" "$ignore_unrelated"
+
+  # Another hard one: remaining usages of 'member'
+  simple_rename "(?<!(Map|Set)[.])member(?!(.*affic|Id))///sv" "$daml_only"
+
+  simple_rename "members: \\[///svs: [" "$ignore_unrelated"
+  simple_rename "{ member: member }///{ sv: member }" "$ignore_unrelated"
+  simple_rename "dsoAction.value.member///dsoAction.value.sv" "$ignore_unrelated"
+  simple_rename "OffboardSvValue.member///OffboardSvValue.sv" "$ignore_unrelated"
+
+  # Second round of fixups
+  simple_rename "Member(?!.*affic)///SV" "$daml_only"
+  simple_rename "\ba SV\b///an SV" "$ignore_unrelated"
+}
+
+
 subcommand_whitelist[cc_module_splice]='Rename: CC Module prefix to Splice'
 function subcmd_cc_module_splice() {
   assert_clean_working_dir
@@ -616,15 +689,24 @@ function subcmd_all_packages() {
 
 subcommand_whitelist[no_illegal_daml_references]='Check for illegal daml references'
 function subcmd_no_illegal_daml_references() {
-    illegal_words=(currency founder founding leader collective consortium svc coin)
-    for word in "${illegal_words[@]}"; do
-        echo "Checking for occurences of $word"
-        if rg -i "$word" daml/; then
-            echo "$word occurs in Daml code, remove all references"
+    local illegal_patterns=(
+      '[cC]urrency'
+      '[fF]ounder'
+      '[fF]ounding'
+      '[lL]eader'
+      '[cC]ollective'
+      '[cC]onsortium'
+      '[sS]vc'
+      '[cC]oin'
+      '(?<!(Map|Set)[.])(?<!sequencer )member(?!(Id|.*[tT]raffic))'
+      )
+    for pattern in "${illegal_patterns[@]}"; do
+        echo "Checking for occurences of $pattern"
+        if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*'; then
+            echo "$pattern occurs in Daml code (other than splitwell), remove all references"
             exit 1
         fi
     done
-
 }
 
 ################################

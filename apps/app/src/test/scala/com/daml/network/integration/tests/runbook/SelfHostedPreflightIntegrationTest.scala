@@ -56,7 +56,7 @@ class SelfHostedPreflightIntegrationTest
         CNNodeConfigTransforms.withPauseSvDomainComponentsOffboardingTriggers()(config)
       )
       .addConfigTransforms((_, conf) => CNNodeConfigTransforms.bumpCantonPortsBy(1000)(conf))
-      // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
+      // Obtain a fresh onboarding secret from an SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
       .addConfigTransform((_, conf) => domainMigrationCNNodeConfigTransforms(conf))
       .withManualStart

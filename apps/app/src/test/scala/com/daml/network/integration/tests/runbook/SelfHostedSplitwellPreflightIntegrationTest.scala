@@ -70,7 +70,7 @@ class SelfHostedSplitwellPreflightIntegrationTest
       .addConfigTransforms((_, conf) =>
         CNNodeConfigTransforms.bumpRemoteSplitwellPortsBy(2000)(conf)
       )
-      // Obtain a fresh onboarding secret from a SV because this is what we want runbook users to do.
+      // Obtain a fresh onboarding secret from an SV because this is what we want runbook users to do.
       .addConfigTransforms((_, conf) => insertValidatorOnboardingSecret(conf))
       // Replace the path to the splitwell dar file.
       .addConfigTransforms((_, conf) => replaceDarFilePath(conf))

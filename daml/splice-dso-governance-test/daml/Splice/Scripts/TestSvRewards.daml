@@ -13,7 +13,7 @@ import Splice.Round
 import Splice.Types
 import Splice.Scripts.Util
 import Splice.DsoRules
-import Splice.DSO.MemberState
+import Splice.DSO.SvState
 import Splice.Scripts.DsoTestUtils
 import Splice.Util
 
@@ -40,8 +40,8 @@ test_SvRewards = do
           require (show sv <> " balance: expected " <> show amount <> " == " <> show amulet.amount.initialAmount)
             (amulet.amount.initialAmount == amount)
     let getSvRewardWeightAndState sv = do
-          info <- getMemberInfoByParty app sv
-          [(rewardStateCid, _)] <- queryFilter @MemberRewardState dso (\s -> s.svName == info.name)
+          info <- getSvInfoByParty app sv
+          [(rewardStateCid, _)] <- queryFilter @SvRewardState dso (\s -> s.svName == info.name)
           pure (info.svRewardWeight, rewardStateCid)
 
     let receiveSvRewardCouponFails sv round rulesCid = do
@@ -138,14 +138,14 @@ test_SvRewards = do
     checkSvRewardCouponsDoNotExist round2._2.round
 
     -- check that the coupons for round 2 and 3 are marked as not collected
-    [(_, sv1State)] <- queryFilter @MemberRewardState dso (\s -> s.svName == "sv1")
+    [(_, sv1State)] <- queryFilter @SvRewardState dso (\s -> s.svName == "sv1")
     sv1State.state === RewardState with
       numRoundsMissed = 2
       numRoundsCollected = 3
       lastRoundCollected = Round 4
       numCouponsIssued = 6
 
-    [(_, sv2State)] <- queryFilter @MemberRewardState dso (\s -> s.svName == "sv2")
+    [(_, sv2State)] <- queryFilter @SvRewardState dso (\s -> s.svName == "sv2")
     sv2State.state === RewardState with
       numRoundsMissed = 3
       numRoundsCollected = 2

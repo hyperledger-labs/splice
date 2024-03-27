@@ -103,7 +103,7 @@ class SvOnboardingRequestTrigger(
         if (SvApp.isDsoMember(name, party, dsoRules)) {
           Future.successful(
             TaskSuccess(
-              s"skipping as SV $name is already an DSO member"
+              s"skipping as SV $name is already an SV"
             )
           )
         } else {

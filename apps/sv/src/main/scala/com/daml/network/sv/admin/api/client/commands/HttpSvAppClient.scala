@@ -6,7 +6,7 @@ import cats.syntax.traverse.*
 import com.daml.network.admin.api.client.commands.HttpClientBuilder
 import com.daml.network.codegen.java.splice.amuletrules.AmuletRules
 import com.daml.network.codegen.java.splice.round.OpenMiningRound
-import com.daml.network.codegen.java.splice.dso.memberstate.SvNodeState
+import com.daml.network.codegen.java.splice.dso.svstate.SvNodeState
 import com.daml.network.codegen.java.splice.dsorules.DsoRules
 import com.daml.network.codegen.java.splice.svonboarding.{
   SvOnboardingConfirmed,

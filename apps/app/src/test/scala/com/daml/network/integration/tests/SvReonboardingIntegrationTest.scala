@@ -232,7 +232,7 @@ class SvReonboardingIntegrationTest
             .getDsoInfo()
             .dsoRules
             .payload
-            .members
+            .svs
             .asScala
             .get(sv4Party.toProtoPrimitive)
             .value
@@ -255,7 +255,7 @@ class SvReonboardingIntegrationTest
             (sv1, sv2, sv3, sv4)
           }
 
-        sv1Backend.getDsoInfo().dsoRules.payload.members.keySet.asScala shouldBe Set(
+        sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet.asScala shouldBe Set(
           sv1Party,
           sv2Party,
           sv3Party,
@@ -293,7 +293,7 @@ class SvReonboardingIntegrationTest
             "SV1 create a vote request to remove sv4", {
               val action: ActionRequiringConfirmation =
                 new ARC_DsoRules(
-                  new SRARC_OffboardMember(new DsoRules_OffboardMember(sv4Party.toProtoPrimitive))
+                  new SRARC_OffboardSv(new DsoRules_OffboardSv(sv4Party.toProtoPrimitive))
                 )
               sv1Backend.createVoteRequest(
                 sv1Backend.getDsoInfo().svParty.toProtoPrimitive,
@@ -316,7 +316,7 @@ class SvReonboardingIntegrationTest
           }
 
           eventually() {
-            sv1Backend.getDsoInfo().dsoRules.payload.members.keySet.asScala shouldBe Set(
+            sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet.asScala shouldBe Set(
               sv1Party,
               sv2Party,
               sv3Party,
@@ -404,7 +404,7 @@ class SvReonboardingIntegrationTest
           sv4PartyNew.uid.namespace should not be sv4Party.uid.namespace
         }
 
-        sv1Backend.getDsoInfo().dsoRules.payload.members.keySet.asScala shouldBe Set(
+        sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet.asScala shouldBe Set(
           sv1Party,
           sv2Party,
           sv3Party,
@@ -415,7 +415,7 @@ class SvReonboardingIntegrationTest
           .getDsoInfo()
           .dsoRules
           .payload
-          .members
+          .svs
           .asScala
           .get(sv4PartyNew.toProtoPrimitive)
           .value

@@ -1,10 +1,10 @@
 -- | Templates and code for the DSO to agree on a amulet price using median-based voting.
 --
--- Every member can change its desired amulet price at any time they like provided they
+-- Every sv can change its desired amulet price at any time they like provided they
 -- wait at least one tick duration (2.5 minutes by default) between changes.
 --
 -- New `OpenMiningRounds` are always openened with the median of the amulet prices desired
--- by the members of the DSO.
+-- by the svs of the DSO.
 module Splice.DSO.AmuletPrice where
 
 import DA.List
@@ -20,9 +20,9 @@ template AmuletPriceVote with
     dso : Party
     sv : Party
     amuletPrice : Optional Decimal
-    -- ^ Set to None for new members, but defined thereafter.
+    -- ^ Set to None for new svs, but defined thereafter.
     lastUpdatedAt : Time
-    -- ^ The last time this price was updated. Tracked to limit members from
+    -- ^ The last time this price was updated. Tracked to limit svs from
     -- changing their vote more than once per tick.
   where
     ensure optional True (0.0 <) amuletPrice
@@ -30,11 +30,11 @@ template AmuletPriceVote with
     signatory dso
 
 fetchMedianAmuletPrice : Party -> [Party] -> [ContractId AmuletPriceVote] -> Update Decimal
-fetchMedianAmuletPrice dso members voteCids = do
+fetchMedianAmuletPrice dso svs voteCids = do
   votes <- forA voteCids $ \voteCid -> do
     fetchReferenceData (ForDso with dso) voteCid
   let voters = map (.sv) votes
-  require "Every member voted exactly once" (sort voters == sort members)
+  require "Every sv voted exactly once" (sort voters == sort svs)
   pure $ median $ mapOptional (.amuletPrice) votes
 
 -- | See https://en.wikipedia.org/wiki/Median

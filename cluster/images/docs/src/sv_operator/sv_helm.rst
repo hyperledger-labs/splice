@@ -624,7 +624,7 @@ If you are redeploying the SV app as part of a :ref:`synchronizer migration <sv-
     :start-after: MIGRATION_START
     :end-before: MIGRATION_END
 
-Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer DSO members. The bundled artifacts consist of the lists of recommended values as follows:
+Your SV node will also be configured with a set of SV identities for your node to auto-approve as peer SVs. The bundled artifacts consist of the lists of recommended values as follows:
 
 - ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-test.yaml`` - the list of currently DSO-approved identities for `TestNet`
 - ``cn-node-0.1.0-SNAPSHOT/examples/sv-helm/approved-sv-id-values-dev.yaml`` - the list of partners currently experimenting with onboarding SV nodes on `DevNet`. Note that this is a less strict list at the moment, and includes identities for e.g. Digital-Asset support employees.
@@ -700,7 +700,7 @@ Configuring the Cluster Ingress
 An IP whitelisting json file ``allowed-ip-ranges-external.json`` will be provided in each SV operations announcement.
 This file contains other clusters' egress IPs that require access to your super validator's components. These IPs typically belong to peer super-validators, validators and the Digital Asset VPN.
 
-Each SV member is required to configure their cluster ingress to allow traffic from these IPs to be operational.
+Each SV is required to configure their cluster ingress to allow traffic from these IPs to be operational.
 
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>`` should be routed to service ``wallet-web-ui`` in the ``sv`` namespace.
 * ``https://wallet.sv.svc.<YOUR_HOSTNAME>/api/validator`` should be routed to ``/api/validator`` at port 5003 of service ``validator-app`` in the ``sv`` namespace.
@@ -900,7 +900,7 @@ Once logged in one should see a page with some SV collective information.
 
 The SV UI presents also some useful debug information for the CometBFT node. To see it, click on the "CometBFT Debug Info" tab.
 If your CometBFT is configured correctly, and it has connectivity to all other nodes, you should see ``n_peers`` that is equal to the size of the DSO, excluding your own node,
-and you should see all peer SV members listed as peers (their human-friendly names will be listed in the ``moniker`` fields).
+and you should see all peer SVs listed as peers (their human-friendly names will be listed in the ``moniker`` fields).
 
 .. _sv-ui-global-domain:
 

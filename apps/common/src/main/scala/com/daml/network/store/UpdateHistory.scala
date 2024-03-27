@@ -162,7 +162,7 @@ final class UpdateHistory(
             s"${description()} started from the ACS at offset $offset, " +
               s"but the ACS already contains (acs=${acs.size}, incompleteOut=${incompleteOut.size} incompleteIn=${incompleteIn.size}) elements at that point. " +
               "This is only fine in the following cases:\n" +
-              "- This is a SV node that joined late, and has thus missed past updates for the multi-hosted SV party. " +
+              "- This is an SV node that joined late, and has thus missed past updates for the multi-hosted SV party. " +
               "In this case, the node needs to download the missing updates from other SV nodes.\n" +
               "- This is a participant starting after a hard domain migration. " +
               "In this case, all items in the ACS must come from the previous domain migration."

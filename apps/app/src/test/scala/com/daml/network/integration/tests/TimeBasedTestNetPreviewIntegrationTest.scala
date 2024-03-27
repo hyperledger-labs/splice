@@ -25,7 +25,7 @@ class TimeBasedTestNetPreviewIntegrationTest
   "TestNet initializes correctly" in { implicit env =>
     clue("DSO contains 4 SV") {
       Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).map(
-        _.getDsoInfo().dsoRules.payload.members should have size 4
+        _.getDsoInfo().dsoRules.payload.svs should have size 4
       )
     }
 

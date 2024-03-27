@@ -339,7 +339,7 @@ class SvFrontendIntegrationTest
       }
     }
 
-    "can create a valid SRARC_OffboardMember vote request and cast vote on it" in { implicit env =>
+    "can create a valid SRARC_OffboardSv vote request and cast vote on it" in { implicit env =>
       val requestReasonUrl = "This is a request reason url."
       val requestReasonBody = "This is a request reason."
       val (createdVoteRequestAction, createdVoteRequestRequester) = withFrontEnd("sv1") {
@@ -360,7 +360,7 @@ class SvFrontendIntegrationTest
           val (_, (createdVoteRequestAction, createdVoteRequestRequester)) = actAndCheck(
             "sv1 operator can create a new vote request", {
               val dropDownAction = new Select(webDriver.findElement(By.id("display-actions")))
-              dropDownAction.selectByValue("SRARC_OffboardMember")
+              dropDownAction.selectByValue("SRARC_OffboardSv")
 
               val dropDownMember = new Select(webDriver.findElement(By.id("display-members")))
               dropDownMember.selectByIndex(3)
@@ -441,7 +441,7 @@ class SvFrontendIntegrationTest
               element.text should matchText("ARC_DsoRules")
             }
             inside(find(id("vote-request-modal-action-name"))) { case Some(element) =>
-              element.text should matchText("SRARC_OffboardMember")
+              element.text should matchText("SRARC_OffboardSv")
             }
             inside(find(id("vote-request-modal-requested-by"))) { case Some(element) =>
               seleniumText(element) should matchText(
@@ -1334,7 +1334,7 @@ class SvFrontendIntegrationTest
         )
 
         val members: Vector[String] =
-          sv3Backend.getDsoInfo().dsoRules.payload.members.keySet().asScala.toVector
+          sv3Backend.getDsoInfo().dsoRules.payload.svs.keySet().asScala.toVector
 
         val newLeader = members.head
 

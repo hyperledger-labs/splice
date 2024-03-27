@@ -1520,7 +1520,7 @@ In addition to inquiring about the status of partners on [Slack](https://daholdi
 here is a hacky oneliner to see if our partners's new sequencers and CometBFT nodes are reachable (before the actual migration has taken place):
 
 ```
-curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.members | .[] | .[1].domainNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
+curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.svs | .[] | .[1].domainNodes | .[0] | .[1].sequencer.url | sub("-0"; "-1") | sub("https://"; "")' -r | xargs -n 1 sh -c 'echo $0; grpcurl --max-time 10 $0:443 grpc.health.v1.Health/Check; nc -w 5 -vz ${0/sequencer-1/global-domain-1-cometbft} 26156; echo'
 ```
 
 This assumes that we're preparing for a migration from migration ID 0 to migration ID 1, that the partners follow our recommended migration ID-based URL scheme for sequencers, that they use the same new CometBFT port as suggested in the runbook and that the hostname for the CometBFT node either doesn't matter (because it's all the same IP) or they are Daml Hub...
@@ -1614,10 +1614,10 @@ You can also access sequencer and mediator:
 
 ### App APIs without authentication
 
-Just use `curl`! For example, here is how to get the current DSO members (as per the `DsoRules`) from SV1 on DevNet:
+Just use `curl`! For example, here is how to get the current SVs (as per the `DsoRules`) from SV1 on DevNet:
 
 ```
-curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.members'
+curl https://sv.sv-1.svc.dev.network.canton.global/api/sv/v0/dso | jq '.dso_rules.payload.svs'
 ```
 
 ### App APIs with authentication

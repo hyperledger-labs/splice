@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.network.codegen.java.splice.dso.memberstate.SvStatusReport
+import com.daml.network.codegen.java.splice.dso.svstate.SvStatusReport
 import com.daml.network.config.CNNodeConfigTransforms.updateAllSvAppConfigs_
 import com.daml.network.console.{
   ScanAppBackendReference,
@@ -177,8 +177,8 @@ class SvInitializationIntegrationTest extends SvIntegrationTestBase {
       svs.map(_.getDsoInfo().svParty.toProtoPrimitive)
     }
     val svPartiesSet = svParties.toSet
-    clue("The four SV apps are all DSO members and there are no other DSO members") {
-      sv1Backend.getDsoInfo().dsoRules.payload.members.keySet() should equal(svParties.toSet.asJava)
+    clue("The four SV apps are all SVs and there are no other SVs") {
+      sv1Backend.getDsoInfo().dsoRules.payload.svs.keySet() should equal(svParties.toSet.asJava)
     }
     clue("The founding SV app (sv1) is the first leader") {
       sv1Backend.getDsoInfo().dsoRules.payload.dsoDelegate should equal(

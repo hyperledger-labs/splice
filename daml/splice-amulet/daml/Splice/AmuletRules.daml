@@ -251,7 +251,7 @@ template AmuletRules
       with
         amuletPrice : Decimal
         round0Duration : RelTime
-        -- Duration of the very first round, typically set to a number large enough for all initial members to complete joining and grab their SvReward coupon.
+        -- Duration of the very first round, typically set to a number large enough for all initial svs to complete joining and grab their SvReward coupon.
       controller dso
       do
         now <- getTime

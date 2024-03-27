@@ -36,7 +36,7 @@ import {
 import ListVoteRequests from './ListVoteRequests';
 import AddFutureAmuletConfigSchedule from './actions/AddFutureAmuletConfigSchedule';
 import GrantFeaturedAppRight from './actions/GrantFeaturedAppRight';
-import OffboardMember from './actions/OffboardMember';
+import OffboardSv from './actions/OffboardSv';
 import RemoveFutureAmuletConfigSchedule from './actions/RemoveFutureAmuletConfigSchedule';
 import RevokeFeaturedAppRight from './actions/RevokeFeaturedAppRight';
 import SetDsoRulesConfig from './actions/SetDsoRulesConfig';
@@ -52,7 +52,7 @@ function actionFromFormIsError(action: ActionFromForm): action is { formError: D
 
 const VoteRequest: React.FC = () => {
   // States related to vote requests
-  const [actionName, setActionName] = useState('SRARC_OffboardMember');
+  const [actionName, setActionName] = useState('SRARC_OffboardSv');
   const [summary, setSummary] = useState<string>('');
   const [url, setUrl] = useState<string>('');
   const [expiration, setExpiration] = useState<Dayjs | null>(null);
@@ -97,7 +97,7 @@ const VoteRequest: React.FC = () => {
   }, [actionName, setActionName]); // same than above
 
   const actionNameOptions = [
-    { name: 'Offboard Member', value: 'SRARC_OffboardMember' },
+    { name: 'Offboard Member', value: 'SRARC_OffboardSv' },
     { name: 'Feature Application', value: 'SRARC_GrantFeaturedAppRight' },
     { name: 'Unfeature Application', value: 'SRARC_RevokeFeaturedAppRight' },
     { name: 'Set DsoRules Configuration', value: 'SRARC_SetConfig' },
@@ -204,7 +204,7 @@ const VoteRequest: React.FC = () => {
         return await createVoteRequest(requester, action, url, summary, duration)
           .then(() => setUrl(''))
           .then(() => setSummary(''))
-          .then(() => setActionName('SRARC_OffboardMember'))
+          .then(() => setActionName('SRARC_OffboardSv'))
           .then(() => setAction(undefined))
           .then(() => setExpiration(getDefaultExpiration))
           .then(() => setMaxDateTimeIfAddFutureAmuletConfigSchedule(undefined))
@@ -246,7 +246,7 @@ const VoteRequest: React.FC = () => {
               </NativeSelect>
             </FormControl>
           </Stack>
-          {actionName === 'SRARC_OffboardMember' && <OffboardMember chooseAction={chooseAction} />}
+          {actionName === 'SRARC_OffboardSv' && <OffboardSv chooseAction={chooseAction} />}
           {actionName === 'SRARC_GrantFeaturedAppRight' && (
             <GrantFeaturedAppRight chooseAction={chooseAction} />
           )}

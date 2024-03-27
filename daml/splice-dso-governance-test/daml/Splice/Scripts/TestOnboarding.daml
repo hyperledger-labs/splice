@@ -74,11 +74,11 @@ testSvOnboarding = do
       confirmer = sv
       action = ARC_DsoRules with
         dsoAction = SRARC_ConfirmSvOnboarding $ DsoRules_ConfirmSvOnboarding with
-          newMemberParty = svX
-          newMemberName = "svX"
+          newSvParty = svX
+          newSvName = "svX"
           newParticipantId = "svX-participant-id"
           reason = "because"
-          newMemberRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
+          newSvRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
   executeAllConfirmedActions app
 
   -- svX is now a confirmed SV
@@ -104,14 +104,14 @@ testSvOnboarding = do
   [(amuletRulesCid, _)] <- query @AmuletRules dso
 
   -- the rounds need to be passed in the correct order
-  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedMember with
+  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = svX
     svOnboardingConfirmedCid
     earliestRoundCid = latestRoundCid
     middleRoundCid
     latestRoundCid = earliestRoundCid
     amuletRulesCid
-  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedMember with
+  submitMultiMustFail [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = svX
     svOnboardingConfirmedCid
     earliestRoundCid
@@ -120,7 +120,7 @@ testSvOnboarding = do
     amuletRulesCid
 
   -- svX completes its own onboarding by adding itself to the DsoRules
-  submitMulti [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedMember with
+  submitMulti [svX] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = svX
     svOnboardingConfirmedCid
     earliestRoundCid
@@ -131,13 +131,13 @@ testSvOnboarding = do
   checkSvStatusReports app
 
   [(_, dsoRules)] <- query @DsoRules dso
-  case Map.lookup svX dsoRules.members of
-    None -> fail "svX is not a member of the DSO"
+  case Map.lookup svX dsoRules.svs of
+    None -> fail "svX is not a sv of the DSO"
     Some info ->
-      -- the new member joined in the earliest open round
+      -- the new sv joined in the earliest open round
       info.joinedAsOfRound === earliestRound.round
   now <- getTime
-  -- now that svX is a member it can set its CometBFT config to become a CometBFT  validator
+  -- now that svX is a sv it can set its CometBFT config to become a CometBFT  validator
   -- TODO(M3-59): add negative tests for limits enforced on config values (manual testing showed they work)
   let cometBftConfig = CometBftConfig with
         nodes = Map.fromList
@@ -213,8 +213,8 @@ testSvOnboardingRequestExpiry = do
   pure ()
 
 
-testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember : Script ()
-testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV : Script ()
+testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsSV = do
   (app, dso, (_, sv2, _, _)) <- initMainNetDSO
 
   -- a new sv prepares his participant
@@ -230,19 +230,19 @@ testSvOnboardingRequestArchiveWhenSvIsAlreadyAddedAsMember = do
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
-  -- DsoDelegate cannot archive the onboarding as svX is not yet added as member
+  -- DsoDelegate cannot archive the onboarding as svX is not yet added as sv
   dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
     DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
   -- create a SvOnboardingConfirmed contract
-  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddMember with
-    newMemberParty = svX
-    newMemberName = "svX"
-    newMemberRewardWeight = 19
-    newMemberParticipantId = "svX-participant-id"
+  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv with
+    newSvParty = svX
+    newSvName = "svX"
+    newSvRewardWeight = 19
+    newSvParticipantId = "svX-participant-id"
     joinedAsOfRound = (Round 3)
 
-  -- DsoDelegate can archive the onboarding as svX is added as member
+  -- DsoDelegate can archive the onboarding as svX is added as sv
   dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_ArchiveSvOnboardingRequest svOnboardingRequestCid
 
@@ -264,10 +264,10 @@ testSvOnboardingConfirmedExpiry = do
       confirmer = sv
       action = ARC_DsoRules with
         dsoAction = SRARC_ConfirmSvOnboarding $ DsoRules_ConfirmSvOnboarding with
-          newMemberParty = svX
-          newMemberName = "svX"
+          newSvParty = svX
+          newSvName = "svX"
           newParticipantId = "svX-participant-id"
-          newMemberRewardWeight = 19
+          newSvRewardWeight = 19
           reason = "because"
 
   executeAllConfirmedActions app
@@ -287,52 +287,52 @@ testSvOnboardingConfirmedExpiry = do
         cid = svOnboardingConfirmedCid
 
   [(_, dsoRules)] <- query @DsoRules dso
-  Map.keys (dsoRules.offboardedMembers) === [svX]
+  Map.keys (dsoRules.offboardedSvs) === [svX]
 
 
 testSvNameUniquenessNotInDevNet : Script ()
 testSvNameUniquenessNotInDevNet = do
-  -- When it is not in devnet, new member cannot be added to DSO if its name is already used by any existing member.
+  -- When it is not in devnet, new sv cannot be added to DSO if its name is already used by any existing sv.
   (_, dso, (_, sv2, _, _)) <- initMainNetDSO
 
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
 
-  (fromSome (Map.lookup sv2 dsoRules.members)).name === "sv2"
+  (fromSome (Map.lookup sv2 dsoRules.svs)).name === "sv2"
 
   svX <- allocateParty "svX"
-  submitMustFail dso $ exerciseCmd dsoRulesCid $ DsoRules_AddMember svX "sv2" 19 "sv2-participant-id" (Round 3)
+  submitMustFail dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv2" 19 "sv2-participant-id" (Round 3)
 
 
-testSvMemberOverwriteInDevNet : Script ()
-testSvMemberOverwriteInDevNet = do
+testSvOverwriteInDevNet : Script ()
+testSvOverwriteInDevNet = do
   (app, dso, (sv1, sv2, _, _)) <- initDevNetDSO
 
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
 
-  (fromSome (Map.lookup sv1 dsoRules.members)).name === "sv1"
-  (fromSome (Map.lookup sv2 dsoRules.members)).name === "sv2"
+  (fromSome (Map.lookup sv1 dsoRules.svs)).name === "sv1"
+  (fromSome (Map.lookup sv2 dsoRules.svs)).name === "sv2"
   svX <- allocateParty "svX"
 
-  -- Failing the template precondition check if the existing member being overwritten is the current DsoDelegaten.
-  submitMustFail dso $ exerciseCmd dsoRulesCid $ DsoRules_AddMember svX "sv1" 19 "sv1-participant-id" (Round 3)
+  -- Failing the template precondition check if the existing sv being overwritten is the current DsoDelegaten.
+  submitMustFail dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv1" 19 "sv1-participant-id" (Round 3)
 
-  -- overwriting existing member successfully (using a new participant node)
-  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddMember svX "sv2" 19 "svX-participant-id" (Round 3)
+  -- overwriting existing sv successfully (using a new participant node)
+  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX "sv2" 19 "svX-participant-id" (Round 3)
 
   [(_, dsoRules)] <- query @DsoRules app.dso
-  dsoRules.offboardedMembers === Map.fromList [(sv2, OffboardedMemberInfo "sv2" "sv2-participant-id")]
+  dsoRules.offboardedSvs === Map.fromList [(sv2, OffboardedSvInfo "sv2" "sv2-participant-id")]
 
   svX2 <- allocateParty "svX2"
 
   [(dsoRulesCid, _)] <- query @DsoRules app.dso
 
-  -- overwriting existing member again
-  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddMember svX2 "sv2" 19 "svX2-participant-id" (Round 3)
+  -- overwriting existing sv again
+  submit dso $ exerciseCmd dsoRulesCid $ DsoRules_AddSv svX2 "sv2" 19 "svX2-participant-id" (Round 3)
 
   [(_, dsoRules)] <- query @DsoRules app.dso
-  dsoRules.offboardedMembers === Map.fromList
-    [ (sv2, OffboardedMemberInfo "sv2" "sv2-participant-id")
-    , (svX, OffboardedMemberInfo "sv2" "svX-participant-id")
+  dsoRules.offboardedSvs === Map.fromList
+    [ (sv2, OffboardedSvInfo "sv2" "sv2-participant-id")
+    , (svX, OffboardedSvInfo "sv2" "svX-participant-id")
     ]
 
   -- status reports are OK
@@ -340,24 +340,24 @@ testSvMemberOverwriteInDevNet = do
 
   pure ()
 
-testSvMemberReonboarding : Script ()
-testSvMemberReonboarding = do
+testSvReonboarding : Script ()
+testSvReonboarding = do
   (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNetDSO
 
   [(_, dsoRules)] <- query @DsoRules dso
 
-  Map.keys dsoRules.members === [sv1, sv2, sv3, sv4]
+  Map.keys dsoRules.svs === [sv1, sv2, sv3, sv4]
 
   initiateAndAcceptVote app [sv1, sv2, sv3] $
     ARC_DsoRules with
-      dsoAction = SRARC_OffboardMember DsoRules_OffboardMember with
-        member = sv4
+      dsoAction = SRARC_OffboardSv DsoRules_OffboardSv with
+        sv = sv4
   passTime (dsoRules.config.voteRequestTimeout)
   executeAllDefinitiveVotes app
 
   [(_, dsoRules)] <- query @DsoRules dso
-  Map.keys dsoRules.members === [sv1, sv2, sv3]
-  Map.keys dsoRules.offboardedMembers === [sv4]
+  Map.keys dsoRules.svs === [sv1, sv2, sv3]
+  Map.keys dsoRules.offboardedSvs === [sv4]
   checkSvStatusReports app
 
   -- reonboard sv4
@@ -371,11 +371,11 @@ testSvMemberReonboarding = do
       confirmer = sv
       action = ARC_DsoRules with
         dsoAction = SRARC_ConfirmSvOnboarding $ DsoRules_ConfirmSvOnboarding with
-          newMemberParty = sv4New
-          newMemberName = "sv4New"
+          newSvParty = sv4New
+          newSvName = "sv4New"
           newParticipantId = "sv4New-participant-id"
           reason = "because the sv4 owner still has the right to operate a node"
-          newMemberRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
+          newSvRewardWeight = 19 -- we use 19 as a dummy reward weight for testing
   executeAllConfirmedActions app
   [(svOnboardingConfirmedCid, _)] <- query @SvOnboardingConfirmed dso
 
@@ -384,7 +384,7 @@ testSvMemberReonboarding = do
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   [(dsoRulesCid, _)] <- query @DsoRules dso
 
-  submitMulti [sv4New] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedMember with
+  submitMulti [sv4New] [dso] $ exerciseCmd dsoRulesCid DsoRules_AddConfirmedSv with
     sv = sv4New
     svOnboardingConfirmedCid
     earliestRoundCid
@@ -394,9 +394,9 @@ testSvMemberReonboarding = do
 
   [(_, dsoRules)] <- query @DsoRules dso
 
-  Map.keys dsoRules.members === [sv1, sv2, sv3, sv4New]
+  Map.keys dsoRules.svs === [sv1, sv2, sv3, sv4New]
   -- sv4 remaines offboarded
-  Map.keys dsoRules.offboardedMembers === [sv4]
+  Map.keys dsoRules.offboardedSvs === [sv4]
 
   -- check status reports
   checkSvStatusReports app

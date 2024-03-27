@@ -148,7 +148,7 @@ const ListVoteRequests: React.FC = () => {
     if (action.tag === 'ARC_DsoRules') {
       const dsoRulesAction = action.value.dsoAction;
       switch (dsoRulesAction.tag) {
-        case 'SRARC_OffboardMember': {
+        case 'SRARC_OffboardSv': {
           return `${dsoRulesAction.tag}`;
         }
         case 'SRARC_GrantFeaturedAppRight': {

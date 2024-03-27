@@ -11,7 +11,7 @@ function createRow(key: string, value: string, isParty: boolean = false) {
   return { key, value, isParty };
 }
 
-const OffboardMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmation) => void }> = ({
+const OffboardSv: React.FC<{ chooseAction: (action: ActionRequiringConfirmation) => void }> = ({
   chooseAction,
 }) => {
   const dsoInfosQuery = useDsoInfos();
@@ -26,7 +26,7 @@ const OffboardMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmat
   }
 
   var memberOptions: { key: string; value: string }[] = [];
-  dsoInfosQuery.data!.dsoRules.payload.members.forEach((value, key) =>
+  dsoInfosQuery.data!.dsoRules.payload.svs.forEach((value, key) =>
     memberOptions.push(createRow(key, value.name))
   );
   function setMemberAction(member: string) {
@@ -35,8 +35,8 @@ const OffboardMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmat
       tag: 'ARC_DsoRules',
       value: {
         dsoAction: {
-          tag: 'SRARC_OffboardMember',
-          value: { member: member },
+          tag: 'SRARC_OffboardSv',
+          value: { sv: member },
         },
       },
     });
@@ -64,4 +64,4 @@ const OffboardMember: React.FC<{ chooseAction: (action: ActionRequiringConfirmat
   );
 };
 
-export default OffboardMember;
+export default OffboardSv;

@@ -1,10 +1,10 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
-import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardMember
+import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_OffboardSv
 import com.daml.network.codegen.java.splice.dsorules.{
   ActionRequiringConfirmation,
-  DsoRules_OffboardMember,
+  DsoRules_OffboardSv,
 }
 import com.daml.network.config.CNNodeConfigTransforms
 import com.daml.network.console.SvAppBackendReference
@@ -64,14 +64,14 @@ class SvCometBftIntegrationTest extends CNNodeIntegrationTestWithSharedEnvironme
     }
   }
 
-  "removed SV member has its node removed" in { implicit env =>
+  "removed SV has its node removed" in { implicit env =>
     eventually(timeUntilSuccess = 2.minute) {
       sv4Backend.cometBftNodeStatus().votingPower.doubleValue should be(1d)
     }
     val action: ActionRequiringConfirmation =
       new ARC_DsoRules(
-        new SRARC_OffboardMember(
-          new DsoRules_OffboardMember(sv4Backend.getDsoInfo().svParty.toProtoPrimitive)
+        new SRARC_OffboardSv(
+          new DsoRules_OffboardSv(sv4Backend.getDsoInfo().svParty.toProtoPrimitive)
         )
       )
     sv4Backend.stop()

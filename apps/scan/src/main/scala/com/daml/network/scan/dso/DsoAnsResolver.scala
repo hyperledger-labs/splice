@@ -19,9 +19,9 @@ class DsoAnsResolver(dsoParty: PartyId) {
     ansName match {
       case `dsoAnsName` => Some(dsoAnsEntry)
       case svAnsNamePattern() =>
-        val maybeSvPartyId = dsoRules.payload.members.asScala.collectFirst {
-          case (svPartyId, memberInfo) if ansName == svAnsName(memberInfo.name) =>
-            PartyId.tryFromProtoPrimitive(svPartyId) -> memberInfo.name
+        val maybeSvPartyId = dsoRules.payload.svs.asScala.collectFirst {
+          case (svPartyId, svInfo) if ansName == svAnsName(svInfo.name) =>
+            PartyId.tryFromProtoPrimitive(svPartyId) -> svInfo.name
         }
         maybeSvPartyId.map { case (svPartyId, memberName) =>
           svAnsEntry(svPartyId, memberName.toLowerCase())
@@ -36,18 +36,17 @@ class DsoAnsResolver(dsoParty: PartyId) {
     party match {
       case `dsoParty` => Some(dsoAnsEntry)
       case _ =>
-        dsoRules.payload.members.asScala
+        dsoRules.payload.svs.asScala
           .get(party.toProtoPrimitive)
-          .map(memberInfo => svAnsEntry(party, memberInfo.name))
+          .map(svInfo => svAnsEntry(party, svInfo.name))
     }
 
   def listEntries(
       dsoRules: Contract[DsoRules.ContractId, DsoRules],
       namePrefix: Option[String],
   ): Seq[DsoAnsEntry] = {
-    val entries = dsoAnsEntry +: dsoRules.payload.members.asScala.collect {
-      case (svParty, memberInfo) =>
-        svAnsEntry(PartyId.tryFromProtoPrimitive(svParty), memberInfo.name)
+    val entries = dsoAnsEntry +: dsoRules.payload.svs.asScala.collect { case (svParty, svInfo) =>
+      svAnsEntry(PartyId.tryFromProtoPrimitive(svParty), svInfo.name)
     }.toSeq
     namePrefix.fold(entries)(prefix => entries.filter(_.name.startsWith(prefix)))
   }

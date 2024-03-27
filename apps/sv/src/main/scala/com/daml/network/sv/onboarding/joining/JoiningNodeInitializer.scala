@@ -468,7 +468,7 @@ class JoiningNodeInitializer(
                   dsoStore.key.svParty
                 ),
               ).tupled
-              svIsDsoMember = dsoRules.payload.members.asScala
+              svIsDsoMember = dsoRules.payload.svs.asScala
                 .contains(dsoStore.key.svParty.toProtoPrimitive)
               _ <- svOnboardingConfirmedOpt match {
                 case None =>
@@ -489,7 +489,7 @@ class JoiningNodeInitializer(
                     Future.unit
                   } else {
                     val cmd = dsoRules.exercise(
-                      _.exerciseDsoRules_AddConfirmedMember(
+                      _.exerciseDsoRules_AddConfirmedSv(
                         dsoStore.key.svParty.toProtoPrimitive,
                         confirmed.contractId,
                         openMiningRounds.oldest.contractId,
@@ -693,7 +693,7 @@ class JoiningNodeInitializer(
   private def isOnboarded(dsoStore: SvDsoStore): Future[Boolean] = for {
     dsoRules <- dsoStore.lookupDsoRules()
     isInDsoRulesMembers = dsoRules.exists(
-      _.payload.members.keySet.contains(dsoStore.key.svParty.toProtoPrimitive)
+      _.payload.svs.keySet.contains(dsoStore.key.svParty.toProtoPrimitive)
     )
     isMemberOfDecentralizedNamespace <-
       if (isInDsoRulesMembers) {

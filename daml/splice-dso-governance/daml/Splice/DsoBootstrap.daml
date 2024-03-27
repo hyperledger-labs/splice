@@ -50,8 +50,8 @@ template DsoBootstrap with
         exercise amuletRulesCid AmuletRules_Bootstrap_Rounds with
           round0Duration
           amuletPrice
-        -- create the DSO rules with the SV1 as the sole member
-        let sv1MemberInfo = MemberInfo with
+        -- create the DSO rules with the SV1 as the sole sv
+        let sv1SvInfo = SvInfo with
               name = sv1Name
               joinedAsOfRound = Round 0
               svRewardWeight = sv1RewardWeight
@@ -59,20 +59,20 @@ template DsoBootstrap with
         let dsoRules = DsoRules with
               dso
               epoch = 0
-              members = Map.fromList [(sv1Party, sv1MemberInfo)]
-              offboardedMembers = Map.empty
+              svs = Map.fromList [(sv1Party, sv1SvInfo)]
+              offboardedSvs = Map.empty
               dsoDelegate = sv1Party
               config
               initialTrafficState
               isDevNet
         create dsoRules
-        -- create initial per-member and per-operator contracts for sv1
-        let addMemberChoiceArgs = DsoRules_AddMember with
-              newMemberParty = sv1Party
-              newMemberName = sv1Name
-              newMemberParticipantId = sv1ParticipantId
+        -- create initial per-sv and per-operator contracts for sv1
+        let addSvChoiceArgs = DsoRules_AddSv with
+              newSvParty = sv1Party
+              newSvName = sv1Name
+              newSvParticipantId = sv1ParticipantId
               joinedAsOfRound = Round 0
-              newMemberRewardWeight = sv1RewardWeight
-        createPerMemberContracts dsoRules addMemberChoiceArgs
+              newSvRewardWeight = sv1RewardWeight
+        createPerSvContracts dsoRules addSvChoiceArgs
         createPerSvPartyContracts dso sv1Party sv1Name sv1DomainNodes (Some amuletPrice)
         return DsoBootstrap_BootstrapResult

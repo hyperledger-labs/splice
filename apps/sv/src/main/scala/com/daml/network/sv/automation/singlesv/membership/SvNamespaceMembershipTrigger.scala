@@ -38,7 +38,7 @@ private class NamespaceMembership(
         dsoParty.uid.namespace,
       )
       .map { decentralizedNamespace =>
-        val dsoRulesMembers = dsoRules.contract.payload.members
+        val dsoRulesMembers = dsoRules.contract.payload.svs
           .keySet()
           .asScala
           .map(PartyId.tryFromProtoPrimitive)
@@ -49,8 +49,8 @@ private class NamespaceMembership(
           )
         // Parties are only hosted on participants with the same namespace which is also the namespace that is used in the decentralized namespace.
         // Therefore we remove the namespace from the decentralized namespace only if
-        // a namespace is present in the offboardedMembers list and not present in the members list
-        val namespaceRemovals = dsoRules.contract.payload.offboardedMembers
+        // a namespace is present in the offboardedSvs list and not present in the members list
+        val namespaceRemovals = dsoRules.contract.payload.offboardedSvs
           .keySet()
           .asScala
           .map(PartyId.tryFromProtoPrimitive)
