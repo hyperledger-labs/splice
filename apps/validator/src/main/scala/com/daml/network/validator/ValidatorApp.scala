@@ -112,7 +112,7 @@ class ValidatorApp(
     with BasicDirectives {
 
   override def packages =
-    super.packages ++ DarResources.wallet.all ++ DarResources.cantonNameService.all ++ DarResources.appManager.all
+    super.packages ++ DarResources.wallet.all ++ DarResources.amuletNameService.all ++ DarResources.appManager.all
 
   override def preInitializeBeforeLedgerConnection()(implicit
       traceContext: TraceContext
@@ -222,7 +222,7 @@ class ValidatorApp(
                           ) { scanConnection =>
                             scanConnection.getAcsSnapshot(partyId)
                           },
-                        Seq(DarResources.cantonAmulet.bootstrap),
+                        Seq(DarResources.amulet.bootstrap),
                       ),
                   ).tupled
                 } yield partyId
@@ -279,7 +279,7 @@ class ValidatorApp(
     logger.info(s"Attempting to setup wallet...")
     val darFiles = Seq(
       UploadablePackage.fromResource(DarResources.wallet.bootstrap),
-      UploadablePackage.fromResource(DarResources.cantonNameService.bootstrap),
+      UploadablePackage.fromResource(DarResources.amuletNameService.bootstrap),
     )
     for {
       _ <- participantAdminConnection.uploadDarFiles(darFiles, RetryFor.WaitingOnInitDependency)

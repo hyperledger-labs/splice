@@ -77,8 +77,6 @@ initDSO isDevNet = do
       sv1RewardWeight = 10 * bpsMultiplier -- Tier 1 SVs get weight 10, and weights are recorded in basis-points, i.e., 1/10000ths
       sv1ParticipantId = "sv1-participant-id"
       sv1DomainNodes = Map.fromList
-        -- NOTE: the Canton domain and CometBft keys and config need to be allocated before bootstrapping the DsoRules
-        -- as we need a working domain to create and exercise Daml contracts.
         [("domain-id",  DomainNodeConfig with
                 cometBft = CometBftConfig with
                   nodes = Map.fromList

@@ -9,10 +9,7 @@ import Splice.GlobalDomain
 import Splice.Issuance
 import Splice.Schedule
 
--- | Default proposal for cost-competitive fees.
---
--- TODO(M3-90): it looks like we need to lower these fees a bit further
--- to be competitive with ETH and BTC: https://ycharts.com/indicators/ethereum_average_transaction_fee
+-- | Somewhat realistic fees to be used in test-code.
 defaultTransferConfig : TransferConfig USD
 defaultTransferConfig = TransferConfig with
     -- Fee to create a new amulet.
@@ -61,7 +58,6 @@ defaultAmuletConfig : AmuletConfig USD
 defaultAmuletConfig = AmuletConfig with
   transferConfig = defaultTransferConfig
 
-  -- Using issuance curve defined in the CC whitepaper
   issuanceCurve = defaultIssuanceCurve
 
   globalDomain = defaultAmuletGlobalDomainConfig
@@ -69,8 +65,8 @@ defaultAmuletConfig = AmuletConfig with
   -- Duration of one tick, which is half the target duration of one round
   tickDuration = minutes 10
   packageConfig = PackageConfig with
-    cantonAmulet = "0.1.0"
-    cantonNameService = "0.1.0"
+    amulet = "0.1.0"
+    amuletNameService = "0.1.0"
     dsoGovernance = "0.1.0"
     validatorLifecycle = "0.1.0"
     wallet = "0.1.0"
@@ -82,11 +78,8 @@ defaultAmuletConfigSchedule = Schedule with
     initialValue = defaultAmuletConfig
     futureValues = []
 
--- Issuance curve from the whitepaper
--------------------------------------
-
--- See the whitepaper here: https://docs.google.com/document/d/1SmC0TBcLBqsHgRDBfxbjIbFigPWXfBEW7B9MZpyCxK4/edit#bookmark=id.75er6skh0ext
--- note: we use the notation _<fromYear>_<toYear> whereby we abbreviate year 0.5 as 0p5 and year 1.5 as 1p5
+-- Test issuance curve
+----------------------
 
 issuanceConfig_0_0p5 : IssuanceConfig
 issuanceConfig_0_0p5 = issuanceConfig_10plus with

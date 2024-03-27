@@ -1,4 +1,4 @@
--- | Utility functions shared accross all CN core apps.
+-- | Utility functions shared across all splice apps.
 module Splice.Util
 ( require,
 

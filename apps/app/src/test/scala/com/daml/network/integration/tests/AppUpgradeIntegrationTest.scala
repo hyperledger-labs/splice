@@ -194,7 +194,7 @@ class AppUpgradeIntegrationTest
               val configs =
                 (newAmuletRules.payload.configSchedule.initialValue :: newAmuletRules.payload.configSchedule.futureValues.asScala.toList
                   .map(_._2))
-              configs.map(_.packageConfig.cantonAmulet) should contain("0.1.1")
+              configs.map(_.packageConfig.amulet) should contain("0.1.1")
             },
           )
 
@@ -252,7 +252,7 @@ class AppUpgradeIntegrationTest
             "observing AmuletRules with new package id",
             _ => {
               val newAmuletRules = sv1Backend.getDsoInfo().amuletRules
-              newAmuletRules.identifier.getPackageId shouldBe DarResources.cantonAmulet_current.packageId
+              newAmuletRules.identifier.getPackageId shouldBe DarResources.amulet_current.packageId
             },
           )
 
@@ -265,7 +265,7 @@ class AppUpgradeIntegrationTest
             "Old and new amulet get merged together into a new amulet",
             _ => {
               val amulet = bobWalletClient.list().amulets.loneElement.contract
-              amulet.identifier.getPackageId shouldBe DarResources.cantonAmulet_current.packageId
+              amulet.identifier.getPackageId shouldBe DarResources.amulet_current.packageId
               BigDecimal(amulet.payload.amount.initialAmount) should beWithin(
                 walletUsdToAmulet(30 - smallAmount),
                 walletUsdToAmulet(30),

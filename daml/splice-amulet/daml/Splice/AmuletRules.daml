@@ -932,7 +932,7 @@ createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary p
       case out.lock of
         None -> TransferResultAmulet <$> create amulet
         Some lock -> do
-          -- We require the lock to expire before the amulet to allow CN app authors to
+          -- We require the lock to expire before the amulet to allow app authors to
           -- assume that a locked amulet is never archived by the DSO while the lock is held.
           require "lock expires before amulet"
             (doesLockExpireBeforeAmulet currentOpenRound lock amulet.amount currentOpenRound.tickDuration)

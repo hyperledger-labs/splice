@@ -78,7 +78,7 @@ class ScanApp(
     ) {
 
   override def packages =
-    super.packages ++ DarResources.cantonNameService.all ++ DarResources.dsoGovernance.all
+    super.packages ++ DarResources.amuletNameService.all ++ DarResources.dsoGovernance.all
 
   override def initialize(
       ledgerClient: CNLedgerClient,
@@ -241,7 +241,7 @@ class ScanApp(
   }
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredPackageIds = Set(DarResources.cantonAmulet.bootstrap.packageId)
+  override lazy val requiredPackageIds = Set(DarResources.amulet.bootstrap.packageId)
 
   protected[this] override def automationServices(st: ScanApp.State) =
     Seq(st.automation)

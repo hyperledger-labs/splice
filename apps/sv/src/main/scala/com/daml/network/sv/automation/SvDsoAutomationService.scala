@@ -392,7 +392,7 @@ object SvDsoAutomationService extends AutomationServiceCompanion {
       // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
       case "Splice.AmuletImport" =>
-        Some(DarResources.cantonAmulet.bootstrap.packageId)
+        Some(DarResources.amulet.bootstrap.packageId)
       case _ => None
     }
 

@@ -159,7 +159,7 @@ class DbMultiDomainAcsStoreTest
       acsTableName: String,
   ) = {
     val packageSignatures =
-      ResourceTemplateDecoder.loadPackageSignaturesFromResources(DarResources.cantonAmulet.all)
+      ResourceTemplateDecoder.loadPackageSignaturesFromResources(DarResources.amulet.all)
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)
 

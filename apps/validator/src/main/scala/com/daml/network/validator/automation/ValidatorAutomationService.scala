@@ -207,7 +207,7 @@ object ValidatorAutomationService extends AutomationServiceCompanion {
       case "Splice.AppManager.Store" => Some(DarResources.appManager.bootstrap.packageId)
       // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
       // we can hardcode this.
-      case "Splice.AmuletImport" => Some(DarResources.cantonAmulet.bootstrap.packageId)
+      case "Splice.AmuletImport" => Some(DarResources.amulet.bootstrap.packageId)
       case _ => None
     }
 

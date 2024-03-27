@@ -116,7 +116,7 @@ class SvApp(
     .filter(_.enabled)
 
   override def packages: Seq[DarResource] =
-    super.packages ++ DarResources.dsoGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.cantonNameService.all
+    super.packages ++ DarResources.dsoGovernance.all ++ DarResources.validatorLifecycle.all ++ DarResources.amuletNameService.all
 
   override def preInitializeBeforeLedgerConnection()(implicit tc: TraceContext): Future[Unit] = {
     val participantAdminConnection = new ParticipantAdminConnection(
@@ -1223,7 +1223,7 @@ object SvApp {
   }
 
   val amuletPackage: UploadablePackage =
-    UploadablePackage.fromResource(DarResources.cantonAmulet.bootstrap)
+    UploadablePackage.fromResource(DarResources.amulet.bootstrap)
   val dsoGovernancePackage: UploadablePackage =
     UploadablePackage.fromResource(DarResources.dsoGovernance.bootstrap)
   val validatorLifecyclePackage: UploadablePackage =

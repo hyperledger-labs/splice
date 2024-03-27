@@ -1429,9 +1429,9 @@ class DbUserWalletStoreTest
   ): Future[DbUserWalletStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.cantonAmulet.all ++
+        DarResources.amulet.all ++
           DarResources.wallet.all ++
-          DarResources.cantonNameService.all
+          DarResources.amuletNameService.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =
       new ResourceTemplateDecoder(packageSignatures, loggerFactory)

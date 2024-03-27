@@ -112,7 +112,7 @@ object UserWalletAutomationService extends AutomationServiceCompanion {
     // ImportCrates are created before AmuletRules. Given that this is only a hack until we have upgrading
     // we can hardcode this.
     Option.when(template.moduleName == "Splice.AmuletImport")(
-      DarResources.cantonAmulet.bootstrap.packageId
+      DarResources.amulet.bootstrap.packageId
     )
 
   // defined because instances are created by UserWalletService, not immediately

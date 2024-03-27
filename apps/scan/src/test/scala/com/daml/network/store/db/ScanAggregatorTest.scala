@@ -654,8 +654,8 @@ class ScanAggregatorTest
   ): Future[(ScanAggregator, DbScanStore)] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.cantonAmulet.all ++
-          DarResources.cantonNameService.all ++
+        DarResources.amulet.all ++
+          DarResources.amuletNameService.all ++
           DarResources.dsoGovernance.all
       )
     implicit val templateJsonDecoder: TemplateJsonDecoder =

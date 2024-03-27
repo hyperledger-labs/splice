@@ -108,8 +108,8 @@ object PackageIdResolver {
             }
           case Some(pkg) =>
             pkg match {
-              case Package.SpliceAmulet => DarResources.cantonAmulet
-              case Package.SpliceAmuletNameService => DarResources.cantonNameService
+              case Package.SpliceAmulet => DarResources.amulet
+              case Package.SpliceAmuletNameService => DarResources.amuletNameService
               case Package.SpliceDsoGovernance => DarResources.dsoGovernance
               case Package.SpliceValidatorLifecycle => DarResources.validatorLifecycle
               case Package.SpliceWallet => DarResources.wallet
@@ -180,8 +180,8 @@ object PackageIdResolver {
   ): PackageVersion = {
     import Package.*
     val version = pkg match {
-      case SpliceAmulet => packageConfig.cantonAmulet
-      case SpliceAmuletNameService => packageConfig.cantonNameService
+      case SpliceAmulet => packageConfig.amulet
+      case SpliceAmuletNameService => packageConfig.amuletNameService
       case SpliceDsoGovernance => packageConfig.dsoGovernance
       case SpliceValidatorLifecycle => packageConfig.validatorLifecycle
       case SpliceWallet => packageConfig.wallet

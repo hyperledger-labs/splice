@@ -598,7 +598,7 @@ class DbValidatorStoreTest
   override protected def mkStore(): Future[DbValidatorStore] = {
     val packageSignatures =
       ResourceTemplateDecoder.loadPackageSignaturesFromResources(
-        DarResources.cantonAmulet.all ++
+        DarResources.amulet.all ++
           DarResources.wallet.all ++
           DarResources.appManager.all
       )

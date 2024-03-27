@@ -36,7 +36,7 @@ class CNNodeConsoleEnvironment(
     DarResources.splitwell.all ++
       DarResources.validatorLifecycle.all ++
       DarResources.wallet.all ++
-      DarResources.cantonAmulet.all ++
+      DarResources.amulet.all ++
       DarResources.dsoGovernance.all
   )
   implicit val actorSystem: ActorSystem = environment.actorSystem

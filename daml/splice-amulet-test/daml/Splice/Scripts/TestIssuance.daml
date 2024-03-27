@@ -45,9 +45,6 @@ testIssuanceCurve = script do
 -- Example 1: medium activity
 -----------------------------
 
--- Note: expected params computed using computation from whitepaper implemented in
--- https://docs.google.com/spreadsheets/d/1RrDYGjWH7Ol4e9LC_EYyE4iGl4iqs-e-eGbd-bugvys/edit#gid=1709116211
-
 summaryExample1 : OpenMiningRoundSummary
 summaryExample1 = OpenMiningRoundSummary with
   totalValidatorRewardCoupons = 10000.0

@@ -50,8 +50,8 @@ validAmuletConfig AmuletConfig{..} =
 -- at that point.
 data PackageConfig = PackageConfig
   with
-    cantonAmulet : Text
-    cantonNameService : Text
+    amulet : Text
+    amuletNameService : Text
     dsoGovernance : Text
     validatorLifecycle : Text
     wallet : Text

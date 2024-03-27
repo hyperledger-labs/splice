@@ -8,11 +8,11 @@ import com.google.protobuf.ByteString
 import scala.util.Using
 
 object DarResources {
-  val cantonAmulet_0_1_0 = DarResource("splice-amulet-0.1.0.dar")
-  val cantonAmulet_current = DarResource("splice-amulet-current.dar")
-  val cantonAmulet = PackageResource(
-    cantonAmulet_0_1_0,
-    Seq(cantonAmulet_current),
+  val amulet_0_1_0 = DarResource("splice-amulet-0.1.0.dar")
+  val amulet_current = DarResource("splice-amulet-current.dar")
+  val amulet = PackageResource(
+    amulet_0_1_0,
+    Seq(amulet_current),
   )
 
   val dsoGovernance_0_1_0 = DarResource("splice-dso-governance-0.1.0.dar")
@@ -22,11 +22,11 @@ object DarResources {
     Seq(dsoGovernance_current),
   )
 
-  val cantonNameService_0_1_0 = DarResource("splice-amulet-name-service-0.1.0.dar")
-  val cantonNameService_current = DarResource("splice-amulet-name-service-current.dar")
-  val cantonNameService = PackageResource(
-    cantonNameService_0_1_0,
-    Seq(cantonNameService_current),
+  val amuletNameService_0_1_0 = DarResource("splice-amulet-name-service-0.1.0.dar")
+  val amuletNameService_current = DarResource("splice-amulet-name-service-current.dar")
+  val amuletNameService = PackageResource(
+    amuletNameService_0_1_0,
+    Seq(amuletNameService_current),
   )
 
   val splitwell_0_1_0 = DarResource("splitwell-0.1.0.dar")
@@ -67,8 +67,8 @@ object DarResources {
   private val packageResources: Seq[PackageResource] =
     Seq(
       DarResources.appManager,
-      DarResources.cantonAmulet,
-      DarResources.cantonNameService,
+      DarResources.amulet,
+      DarResources.amuletNameService,
       DarResources.splitwell,
       DarResources.dsoGovernance,
       DarResources.validatorLifecycle,

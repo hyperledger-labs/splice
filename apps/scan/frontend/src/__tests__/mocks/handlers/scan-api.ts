@@ -214,8 +214,8 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
                     microseconds: '600000000',
                   },
                   packageConfig: {
-                    cantonAmulet: '0.1.0',
-                    cantonNameService: '0.1.0',
+                    amulet: '0.1.0',
+                    amuletNameService: '0.1.0',
                     dsoGovernance: '0.1.0',
                     validatorLifecycle: '0.1.0',
                     wallet: '0.1.0',

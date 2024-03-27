@@ -623,8 +623,6 @@ function subcmd_cn_module_splice() {
 
 ### Splice packages
 
-# TODO(#11111): complete this part of the script
-
 function rename_daml_package_raw() {
   local old=$1
   local new=$2
@@ -687,21 +685,43 @@ function subcmd_all_packages() {
   rename_daml_package 'canton-name-service' 'splice-amulet-name-service' 'CantonNameService' 'SpliceAmuletNameService'
 }
 
+### Remove usage of Canton
+
+subcommand_whitelist[remove_canton]='Rename: cantonAmulet and cantonNameService'
+
+function subcmd_remove_canton() {
+  assert_clean_working_dir
+
+  # Ignore files with unrelated mentions of 'member'
+  local ignore_unrelated=""
+  local daml_only="-i 'daml/**' $ignore_unrelated"
+
+  # Rename instances of 'Member' that are not related to 'Traffic'
+  simple_rename "cantonAmulet///amulet" "$ignore_unrelated"
+  simple_rename "cantonNameService///amuletNameService" "$ignore_unrelated"
+}
+
+### Static Check
+
 subcommand_whitelist[no_illegal_daml_references]='Check for illegal daml references'
 function subcmd_no_illegal_daml_references() {
+    local illegal_words=(
+      currency founder founding leader collective consortium
+      coin cn whitepaper canton
+      )
+    for word in "${illegal_words[@]}"; do
+        echo "Checking for occurences of '$word' (case-insensitive)"
+        if rg -i "$word" daml/; then
+            echo "$word occurs in Daml code, remove all references"
+            exit 1
+        fi
+    done
     local illegal_patterns=(
-      '[cC]urrency'
-      '[fF]ounder'
-      '[fF]ounding'
-      '[lL]eader'
-      '[cC]ollective'
-      '[cC]onsortium'
-      '[sS]vc'
-      '[cC]oin'
+      svc SVC Svc   # to avoid conflict with PerSvContracts
       '(?<!(Map|Set)[.])(?<!sequencer )member(?!(Id|.*[tT]raffic))'
       )
     for pattern in "${illegal_patterns[@]}"; do
-        echo "Checking for occurences of $pattern"
+        echo "Checking for occurences of '$pattern' (case sensitive, in code other than splitwell)"
         if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*'; then
             echo "$pattern occurs in Daml code (other than splitwell), remove all references"
             exit 1
