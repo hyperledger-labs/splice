@@ -394,6 +394,7 @@ final class ScanAggregator(
           else rounds.take(100).mkString(", ") + "..."
         logger.debug(s"Closed mining rounds since last aggregated: $roundsReported")
       }
+      // TODO (#11316): find a different approach for finding in-flight closed rounds
       roundsIncomplete <- getIncompleteRoundsByContract(
         rounds.collect { case (round, Some(cId)) =>
           (round, cId)
@@ -469,7 +470,8 @@ final class ScanAggregator(
       .query(
         sql"""
             select   round,
-                     acs_contract_id
+                     -- TODO (#11316) This query was using the deprecated acs_contract_id which ends up always being null
+                     null
             from     scan_txlog_store
             where    store_id = $storeId
             and      entry_type = ${EntryType.ClosedMiningRoundTxLogEntry}

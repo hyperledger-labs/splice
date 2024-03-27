@@ -59,7 +59,7 @@ import scala.collection.immutable
 import scala.collection.immutable.Queue
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.{RoundingMode, javaBigDecimal2bigDecimal}
-import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
+import com.daml.network.environment.ledger.api.ActiveContract
 import com.daml.network.store.events.SvRewardCoupon_ArchiveAsBeneficiary
 import com.daml.network.wallet.store.TxLogEntry.{
   BalanceChangeTransactionSubtype,
@@ -686,18 +686,6 @@ class UserWalletTxLogParser(
   ): Eval[State] = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
     roots.foldMap(parseTree(tree, _, domainId))
-  }
-
-  override def parseAcs(
-      acs: Seq[ActiveContract],
-      incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-      incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-  )(implicit
-      tc: TraceContext
-  ): Seq[(DomainId, Option[ContractId[?]], TxLogEntry)] = {
-    // Note: entries may appear in a random order, but it's unlikely that a user has many amulets,
-    // due to the wallet automation automatically merging amulets.
-    acs.collect(ac => ac.createdEvent match { case AmuletCreate(c) => State.fromAcsAmulet(ac, c) })
   }
 
   override def tryParse(tx: TransactionTree, domainId: DomainId)(implicit

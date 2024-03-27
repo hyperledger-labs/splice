@@ -1,6 +1,5 @@
 package com.daml.network.store.db
 
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.store.{StoreErrors, TxLogStore}
 import com.daml.network.store.db.TxLogQueries.SelectFromTxLogTableResult
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -39,7 +38,6 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
           <<[Long],
           <<[String],
           <<[DomainId],
-          <<[Option[ContractId[?]]],
           <<[String3],
           <<[String],
         )
@@ -62,7 +60,6 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
             tx.entry_number,
             tx.transaction_offset,
             tx.domain_id,
-            tx.acs_contract_id,
             tx.entry_type,
             tx.entry_data
        from store_descriptors sd
@@ -83,7 +80,6 @@ trait TxLogQueries[TXE] extends AcsJdbcTypes with StoreErrors {
       storeIdFromTxLogRow.map { storeId =>
         SelectFromTxLogTableResult(
           storeId,
-          pp.<<,
           pp.<<,
           pp.<<,
           pp.<<,
@@ -110,7 +106,6 @@ object TxLogQueries {
       entryNumber: Long,
       offset: String,
       domainId: DomainId,
-      acsContractId: Option[ContractId[?]],
       entryType: String3,
       entryData: String,
   )
@@ -121,7 +116,6 @@ object TxLogQueries {
           ${qualifier}entry_number,
           ${qualifier}transaction_offset,
           ${qualifier}domain_id,
-          ${qualifier}acs_contract_id,
           ${qualifier}entry_type,
           ${qualifier}entry_data"""
   }

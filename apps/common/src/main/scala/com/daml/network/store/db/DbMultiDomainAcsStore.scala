@@ -650,7 +650,6 @@ final class DbMultiDomainAcsStore[TXE](
         finishedAcsIngestion.isCompleted == false,
         s"ACS was already ingested for store $storeId",
       )
-      val txLogEntries = txLogConfig.parser.parseAcs(acs, incompleteOut, incompleteIn)
 
       // Filter out all contracts we are not interested in
       val todoAcs = acs
@@ -721,18 +720,6 @@ final class DbMultiDomainAcsStore[TXE](
                           summaryState,
                         )
                       } yield ()
-                    }
-                    ++ txLogEntries.map { case (domain, contractId, txe) =>
-                      doIngestTxLogInsert(
-                        domain,
-                        offset,
-                        // The ACS doesn't have a record time, but we're removing parser.parseAcs soon
-                        // we we'll use a random useless time for now
-                        CantonTimestamp.now(),
-                        contractId,
-                        txe,
-                        summaryState,
-                      )
                     }
                 ),
             ),
@@ -1001,7 +988,6 @@ final class DbMultiDomainAcsStore[TXE](
                         domainId,
                         tree.getOffset,
                         CantonTimestamp.assertFromInstant(tree.getRecordTime),
-                        None,
                         txe,
                         summary,
                       )
@@ -1132,7 +1118,6 @@ final class DbMultiDomainAcsStore[TXE](
         domainId: DomainId,
         offset: String,
         recordTime: CantonTimestamp,
-        acsContractId: Option[ContractId[?]],
         txe: TXE,
         summary: MutableIngestionSummary,
     ) = {
@@ -1147,9 +1132,9 @@ final class DbMultiDomainAcsStore[TXE](
 
       summary.ingestedTxLogEntries.addOne((entryType, entryData))
       (sql"""
-      insert into #$txLogTableName(store_id, migration_id, transaction_offset, record_time, domain_id, acs_contract_id,
+      insert into #$txLogTableName(store_id, migration_id, transaction_offset, record_time, domain_id,
       entry_type, entry_data #$indexColumnNames)
-      values ($storeId, $domainMigrationId, $safeOffset, $recordTime, $domainId, $acsContractId,
+      values ($storeId, $domainMigrationId, $safeOffset, $recordTime, $domainId,
               $entryType, ${safeEntryData}::jsonb""" ++ indexColumnNameValues ++ sql""")
     """).toActionBuilder.asUpdate
     }

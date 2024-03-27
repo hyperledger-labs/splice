@@ -1,13 +1,11 @@
 package com.daml.network.store
 
 import com.daml.ledger.javaapi.data.TransactionTree
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
-import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.daml.network.store.db.TxLogRowData
 import com.daml.network.util.Codec
 import com.digitalasset.canton.config.CantonRequireTypes.String3
@@ -56,15 +54,6 @@ object TxLogStore {
   /** Extracts tx log entries from transaction tree events */
   trait Parser[+TXE] {
 
-    /** Extract application-specific TxLog entries from the acs, before starting to ingest transactions */
-    def parseAcs(
-        acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-    )(implicit
-        tc: TraceContext
-    ): Seq[(DomainId, Option[ContractId[?]], TXE)]
-
     /** Extract application-specific TxLog entries from the given daml transaction */
     def tryParse(tx: TransactionTree, domain: DomainId)(implicit tc: TraceContext): Seq[TXE]
 
@@ -93,13 +82,6 @@ object TxLogStore {
 
   object Parser {
     lazy val empty: Parser[Nothing] = new Parser[Nothing] {
-      override def parseAcs(
-          acs: Seq[ActiveContract],
-          incompleteUnassign: Seq[IncompleteReassignmentEvent.Unassign],
-          incompleteAssign: Seq[IncompleteReassignmentEvent.Assign],
-      )(implicit
-          tc: TraceContext
-      ) = Seq.empty
       override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
           tc: TraceContext
       ) = Seq.empty

@@ -1033,13 +1033,6 @@ object StoreTest {
   }
 
   object TestTxLogStoreParser extends TxLogStore.Parser[TestTxLogEntry] {
-    def parseAcs(
-        acs: Seq[ActiveContract],
-        incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-        incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-    )(implicit
-        tc: TraceContext
-    ): Seq[(DomainId, Option[ContractId[?]], TestTxLogEntry)] = Seq.empty
 
     private def parseCreatedEvent(event: CreatedEvent): TestTxLogEntry = {
       // Note: amulets and app reward coupons are heavily used in MultiDomainAcsStoreTest

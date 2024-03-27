@@ -19,8 +19,6 @@ import io.grpc.Status
 import scala.collection.immutable
 import scala.jdk.CollectionConverters.*
 import scala.math.BigDecimal.javaBigDecimal2bigDecimal
-import com.daml.network.environment.ledger.api.ActiveContract
-import com.daml.network.environment.ledger.api.IncompleteReassignmentEvent
 import com.daml.network.store.events.SvRewardCoupon_ArchiveAsBeneficiary
 import com.digitalasset.canton.topology.DomainId
 
@@ -104,21 +102,6 @@ class ScanTxLogParser(
   ): State = {
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
     roots.foldMap(parseTree(tree, domainId, _))
-  }
-
-  // TODO(#4906): handle in-flight contracts when we tackle global domain migration
-  override def parseAcs(
-      acs: Seq[ActiveContract],
-      incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-      incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-  )(implicit
-      tc: TraceContext
-  ) = {
-    // TODO(#9977) Cleanup ignoring ACS import from SV onboarding.
-    // This is a temporary fix to ignore possible ACS imports that occur during SV onboarding.
-    // It ensures that the first open mining round we see will be on the GetUpdates stream and it will be after the initial ACS import.
-    // while we will ingest an incomplete round (i.e., the one during which we're joining), this is fine as those events will just be ignored in favor of the aggregate fetched from the other SVs for bootstrapping.
-    Seq()
   }
 
   override def tryParse(tx: TransactionTree, domain: DomainId)(implicit

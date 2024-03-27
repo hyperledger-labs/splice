@@ -12,7 +12,6 @@ import com.daml.network.codegen.java.splice.dsorules.{
   DsoRules_CloseVoteRequest,
   DsoRules_CloseVoteRequestResult,
 }
-import com.daml.network.environment.ledger.api.{ActiveContract, IncompleteReassignmentEvent}
 import com.daml.network.store.TxLogStore
 import com.daml.network.sv.history.*
 import com.daml.network.util.ExerciseNode
@@ -57,15 +56,6 @@ class DsoTxLogParser(
     val roots = rootsEventIds.map(tree.getEventsById.get(_))
     roots.foldMap(parseTree(tree, domainId, _))
   }
-
-  override def parseAcs(
-      acs: Seq[ActiveContract],
-      incompleteOut: Seq[IncompleteReassignmentEvent.Unassign],
-      incompleteIn: Seq[IncompleteReassignmentEvent.Assign],
-  )(implicit
-      tc: TraceContext
-  ): Seq[(DomainId, Option[codegen.ContractId[?]], TxLogEntry)] =
-    Seq.empty
 
   override def tryParse(tx: TransactionTree, domain: DomainId)(implicit
       tc: TraceContext
