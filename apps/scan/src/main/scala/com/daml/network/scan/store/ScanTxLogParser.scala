@@ -5,12 +5,14 @@ import cats.syntax.foldable.*
 import com.daml.ledger.javaapi.data.{TreeEvent, *}
 import com.daml.network.codegen.java.splice.amulet.{AmuletCreateSummary, AmuletExpireSummary}
 import com.daml.network.codegen.java.splice
+import splice.wallet.subscriptions as sws
 import com.daml.network.codegen.java.splice.fees.ExpiringAmount
 import com.daml.network.history.*
 import com.daml.network.store.TxLogStore
 import com.daml.network.scan.store.TxLogEntry.*
 import com.daml.network.util.{Codec, ExerciseNode}
 import com.daml.network.util.CNNodeUtil.dollarsToCC
+import com.daml.network.util.TransactionTreeExtensions.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -65,9 +67,21 @@ class ScanTxLogParser(
           case LockedAmuletUnlock(_) =>
             State.empty
           case AnsRules_CollectInitialEntryPayment(_) =>
-            fromAnsEntryPaymentCollection(tree, exercised, domainId)
+            fromAnsEntryPaymentCollection(
+              tree,
+              exercised,
+              domainId,
+              sws.SubscriptionInitialPayment.COMPANION,
+              sws.SubscriptionInitialPayment.CHOICE_SubscriptionInitialPayment_Collect,
+            )(_.amulet)
           case AnsRules_CollectEntryRenewalPayment(_) =>
-            fromAnsEntryPaymentCollection(tree, exercised, domainId)
+            fromAnsEntryPaymentCollection(
+              tree,
+              exercised,
+              domainId,
+              sws.SubscriptionPayment.COMPANION,
+              sws.SubscriptionPayment.CHOICE_SubscriptionPayment_Collect,
+            )(_.amulet)
           case AmuletArchive(_) =>
             throw new RuntimeException(
               s"Unexpected amulet archive event for amulet ${exercised.getContractId} in transaction ${tree.getUpdateId}"
@@ -118,25 +132,31 @@ class ScanTxLogParser(
       )
     )
 
-  private def fromAnsEntryPaymentCollection(
+  private def fromAnsEntryPaymentCollection[Marker, Res](
       tree: TransactionTree,
       exercised: ExercisedEvent,
       domainId: DomainId,
+      paymentCollectionTemplate: codegen.ContractCompanion[?, ?, Marker],
+      paymentCollectionChoice: codegen.Choice[Marker, ?, Res],
+  )(
+      collectionProducedAmulet: Res => AmuletCreate.TCid
   )(implicit tc: TraceContext) = {
     // first child event is the initial subscription payment collected by DSO
-    val paymentCollectionEvent =
-      tree.getEventsById.get(exercised.getChildEventIds.get(0)) match {
-        case e: ExercisedEvent => e
-        case e =>
-          throw new RuntimeException(
-            s"Unable to parse event ${e.getEventId} as ExercisedEvent"
+    val (paymentCollectionEvent, producedAmulet) =
+      tree
+        .firstDescendantExercise(exercised, paymentCollectionTemplate, paymentCollectionChoice)
+        .map { case (e, pr) => (e, collectionProducedAmulet(pr)) }
+        .getOrElse {
+          sys.error(
+            s"Unable to find ${paymentCollectionChoice.name} in ${exercised.getChoice}"
           )
-      }
+        }
 
     val stateFromPaymentCollection = parseTree(tree, domainId, paymentCollectionEvent)
     State.fromCollectEntryPayment(
       tree,
       exercised,
+      producedAmulet,
       domainId,
       stateFromPaymentCollection,
     )
@@ -168,18 +188,13 @@ object ScanTxLogParser {
         a.appended(b)
     }
 
-    private def getAmuletFromSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+    private def getAmuletFromSummary(
         tx: TransactionTree,
-        ccsum: AmuletCreateSummary[T],
+        ccsum: AmuletCreateSummary[_ <: codegen.ContractId[AmuletCreate.T]],
     ) = {
-      val amuletCid = ccsum.amulet.contractId
-      tx.getEventsById.asScala
-        .collectFirst {
-          case (_, c: CreatedEvent) if c.getContractId == amuletCid => {
-            AmuletCreate.unapply(c).map(_.payload)
-          }
-        }
-        .flatten
+      val amuletCid = ccsum.amulet
+      tx.findCreation(AmuletCreate.companion, amuletCid)
+        .map(_.payload)
         .getOrElse {
           throw new RuntimeException(
             s"The amulet contract $amuletCid referenced by AmuletCreateSummary was not found in transaction ${tx.getUpdateId}"
@@ -187,14 +202,14 @@ object ScanTxLogParser {
         }
     }
 
-    def fromAmuletCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+    def fromAmuletCreateSummary(
         tx: TransactionTree,
         event: TreeEvent,
         domainId: DomainId,
-        ccsum: AmuletCreateSummary[T],
+        acsum: AmuletCreateSummary[_ <: codegen.ContractId[AmuletCreate.T]],
         activityType: TransactionType,
     ): State = {
-      val amulet = getAmuletFromSummary(tx, ccsum)
+      val amulet = getAmuletFromSummary(tx, acsum)
       val activityEntry: TransactionTxLogEntry = activityType match {
         case TransactionType.Tap =>
           TapTxLogEntry(
@@ -204,8 +219,8 @@ object ScanTxLogParser {
             date = Some(tx.getEffectiveAt),
             amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
             amuletAmount = amulet.amount.initialAmount,
-            amuletPrice = ccsum.amuletPrice,
-            round = ccsum.round.number,
+            amuletPrice = acsum.amuletPrice,
+            round = acsum.round.number,
           )
         case TransactionType.Mint =>
           MintTxLogEntry(
@@ -215,8 +230,8 @@ object ScanTxLogParser {
             date = Some(tx.getEffectiveAt),
             amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
             amuletAmount = amulet.amount.initialAmount,
-            amuletPrice = ccsum.amuletPrice,
-            round = ccsum.round.number,
+            amuletPrice = acsum.amuletPrice,
+            round = acsum.round.number,
           )
         case TransactionType.SvRewardCollected =>
           SvRewardCollectedTxLogEntry(
@@ -226,8 +241,8 @@ object ScanTxLogParser {
             date = Some(tx.getEffectiveAt),
             amuletOwner = PartyId.tryFromProtoPrimitive(amulet.owner),
             amuletAmount = amulet.amount.initialAmount,
-            amuletPrice = ccsum.amuletPrice,
-            round = ccsum.round.number,
+            amuletPrice = acsum.amuletPrice,
+            round = acsum.round.number,
           )
         case unexpected =>
           throw new Exception(
@@ -498,29 +513,35 @@ object ScanTxLogParser {
     def fromCollectEntryPayment(
         tx: TransactionTree,
         event: ExercisedEvent,
+        producedAmulet: codegen.ContractId[AmuletCreate.T],
         domainId: DomainId,
         stateFromPaymentCollection: State,
     ): State = {
-      // second child event is burning of transferred amulet by DSO
-      val amuletArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
+      val amuletArchiveEvent = tx
+        .findArchive(event, producedAmulet, splice.amulet.Amulet.CHOICE_Archive)
+        .getOrElse(sys.error(s"No archive of $producedAmulet in ${tx.getUpdateId}"))
       // Adjust tx log entries for DSO since the amulet it receives is immediately burnt
       val stateFromBurntAmulet =
-        State.fromAmuletArchiveEvent(tx, amuletArchiveEvent, domainId, Some(event.getEventId()))
+        State.fromAmuletArchiveEvent(
+          tx,
+          amuletArchiveEvent,
+          producedAmulet,
+          domainId,
+          Some(event.getEventId()),
+        )
       stateFromPaymentCollection.appended(stateFromBurntAmulet)
     }
 
     def fromAmuletArchiveEvent(
         tx: TransactionTree,
         event: TreeEvent,
+        producedAmulet: codegen.ContractId[AmuletCreate.T],
         domainId: DomainId,
         rootEventId: Option[String] = None,
     ): State = {
-      val burntAmulet = tx.getEventsById.asScala
-        .collectFirst {
-          case (_, c: CreatedEvent) if c.getContractId == event.getContractId =>
-            AmuletCreate.unapply(c).map(_.payload)
-        }
-        .flatten
+      val burntAmulet = tx
+        .findCreation(AmuletCreate.companion, producedAmulet)
+        .map(_.payload)
         .getOrElse(
           throw new RuntimeException(
             s"The amulet contract ${event.getContractId} " +

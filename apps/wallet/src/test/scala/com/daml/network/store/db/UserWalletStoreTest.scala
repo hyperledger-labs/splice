@@ -46,6 +46,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil
 import com.digitalasset.canton.{DomainAlias, HasActorSystem, HasExecutionContext}
 import org.scalatest.{Assertion, Succeeded}
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks.forAll as scForAll
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -276,7 +277,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       "return the latest entry" in {
         val trafficRequestCid = nextCid()
 
-        def mkBuyTrafficRequest(trackingId: String, cid: String)(offset: String) = {
+        def mkBuyTrafficRequest(
+            trackingId: String,
+            cid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
+        )(offset: String) = {
           mkBuyTrafficRequestTx(offset, trackingId, user1, participantId, dummyDomain, cid)
         }
         def mkCancelTrafficRequest(trackingId: String, reason: String, cid: String)(
@@ -287,7 +291,12 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
         for {
           store <- mkStore(user1)
-          _ <- dummyDomain.ingest(mkBuyTrafficRequest("trackingId", trafficRequestCid))(
+          _ <- dummyDomain.ingest(
+            mkBuyTrafficRequest(
+              "trackingId",
+              new trafficRequestCodegen.BuyTrafficRequest.ContractId(trafficRequestCid),
+            )
+          )(
             store.multiDomainAcsStore
           )
           cancelledTree <- dummyDomain.ingest(
@@ -308,6 +317,19 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         }
       }
 
+      "retrieve requests from batch operations without losing elements" in scForAll {
+        (n: Int, xs: List[Int]) =>
+          import com.daml.network.wallet.store.UserWalletTxLogParser.splitFirst
+          val withoutN = xs.filterNot(Set(n))
+          val withN = util.Random.shuffle(n +: xs)
+          val isN: Int PartialFunction Int = { case nn if n == nn => nn }
+          splitFirst(withoutN)(isN) shouldBe (withoutN, None) withClue "passthrough if no match"
+          inside(splitFirst(withN)(isN)) { case (prefix, Some((found, suffix))) =>
+            prefix ++ (found +: suffix) shouldBe withN
+          } withClue "finds match if it exists"
+          splitFirst(n +: withN)(isN) shouldBe
+            (List.empty, Some((n, withN))) withClue "prefers the first match"
+      }
     }
 
     "listExpiredAppPaymentRequests" should {
@@ -925,6 +947,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       currency: paymentCodegen.Unit,
       expiresAt: CantonTimestamp,
       trackingId: String = UUID.randomUUID().toString,
+      contractId: transferOffersCodegen.TransferOffer.ContractId =
+        new transferOffersCodegen.TransferOffer.ContractId(nextCid()),
   ) = {
     val templateId = transferOffersCodegen.TransferOffer.TEMPLATE_ID
     val template = new transferOffersCodegen.TransferOffer(
@@ -938,7 +962,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
     contract(
       identifier = templateId,
-      contractId = new transferOffersCodegen.TransferOffer.ContractId(nextCid()),
+      contractId = contractId,
       payload = template,
     )
   }
@@ -975,7 +999,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       trafficAmount: Long,
       expiresAt: CantonTimestamp,
       trackingId: String,
-      cid: String = nextCid(),
+      cid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
   ) = {
     val templateId = trafficRequestCodegen.BuyTrafficRequest.TEMPLATE_ID
     val template = new trafficRequestCodegen.BuyTrafficRequest(
@@ -990,7 +1014,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
     )
     contract(
       identifier = templateId,
-      contractId = new trafficRequestCodegen.BuyTrafficRequest.ContractId(cid),
+      contractId = cid,
       payload = template,
     )
   }
@@ -1255,6 +1279,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       transferOfferCid: String,
   ) = {
     val walletAppInstallCid = nextCid()
+    val transferOfferTCid = new transferOffersCodegen.TransferOffer.ContractId(transferOfferCid)
 
     mkExerciseTx(
       offset,
@@ -1272,7 +1297,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           trackingId,
         ).toValue,
         new installCodegen.WalletAppInstall_CreateTransferOfferResult(
-          new transferOffersCodegen.TransferOffer.ContractId(transferOfferCid)
+          transferOfferTCid
         ).toValue,
       ),
       Seq(
@@ -1284,6 +1309,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             paymentCodegen.Unit.CC,
             CantonTimestamp.now().plusSeconds(60),
             trackingId,
+            transferOfferTCid,
           ),
           Seq(sender, receiver),
         )
@@ -1338,7 +1364,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       buyer: PartyId,
       memberId: Member,
       domainId: DomainId,
-      trafficRequestCid: String,
+      trafficRequestCid: trafficRequestCodegen.BuyTrafficRequest.ContractId,
       trafficAmount: Long = 1_000_000L,
   ) = {
     val walletAppInstallCid = nextCid()
@@ -1360,7 +1386,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
           trackingId,
         ).toValue,
         new install.WalletAppInstall_CreateBuyTrafficRequestResult(
-          new trafficRequestCodegen.BuyTrafficRequest.ContractId(trafficRequestCid)
+          trafficRequestCid
         ).toValue,
       ),
       Seq(
@@ -1372,6 +1398,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             trafficAmount,
             CantonTimestamp.now().plusSeconds(60),
             trackingId,
+            trafficRequestCid,
           ),
           Seq(buyer),
         )

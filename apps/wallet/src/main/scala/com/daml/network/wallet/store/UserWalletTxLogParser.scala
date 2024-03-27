@@ -50,7 +50,8 @@ import com.daml.network.history.{
   Transfer,
 }
 import com.daml.network.store.TxLogStore
-import com.daml.network.util.ExerciseNode
+import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion}
+import com.daml.network.util.TransactionTreeExtensions.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
@@ -117,85 +118,56 @@ class UserWalletTxLogParser(
                           Either[InvalidTransferReason, Seq[ExercisedEvent]],
                       )
                     ],
-                    0,
+                    exercised.getChildEventIds.asScala.map(tree.getEventsById.asScala),
                   )
                 )({
-                  case ((result, nextChildEventId), r) => {
+                  case ((result, nextChildEvents), r) => {
                     r match {
                       case (op, outcome: COO_Error) =>
                         (
                           result.appended(
                             (op, outcome, Left(outcome.invalidTransferReasonValue))
                           ),
-                          nextChildEventId,
+                          nextChildEvents,
                         )
                       case (op: CO_BuyMemberTraffic, outcome) =>
                         // Special handling for CO_BuyMemberTraffic to associate multiple events with it.
-                        // Since we auto-tap amulets on DevNet, there will be 6 associated events.
-                        // - Archive (of the old ValidatorTopUpState)
-                        // - Create (of the new ValidatorTopUpState)
-                        // - AmuletRules_Fetch
-                        // - OpenMiningRound_Fetch
-                        // - AmuletRules_DevNet_Tap
-                        // - AmuletRules_BuyMemberTraffic
-                        // The first 4 of these are related to identifying the amount of CC to tap to cover
-                        // the purchase and then actually tapping it.
-                        // On non-DevNet, there will be only 4 associated events.
-                        // - Archive (of the old ValidatorTopUpState)
-                        // - Create (of the new ValidatorTopUpState)
-                        // - AmuletRules_Fetch
-                        // - AmuletRules_BuyMemberTraffic
-                        val (childEventCount, expectedChildExercisedEvents) = tree.getEventsById
-                          // assume non-DevNet if the fourth event is the BuyMemberTraffic choice
-                          .get(exercised.getChildEventIds.get(nextChildEventId + 3)) match {
-                          case e: ExercisedEvent if e.getChoice == "AmuletRules_BuyMemberTraffic" =>
-                            (4, Seq("Archive", "AmuletRules_Fetch", "AmuletRules_BuyMemberTraffic"))
-                          case _ =>
+                        // There will be several events until the final event, AmuletRules_BuyMemberTraffic.
+                        // We look for that event, and filter in only those interim events we
+                        // also want to add to the result, i.e. the AmuletRules_DevNet_Tap.
+                        import splice.amuletrules.AmuletRules as AR
+                        val finalEventChoice = AR.CHOICE_AmuletRules_BuyMemberTraffic.name
+                        val interimEventChoices = Set(AR.CHOICE_AmuletRules_DevNet_Tap.name)
+                        val (eventsOfInterest, remainingEvents) = splitFirst(nextChildEvents) {
+                          case e: ExercisedEvent if e.getChoice == finalEventChoice =>
+                            e
+                        } match {
+                          case (priorEvents, Some((bmtEvent, furtherChildEvents))) =>
                             (
-                              6,
-                              Seq(
-                                "Archive",
-                                "AmuletRules_Fetch",
-                                "OpenMiningRound_Fetch",
-                                "AmuletRules_DevNet_Tap",
-                                "AmuletRules_BuyMemberTraffic",
-                              ),
+                              priorEvents.collect {
+                                case e: ExercisedEvent if interimEventChoices(e.getChoice) =>
+                                  e
+                              } :+ bmtEvent,
+                              furtherChildEvents,
                             )
+                          case (allEvents, None) =>
+                            logger.warn {
+                              val remainingExercises =
+                                nextChildEvents.collect { case e: ExercisedEvent => e.getChoice }
+                              s"Expected events to include $finalEventChoice. Got $remainingExercises"
+                            }
+                            (Seq.empty, allEvents)
                         }
-
-                        val childExercisedEvents = exercised.getChildEventIds.asScala.toSeq
-                          .slice(nextChildEventId, nextChildEventId + childEventCount)
-                          .map(tree.getEventsById.get)
-                          .flatMap {
-                            case e: ExercisedEvent =>
-                              Seq(e)
-                            case e: CreatedEvent
-                                if e.getTemplateId.getEntityName == "ValidatorTopUpState" =>
-                              Seq()
-                            case e =>
-                              logger.warn(s"Unexpected event $e.")
-                              Seq()
-                          }
-                        if (childExercisedEvents.map(_.getChoice) != expectedChildExercisedEvents)
-                          logger.warn(
-                            s"Expected events $expectedChildExercisedEvents. Got ${childExercisedEvents
-                                .map(_.getChoice)}"
-                          )
-                        val eventsOfInterest = childExercisedEvents.filter(e =>
-                          Seq("AmuletRules_BuyMemberTraffic", "AmuletRules_DevNet_Tap")
-                            .contains(e.getChoice)
-                        )
                         (
-                          result.appended((op, outcome, Right(eventsOfInterest))),
-                          nextChildEventId + childEventCount,
+                          result.appended((op, outcome, Right(eventsOfInterest.toSeq))),
+                          remainingEvents,
                         )
                       case (op, outcome) =>
-                        val childEvent =
-                          tree.getEventsById.get(exercised.getChildEventIds.get(nextChildEventId))
-                        childEvent match {
-                          case e: ExercisedEvent =>
-                            (result.appended((op, outcome, Right(Seq(e)))), nextChildEventId + 1)
+                        nextChildEvents match {
+                          case (e: ExercisedEvent) +: furtherChildEvents =>
+                            (result.appended((op, outcome, Right(Seq(e)))), furtherChildEvents)
                           case _ =>
+                            // ...except if CO_BuyMemberTraffic is used
                             throw new RuntimeException(
                               "All child events of WalletAppInstall_ExecuteBatch should be exercise events"
                             )
@@ -269,11 +241,11 @@ class UserWalletTxLogParser(
           // TODO (#7153): these are not used for the Transaction History, and would benefit from being split off
           // ------------------------------------------------------------------
 
-          case WalletAppInstall_CreateTransferOffer(_) =>
-            now(State.fromCreateTransferOffer(tree, exercised))
+          case WalletAppInstall_CreateTransferOffer(ex) =>
+            now(State.fromCreateTransferOffer(tree, ex.result.value.transferOffer))
 
-          case TransferOffer_Accept(_) =>
-            now(State.fromTransferOfferAccept(tree, exercised))
+          case TransferOffer_Accept(ex) =>
+            now(State.fromTransferOfferAccept(tree, ex.result.value.acceptedTransferOffer))
 
           case TransferOffer_Reject(node) =>
             now(
@@ -355,8 +327,10 @@ class UserWalletTxLogParser(
           // Buy Traffic Requests
           // ------------------------------------------------------------------
 
-          case WalletAppInstall_CreateBuyTrafficRequest(_) =>
-            now(State.fromCreateBuyTrafficRequest(tree, exercised))
+          case WalletAppInstall_CreateBuyTrafficRequest(ex) =>
+            now(
+              State.fromCreateBuyTrafficRequest(tree, exercised, ex.result.value.buyTrafficRequest)
+            )
 
           case BuyTrafficRequest_Complete(node) =>
             // this creates different entries with different event ids:
@@ -639,7 +613,8 @@ class UserWalletTxLogParser(
               exercised,
               domainId,
               TransferTransactionSubtype.InitialEntryPaymentCollection,
-            )
+              SubscriptionInitialPayment_Collect,
+            )(_.amulet)
 
           case AnsRules_CollectEntryRenewalPayment(_) =>
             fromAnsEntryPaymentCollection(
@@ -647,7 +622,8 @@ class UserWalletTxLogParser(
               exercised,
               domainId,
               TransferTransactionSubtype.EntryRenewalPaymentCollection,
-            )
+              SubscriptionPayment_Collect,
+            )(_.amulet)
 
           // ------------------------------------------------------------------
           // Other
@@ -704,22 +680,28 @@ class UserWalletTxLogParser(
       exercised: ExercisedEvent,
       domainId: DomainId,
       transactionSubtype: TransferTransactionSubtype,
+      paymentCollection: ExerciseNodeCompanion,
+  )(
+      collectionProducedAmulet: paymentCollection.Res => AmuletCreate.TCid
   )(implicit tc: TraceContext): Eval[State] = {
     import Eval.defer
-    // first child event is the subscription payment collected by DSO
-    val paymentCollectionEvent =
-      tree.getEventsById.get(exercised.getChildEventIds.get(0)) match {
-        case e: ExercisedEvent => e
-        case e =>
-          throw new RuntimeException(
-            s"Unable to parse event ${e.getEventId} as ExercisedEvent"
+    // child events contain a subscription payment collected by DSO
+    val (paymentCollectionEvent, producedAmulet) =
+      tree
+        .firstDescendantExercise(exercised, paymentCollection.template, paymentCollection.choice)
+        .map { case (e, pr) => (e, collectionProducedAmulet(pr)) }
+        .getOrElse {
+          sys.error(
+            s"Unable to find ${paymentCollection.choice.name} in ${exercised.getChoice}"
           )
-      }
+        }
+
     defer(
       parseTree(tree, paymentCollectionEvent, domainId).map { stateFromPaymentCollection =>
         State.fromCollectEntryPayment(
           tree,
           exercised,
+          producedAmulet,
           stateFromPaymentCollection,
           transactionSubtype,
         )
@@ -870,23 +852,21 @@ object UserWalletTxLogParser {
     }
     def fromCreateTransferOffer(
         tx: TransactionTree,
-        event: ExercisedEvent,
+        offerCid: transferCodegen.TransferOffer.ContractId,
     ): State = {
-      val (offerCid, transferOffer) = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
-        case event: CreatedEvent =>
-          event.getContractId -> transferCodegen.TransferOffer
-            .valueDecoder()
-            .decode(event.getArguments)
-        case x =>
-          throw new RuntimeException(
-            s"Expected first child to be the CreatedEvent of a TransferOffer, but was $x"
-          )
-      }
+      val transferOffer =
+        tx.findCreation(transferCodegen.TransferOffer.COMPANION, offerCid)
+          .map(_.payload)
+          .getOrElse {
+            throw new RuntimeException(
+              s"Expected transaction to contain a TransferOffer $offerCid"
+            )
+          }
       fromTransferOfferOperation(
         transferOffer.trackingId,
         TransferOfferTxLogEntry.Status.Created(
           TransferOfferStatusCreated(
-            offerCid,
+            offerCid.contractId,
             tx.getUpdateId,
           )
         ),
@@ -897,24 +877,21 @@ object UserWalletTxLogParser {
 
     def fromTransferOfferAccept(
         tx: TransactionTree,
-        event: ExercisedEvent,
+        acceptedCid: transferCodegen.AcceptedTransferOffer.ContractId,
     ): State = {
-      val (acceptedCid, acceptedTransferOffer) =
-        tx.getEventsById.get(event.getChildEventIds.get(0)) match {
-          case event: CreatedEvent =>
-            event.getContractId -> transferCodegen.AcceptedTransferOffer
-              .valueDecoder()
-              .decode(event.getArguments)
-          case x =>
+      val acceptedTransferOffer =
+        tx.findCreation(transferCodegen.AcceptedTransferOffer.COMPANION, acceptedCid)
+          .map(_.payload)
+          .getOrElse {
             throw new RuntimeException(
-              s"Expected first child to be the CreatedEvent of a AcceptedTransferOffer, but was $x"
+              s"Expected transaction to contain an AcceptedTransferOffer $acceptedCid"
             )
-        }
+          }
       fromTransferOfferOperation(
         acceptedTransferOffer.trackingId,
         TransferOfferTxLogEntry.Status.Accepted(
           TransferOfferStatusAccepted(
-            acceptedCid,
+            acceptedCid.contractId,
             tx.getUpdateId,
           )
         ),
@@ -1038,17 +1015,16 @@ object UserWalletTxLogParser {
     def fromCreateBuyTrafficRequest(
         tx: TransactionTree,
         event: ExercisedEvent,
+        buyTrafficRequestId: trafficRequestCodegen.BuyTrafficRequest.ContractId,
     ): State = {
-      val buyTrafficRequest = tx.getEventsById.get(event.getChildEventIds.get(0)) match {
-        case event: CreatedEvent =>
-          trafficRequestCodegen.BuyTrafficRequest
-            .valueDecoder()
-            .decode(event.getArguments)
-        case x =>
-          throw new RuntimeException(
-            s"Expected first child to be the CreatedEvent of a BuyTrafficRequest, but was $x"
-          )
-      }
+      val buyTrafficRequest =
+        tx.findCreation(trafficRequestCodegen.BuyTrafficRequest.COMPANION, buyTrafficRequestId)
+          .map(_.payload)
+          .getOrElse {
+            throw new RuntimeException(
+              s"Expected descendants to contain a BuyTrafficRequest, but were ${tx.preorderDescendants(event).toSeq}"
+            )
+          }
       fromBuyTrafficRequestOperation(
         buyTrafficRequest.trackingId,
         BuyTrafficRequestTxLogEntry.Status.Created(BuyTrafficRequestStatusCreated()),
@@ -1131,13 +1107,13 @@ object UserWalletTxLogParser {
     def fromCollectEntryPayment(
         tx: TransactionTree,
         event: ExercisedEvent,
+        producedAmulet: ContractId[AmuletCreate.T],
         stateFromPaymentCollection: State,
         transactionSubtype: TransferTransactionSubtype,
     ): State = {
-      // second child event is burning of transferred amulet by DSO
-      val amuletArchiveEvent = tx.getEventsById.get(event.getChildEventIds.get(1))
-      // Adjust tx log entries for DSO since the amulet it receives is immediately burnt
-      val burntAmulet = getAmuletCreateEvent(tx, amuletArchiveEvent.getContractId)
+      // Adjust tx log entries for DSO since the amulet it receives is
+      // immediately burnt
+      val burntAmulet = getAmuletCreateEvent(tx, producedAmulet)
       val stateFromBurntAmulet = State.fromBurntAmulet(burntAmulet)
 
       stateFromPaymentCollection
@@ -1149,17 +1125,17 @@ object UserWalletTxLogParser {
     /** State from a choice that returns a `MintSummary`.
       * These are choices that create exactly one new amulet in their transaction subtree.
       */
-    def fromAmuletCreateSummary[T <: com.daml.ledger.javaapi.data.codegen.ContractId[_]](
+    def fromAmuletCreateSummary(
         tx: TransactionTree,
         event: TreeEvent,
-        ccsum: AmuletCreateSummary[T],
+        acsum: AmuletCreateSummary[_ <: ContractId[AmuletCreate.T]],
         transactionSubtype: BalanceChangeTransactionSubtype,
     ): State = {
       // Note: AmuletCreateSummary only contains the contract id of the new amulet, but not the amulet payload.
       // However, the new amulet is always created in the same transaction.
       // Instead of including the amulet price and owner in AmuletCreateSummary,
       // we locate the corresponding amulet create event in the transaction tree.
-      val amuletCid = ccsum.amulet.contractId
+      val amuletCid = acsum.amulet
       val amulet = getAmuletCreateEvent(tx, amuletCid)
       val newEntry = BalanceChangeTxLogEntry(
         eventId = event.getEventId,
@@ -1167,7 +1143,7 @@ object UserWalletTxLogParser {
         date = Some(tx.getEffectiveAt),
         amount = amulet.amount.initialAmount,
         receiver = amulet.owner,
-        amuletPrice = ccsum.amuletPrice,
+        amuletPrice = acsum.amuletPrice,
       )
       State(
         entries = immutable.Queue(newEntry)
@@ -1228,17 +1204,14 @@ object UserWalletTxLogParser {
       )
     )
 
-    private def getAmuletCreateEvent(tx: TransactionTree, cid: String) = {
-      tx.getEventsById.asScala
-        .collectFirst {
-          case (_, c: CreatedEvent) if c.getContractId == cid =>
-            AmuletCreate.unapply(c).map(_.payload)
-        }
-    }.flatten.getOrElse(
-      throw new RuntimeException(
-        s"The amulet contract $cid was not found in transaction ${tx.getUpdateId}"
-      )
-    )
+    private def getAmuletCreateEvent(tx: TransactionTree, cid: ContractId[AmuletCreate.T]) =
+      tx.findCreation(AmuletCreate.companion, cid)
+        .map(_.payload)
+        .getOrElse(
+          throw new RuntimeException(
+            s"The amulet contract $cid was not found in transaction ${tx.getUpdateId}"
+          )
+        )
   }
 
   private def parseSender(
@@ -1321,6 +1294,13 @@ object UserWalletTxLogParser {
           receiverFee = setDamlDecimalScale(BigDecimal(fee) * out.receiverFeeRatio),
         )
       }
+  }
+
+  private[network] def splitFirst[A, CC[_], C, Z](
+      fa: collection.SeqOps[A, CC, C] & C
+  )(p: A PartialFunction Z): (C, Option[(Z, C)]) = {
+    val pivot = fa indexWhere p.isDefinedAt
+    if (pivot < 0) (fa, None) else (fa take pivot, Some((p(fa(pivot)), fa drop (pivot + 1))))
   }
 
   /** Returns the input number modified such that it has the same number of decimal places as a daml decimal */

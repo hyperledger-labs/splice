@@ -23,7 +23,7 @@ public final class Choice<Tpl, ArgType, ResType> {
   final Function<ArgType, Value> encodeArg;
 
   final ValueDecoder<ArgType> argTypeDecoder;
-  final ValueDecoder<ResType> returnTypeDecoder;
+  public final ValueDecoder<ResType> returnTypeDecoder;
 
   final JsonLfDecoder<ArgType> argJsonDecoder;
   final JsonLfDecoder<ResType> resultJsonDecoder;
