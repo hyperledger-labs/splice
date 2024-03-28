@@ -140,9 +140,6 @@ class JoiningNodeInitializer(
         initConnection,
         config,
         participantAdminConnection,
-        clock,
-        retryProvider,
-        loggerFactory,
       )
       _ <- darUploads
       storeKey = SvStore.Key(svParty, dsoPartyId)

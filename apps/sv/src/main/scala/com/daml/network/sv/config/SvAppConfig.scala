@@ -11,7 +11,6 @@ import com.daml.network.config.{
   GcpBucketConfig,
   ParticipantBootstrapDumpConfig,
 }
-import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.sv.SvAppClientConfig
 import com.daml.network.util.CNNodeUtil
 import com.digitalasset.canton.DomainAlias
@@ -150,13 +149,6 @@ final case class SvSynchronizerConfig(
     global: SvDecentralizedSynchronizerConfig
 )
 
-final case class MigrateSvPartyConfig(
-    // The scan instance the ACS snapshot should be fetched from.
-    // We don't require a BFT read as ACS commitments are a sufficient indicator
-    // that something went wrong.
-    scan: ScanAppClientConfig
-)
-
 case class SvAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CNDbConfig,
@@ -180,8 +172,6 @@ case class SvAppBackendConfig(
     localSynchronizerNode: Option[SvSynchronizerNodeConfig],
     scan: Option[SvScanConfig],
     participantBootstrappingDump: Option[ParticipantBootstrapDumpConfig] = None,
-    // Migrate the SV party from an existing participant with the same namespace.
-    migrateSvParty: Option[MigrateSvPartyConfig] = None,
     identitiesDump: Option[BackupDumpConfig] = None,
     domainMigrationDumpPath: Option[Path] = None,
     // TODO(#9731): get migration id from sponsor sv / scan instead of configuring here

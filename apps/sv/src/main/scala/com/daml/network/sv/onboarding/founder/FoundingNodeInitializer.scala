@@ -130,9 +130,6 @@ class FoundingNodeInitializer(
           initConnection,
           config,
           participantAdminConnection,
-          clock,
-          retryProvider,
-          loggerFactory,
         ),
         participantAdminConnection.uploadDarFiles(
           requiredDars,

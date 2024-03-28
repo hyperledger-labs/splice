@@ -456,8 +456,6 @@ object CNNodeConfig {
       deriveReader[BackupDumpConfig]
     implicit val periodicBackupDumpConfigReader: ConfigReader[PeriodicBackupDumpConfig] =
       deriveReader[PeriodicBackupDumpConfig]
-    implicit val migrateSvPartyConfigReader: ConfigReader[MigrateSvPartyConfig] =
-      deriveReader[MigrateSvPartyConfig]
     implicit val extraBeneficiariesConfigReader: ConfigReader[Map[PartyId, BigDecimal]] =
       implicitly[ConfigReader[Map[String, BigDecimal]]].map(_.map { case (k, v) =>
         PartyId.tryFromProtoPrimitive(k) -> v
@@ -708,8 +706,6 @@ object CNNodeConfig {
       deriveWriter[BackupDumpConfig]
     implicit val periodicBackupDumpConfigWriter: ConfigWriter[PeriodicBackupDumpConfig] =
       deriveWriter[PeriodicBackupDumpConfig]
-    implicit val migrateSvPartyConfigWriter: ConfigWriter[MigrateSvPartyConfig] =
-      deriveWriter[MigrateSvPartyConfig]
     implicit val extraBeneficiariesConfigWriter: ConfigWriter[Map[PartyId, BigDecimal]] =
       implicitly[ConfigWriter[Map[String, BigDecimal]]].contramap(_.map { case (k, v) =>
         k.toProtoPrimitive -> v
