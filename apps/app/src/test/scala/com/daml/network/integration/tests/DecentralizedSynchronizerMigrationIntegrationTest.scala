@@ -2,20 +2,20 @@ package com.daml.network.integration.tests
 
 import better.files.File.apply
 import cats.implicits.catsSyntaxParallelTraverse1
-import com.daml.network.codegen.java.splice.types.Round
-import com.daml.network.codegen.java.splice.splitwell.Group
-import com.daml.network.codegen.java.splice.splitwell.balanceupdatetype.Transfer
-import com.daml.network.codegen.java.splice.dsorules.{SynchronizerUpgradeSchedule, DsoRules_AddSv}
+import com.daml.network.codegen.java.splice.dsorules.{DsoRules_AddSv, SynchronizerUpgradeSchedule}
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
+import com.daml.network.codegen.java.splice.splitwell.Group
+import com.daml.network.codegen.java.splice.splitwell.balanceupdatetype.Transfer
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.payment.ReceiverAmuletAmount
 import com.daml.network.config.{
   CNNodeConfigTransforms,
   CNParticipantClientConfig,
-  SynchronizerConfig,
   NetworkAppClientConfig,
+  SynchronizerConfig,
 }
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
 import com.daml.network.console.{
   CNParticipantClientReference,
   ScanAppBackendReference,
@@ -40,10 +40,9 @@ import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientCon
 import com.daml.network.scan.admin.api.client.commands.HttpScanAppClient.DomainSequencers
 import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
-import com.daml.network.splitwell.config.{SplitwellSynchronizerConfig, SplitwellDomains}
+import com.daml.network.splitwell.config.{SplitwellDomains, SplitwellSynchronizerConfig}
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
-import com.daml.network.sv.migration.DecentralizedSynchronizerMigrationTrigger
 import com.daml.network.sv.util.SvUtil
 import com.daml.network.util.{
   CNNodeUtil,
@@ -56,8 +55,8 @@ import com.daml.network.util.{
 }
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
 import com.daml.network.validator.config.{
-  ValidatorSynchronizerConfig,
   ValidatorDecentralizedSynchronizerConfig,
+  ValidatorSynchronizerConfig,
 }
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
@@ -85,7 +84,7 @@ import java.io.File
 import java.nio.file.Path
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
@@ -584,8 +583,8 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               upgradeSynchronizerNode3,
               upgradeSynchronizerNode4,
             )
-          val dsoPartyDecentralizedNamespace =
-            sv1Backend.appState.dsoStore.key.dsoParty.uid.namespace
+          val testDsoParty = dsoParty(env)
+          val dsoPartyDecentralizedNamespace = testDsoParty.uid.namespace
 
           val domainDynamicParams =
             sv1Backend.participantClientWithAdminToken.topology.domain_parameters
@@ -623,18 +622,11 @@ class DecentralizedSynchronizerMigrationIntegrationTest
             },
             // reset to not crash other tests
             {
-              // pausing SynchronizerUpgradeTrigger of all all old SV to avoid them from setting the confirmationRequestsMaxRate back to zero.
-              allNodes.foreach { node =>
-                node.oldBackend.dsoAutomation
-                  .trigger[DecentralizedSynchronizerMigrationTrigger]
-                  .pause()
-                  .futureValue
-              }
               clue(
                 s"reset confirmationRequestsMaxRate to ${domainDynamicParams.confirmationRequestsMaxRate} to not crash other tests"
               ) {
                 changeDomainRatePerParticipant(
-                  allNodes.map(_.oldBackend.appState.participantAdminConnection),
+                  allNodes.map(_.oldParticipantConnection),
                   domainDynamicParams.confirmationRequestsMaxRate,
                 )
               }
@@ -662,6 +654,24 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               }
             }
 
+            withClueAndLog("stopping old apps") {
+              stopAllAsync(
+                sv1Backend,
+                sv2Backend,
+                sv3Backend,
+                sv4Backend,
+                sv1ValidatorBackend,
+                sv2ValidatorBackend,
+                sv3ValidatorBackend,
+                sv4ValidatorBackend,
+                sv1ScanBackend,
+                sv2ScanBackend,
+                splitwellBackend,
+                splitwellValidatorBackend,
+                aliceValidatorBackend,
+              ).futureValue
+            }
+
             withClueAndLog("starting sv2-4 upgraded nodes") {
               startAllSync(
                 sv2LocalBackend,
@@ -670,7 +680,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
               )
             }
 
-            checkMigrateDomainOnNodes(majorityUpgradeNodes)
+            checkMigrateDomainOnNodes(majorityUpgradeNodes, testDsoParty)
 
             val namespaceChangeResult =
               withClueAndLog("decentralized namespace can be modified on the new domain") {
@@ -723,7 +733,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
 
             withClueAndLog("domain is unchanged on the old nodes") {
               eventuallySucceeds() {
-                sv1Backend.appState.participantAdminConnection
+                upgradeSynchronizerNode1.oldParticipantConnection
                   .getDecentralizedNamespaceDefinition(
                     decentralizedSynchronizerId,
                     dsoPartyDecentralizedNamespace,
@@ -732,7 +742,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   .mapping
                   .owners
                   .forgetNE should have size 4
-                sv1Backend.appState.participantAdminConnection
+                upgradeSynchronizerNode1.oldParticipantConnection
                   .getDomainParametersState(
                     decentralizedSynchronizerId
                   )
@@ -910,39 +920,6 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                 sv1LocalBackend.stop()
                 svb("sv1LocalOnboarded").startSync()
               }
-            }
-
-            withClueAndLog("old domain can be unpaused") {
-              clue("old domain is paused") {
-                sv1Backend.appState.participantAdminConnection
-                  .getDomainParametersState(
-                    decentralizedSynchronizerId
-                  )
-                  .futureValue
-                  .mapping
-                  .parameters
-                  .confirmationRequestsMaxRate shouldBe NonNegativeInt.zero
-              }
-
-              actAndCheck(
-                "all sv propose to unpause the old domain",
-                Seq(sv1Backend, sv2Backend, sv3Backend, sv4Backend).parTraverse { svBackend =>
-                  Future {
-                    svBackend.unpauseDecentralizedSynchronizer()
-                  }
-                }.futureValue,
-              )(
-                "old domain is un-paused",
-                _ =>
-                  sv1Backend.appState.participantAdminConnection
-                    .getDomainParametersState(
-                      decentralizedSynchronizerId
-                    )
-                    .futureValue
-                    .mapping
-                    .parameters
-                    .confirmationRequestsMaxRate should be > NonNegativeInt.zero,
-              )
             }
           }
       }

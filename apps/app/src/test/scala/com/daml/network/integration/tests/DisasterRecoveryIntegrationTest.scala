@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import better.files.File
 import better.files.File.apply
 import com.daml.network.config.{CNNodeConfigTransforms, NetworkAppClientConfig}
-import com.daml.network.config.CNNodeConfigTransforms.{ConfigurableApp, updateAutomationConfig}
+import com.daml.network.config.CNNodeConfigTransforms.{updateAutomationConfig, ConfigurableApp}
 import com.daml.network.console.{ScanAppBackendReference, SvAppBackendReference}
 import com.daml.network.environment.{CNNodeEnvironmentImpl, RetryProvider}
 import com.daml.network.http.v0.definitions.TransactionHistoryRequest
@@ -14,7 +14,7 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.integration.CNNodeEnvironmentDefinition
 import com.daml.network.scan.admin.api.client.BftScanConnection.BftScanClientConfig.TrustSingle
 import com.daml.network.sv.automation.singlesv.ReceiveSvRewardCouponTrigger
-import com.daml.network.sv.config.{SvSynchronizerConfig, SvDecentralizedSynchronizerConfig}
+import com.daml.network.sv.config.{SvDecentralizedSynchronizerConfig, SvSynchronizerConfig}
 import com.daml.network.sv.config.SvOnboardingConfig.DomainMigration
 import com.daml.network.sv.migration.{
   DomainDataSnapshot,
@@ -30,8 +30,8 @@ import com.daml.network.util.{
 }
 import com.daml.network.util.DomainMigrationUtil.testDumpDir
 import com.daml.network.validator.config.{
-  ValidatorSynchronizerConfig,
   ValidatorDecentralizedSynchronizerConfig,
+  ValidatorSynchronizerConfig,
 }
 import com.daml.network.wallet.store.BalanceChangeTxLogEntry
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -317,6 +317,7 @@ class DisasterRecoveryIntegrationTest
             retryProvider,
             env.environment.config.monitoring.logging.api,
             28,
+            27,
           ),
           createUpgradeNode(
             2,
@@ -325,6 +326,7 @@ class DisasterRecoveryIntegrationTest
             retryProvider,
             env.environment.config.monitoring.logging.api,
             28,
+            27,
           ),
           createUpgradeNode(
             3,
@@ -333,6 +335,7 @@ class DisasterRecoveryIntegrationTest
             retryProvider,
             env.environment.config.monitoring.logging.api,
             28,
+            27,
           ),
           createUpgradeNode(
             4,
@@ -341,6 +344,7 @@ class DisasterRecoveryIntegrationTest
             retryProvider,
             env.environment.config.monitoring.logging.api,
             28,
+            27,
           ),
         ) {
           case (
@@ -384,7 +388,7 @@ class DisasterRecoveryIntegrationTest
               )
             }
 
-            checkMigrateDomainOnNodes(allNodes)
+            checkMigrateDomainOnNodes(allNodes, dsoParty)
 
             withClueAndLog("Old balance has been transferred to new domain") {
               assertInRange(

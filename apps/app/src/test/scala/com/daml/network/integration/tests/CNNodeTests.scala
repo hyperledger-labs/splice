@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import cats.syntax.parallel.*
 import com.auth0.exception.Auth0Exception
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.MetricsContext
@@ -26,6 +27,7 @@ import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.digitalasset.canton.tracing.TracingConfig.Tracer
 import io.opentelemetry.api.{GlobalOpenTelemetry, OpenTelemetry}
+import com.digitalasset.canton.util.FutureInstances.parallelFuture
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer
 import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
 import org.apache.pekko.Done
@@ -36,6 +38,7 @@ import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.{Matcher, MatchResult}
 
 import scala.annotation.nowarn
+import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.*
 import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
@@ -442,6 +445,12 @@ object CNNodeTests {
     protected def startAllSync(nodes: CNNodeAppBackendReference*): Unit = {
       nodes.foreach(_.start())
       nodes.foreach(_.waitForInitialization())
+    }
+
+    protected def stopAllAsync(
+        nodes: CNNodeAppBackendReference*
+    )(implicit ec: ExecutionContext): Future[Unit] = {
+      nodes.parTraverse(node => Future { node.stop() }).map(_ => ())
     }
 
     def registerHttpConnectionPoolsCleanup(implicit
