@@ -17,7 +17,6 @@ import com.daml.network.sv.config.InitialAnsConfig
 import scala.concurrent.{ExecutionContext, Future}
 import com.digitalasset.canton.util.FutureInstances.*
 import cats.syntax.parallel.*
-import com.daml.network.automation.Trigger
 import com.daml.network.http.v0.definitions
 import com.daml.network.scan.dso.DsoAnsResolver
 import com.daml.network.sv.automation.leaderbased.{
@@ -322,10 +321,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
       setTriggersWithin[Assertion](
         triggersToPauseAtStart = Seq(aliceSubscriptionReadyForPaymentTrigger),
-        triggersToResumeAtStart = Seq[Trigger](
-          leaderExpiredAnsEntryTrigger,
-          sv1Backend.leaderBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger],
-        ),
+        triggersToResumeAtStart = Seq(leaderExpiredAnsEntryTrigger),
       ) {
 
         val ansRules = sv1ScanBackend.getAnsRules()
@@ -367,14 +363,33 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         eventually() {
           lookupEntryByName(testEntryName) shouldBe empty
         }
-        // Wait for subscription to be expired.
-        eventually() {
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(subCodegen.Subscription.COMPANION)(aliceUserParty) shouldBe empty
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(subCodegen.SubscriptionIdleState.COMPANION)(aliceUserParty) shouldBe empty
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
-            .filterJava(codegen.AnsEntryContext.COMPANION)(aliceUserParty) shouldBe empty
+        withClue("subscription expires even with disabled trigger") {
+          eventually() {
+            aliceWalletClient.listSubscriptions() shouldBe empty
+          }
+        }
+        setTriggersWithin(
+          Seq.empty,
+          triggersToResumeAtStart =
+            Seq(sv1Backend.leaderBasedAutomation.trigger[ExpiredAnsSubscriptionTrigger]),
+        ) {
+          withClue("contracts removed with subscription trigger reenabled") {
+            // Wait for subscription to be expired.
+            eventually() {
+              import com.daml.network.store.MultiDomainAcsStore.ConstrainedTemplate
+              forEvery(
+                Table[ConstrainedTemplate](
+                  "template",
+                  subCodegen.Subscription.COMPANION,
+                  subCodegen.SubscriptionIdleState.COMPANION,
+                  codegen.AnsEntryContext.COMPANION,
+                )
+              ) { companion =>
+                aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+                  .filterJava(companion)(aliceUserParty) shouldBe empty
+              }
+            }
+          }
         }
       }
     }
