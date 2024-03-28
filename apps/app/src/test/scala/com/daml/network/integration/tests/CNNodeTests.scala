@@ -1,8 +1,5 @@
 package com.daml.network.integration.tests
 
-import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
-import org.apache.pekko.Done
-import org.apache.pekko.http.scaladsl.Http
 import com.auth0.exception.Auth0Exception
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.metrics.api.MetricsContext
@@ -28,42 +25,51 @@ import com.digitalasset.canton.metrics.MetricsFactoryType.External
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.telemetry.OpenTelemetryFactory
 import com.digitalasset.canton.tracing.TracingConfig.Tracer
+import io.opentelemetry.api.{GlobalOpenTelemetry, OpenTelemetry}
 import io.opentelemetry.exporter.prometheus.PrometheusHttpServer
+import org.apache.pekko.actor.{ActorSystem, CoordinatedShutdown}
+import org.apache.pekko.Done
+import org.apache.pekko.http.scaladsl.Http
 import org.scalactic.source
+import org.scalatest.{AppendedClues, BeforeAndAfterEach}
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.{Matcher, MatchResult}
-import org.scalatest.{AppendedClues, BeforeAndAfterEach}
 
 import scala.annotation.nowarn
 import scala.concurrent.duration.*
 import scala.language.implicitConversions
 import scala.math.BigDecimal.RoundingMode
-import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 import scala.util.chaining.scalaUtilChainingOps
+import scala.util.control.NonFatal
 
 /** Analogue to Canton's CommunityTests */
 object CNNodeTests {
-  private val configuredOpenTelemetry = OpenTelemetryFactory
-    .initializeOpenTelemetry(
-      initializeGlobalOpenTelemetry = true,
-      attachReporters = sdkMeterProviderBuilder => {
-        sdkMeterProviderBuilder.registerMetricReader(
-          PrometheusHttpServer
-            .builder()
-            .setHost("localhost")
-            .setPort(25001)
-            .build()
+  private val configuredOpenTelemetry: OpenTelemetry =
+    Option(GlobalOpenTelemetry.get()).getOrElse(
+      OpenTelemetryFactory
+        .initializeOpenTelemetry(
+          initializeGlobalOpenTelemetry = true,
+          attachReporters = sdkMeterProviderBuilder => {
+            sdkMeterProviderBuilder.registerMetricReader(
+              PrometheusHttpServer
+                .builder()
+                .setHost("localhost")
+                .setPort(25001)
+                .build()
+            )
+          },
+          metricsEnabled = true,
+          config = Tracer(),
+          histograms = Seq.empty,
+          loggerFactory = NamedLoggerFactory.root,
         )
-      },
-      metricsEnabled = true,
-      config = Tracer(),
-      histograms = Seq.empty,
-      loggerFactory = NamedLoggerFactory.root,
+        .tap { otel =>
+          sys.addShutdownHook(otel.close())
+        }
+        .openTelemetry
     )
-    .tap { otel =>
-      sys.addShutdownHook(otel.close())
-    }
+
   type CNNodeTestConsoleEnvironment = TestConsoleEnvironment[CNNodeEnvironmentImpl]
   type SharedCNNodeEnvironment =
     SharedEnvironment[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment]
@@ -79,7 +85,7 @@ object CNNodeTests {
     override lazy val testInfrastructureMetricsFactory: CantonLabeledMetricsFactory = {
       CNNodeMetricsFactory
         .forConfig(
-          configuredOpenTelemetry.openTelemetry.getMeterProvider,
+          configuredOpenTelemetry.getMeterProvider,
           metricsFactoryType = External,
         )
         .createLabeledMetricsFactory(MetricsContext.Empty)
