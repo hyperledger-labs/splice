@@ -344,6 +344,7 @@ lazy val `apps-common` =
   project
     .in(file("apps/common"))
     .dependsOn(
+      `canton-bindings-java` % "test->test",
       `canton-community-common`,
       `canton-community-app` % "compile->compile;test->test",
       `canton-community-testing` % "test",

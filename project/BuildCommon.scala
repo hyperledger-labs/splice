@@ -1161,7 +1161,7 @@ object BuildCommon {
         `canton-ledger-api`
       )
       .settings(
-        removeTestSources,
+        disableTests,
         sharedSettings,
         compileOrder := CompileOrder.JavaThenScala,
         libraryDependencies ++= Seq(
