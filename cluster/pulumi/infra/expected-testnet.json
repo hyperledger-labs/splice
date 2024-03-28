@@ -1250,6 +1250,7 @@
           "logAsJson": true
         },
         "meshConfig": {
+          "accessLogEncoding": "JSON",
           "accessLogFile": "/dev/stdout",
           "enablePrometheusMerge": false
         }

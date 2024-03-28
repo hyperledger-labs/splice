@@ -54,6 +54,8 @@ function configureIstiod(
         meshConfig: {
           // Turns on envoy logging
           accessLogFile: '/dev/stdout',
+          // taken from https://github.com/istio/istio/issues/37682
+          accessLogEncoding: 'JSON',
           // https://istio.io/latest/docs/ops/integrations/prometheus/#option-1-metrics-merging disable as we don't use annotations
           enablePrometheusMerge: false,
         },
