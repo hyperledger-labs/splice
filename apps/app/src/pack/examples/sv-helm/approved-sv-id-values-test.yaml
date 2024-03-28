@@ -15,3 +15,6 @@ approvedSvIdentities:
   - name: Global-Synchronizer-Foundation
     publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==
     rewardWeightBps: 120000
+  - name: Orb-1-LP
+    publicKey: MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEJjVrU8AbQM12OyHwsoI1uHNQrtOYO5IFbB7w46F+ivPWSIo+7nqh5nKYFkFoMNPEYGUwrO57N12rj8Dyb0ldDg==
+    rewardWeightBps: 100000
