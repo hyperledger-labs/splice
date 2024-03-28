@@ -147,41 +147,14 @@ export async function installNode(
       },
       ingress: {
         decentralizedSynchronizer: {
-          activeMigrationId: decentralizedSynchronizerMigrationConfig.active.migrationId.toString(),
+          migrationIds: decentralizedSynchronizerMigrationConfig
+            .allMigrationInfos()
+            .map(x => x.migrationId.toString()),
         },
       },
     },
     defaultVersion,
     ingressImagePullDeps.concat([sv, validator])
-  );
-  installMigrationIdSpecificComponent(
-    decentralizedSynchronizerMigrationConfig,
-    (migrationId, _, version) => {
-      installCNRunbookHelmChartByNamespaceName(
-        xns.logicalName,
-        xns.logicalName,
-        `cluster-ingress-sv-domain-${migrationId}`,
-        'cn-cluster-ingress-runbook',
-        {
-          cluster: {
-            hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-            svNamespace: svNamespaceStr,
-          },
-          ingress: {
-            wallet: false,
-            ans: false,
-            scan: false,
-            sequencer: true,
-            sv: false,
-            decentralizedSynchronizer: {
-              migrationId: migrationId.toString(),
-            },
-          },
-        },
-        version,
-        ingressImagePullDeps.concat([sv])
-      );
-    }
   );
 }
 

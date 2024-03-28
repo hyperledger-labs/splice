@@ -1,13 +1,15 @@
 {{- if and .Values.ingress.sequencer .Values.withSvIngress }}
-  {{- if ((.Values.ingress).decentralizedSynchronizer).activeMigrationId }}
+{{- $cluster := .Values.cluster }}
+{{- $releaseNamespace := .Release.Namespace }}
+{{- range $migrationId := .Values.ingress.decentralizedSynchronizer.migrationIds }}
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: sequencer-sv-{{ (.Values.cluster).svNamespace }}
-  namespace: {{ .Release.Namespace }}
+  name: sequencer-{{ $cluster.svNamespace }}-domain-{{ $migrationId }}
+  namespace: {{ $releaseNamespace }}
 spec:
   hosts:
-    - "sequencer.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
+    - "sequencer-{{ $migrationId }}.{{ $cluster.svNamespace }}.{{ $cluster.hostPrefix }}{{ $cluster.hostname }}"
   gateways:
     - cluster-ingress/cn-http-gateway
   http:
@@ -17,28 +19,7 @@ spec:
         - destination:
             port:
               number: 5008
-            host: global-domain-{{ .Values.ingress.decentralizedSynchronizer.activeMigrationId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
+            host: global-domain-{{ $migrationId }}-sequencer.{{ $cluster.svNamespace }}.svc.cluster.local
 ---
-  {{- end }}
-  {{- if ((.Values.ingress).decentralizedSynchronizer).migrationId }}
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: sequencer-{{ (.Values.cluster).svNamespace }}-domain-{{ .Values.ingress.decentralizedSynchronizer.migrationId }}
-  namespace: {{ .Release.Namespace }}
-spec:
-  hosts:
-    - "sequencer-{{ .Values.ingress.decentralizedSynchronizer.migrationId }}.{{ (.Values.cluster).svNamespace }}.{{ (.Values.cluster).hostPrefix }}{{ (.Values.cluster).hostname }}"
-  gateways:
-    - cluster-ingress/cn-http-gateway
-  http:
-    - match:
-        - port: 443
-      route:
-        - destination:
-            port:
-              number: 5008
-            host: global-domain-{{ .Values.ingress.decentralizedSynchronizer.migrationId }}-sequencer.{{ (.Values.cluster).svNamespace }}.svc.cluster.local
----
-  {{- end }}
+{{- end }}
 {{- end }}

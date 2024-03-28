@@ -1128,8 +1128,9 @@
         "ingress": {
           "ans": true,
           "decentralizedSynchronizer": {
-            "activeMigrationId": "",
-            "migrationId": ""
+            "migrationIds": [
+              "0"
+            ]
           },
           "scan": true,
           "sequencer": true,
@@ -1719,48 +1720,6 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-domain-0",
-      "namespace": "sv-1",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "hostPrefix": "svc.",
-          "hostname": "mock.network.canton.global",
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet",
-          "svNamespace": "sv-1"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "ingress": {
-          "ans": false,
-          "decentralizedSynchronizer": {
-            "activeMigrationId": "",
-            "migrationId": "0"
-          },
-          "scan": false,
-          "sequencer": true,
-          "splitwell": false,
-          "sv": false,
-          "wallet": false
-        },
-        "withSvIngress": true
-      }
-    },
-    "name": "sv-1-ingress-domain-0",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
-      "compat": "true",
       "name": "ingress-sv",
       "namespace": "sv-1",
       "timeout": 480,
@@ -1781,8 +1740,9 @@
         "ingress": {
           "ans": true,
           "decentralizedSynchronizer": {
-            "activeMigrationId": "0",
-            "migrationId": ""
+            "migrationIds": [
+              "0"
+            ]
           },
           "scan": true,
           "sequencer": true,
@@ -2669,48 +2629,6 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-domain-0",
-      "namespace": "sv-2",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "hostPrefix": "svc.",
-          "hostname": "mock.network.canton.global",
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet",
-          "svNamespace": "sv-2"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "ingress": {
-          "ans": false,
-          "decentralizedSynchronizer": {
-            "activeMigrationId": "",
-            "migrationId": "0"
-          },
-          "scan": false,
-          "sequencer": true,
-          "splitwell": false,
-          "sv": false,
-          "wallet": false
-        },
-        "withSvIngress": true
-      }
-    },
-    "name": "sv-2-ingress-domain-0",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
-      "compat": "true",
       "name": "ingress-sv",
       "namespace": "sv-2",
       "timeout": 480,
@@ -2731,8 +2649,9 @@
         "ingress": {
           "ans": true,
           "decentralizedSynchronizer": {
-            "activeMigrationId": "0",
-            "migrationId": ""
+            "migrationIds": [
+              "0"
+            ]
           },
           "scan": true,
           "sequencer": true,
@@ -3581,48 +3500,6 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-domain-0",
-      "namespace": "sv-3",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "hostPrefix": "svc.",
-          "hostname": "mock.network.canton.global",
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet",
-          "svNamespace": "sv-3"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "ingress": {
-          "ans": false,
-          "decentralizedSynchronizer": {
-            "activeMigrationId": "",
-            "migrationId": "0"
-          },
-          "scan": false,
-          "sequencer": true,
-          "splitwell": false,
-          "sv": false,
-          "wallet": false
-        },
-        "withSvIngress": true
-      }
-    },
-    "name": "sv-3-ingress-domain-0",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
-      "compat": "true",
       "name": "ingress-sv",
       "namespace": "sv-3",
       "timeout": 480,
@@ -3643,8 +3520,9 @@
         "ingress": {
           "ans": true,
           "decentralizedSynchronizer": {
-            "activeMigrationId": "0",
-            "migrationId": ""
+            "migrationIds": [
+              "0"
+            ]
           },
           "scan": true,
           "sequencer": true,
@@ -4493,48 +4371,6 @@
     "inputs": {
       "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
       "compat": "true",
-      "name": "ingress-domain-0",
-      "namespace": "sv-4",
-      "timeout": 480,
-      "values": {
-        "cluster": {
-          "basename": "mock",
-          "dnsName": "mock.network.canton.global",
-          "fixedTokens": false,
-          "hostPrefix": "svc.",
-          "hostname": "mock.network.canton.global",
-          "imageTag": "0.0.1-deadbeef",
-          "name": "cn-mocknet",
-          "svNamespace": "sv-4"
-        },
-        "clusterUrl": "mock.network.canton.global",
-        "defaultJvmOptions": "-Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8",
-        "imageRepo": "us-central1-docker.pkg.dev/da-cn-shared/cn-images",
-        "ingress": {
-          "ans": false,
-          "decentralizedSynchronizer": {
-            "activeMigrationId": "",
-            "migrationId": "0"
-          },
-          "scan": false,
-          "sequencer": true,
-          "splitwell": false,
-          "sv": false,
-          "wallet": false
-        },
-        "withSvIngress": true
-      }
-    },
-    "name": "sv-4-ingress-domain-0",
-    "provider": "",
-    "type": "kubernetes:helm.sh/v3:Release"
-  },
-  {
-    "custom": true,
-    "id": "",
-    "inputs": {
-      "chart": "/cluster/helm/cn-cluster-ingress-runbook/",
-      "compat": "true",
       "name": "ingress-sv",
       "namespace": "sv-4",
       "timeout": 480,
@@ -4555,8 +4391,9 @@
         "ingress": {
           "ans": true,
           "decentralizedSynchronizer": {
-            "activeMigrationId": "0",
-            "migrationId": ""
+            "migrationIds": [
+              "0"
+            ]
           },
           "scan": true,
           "sequencer": true,
@@ -5249,7 +5086,9 @@
           "ans": true,
           "decentralizedSynchronizer": {
             "activeMigrationId": "0",
-            "migrationId": ""
+            "migrationIds": [
+              "0"
+            ]
           },
           "scan": true,
           "sequencer": true,

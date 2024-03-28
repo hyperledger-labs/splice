@@ -12,8 +12,7 @@ ingress:
   sequencer: true
   splitwell: false
   decentralizedSynchronizer:
-    migrationId: ""
-    activeMigrationId: ""
+    migrationIds: ["0"]
 
 # k8s affinity for all deployed pods (optional)
 # affinity:

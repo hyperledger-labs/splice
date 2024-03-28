@@ -76,7 +76,7 @@ trait PreflightIntegrationTestUtil extends DomainMigrationIntegrationTestUtil {
 
 trait DomainMigrationIntegrationTestUtil {
 
-  protected val migrationId: Long = sys.env.getOrElse("CN_MIGRATION_DOMAIN_INDEX", "0").toLong
+  protected val migrationId: Long = sys.env.getOrElse("MIGRATION_ID", "0").toLong
 
   protected def domainMigrationCNNodeConfigTransforms(
       config: CNNodeConfig

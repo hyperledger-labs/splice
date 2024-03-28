@@ -28,6 +28,9 @@ Release Notes
 * Sequencer pruning period has been adjusted to 30 days and pruning interval has been reduced to 1 hour.
   Adjust ``sequencerPruningConfig.pruningInterval`` and ``sequencerPruningConfig.retentionPeriod`` in your ``sv-values.yaml`` to match the example ``sv-values.yaml``.
 
+* The sequencer URL of the Digital Asset 2 node ``https://sequencer.sv-1.svc.CLUSTER.network.canton.global`` is no longer exposed. Instead use
+  ``https://sequencer-MIGRATION_ID.sv-1.svc.CLUSTER.network.canton.global`` where ``MIGRATION_ID`` is the current migration id of the cluster.
+
 
 2024-03-25
 ----------

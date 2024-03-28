@@ -21,11 +21,11 @@ Following the :ref:`recommended topology <topology_image>` for
 deploying Canton network applications, we run a separate validator
 node for our application.
 
-To start the validator node, first start the validator participant using the Canton binary and connect it to the domain:
+To start the validator node, first start the validator participant using the Canton binary and connect it to the domain. Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 .. parsed-literal::
 
-    DOMAIN_URL=https://sequencer.sv-1.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
+    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
 
 Before starting the splitwell backend, some setup is required:
 
@@ -60,11 +60,12 @@ As when setting up a self-hosted validator, you need a super validator to provid
 
      curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
-...and then start the splitwell validator with this configuration file and the onboarding config you just obtained:
+...and then start the splitwell validator with this configuration file and the onboarding config you just obtained.
+Replace ``$MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/splitwell/splitwell-validator.conf --config validator-onboarding.conf
+  NETWORK_APPS_ADDRESS_PROTOCOL=https MIGRATION_ID=$MIGRATION_ID NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/splitwell/splitwell-validator.conf --config validator-onboarding.conf
 
 Now you can finally start the app backend. Splitwell is included as
 part of the standard release so it is started using the same binary.
@@ -127,11 +128,11 @@ First, start the splitwell domain ::
 
   ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-domain.conf
 
-Next, in a separate terminal, start the participant again using the same command that we used in the single-domain setup:
+Next, in a separate terminal, start the participant again using the same command that we used in the single-domain setup. Replace ``MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 .. parsed-literal::
 
-    DOMAIN_URL=https://sequencer.sv-1.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
+    DOMAIN_URL=https://sequencer-MIGRATION_ID.sv-1.svc.|cn_cluster|.network.canton.global ../|canton_subdir|/bin/canton --config examples/splitwell/splitwell-participant.conf
 
 Once the console opened, connect it to the domain you started earlier ::
 
@@ -150,11 +151,11 @@ Save the configuration you got from your sponsoring SV under ``validator-onboard
 
      curl -X POST https://sv.sv-1.svc.\ |cn_cluster|.network.canton.global/api/sv/v0/devnet/onboard/validator/prepare | xargs -I _ sed 's#PLACEHOLDER#_#' examples/validator/validator-onboarding-nosecret.conf > validator-onboarding.conf
 
-Next start up the validator:
+Next start up the validator. Replace ``$MIGRATION_ID`` with the migration ID of the global synchronizer on your target cluster.
 
 .. parsed-literal::
 
-  NETWORK_APPS_ADDRESS_PROTOCOL=https NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/splitwell/splitwell-validator.conf --config validator-onboarding.conf
+  NETWORK_APPS_ADDRESS_PROTOCOL=https MIGRATION_ID=$MIGRATION_ID NETWORK_APPS_ADDRESS=\ |cn_cluster|.network.canton.global bin/cn-node --config examples/splitwell/splitwell-validator.conf --config validator-onboarding.conf
 
 And now start the app backend. Note that this time, we are configuring it to operate on the domain we started earlier:
 

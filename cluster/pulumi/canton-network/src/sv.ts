@@ -123,7 +123,6 @@ export interface SvConfig extends StaticSvConfig {
 }
 
 type InstalledMigrationSpecificSv = {
-  ingress: Release;
   decentralizedSynchronizer: DecentralizedSynchronizerNode;
   participant: Release;
 };
@@ -276,7 +275,7 @@ export async function installSvNode(
     scan
   );
 
-  const activeIngress = installCNHelmChart(
+  const ingress = installCNHelmChart(
     xns,
     'ingress-sv',
     'cn-cluster-ingress-runbook',
@@ -284,7 +283,9 @@ export async function installSvNode(
       withSvIngress: true,
       ingress: {
         decentralizedSynchronizer: {
-          activeMigrationId: decentralizedSynchronizerUpgradeConfig.active.migrationId.toString(),
+          migrationIds: decentralizedSynchronizerUpgradeConfig
+            .allMigrationInfos()
+            .map(x => x.migrationId.toString()),
         },
       },
       cluster: {
@@ -296,7 +297,7 @@ export async function installSvNode(
     { dependsOn: [xns.ns] }
   );
 
-  return { ...activeMigrationComponents, validatorApp, svApp, scan, ingress: activeIngress };
+  return { ...activeMigrationComponents, validatorApp, svApp, scan, ingress };
 }
 
 function persistenceConfig(postgresDb: postgres.Postgres, dbName: string): PersistenceConfig {
@@ -421,33 +422,9 @@ function installMigrationIdSpecificComponents(
         svConfig.onboardingName,
         version
       );
-      const migrationIngress = installCNHelmChart(
-        xns,
-        'ingress-domain-' + migrationId,
-        'cn-cluster-ingress-runbook',
-        {
-          ingress: {
-            wallet: false,
-            ans: false,
-            scan: false,
-            sequencer: true,
-            sv: false,
-            decentralizedSynchronizer: {
-              migrationId: migrationId.toString(),
-            },
-          },
-          cluster: {
-            hostname: `${CLUSTER_BASENAME}.network.canton.global`,
-            svNamespace: xns.logicalName,
-          },
-        },
-        version,
-        { dependsOn: [xns.ns] }
-      );
       return {
         decentralizedSynchronizer: decentralizedSynchronizerNode,
         participant: participant,
-        ingress: migrationIngress,
       };
     }
   );

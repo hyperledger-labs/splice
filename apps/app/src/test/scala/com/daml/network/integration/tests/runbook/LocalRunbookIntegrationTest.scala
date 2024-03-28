@@ -39,6 +39,7 @@ class LocalRunbookIntegrationTest
   System.setProperty("NETWORK_APPS_ADDRESS", "localhost")
   System.setProperty("NETWORK_APPS_ADDRESS_PROTOCOL", "http")
   System.setProperty("GLOBAL_DOMAIN_URL", "http://localhost:5108")
+  System.setProperty("MIGRATION_ID", "0")
 
   // For flyway migrations
   System.setProperty("CANTON_DB_USER", "postgres")

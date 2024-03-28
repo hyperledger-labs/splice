@@ -44,6 +44,12 @@ export class DecentralizedSynchronizerMigrationConfig {
     );
   }
 
+  allMigrationInfos(): MigrationInfo[] {
+    return [this.active]
+      .concat(this.legacy ? [this.legacy] : [])
+      .concat(this.upgrade ? [this.upgrade] : []);
+  }
+
   containsUpgrade(): boolean {
     return this.upgrade != undefined;
   }
