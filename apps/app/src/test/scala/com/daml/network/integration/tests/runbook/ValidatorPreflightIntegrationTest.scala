@@ -43,7 +43,7 @@ abstract class ValidatorPreflightIntegrationTestBase
   private lazy val walletUiUrl =
     s"https://wallet.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private lazy val ansUiUrl =
-    s"https://ans.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
+    s"https://cns.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
   private lazy val splitwellUiUrl =
     s"https://splitwell.${validatorName}.${sys.env("NETWORK_APPS_ADDRESS")}/"
 

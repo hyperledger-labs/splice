@@ -121,12 +121,12 @@ export async function validatorSecrets(
   };
 }
 
-export function ansUiSecret(
+export function cnsUiSecret(
   ns: ExactNamespace,
   auth0Client: Auth0Client,
   clientId: string
 ): k8s.core.v1.Secret {
-  return uiSecret(auth0Client, ns, 'ans', clientId);
+  return uiSecret(auth0Client, ns, 'cns', clientId);
 }
 
 export async function svAppSecrets(

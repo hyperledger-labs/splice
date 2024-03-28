@@ -1071,7 +1071,7 @@ lazy val bundleTask = {
     val webUis =
       Seq(
         ((`apps-wallet-frontend` / bundle).value, "wallet"),
-        ((`apps-ans-frontend` / bundle).value, "ans"),
+        ((`apps-ans-frontend` / bundle).value, "cns"),
         ((`apps-sv-frontend` / bundle).value, "sv"),
         ((`apps-scan-frontend` / bundle).value, "scan"),
         ((`apps-splitwell-frontend` / bundle).value, "splitwell"),

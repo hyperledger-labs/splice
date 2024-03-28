@@ -1,11 +1,11 @@
 const host = window.location.hostname;
-const cluster = "${CN_APP_ANS_UI_CLUSTER}";
+const cluster = "${CN_APP_CNS_UI_CLUSTER}";
 window.canton_network_config = {
   auth: {
     algorithm: "rs-256",
-    authority: "${CN_APP_ANS_UI_AUTH_URL}",
-    client_id: "${CN_APP_ANS_UI_AUTH_CLIENT_ID}",
-    token_audience: "${CN_APP_ANS_UI_AUTH_AUDIENCE}",
+    authority: "${CN_APP_CNS_UI_AUTH_URL}",
+    client_id: "${CN_APP_CNS_UI_AUTH_CLIENT_ID}",
+    token_audience: "${CN_APP_CNS_UI_AUTH_AUDIENCE}",
   },
   services: {
     scan: {
@@ -17,7 +17,7 @@ window.canton_network_config = {
     },
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
-      uiUrl: window.location.origin.replace("ans", "wallet"),
+      uiUrl: window.location.origin.replace("cns", "wallet"),
     },
   },
 };

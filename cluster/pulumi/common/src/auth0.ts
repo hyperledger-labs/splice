@@ -235,7 +235,7 @@ export function requireAuth0ClientId(clientIdMap: ClientIdMap, app: string): str
   const appClientId = clientIdMap[app];
 
   if (!appClientId) {
-    throw new Error(`Unknown Auth0 client ID for app: ${app}`);
+    throw new Error(`Unknown Auth0 client ID for app: ${app}, JSON.stringify(clientIdMap)`);
   }
 
   return appClientId;

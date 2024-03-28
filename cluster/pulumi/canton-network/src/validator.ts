@@ -40,7 +40,7 @@ export type ValidatorBackupConfig = {
 export type ValidatorSecrets = {
   validatorSecret: Secret;
   wallet: Secret;
-  ans: Secret;
+  cns: Secret;
 };
 
 type BasicValidatorConfig = {
@@ -125,7 +125,7 @@ export async function installValidatorApp(
     .concat(validatorOnboardingSecret)
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(participantBootstrapDumpSecret ? [participantBootstrapDumpSecret] : [])
-    .concat([validatorSecrets.validatorSecret, validatorSecrets.wallet, validatorSecrets.ans])
+    .concat([validatorSecrets.validatorSecret, validatorSecrets.wallet, validatorSecrets.cns])
     .concat(config.extraDependsOn || []);
 
   return installCNHelmChart(
@@ -194,6 +194,6 @@ export async function installValidatorSecrets(
       config.auth0AppName
     ),
     wallet: await installAuth0UISecret(config.auth0Client, config.xns, 'wallet', 'wallet'),
-    ans: await installAuth0UISecret(config.auth0Client, config.xns, 'ans', 'ans'),
+    cns: await installAuth0UISecret(config.auth0Client, config.xns, 'cns', 'cns'),
   };
 }

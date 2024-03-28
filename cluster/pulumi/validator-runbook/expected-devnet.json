@@ -31,18 +31,18 @@
       "apiVersion": "v1",
       "kind": "Secret",
       "metadata": {
-        "name": "cn-app-ans-ui-auth",
+        "name": "cn-app-cns-ui-auth",
         "namespace": "validator"
       },
       "stringData": {
         "4dabf18193072939515e22adb298388d": "1b47061264138c4ac30d75fd1eb44270",
         "value": {
-          "client-id": "ans-client-id",
+          "client-id": "cns-client-id",
           "url": "https://auth0Domain"
         }
       }
     },
-    "name": "auth0-ui-secret-validator-ans",
+    "name": "auth0-ui-secret-validator-cns",
     "provider": "",
     "type": "kubernetes:core/v1:Secret"
   },

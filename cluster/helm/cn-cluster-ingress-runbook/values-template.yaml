@@ -7,7 +7,7 @@ defaultJvmOptions: -Xms384M -Xmx384M -Dscala.concurrent.context.minThreads=8
 ingress:
   wallet: true
   sv: true
-  ans: true
+  cns: true
   scan: true
   sequencer: true
   splitwell: false

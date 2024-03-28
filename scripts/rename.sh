@@ -902,6 +902,29 @@ function subcmd_ui_cleanup_amulet() {
   simple_rename "Amulet(?=( Operation| Expired| Unlocked| Owner| Balance| Creation| Price))///Canton Coin" "$frontend_only"
 }
 
+#### No ANS and Amulet in Cluster
+
+subcommand_whitelist[cluster_ans_amulet]='Rename: remove ANS and Amulet in cluster and docs'
+function subcmd_cluster_ans_amulet() {
+  assert_clean_working_dir
+
+  local cluster_only="-i 'cluster/**'"
+
+  rename "ANS to CNS"  \
+    "'ANS///CNS'" \
+    "$cluster_only" \
+    ""
+
+  rename "ans to cns" \
+    "'(?<![a-z])ans(?!/)(?=(\b|[A-Z0-9]))///cns'" \
+    "$cluster_only" \
+    ""
+
+  # Direct impl. as auth0 is protected in the other higher-level renames
+  run_and_commit "rename Ans to Cns:" \
+    "gsr -i 'cluster/**' $NO_CRYPTO $NO_LOCKS 'Ans(?!.*Trigger)///Cns' -f"
+
+}
 
 ### Static Check
 
@@ -947,10 +970,15 @@ function subcmd_no_illegal_daml_references() {
         fi
     done
 
-    # Using this cheap way to make the UI check a static check as well
+    # Using this cheap way to add some further static checks
+    # TODO(tech-debt): create a proper top-level wrapper for these
     echo ""
     echo "Also checking frontend code:"
     subcmd_no_amulet_in_ui
+
+    echo ""
+    echo "Also checking repo-wide invariants:"
+    subcmd_no_bad_things_repo_wide
 }
 
 subcommand_whitelist[no_amulet_in_ui]='Check for Amulet and ANS in user UI'
@@ -963,6 +991,20 @@ function subcmd_no_amulet_in_ui() {
         echo "Checking for occurences of '$pattern' in frontend code"
         if rg -P "$pattern" -g '*.tsx' -g '*.ts' -g '**test/**/*.scala' -g '!cluster/**'; then
             echo "$pattern occurs in frontend, ensure it is not user-visible"
+            exit 1
+        fi
+    done
+}
+
+subcommand_whitelist[no_bad_things_repo_wide]='Repo-wide checks for bad patterns'
+function subcmd_no_bad_things_repo_wide() {
+    local illegal_patterns=(
+      'http.*ans[.](?!(com|AnsResource))'
+      )
+    for pattern in "${illegal_patterns[@]}"; do
+        echo "Checking for occurences of '$pattern' in repo"
+        if rg -P "$pattern"; then
+            echo "$pattern occurs in code, please remedy"
             exit 1
         fi
     done

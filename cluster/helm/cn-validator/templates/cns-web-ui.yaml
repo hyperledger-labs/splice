@@ -1,45 +1,45 @@
-{{- $ansWebUiLabel := "ans-web-ui" }}
+{{- $cnsWebUiLabel := "cns-web-ui" }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
   labels:
-    app: {{ $ansWebUiLabel }}
+    app: {{ $cnsWebUiLabel }}
     migration: {{ .Values.migration.id | quote }}
-  name: {{ $ansWebUiLabel }}
+  name: {{ $cnsWebUiLabel }}
   namespace: {{ .Release.Namespace }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: {{ $ansWebUiLabel }}
+      app: {{ $cnsWebUiLabel }}
   strategy:
     type: Recreate
   template:
     metadata:
       labels:
-        app: {{ $ansWebUiLabel }}
+        app: {{ $cnsWebUiLabel }}
         migration: {{ .Values.migration.id | quote }}
     spec:
       containers:
-      - name: ans-web-ui
-        image: "{{ .Values.imageRepo }}/ans-web-ui:{{ (.Values.cluster).imageTag }}"
+      - name: cns-web-ui
+        image: "{{ .Values.imageRepo }}/cns-web-ui:{{ (.Values.cluster).imageTag }}"
         imagePullPolicy: Always
         env:
-        - name: CN_APP_ANS_UI_AUTH_CLIENT_ID
+        - name: CN_APP_CNS_UI_AUTH_CLIENT_ID
           valueFrom:
             secretKeyRef:
               key: client-id
-              name: cn-app-ans-ui-auth
+              name: cn-app-cns-ui-auth
               optional: false
-        - name: CN_APP_ANS_UI_AUTH_URL
+        - name: CN_APP_CNS_UI_AUTH_URL
           valueFrom:
             secretKeyRef:
               key: url
-              name: cn-app-ans-ui-auth
+              name: cn-app-cns-ui-auth
               optional: false
-        - name: CN_APP_ANS_UI_AUTH_AUDIENCE
+        - name: CN_APP_CNS_UI_AUTH_AUDIENCE
           value: {{ (.Values.auth).audience | default "https://canton.network.global" | quote }}
-        - name: CN_APP_ANS_UI_CLUSTER
+        - name: CN_APP_CNS_UI_CLUSTER
           value: {{ .Values.clusterUrl | quote }}
         ports:
         - containerPort: 80
@@ -61,13 +61,13 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ $ansWebUiLabel }}
+  name: {{ $cnsWebUiLabel }}
   namespace: {{ .Release.Namespace }}
   labels:
     migration: {{ .Values.migration.id | quote }}
 spec:
   selector:
-    app: {{ $ansWebUiLabel }}
+    app: {{ $cnsWebUiLabel }}
   ports:
   - name: http
     port: 80

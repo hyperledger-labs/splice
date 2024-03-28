@@ -6,7 +6,7 @@ import {
   BackupConfig,
   ChartValues,
   CnInput,
-  ansUiSecret,
+  cnsUiSecret,
   exactNamespace,
   ExactNamespace,
   fixedTokens,
@@ -262,14 +262,14 @@ async function installValidator(config: ValidatorConfig): Promise<k8s.helm.v3.Re
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const ansUiClientId = validatorNameSpaceAuth0Clients['ans'];
-  if (!ansUiClientId) {
+  const cnsUiClientId = validatorNameSpaceAuth0Clients['cns'];
+  if (!cnsUiClientId) {
     throw new Error('No validator ui client id in auth0 config');
   }
   const dependsOn = imagePullDeps
     .concat([participant])
     .concat([validatorAppSecret, validatorUISecret])
-    .concat([ansUiSecret(xns, auth0Client, ansUiClientId)])
+    .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
     .concat(backupConfigSecret ? [backupConfigSecret] : [])
     .concat(
       onboardingSecret ? [installValidatorOnboardingSecret(xns, 'validator', onboardingSecret)] : []

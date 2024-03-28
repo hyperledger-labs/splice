@@ -4,7 +4,7 @@ import {
   Auth0Client,
   BackupConfig,
   ChartValues,
-  ansUiSecret,
+  cnsUiSecret,
   envFlag,
   exactNamespace,
   ExactNamespace,
@@ -442,8 +442,8 @@ async function installSvAndValidator(
     topup: topupConfig ? { enabled: true, ...topupConfig } : { enabled: false },
   };
 
-  const ansUiClientId = svNameSpaceAuth0Clients['ans'];
-  if (!ansUiClientId) {
+  const cnsUiClientId = svNameSpaceAuth0Clients['cns'];
+  if (!cnsUiClientId) {
     throw new Error('No CNS ui client id in auth0 config');
   }
 
@@ -456,7 +456,7 @@ async function installSvAndValidator(
     imagePullDeps
       .concat([sv, participant])
       .concat([svValidatorAppSecret, svValidatorUISecret])
-      .concat([ansUiSecret(xns, auth0Client, ansUiClientId)])
+      .concat([cnsUiSecret(xns, auth0Client, cnsUiClientId)])
       .concat(backupConfigSecret ? [backupConfigSecret] : [])
       .concat([appsPg])
   );
