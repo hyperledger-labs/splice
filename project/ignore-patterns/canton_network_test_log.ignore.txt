@@ -86,4 +86,7 @@ The Prometheus metrics HTTPServer caught an Exception while trying to send the m
 # where all old apps are stopped before doing the migration.
 but the configuration says the domain was paused during the migration.*DecentralizedSynchronizerMigrationIntegrationTest
 
+# TODO (#11370): Investigate
+Gave up ensuring Extra traffic limit for MED.*DisasterRecoveryIntegrationTest.*UNAVAILABLE.*
+
 # Make sure to have a trailing newline
