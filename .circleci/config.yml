@@ -2423,9 +2423,6 @@ jobs:
       max_pipeline_age_secs:
         type: integer
         default: 28800  # limit search to pipelines that are 8 hours old
-      wait_type:
-        type: string
-        default: "wait"
     steps:
       - checkout_with_retry
       - run:
@@ -2433,7 +2430,7 @@ jobs:
           command: |
             .circleci/wait_for_or_cancel_pipelines.sh << pipeline.number >> "<< parameters.workflow_names >>" \
               "<< parameters.branch_filter >>" "<< parameters.branch_filter_is_regex >>" "<< parameters.branch_ignores >>" \
-              << parameters.max_pipeline_age_secs >> << parameters.wait_type >>
+              << parameters.max_pipeline_age_secs >> wait
 
   cancel_if_previous_pipeline:
     docker:
@@ -3883,7 +3880,6 @@ workflows:
             - artifactory
             - slack-context
           workflow_names: "deploy_cimain"
-          wait_type: "wait_workflow"
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           <<: *main-branch-only
@@ -4109,7 +4105,6 @@ workflows:
             - artifactory
             - slack-context
           workflow_names: "deploy_ciupgrade"
-          wait_type: "wait_workflow"
           requires:
             - cancel_if_current_commit_is_base_version
       - deploy_cluster:

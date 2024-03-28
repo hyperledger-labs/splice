@@ -16,7 +16,6 @@ workflow:
             - artifactory
             - slack-context
           workflow_names: "deploy_cimain"
-          wait_type: "wait_workflow"
       - deploy_cluster:
           name: "deploy_cluster_for_migration"
           <<: *main-branch-only
