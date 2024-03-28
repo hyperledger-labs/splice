@@ -1687,6 +1687,11 @@
             "name": "Cumberland",
             "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEUqL9Y0mFB8xQXGAAJk+7q5/E/SyrwM20pKWB4ZhwGGmyR7L7ss5hr56dwcCURLUGnIlKssuV89XFUwFfwhz3AA==",
             "rewardWeightBps": 240000
+          },
+          {
+            "name": "Global-Synchronizer-Foundation",
+            "publicKey": "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAETri1wBeoV3AYnEF/slvViz9GO2g2lcxUQ3SadBTA70Kn87KzAZ/25n6+hhuRebuuGlm70KFKGJGr8RFd1YjB1Q==",
+            "rewardWeightBps": 120000
           }
         ],
         "cluster": {
