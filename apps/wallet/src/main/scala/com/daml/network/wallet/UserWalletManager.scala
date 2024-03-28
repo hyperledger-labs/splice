@@ -195,15 +195,17 @@ class UserWalletManager(
     (userRetryProvider, walletService)
   }
 
-  def offboardUser(username: String): Unit = {
+  def offboardUser(username: String): PartyId = {
     removeEndUserWallet(username) match {
       case None =>
         throw Status.NOT_FOUND
           .withDescription(s"No wallet service found for user ${username}")
           .asRuntimeException()
       case Some((userRetryProvider, walletService)) =>
+        val endUserParty = walletService.store.key.endUserParty
         userRetryProvider.close()
         walletService.close()
+        endUserParty
     }
   }
 

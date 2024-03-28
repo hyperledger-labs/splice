@@ -8,7 +8,7 @@ import com.daml.network.automation.{
   TriggerContext,
 }
 import com.daml.network.codegen.java.splice.wallet.install as installCodegen
-import com.daml.network.environment.CNLedgerConnection
+import com.daml.network.environment.{CNLedgerConnection, RetryFor}
 import com.daml.network.util.AssignedContract
 import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.lifecycle.UnlessShutdown
@@ -43,12 +43,8 @@ class WalletAppInstallTrigger(
     val endUserName = install.payload.endUserName
     val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
     for {
-      // User rights might have gone lost during a hard migration or a disaster recovery.
-      _ <- connection.grantUserRights(
-        walletManager.validatorUser,
-        Seq(endUserParty),
-        Seq(),
-      )
+      // actAs rights for the validator user might have gone lost during a hard migration or a disaster recovery
+      _ <- ensureActAsRight(endUserParty)
     } yield walletManager.getOrCreateUserWallet(install.contract) match {
       case UnlessShutdown.AbortedDueToShutdown =>
         TaskSuccess(
@@ -60,5 +56,17 @@ class WalletAppInstallTrigger(
         logger.info(s"Unexpected duplicate on-boarding of wallet end-user '$endUserName'")
         TaskSuccess(s"skipped duplicate on-boarding wallet end-user '$endUserName'")
     }
+  }
+
+  private def ensureActAsRight(endUserParty: PartyId)(implicit tc: TraceContext): Future[Unit] = {
+    val validatorUser = walletManager.validatorUser
+    context.retryProvider.ensureThatB(
+      RetryFor.Automation,
+      "ensure_act_as_right",
+      s"$validatorUser can actAs $endUserParty",
+      connection.getUserActAs(validatorUser).map(_.contains(endUserParty)),
+      connection.grantUserRights(validatorUser, Seq(endUserParty), Seq()),
+      logger,
+    )
   }
 }

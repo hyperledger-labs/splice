@@ -38,10 +38,9 @@ class OffboardUsersTrigger(
       tc: TraceContext
   ): Future[TaskOutcome] = {
     for {
-      _ <- Future {
+      party <- Future {
         walletManager.offboardUser(task.username)
       }
-      party <- connection.getPrimaryParty(task.username)
       _ <- connection.revokeUserRights(
         walletManager.validatorUser,
         Seq(party),

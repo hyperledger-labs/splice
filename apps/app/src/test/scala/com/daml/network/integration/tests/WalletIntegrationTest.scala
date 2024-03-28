@@ -403,77 +403,96 @@ class WalletIntegrationTest
       )
     }
 
-    "accepted transfer offers are completed even if the recipient user does not exist" in {
-      implicit env =>
-        val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-        val aliceUser = aliceWalletClient.config.ledgerApiUser
-        val aliceValidatorUser = aliceValidatorBackend.config.ledgerApiUser
-        val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
-        aliceWalletClient.tap(50)
+    "automation and offboarding work even if the recipient user does not exist" in { implicit env =>
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val aliceUser = aliceWalletClient.config.ledgerApiUser
+      val aliceValidatorUser = aliceValidatorBackend.config.ledgerApiUser
+      val bobParty = onboardWalletUser(bobWalletClient, bobValidatorBackend)
+      aliceWalletClient.tap(50)
 
-        val (offerCid, _) =
-          actAndCheck(
-            "Alice creates transfer",
-            aliceWalletClient.createTransferOffer(
-              bobParty,
-              10,
-              "transfer 10 amulets to Bob",
-              CantonTimestamp.now().plus(Duration.ofMinutes(1)),
-              UUID.randomUUID.toString,
-            ),
-          )(
-            "Bob sees transfer offer",
-            _ => bobWalletClient.listTransferOffers() should have length 1,
-          )
-
-        // We simulate things here that can happen during a hard domain migration or disaster recovery.
-        clue("Alice's validator shuts down") {
-          aliceValidatorBackend.stop()
-        }
+      val (offerCid, _) =
         actAndCheck(
-          "Alice's user disappears",
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.delete(aliceUser),
+          "Alice creates transfer",
+          aliceWalletClient.createTransferOffer(
+            bobParty,
+            10,
+            "transfer 10 amulets to Bob",
+            CantonTimestamp.now().plus(Duration.ofMinutes(1)),
+            UUID.randomUUID.toString,
+          ),
         )(
-          "Alice's user is gone",
-          _ =>
-            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
-              .list()
-              .users
-              .find(_.id == aliceUser) shouldBe None,
-        )
-        actAndCheck(
-          "Alice's validator loses rights over Alice's party",
-          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.rights
-            .revoke(aliceValidatorUser, Set(aliceParty), Set()),
-        )(
-          "Alice's validator has no rights over Alice's party",
-          _ => {
-            val rights =
-              aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.rights
-                .list(aliceValidatorUser)
-            rights.actAs should not(contain((aliceParty)))
-            rights.readAs should not(contain((aliceParty)))
-          },
-        )
-        clue("Alice's validator starts back up") {
-          aliceValidatorBackend.startSync()
-        }
-
-        actAndCheck(
-          "Bob accepts transfer offer",
-          bobWalletClient.acceptTransferOffer(offerCid),
-        )(
-          "Bob sees updated balance",
-          _ => {
-            bobWalletClient.listTransferOffers() should have length 0
-            bobWalletClient.balance().unlockedQty should beAround(10)
-          },
+          "Bob sees transfer offer",
+          _ => bobWalletClient.listTransferOffers() should have length 1,
         )
 
-        clue("Alice can reonboard and transfer some more amulets") {
-          onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
-          p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, 10)
+      // We simulate things here that can happen during a hard domain migration or disaster recovery.
+      clue("Alice's validator shuts down") {
+        aliceValidatorBackend.stop()
+      }
+      actAndCheck(
+        "Alice's user disappears",
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.delete(aliceUser),
+      )(
+        "Alice's user is gone",
+        _ =>
+          aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users
+            .list()
+            .users
+            .find(_.id == aliceUser) shouldBe None,
+      )
+      actAndCheck(
+        "Alice's validator loses rights over Alice's party",
+        aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.rights
+          .revoke(aliceValidatorUser, Set(aliceParty), Set()),
+      )(
+        "Alice's validator has no rights over Alice's party",
+        _ => {
+          val rights =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.rights
+              .list(aliceValidatorUser)
+          rights.actAs should not(contain((aliceParty)))
+          rights.readAs should not(contain((aliceParty)))
+        },
+      )
+      clue("Alice's validator starts back up") {
+        aliceValidatorBackend.startSync()
+      }
+
+      actAndCheck(
+        "Bob accepts transfer offer",
+        bobWalletClient.acceptTransferOffer(offerCid),
+      )(
+        "Bob sees updated balance",
+        _ => {
+          bobWalletClient.listTransferOffers() should have length 0
+          bobWalletClient.balance().unlockedQty should beAround(10)
+        },
+      )
+
+      clue("Alice is listed as a user") {
+        aliceValidatorBackend.listUsers() should contain(aliceUser)
+      }
+      actAndCheck(
+        "We offboard Alice",
+        aliceValidatorBackend.offboardUser(aliceUser),
+      )(
+        "Alice is offboarded",
+        _ => aliceValidatorBackend.listUsers() should not(contain((aliceUser))),
+      )
+      clue("Alice's validator has no rights over Alice's party") {
+        eventually() {
+          val rights =
+            aliceValidatorBackend.participantClientWithAdminToken.ledger_api.users.rights
+              .list(aliceValidatorUser)
+          rights.actAs should not(contain((aliceParty)))
+          rights.readAs should not(contain((aliceParty)))
         }
+      }
+
+      clue("Alice can reonboard and transfer some more amulets") {
+        onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+        p2pTransfer(aliceWalletClient, bobWalletClient, bobParty, 10)
+      }
     }
   }
 }

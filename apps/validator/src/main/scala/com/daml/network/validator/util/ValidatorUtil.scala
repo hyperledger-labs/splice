@@ -14,6 +14,7 @@ import com.daml.network.store.MultiDomainAcsStore.ContractState.Assigned
 import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.util.CNNodeUtil
 import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.wallet.UserWalletManager
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -144,13 +145,18 @@ private[validator] object ValidatorUtil {
       storeWithIngestion: CNNodeAppStoreWithIngestion[ValidatorStore],
       validatorUserName: String,
       validatorWalletUserName: Option[String],
+      walletManagerOpt: Option[UserWalletManager],
       retryProvider: RetryProvider,
       logger: TracedLogger,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
     val store = storeWithIngestion.store
     val validatorParty = store.key.validatorParty
+    val endUserPartyFromWalletManager =
+      walletManagerOpt.flatMap(_.lookupUserWallet(endUserName)).map(_.store.key.endUserParty)
     for {
-      endUserParty <- storeWithIngestion.connection.getPrimaryParty(endUserName)
+      endUserParty <- endUserPartyFromWalletManager
+        .map(Future.successful(_))
+        .getOrElse(storeWithIngestion.connection.getPrimaryParty(endUserName))
       _ <-
         if (
           endUserParty == validatorParty ||

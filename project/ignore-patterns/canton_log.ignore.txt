@@ -41,6 +41,9 @@ GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
 # We can't do log suppression for Canton, so instead we ignore this.
 NOT_FOUND/USER_NOT_FOUND.*: getting user failed for unknown user \\"sv_user\\".*invoked from sv-participant\.sc
 
+# ...and this, for WalletIntegrationTest
+PERMISSION_DENIED.*Claims do not authorize to act as party 'alice__wallet__user.*aliceParticipant
+
 # TODO(#7924): remove once txs in-flight during party migrations do not produce any more warnings
 # Made as specific as possible to avoid ignoring other SYNC_SERVICE_ALARMS
 SYNC_SERVICE_ALARM.*Received a request.*where the view.*has missing recipients.*PAR::sv.*Participant::.*Discarding.*with all ancestors
