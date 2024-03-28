@@ -4,12 +4,12 @@ package com.daml.network.sv.cometbft
 
 import com.daml.network.http.v0.definitions.CometBftJsonRpcRequestId
 import com.daml.network.sv.cometbft.CometBftClientIntegrationTest.{
-  createUpdateNetworkConfigRequest,
   InitialVotingPower,
   PubKey2,
   SvNode1,
   SvNode2,
   SvNode2CometId,
+  createUpdateNetworkConfigRequest,
 }
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.drivers.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest
@@ -141,10 +141,11 @@ object CometBftClientIntegrationTest {
       changedSvNodeId: String,
       pubKey: String,
   ) = {
+    val cometBftRequestSigner = CometBftRequestSigner.getGenesisSigner
     val request = NetworkConfigChangeRequest(
       chainId = chainId,
       submitterSvNodeId = submitterSvNodeId,
-      submitterKeyId = CometBftRequestSigner.GenesisFingerprint,
+      submitterKeyId = cometBftRequestSigner.Fingerprint,
       submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
       kind = NodeConfigChangeRequest(
         SvNodeConfigChangeRequest.of(
@@ -166,7 +167,7 @@ object CometBftClientIntegrationTest {
     UpdateNetworkConfigRequest.of(
       changeRequestBytes = request.toByteString,
       signature =
-        com.google.protobuf.ByteString.copyFrom(CometBftRequestSigner.signRequest(request)),
+        com.google.protobuf.ByteString.copyFrom(cometBftRequestSigner.signRequest(request)),
     )
   }
 

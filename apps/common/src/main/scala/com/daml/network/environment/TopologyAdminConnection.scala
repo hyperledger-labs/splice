@@ -24,6 +24,8 @@ import com.digitalasset.canton.admin.api.client.data.topologyx.{
 }
 import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, NonNegativeFiniteDuration}
 import com.digitalasset.canton.config.RequireTypes.{NonNegativeInt, PositiveInt, PositiveLong}
+import com.digitalasset.canton.crypto.SigningKeyScheme.Ed25519
+import com.digitalasset.canton.crypto.SigningPublicKey
 import com.digitalasset.canton.crypto.{Fingerprint, PublicKey}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -35,8 +37,8 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.admin.grpc
 import com.digitalasset.canton.topology.admin.grpc.BaseQueryX
 import com.digitalasset.canton.topology.store.{
-  StoredTopologyTransactionsX,
   StoredTopologyTransactionX,
+  StoredTopologyTransactionsX,
   TimeQuery,
   TopologyStoreId,
 }
@@ -1378,16 +1380,22 @@ abstract class TopologyAdminConnection(
       traceContext: TraceContext
   ): Future[NodeIdentity]
 
-  def listMyKeys()(implicit
+  def listMyKeys(name: String = "")(implicit
       traceContext: TraceContext
   ): Future[Seq[com.digitalasset.canton.crypto.admin.grpc.PrivateKeyMetadata]] = {
-    runCmd(VaultAdminCommands.ListMyKeys("", ""))
+    runCmd(VaultAdminCommands.ListMyKeys("", name))
   }
 
   def exportKeyPair(fingerprint: Fingerprint)(implicit
       traceContext: TraceContext
   ): Future[ByteString] = {
     runCmd(VaultAdminCommands.ExportKeyPair(fingerprint, ProtocolVersion.latest, password = None))
+  }
+
+  def generateKeyPair(name: String)(implicit
+      traceContext: TraceContext
+  ): Future[SigningPublicKey] = {
+    runCmd(VaultAdminCommands.GenerateSigningKey(name, Some(Ed25519)))
   }
 
   def importKeyPair(keyPair: Array[Byte], name: Option[String])(implicit

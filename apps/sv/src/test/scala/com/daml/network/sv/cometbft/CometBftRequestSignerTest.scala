@@ -11,8 +11,6 @@ import com.digitalasset.canton.drivers.cometbft.NetworkConfigChangeRequest.Kind.
 import com.digitalasset.canton.drivers.cometbft.SvNodeConfigChange.Kind.SetConfig
 
 import java.security.GeneralSecurityException
-//import org.bouncycastle.crypto.params.Ed25519PrivateKeyParameters
-//import org.bouncycastle.crypto.signers.Ed25519Signer
 import org.scalatest.wordspec.AnyWordSpec
 
 import java.util.Base64
@@ -20,6 +18,8 @@ import java.util.Base64
 class CometBftRequestSignerTest extends AnyWordSpec with BaseTest {
 
   "Signing requests" should {
+
+    val cometBftRequestSigner = CometBftRequestSigner.getGenesisSigner
 
     val request = NetworkConfigChangeRequest(
       "id",
@@ -43,7 +43,7 @@ class CometBftRequestSignerTest extends AnyWordSpec with BaseTest {
       ),
     )
 
-    val requestSignature = CometBftRequestSigner.signRequest(
+    val requestSignature = cometBftRequestSigner.signRequest(
       request
     )
     val bogusRequestSignature = {
@@ -59,25 +59,25 @@ class CometBftRequestSignerTest extends AnyWordSpec with BaseTest {
     }
 
     "match public keys keys" in {
-      CometBftRequestSigner.GenesisPubKeyBytes shouldBe CometBftRequestSigner.genesisPubKeyBytesFromPrivateKey
+      cometBftRequestSigner.PubKeyBytes shouldBe cometBftRequestSigner.PubKeyBytesFromPrivateKey
     }
 
     "validate the correct signature for the request" in {
-      CometBftRequestSigner.GenesisPubKey.verify(
+      cometBftRequestSigner.PubKey.verify(
         requestSignature,
         request.toByteArray,
       )
     }
 
     "fails validating a bogus signature for the request" in {
-      an[GeneralSecurityException] should be thrownBy CometBftRequestSigner.GenesisPubKey.verify(
+      an[GeneralSecurityException] should be thrownBy cometBftRequestSigner.PubKey.verify(
         bogusRequestSignature,
         request.toByteArray,
       )
     }
 
     "generate the expected fingerprint for the public key" in {
-      CometBftRequestSigner.GenesisFingerprint shouldBe "12202b5d36b909489e4e00464ae7b558183da96fabc9eca3ddc5e34fbdba246a4be6"
+      cometBftRequestSigner.Fingerprint shouldBe "12202b5d36b909489e4e00464ae7b558183da96fabc9eca3ddc5e34fbdba246a4be6"
     }
 
   }

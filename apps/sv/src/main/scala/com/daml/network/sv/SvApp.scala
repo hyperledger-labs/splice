@@ -25,14 +25,15 @@ import com.daml.network.store.MultiDomainAcsStore.QueryResult
 import com.daml.network.sv.admin.http.{HttpSvAdminHandler, HttpSvHandler}
 import com.daml.network.sv.automation.{
   LeaderBasedAutomationService,
-  SvSvAutomationService,
   SvDsoAutomationService,
+  SvSvAutomationService,
 }
 import com.daml.network.sv.cometbft.{
   CometBftClient,
   CometBftConnectionConfig,
   CometBftHttpRpcClient,
   CometBftNode,
+  CometBftRequestSigner,
 }
 import com.daml.network.sv.config.{SvAppBackendConfig, SvOnboardingConfig}
 import com.daml.network.sv.metrics.SvAppMetrics
@@ -229,11 +230,16 @@ class SvApp(
       localSynchronizerNode: Option[LocalSynchronizerNode],
   )(implicit tc: TraceContext): Future[SvApp.State] = {
     val cometBftClient = newCometBftClient
-    val cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
-      new CometBftNode(client, config, loggerFactory)
-    )
 
     for {
+      signer <- CometBftRequestSigner.getOrGenerateSigner(
+        "cometbft-governance-keys",
+        participantAdminConnection,
+        logger,
+      )
+      cometBftNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
+        new CometBftNode(client, signer, config, loggerFactory)
+      )
       (_, participantId) <- (
         // It is possible that the participant left disconnected to domains due to party migration failure in the last SV startup.
         // reconnect all domains at the beginning of SV initialization just in case.
@@ -286,6 +292,15 @@ class SvApp(
       config.onboarding match {
         case Some(foundingConfig: SvOnboardingConfig.FoundCollective) =>
           appInitStep("FoundingNodeInitializer founding collective") {
+            val cometBftFoundingNode = (cometBftClient, cometBftConfig).mapN((client, config) =>
+              new CometBftNode(
+                client,
+                CometBftRequestSigner.getGenesisSigner,
+                config,
+                loggerFactory,
+              )
+            )
+            // TODO(#11367): rotate the keypair in bootstrap
             val initializer = new FoundingNodeInitializer(
               localSynchronizerNode.getOrElse(
                 sys.error("Founding node must always specify a domain config")
@@ -294,7 +309,7 @@ class SvApp(
               darFilesToUploadDuringInit,
               participantId,
               config,
-              cometBftNode,
+              cometBftFoundingNode,
               ledgerClient,
               participantAdminConnection,
               clock,
@@ -303,6 +318,7 @@ class SvApp(
               loggerFactory,
             )
             initializer.bootstrapCollective()
+
           }
         case Some(joiningConfig: SvOnboardingConfig.JoinWithKey) =>
           appInitStep("JoiningNodeInitializer joining collective with key") {

@@ -27,6 +27,7 @@ import scala.jdk.CollectionConverters.*
   */
 class CometBftNode(
     cometBftClient: CometBftClient,
+    cometBftRequestSigner: CometBftRequestSigner,
     val cometBftConfig: CometBftConfig,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
@@ -44,11 +45,11 @@ class CometBftNode(
       owningSvNode: String,
       target: DsoRulesWithMemberNodeStates,
   )(implicit tc: TraceContext): Future[Unit] = {
-    // TODO(#4925): select the governance key to use for submitting the change requests comparing the KMS (Canton ;-)) against the configured state
+
     val ourGovernanceKey = {
       proto.cometbft.GovernanceKey(
-        CometBftRequestSigner.GenesisPubKeyBase64,
-        CometBftRequestSigner.GenesisFingerprint,
+        cometBftRequestSigner.PublicKeyBase64,
+        cometBftRequestSigner.Fingerprint,
       )
     }
     val domainId = target.dsoRules.domain
@@ -75,7 +76,7 @@ class CometBftNode(
         actualConfig <- cometBftClient.readNetworkConfig()
         networkConfigChanges = diffNetworkConfig(
           owningSvNode,
-          CometBftRequestSigner.GenesisFingerprint,
+          cometBftRequestSigner.Fingerprint,
           targetNodeStates,
           actualConfig,
           domainId,
@@ -109,7 +110,7 @@ class CometBftNode(
                     chainId = actualConfig.chainId,
                     submitterSvNodeId = owningSvNode,
                     submittedAt = Some(TimestampConverters.fromJavaInstant(Instant.now())),
-                    submitterKeyId = CometBftRequestSigner.GenesisFingerprint,
+                    submitterKeyId = cometBftRequestSigner.Fingerprint,
                     kind = NetworkConfigChangeRequest.Kind.BootstrapConfigChangeRequest(
                       SvBootstrapConfigChangeRequest(
                         networkConfigChanges.requests.map(_.getNodeConfigChangeRequest)
@@ -148,7 +149,7 @@ class CometBftNode(
     val request = proto.cometbft.UpdateNetworkConfigRequest(
       changeRequestBytes = changeRequest.toByteString,
       signature =
-        com.google.protobuf.ByteString.copyFrom(CometBftRequestSigner.signRequest(changeRequest)),
+        com.google.protobuf.ByteString.copyFrom(cometBftRequestSigner.signRequest(changeRequest)),
     )
     cometBftClient
       .updateNetworkConfig(request)
@@ -171,11 +172,10 @@ class CometBftNode(
                 votingPower = 1, // hard-coded to one for now, as we only have one node at most
               )
           ),
-          // TODO(#4925) use a per-node key, instead of this static one
           governanceKeys = List(
             proto.cometbft.GovernanceKey(
-              CometBftRequestSigner.GenesisPubKeyBase64,
-              CometBftRequestSigner.GenesisFingerprint,
+              cometBftRequestSigner.PublicKeyBase64,
+              cometBftRequestSigner.Fingerprint,
             )
           ),
           // TODO(#5882): add support for sequencing keys

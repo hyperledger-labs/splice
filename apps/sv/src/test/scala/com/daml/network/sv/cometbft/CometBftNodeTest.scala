@@ -25,6 +25,8 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
   private val chainId = "dummy-chain-id"
   private val dummyDsoDomainId = DomainId.tryFromString("domain1::domain")
 
+  private val cometBftRequestSigner = CometBftRequestSigner.getGenesisSigner
+
   private def mkCometBftNodeName(svNodeNr: Int) = "cometBftNode" + svNodeNr.toString
 
   private def mkSvNodeId(svNodeNr: Int) = "svNode" + svNodeNr.toString
@@ -39,7 +41,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
     proto.cometbft.NetworkConfigChangeRequest(
       chainId = chainId,
       submitterSvNodeId = owningSvNodeId,
-      submitterKeyId = CometBftRequestSigner.GenesisFingerprint,
+      submitterKeyId = cometBftRequestSigner.Fingerprint,
       kind = proto.cometbft.NetworkConfigChangeRequest.Kind.NodeConfigChangeRequest(changeRequest),
     )
   }
@@ -147,7 +149,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
     val configDiff = CometBftNode
       .diffNetworkConfig(
         owningSvNodeId,
-        CometBftRequestSigner.GenesisFingerprint,
+        cometBftRequestSigner.Fingerprint,
         mkMemberNodeStates(
           targetConfig.map((nodeNr, _)).toList ++ Seq(10 -> "key-10", 11 -> "key-11")
         ),
@@ -319,7 +321,7 @@ class CometBftNodeTest extends AnyWordSpec with BaseTest {
       val configDiff = CometBftNode
         .diffNetworkConfig(
           owningSvNodeId,
-          CometBftRequestSigner.GenesisFingerprint,
+          cometBftRequestSigner.Fingerprint,
           mkMemberNodeStates(
             Seq(10 -> "key-10")
           ),
