@@ -13,7 +13,7 @@ const Root: React.FC = () => {
     <ErrorBoundary>
       <Box height="100%" sx={{ display: 'flex', flexDirection: 'column' }}>
         <Box bgcolor="colors.neutral.20">
-          <Header title="Amulet Name Service">
+          <Header title="Canton Name Service">
             <Stack direction="row" alignItems="center" spacing={1}>
               {primaryPartyId && ( // Using a DirectoryEntry here seems a bit circular
                 <PartyId partyId={primaryPartyId} id="logged-in-user" />

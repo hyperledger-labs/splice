@@ -30,8 +30,8 @@ test('recent activity link from tab opens a tab', async () => {
   expect(within(firstRow).getByText('1 CC/USD')).toBeDefined();
 });
 
-test('recent activity looks up ANS entries', async () => {
+test('recent activity looks up CNS entries', async () => {
   render(<App />);
-  const ansNameElement = await screen.findByText('charlie.unverified.ans');
+  const ansNameElement = await screen.findByText('charlie.unverified.cns');
   expect(ansNameElement).toBeDefined();
 });

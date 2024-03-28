@@ -112,8 +112,8 @@ class WalletTransactionHistoryFrontendTimeBasedIntegrationTest
           expectedAction = "Sent",
           expectedSubtype =
             if (isInitial)
-              "ANS Entry Initial Payment Collected"
-            else "ANS Entry Renewal Payment Collected",
+              "CNS Entry Initial Payment Collected"
+            else "CNS Entry Renewal Payment Collected",
           expectedPartyDescription = Some(s"$entryForAns $entryForAns"),
           expectedAmountAmulet = BigDecimal(0), // 0 USD
         )

@@ -168,7 +168,7 @@ object CNNodeTests {
         env: CNNodeTestConsoleEnvironment
     ): SplitwellAppClientReference = extendLedgerApiUserWithCaseId(super.rsw(name))(env.actorSystem)
 
-    override def perTestCaseName(name: String) = s"${name}_tc$testCaseId.unverified.ans"
+    override def perTestCaseName(name: String) = s"${name}_tc$testCaseId.unverified.cns"
     def perTestCaseNameWithoutUnverified(name: String) = s"${name}_tc$testCaseId"
 
     private def extendLedgerApiUserWithCaseId(

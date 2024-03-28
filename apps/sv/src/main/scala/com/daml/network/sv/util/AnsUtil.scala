@@ -6,8 +6,8 @@ import scala.util.{Failure, Success, Try}
 
 object AnsUtil {
 
-  val entryNameSuffix = ".unverified.ans"
-  val entryNameRegex = s"[a-z0-9_-]{1,${60 - entryNameSuffix.length()}}\\.unverified\\.ans"
+  val entryNameSuffix = ".unverified.cns"
+  val entryNameRegex = s"[a-z0-9_-]{1,${60 - entryNameSuffix.length()}}\\.unverified\\.cns"
   val entryUrlLength = 255
   val validEntryUrlSchemes = Seq("http", "https")
   val entryDescriptionLength = 140

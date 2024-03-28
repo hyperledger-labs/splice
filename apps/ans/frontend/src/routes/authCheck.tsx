@@ -14,7 +14,7 @@ const AuthCheck: React.FC<AuthCheckProps> = ({ authConfig, testAuthConfig }) => 
     return <Outlet />;
   } else {
     return (
-      <Login title="Amulet Name Service" authConfig={authConfig} testAuthConfig={testAuthConfig} />
+      <Login title="Canton Name Service" authConfig={authConfig} testAuthConfig={testAuthConfig} />
     );
   }
 };

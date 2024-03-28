@@ -16,7 +16,7 @@ const AnsEntries: React.FC = () => {
 
   return (
     <div id="ans-entries">
-      <Typography variant="h5">Your ANS Entries</Typography>
+      <Typography variant="h5">Your CNS Entries</Typography>
       {isLoading ? (
         <Loading />
       ) : isError ? (

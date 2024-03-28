@@ -132,7 +132,7 @@ const AnsReady: React.FC<AnsProps> = ({ fullEntryName }) => {
 };
 
 const UnverifiedInfo: React.FC<AnsProps> = ({ fullEntryName }) => {
-  const isUnverified = fullEntryName.endsWith('.unverified.ans');
+  const isUnverified = fullEntryName.endsWith('.unverified.cns');
   if (isUnverified) {
     return (
       <Stack>
@@ -140,7 +140,7 @@ const UnverifiedInfo: React.FC<AnsProps> = ({ fullEntryName }) => {
           Why <i>unverified</i>.ans?
         </Typography>
         <Typography variant="body1" color="colors.neutral.80">
-          There is no verification of a user’s identity for ANS entry names at this point so entries
+          There is no verification of a user’s identity for CNS entry names at this point so entries
           are required to include ".unverified" in the name to allow for the later addition of
           verified entries.
         </Typography>
@@ -155,7 +155,7 @@ const YourAnsEntriesButton: React.FC = () => {
   return (
     <Link to="/">
       <Button variant="pill" id="ans-entries-button">
-        Go to your ANS Entries
+        Go to your CNS Entries
       </Button>
     </Link>
   );

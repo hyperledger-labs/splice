@@ -14,11 +14,11 @@ trait AnsEntryTestUtil extends CNNodeTestCommon with AnsTestUtil {
       wallet: WalletAppClientReference,
   ): Unit = {
     val (_, reqId) = actAndCheck(
-      show"Request ANS entry ${userName.singleQuoted} for $userParty",
+      show"Request CNS entry ${userName.singleQuoted} for $userParty",
       ansExternalApp.createAnsEntry(
         userName,
         "https://ans-dir-url.com",
-        "Sample ANS Entry Description",
+        "Sample CNS Entry Description",
       ),
     )(
       "There is exactly one subscription request",

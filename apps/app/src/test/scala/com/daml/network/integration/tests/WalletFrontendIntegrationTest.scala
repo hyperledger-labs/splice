@@ -214,7 +214,7 @@ class WalletFrontendIntegrationTest
             browseToAliceWallet(aliceDamlUser)
           },
         )(
-          "Alice sees her ANS entry name",
+          "Alice sees her CNS entry name",
           _ => {
             seleniumText(find(id("logged-in-user"))) should matchText(entryName)
           },

@@ -66,7 +66,7 @@ def ensureAnsEntry(
 }
 ensureAnsEntry(
   aliceUserParty,
-  "alice.unverified.ans",
+  "alice.unverified.cns",
   "https://alice-url.ans.com",
   "",
   aliceAns,
@@ -74,7 +74,7 @@ ensureAnsEntry(
 )
 ensureAnsEntry(
   bobUserParty,
-  "bob.unverified.ans",
+  "bob.unverified.cns",
   "https://bob-url.ans.com",
   "",
   bobAns,
@@ -82,7 +82,7 @@ ensureAnsEntry(
 )
 ensureAnsEntry(
   charlieUserParty,
-  "charlie.unverified.ans",
+  "charlie.unverified.cns",
   "https://charlie-url.ans.com",
   "",
   charlieAns,

@@ -865,6 +865,44 @@ function subcmd_remove_canton() {
   simple_rename "cantonNameService///amuletNameService" "$ignore_unrelated"
 }
 
+
+### UI cleanup - ANS
+
+subcommand_whitelist[ui_cleanup_ans]='Rename: UI cleanup to use CNS instead of ANS'
+
+function subcmd_ui_cleanup_ans() {
+  assert_clean_working_dir
+
+  # Ignore files with unrelated mentions of 'member'
+  local ignore_unrelated="-e 'daml/**'"
+  local frontend_only="-i '*.tsx' -i '*.ts' -i '**/test/**/*.scala' $ignore_unrelated"
+
+  simple_rename "(?<=unverified[.])ans///cns" "$ignore_unrelated"
+  # Regexes for ANS entries
+  simple_rename "(?<=[\\\\][.])ans///cns" "$ignore_unrelated"
+  simple_rename "(?<=dso[.])ans///cns" "$ignore_unrelated"
+  simple_rename "(?<=sv[.])ans///cns" "$ignore_unrelated"
+
+  simple_rename "Amulet Name Service///Canton Name Service" "$frontend_only"
+  simple_rename "ANS(?=( entry| Entry| entries| Entries))///CNS" "$frontend_only"
+  simple_rename "ANS(?=( client))///CNS" "$frontend_only"
+  simple_rename "ANS(?=( and | ui| UI))///CNS" "$frontend_only"
+}
+
+### UI cleanup no Amulet
+
+subcommand_whitelist[ui_cleanup_amulet]='Rename: UI cleanup to use Canton Coin instead of Amulet'
+function subcmd_ui_cleanup_amulet() {
+  assert_clean_working_dir
+
+  local ignore_unrelated="-e 'daml/**'"
+  local frontend_only="-i '*.tsx' -i '*.ts' -i '**/*.scala' $ignore_unrelated"
+
+  simple_rename "Amulet(?=(/USD|/Round))///CC" "$frontend_only"
+  simple_rename "Amulet(?=( Operation| Expired| Unlocked| Owner| Balance| Creation| Price))///Canton Coin" "$frontend_only"
+}
+
+
 ### Static Check
 
 subcommand_whitelist[no_illegal_daml_references]='Check for illegal daml references'
@@ -905,6 +943,26 @@ function subcmd_no_illegal_daml_references() {
         echo "Checking for occurences of '$pattern' (case sensitive, in code other than splitwell)"
         if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*' -g '!daml/dars.lock'; then
             echo "$pattern occurs in Daml code (other than splitwell), remove all references"
+            exit 1
+        fi
+    done
+
+    # Using this cheap way to make the UI check a static check as well
+    echo ""
+    echo "Also checking frontend code:"
+    subcmd_no_amulet_in_ui
+}
+
+subcommand_whitelist[no_amulet_in_ui]='Check for Amulet and ANS in user UI'
+function subcmd_no_amulet_in_ui() {
+    local illegal_patterns=(
+      'ANS(?!_LEDGER_NAME)'
+      "(?<!Splice[./])\bAmulet\b"
+      )
+    for pattern in "${illegal_patterns[@]}"; do
+        echo "Checking for occurences of '$pattern' in frontend code"
+        if rg -P "$pattern" -g '*.tsx' -g '*.ts' -g '**test/**/*.scala' -g '!cluster/**'; then
+            echo "$pattern occurs in frontend, ensure it is not user-visible"
             exit 1
         fi
     done

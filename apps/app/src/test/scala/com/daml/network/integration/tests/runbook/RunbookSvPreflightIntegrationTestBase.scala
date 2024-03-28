@@ -241,10 +241,10 @@ abstract class RunbookSvPreflightIntegrationTestBase
     }
   }
 
-  "The ANS UI is working" in { implicit env =>
+  "The CNS UI is working" in { implicit env =>
     val ansUrl = s"https://ans.sv.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
     val svPassword = sys.env(s"SV_DEV_NET_WEB_UI_PASSWORD");
-    val ansName = s"da-test-${Random.alphanumeric.take(10).mkString.toLowerCase}.unverified.ans"
+    val ansName = s"da-test-${Random.alphanumeric.take(10).mkString.toLowerCase}.unverified.cns"
 
     withFrontEnd("sv") { implicit webDriver =>
       def login(): Unit = {

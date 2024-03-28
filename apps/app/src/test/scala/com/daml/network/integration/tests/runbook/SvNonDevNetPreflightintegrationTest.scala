@@ -57,7 +57,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
     }
   }
 
-  "SV can login to the ANS UI" in { _ =>
+  "SV can login to the CNS UI" in { _ =>
     val ansUrl = s"https://ans.$svUrlPrefix.svc.${sys.env("NETWORK_APPS_ADDRESS")}"
 
     withFrontEnd("sv") { implicit webDriver =>

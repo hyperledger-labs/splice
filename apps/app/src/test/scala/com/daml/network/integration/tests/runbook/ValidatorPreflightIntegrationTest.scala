@@ -296,18 +296,18 @@ abstract class ValidatorPreflightIntegrationTestBase
     }
   }
 
-  "test the ANS ui of a validator" in { _ =>
+  "test the CNS ui of a validator" in { _ =>
     val aliceUser = auth0Users.get("alice-validator").value
 
     withFrontEnd("alice-validator") { implicit webDriver =>
       loginAndOnboardToWalletUi(aliceUser)
 
       if (isDevNet) {
-        // On DevNet-like clusters, we test the full ANS entry creation flow
+        // On DevNet-like clusters, we test the full CNS entry creation flow
 
         // Generate new random ANS names to avoid conflicts between multiple preflight check runs
         val entryId = (new scala.util.Random).nextInt().toHexString
-        val ansName = s"alice_${entryId}.unverified.ans"
+        val ansName = s"alice_${entryId}.unverified.cns"
 
         tapAmulets(100)
         reserveAnsNameFor(

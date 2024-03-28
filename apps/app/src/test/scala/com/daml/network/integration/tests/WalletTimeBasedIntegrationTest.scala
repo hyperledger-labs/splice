@@ -53,9 +53,9 @@ class WalletTimeBasedIntegrationTest
     with TriggerTestUtil {
 
   private val splitwellDarPath = "daml/splitwell/.daml/dist/splitwell-0.1.0.dar"
-  private val testEntryName = "mycoolentry.unverified.ans"
+  private val testEntryName = "mycoolentry.unverified.cns"
   private val testEntryUrl = "https://ans-dir-url.com"
-  private val testEntryDescription = "Sample ANS Entry Description"
+  private val testEntryDescription = "Sample CNS Entry Description"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -198,7 +198,7 @@ class WalletTimeBasedIntegrationTest
           for ((name, i) <- List("alice1", "alice2", "alice3").map(perTestCaseName).zipWithIndex) {
 
             val (_, requestId) = actAndCheck(
-              "Request ANS entry", {
+              "Request CNS entry", {
                 aliceAnsExternalClient
                   .createAnsEntry(name, testEntryUrl, testEntryDescription)
               },
@@ -273,7 +273,7 @@ class WalletTimeBasedIntegrationTest
         }
         val entryName = "alice"
         val (_, requestId) = actAndCheck(
-          "Request ANS entry", {
+          "Request CNS entry", {
             aliceAnsExternalClient
               .createAnsEntry(perTestCaseName(entryName), testEntryUrl, testEntryDescription)
           },
@@ -639,7 +639,7 @@ class WalletTimeBasedIntegrationTest
         Range(1, 8).foreach(_ => advanceRoundsByOneTick)
       }
 
-      val respond = clue("Alice requests a ANS entry") {
+      val respond = clue("Alice requests a CNS entry") {
         aliceAnsExternalClient.createAnsEntry(
           testEntryName,
           testEntryUrl,
@@ -688,7 +688,7 @@ class WalletTimeBasedIntegrationTest
         )
 
         actAndCheck(
-          "Advance time until ANS entry is up for renewal", {
+          "Advance time until CNS entry is up for renewal", {
             // We time the advances so that automation doesn't trigger before payments can be made.
             // TODO (#7609): consider replacing with stopping and starting triggers
             advanceTimeAndWaitForRoundAutomation(Duration.ofDays(89).minus(Duration.ofMinutes(17)))

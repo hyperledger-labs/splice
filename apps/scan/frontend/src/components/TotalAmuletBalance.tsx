@@ -15,7 +15,7 @@ export const TotalAmuletBalance: React.FC = () => {
     case 'success':
       return (
         <AmountSummary
-          title="Total Amulet Balance"
+          title="Total Canton Coin Balance"
           amount={new BigNumber(totalAmuletBalanceQuery.data.total_balance)}
           idCC="total-amulet-balance-cc"
         />

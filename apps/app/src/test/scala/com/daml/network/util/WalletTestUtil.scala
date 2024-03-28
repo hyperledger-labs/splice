@@ -437,7 +437,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       wallet: WalletAppClientReference,
       tapAmount: BigDecimal = 5.0,
       entryUrl: String = "https://ans-dir-url.com",
-      entryDescription: String = "Sample ANS Entry Description",
+      entryDescription: String = "Sample CNS Entry Description",
   )(implicit
       env: CNNodeTestConsoleEnvironment
   ): Unit = {
@@ -469,7 +469,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       ansExternalApp: AnsExternalAppReference,
       entryName: String,
       entryUrl: String = "https://ans-dir-url.com",
-      entryDescription: String = "Sample ANS Entry Description",
+      entryDescription: String = "Sample CNS Entry Description",
   ) = {
     // TODO(#8300) global domain can be disconnected and reconnected after config of sequencer connections changed
     retryCommandSubmission(
@@ -753,7 +753,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       userParty: PartyId,
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val entryUrl = "https://ans-dir-url.com"
-    val entryDescription = "Sample ANS Entry Description"
+    val entryDescription = "Sample CNS Entry Description"
     val ansRules = sv1ScanBackend.getAnsRules()
     val update = ansRules.contractId.exerciseAnsRules_RequestEntry(
       entryName,
@@ -999,7 +999,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       refs: DynamicUserRefs,
       entryName: String,
       entryUrl: String = "https://ans-dir-url.com",
-      entryDescription: String = "Sample ANS Entry Description",
+      entryDescription: String = "Sample CNS Entry Description",
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     val ansRules = sv1ScanBackend.getAnsRules()
 
@@ -1025,7 +1025,7 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
       refs: DynamicUserRefs,
       entryName: String,
       entryUrl: String = "https://ans-dir-url.com",
-      entryDescription: String = "Sample ANS Entry Description",
+      entryDescription: String = "Sample CNS Entry Description",
   )(implicit env: CNNodeTestConsoleEnvironment) = {
     // for paying the ans entry initial payment.
     refs.wallet.tap(5.0)

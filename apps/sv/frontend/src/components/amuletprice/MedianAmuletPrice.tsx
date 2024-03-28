@@ -48,7 +48,7 @@ const MedianAmuletPrice: React.FC = () => {
   return (
     <Stack mt={4} spacing={2} direction="column" justifyContent="center">
       <Typography mt={4} variant="h4">
-        Amulet Price for Next Open Mining Round
+        Canton Coin Price for Next Open Mining Round
       </Typography>
       <Typography id="median-amulet-price-usd" variant="h2">
         {medianAmuletPrice && <AmountDisplay amount={medianAmuletPrice} currency="USDUnit" />}

@@ -286,6 +286,9 @@ object CNNodeUtil {
 
     // entryFee
     damlDecimal(entryFee),
+
+    // Description prefix
+    "CNS entry: ",
   )
 
   private def defaultDecentralizedSynchronizerConfig(

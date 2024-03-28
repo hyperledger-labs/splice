@@ -26,7 +26,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
             entry: {
               contract_id:
                 '00c8e178f8b0b2c2955103b3fa59ccdc5f34861c4bcf659844c2959ba9febf3f61ca0212207e6c7b0db1b456c2f3f23c3b0c75b02dfc0c470cd1ea3fb603a01527e414c922',
-              name: 'alice.unverified.ans',
+              name: 'alice.unverified.cns',
               url: 'https://alice-url.ans.com',
               description: '',
               expires_at: new Date('2024-01-07T14:50:26.364476Z'),
@@ -42,7 +42,7 @@ export const buildScanMock = (scanUrl: string): RestHandler[] => [
             entry: {
               contract_id:
                 '00c8e178f8b0b2c2955103b3fa59ccdc5f34861c4bcf659844c2959ba9febf3f61ca0212207e6c7b0db1b456c2f3f23c3b0c75b02dfc0c470cd1ea3fb603a01527e414c922',
-              name: 'bob.unverified.ans',
+              name: 'bob.unverified.cns',
               url: 'https://bob-url.ans.com',
               description: '',
               expires_at: new Date('2024-01-07T14:50:26.364476Z'),

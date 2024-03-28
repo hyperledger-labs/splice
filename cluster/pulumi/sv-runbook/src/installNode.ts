@@ -444,7 +444,7 @@ async function installSvAndValidator(
 
   const ansUiClientId = svNameSpaceAuth0Clients['ans'];
   if (!ansUiClientId) {
-    throw new Error('No ANS ui client id in auth0 config');
+    throw new Error('No CNS ui client id in auth0 config');
   }
 
   const validator = installCNRunbookHelmChart(

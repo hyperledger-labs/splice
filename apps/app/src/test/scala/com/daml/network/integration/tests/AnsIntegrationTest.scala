@@ -39,9 +39,9 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
   import WalletTestUtil.*
 
-  private val testEntryName = "mycoolentry.unverified.ans"
+  private val testEntryName = "mycoolentry.unverified.cns"
   private val testEntryUrl = "https://ans-dir-url.com"
-  private val testEntryDescription = "Sample ANS Entry Description"
+  private val testEntryDescription = "Sample CNS Entry Description"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CNNodeEnvironmentImpl, CNNodeTestConsoleEnvironment] =
@@ -104,12 +104,12 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       entry.name shouldBe testEntryName
     }
 
-    "archive expired ANS entries" in { implicit env =>
+    "archive expired CNS entries" in { implicit env =>
       setTriggersWithin[Assertion](
         triggersToPauseAtStart = Seq(),
         triggersToResumeAtStart = Seq(leaderExpiredAnsEntryTrigger),
       ) {
-        clue("Creating a ANS entry that expires immediately") {
+        clue("Creating a CNS entry that expires immediately") {
           clue("no user entries is created") {
             val userEntries = sv1ScanBackend
               .listEntries("", 25)
@@ -152,7 +152,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
 
       clue("invalid entries(bad names) are rejected") {
         val invalidNames =
-          Seq("alice.company.unverified.ans", "alice$company.unverified.ans", "alice.ans")
+          Seq("alice.company.unverified.cns", "alice$company.unverified.cns", "alice.ans")
         invalidNames.foreach { name =>
           loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
@@ -179,7 +179,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
         invalidUrls.foreach { url =>
           loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
-              requestAndPayForEntry(aliceRefs, "alice.unverified.ans", entryUrl = url)
+              requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryUrl = url)
             },
             lines => {
               forAll(lines) { line =>
@@ -197,11 +197,11 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       val aliceRefs = setupUser(aliceStaticRefs)
 
       clue("invalid entries(bad descriptions) are rejected") {
-        val invalidDescriptions = Seq("Sample ANS Entry Description -" * 50)
+        val invalidDescriptions = Seq("Sample CNS Entry Description -" * 50)
         invalidDescriptions.foreach { desc =>
           loggerFactory.assertLogsSeq(SuppressionRule.Level(Level.WARN))(
             {
-              requestAndPayForEntry(aliceRefs, "alice.unverified.ans", entryDescription = desc)
+              requestAndPayForEntry(aliceRefs, "alice.unverified.cns", entryDescription = desc)
             },
             lines => {
               forAll(lines) { line =>
@@ -217,7 +217,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       val aliceStaticRefs = StaticUserRefs(aliceValidatorBackend, aliceWalletClient)
       val aliceRefs = setupUser(aliceStaticRefs)
       val (subscriptionRequest, _) = actAndCheck(
-        "request ANS entry",
+        "request CNS entry",
         requestEntry(aliceRefs, testEntryName),
       )(
         "alice sees subscription request",
@@ -379,7 +379,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       }
     }
 
-    "dso ans entries can be seen via scan api" in { implicit env =>
+    "the DSO party's CNS entry can be seen via scan api" in { implicit env =>
       val expectedDsoEntry = definitions.AnsEntry(
         None,
         dsoParty.toProtoPrimitive,
@@ -394,7 +394,7 @@ class AnsIntegrationTest extends CNNodeIntegrationTest with WalletTestUtil with 
       sv1ScanBackend.listEntries("", 100) should contain(expectedDsoEntry)
     }
 
-    "sv member ans entries can be seen via scan api" in { implicit env =>
+    "na SV's CNS entry can be seen via scan api" in { implicit env =>
       val dsoRules = sv1Backend.getDsoInfo().dsoRules
       dsoRules.payload.svs.asScala.foreach { case (svParty, svInfo) =>
         val expectedSvEntry = svEntry(svInfo.name, svParty)

@@ -150,7 +150,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
             matchTransaction(ansCreation)(
               amuletPrice = 2,
               expectedAction = "Sent",
-              expectedSubtype = "ANS Entry Initial Payment Collected",
+              expectedSubtype = "CNS Entry Initial Payment Collected",
               expectedPartyDescription = Some(s"$dsoEntry $dsoEntry"),
               expectedAmountAmulet = BigDecimal(0), // 0 USD
             )
@@ -203,7 +203,7 @@ class WalletTransactionHistoryFrontendIntegrationTest
                 expectedAction = "Sent",
                 expectedSubtype = "Extra Traffic Purchase",
                 expectedPartyDescription = Some(
-                  s"${expectedAns(dsoParty, "dso.ans")} ${expectedAns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.ans")}"
+                  s"${expectedAns(dsoParty, "dso.cns")} ${expectedAns(PartyId.tryFromProtoPrimitive(sv1ValidatorParty), s"${sv1Name.toLowerCase}.sv.cns")}"
                 ),
                 expectedAmountAmulet = -trafficCostCc,
               )

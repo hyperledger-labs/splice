@@ -1,4 +1,4 @@
-import { Contract, AssignedContract } from 'common-frontend-utils/interfaces';
+import { AssignedContract, Contract } from 'common-frontend-utils/interfaces';
 
 import { Unit } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 
@@ -31,7 +31,7 @@ export function sameAssignedContracts<T>(
 
 export type Currency = 'CC' | 'USD';
 
-// TODO(#11265) Clean this up
+// TODO(#11375): inject this via a config instead of hardcoding... and please no more string matching
 export const unitStringToCurrency = (unit: string): Currency => {
   switch (unit) {
     case 'AMULETUNIT':

@@ -10,7 +10,7 @@ import scala.jdk.CollectionConverters.*
 
 class DsoAnsResolver(dsoParty: PartyId) {
   private val dsoAnsEntry: DsoAnsEntry = DsoAnsEntry(dsoParty, dsoAnsName)
-  private val svAnsNamePattern = """^[a-zA-Z0-9_-]+\.sv\.ans$""".r
+  private val svAnsNamePattern = """^[a-zA-Z0-9_-]+\.sv\.cns$""".r
 
   def lookupEntryByName(
       dsoRules: Contract[DsoRules.ContractId, DsoRules],
@@ -57,8 +57,8 @@ class DsoAnsResolver(dsoParty: PartyId) {
 }
 
 object DsoAnsResolver {
-  val dsoAnsName = "dso.ans"
-  val svAnsNameSuffix = ".sv.ans"
+  val dsoAnsName = "dso.cns"
+  val svAnsNameSuffix = ".sv.cns"
   case class DsoAnsEntry(user: PartyId, name: String) {
     def toHttp: http.AnsEntry = http.AnsEntry(None, user.toProtoPrimitive, name, "", "", None)
   }

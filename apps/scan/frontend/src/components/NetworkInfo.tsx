@@ -101,13 +101,13 @@ const FeesTable: React.FC<{ amuletConfig: AmuletConfig<'USD'> }> = ({ amuletConf
       <Table>
         <TableBody>
           <FeeTableRow
-            name="Amulet Creation Fee"
+            name="Canton Coin Creation Fee"
             value={`${BigNumber(amuletConfig.transferConfig.createFee.fee)} CC`}
             description="A fixed fee for the creation of new amulet records."
           />
           <FeeTableRow
             name="Holding Fee"
-            value={`${BigNumber(amuletConfig.transferConfig.holdingFee.rate)} Amulet/Round`}
+            value={`${BigNumber(amuletConfig.transferConfig.holdingFee.rate)} CC/Round`}
             description="A fixed fee for maintaining each active amulet record, charged per round."
           />
           <FeeTableRow

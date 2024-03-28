@@ -46,7 +46,7 @@ export const ExternalAnsClientProvider: React.FC<React.PropsWithChildren<Externa
 export const useExternalAnsClient: () => AnsApi = () => {
   const client = useContext<AnsApi | undefined>(ExternalAnsContext);
   if (!client) {
-    throw new Error('External ANS client not initialized');
+    throw new Error('External CNS client not initialized');
   }
   return client;
 };

@@ -18,7 +18,7 @@ const Searchbar: React.FC<InputBaseProps> = props => (
         <Search color="secondary" />
       </InputAdornment>
     }
-    endAdornment={<InputAdornment position="end">.unverified.ans</InputAdornment>}
+    endAdornment={<InputAdornment position="end">.unverified.cns</InputAdornment>}
     {...props}
   />
 );

@@ -122,6 +122,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         new RelTime(1_000_000),
         new RelTime(1_000_000),
         new java.math.BigDecimal(1.0).setScale(10),
+        "CNS entry: ",
       ),
     )
     contract(

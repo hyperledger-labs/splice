@@ -79,7 +79,7 @@ template AnsRules
               receiver = dso
               provider = dso
               dso
-              description = "ANS entry: " <> show name
+              description = config.descriptionPrefix <> show name
             payData = SubscriptionPayData with
               paymentAmount = PaymentAmount config.entryFee USDUnit
               paymentInterval = config.entryLifetime
@@ -206,6 +206,7 @@ data AnsRulesConfig = AnsRulesConfig with
     renewalDuration : RelTime -- Length of interval within which user can renew. At the end the entry expires
     entryLifetime : RelTime -- Duration until an entry expires
     entryFee : Decimal -- Fee for each entry
+    descriptionPrefix : Text -- Prefix to use for the description of the entry subscription
   deriving (Eq, Show)
 
 template AnsEntryContext

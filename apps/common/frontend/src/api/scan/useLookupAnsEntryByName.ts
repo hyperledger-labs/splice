@@ -37,7 +37,7 @@ export function useLookupAnsEntryByNameFromResponse(
         return response.entry;
       } catch (e: unknown) {
         if ((e as ApiException<undefined>).code === 404) {
-          console.info(`No ANS entry for name ${name} found`);
+          console.info(`No CNS entry for name ${name} found`);
           if (retryWhenNotFound) {
             throw e;
           } else {

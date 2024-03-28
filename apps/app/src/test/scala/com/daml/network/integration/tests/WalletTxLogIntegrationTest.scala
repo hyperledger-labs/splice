@@ -1020,7 +1020,7 @@ class WalletTxLogIntegrationTest
         "Request ans entry",
         requestAnsEntry(
           aliceValidatorBackend.participantClientWithAdminToken,
-          "alice.unverified.ans",
+          "alice.unverified.cns",
           aliceUserId,
           aliceUserParty,
         ),
