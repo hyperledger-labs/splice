@@ -1126,10 +1126,6 @@ components:
           description: |
             base64 encoded string of domain genesis state
           type: string
-        vetted_packages:
-          description: |
-            base64 encoded string of vetted packages
-          type: string
         acs_snapshot:
           description: |
             base64 encoded string of acs snapshot for the requested party id, or for the dso and sv parties by default

@@ -33,9 +33,7 @@ import com.digitalasset.canton.sequencing.SequencerConnections
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.topology.store.TopologyStoreId
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.MonadUtil
 import com.google.protobuf.ByteString
 import io.grpc.Status
 import io.opentelemetry.api.trace.Tracer
@@ -167,9 +165,6 @@ class DomainMigrationInitializer(
         domainMigrationDump.domainDataSnapshot.genesisState.getOrElse(
           sys.error("Domain nodes cannot be initialized without a genesis dump")
         ),
-        domainMigrationDump.domainDataSnapshot.vettedPackages.getOrElse(
-          sys.error("Domain nodes cannot be initialized without vetted packages snapshot")
-        ),
       )
       _ <- domainDataRestorer.connectDomainAndRestoreData(
         readOnlyConnection,
@@ -196,7 +191,6 @@ class DomainMigrationInitializer(
   private def initializeSynchronizerNode(
       nodeIdentities: SynchronizerNodeIdentities,
       genesisState: ByteString,
-      vettedPackages: GenericStoredTopologyTransactionsX,
   ): Future[Unit] = {
     val synchronizerNodeInitiaizer = SynchronizerNodeInitializer(
       localSynchronizerNode,
@@ -211,17 +205,6 @@ class DomainMigrationInitializer(
         nodeIdentities.sequencer,
         genesisState,
       )
-      _ = logger.info(
-        s"Adding ${vettedPackages.result.size} vetted packages topology transactions after sequencer initialization"
-      )
-      _ <- MonadUtil.sequentialTraverse_(vettedPackages.result.zipWithIndex) { case (tx, index) =>
-        logger.info(s"Replaying vetted packages $index / ${vettedPackages.result.size}")
-        localSynchronizerNode.sequencerAdminConnection
-          .addVettedPackageTransactionAndEnsurePersisted(
-            nodeIdentities.domainId,
-            tx.transaction,
-          )
-      }
       _ <- initializeMediator(
         nodeIdentities.domainId,
         synchronizerNodeInitiaizer,

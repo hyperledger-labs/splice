@@ -32,9 +32,6 @@ class DomainDataSnapshotGenerator(
     decentralizedSynchronizer <- dsoStore.getDsoRules().map(_.domain)
     cantonTimestamp = CantonTimestamp.tryFromInstant(timestamp)
     topologySnapshot <- sequencerAdminConnection.traverse(_.getGenesisState(cantonTimestamp))
-    vettedPackages <- sequencerAdminConnection.traverse(
-      _.getVettedPackagesSnapshot(decentralizedSynchronizer, cantonTimestamp)
-    )
     acsSnapshot <- acsExporter
       .exportAcsAtTimestamp(
         decentralizedSynchronizer,
@@ -44,7 +41,6 @@ class DomainDataSnapshotGenerator(
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
     topologySnapshot,
-    vettedPackages,
     acsSnapshot,
     acsTimestamp = timestamp,
     dars,
@@ -63,9 +59,6 @@ class DomainDataSnapshotGenerator(
     genesisState <- sequencerAdminConnection.traverse(
       _.getGenesisState(timestamp)
     )
-    vettedPackages <- sequencerAdminConnection.traverse(
-      _.getVettedPackagesSnapshot(decentralizedSynchronizer, timestamp)
-    )
     (acsSnapshot, acsTimestamp) <- acsExporter
       .safeExportParticipantPartiesAcsFromPausedDomain(decentralizedSynchronizer)
       .leftMap(failure =>
@@ -75,7 +68,6 @@ class DomainDataSnapshotGenerator(
     dars <- darExporter.exportAllDars()
   } yield DomainDataSnapshot(
     genesisState,
-    vettedPackages,
     acsSnapshot,
     acsTimestamp,
     dars,

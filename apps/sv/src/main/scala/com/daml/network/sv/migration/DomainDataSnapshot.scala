@@ -1,13 +1,8 @@
 package com.daml.network.sv.migration
 
-import cats.syntax.either.*
-import cats.syntax.traverse.*
 import com.daml.network.http.v0.definitions as http
 import com.daml.network.migration.Dar
 import com.digitalasset.canton.crypto.Hash
-import com.digitalasset.canton.topology.admin.v30.TopologyTransactions
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX
-import com.digitalasset.canton.topology.store.StoredTopologyTransactionsX.GenericStoredTopologyTransactionsX
 import com.google.protobuf.ByteString
 
 import java.time.Instant
@@ -17,8 +12,6 @@ import java.util.Base64
 // the optional mess.
 case class DomainDataSnapshot(
     genesisState: Option[ByteString],
-    // TODO(#11098) Stop replaying vetted packages separately.
-    vettedPackages: Option[GenericStoredTopologyTransactionsX],
     acsSnapshot: ByteString,
     acsTimestamp: Instant,
     dars: Seq[Dar],
@@ -26,7 +19,6 @@ case class DomainDataSnapshot(
 ) {
   def toHttp: http.DomainDataSnapshot = http.DomainDataSnapshot(
     genesisState.map(s => Base64.getEncoder.encodeToString(s.toByteArray)),
-    vettedPackages.map(pkgs => Base64.getEncoder.encodeToString(pkgs.toProtoV30.toByteArray)),
     Base64.getEncoder.encodeToString(acsSnapshot.toByteArray),
     acsTimestamp.toString,
     dars.map { dar =>
@@ -51,21 +43,14 @@ object DomainDataSnapshot {
         Dar(Hash.tryFromHexString(dar.hash), ByteString.copyFrom(decoded))
       }
     val acsTimestamp = Instant.parse(src.acsTimestamp)
-    for {
-      vettedPackages <- src.vettedPackages.traverse { pkgs =>
-        val decoded = base64Decoder.decode(pkgs)
-        val proto = TopologyTransactions.parseFrom(decoded)
-        StoredTopologyTransactionsX
-          .fromProtoV30(proto)
-          .leftMap(_ => "Failed to parse Topology Transactions")
-      }
-    } yield DomainDataSnapshot(
-      genesisState,
-      vettedPackages,
-      acsSnapshot,
-      acsTimestamp,
-      dars,
-      src.domainWasHalted,
+    Right(
+      DomainDataSnapshot(
+        genesisState,
+        acsSnapshot,
+        acsTimestamp,
+        dars,
+        src.domainWasHalted,
+      )
     )
   }
 }
