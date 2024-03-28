@@ -112,7 +112,7 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
     }
   }
 
-  "Check that open mining round 0 is open for 24h" in { implicit env =>
+  "Check that open mining round 0 is open for 26h" in { implicit env =>
     val (openRounds, _) = svScanClient.getOpenAndIssuingMiningRounds()
     inside(openRounds.find(_.contract.payload.round.number == 0)) {
       case None =>
@@ -126,8 +126,8 @@ abstract class SvNonDevNetPreflightIntegrationTestBase
         ) - CantonTimestamp.assertFromInstant(round.contract.payload.opensAt)
         // In theory this should be exact but I don't entirely trust that leap seconds or whatever don't break this
         // and we don't actually care about it being exact.
-        diff should be < Duration.ofHours(24).plus(Duration.ofSeconds(1))
-        diff should be > Duration.ofHours(24).minus(Duration.ofSeconds(1))
+        diff should be < Duration.ofHours(26).plus(Duration.ofSeconds(1))
+        diff should be > Duration.ofHours(26).minus(Duration.ofSeconds(1))
     }
   }
 

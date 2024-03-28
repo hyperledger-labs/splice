@@ -31,6 +31,10 @@ Release Notes
 * The sequencer URL of the Digital Asset 2 node ``https://sequencer.sv-1.svc.CLUSTER.network.canton.global`` is no longer exposed. Instead use
   ``https://sequencer-MIGRATION_ID.sv-1.svc.CLUSTER.network.canton.global`` where ``MIGRATION_ID`` is the current migration id of the cluster.
 
+* Round 0 now has a duration of 26h. The two extra hours are to allow for internal validation before the release is announced while still providing 24h for anyone else to validate the config.
+
+* DevNet and TestNet are deployed on Monday instead of Sunday each week.
+
 
 2024-03-25
 ----------

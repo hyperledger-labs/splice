@@ -11,7 +11,7 @@
       "hours-of-day": [
         21
       ],
-      "days-of-week" : [ "SUN" ],
+      "days-of-week" : [ "MON" ],
       "days-of-month" : [ ],
       "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
     }
