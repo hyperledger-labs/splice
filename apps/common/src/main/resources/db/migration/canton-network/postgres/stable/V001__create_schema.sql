@@ -913,8 +913,8 @@ create table update_history_exercises
     template_id_entity_name     text not null,
     contract_id                 text not null,
     consuming                   boolean not null,
-    argument                    bytea not null, -- TODO(#10488): Store values in JSON format instead.
-    result                      bytea not null  -- TODO(#10488): Store values in JSON format instead.
+    argument                    jsonb not null,
+    result                      jsonb not null
 
     -- not storing:
     -- witnesses (the stored witnesses is the intersection of actual witnesses according to the daml model
@@ -948,7 +948,7 @@ create table update_history_creates(
     template_id_module_name     text not null,
     template_id_entity_name     text not null,
     package_name                text not null,
-    create_arguments            bytea not null -- TODO(#10488): Store values in JSON format instead.
+    create_arguments            jsonb not null
 
     -- not storing:
     -- contract key hash (CN doesn't use contract keys and they will be removed in 3.0)
@@ -998,7 +998,7 @@ create table update_history_assignments
     template_id_module_name     text not null,
     template_id_entity_name     text not null,
     package_name                text not null,
-    create_arguments            bytea not null -- TODO(#10488): Store values in JSON format instead.
+    create_arguments            jsonb not null
 );
 
 -- Update history is mainly traversed by (migration_id, domain_id, record_time)

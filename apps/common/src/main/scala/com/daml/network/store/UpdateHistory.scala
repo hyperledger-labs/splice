@@ -24,6 +24,7 @@ import com.daml.network.environment.ledger.api.{
 import com.daml.network.migration.DomainMigrationInfo
 import com.daml.network.store.MultiDomainAcsStore.{HasIngestionSink, IngestionFilter}
 import com.daml.network.store.db.AcsJdbcTypes
+import com.digitalasset.canton.config.CantonRequireTypes.String256M
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.CloseContext
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -31,6 +32,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.ByteString
+import com.google.protobuf.util.JsonFormat
 import org.apache.pekko.NotUsed
 import org.apache.pekko.stream.scaladsl.Source
 import slick.dbio.{DBIO, DBIOAction, Effect, NoStream}
@@ -311,7 +313,6 @@ final class UpdateHistory(
         val createArguments = serializeValue(event.createdEvent.getArguments)
         val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdEvent.createdAt)
 
-        import storage.DbStorageConverters.setParameterByteArray
         sqlu"""
         insert into update_history_assignments(
           history_id,update_id,record_time,
@@ -329,7 +330,7 @@ final class UpdateHistory(
           $safeUnassignId, ${event.submitter},
           $safeContractId, $safeEventId, $safeCreatedAt,
           $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
-          $safePackageName, $createArguments
+          $safePackageName, $createArguments::jsonb
         )
       """
       }
@@ -392,7 +393,6 @@ final class UpdateHistory(
         val createArguments = serializeValue(event.getArguments)
         val safeCreatedAt = CantonTimestamp.assertFromInstant(event.createdAt)
 
-        import storage.DbStorageConverters.setParameterByteArray
         sqlu"""
           insert into update_history_creates(
             history_id, event_id, update_row_id,
@@ -404,7 +404,7 @@ final class UpdateHistory(
             $historyId, $safeEventId, $updateRowId,
             $safeContractId, $safeCreatedAt,
             $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
-            $safePackageName, $createArguments
+            $safePackageName, $createArguments::jsonb
           )
         """
       }
@@ -424,7 +424,6 @@ final class UpdateHistory(
         val choiceArguments = serializeValue(event.getChoiceArgument)
         val exerciseResult = serializeValue(event.getExerciseResult)
 
-        import storage.DbStorageConverters.setParameterByteArray
         sqlu"""
           insert into update_history_exercises(
             history_id, event_id, update_row_id,
@@ -438,7 +437,7 @@ final class UpdateHistory(
             $safeChildEventIds, $safeChoice,
             $templateIdPackageId, $templateIdModuleName, $templateIdEntityName,
             $safeContractId, ${event.isConsuming},
-            $choiceArguments, $exerciseResult
+            $choiceArguments::jsonb, $exerciseResult::jsonb
           )
         """
       }
@@ -918,17 +917,15 @@ final class UpdateHistory(
     )
   }
 
-  // Note: for now, storing values in binary protobuf format.
-  // JSON decoding requires type information. To read the value of a field,
-  // you need to look up the type of the field, in order to distinguish between party
-  // and string primitives, for example.
-  // TODO(#10488): Store values in JSON format instead.
-  private def serializeValue(x: com.daml.ledger.javaapi.data.Value): Array[Byte] = {
-    x.toProto.toByteArray
+  private def serializeValue(x: com.daml.ledger.javaapi.data.Value): String256M = {
+    val proto = x.toProto
+    val protoString = JsonFormat.printer.print(proto)
+    String256M.tryCreate(protoString)
   }
-  private def deserializeValue(x: Array[Byte]): com.daml.ledger.javaapi.data.Value = {
-    com.daml.ledger.javaapi.data.Value
-      .fromProto(com.daml.ledger.api.v2.ValueOuterClass.Value.parseFrom(x))
+  private def deserializeValue(x: String): com.daml.ledger.javaapi.data.Value = {
+    val builder = com.daml.ledger.api.v2.ValueOuterClass.Value.newBuilder()
+    JsonFormat.parser().merge(x, builder)
+    com.daml.ledger.javaapi.data.Value.fromProto(builder.build())
   }
 
   private implicit lazy val GetResultSelectFromTransactions: GetResult[SelectFromTransactions] =
@@ -960,7 +957,7 @@ final class UpdateHistory(
           <<[String],
           <<[String],
           <<[String],
-          <<[Array[Byte]],
+          <<[String],
         )
       )
     }
@@ -978,8 +975,8 @@ final class UpdateHistory(
           <<[String],
           <<[String],
           <<[Boolean],
-          <<[Array[Byte]],
-          <<[Array[Byte]],
+          <<[String],
+          <<[String],
         )
       )
     }
@@ -1005,7 +1002,7 @@ final class UpdateHistory(
           <<[String],
           <<[String],
           <<[String],
-          <<[Array[Byte]],
+          <<[String],
         )
       )
     }
@@ -1057,7 +1054,7 @@ object UpdateHistory {
       templateModuleName: String,
       templateEntityName: String,
       packageName: String,
-      createArguments: Array[Byte],
+      createArguments: String,
   )
 
   private case class SelectFromExerciseEvents(
@@ -1069,8 +1066,8 @@ object UpdateHistory {
       templateEntityName: String,
       contractId: String,
       consuming: Boolean,
-      argument: Array[Byte],
-      result: Array[Byte],
+      argument: String,
+      result: String,
   )
 
   private case class SelectFromAssignments(
@@ -1090,7 +1087,7 @@ object UpdateHistory {
       templateModuleName: String,
       templateEntityName: String,
       packageName: String,
-      createArguments: Array[Byte],
+      createArguments: String,
   )
 
   private case class SelectFromUnassignments(
