@@ -16,8 +16,6 @@ Release Notes
   * Global Domain (whenever it refers to the more generic concept) -> Decentralized Synchronizer
   * Note that for technical reasons the URLs for networks still include the term "svc" for now;
     e.g., ``https://wallet.sv.svc.YOUR_HOSTNAME``.
-    Furthermore, some URLs and UIs may refer to the terms Amulet or ANS, but should actually be specialized
-    to the term CNS or Canton Coin. This will be fixed in a future release.
 
 * Added an option to disable the Validator apps' wallet. This can be done by setting ``enableWallet`` to ``false`` in the ``validator-values.yaml`` file.
 

@@ -557,7 +557,7 @@ You can open your browser at
 https://cns.validator.YOUR_HOSTNAME and login using the
 credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to register a name on the
-Amulet Name Service.
+Canton Name Service.
 
 .. image:: images/ans_home.png
   :width: 600

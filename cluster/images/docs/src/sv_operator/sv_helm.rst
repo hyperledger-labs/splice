@@ -879,7 +879,7 @@ You can open your browser at
 https://cns.sv.svc.YOUR_HOSTNAME and login using the
 credentials for the user that you configured as
 ``validatorWalletUser`` earlier. You will be able to register a name on the
-Amulet Name Service.
+Canton Name Service.
 
 .. image:: images/ans_home.png
   :width: 600
@@ -937,7 +937,7 @@ Backup of Node Identities
 Once your SV node is up and onboarded, please make sure to backup the node identities of your SV node. **Note that this information
 is highly sensitive, and contains the private keys of your participant, sequencer and mediator,** so make sure to store it in
 a secure location, such as a Secret Manager. On the other hand, it is crucial for maintaining your identity (and thus, e.g.
-access to your Amulet holdings), so must be backed up outside of the cluster.
+access to your Canton Coin holdings), so must be backed up outside of the cluster.
 
 Your identites may be fetched from your node through the following endpoint:
 

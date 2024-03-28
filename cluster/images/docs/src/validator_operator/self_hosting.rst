@@ -219,6 +219,9 @@ Open ``web-uis/ans/config.js`` and change ``TARGET_CLUSTER`` in the Scan URL to 
     :start-after: BEGIN_ANS_CLUSTER_BACKEND_CONFIG
     :end-before: END_ANS_CLUSTER_BACKEND_CONFIG
 
+.. note::
+  The "ans" in ``web-uis/ans/config.js`` stands for "Amulet Name Service", which is the name of the
+  code the implements the logic underlying CNS.
 
 .. _splitwell-user:
 

@@ -3,6 +3,14 @@ Glossary
 
 .. glossary::
 
+    Amulet
+
+      The generic name for the code and the logic implementing Canton Coin.
+
+    Amulet Name Service
+
+      The generic name for the code and logic implementing the Canton Name Service.
+
     CC
 
       :term:`Canton Coin`
@@ -61,7 +69,7 @@ Glossary
       * provides UI for managing peer-to-peer transfers
         between two users
 
-    Amulet Name Service (sometimes also called directory service)
+    Canton Name Service (sometimes also called directory service)
 
       * allows parties to buy a globally unique, human readable name for a time period mapped to their party (similar to DNS)
       * allows each party to declare one of their entries as the primary
@@ -70,6 +78,10 @@ Glossary
       * provides APIs for resolution in both directions that can be used by
         other apps (e.g., the wallet) to display and accept CNS names instead of party ids
 
+    Splice
+
+      * The name of the HyperLedger lab project that will host the code for Amulet, DSO governance,
+        Amulet Name Service, SV nodes, and validator nodes.
 
     Splitwell
 
