@@ -4193,6 +4193,7 @@ workflows:
       - deploy_partial_upgrade:
           name: "deploy_partial_upgrade"
           cluster: "ciupgrade"
+          send_deployment_notification: false
           context:
             - artifactory
             - slack-context
