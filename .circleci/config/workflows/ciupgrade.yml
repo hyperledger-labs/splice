@@ -12,6 +12,7 @@ workflow:
             - artifactory
             - slack-context
           workflow_names: "deploy_ciupgrade"
+          wait_type: "wait_workflow"
           requires:
             - cancel_if_current_commit_is_base_version
       - deploy_cluster:

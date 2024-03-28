@@ -13,6 +13,7 @@ BRANCH_IGNORES=${5:-"^$"}  # do not execute on branches that match this pattern
 MAX_AGE_SECONDS="${6:-0}"
 # valid values for WAIT_OR_CANCEL:
 # - wait - (default) wait for pipelines with workflows matching WORKFLOW_NAMES to complete
+# - wait_workflow - (default) waits for workflows matching WORKFLOW_NAMES to complete (but not their entire pipeline)
 # - cancel_self - cancel current workflow if there exists a previously running pipeline with workflows matching WORKFLOW_NAMES
 # - cancel_self_if_found - cancel current workflow if there exists a previously pipeline (regardless of their status) with workflows matching WORKFLOW_NAMES
 # - cancel_pipeline - cancel previously running pipelines with workflows matching WORKFLOW_NAMES
@@ -183,6 +184,58 @@ wait_for_pipeline_to_complete() {
     done
 }
 
+workflows_complete() {
+    local pipeline_id="$1"
+    local workflows_to_check="$2"
+    local pipeline_workflows workflow_id workflow_name workflow_status
+
+    pipeline_workflows=$(fetch_pipeline_workflows "$pipeline_id") || return $?
+    echo "workflows for pipeline $pipeline_id:"
+    echo "$pipeline_workflows"
+    echo ""
+
+    while IFS= read -r workflow; do
+      workflow_id=$(jq -r '.id' <<<"$workflow")
+      workflow_name=$(jq -r '.name' <<<"$workflow")
+      workflow_status=$(jq -r '.status' <<<"$workflow")
+      # note that workflows to check can be a string like "deploy_cidaily_and_cidaily_testnet cidaily_health_check"
+      # so we need to check that the workflow name is in it
+      echo "Checking if $workflows_to_check contains $workflow_name"
+      if [[ " $workflows_to_check " == *" $workflow_name "*  ]]; then
+        if [[ "$workflow_status" == "running" || "$workflow_status" == "failing" ]]; then
+          echo "Workflow $workflow_name is still running."
+          return 1
+        else
+          echo "Workflow $workflow_name is $workflow_status."
+        fi
+      else
+        echo "Workflow $workflow_name is not checked. Ignoring."
+      fi
+    done <<< "$pipeline_workflows"
+
+    echo "Workflow complete"
+    return 0
+}
+
+wait_for_workflows_to_complete() {
+    local pipeline_id="$1"
+    local workflow_names="$2"
+
+    local current_time diff max
+    while ! workflows_complete "$pipeline_id" "$workflow_names"; do
+        echo "Workflow still running, waiting ..."
+        sleep 5
+        current_time=$(date +%s)
+        diff=$((current_time - START_TIME))
+        # wait up to $MAX_TIMEOUT_MINUTES number of minutes
+        max=$((MAX_TIMEOUT_MINUTES * 60))
+        if [[ $diff -ge $max ]]; then
+            echo "Waited for $MAX_TIMEOUT_MINUTES min, but previous workflow never became available. Quitting."
+            exit 1
+        fi
+    done
+}
+
 cancel_workflow() {
     local workflow_id="$1"
     curl -fsSL -X POST \
@@ -238,6 +291,9 @@ run() {
                     elif [ "$WAIT_OR_CANCEL" = "wait" ]; then
                         echo "Pipeline contains workflow $WORKFLOW_NAME, waiting for pipeline to complete ..."
                         wait_for_pipeline_to_complete "$PIPELINE_ID" || return $?
+                    elif [ "$WAIT_OR_CANCEL" = "wait_workflow" ]; then
+                        echo "Pipeline contains workflow $WORKFLOW_NAME, checking status ..."
+                        wait_for_workflows_to_complete "$PIPELINE_ID" "$WORKFLOW_NAME" || return $?
                     else
                         echo "Invalid value for WAIT_OR_CANCEL: $WAIT_OR_CANCEL"
                         exit 1
