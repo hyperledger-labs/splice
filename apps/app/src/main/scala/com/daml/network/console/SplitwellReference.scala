@@ -345,7 +345,7 @@ final class SplitwellAppClientReference(
   @Help.Summary("Initiate a transfer. Must be confirmed in the wallet.")
   def initiateTransfer(
       key: HttpSplitwellAppClient.GroupKey,
-      receiverAmounts: Seq[walletCodegen.ReceiverCCAmount],
+      receiverAmounts: Seq[walletCodegen.ReceiverAmuletAmount],
   ): walletCodegen.AppPaymentRequest.ContractId = {
     val party = getUserPrimaryParty()
     val (domain, group) = getGroup(key)

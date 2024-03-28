@@ -96,7 +96,7 @@ class SplitwellIntegrationTest
           aliceSplitwellClient.initiateTransfer(
             key,
             Seq(
-              new walletCodegen.ReceiverCCAmount(
+              new walletCodegen.ReceiverAmuletAmount(
                 bobUserParty.toProtoPrimitive,
                 BigDecimal(42.0).bigDecimal,
               )
@@ -168,7 +168,7 @@ class SplitwellIntegrationTest
           aliceSplitwellClient.initiateTransfer(
             key,
             Seq(
-              new walletCodegen.ReceiverCCAmount(
+              new walletCodegen.ReceiverAmuletAmount(
                 bobUserParty.toProtoPrimitive,
                 BigDecimal(42.0).bigDecimal,
               )
@@ -300,7 +300,7 @@ class SplitwellIntegrationTest
         bobSplitwellClient.initiateTransfer(
           key,
           Seq(
-            new walletCodegen.ReceiverCCAmount(
+            new walletCodegen.ReceiverAmuletAmount(
               aliceUserParty.toProtoPrimitive,
               BigDecimal(50.0).bigDecimal,
             )

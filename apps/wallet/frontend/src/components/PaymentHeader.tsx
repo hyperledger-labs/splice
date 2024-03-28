@@ -36,10 +36,10 @@ const PaymentHeader: React.FC = () => {
           ) : (
             <Typography className="available-balance">
               Total Available Balance:{' '}
-              <AmountDisplay amount={balanceQuery.data.availableCC} currency="CC" /> /{' '}
+              <AmountDisplay amount={balanceQuery.data.availableCC} currency="AmuletUnit" /> /{' '}
               <AmountDisplay
                 amount={balanceQuery.data.availableCC}
-                currency="CC"
+                currency="AmuletUnit"
                 convert="CCtoUSD"
                 amuletPrice={amuletPriceQuery.data}
               />

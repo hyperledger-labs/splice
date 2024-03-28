@@ -25,12 +25,12 @@ const Hero: React.FC = () => {
           <Box>
             <Typography variant="h6">Total Available Balance</Typography>
             <Typography id="wallet-balance-cc" variant="h4">
-              <AmountDisplay amount={balanceQuery.data.availableCC} currency="CC" />
+              <AmountDisplay amount={balanceQuery.data.availableCC} currency="AmuletUnit" />
             </Typography>
             <Typography id="wallet-balance-usd" variant="caption" style={{ marginRight: 12 }}>
               <AmountDisplay
                 amount={balanceQuery.data.availableCC}
-                currency="CC"
+                currency="AmuletUnit"
                 convert="CCtoUSD"
                 amuletPrice={amuletPriceQuery.data}
               />

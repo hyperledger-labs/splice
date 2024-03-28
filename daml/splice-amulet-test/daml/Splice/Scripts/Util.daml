@@ -14,7 +14,8 @@ import DA.Time
 import DA.Assert
 import Splice.Amulet
 import Splice.AmuletRules
-import Splice.AmuletConfig
+import Splice.AmuletConfig (AmuletConfig(..))
+import qualified Splice.AmuletConfig as Unit
 import Splice.Expiry
 import Splice.Issuance
 import Splice.Round
@@ -27,11 +28,11 @@ import Splice.ValidatorLicense
 import Splice.Scripts.Parameters
 import Splice.Util
 
--- Bootstrapping CC
+-- Bootstrapping Amulet
 -------------------
 
 
--- | A type to hold the off-ledger information required to interact with the CC app.
+-- | A type to hold the off-ledger information required to interact with the Amulet app.
 data AmuletApp = AmuletApp with
     dso : Party
     dsoUser : AmuletUser
@@ -41,11 +42,11 @@ demoTime : Time
 demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
 
 
--- | Setup the DSO party and the contracts defining the CC app.
+-- | Setup the DSO party and the contracts defining the Amulet app.
 setupApp : Script AmuletApp
 setupApp = genericSetupApp ""
 
--- | Setup the DSO party with a specific prefix and the contracts defining the CC app.
+-- | Setup the DSO party with a specific prefix and the contracts defining the Amulet app.
 genericSetupApp : Text -> Script AmuletApp
 genericSetupApp dsoPrefix = do
   -- use a time that is easy to reason about in script outputs
@@ -80,8 +81,8 @@ genericSetupApp dsoPrefix = do
 
 setupValidator : AmuletApp -> Text -> Script Party
 setupValidator app name = do
-  validatorCcUser <- setupValidator' app name
-  return validatorCcUser.primaryParty
+  validatorUser <- setupValidator' app name
+  return validatorUser.primaryParty
 
 setupValidator' : AmuletApp -> Text -> Script AmuletUser
 setupValidator' app name = do
@@ -599,7 +600,7 @@ assertError f = do
     catch (_ : AnyException) -> pure True
   unless isThrown (abort "expected exception but didn't get one")
 
-getAmuletConfig : AmuletApp -> Script (AmuletConfig USD)
+getAmuletConfig : AmuletApp -> Script (AmuletConfig Unit.USD)
 getAmuletConfig app = do
   Some (_, amuletRules) <- queryAmuletRulesByKey app.dso
   now <- getTime

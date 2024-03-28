@@ -1189,7 +1189,7 @@ abstract class SvDsoStoreTest extends StoreTest with HasExecutionContext {
         entryDescription,
       ),
       new SubscriptionPayData(
-        new PaymentAmount(numeric(BigDecimal("1")), Unit.CC),
+        new PaymentAmount(numeric(BigDecimal("1")), Unit.AMULETUNIT),
         new RelTime(1_000_000_000L),
         new RelTime(1_000_000L),
       ),

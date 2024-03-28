@@ -15,10 +15,10 @@ const NetworkTotal: React.FC<{ title: string; amount: BigNumber; idCC?: string }
           {title}
         </Typography>
         <Typography variant="h1" mb={1} id={idCC}>
-          <AmountDisplay amount={amount} currency="CC" />
+          <AmountDisplay amount={amount} currency="AmuletUnit" />
         </Typography>
         <Typography variant="h4">
-          <AmountDisplay amount={amount} currency="USD" />
+          <AmountDisplay amount={amount} currency="USDUnit" />
         </Typography>
       </CardContent>
     </Card>

@@ -109,7 +109,7 @@ const SubscriptionBar: React.FC<{ entryName: string; nameLookupStatus: NameLooku
     additionalContent = (
       <Stack direction="row" alignItems="center">
         <Typography display="inline" fontWeight="bold">
-          <AmountDisplay amount={entryFee} currency="USD" />
+          <AmountDisplay amount={entryFee} currency="USDUnit" />
         </Typography>
         &nbsp;
         <Typography display="inline">

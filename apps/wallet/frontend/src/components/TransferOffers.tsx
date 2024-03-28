@@ -40,7 +40,7 @@ export const TransferOffers: React.FC = () => {
             conversionRate: amuletPrice ? amuletPrice?.toString() : '...',
             convertedCurrency: convertCurrency(
               BigNumber(offer.payload.amount.amount),
-              Unit.CC,
+              Unit.AmuletUnit,
               amuletPrice
             ),
             senderId: offer.payload.sender,
@@ -117,7 +117,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
         </Stack>
         <Stack direction="column" alignItems="flex-end">
           <Typography className="transfer-offer-cc-amount">
-            + <AmountDisplay amount={BigNumber(offer.ccAmount)} currency="CC" />
+            + <AmountDisplay amount={BigNumber(offer.ccAmount)} currency="AmuletUnit" />
           </Typography>
           <Typography className="transfer-offer-usd-amount-rate">
             <>
@@ -125,7 +125,7 @@ export const TransferOfferDisplay: React.FC<TransferOfferProps> = props => {
                 amount={offer.convertedCurrency.amount}
                 currency={offer.convertedCurrency.currency}
               />{' '}
-              @ {offer.convertedCurrency.amuletPriceToShow.toString()} Amulet/USD
+              @ {offer.convertedCurrency.amuletPriceToShow.toString()} CC/USD
             </>
           </Typography>
         </Stack>

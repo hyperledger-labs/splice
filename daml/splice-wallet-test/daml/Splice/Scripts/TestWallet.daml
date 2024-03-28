@@ -75,8 +75,8 @@ checkAmuletPositions owner expectedAmounts = do
     actualAmulets <- queryFilter @Amulet ownerParty (\c -> c.owner == ownerParty)
     sort (map (._2.amount.initialAmount) actualAmulets) === sort expectedAmounts
 
-testSingleReceiverCCPaymentRequest : Script ()
-testSingleReceiverCCPaymentRequest = script do
+testSinglerReceiverAmuletPaymentRequest : Script ()
+testSinglerReceiverAmuletPaymentRequest = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   runNextIssuance app
   runAmuletDepositBots app
@@ -89,7 +89,7 @@ testSingleReceiverCCPaymentRequest = script do
   amulet <- tap app alice 42.0
   transferRequest <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
-    (PaymentAmount paymentAmount CC)
+    (PaymentAmount paymentAmount AmuletUnit)
 
   acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
@@ -102,8 +102,8 @@ testSingleReceiverCCPaymentRequest = script do
     provider = provider1.primaryParty
     dso = app.dso
     lockedAmulet = lockedAmuletCid
-    ccReceiverAmounts = [
-      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = paymentAmount)
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = paymentAmount)
       ]
     round = lockedAmulet.amulet.amount.createdAt
     reference = transferRequest
@@ -116,15 +116,15 @@ testSingleReceiverCCPaymentRequest = script do
 
   pure ()
 
-testExpiringCCPaymentRequest : Script ()
-testExpiringCCPaymentRequest = script do
+testExpiringAmuletPaymentRequest : Script ()
+testExpiringAmuletPaymentRequest = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   runNextIssuance app
   runAmuletDepositBots app
 
   transferRequest <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
-    (PaymentAmount 30.0 CC)
+    (PaymentAmount 30.0 AmuletUnit)
 
   install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
     endUserParty = alice.primaryParty
@@ -151,10 +151,10 @@ testSingleReceiverUSDPaymentRequest = script do
   advanceToIssuanceWithPrice app 0.5
   runAmuletDepositBots app
 
-  amulet <- tap app alice 62.0 -- Need to cover a 30USD payment with 1USD=2CC
+  amulet <- tap app alice 62.0 -- Need to cover a 30USD payment with 1USD=2Amulet
   transferRequest <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
-    (PaymentAmount 30.0 USD)
+    (PaymentAmount 30.0 USDUnit)
 
   acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
@@ -165,16 +165,16 @@ testSingleReceiverUSDPaymentRequest = script do
     provider = provider1.primaryParty
     dso = app.dso
     lockedAmulet = lockedAmuletCid
-    ccReceiverAmounts = [
-      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 60.0)
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 60.0)
       ]
     round = lockedAmulet.amulet.amount.createdAt
     reference = transferRequest
 
   pure ()
 
-testCCPaymentRequest : Script ()
-testCCPaymentRequest = script do
+testAmuletPaymentRequest : Script ()
+testAmuletPaymentRequest = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   advanceToIssuanceWithPrice app 1.0
   runAmuletDepositBots app
@@ -188,8 +188,8 @@ testCCPaymentRequest = script do
   amulet <- tap app alice 27.0
   transferRequest <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
-      (bob.primaryParty, PaymentAmount 15.0 CC),
-      (charlie.primaryParty, PaymentAmount 10.0 CC)]
+      (bob.primaryParty, PaymentAmount 15.0 AmuletUnit),
+      (charlie.primaryParty, PaymentAmount 10.0 AmuletUnit)]
   acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty (Some featuredValidator) transferRequest amulet
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedAmulet, lockedAmuletPayload)] <- query @LockedAmulet alice.primaryParty
@@ -201,9 +201,9 @@ testCCPaymentRequest = script do
   lockedAmuletPayload.lock.holders === map (.primaryParty) [bob, charlie, provider1]
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
-    ccReceiverAmounts = [
-      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 15.0),
-      (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 10.0)
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 15.0),
+      (ReceiverAmuletAmount with receiver = charlie.primaryParty, amuletAmount = 10.0)
       ]
     provider = provider1.primaryParty
     dso = app.dso
@@ -255,8 +255,8 @@ testCCPaymentRequest = script do
 
   pure ()
 
-testCCPaymentCollectionRoundInLatestRoundMustFail : Script ()
-testCCPaymentCollectionRoundInLatestRoundMustFail = script do
+testAmuletPaymentCollectionRoundInLatestRoundMustFail : Script ()
+testAmuletPaymentCollectionRoundInLatestRoundMustFail = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   advanceToIssuanceWithPrice app 1.0
   runAmuletDepositBots app
@@ -264,8 +264,8 @@ testCCPaymentCollectionRoundInLatestRoundMustFail = script do
   amulet <- tap app alice 27.0
   transferRequest <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
-      (bob.primaryParty, PaymentAmount 15.0 CC),
-      (charlie.primaryParty, PaymentAmount 10.0 CC)]
+      (bob.primaryParty, PaymentAmount 15.0 AmuletUnit),
+      (charlie.primaryParty, PaymentAmount 10.0 AmuletUnit)]
 
 
   acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
@@ -289,8 +289,8 @@ testUSDPaymentRequest = script do
   amulet <- tap app alice 52.0
   transferRequest <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
-      (bob.primaryParty, PaymentAmount 10.0 USD),
-      (charlie.primaryParty, PaymentAmount 15.0 USD)]
+      (bob.primaryParty, PaymentAmount 10.0 USDUnit),
+      (charlie.primaryParty, PaymentAmount 15.0 USDUnit)]
   acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedAmuletCid, lockedAmulet)] <- query @LockedAmulet alice.primaryParty
@@ -299,9 +299,9 @@ testUSDPaymentRequest = script do
     provider = provider1.primaryParty
     dso = app.dso
     lockedAmulet = lockedAmuletCid
-    ccReceiverAmounts = [
-      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 20.0),
-      (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 30.0)
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 20.0),
+      (ReceiverAmuletAmount with receiver = charlie.primaryParty, amuletAmount = 30.0)
       ]
     round = lockedAmulet.amulet.amount.createdAt
     reference = transferRequest
@@ -317,8 +317,8 @@ testMixedPaymentRequest = script do
   amulet <- tap app alice 32.0
   transferRequest <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
-      (bob.primaryParty, PaymentAmount 10.0 CC),
-      (charlie.primaryParty, PaymentAmount 10.0 USD)]
+      (bob.primaryParty, PaymentAmount 10.0 AmuletUnit),
+      (charlie.primaryParty, PaymentAmount 10.0 USDUnit)]
   acceptedPaymentCid <- acceptPaymentRequest app alice aliceValidator.primaryParty None transferRequest amulet
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedAmuletCid, lockedAmulet)] <- query @LockedAmulet alice.primaryParty
@@ -327,9 +327,9 @@ testMixedPaymentRequest = script do
     provider = provider1.primaryParty
     dso = app.dso
     lockedAmulet = lockedAmuletCid
-    ccReceiverAmounts = [
-      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 10.0),
-      (ReceiverCCAmount with receiver = charlie.primaryParty, ccAmount = 20.0)
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 10.0),
+      (ReceiverAmuletAmount with receiver = charlie.primaryParty, amuletAmount = 20.0)
       ]
     round = lockedAmulet.amulet.amount.createdAt
     reference = transferRequest
@@ -353,7 +353,7 @@ testTerminatedPayments = script do
 
   let createPaymentRequest = createSingleReceiverPaymentRequest app
         provider1.primaryParty alice.primaryParty bob.primaryParty
-        (PaymentAmount paymentAmount CC)
+        (PaymentAmount paymentAmount AmuletUnit)
 
   paymentRequest <- createPaymentRequest
   submit alice.primaryParty $ exerciseCmd paymentRequest AppPaymentRequest_Reject
@@ -383,8 +383,8 @@ testTerminatedPayments = script do
 
   pure ()
 
-testSuccessfulBatchCCPaymentRequests : Script ()
-testSuccessfulBatchCCPaymentRequests = script do
+testSuccessfulBatchAmuletPaymentRequests : Script ()
+testSuccessfulBatchAmuletPaymentRequests = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   runNextIssuance app
   runAmuletDepositBots app
@@ -392,11 +392,11 @@ testSuccessfulBatchCCPaymentRequests = script do
   amulet <- tap app alice 42.0
   transferRequest <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
-    (PaymentAmount 1.0 CC)
+    (PaymentAmount 1.0 AmuletUnit)
   transferRequest2 <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
-      (bob.primaryParty, PaymentAmount 2.0 CC),
-      (alice.primaryParty, PaymentAmount 2.0 CC)]
+      (bob.primaryParty, PaymentAmount 2.0 AmuletUnit),
+      (alice.primaryParty, PaymentAmount 2.0 AmuletUnit)]
 
   let endUserName = "wallet_service_participant_user"
   install <- submitMulti [alice.primaryParty, aliceValidator.primaryParty] [] $ createCmd $ WalletAppInstall with
@@ -425,16 +425,16 @@ testSuccessfulBatchCCPaymentRequests = script do
     provider = provider1.primaryParty
     dso = app.dso
     lockedAmulet = lockedAmuletCid
-    ccReceiverAmounts = [
-      ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 1.0 ]
+    amuletReceiverAmounts = [
+      ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 1.0 ]
     round = lockedAmulet.amulet.amount.createdAt
     reference = transferRequest
 
   acceptedPayment2 === AcceptedAppPayment with
     sender = alice.primaryParty
-    ccReceiverAmounts = [
-      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 2.0),
-      (ReceiverCCAmount with receiver = alice.primaryParty, ccAmount = 2.0)
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 2.0),
+      (ReceiverAmuletAmount with receiver = alice.primaryParty, amuletAmount = 2.0)
       ]
     provider = provider1.primaryParty
     dso = app.dso
@@ -445,8 +445,8 @@ testSuccessfulBatchCCPaymentRequests = script do
   pure ()
 
 
-testInsufficientFundsBatchCCPaymentRequests : Script ()
-testInsufficientFundsBatchCCPaymentRequests = script do
+testInsufficientFundsBatchAmuletPaymentRequests : Script ()
+testInsufficientFundsBatchAmuletPaymentRequests = script do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
   runAmuletDepositBots app
   amulet <- tap app alice 42.0
@@ -459,12 +459,12 @@ testInsufficientFundsBatchCCPaymentRequests = script do
 
   transferRequest3 <- createSingleReceiverPaymentRequest app
     provider1.primaryParty alice.primaryParty bob.primaryParty
-    (PaymentAmount 10000.0 CC)
+    (PaymentAmount 10000.0 AmuletUnit)
   transferRequest4 <-
     createPaymentRequest app provider1.primaryParty alice.primaryParty [
-      (bob.primaryParty, PaymentAmount 3.0 CC),
-      (alice.primaryParty, PaymentAmount 3.0 CC)]
-  -- trying to fulfill the request for 10,000 CC will fail
+      (bob.primaryParty, PaymentAmount 3.0 AmuletUnit),
+      (alice.primaryParty, PaymentAmount 3.0 AmuletUnit)]
+  -- trying to fulfill the request for 10,000 Amulet will fail
   context <- getPaymentTransferContext app alice
   WalletAppInstall_ExecuteBatchResult { outcomes } <- submitMulti [aliceValidator.primaryParty] [alice.primaryParty, app.dso] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputAmulet amulet]
@@ -481,9 +481,9 @@ testInsufficientFundsBatchCCPaymentRequests = script do
 
   acceptedPayment4 === AcceptedAppPayment with
     sender = alice.primaryParty
-    ccReceiverAmounts = [
-      (ReceiverCCAmount with receiver = bob.primaryParty, ccAmount = 3.0),
-      (ReceiverCCAmount with receiver = alice.primaryParty, ccAmount = 3.0)
+    amuletReceiverAmounts = [
+      (ReceiverAmuletAmount with receiver = bob.primaryParty, amuletAmount = 3.0),
+      (ReceiverAmuletAmount with receiver = alice.primaryParty, amuletAmount = 3.0)
       ]
     provider = provider1.primaryParty
     dso = app.dso
@@ -578,10 +578,10 @@ testBuyMemberTraffic = script do
 
   -- validate the state of the member traffic contract
   Some traffic1 <- queryContractId @MemberTraffic app.dso trafficCid1
-  (ccSpent, usdSpent) <- calculateSynchronizerFees app minTopupAmount
+  (amuletSpent, usdSpent) <- calculateSynchronizerFees app minTopupAmount
   traffic1.totalPurchased === minTopupAmount
   traffic1.numPurchases === 1
-  traffic1.ccSpent === ccSpent
+  traffic1.amuletSpent === amuletSpent
   traffic1.usdSpent === usdSpent
 
   -- validate that the topup state got updated
@@ -597,7 +597,7 @@ testBuyMemberTraffic = script do
   coupon === ValidatorRewardCoupon with
     dso = app.dso
     round = Round 2
-    amount = ccSpent
+    amount = amuletSpent
     user = aliceValidator.primaryParty
 
   -- topping up too soon fails
@@ -636,10 +636,10 @@ testBuyMemberTraffic = script do
   -- validate the state of the member traffic contract
   Some providerTraffic <- queryContractId @MemberTraffic app.dso providerTrafficCid
   let totalPurchased = minTopupAmount + 1
-  (ccSpent, usdSpent) <- calculateSynchronizerFees app totalPurchased
+  (amuletSpent, usdSpent) <- calculateSynchronizerFees app totalPurchased
   providerTraffic.totalPurchased === totalPurchased
   providerTraffic.numPurchases === 1
-  providerTraffic.ccSpent === ccSpent
+  providerTraffic.amuletSpent === amuletSpent
   providerTraffic.usdSpent === usdSpent
 
   -- check that the app reward coupons were issued to the provider
@@ -714,7 +714,7 @@ testBuyMemberTraffic = script do
   mergedTraffic.totalPurchased === 4 * minTopupAmount + 1
   mergedTraffic.numPurchases === 4
   mergedTraffic.usdSpent === traffic1.usdSpent + traffic2.usdSpent + providerTraffic.usdSpent + requestedTraffic.usdSpent
-  mergedTraffic.ccSpent === traffic1.ccSpent + traffic2.ccSpent + providerTraffic.ccSpent + requestedTraffic.ccSpent
+  mergedTraffic.amuletSpent === traffic1.amuletSpent + traffic2.amuletSpent + providerTraffic.amuletSpent + requestedTraffic.amuletSpent
 
   -- at least 1 contract must be provided to merge
   submitMustFail app.dso $ exerciseCmd amuletRulesCid AmuletRules_MergeMemberTrafficContracts with
@@ -743,7 +743,7 @@ testInsufficientFundsBatchSubscriptions = script do
   let payData = SubscriptionPayData with
         paymentInterval = days 28
         paymentDuration = days 1
-        paymentAmount = PaymentAmount 10.0 USD
+        paymentAmount = PaymentAmount 10.0 USDUnit
 
   let subscriptionData = SubscriptionData with
         sender = alice.primaryParty

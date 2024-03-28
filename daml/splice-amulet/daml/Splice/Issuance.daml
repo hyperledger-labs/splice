@@ -1,4 +1,4 @@
--- | CC rewards issuance configuration and computation.
+-- | Amulet rewards issuance configuration and computation.
 module Splice.Issuance where
 
 import DA.Optional

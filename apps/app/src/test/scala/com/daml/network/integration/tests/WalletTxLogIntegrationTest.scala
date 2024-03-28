@@ -327,8 +327,8 @@ class WalletTxLogIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(charlieUserParty, transferAmountAmulet, walletCodegen.Unit.CC),
-            receiverAmount(aliceValidatorUserParty, transferAmountUSD, walletCodegen.Unit.USD),
+            receiverAmount(charlieUserParty, transferAmountAmulet, walletCodegen.Unit.AMULETUNIT),
+            receiverAmount(aliceValidatorUserParty, transferAmountUSD, walletCodegen.Unit.USDUNIT),
           ),
         ),
       )(
@@ -505,11 +505,11 @@ class WalletTxLogIntegrationTest
           aliceWalletClient,
           key,
           Seq(
-            new walletCodegen.ReceiverCCAmount(
+            new walletCodegen.ReceiverAmuletAmount(
               bobUserParty.toProtoPrimitive,
               new java.math.BigDecimal(20.0),
             ),
-            new walletCodegen.ReceiverCCAmount(
+            new walletCodegen.ReceiverAmuletAmount(
               charlieUserParty.toProtoPrimitive,
               new java.math.BigDecimal(30.0),
             ),
@@ -600,7 +600,7 @@ class WalletTxLogIntegrationTest
           aliceUserParty,
           charlieUserParty,
           charlieUserParty,
-          paymentAmount(subscriptionPrice, walletCodegen.Unit.CC),
+          paymentAmount(subscriptionPrice, walletCodegen.Unit.AMULETUNIT),
           paymentInterval = Duration.ofMinutes(60),
           paymentDuration = Duration.ofMinutes(60),
         ),
@@ -768,7 +768,7 @@ class WalletTxLogIntegrationTest
           aliceUserParty,
           charlieUserParty,
           charlieUserParty,
-          paymentAmount(subscriptionPrice, walletCodegen.Unit.CC),
+          paymentAmount(subscriptionPrice, walletCodegen.Unit.AMULETUNIT),
           paymentInterval = Duration.ofMinutes(60),
           paymentDuration = Duration.ofMinutes(60),
         ),
@@ -859,7 +859,7 @@ class WalletTxLogIntegrationTest
           aliceUserParty,
           charlieUserParty,
           charlieUserParty,
-          paymentAmount(subscriptionPrice, walletCodegen.Unit.CC),
+          paymentAmount(subscriptionPrice, walletCodegen.Unit.AMULETUNIT),
           paymentInterval = Duration.ofMinutes(60),
           paymentDuration = Duration.ofMinutes(60),
         ),
@@ -1264,7 +1264,7 @@ class WalletTxLogIntegrationTest
           aliceUserParty,
           charlieUserParty,
           charlieUserParty,
-          paymentAmount(100.0, walletCodegen.Unit.CC),
+          paymentAmount(100.0, walletCodegen.Unit.AMULETUNIT),
           paymentInterval = Duration.ofMinutes(60),
           paymentDuration = Duration.ofMinutes(60),
         ),
@@ -1308,7 +1308,7 @@ class WalletTxLogIntegrationTest
           aliceUserParty,
           charlieUserParty,
           charlieUserParty,
-          paymentAmount(subscriptionPrice, walletCodegen.Unit.CC),
+          paymentAmount(subscriptionPrice, walletCodegen.Unit.AMULETUNIT),
           paymentInterval = Duration.ofMillis(10),
           paymentDuration = Duration.ofMillis(10),
         ),

@@ -3,7 +3,7 @@ import { Contract } from 'common-frontend-utils';
 
 import {
   AppPaymentRequest,
-  ReceiverCCAmount,
+  ReceiverAmuletAmount,
 } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import { GroupId, SplitwellRules } from '@daml.js/splitwell/lib/Splice/Splitwell';
 import { ContractId } from '@daml/types';
@@ -19,12 +19,12 @@ export const useInitiateTransfer = (
 ): UseMutationResult<
   ContractId<AppPaymentRequest>,
   unknown,
-  { groupId: GroupId; amounts: ReceiverCCAmount[] }
+  { groupId: GroupId; amounts: ReceiverAmuletAmount[] }
 > => {
   const ledgerApiClient = useSplitwellLedgerApiClient();
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (arg: { groupId: GroupId; amounts: ReceiverCCAmount[] }) => {
+    mutationFn: async (arg: { groupId: GroupId; amounts: ReceiverAmuletAmount[] }) => {
       const { groupId, amounts } = arg;
       const groups = getGroups(party, queryClient);
 

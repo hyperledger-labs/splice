@@ -571,13 +571,13 @@ trait WalletTestUtil extends CNNodeTestCommon with AnsTestUtil {
 
   private val defaultSubscriptionAmount = new paymentCodegen.PaymentAmount(
     BigDecimal(10).bigDecimal.setScale(10),
-    paymentCodegen.Unit.CC,
+    paymentCodegen.Unit.AMULETUNIT,
   )
   private val defaultSubscriptionInterval = Duration.ofMinutes(10)
   private val defaultSubscriptionDuration = Duration.ofMinutes(60)
   private val defaultPaymentAmount = new paymentCodegen.PaymentAmount(
     BigDecimal(10).bigDecimal.setScale(10),
-    paymentCodegen.Unit.CC,
+    paymentCodegen.Unit.AMULETUNIT,
   )
 
   private def createSubscriptionData(

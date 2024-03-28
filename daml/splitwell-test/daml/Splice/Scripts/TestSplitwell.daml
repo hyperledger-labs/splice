@@ -115,7 +115,7 @@ enterPayment payer provider groupKey amount description = do
   group <- getGroup payer groupKey
   void $ exerciseSplitwellRules payer provider $ SplitwellRules_EnterPayment with user = payer.primaryParty, ..
 
-initiateTransfer : AmuletUser -> AmuletUser -> GroupKey -> [ReceiverCCAmount] -> Script (ContractId AppPaymentRequest)
+initiateTransfer : AmuletUser -> AmuletUser -> GroupKey -> [ReceiverAmuletAmount] -> Script (ContractId AppPaymentRequest)
 initiateTransfer sender provider groupKey receiverAmounts = do
   group <- getGroup sender groupKey
   (_, request) <- exerciseSplitwellRules sender provider SplitwellRules_InitiateTransfer with user = sender.primaryParty, ..
@@ -192,7 +192,7 @@ testCase app Parties{..} = do
   balance <- queryBalances charlie (getGroupKey group)
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
-  request <- initiateTransfer alice provider (getGroupKey group) [ReceiverCCAmount bob.primaryParty 8.0]
+  request <- initiateTransfer alice provider (getGroupKey group) [ReceiverAmuletAmount bob.primaryParty 8.0]
   amulet <- tap app alice 63.0
   receipt <- acceptPaymentRequest app alice (getValidator alice) None request amulet
 
@@ -206,8 +206,8 @@ testCase app Parties{..} = do
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
   request <- initiateTransfer charlie provider (getGroupKey group) [
-      ReceiverCCAmount alice.primaryParty 39.0,
-      ReceiverCCAmount bob.primaryParty 11.0
+      ReceiverAmuletAmount alice.primaryParty 39.0,
+      ReceiverAmuletAmount bob.primaryParty 11.0
     ]
   amulet <- tap app charlie 55.0
   receipt <- acceptPaymentRequest app charlie (getValidator charlie) None request amulet

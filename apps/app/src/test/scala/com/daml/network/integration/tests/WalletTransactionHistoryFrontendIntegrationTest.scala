@@ -98,7 +98,11 @@ class WalletTransactionHistoryFrontendIntegrationTest
               aliceDamlUser,
               aliceUserParty,
               receiverAmounts = Seq(
-                receiverAmount(charlieUserParty, BigDecimal("1.31415"), paymentCodegen.Unit.CC)
+                receiverAmount(
+                  charlieUserParty,
+                  BigDecimal("1.31415"),
+                  paymentCodegen.Unit.AMULETUNIT,
+                )
               ),
             )
             eventuallySucceeds() {

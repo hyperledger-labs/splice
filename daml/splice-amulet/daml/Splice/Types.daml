@@ -1,4 +1,4 @@
--- Base types for CC and all related modules.
+-- Base types for Amulet and all related modules.
 module Splice.Types where
 
 

@@ -6,6 +6,7 @@ import {
   ErrorDisplay,
   IntervalDisplay,
   Loading,
+  unitToCurrency,
 } from 'common-frontend';
 import differenceInMilliseconds from 'date-fns/differenceInMilliseconds';
 import intlFormat from 'date-fns/intlFormat';
@@ -177,7 +178,7 @@ const Price: React.FC<PriceProps> = ({ payData, amuletPrice }) => {
       <Typography variant="caption" className="sub-amulet-price">
         <AmountDisplay amount={converted.amount} currency={converted.currency} /> @{' '}
         {converted.amuletPriceToShow.toString()}
-        {currency}/{converted.currency}
+        {unitToCurrency(currency)}/{unitToCurrency(converted.currency)}
       </Typography>
     </Stack>
   );

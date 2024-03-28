@@ -179,7 +179,7 @@ template FeaturedAppRight with
 
 
 -- | A coupon for receiving app rewards proportional to the usage fee paid as part of a
--- CC transfer coordinated by the app of a provider.
+-- Amulet transfer coordinated by the app of a provider.
 template AppRewardCoupon
   with
     dso : Party

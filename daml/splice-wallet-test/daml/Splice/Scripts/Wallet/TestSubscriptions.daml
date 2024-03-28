@@ -20,7 +20,7 @@ data Users = Users with
   pizzeria : AmuletUser
   provider : AmuletUser
 
-testPayData = SubscriptionPayData (PaymentAmount 12.0 CC) (days 28) (days 1)
+testPayData = SubscriptionPayData (PaymentAmount 12.0 AmuletUnit) (days 28) (days 1)
 
 testSetup : Script (AmuletApp, Users, ContractId SubscriptionRequest)
 testSetup = script do
@@ -145,7 +145,7 @@ testUSDSubscription = script do
   let payData = SubscriptionPayData with
         paymentInterval = days 28
         paymentDuration = days 1
-        paymentAmount = PaymentAmount 1.0 USD
+        paymentAmount = PaymentAmount 1.0 USDUnit
 
   let subscriptionData = SubscriptionData with
         sender = alice.primaryParty

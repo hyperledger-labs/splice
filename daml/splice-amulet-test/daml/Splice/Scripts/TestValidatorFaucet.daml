@@ -60,14 +60,14 @@ test_ValidatorFaucet = do
     -- checking that the rewards are gone; we're not checking balances as that logic is tested in
     -- the rewards issuance tests
     checkRewardCouponsDoNotExist round0._2.round
-    checkAliceValidatorBalanceAbove 3.0 -- initial 1 CC plus 2.85 CC from the faucet
+    checkAliceValidatorBalanceAbove 3.0 -- initial 1 Amulet plus 2.85 Amulet from the faucet
 
     -- also collect the round 1
     runNextIssuance app
     runAmuletDepositBots app
     checkRewardCouponsDoNotExist round1._2.round
 
-    checkAliceValidatorBalanceAbove 6.0 -- an additional 2.85 CC from the faucet
+    checkAliceValidatorBalanceAbove 6.0 -- an additional 2.85 Amulet from the faucet
 
     -- testing skipping
     -------------------

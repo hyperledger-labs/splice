@@ -9,7 +9,7 @@ import React, { useContext } from 'react';
 
 import {
   AppPaymentRequest,
-  ReceiverCCAmount,
+  ReceiverAmuletAmount,
 } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import {
   AcceptedGroupInvite,
@@ -166,7 +166,7 @@ class SplitwellLedgerApiClient extends LedgerApiClient {
     _provider: string,
     groupId: GroupId,
     groups: AssignedContract<Group>[],
-    receiverAmounts: ReceiverCCAmount[],
+    receiverAmounts: ReceiverAmuletAmount[],
     domainId: string,
     rules: Contract<SplitwellRules>
   ): Promise<ContractId<AppPaymentRequest>> {

@@ -15,7 +15,7 @@ import Splice.Util
 -- of a series of actual synchronizers, which are introduced for handling the (rare) occasions of switching
 -- to a new synchronizer protocol version.
 data AmuletDecentralizedSynchronizerConfig = AmuletDecentralizedSynchronizerConfig with
-    requiredSynchronizers : Set.Set Text -- ^ The synchronizer-ids of all synchronizers that CC and ANS users should be connected to.
+    requiredSynchronizers : Set.Set Text -- ^ The synchronizer-ids of all synchronizers that Amulet and ANS users should be connected to.
     activeSynchronizer : Text -- ^ The synchronizer-id of the synchronizer on which the DSO accepts transactions involving the
                         -- AmuletRules and related contracts, which must be one of the `requiredSynchronizers`.
     fees : SynchronizerFeesConfig -- ^ The fees charged for using the decentralized synchronizer. We use the same fees across all active decentralized synchronizers.
@@ -58,14 +58,14 @@ template MemberTraffic with
     migrationId : Int -- ^ The migration id of the synchronizer for which this contract tracks purchased extra traffic
     totalPurchased : Int -- ^ The number of bytes of extra traffic purchased
     numPurchases : Int -- ^ Number of times extra traffic has been purchased
-    ccSpent : Decimal -- ^ Total CC spent on extra traffic
+    amuletSpent : Decimal -- ^ Total Amulet spent on extra traffic
     usdSpent : Decimal -- ^ Total USD spent on extra traffic
   where
     signatory dso
 
     ensure totalPurchased >= 0
       && numPurchases >= 0
-      && ccSpent >= 0.0
+      && amuletSpent >= 0.0
       && usdSpent >= 0.0
       && migrationId >= 0
 
@@ -78,7 +78,7 @@ initialMemberTraffic dso memberId synchronizerId migrationId = MemberTraffic wit
     synchronizerId
     totalPurchased = 0
     numPurchases = 0
-    ccSpent = 0.0
+    amuletSpent = 0.0
     usdSpent = 0.0
 
 data ForMemberTraffic = ForMemberTraffic with

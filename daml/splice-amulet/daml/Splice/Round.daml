@@ -22,7 +22,7 @@ template OpenMiningRound
     opensAt : Time -- ^ Time after which transfers can use this mining round
     targetClosesAt : Time -- ^ Time when the DSO expects to close this round. The round SHOULD NOT be archived before this time.
     issuingFor : RelTime -- ^ Time for which the DSO has been issuing rewards. Determines the configuration for the issuance round.
-    transferConfigUsd : TransferConfig USD -- ^ Configuration determining the fees and limits in USD for CC transfers
+    transferConfigUsd : TransferConfig USD -- ^ Configuration determining the fees and limits in USD for Amulet transfers
     issuanceConfig : IssuanceConfig -- ^ Configuration for issuance of this round.
     tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
   where

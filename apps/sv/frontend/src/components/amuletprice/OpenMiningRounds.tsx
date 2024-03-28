@@ -81,7 +81,7 @@ const OpenMiningRoundRow: React.FC<OpenMiningRoundRowProps> = ({
     <TableRow className="open-mining-round-row">
       <TableCell className="round-number">{round}</TableCell>
       <TableCell className="amulet-price">
-        <AmountDisplay amount={amuletPrice} currency="USD" />
+        <AmountDisplay amount={amuletPrice} currency="USDUnit" />
       </TableCell>
       <TableCell>
         <DateDisplay datetime={opensAt.toISOString()} />

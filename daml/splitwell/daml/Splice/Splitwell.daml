@@ -133,7 +133,7 @@ template SplitwellRules
     nonconsuming choice SplitwellRules_InitiateTransfer : (ContractId TransferInProgress, ContractId AppPaymentRequest)
       with
         group : ContractId Group
-        receiverAmounts : [ReceiverCCAmount]
+        receiverAmounts : [ReceiverAmuletAmount]
         user : Party
       controller user
       do exercise group Group_InitiateTransfer with
@@ -218,14 +218,14 @@ template Group
     nonconsuming choice Group_InitiateTransfer : (ContractId TransferInProgress, ContractId AppPaymentRequest)
       with
         sender : Party
-        receiverAmounts : [ReceiverCCAmount]
+        receiverAmounts : [ReceiverAmuletAmount]
       controller sender
       do require "sender is a member" (sender `elem` groupMembers this)
          require "receiver is a member" (fmap (\x -> x.receiver) receiverAmounts `subset` groupMembers this)
          now <- getTime
          paymentRequest <- create AppPaymentRequest with
            sender, provider, dso
-           receiverAmounts = map (\rq -> ReceiverAmount rq.receiver (PaymentAmount rq.ccAmount CC)) receiverAmounts
+           receiverAmounts = map (\rq -> ReceiverAmount rq.receiver (PaymentAmount rq.amuletAmount AmuletUnit)) receiverAmounts
            description = "Transfer from " <> show sender <> " to " <> show (map (.receiver) receiverAmounts)
            expiresAt = now `addRelTime` acceptDuration
          deliveryOffer <- create TransferInProgress
@@ -263,7 +263,7 @@ template TransferInProgress
   with
     group : Group
     sender : Party
-    receiverAmounts : [ReceiverCCAmount]
+    receiverAmounts : [ReceiverAmuletAmount]
     reference : ContractId AppPaymentRequest
   where
     signatory signatory group
@@ -294,19 +294,19 @@ template TransferInProgress
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender
                provider = group.provider
-               ccReceiverAmounts = receiverAmounts
+               amuletReceiverAmounts = receiverAmounts
                dso = group.dso
                lockedAmulet = acceptedPayment.lockedAmulet
                round = openMiningRound.round
                reference
          acceptedPayment === expectedAcceptedPayment
-         forA receiverAmounts \ReceiverCCAmount{receiver, ccAmount} ->
+         forA receiverAmounts \ReceiverAmuletAmount{receiver, amuletAmount} ->
            create BalanceUpdate with
              group
              update = Transfer with
                sender
                receiver
-               amount = ccAmount
+               amount = amuletAmount
 
 template BalanceUpdate
   with
@@ -321,7 +321,7 @@ data BalanceUpdateType
   = ExternalPayment with
       payer : Party
       description : Text
-      amount : Decimal -- Amount in CC
+      amount : Decimal -- Amount in Amulet
   -- | Transfer from sender to receiver to reduce their debt.
   -- Note that it is possible to transfer preemptively before a bill has been submitted.
   | Transfer with

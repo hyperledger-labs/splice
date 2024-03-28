@@ -492,7 +492,8 @@ class DecentralizedSynchronizerSoftDomainMigrationTimeBasedIntegrationTest
         )
       )
 
-      val dummyPaymentAmount = new cnw.payment.PaymentAmount(dummyDecimal, cnw.payment.Unit.CC)
+      val dummyPaymentAmount =
+        new cnw.payment.PaymentAmount(dummyDecimal, cnw.payment.Unit.AMULETUNIT)
 
       val dummySubscriptionData = new cnw.subscriptions.SubscriptionData(
         sv1WalletUser.toProtoPrimitive,

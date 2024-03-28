@@ -315,7 +315,7 @@ const ActivityRow: React.FC<ActivityRowProps> = ({ activity }) => {
         <ActivityAmountDisplay amountAmulet={activity.feesBurnt} />
       </TableCell>
       <TableCell align="right">
-        <RateDisplay base="CC" quote="USD" amuletPrice={activity.amuletPrice} />
+        <RateDisplay base="AmuletUnit" quote="USDUnit" amuletPrice={activity.amuletPrice} />
       </TableCell>
     </TableRow>
   );
@@ -329,7 +329,7 @@ const ActivityAmountDisplay: React.FC<TransactionAmountProps> = ({ amountAmulet 
   return (
     <Stack direction="column">
       <Typography className="tx-amount-cc">
-        <AmountDisplay amount={amountAmulet} currency="CC" />
+        <AmountDisplay amount={amountAmulet} currency="AmuletUnit" />
       </Typography>
     </Stack>
   );

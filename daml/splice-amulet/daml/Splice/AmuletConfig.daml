@@ -6,10 +6,10 @@ import Splice.Issuance
 import Splice.Schedule
 import DA.Time
 
-data CC = CC deriving (Show, Eq)
+data Amulet = Amulet deriving (Show, Eq)
 data USD = USD deriving (Show, Eq)
 
--- | Configuration determining the fees and limits for CC transfers granted by
+-- | Configuration determining the fees and limits for Amulet transfers granted by
 -- the AmuletRules.
 --
 -- See Splice.Scripts.Parameters for concrete values.
@@ -28,7 +28,7 @@ data TransferConfig unit = TransferConfig with
 --
 -- See Splice.Scripts.Parameters for concrete values.
 data AmuletConfig unit = AmuletConfig with
-    transferConfig : TransferConfig unit -- ^ Configuration determining the fees and limits for CC transfers
+    transferConfig : TransferConfig unit -- ^ Configuration determining the fees and limits for Amulet transfers
     issuanceCurve : Schedule RelTime IssuanceConfig -- ^ Issuance curve to use.
     decentralizedSynchronizer : AmuletDecentralizedSynchronizerConfig -- ^ Configuration for the decentralized synchronizer and its fees.
     -- TODO(M4-85): the values in here are likely quite large (several URls and long synchronizerIds) and not required for executing transfers. Split this part of the config out into a separate contract as a performance optimization.

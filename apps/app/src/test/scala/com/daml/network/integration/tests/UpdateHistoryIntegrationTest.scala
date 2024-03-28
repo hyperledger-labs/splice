@@ -145,7 +145,7 @@ class UpdateHistoryIntegrationTest
         aliceSplitwellClient.initiateTransfer(
           key,
           Seq(
-            new walletCodegen.ReceiverCCAmount(
+            new walletCodegen.ReceiverAmuletAmount(
               bobUserParty.toProtoPrimitive,
               transferAmount.bigDecimal,
             )

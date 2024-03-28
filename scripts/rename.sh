@@ -873,11 +873,13 @@ function subcmd_no_illegal_daml_references() {
     done
     local illegal_patterns=(
       svc SVC Svc   # to avoid conflict with PerSvContracts
+      '(?<![a-z])cc(?!(ept|essor|g[.]github))'
+      CC
       '(?<!(Map|Set)[.])(?<!sequencer )member(?!(Id|.*[tT]raffic))'
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' (case sensitive, in code other than splitwell)"
-        if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*'; then
+        if rg -P "$pattern" daml/ -g '!*/splitwell/*' -g '!*/splitwell-test/*' -g '!daml/dars.lock'; then
             echo "$pattern occurs in Daml code (other than splitwell), remove all references"
             exit 1
         fi

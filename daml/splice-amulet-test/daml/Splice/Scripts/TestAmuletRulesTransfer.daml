@@ -131,8 +131,7 @@ testAmuletUsedInRoundBeforeItsCreation = do
 
   openRoundsSorted <- getOpenRoundsSorted app
   let (round1Cid, round1) = head openRoundsSorted
-      round1IfcCid = round1Cid
-      contextWithRound1 = context with context = context.context with openMiningRound = round1IfcCid
+      contextWithRound1 = context with context = context.context with openMiningRound = round1Cid
 
   -- The input amulet is created in round 2
   -- OpenMiningRound 1 will be used in the context

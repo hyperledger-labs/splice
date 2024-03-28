@@ -116,7 +116,7 @@ const DesiredAmuletPrice: React.FC = () => {
           {curSvAmuletPriceVote?.amuletPrice ? (
             <AmountDisplay
               amount={maybeBigNumber(curSvAmuletPriceVote.amuletPrice)!}
-              currency="USD"
+              currency="USDUnit"
             />
           ) : (
             'Not Set'
@@ -191,7 +191,7 @@ const OtherAmuletPricesRow: React.FC<OtherAmuletPricesRowProps> = ({
         <PartyId partyId={sv} className="sv-party" />
       </TableCell>
       <TableCell className="amulet-price">
-        {amuletPrice ? <AmountDisplay amount={amuletPrice} currency="USD" /> : 'Not Set'}
+        {amuletPrice ? <AmountDisplay amount={amuletPrice} currency="USDUnit" /> : 'Not Set'}
       </TableCell>
       <TableCell>
         <DateDisplay datetime={lastUpdatedAt.toISOString()} />

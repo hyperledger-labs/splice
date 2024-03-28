@@ -26,7 +26,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { ReceiverCCAmount } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
+import { ReceiverAmuletAmount } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
 import {
   BalanceUpdate,
   Group as CodegenGroup,
@@ -64,10 +64,10 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider, domainId, r
 
   const initiateSettleDebts = useCallback(() => {
     if (balances.data) {
-      const amounts: ReceiverCCAmount[] = Object.entries(balances.data)
+      const amounts: ReceiverAmuletAmount[] = Object.entries(balances.data)
         .filter(([_, v]) => new Decimal(v).isNegative())
         .map(([k, v]) => {
-          return { receiver: k, ccAmount: Decimal.abs(new Decimal(v)).toString() };
+          return { receiver: k, amuletAmount: Decimal.abs(new Decimal(v)).toString() };
         });
       return initiateTransfer.mutateAsync({ groupId, amounts });
     } else {
@@ -195,8 +195,8 @@ const Entry: React.FC<EntryProps> = ({ group, party, provider, domainId, rules }
         `Transfer receiver ${transferReceiver} is not part of the group’s members: ${members}`
       );
     } else {
-      const amounts: ReceiverCCAmount[] = [
-        { receiver: transferReceiver, ccAmount: transferAmount },
+      const amounts: ReceiverAmuletAmount[] = [
+        { receiver: transferReceiver, amuletAmount: transferAmount },
       ];
       return await initiateTransfer.mutateAsync({ groupId, amounts });
     }

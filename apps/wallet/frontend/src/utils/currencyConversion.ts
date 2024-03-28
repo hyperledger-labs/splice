@@ -14,23 +14,23 @@ export interface ConvertedCurrency {
  * E.g.:
  * originalAmount = 2, originalCurrency = CC, amuletPrice = 2 (USD/CC)
  * would return:
- * amount = 4, currency = USD, amuletPriceToShow = 0.5 (Amulet/USD)
+ * amount = 4, currency = USD, amuletPriceToShow = 0.5 (CC/USD)
  */
 export function convertCurrency(
   originalAmount: BigNumber,
   originalCurrency: Unit,
   amuletPrice: BigNumber
 ): ConvertedCurrency {
-  if (originalCurrency === 'CC') {
+  if (originalCurrency === 'AmuletUnit') {
     return {
       amount: originalAmount.times(amuletPrice),
-      currency: 'USD',
+      currency: 'USDUnit',
       amuletPriceToShow: new BigNumber(1).div(amuletPrice),
     };
   } else {
     return {
       amount: originalAmount.div(amuletPrice),
-      currency: 'CC',
+      currency: 'AmuletUnit',
       amuletPriceToShow: amuletPrice, // already in USD/CC
     };
   }

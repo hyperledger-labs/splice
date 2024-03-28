@@ -187,7 +187,7 @@ abstract class ValidatorPreflightIntegrationTestBase
               description should fullyMatch regex partyR
               transaction.ccAmount should beWithin(BigDecimal(10) - smallAmount, BigDecimal(10))
               // we can't test a specific amulet price as the amulet price on a live network can change
-              val rateR = """^\s*(\d+(?:\.\d+)?)\s*Amulet/USD\s*$""".r
+              val rateR = """^\s*(\d+(?:\.\d+)?)\s*CC/USD\s*$""".r
               inside(transaction.rate) { case rateR(rate) =>
                 BigDecimal(rate) should be > BigDecimal(0)
                 transaction.usdAmount should beWithin(

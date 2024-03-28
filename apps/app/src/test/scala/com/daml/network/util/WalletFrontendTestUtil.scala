@@ -129,7 +129,7 @@ trait WalletFrontendTestUtil extends WalletTestUtil { self: FrontendTestCommon =
       expectedAmountUSD._1,
       expectedAmountUSD._2,
     )
-    transaction.rate should matchText(s"${BigDecimal(1) / amuletPrice} Amulet/USD")
+    transaction.rate should matchText(s"${BigDecimal(1) / amuletPrice} CC/USD")
   }
 
   protected def createTransferOffer(

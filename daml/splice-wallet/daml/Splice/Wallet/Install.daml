@@ -39,44 +39,44 @@ data ExecutionContext = ExecutionContext with
 -- Given multiple amulet operations and transfer inputs, it executes the operations sequentially while
 -- stringing along the remaining inputs. Returns all outcomes.
 executeAmuletOperationRec : ExecutionContext -> [TransferInput] -> [AmuletOperationOutcome] -> [AmuletOperation] -> Update ([AmuletOperationOutcome])
-executeAmuletOperationRec execContext inputs prevResults (operation::remainingOperations) = do
+executeAmuletOperationRec executionContext inputs prevResults (operation::remainingOperations) = do
   case operation of
     CO_AppPayment cid -> do
-      resultE <- catchAll $ exercise cid (AppPaymentRequest_Accept inputs execContext.paymentContext execContext.validator)
+      resultE <- catchAll $ exercise cid (AppPaymentRequest_Accept inputs executionContext.paymentContext executionContext.validator)
       handleResultAcceptAppPayment resultE
     CO_CompleteAcceptedTransfer cid -> do
-      resultE <- catchAll $ exercise cid (AcceptedTransferOffer_Complete inputs execContext.paymentContext execContext.validator)
+      resultE <- catchAll $ exercise cid (AcceptedTransferOffer_Complete inputs executionContext.paymentContext executionContext.validator)
       handleResultCompleteAcceptedTransfer resultE
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> do
-      resultE <- catchAll $ exercise cid (SubscriptionRequest_AcceptAndMakePayment inputs execContext.paymentContext execContext.validator)
+      resultE <- catchAll $ exercise cid (SubscriptionRequest_AcceptAndMakePayment inputs executionContext.paymentContext executionContext.validator)
       handleResultSubscriptionAcceptAndMakePayment resultE
     CO_SubscriptionMakePayment cid -> do
-      resultE <- catchAll $ exercise cid (SubscriptionIdleState_MakePayment inputs execContext.paymentContext execContext.validator)
+      resultE <- catchAll $ exercise cid (SubscriptionIdleState_MakePayment inputs executionContext.paymentContext executionContext.validator)
       handleResultSubscriptionMakePayment resultE
     CO_BuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCid -> do
       resultE <- catchAll $ handleBuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCid
       handleResult COO_BuyMemberTraffic resultE
     CO_CompleteBuyTrafficRequest cid -> do
-      resultE <- catchAll $ exercise cid (BuyTrafficRequest_Complete inputs execContext.paymentContext execContext.validator)
+      resultE <- catchAll $ exercise cid (BuyTrafficRequest_Complete inputs executionContext.paymentContext executionContext.validator)
       handleResultBuyTraffic resultE
     CO_MergeTransferInputs -> do
-        let transfer = mkMergeAmuletAndRewardsTransfer execContext.endUser inputs
+        let transfer = mkMergeAmuletAndRewardsTransfer executionContext.endUser inputs
         result <- catchAll (exercisePaymentTransfer context transfer)
         handleResultMergeInputs result
     CO_Tap tapAmount -> do
-      ccsum <- catchAll (exercise context.amuletRules (AmuletRules_DevNet_Tap execContext.endUser tapAmount context.context.openMiningRound))
-      handleResultTap ccsum
+      amuletsum <- catchAll (exercise context.amuletRules (AmuletRules_DevNet_Tap executionContext.endUser tapAmount context.context.openMiningRound))
+      handleResultTap amuletsum
     ExtAmuletOperation _dummyUnitField -> error "ExtAmuletOperation: bare extension constructors are not allowed at runtime"
   where
     context : PaymentTransferContext
-    context = execContext.paymentContext
+    context = executionContext.paymentContext
 
     handleResult : (r -> AmuletOperationOutcome) -> Either InvalidTransferReason (r, Optional (ContractId Amulet)) -> Update [AmuletOperationOutcome]
     handleResult resultConstructor = \case
       Left errorMsg -> handleLeft errorMsg
       Right (result, change) -> do
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) change
-        executeAmuletOperationRec execContext inputAmulets (resultConstructor result :: prevResults) remainingOperations
+        executeAmuletOperationRec executionContext inputAmulets (resultConstructor result :: prevResults) remainingOperations
 
     handleResultMergeInputs : Either InvalidTransferReason (TransferResult) -> Update [AmuletOperationOutcome]
     handleResultMergeInputs = \case
@@ -84,17 +84,17 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
       Right transferResult -> do
         let senderChange = transferResult.senderChangeAmulet
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
-        executeAmuletOperationRec execContext inputAmulets (COO_MergeTransferInputs senderChange :: prevResults) remainingOperations
+        executeAmuletOperationRec executionContext inputAmulets (COO_MergeTransferInputs senderChange :: prevResults) remainingOperations
 
     handleResultTap : Either InvalidTransferReason (AmuletRules_DevNet_TapResult) -> Update [AmuletOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
       Right result -> do
         let tappedAmulet = result.amuletSum.amulet
-        executeAmuletOperationRec execContext (InputAmulet tappedAmulet :: inputs) (COO_Tap result.amuletSum.amulet :: prevResults) remainingOperations
+        executeAmuletOperationRec executionContext (InputAmulet tappedAmulet :: inputs) (COO_Tap result.amuletSum.amulet :: prevResults) remainingOperations
 
     handleLeft : InvalidTransferReason -> Update [AmuletOperationOutcome]
-    handleLeft errorMsg = executeAmuletOperationRec execContext inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
+    handleLeft errorMsg = executeAmuletOperationRec executionContext inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
 
     handleResultBuyTraffic : Either InvalidTransferReason (BuyTrafficRequest_CompleteResult) -> Update [AmuletOperationOutcome]
     handleResultBuyTraffic = \case
@@ -102,7 +102,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
       Right result -> do
         let ((purchasedTraffic, trackingInfo), senderChange) = ((result.purchasedTraffic, result.trackingInfo), result.senderChangeAmulet)
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
-        executeAmuletOperationRec execContext inputAmulets (COO_CompleteBuyTrafficRequest (purchasedTraffic, trackingInfo) :: prevResults) remainingOperations
+        executeAmuletOperationRec executionContext inputAmulets (COO_CompleteBuyTrafficRequest (purchasedTraffic, trackingInfo) :: prevResults) remainingOperations
 
     handleResultCompleteAcceptedTransfer : Either InvalidTransferReason (AcceptedTransferOffer_CompleteResult) -> Update [AmuletOperationOutcome]
     handleResultCompleteAcceptedTransfer = \case
@@ -110,7 +110,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
       Right result -> do
         let ((transferResult, trackingInfo), senderChange) = ((result.transferResult, result.trackingInfo), result.senderChangeAmulet)
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
-        executeAmuletOperationRec execContext inputAmulets (COO_CompleteAcceptedTransfer (transferResult, trackingInfo) :: prevResults) remainingOperations
+        executeAmuletOperationRec executionContext inputAmulets (COO_CompleteAcceptedTransfer (transferResult, trackingInfo) :: prevResults) remainingOperations
 
     handleResultAcceptAppPayment : Either InvalidTransferReason (AppPaymentRequest_AcceptResult) -> Update [AmuletOperationOutcome]
     handleResultAcceptAppPayment = \case
@@ -118,7 +118,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
       Right result -> do
         let (acceptedPayment, senderChange) = (result.acceptedPayment, result.senderChangeAmulet)
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
-        executeAmuletOperationRec execContext inputAmulets (COO_AcceptedAppPayment (acceptedPayment) :: prevResults) remainingOperations
+        executeAmuletOperationRec executionContext inputAmulets (COO_AcceptedAppPayment (acceptedPayment) :: prevResults) remainingOperations
 
     handleResultSubscriptionAcceptAndMakePayment : Either InvalidTransferReason (SubscriptionRequest_AcceptAndMakePaymentResult) -> Update [AmuletOperationOutcome]
     handleResultSubscriptionAcceptAndMakePayment = \case
@@ -126,7 +126,7 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
       Right result -> do
         let (subscriptionPayment, senderChange) = (result.subscriptionPayment, result.senderChange)
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
-        executeAmuletOperationRec execContext inputAmulets (COO_SubscriptionInitialPayment (subscriptionPayment) :: prevResults) remainingOperations
+        executeAmuletOperationRec executionContext inputAmulets (COO_SubscriptionInitialPayment (subscriptionPayment) :: prevResults) remainingOperations
 
     handleResultSubscriptionMakePayment : Either InvalidTransferReason (SubscriptionIdleState_MakePaymentResult) -> Update [AmuletOperationOutcome]
     handleResultSubscriptionMakePayment = \case
@@ -134,41 +134,41 @@ executeAmuletOperationRec execContext inputs prevResults (operation::remainingOp
       Right result -> do
         let (subscriptionPayment, senderChange) = (result.subscriptionPayment, result.senderChange)
         let inputAmulets = optional [] (\amulet -> [InputAmulet amulet]) senderChange
-        executeAmuletOperationRec execContext inputAmulets (COO_SubscriptionPayment (subscriptionPayment) :: prevResults) remainingOperations
+        executeAmuletOperationRec executionContext inputAmulets (COO_SubscriptionPayment (subscriptionPayment) :: prevResults) remainingOperations
 
     handleBuyMemberTraffic: Int -> Text -> Text -> Int -> RelTime -> Optional (ContractId ValidatorTopUpState) -> Update (ContractId MemberTraffic, Optional (ContractId Amulet))
     handleBuyMemberTraffic trafficAmount memberId synchronizerId migrationId minTopupInterval topupStateCidO = do
       now <- getTime
       -- validate and update topupState if provided
       forA_ topupStateCidO $ \topupStateCid -> do
-        topupState <- fetchAndArchive (ForMemberTraffic with dso = execContext.dso; memberId, synchronizerId, migrationId)  topupStateCid
-        require "validator party and ValidatorTopUpState match" (execContext.validator== topupState.validator)
+        topupState <- fetchAndArchive (ForMemberTraffic with dso = executionContext.dso; memberId, synchronizerId, migrationId)  topupStateCid
+        require "validator party and ValidatorTopUpState match" (executionContext.validator== topupState.validator)
         -- protect against successive topups being too close together
         require "enough time has elapsed since the last topup" (addRelTime topupState.lastPurchasedAt minTopupInterval <= now)
         void $ create topupState with lastPurchasedAt = now
-      -- auto-tap enough CC to buy extra traffic
+      -- auto-tap enough Amulet to buy extra traffic
       -- Note that auto-tapping is done only to make integration testing of the valdiator top-up loop easier.
       -- So, we only do this when the choice is exercised from the top-up automation and we are on DevNet.
       let amuletRulesCid = context.amuletRules
-      amuletRules <- fetchPublicReferenceData (ForDso with dso = execContext.dso) amuletRulesCid (AmuletRules_Fetch execContext.validator)
+      amuletRules <- fetchPublicReferenceData (ForDso with dso = executionContext.dso) amuletRulesCid (AmuletRules_Fetch executionContext.validator)
       newInputs <-
         -- Check that we are on DevNet and the topupState is defined
         if (amuletRules.isDevNet && isSome topupStateCidO)
           then do
-            -- Calculate CC required to buy extra traffic
-            (trafficCostCc, _) <- computeSynchronizerFees execContext.validator trafficAmount amuletRules context.context
-            -- Tap enough CC to cover extra traffic purchase
-            result <- exercise amuletRulesCid (AmuletRules_DevNet_Tap execContext.validator trafficCostCc context.context.openMiningRound)
+            -- Calculate Amulet required to buy extra traffic
+            (trafficCostAmulet, _) <- computeSynchronizerFees executionContext.validator trafficAmount amuletRules context.context
+            -- Tap enough Amulet to cover extra traffic purchase
+            result <- exercise amuletRulesCid (AmuletRules_DevNet_Tap executionContext.validator trafficCostAmulet context.context.openMiningRound)
             -- Use only the newly created amulet as input to avoid amulet merges and having to pay for a new change amulet
             pure $ [InputAmulet result.amuletSum.amulet]
           else
             pure inputs
       -- purchase extra traffic for sequencer member
       result <- exercise amuletRulesCid
-        (AmuletRules_BuyMemberTraffic newInputs context.context execContext.validator memberId synchronizerId migrationId trafficAmount)
+        (AmuletRules_BuyMemberTraffic newInputs context.context executionContext.validator memberId synchronizerId migrationId trafficAmount)
       pure (result.purchasedTraffic, result.senderChangeAmulet)
 
-executeAmuletOperationRec _execContext _inputs prevResults [] = do
+executeAmuletOperationRec _executionContext _inputs prevResults [] = do
   return prevResults
 
 

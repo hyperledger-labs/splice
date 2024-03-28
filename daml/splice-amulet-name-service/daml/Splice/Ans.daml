@@ -81,7 +81,7 @@ template AnsRules
               dso
               description = "ANS entry: " <> show name
             payData = SubscriptionPayData with
-              paymentAmount = PaymentAmount config.entryFee USD
+              paymentAmount = PaymentAmount config.entryFee USDUnit
               paymentInterval = config.entryLifetime
               paymentDuration = config.renewalDuration
         request <- create SubscriptionRequest with

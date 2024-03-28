@@ -51,7 +51,7 @@ const MedianAmuletPrice: React.FC = () => {
         Amulet Price for Next Open Mining Round
       </Typography>
       <Typography id="median-amulet-price-usd" variant="h2">
-        {medianAmuletPrice && <AmountDisplay amount={medianAmuletPrice} currency="USD" />}
+        {medianAmuletPrice && <AmountDisplay amount={medianAmuletPrice} currency="USDUnit" />}
       </Typography>
       <Typography variant="caption">
         Median of amulet prices voted by all Super Validators

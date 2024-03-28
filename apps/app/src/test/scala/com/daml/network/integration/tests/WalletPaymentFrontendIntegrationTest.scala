@@ -65,7 +65,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(charlieUserParty, BigDecimal("1.5"), paymentCodegen.Unit.CC)
+            receiverAmount(charlieUserParty, BigDecimal("1.5"), paymentCodegen.Unit.AMULETUNIT)
           ),
           description = description,
         )
@@ -81,11 +81,11 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchSinglePaymentInfo(id("confirm-payment").element)(
                 expectedBalance = (4.4475, 8.895), // from the self-directory creation
-                expectedSendAmount = "1.5" -> paymentCodegen.Unit.CC,
+                expectedSendAmount = "1.5" -> paymentCodegen.Unit.AMULETUNIT,
                 expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 1.5,
-                expectedComputeText = "3 USD @ 0.5 Amulet/USD",
+                expectedComputeText = "3 USD @ 0.5 CC/USD",
                 expectedDescription = description,
               )
             },
@@ -146,7 +146,7 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(charlieUserParty, BigDecimal("5.5"), paymentCodegen.Unit.USD)
+            receiverAmount(charlieUserParty, BigDecimal("5.5"), paymentCodegen.Unit.USDUNIT)
           ),
           description = description,
         )
@@ -162,7 +162,7 @@ class WalletPaymentFrontendIntegrationTest
             _ => {
               matchSinglePaymentInfo(id("confirm-payment").element)(
                 expectedBalance = (4.4475, 8.895), // from the self-directory creation
-                expectedSendAmount = "5.5" -> paymentCodegen.Unit.USD,
+                expectedSendAmount = "5.5" -> paymentCodegen.Unit.USDUNIT,
                 expectedReceiver = expectedAns(charlieUserParty, charlieEntryName),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.75,
@@ -231,8 +231,8 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Unit.CC),
-            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Unit.CC),
+            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Unit.AMULETUNIT),
+            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Unit.AMULETUNIT),
           ),
           description = description,
         )
@@ -254,7 +254,7 @@ class WalletPaymentFrontendIntegrationTest
                 ),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 4.0,
-                expectedComputeText = "8 USD @ 0.5 Amulet/USD",
+                expectedComputeText = "8 USD @ 0.5 CC/USD",
                 expectedDescription = description,
               )
             },
@@ -315,8 +315,8 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Unit.USD),
-            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Unit.USD),
+            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Unit.USDUNIT),
+            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Unit.USDUNIT),
           ),
           description = description,
         )
@@ -399,8 +399,8 @@ class WalletPaymentFrontendIntegrationTest
           aliceWalletClient.config.ledgerApiUser,
           aliceUserParty,
           Seq(
-            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Unit.CC),
-            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Unit.USD),
+            receiverAmount(aliceUserParty, BigDecimal("1.5"), paymentCodegen.Unit.AMULETUNIT),
+            receiverAmount(charlieUserParty, BigDecimal("2.5"), paymentCodegen.Unit.USDUNIT),
           ),
           description = description,
         )
@@ -422,7 +422,7 @@ class WalletPaymentFrontendIntegrationTest
                 ),
                 expectedProvider = expectedAns(aliceUserParty, aliceEntryName),
                 expectedTotalCC = 2.75,
-                expectedComputeText = "5.5 USD @ 0.5 Amulet/USD",
+                expectedComputeText = "5.5 USD @ 0.5 CC/USD",
                 expectedDescription = description,
               )
             },
@@ -480,6 +480,13 @@ class WalletPaymentFrontendIntegrationTest
     )._2
   }
 
+  private def renderPaymentUnit(unit: paymentCodegen.Unit): String =
+    unit match {
+      case paymentCodegen.Unit.AMULETUNIT => "CC"
+      case paymentCodegen.Unit.USDUNIT => "USD"
+      case _ => fail(s"Invalid unit: $unit")
+    }
+
   private def matchSinglePaymentInfo(element: Element)(
       expectedBalance: (BigDecimal, BigDecimal),
       expectedSendAmount: (String, paymentCodegen.Unit),
@@ -498,7 +505,7 @@ class WalletPaymentFrontendIntegrationTest
     )
 
     element.childElement(className("payment-amount")).text should matchText(
-      s"Send ${expectedSendAmount._1} ${expectedSendAmount._2} to"
+      s"Send ${expectedSendAmount._1} ${renderPaymentUnit(expectedSendAmount._2)} to"
     )
 
     seleniumText(element.childElement(className("payment-receiver"))) should matchText(

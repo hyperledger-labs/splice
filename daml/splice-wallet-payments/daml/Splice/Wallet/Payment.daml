@@ -11,8 +11,8 @@ import Splice.Round
 import Splice.Types
 
 data Unit
-  = USD
-  | CC
+  = USDUnit
+  | AmuletUnit
   | ExtUnit
       -- ^ Extension constructor to work around the current lack of upgrading for variants in Daml 3.0.
       -- Will serve as the default value in a containing record in case of an extension.
@@ -49,30 +49,30 @@ data ReceiverAmount = ReceiverAmount
    amount : PaymentAmount
  deriving (Show, Eq, Ord)
 
-data ReceiverCCAmount = ReceiverCCAmount
+data ReceiverAmuletAmount = ReceiverAmuletAmount
  with
    receiver : Party
-   ccAmount : Decimal
+   amuletAmount : Decimal
  deriving (Show, Eq, Ord)
 
-paymentAmountToCC : Party -> OpenMiningRound -> PaymentAmount -> Update Decimal
-paymentAmountToCC dso openMiningRound pq =
+paymentAmountToAmulet : Party -> OpenMiningRound -> PaymentAmount -> Update Decimal
+paymentAmountToAmulet dso openMiningRound pq =
   case pq.unit of
-    USD ->
+    USDUnit ->
       do
         require "DSO matches" (openMiningRound.dso == dso)
         pure (pq.amount / openMiningRound.amuletPrice)
-    CC ->
+    AmuletUnit ->
       pure pq.amount
     ExtUnit -> error "ExtUnit: bare extension constructors are not allowed at runtime"
 
-receiverAmountToCCReceiverAmount : Party -> OpenMiningRound -> ReceiverAmount -> Update ReceiverCCAmount
-receiverAmountToCCReceiverAmount dso openMiningRound rq =
+receiverAmountToAmuletReceiverAmount : Party -> OpenMiningRound -> ReceiverAmount -> Update ReceiverAmuletAmount
+receiverAmountToAmuletReceiverAmount dso openMiningRound rq =
   do
-    cc <- paymentAmountToCC dso openMiningRound rq.amount
-    pure ReceiverCCAmount with
+    amulet <- paymentAmountToAmulet dso openMiningRound rq.amount
+    pure ReceiverAmuletAmount with
       receiver = rq.receiver
-      ccAmount = cc
+      amuletAmount = amulet
 
 appPaymentRequest_receivers : AppPaymentRequest -> [Party]
 appPaymentRequest_receivers AppPaymentRequest{..} = map (\r -> r.receiver) receiverAmounts
@@ -82,7 +82,7 @@ template AppPaymentRequest
     sender : Party -- ^ The party that should pay.
     receiverAmounts : [ReceiverAmount] -- ^ Pairs of (party, amount) requesting to be paid.
     provider : Party -- ^ The app provider; receives usage rewards.
-    dso : Party -- ^ The issuer of CC that should be used to make the payment.
+    dso : Party -- ^ The issuer of Amulet that should be used to make the payment.
     expiresAt : Time -- ^ When the payment request expires.
     description : Text -- ^ Human readable description of the reason / good for which the payment is requested.
   where
@@ -109,12 +109,12 @@ template AppPaymentRequest
       do now <- getTime
          contextRound <- exercise context.context.openMiningRound (OpenMiningRound_Fetch provider)
 
-         -- Convert from USD to CC amounts
-         ccReceiverAmounts <- forA receiverAmounts $ \rq ->
-           receiverAmountToCCReceiverAmount dso contextRound rq
+         -- Convert from USD to Amulet amounts
+         amuletReceiverAmounts <- forA receiverAmounts $ \rq ->
+           receiverAmountToAmuletReceiverAmount dso contextRound rq
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
-         outputFees <- exerciseComputeFees context sender (map mkReceiverOutput ccReceiverAmounts)
+         outputFees <- exerciseComputeFees context sender (map mkReceiverOutput amuletReceiverAmounts)
 
          -- We know that the contextRound (=latest Round) won't be archived before
          -- its targetClosesAt or for at least 1 tick from the time we submit against the ledger.
@@ -129,7 +129,7 @@ template AppPaymentRequest
               outputs =
                 [ TransferOutput with
                     receiver = sender
-                    amount = sum outputFees + sum (map (.ccAmount) ccReceiverAmounts)
+                    amount = sum outputFees + sum (map (.amuletAmount) amuletReceiverAmounts)
                     lock = Some TimeLock with
                       holders = dedupSort $ provider :: map (.receiver) receiverAmounts
                       expiresAt = expiresAt
@@ -140,7 +140,7 @@ template AppPaymentRequest
          let round = result.round
          acceptedPayment <- create AcceptedAppPayment
            with
-             dso, provider, ccReceiverAmounts, sender, lockedAmulet, round, reference = self
+             dso, provider, amuletReceiverAmounts, sender, lockedAmulet, round, reference = self
          return AppPaymentRequest_AcceptResult with
            acceptedPayment
            senderChangeAmulet = result.senderChangeAmulet
@@ -180,11 +180,11 @@ data ReceiverAmulet = ReceiverAmulet with receiver : Party, lockedAmulet : Contr
 unzipReceiverAmulets : [ReceiverAmulet] -> ([Party], [ContractId LockedAmulet])
 unzipReceiverAmulets = foldr (\ReceiverAmulet{..} (rs,cs) -> (receiver :: rs, lockedAmulet :: cs)) ([], [])
 
-mkReceiverOutput : ReceiverCCAmount -> TransferOutput
+mkReceiverOutput : ReceiverAmuletAmount -> TransferOutput
 mkReceiverOutput receiverAmount =
   TransferOutput with
     receiver = receiverAmount.receiver
-    amount = receiverAmount.ccAmount
+    amount = receiverAmount.amuletAmount
     receiverFeeRatio = 0.0
     lock = None
 
@@ -194,14 +194,14 @@ data AcceptedAppPayment_CollectResult = AcceptedAppPayment_CollectResult with
 template AcceptedAppPayment
   with
     sender : Party
-    ccReceiverAmounts : [ReceiverCCAmount]
+    amuletReceiverAmounts : [ReceiverAmuletAmount]
     provider : Party
     dso : Party
     lockedAmulet : ContractId LockedAmulet
     round : Round -- ^ The round in which the locked amulet was created, added as an extra field so we can avoid ingesting locked amulets.
     reference : ContractId AppPaymentRequest -- ^ The contract id of the original payment request to correlate it. Note that the contract will no longer be active.
   where
-    signatory sender, provider, map (\r -> r.receiver) ccReceiverAmounts
+    signatory sender, provider, map (\r -> r.receiver) amuletReceiverAmounts
 
     choice AcceptedAppPayment_Collect : AcceptedAppPayment_CollectResult
       with
@@ -216,19 +216,19 @@ template AcceptedAppPayment
               sender
               provider
               inputs = [InputAmulet result.amuletSum.amulet]
-              outputs = map mkReceiverOutput ccReceiverAmounts
+              outputs = map mkReceiverOutput amuletReceiverAmounts
         result <- exerciseAppTransfer context transfer
         require "Precomputed fees were exact" (result.summary.senderChangeFee == 0.0)
         let amulets = map (\(TransferResultAmulet amuletCid) -> amuletCid) result.createdAmulets
-        let receivers = map (\r -> r.receiver) ccReceiverAmounts
+        let receivers = map (\r -> r.receiver) amuletReceiverAmounts
         pure AcceptedAppPayment_CollectResult with
             receiverAmulets = zip receivers amulets
 
     choice AcceptedAppPayment_Reject : AcceptedAppPayment_RejectResult
       with
         context : AppTransferContext
-      controller map (\r -> r.receiver) ccReceiverAmounts
-      do create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
+      controller map (\r -> r.receiver) amuletReceiverAmounts
+      do create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) amuletReceiverAmounts
          result <- exercise lockedAmulet (LockedAmulet_Unlock context.openMiningRound)
          return AcceptedAppPayment_RejectResult with
             amulet = result.amuletSum
@@ -238,7 +238,7 @@ template AcceptedAppPayment
         context : AppTransferContext
       controller sender
       do -- TODO(#3152) Split out amulet unlocking from payment expiry
-         create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) ccReceiverAmounts
+         create TerminatedAppPayment with reference, sender, provider, receivers = map (\a -> a.receiver) amuletReceiverAmounts
          result <- exercise lockedAmulet (LockedAmulet_OwnerExpireLock context.openMiningRound)
          return AcceptedAppPayment_ExpireResult with
             amulet = result.amuletSum

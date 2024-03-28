@@ -56,7 +56,7 @@ const AppRow: React.FC<{
         <PartyId partyId={name} />
       </TableCell>
       <TableCell align="right">
-        <AmountDisplay amount={totalRewards} currency="CC" />
+        <AmountDisplay amount={totalRewards} currency="AmuletUnit" />
       </TableCell>
     </TableRow>
   );

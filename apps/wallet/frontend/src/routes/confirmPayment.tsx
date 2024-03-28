@@ -89,7 +89,7 @@ export const ConfirmPayment: React.FC = () => {
   );
 };
 
-type BothUnits = 'CC & USD';
+type BothUnits = 'AmuletUnit & USDUnit';
 interface Total {
   totalAmount: BigNumber;
   /**
@@ -106,19 +106,19 @@ function computeTotal(
   amuletPrice: BigNumber
 ): Total | undefined {
   // The currency is NOT necessarily the same for all receivers
-  const { totalAmulet, totalUSD } = receiverAmounts.reduce(
+  const { totalAmulet, totalUSDUnit } = receiverAmounts.reduce(
     (acc, next) => {
       let newAcc;
       switch (next.amount.unit) {
-        case 'CC':
+        case 'AmuletUnit':
           newAcc = {
             totalAmulet: acc.totalAmulet.plus(next.amount.amount),
-            totalUSD: acc.totalUSD,
+            totalUSDUnit: acc.totalUSDUnit,
           };
           break;
-        case 'USD':
+        case 'USDUnit':
           newAcc = {
-            totalUSD: acc.totalUSD.plus(next.amount.amount),
+            totalUSDUnit: acc.totalUSDUnit.plus(next.amount.amount),
             totalAmulet: acc.totalAmulet,
           };
           break;
@@ -131,22 +131,34 @@ function computeTotal(
     },
     {
       totalAmulet: new BigNumber(0),
-      totalUSD: new BigNumber(0),
+      totalUSDUnit: new BigNumber(0),
     }
   );
 
-  if (totalAmulet.eq(0) && totalUSD.eq(0)) {
+  if (totalAmulet.eq(0) && totalUSDUnit.eq(0)) {
     return undefined;
-  } else if (totalUSD.eq(0)) {
-    // everything is in CC
-    return { totalCurrency: 'CC', totalAmount: totalAmulet, currencyForAllReceivers: 'CC' };
+  } else if (totalUSDUnit.eq(0)) {
+    // everything is in AmuletUnit
+    return {
+      totalCurrency: 'AmuletUnit',
+      totalAmount: totalAmulet,
+      currencyForAllReceivers: 'AmuletUnit',
+    };
   } else if (totalAmulet.eq(0)) {
-    // everything is in USD
-    return { totalCurrency: 'USD', totalAmount: totalUSD, currencyForAllReceivers: 'USD' };
+    // everything is in USDUnit
+    return {
+      totalCurrency: 'USDUnit',
+      totalAmount: totalUSDUnit,
+      currencyForAllReceivers: 'USDUnit',
+    };
   } else {
-    // both, we use CC to show the total amount
-    const totalAmount = totalUSD.div(amuletPrice).plus(totalAmulet);
-    return { totalCurrency: 'CC', totalAmount, currencyForAllReceivers: 'CC & USD' };
+    // both, we use AmuletUnit to show the total amount
+    const totalAmount = totalUSDUnit.div(amuletPrice).plus(totalAmulet);
+    return {
+      totalCurrency: 'AmuletUnit',
+      totalAmount,
+      currencyForAllReceivers: 'AmuletUnit & USDUnit',
+    };
   }
 }
 
@@ -260,10 +272,10 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
   amuletPrice,
 }) => {
   const converted = convertCurrency(total.totalAmount, total.totalCurrency, amuletPrice);
-  const ccAmount = total.totalCurrency === 'CC' ? total.totalAmount : converted.amount;
+  const ccAmount = total.totalCurrency === 'AmuletUnit' ? total.totalAmount : converted.amount;
 
   const totalAmulet = ccAmount; // TODO (#3492): compute actual fee
-  const totalUSD = totalAmulet.times(amuletPrice);
+  const totalUSDUnit = totalAmulet.times(amuletPrice);
 
   return (
     <Container>
@@ -272,10 +284,10 @@ const TotalPaymentContainer: React.FC<PaymentContainerProps> = ({
           <Typography variant="body1">{"You'll pay:"}</Typography>
           <Stack alignItems="center">
             <Typography variant="h5" className="payment-total-cc">
-              <AmountDisplay amount={totalAmulet} currency={'CC'} />
+              <AmountDisplay amount={totalAmulet} currency={'AmuletUnit'} />
             </Typography>
             <Typography variant="body2" className="payment-compute">
-              <AmountDisplay amount={totalUSD} currency={'USD'} /> @{' '}
+              <AmountDisplay amount={totalUSDUnit} currency={'USDUnit'} /> @{' '}
               <RateDisplay
                 base={total.totalCurrency}
                 quote={converted.currency}

@@ -7,7 +7,10 @@ import com.daml.network.integration.tests.CNNodeTests.{
 import com.daml.network.splitwell.admin.api.client.commands.HttpSplitwellAppClient
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.splice.splitwell as splitwellCodegen
-import com.daml.network.codegen.java.splice.wallet.payment.{AcceptedAppPayment, ReceiverCCAmount}
+import com.daml.network.codegen.java.splice.wallet.payment.{
+  AcceptedAppPayment,
+  ReceiverAmuletAmount,
+}
 import com.daml.network.console.{
   CNParticipantClientReference,
   SplitwellAppClientReference,
@@ -136,7 +139,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       senderWallet,
       key,
       Seq(
-        new walletCodegen.ReceiverCCAmount(
+        new walletCodegen.ReceiverAmuletAmount(
           receiver.toProtoPrimitive,
           amount.bigDecimal,
         )
@@ -147,7 +150,7 @@ trait SplitwellTestUtil extends CNNodeTestCommon with WalletTestUtil with TimeTe
       senderSplitwell: SplitwellAppClientReference,
       senderWallet: WalletAppClientReference,
       key: HttpSplitwellAppClient.GroupKey,
-      receiverAmounts: Seq[ReceiverCCAmount],
+      receiverAmounts: Seq[ReceiverAmuletAmount],
   )(implicit env: CNNodeTestConsoleEnvironment): AcceptedAppPayment.ContractId = {
     senderSplitwell.initiateTransfer(key, receiverAmounts)
     val request = eventually()(getSingleRequestOnDecentralizedSynchronizer(senderWallet))

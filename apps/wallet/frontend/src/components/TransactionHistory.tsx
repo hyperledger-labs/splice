@@ -405,21 +405,25 @@ const TransactionAmount: React.FC<TransactionAmountProps> = ({ transaction, prim
     <Stack direction="column">
       <Typography className="tx-amount-cc">
         {sign}
-        <AmountDisplay amount={amountAmulet} currency="CC" />
+        <AmountDisplay amount={amountAmulet} currency="AmuletUnit" />
       </Typography>
       <Stack direction="row" spacing={0.5}>
         <Typography variant="caption" className="tx-amount-usd">
           {sign}
           <AmountDisplay
             amount={amountAmulet}
-            currency="CC"
+            currency="AmuletUnit"
             convert="CCtoUSD"
             amuletPrice={amuletPriceAtTimeOfTransaction}
           />
         </Typography>
         <Typography variant="caption">@</Typography>
         <Typography variant="caption" className="tx-amount-rate">
-          <RateDisplay base="CC" quote="USD" amuletPrice={amuletPriceAtTimeOfTransaction} />
+          <RateDisplay
+            base="AmuletUnit"
+            quote="USDUnit"
+            amuletPrice={amuletPriceAtTimeOfTransaction}
+          />
         </Typography>
       </Stack>
     </Stack>

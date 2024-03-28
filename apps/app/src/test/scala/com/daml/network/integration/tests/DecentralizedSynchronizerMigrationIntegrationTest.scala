@@ -8,7 +8,7 @@ import com.daml.network.codegen.java.splice.splitwell.balanceupdatetype.Transfer
 import com.daml.network.codegen.java.splice.dsorules.{SynchronizerUpgradeSchedule, DsoRules_AddSv}
 import com.daml.network.codegen.java.splice.dsorules.actionrequiringconfirmation.ARC_DsoRules
 import com.daml.network.codegen.java.splice.dsorules.dsorules_actionrequiringconfirmation.SRARC_AddSv
-import com.daml.network.codegen.java.splice.wallet.payment.ReceiverCCAmount
+import com.daml.network.codegen.java.splice.wallet.payment.ReceiverAmuletAmount
 import com.daml.network.config.{
   CNNodeConfigTransforms,
   CNParticipantClientConfig,
@@ -860,7 +860,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
                   rsw("aliceSplitwellLocal").initiateTransfer(
                     splitwellGroupKey,
                     Seq(
-                      new ReceiverCCAmount(
+                      new ReceiverAmuletAmount(
                         charlieUserParty.toProtoPrimitive,
                         BigDecimal(43.0).bigDecimal,
                       )
@@ -1095,7 +1095,7 @@ class DecentralizedSynchronizerMigrationIntegrationTest
           aliceSplitwellClient.initiateTransfer(
             key,
             Seq(
-              new ReceiverCCAmount(
+              new ReceiverAmuletAmount(
                 charlieUserParty.toProtoPrimitive,
                 BigDecimal(42.0).bigDecimal,
               )

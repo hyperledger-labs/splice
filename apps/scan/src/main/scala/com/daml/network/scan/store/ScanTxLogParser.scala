@@ -462,7 +462,7 @@ object ScanTxLogParser {
         )
       val round = node.result.value.round
       val trafficPurchased = node.argument.value.trafficAmount
-      val ccSpent = node.result.value.ccPaid
+      val ccSpent = node.result.value.amuletPaid
       val buyExtraTrafficEntry = ExtraTrafficPurchaseTxLogEntry(
         eventId = event.getEventId(),
         domainId = domainId,

@@ -85,7 +85,7 @@ class WalletAuth0FrontendIntegrationTest
               auth0User.id,
               userPartyId,
               Seq(
-                receiverAmount(userPartyId, BigDecimal("1.5"), Unit.CC)
+                receiverAmount(userPartyId, BigDecimal("1.5"), Unit.AMULETUNIT)
               ),
             )
             paymentRequestContractId

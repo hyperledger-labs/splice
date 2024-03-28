@@ -1,4 +1,10 @@
-import { IntervalDisplay, DateDisplay, Loading, ErrorDisplay } from 'common-frontend';
+import {
+  IntervalDisplay,
+  DateDisplay,
+  Loading,
+  ErrorDisplay,
+  unitStringToCurrency,
+} from 'common-frontend';
 import React from 'react';
 
 import { Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
@@ -31,7 +37,9 @@ const AnsEntries: React.FC = () => {
               <TableRow key={entry.contractId} className="entries-table-row">
                 <TableCell className="entries-table-name">{entry.name}</TableCell>
                 <TableCell className="entries-table-amount">{entry.amount}</TableCell>
-                <TableCell className="entries-table-currency">{entry.currency}</TableCell>
+                <TableCell className="entries-table-currency">
+                  {unitStringToCurrency(entry.currency)}
+                </TableCell>
                 <TableCell className="entries-table-expires-at">
                   <DateDisplay datetime={new Date(Number(entry.expiresAt))} />
                 </TableCell>

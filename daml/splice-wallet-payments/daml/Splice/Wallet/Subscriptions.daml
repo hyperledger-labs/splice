@@ -179,7 +179,7 @@ template SubscriptionInitialPayment
   with
     subscriptionData : SubscriptionData
     payData : SubscriptionPayData
-    targetAmount : Decimal -- ^ Exact amount in CC that the receiver will get.
+    targetAmount : Decimal -- ^ Exact amount in Amulet that the receiver will get.
     lockedAmulet : ContractId LockedAmulet
     round : Round -- ^ The round in which the locked amulet was created, added as an extra field so we can avoid ingesting locked amulets.
     reference : ContractId SubscriptionRequest -- ^ Reference to the subscription request, note that the contract will no longer be active so this just acts as a tracking id.
@@ -361,7 +361,7 @@ lockAndMakeChange context subscriptionData payData inputs now walletProvider = d
 
   contextRound <- exercise @OpenMiningRound context.context.openMiningRound (OpenMiningRound_Fetch sender)
 
-  targetAmount <- paymentAmountToCC dso contextRound paymentAmount
+  targetAmount <- paymentAmountToAmulet dso contextRound paymentAmount
 
   outputFees <- exerciseComputeFees context sender [mkTransferOutput receiver targetAmount]
   let lockAmount = targetAmount + sum outputFees

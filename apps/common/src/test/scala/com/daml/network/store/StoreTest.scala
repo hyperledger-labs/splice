@@ -302,7 +302,7 @@ abstract class StoreTest extends AsyncWordSpec with BaseTest {
         "description",
       )
     val payData = new subCodegen.SubscriptionPayData(
-      new paymentCodegen.PaymentAmount(numeric(amount.bigDecimal), paymentCodegen.Unit.CC),
+      new paymentCodegen.PaymentAmount(numeric(amount.bigDecimal), paymentCodegen.Unit.AMULETUNIT),
       new RelTime(1L),
       new RelTime(1L),
     )

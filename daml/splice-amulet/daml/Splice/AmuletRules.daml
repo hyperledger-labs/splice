@@ -15,7 +15,8 @@ import DA.Traversable (forA)
 import DA.Time
 
 import Splice.Amulet
-import Splice.AmuletConfig
+import Splice.AmuletConfig (AmuletConfig(..), TransferConfig(..), validAmuletConfig)
+import qualified Splice.AmuletConfig as Unit
 import Splice.Schedule
 import Splice.Expiry
 import Splice.Fees
@@ -73,12 +74,12 @@ data AmuletRules_UpdateFutureAmuletConfigScheduleResult = AmuletRules_UpdateFutu
     newAmuletRules : ContractId AmuletRules
 
 
--- | The rules governing how CC users can modify the CC state
+-- | The rules governing how Amulet users can modify the Amulet state
 -- managed by the DSO.
 template AmuletRules
   with
     dso : Party
-    configSchedule : Schedule Time (AmuletConfig USD)
+    configSchedule : Schedule Time (AmuletConfig Unit.USD)
     isDevNet : Bool
   where
     ensure validSchedule configSchedule validAmuletConfig
@@ -127,14 +128,14 @@ template AmuletRules
         case validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount of
           Left err -> throw (InvalidTransfer err)
           Right _ -> pure ()
-        (trafficCostCc, trafficCostUsd) <- computeSynchronizerFees provider trafficAmount this context
+        (trafficCostAmulet, trafficCostUsd) <- computeSynchronizerFees provider trafficAmount this context
         let transfer = Transfer with
               sender = provider
               provider
               inputs
               outputs = [ TransferOutput with
                             receiver = dso
-                            amount = trafficCostCc
+                            amount = trafficCostAmulet
                             receiverFeeRatio = 1.0 -- ensure the provider pays only the traffic cost
                             lock = None
                         ]
@@ -151,7 +152,7 @@ template AmuletRules
           dso
           round = transferResult.round
           user = provider
-          amount = trafficCostCc
+          amount = trafficCostAmulet
         -- create a new MemberTraffic contract for the purchased traffic
         purchasedTraffic <- create MemberTraffic with
           dso
@@ -160,13 +161,13 @@ template AmuletRules
           migrationId
           totalPurchased = trafficAmount
           numPurchases = 1
-          ccSpent = trafficCostCc
+          amuletSpent = trafficCostAmulet
           usdSpent =  trafficCostUsd
         -- return result
         return AmuletRules_BuyMemberTrafficResult with
           round = transferResult.round
           summary = transferResult.summary
-          ccPaid = trafficCostCc
+          amuletPaid = trafficCostAmulet
           purchasedTraffic
           senderChangeAmulet = transferResult.senderChangeAmulet
 
@@ -197,7 +198,7 @@ template AmuletRules
                 totalPurchased = acc.totalPurchased + traffic.totalPurchased
                 numPurchases = acc.numPurchases + traffic.numPurchases
                 usdSpent = acc.usdSpent + traffic.usdSpent
-                ccSpent = acc.ccSpent + traffic.ccSpent
+                amuletSpent = acc.amuletSpent + traffic.amuletSpent
               ) (initialMemberTraffic dso first.memberId first.synchronizerId first.migrationId) traffics
         mergedTrafficCid <- create mergedTraffic
         return AmuletRules_MergeMemberTrafficContractsResult with ..
@@ -503,7 +504,7 @@ template AmuletRules
     -- This inserts a new AmuletConfig Schedule into the future Schedules
     choice AmuletRules_AddFutureAmuletConfigSchedule: AmuletRules_AddFutureAmuletConfigScheduleResult
       with
-        newScheduleItem : (Time, AmuletConfig USD)
+        newScheduleItem : (Time, AmuletConfig Unit.USD)
       controller dso
       do
         now <- getTime
@@ -525,7 +526,7 @@ template AmuletRules
     -- This updates a AmuletConfig Schedule defined in the future Schedules
     choice AmuletRules_UpdateFutureAmuletConfigSchedule: AmuletRules_UpdateFutureAmuletConfigScheduleResult
       with
-        scheduleItem: (Time, AmuletConfig USD)
+        scheduleItem: (Time, AmuletConfig Unit.USD)
       controller dso
       do
         now <- getTime
@@ -544,7 +545,7 @@ transferControllers t =
     addOutputController s (TransferOutput with receiver; lock; ..) =
       Set.insert receiver $ optional s (foldl (flip Set.insert) s) (holders <$> lock)
 
-scaleAmuletConfig : Decimal -> AmuletConfig USD -> AmuletConfig CC
+scaleAmuletConfig : Decimal -> AmuletConfig Unit.USD -> AmuletConfig Amulet
 scaleAmuletConfig amuletPrice config = AmuletConfig with
   transferConfig = scaleFees (1.0 / amuletPrice) config.transferConfig
   decentralizedSynchronizer = config.decentralizedSynchronizer
@@ -558,7 +559,7 @@ computeFees dso context sender outputs = do
   let transferConfigAmulet = transferConfigAmuletFromOpenRound openRound
   return $ map (computeOutputFee transferConfigAmulet sender) outputs
 
-computeOutputFee : TransferConfig CC -> Party -> TransferOutput -> Decimal
+computeOutputFee : TransferConfig Amulet -> Party -> TransferOutput -> Decimal
 computeOutputFee transferConfigAmulet sender out =
     transferConfigAmulet.createFee.fee + lockingFee + transferFee
   where
@@ -585,7 +586,7 @@ exception InvalidTransfer
   where
     message show reason
 
-checkTransferConstraints: Transfer -> TransferSummary -> TransferConfig CC -> Either InvalidTransferReason ()
+checkTransferConstraints: Transfer -> TransferSummary -> TransferConfig Amulet -> Either InvalidTransferReason ()
 checkTransferConstraints transfer summary transferConfigAmulet
     | length transfer.inputs > transferConfigAmulet.maxNumInputs = Left $ ITR_Other $ "More than the maximum number of inputs"
     | length transfer.outputs > transferConfigAmulet.maxNumOutputs = Left $ ITR_Other $ "More than the maximum number of outputs"
@@ -626,7 +627,7 @@ executeTransfer config context dso t = do
 
 data TransferContextSummary = TransferContextSummary with
     featuredAppProvider : Optional Party
-    config : TransferConfig CC
+    config : TransferConfig Amulet
     openRound : OpenMiningRound
     issuingMiningRounds : Map Round IssuingMiningRound
     validatorRights : Map Party (ContractId ValidatorRight)
@@ -801,7 +802,7 @@ summarizeAndConsumeInputs csum dso sender inps = do
         changeToHoldingFeesRate = s.changeToHoldingFeesRate
 
 
-preprocessOutputs : TransferConfig CC -> Party -> [TransferOutput] -> Update TransferOutputsSummary
+preprocessOutputs : TransferConfig Amulet -> Party -> [TransferOutput] -> Update TransferOutputsSummary
 preprocessOutputs transferConfigAmulet sender outs =
     mapA (preprocessOutput . dedupOutputLockHolders) outs
   where
@@ -835,7 +836,7 @@ preprocessOutputs transferConfigAmulet sender outs =
             amount = amount - receiverOutputFee
             lock
 
-summarizeTransfer : Party -> OpenMiningRound -> TransferConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
+summarizeTransfer : Party -> OpenMiningRound -> TransferConfig Amulet -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
 summarizeTransfer sender openRound transferConfigAmulet inp preprocessedOutputs = do
     -- These traces are shown in the tx view in Daml studio, and greatly aid debugging fee calculations
     trace summary $ trace preprocessedOutputs $ trace inp $ pure summary
@@ -909,7 +910,7 @@ issueRewards config csum sender provider summary
     extraAppReward = if featured then csum.config.extraFeaturedAppRewardAmount else 0.0
 
 createTransferOutputs
-  : OpenMiningRound -> TransferConfig CC -> Party -> Party -> TransferSummary -> TransferOutputsSummary
+  : OpenMiningRound -> TransferConfig Amulet -> Party -> Party -> TransferSummary -> TransferOutputsSummary
   -> Update ([CreatedAmulet], Optional (ContractId Amulet))
 createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary preprocessedOutputs = do
     outputAmulets <- mapA createOutput preprocessedOutputs
@@ -939,7 +940,7 @@ createTransferOutputs currentOpenRound transferConfigAmulet dso sender summary p
           TransferResultLockedAmulet <$> create LockedAmulet with amulet; lock
 
 -- | Scale the 'AmuletConfig' such that the fees charged are scaled by the same scale factor.
-scaleFees : Decimal -> TransferConfig USD -> TransferConfig CC
+scaleFees : Decimal -> TransferConfig Unit.USD -> TransferConfig Amulet
 scaleFees s c = TransferConfig with
     createFee = scaleFixedFee s c.createFee
     holdingFee = scaleRatePerRound s c.holdingFee
@@ -950,10 +951,10 @@ scaleFees s c = TransferConfig with
     maxNumOutputs = c.maxNumOutputs
     maxNumLockHolders = c.maxNumLockHolders
 
-transferConfigAmuletFromOpenRound : OpenMiningRound -> TransferConfig CC
+transferConfigAmuletFromOpenRound : OpenMiningRound -> TransferConfig Amulet
 transferConfigAmuletFromOpenRound openRound = scaleFees (1.0 / openRound.amuletPrice) openRound.transferConfigUsd
 
-validateBuyMemberTrafficInputs : AmuletConfig USD -> Text -> Int -> Either InvalidTransferReason ()
+validateBuyMemberTrafficInputs : AmuletConfig Unit.USD -> Text -> Int -> Either InvalidTransferReason ()
 validateBuyMemberTrafficInputs configUsd synchronizerId trafficAmount
   | not (synchronizerId `Set.member` configUsd.decentralizedSynchronizer.requiredSynchronizers) = Left $ ITR_UnknownSynchronizer with synchronizerId
   | trafficAmount < configUsd.decentralizedSynchronizer.fees.minTopupAmount = Left $ ITR_InsufficientTopupAmount with
@@ -969,10 +970,10 @@ computeSynchronizerFees validator trafficAmount amuletRules context = do
   let configUsd = getValueAsOf now amuletRules.configSchedule
   let extraTrafficPrice = configUsd.decentralizedSynchronizer.fees.extraTrafficPrice
   let trafficCostUsd = intToDecimal trafficAmount / 1e6 * extraTrafficPrice
-  -- compute traffic cost in CC
+  -- compute traffic cost in Amulet
   contextMiningRound <- exercise context.openMiningRound (OpenMiningRound_Fetch validator)
-  let trafficCostCc = trafficCostUsd / contextMiningRound.amuletPrice
-  pure (trafficCostCc, trafficCostUsd)
+  let trafficCostAmulet = trafficCostUsd / contextMiningRound.amuletPrice
+  pure (trafficCostAmulet, trafficCostUsd)
 
 data AppTransferContext = AppTransferContext
   with
@@ -1087,7 +1088,7 @@ data TransferResult
 data AmuletRules_BuyMemberTrafficResult = AmuletRules_BuyMemberTrafficResult with
     round : Round
     summary : TransferSummary
-    ccPaid : Decimal
+    amuletPaid : Decimal
     purchasedTraffic : ContractId MemberTraffic
     senderChangeAmulet : Optional (ContractId Amulet)
   deriving (Show, Eq)

@@ -93,7 +93,7 @@ testSynchronizerMigration = do
   -- The new synchronizer becomes active, which implies that:
   -- 1. The SV apps change the synchronizer topology information to allow transferring all of its contracts.
   --    (once synchronizers support transfer permissions)
-  -- 2. The stakeholders of CC and DSO contracts transfer them to the new active synchronizer as described in
+  -- 2. The stakeholders of Amulet and DSO contracts transfer them to the new active synchronizer as described in
   --    the design document: https://docs.google.com/document/d/1vjcq9iGBnqWl0Q-3sIBvXEV61U2TflolxDpuES97Kh4/edit#bookmark=id.9lc9od4yaflf
   pure ()
 

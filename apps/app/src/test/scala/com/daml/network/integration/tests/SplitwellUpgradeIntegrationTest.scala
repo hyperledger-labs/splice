@@ -299,7 +299,7 @@ class SplitwellUpgradeIntegrationTest
           bobSplitwellClient.initiateTransfer(
             abGroupKey,
             Seq(
-              new walletCodegen.ReceiverCCAmount(
+              new walletCodegen.ReceiverAmuletAmount(
                 alice.toProtoPrimitive,
                 BigDecimal("21.20").bigDecimal,
               )

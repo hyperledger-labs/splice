@@ -103,8 +103,8 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       "return correct results" in {
         for {
           store <- mkStore(user1)
-          offer1 = transferOffer(user1, user2, 10.0, paymentCodegen.Unit.CC, time(1))
-          offer3 = transferOffer(user1, user2, 20.0, paymentCodegen.Unit.USD, time(3))
+          offer1 = transferOffer(user1, user2, 10.0, paymentCodegen.Unit.AMULETUNIT, time(1))
+          offer3 = transferOffer(user1, user2, 20.0, paymentCodegen.Unit.USDUNIT, time(3))
           _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
             store.multiDomainAcsStore
           )
@@ -135,8 +135,14 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
       "return correct results" in {
         for {
           store <- mkStore(user1)
-          offer1 = acceptedTransferOffer(user1, user2, 10.0, paymentCodegen.Unit.CC, time(1))
-          offer3 = acceptedTransferOffer(user1, user2, 20.0, paymentCodegen.Unit.USD, time(3))
+          offer1 = acceptedTransferOffer(
+            user1,
+            user2,
+            10.0,
+            paymentCodegen.Unit.AMULETUNIT,
+            time(1),
+          )
+          offer3 = acceptedTransferOffer(user1, user2, 20.0, paymentCodegen.Unit.USDUNIT, time(3))
           _ <- dummyDomain.create(offer1, createdEventSignatories = Seq(user1))(
             store.multiDomainAcsStore
           )
@@ -340,7 +346,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             user1,
             provider1,
             10.0,
-            paymentCodegen.Unit.CC,
+            paymentCodegen.Unit.AMULETUNIT,
             time(t),
             s"expiring at $t",
           )
@@ -398,7 +404,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             user1,
             provider1,
             10.0,
-            paymentCodegen.Unit.CC,
+            paymentCodegen.Unit.AMULETUNIT,
             time(1),
             s"request for $user1",
           )
@@ -406,7 +412,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             user2,
             provider1,
             10.0,
-            paymentCodegen.Unit.CC,
+            paymentCodegen.Unit.AMULETUNIT,
             time(1),
             s"request for $user2",
           )
@@ -461,7 +467,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             user1,
             provider1,
             10.0,
-            paymentCodegen.Unit.CC,
+            paymentCodegen.Unit.AMULETUNIT,
             time(1),
             "request1",
           )
@@ -469,7 +475,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             user1,
             provider1,
             20.0,
-            paymentCodegen.Unit.CC,
+            paymentCodegen.Unit.AMULETUNIT,
             time(2),
             "request2",
           )
@@ -477,7 +483,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             user1,
             provider1,
             30.0,
-            paymentCodegen.Unit.CC,
+            paymentCodegen.Unit.AMULETUNIT,
             time(3),
             "request3",
           )
@@ -1156,7 +1162,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
 
   private def subscriptionPayData(
       amount: Double = 10.0,
-      currency: paymentCodegen.Unit = paymentCodegen.Unit.CC,
+      currency: paymentCodegen.Unit = paymentCodegen.Unit.AMULETUNIT,
       paymentIntervalSeconds: Long = 60L,
       paymentDurationSeconds: Long = 1L,
   ): subsCodegen.SubscriptionPayData = {
@@ -1291,7 +1297,10 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
         consuming = false,
         new installCodegen.WalletAppInstall_CreateTransferOffer(
           "receiver",
-          new paymentCodegen.PaymentAmount(BigDecimal(1.0).bigDecimal, paymentCodegen.Unit.CC),
+          new paymentCodegen.PaymentAmount(
+            BigDecimal(1.0).bigDecimal,
+            paymentCodegen.Unit.AMULETUNIT,
+          ),
           "desc",
           Instant.now().truncatedTo(ChronoUnit.MICROS).plusSeconds(60),
           trackingId,
@@ -1306,7 +1315,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             sender,
             receiver,
             1.0,
-            paymentCodegen.Unit.CC,
+            paymentCodegen.Unit.AMULETUNIT,
             CantonTimestamp.now().plusSeconds(60),
             trackingId,
             transferOfferTCid,
@@ -1346,7 +1355,7 @@ abstract class UserWalletStoreTest extends StoreTest with HasExecutionContext {
             sender,
             receiver,
             1.0,
-            paymentCodegen.Unit.CC,
+            paymentCodegen.Unit.AMULETUNIT,
             CantonTimestamp.now().plusSeconds(60),
             trackingId,
             acceptedTransferOfferCid,

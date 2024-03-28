@@ -5,6 +5,7 @@ import {
   ErrorDisplay,
   IntervalDisplay,
   DisableConditionally,
+  unitToCurrency,
 } from 'common-frontend';
 import { Contract } from 'common-frontend-utils';
 import { useState } from 'react';
@@ -103,7 +104,8 @@ const SubscriptionContainer: React.FC<{ subscription: Contract<SubscriptionReque
             </Typography>
             <Typography variant="body2" className="sub-request-price-converted">
               <AmountDisplay amount={converted.amount} currency={converted.currency} /> @{' '}
-              <AmountDisplay amount={amuletPriceQuery.data} currency={unit} />/{converted.currency}
+              <AmountDisplay amount={amuletPriceQuery.data} currency={unit} />/
+              {unitToCurrency(converted.currency)}
             </Typography>
             <Typography variant="body2">Fees will be added.</Typography>
           </Stack>

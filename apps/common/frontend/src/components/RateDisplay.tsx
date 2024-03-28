@@ -1,9 +1,11 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
 
+import { Unit } from '@daml.js/splice-wallet-payments/lib/Splice/Wallet/Payment';
+
 type RateDisplayProps = {
-  base: Currency;
-  quote: Currency;
+  base: Unit;
+  quote: Unit;
   amuletPrice: number | BigNumber;
 };
 
@@ -11,16 +13,16 @@ const RateDisplay: React.FC<RateDisplayProps> = props => {
   var { base, quote, amuletPrice } = props;
   var amount, rate;
   switch (true) {
-    case base === 'CC' && quote === 'USD':
+    case base === 'AmuletUnit' && quote === 'USDUnit':
       amount = BigNumber(1).div(amuletPrice);
-      rate = 'Amulet/USD';
+      rate = 'CC/USD';
       break;
-    case base === 'USD' && quote === 'CC':
+    case base === 'USDUnit' && quote === 'AmuletUnit':
       amount = amuletPrice;
       rate = 'USD/CC';
       break;
     default:
-      throw Error('Rate not properly defined.');
+      throw Error(`Rate not properly defined.: base: ${base}, quote: ${quote}`);
   }
   return (
     <>

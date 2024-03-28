@@ -72,7 +72,7 @@ const ValidatorRow: React.FC<{
       <TableCell align="right">{numPurchases}</TableCell>
       <TableCell align="right">{totalTrafficPurchased}</TableCell>
       <TableCell align="right">
-        <AmountDisplay amount={totalCcSpent} currency="CC" />
+        <AmountDisplay amount={totalCcSpent} currency="AmuletUnit" />
       </TableCell>
       <TableCell align="right">{lastPurchasedInRound}</TableCell>
     </TableRow>

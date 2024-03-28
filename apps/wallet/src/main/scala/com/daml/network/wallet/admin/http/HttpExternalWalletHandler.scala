@@ -74,7 +74,7 @@ class HttpExternalWalletHandler(
                   installCid
                     .exerciseWalletAppInstall_CreateTransferOffer(
                       receiver.toProtoPrimitive,
-                      new PaymentAmount(amount, Unit.CC),
+                      new PaymentAmount(amount, Unit.AMULETUNIT),
                       request.description,
                       expiresAt.toInstant,
                       request.trackingId,

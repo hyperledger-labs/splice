@@ -389,7 +389,7 @@ class AppUpgradeIntegrationTest
               aliceSplitwellClient.initiateTransfer(
                 key,
                 Seq(
-                  new walletCodegen.ReceiverCCAmount(
+                  new walletCodegen.ReceiverAmuletAmount(
                     bob.toProtoPrimitive,
                     BigDecimal(2.0).bigDecimal,
                   )
