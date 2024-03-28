@@ -20,8 +20,8 @@ template OpenMiningRound
     round : Round
     amuletPrice : Decimal
     opensAt : Time -- ^ Time after which transfers can use this mining round
-    targetClosesAt : Time -- ^ Time when the DSO expects to close this round. The round SHOULD NOT be archived before this time.
-    issuingFor : RelTime -- ^ Time for which the DSO has been issuing rewards. Determines the configuration for the issuance round.
+    targetClosesAt : Time -- ^ Time when this round is expected to be closed as part of standard DSO. The round SHOULD NOT be archived before this time.
+    issuingFor : RelTime -- ^ Timepoint on the issuance curve that was used to determing the issuance configuration for this round.
     transferConfigUsd : TransferConfig USD -- ^ Configuration determining the fees and limits in USD for Amulet transfers
     issuanceConfig : IssuanceConfig -- ^ Configuration for issuance of this round.
     tickDuration : RelTime -- ^ Duration of a tick, which is the duration of half a round.
@@ -58,7 +58,7 @@ template IssuingMiningRound
     issuancePerUnfeaturedAppRewardCoupon : Decimal
     issuancePerSvRewardCoupon : Decimal
     opensAt : Time-- ^ Time after which rewards from this mining round can be collected
-    targetClosesAt : Time -- ^ Time when the DSO expects to close this round. The round SHOULD NOT be archived before this time.
+    targetClosesAt : Time -- ^ Time when this round is expected to close during standard DSO. The round SHOULD NOT be archived before this time.
     optIssuancePerValidatorFaucetCoupon : Optional Decimal
       -- ^ Introduced in CIP-3
   where

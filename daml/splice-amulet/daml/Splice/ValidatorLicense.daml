@@ -65,7 +65,6 @@ template ValidatorLicense with
 
         return ValidatorLicense_ReceiveFaucetCouponResult with ..
 
-    -- We expect the DSO to call this choice for misbehaving validators.
     choice ValidatorLicense_Withdraw : ValidatorLicense_WithdrawResult
       with
         reason : Text

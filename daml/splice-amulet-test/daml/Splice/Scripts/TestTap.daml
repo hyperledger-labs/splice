@@ -9,7 +9,7 @@ testTap: Script ()
 testTap = do
     DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
-    -- start issuing so the DSO has some amulets to invite users
+    -- start issuing
     advanceToIssuanceWithPrice app 1.0
     runAmuletDepositBots app
     cid <- tap app alice 100.0

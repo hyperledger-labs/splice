@@ -42,23 +42,22 @@ import Splice.Util
 -- 2. Some of the actions that require confirmations should be executed automatically
 --    once the ledger and the wall-clocks of the SV nodes are in a particular state.
 --    These actions are confirmed by each SV node automatically once the action's precondition is met.
---    Once 2 * f + 1 confirmations* are visible to the DsoDelegate it executes them.
+--    Once 2 * f + 1 confirmations* are visible to the DSO delegate it executes them.
 --
 -- * Simplified for clarity; see `requiredNumVotes` for exact formula.
 --
 -- Process 2 is an optimization of Process 1 for the case where no disagreement to the
 -- action is expected. It avoids the extra round-trip and the complications of having
--- the DsoDelegate to reliably initiate the vote when it is time to execute an automated action
+-- the DSO delegate to reliably initiate the vote when it is time to execute an automated action
 -- that requires confirmation.
 --
 -- We expect honest SV nodes to only create confirmations for actions
 -- whose preconditions are met. We also rely on the execution of these actions to be
--- idempotent, as more than the required number of confirmations can be created and the DsoDelegate could
+-- idempotent, as more than the required number of confirmations can be created and the DSO delegate could
 -- thus in principle execute the corresponding action multiple times.
 --
 -- Note also that having these two processes also aids in distinguishing between manually initiated
--- ad-hoc votes and the regular confirmations that need to happen for the DSO to
--- perform its duties.
+-- ad-hoc votes and the regular confirmations that need to happen during standard DSO.
 data ActionRequiringConfirmation
   = ARC_DsoRules with
       dsoAction : DsoRules_ActionRequiringConfirmation
@@ -88,9 +87,9 @@ data AmuletRules_ActionRequiringConfirmation
 
 data DsoRules_ActionRequiringConfirmation
   = SRARC_AddSv DsoRules_AddSv
-    -- ^ Voted action to directly add a sv to the DSO.
+    -- ^ Voted action to directly add an SV
   | SRARC_OffboardSv DsoRules_OffboardSv
-    -- ^ Voted action to remove a sv from the DSO.
+    -- ^ Voted action to remove an SV
   | SRARC_ConfirmSvOnboarding DsoRules_ConfirmSvOnboarding
     -- ^ Automated action to confirm that a party can become an SV.
   | SRARC_GrantFeaturedAppRight DsoRules_GrantFeaturedAppRight
@@ -108,11 +107,11 @@ data AnsEntryContext_ActionRequiringConfirmation
     -- ^ Automated action to reject initial payment of an ans entry.
   deriving (Eq, Show)
 
--- | Information about svs relevant to DSO governance.
+-- | Information about SVs relevant to DSO governance.
 data SvInfo = SvInfo with
     name : Text -- ^ Human-readable name; must be unique.
-    joinedAsOfRound : Round -- ^ Round in which the sv joined the DSO.
-    svRewardWeight : Int -- ^ Weight of the SV in the DSO reward distribution.
+    joinedAsOfRound : Round -- ^ Round in which the SV joined
+    svRewardWeight : Int -- ^ Weight of the SV in the SV reward distribution.
     participantId : Text -- ^ Participant ID of the SV, stored here as PartyToParticipant mappings are tracked via state on the DsoRules + SvOnboardingConfirmed contracts.
   deriving (Eq, Show)
 
@@ -122,12 +121,12 @@ data OffboardedSvInfo = OffboardedSvInfo with
     participantId : Text -- ^ Participant ID of the offboarded SV.
   deriving (Eq, Show)
 
-data DSOSummary = DSOSummary with
+data DsoSummary = DsoSummary with
     dsoDelegate : Party
     numSvs : Int
     requiredNumVotes : Int
     -- | The number of votes required for considering a confirmation, a request for a vote, or
-    -- a DsoDelegate election definitive.
+    -- a DSO delegate election definitive.
   deriving (Eq, Show)
 
 -- | Choice return types
@@ -245,31 +244,31 @@ data DsoRules_MergeMemberTrafficContractsResult = DsoRules_MergeMemberTrafficCon
 -- TODO(#7649) revise and/or remove
 data ElectionRequestReason
   = ERR_DsoDelegateUnavailable
-  -- TODO(#7649): add case for DsoDelegate asking to be relieved for a graceful shutdown
+  -- TODO(#7649): add case for DSO delegate asking to be relieved for a graceful shutdown
   | ERR_OtherReason Text
   | ExtElectionRequestReason with
       dummyUnitField : ()
         -- ^ Extension constructor (and field) to work around the current lack of upgrading for variants in Daml 3.0
   deriving (Eq, Ord, Show)
 
--- | A request to elect a new DsoDelegate for the DSO.
+-- | A request to elect a new DSO delegate.
 -- TODO(#7649) revise and/or remove
 template ElectionRequest with
     dso : Party
     requester : Party
-    epoch : Int  -- current epoch whose DsoDelegate should be replaced
-    reason : ElectionRequestReason -- reason for electing a new DsoDelegate
-    ranking : [Party] -- preference ranking for new DsoDelegates
+    epoch : Int  -- current epoch whose DSO delegate should be replaced
+    reason : ElectionRequestReason -- reason for electing a new DSO delegate
+    ranking : [Party] -- preference ranking for new DSO delegates
   where
     -- NOTE: we expect the requester to observe this contract by hosting the
-    -- 'dso' party (as all SVs do). The requester can in
+    -- DSO party (as all SVs do). The requester can in
     -- particular not be a signatory, as otherwise fetching and archiving of
     -- the request would require the requesters confirmation instead of only
-    -- the confirmation of the 'dso'.
+    -- the confirmation of the DSO party.
     signatory dso
 
 
--- | A confirmation for the DsoDelegate to take an action in the name of the DSO.
+-- | A confirmation for the DSO delegate to take action as part of standard DSO.
 -- Used for executing automated actions in a shortened process.
 -- See the comments on `ActionRequiringConfirmation` for details.
 template Confirmation with
@@ -278,7 +277,7 @@ template Confirmation with
     action : ActionRequiringConfirmation
     expiresAt : Time
   where
-    -- As for 'ElectionRequest' we only make the 'dso' a signatory.
+    -- As for 'ElectionRequest' we only make the DSO party a signatory.
     signatory dso
 
     choice Confirmation_Expire : Confirmation_ExpireResult
@@ -305,7 +304,7 @@ template VoteRequest
     voteBefore : Time
     -- ^ The time before which votes are accepted, and SHOULD be submitted.
     votes : Map.Map Text Vote
-    -- ^ The votes cast by current (or previous svs) of the DSO. These may be previous svs in case
+    -- ^ The votes cast by current or previous SVs. These may be previous SVs in case
     -- there was an SV change after the vote was requested.
     trackingCid : Optional (ContractId VoteRequest)
     -- ^ An optional tracking ContractId to be used for tracking the vote request through its updates.
@@ -343,7 +342,7 @@ data Vote = Vote with
   deriving(Eq, Show)
 
 data Reason = Reason with
-    url : Text -- ^ Url pointing to additional background on the reason, ideally using a https://w3c-ccg.github.io/hashlink/
+    url : Text -- ^ Url pointing to additional background on the reason, e.g., using a https://w3c-ccg.github.io/hashlink/
     body : Text -- ^ Freeform text intended for human consumption.
   deriving (Eq, Show)
 
@@ -355,7 +354,7 @@ data DsoRulesConfig = DsoRulesConfig with
     svOnboardingRequestTimeout : RelTime -- ^ The TTL for contracts representing an incomplete onboarding
     svOnboardingConfirmedTimeout : RelTime -- ^ The TTL for contracts representing an SV confirmation
     voteRequestTimeout : RelTime  -- ^ The TTL for a `VoteRequest` and its associated `Vote`s.
-    dsoDelegateInactiveTimeout: RelTime -- ^ The amount of time given to the DsoDelegate to complete an action it should take care of
+    dsoDelegateInactiveTimeout: RelTime -- ^ The amount of time given to the DSO delegate to complete an action it should take care of
     synchronizerNodeConfigLimits : SynchronizerNodeConfigLimits  -- ^ Limits to enforce on the svs' `SynchronizerNodeConfig`
     maxTextLength : Int -- ^ Generic upper limit on text fields in choices and contracts.
     decentralizedSynchronizer : DsoDecentralizedSynchronizerConfig
@@ -370,12 +369,12 @@ data SynchronizerUpgradeSchedule = SynchronizerUpgradeSchedule with
   deriving (Eq, Show)
 
 data TrafficState = TrafficState with
-    consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the DSO was founded.
+    consumedTraffic: Int -- ^ Bytes of extra traffic consumed before the decentralized synchronizer was bootstrapped.
   deriving (Eq, Show)
 
 template DsoRules with
-    dso : Party        -- ^ The party representing the DSO
-    epoch : Int        -- ^ The number of DsoDelegates that have already been elected.
+    dso : Party
+    epoch : Int        -- ^ The number of DSO delegates that have already been elected.
     svs : Map.Map Party SvInfo
     offboardedSvs : Map.Map Party OffboardedSvInfo
     dsoDelegate : Party
@@ -390,7 +389,7 @@ template DsoRules with
 
     -- NOTE: the svs are not direct signatories as that would not give us the right fault-tolerance wrt
     -- validating choices on this contract. Instead, the svs are indirect signatories by being
-    -- hosting the `dso` party with confirmation rights.
+    -- hosting the DSO party with confirmation rights.
     signatory dso
 
 
@@ -421,7 +420,7 @@ template DsoRules with
             -- and drops their CommetBFT config, which will in turn lead to the SV apps of the remaining svs
             -- revoking that sv's rights in the CometBFT network.
             let newSvs = Map.delete sv svs
-            -- We optimize for prompt removal of a sv if the vote said so. We can thus not wait for a DsoDelegate-election
+            -- We optimize for prompt removal of a sv if the vote said so. We can thus not wait for a DSO delegate-election
             -- and instead just choose the sv with the lexicographically smallest name.
             let (newDsoDelegate, newEpoch)
                   | sv == dsoDelegate = (head (Map.keys newSvs), epoch + 1)
@@ -525,7 +524,7 @@ template DsoRules with
         return DsoRules_SetSynchronizerNodeConfigResult with ..
 
 
-    -- Automation DsoDelegate election
+    -- Automation DSO delegate election
     ------------------------------
     -- TODO(#7649) revise and/or remove
     nonconsuming choice DsoRules_RequestElection : DsoRules_RequestElectionResult
@@ -549,7 +548,7 @@ template DsoRules with
         requestCids : [ContractId ElectionRequest]
       controller actor
       do
-        let summary = summarizeDSO this
+        let summary = summarizeDso this
         -- fetch, check, and archive all requests
         reqs <- forA requestCids $ \requestCid -> do
           req <- fetchAndArchive (ForDso with dso) requestCid
@@ -605,7 +604,7 @@ template DsoRules with
         confirmationCids : [ContractId Confirmation]
       controller dsoDelegate
       do
-        let s = summarizeDSO this
+        let s = summarizeDso this
         let forDso = ForDso with dso
         require "Enough confirmations" (length confirmationCids >= s.requiredNumVotes)
         confirmers <- forA confirmationCids $ \confirmationCid -> do
@@ -698,7 +697,7 @@ template DsoRules with
               ]
         let abstainingSvs = [ name | name <- activeSvs, not (name `Map.member` request.votes) ]
         let (yays, nays) = partition (.accept) validVotes
-        let s = summarizeDSO this
+        let s = summarizeDso this
         outcome <-
           if length yays >= s.requiredNumVotes
             then do
@@ -757,8 +756,8 @@ template DsoRules with
     -- happen due to a too quick removal and re-addition of a sv.
     -- We expect this to be run as an OnAssignedContractTrigger for the DsoRules contract.
     --
-    -- Note: we do not archive the AmuletPriceVote of a sv on its removal from the DSO,
-    -- as that would allow that sv to block the removal via updating its AmuletPriceVote at the right time.
+    -- Note: we do not archive the AmuletPriceVote of an SV on its removal,
+    -- as that would allow that SV to block the removal via updating its AmuletPriceVote at the right time.
     --
     -- TODO(#10063): drop this code in favor of just keeping AmuletPriceVotes around.
     nonconsuming choice DsoRules_GarbageCollectAmuletPriceVotes : DsoRules_GarbageCollectAmuletPriceVotesResult
@@ -784,12 +783,12 @@ template DsoRules with
             [] -> fail "empty list of duplicate votes"
             [_] -> fail "singleton list of duplicate votes"
             ((_, vote)::duplicates) -> do
-              require "DSO matches" (vote.dso == dso)
+              require "matching DSO party" (vote.dso == dso)
               require "SV is a sv" (vote.sv `Map.member` svs)
               forA_ duplicates $ \(duplicateCid, duplicate) -> do
                 -- safe, as we fetched it before and check the constraints below
                 potentiallyUnsafeArchive duplicateCid
-                require "DSO matches" (duplicate.dso == dso)
+                require "matching DSO party" (duplicate.dso == dso)
                 require "SV of duplicate matches" (duplicate.sv == vote.sv)
         return DsoRules_GarbageCollectAmuletPriceVotesResult
 
@@ -879,12 +878,11 @@ template DsoRules with
         svOnboardingRequestCid: ContractId SvOnboardingRequest
       controller dsoDelegate
       do
-        -- require that the sv is already added to the DSO
         -- TODO(#3756) Enable archiving also before the sv is added, after a matching `SvOnboardingConfirmed` contract is created.
         svOnboardingRequest <- fetchAndArchive (ForDso with dso) svOnboardingRequestCid
         let maybeSv = Map.lookup svOnboardingRequest.candidateParty svs
-        require "sv party is already added to the DSO" (isSome maybeSv)
-        require "sv name matches" ((fromSome maybeSv).name == svOnboardingRequest.candidateName)
+        require "SV party is an SV" (isSome maybeSv)
+        require "SV name matches" ((fromSome maybeSv).name == svOnboardingRequest.candidateName)
         return DsoRules_ArchiveSvOnboardingRequestResult
 
     nonconsuming choice DsoRules_ConfirmSvOnboarding : DsoRules_ConfirmSvOnboardingResult
@@ -920,7 +918,7 @@ template DsoRules with
       do
         svOnboardingConfirmed <- fetchButArchiveLater (ForDso with dso) cid
         exercise cid SvOnboardingConfirmed_Expire
-        -- register the sv as offboarded so it's PartyToParticipant mapping for the dso party gets removed
+        -- register the sv as offboarded so it's PartyToParticipant mapping for the DSO party gets removed
         let sv = svOnboardingConfirmed.svParty
         let offboardingInfo = OffboardedSvInfo with
               name = svOnboardingConfirmed.svName
@@ -930,7 +928,7 @@ template DsoRules with
         return DsoRules_ExpireSvOnboardingConfirmedResult with ..
 
 
-    -- Amulet management driven directly by the DsoDelegate
+    -- Amulet management driven directly by the DSO delegate
     -------------------------------------------------------
 
     nonconsuming choice DsoRules_Amulet_Expire : DsoRules_Amulet_ExpireResult
@@ -954,7 +952,7 @@ template DsoRules with
           expireSum = result.expireSum
 
 
-    -- Round management driven directly by the DsoDelegate
+    -- Round management driven directly by the DSO delegate
     ------------------------------------------------------
 
     nonconsuming choice DsoRules_AdvanceOpenMiningRounds : DsoRules_AdvanceOpenMiningRoundsResult
@@ -973,7 +971,7 @@ template DsoRules with
           openRound = result.openRoundCid
 
 
-    -- ANS entry and payment management driven directly by the DsoDelegate
+    -- ANS entry and payment management driven directly by the DSO delegate
     -----------------------------------------------
 
     nonconsuming choice DsoRules_CollectEntryRenewalPayment : DsoRules_CollectEntryRenewalPaymentResult
@@ -1017,7 +1015,7 @@ template DsoRules with
         pure DsoRules_TerminateSubscriptionResult
 
 
-    -- Reward management driven directly by the DsoDelegate
+    -- Reward management driven directly by the DSO delegate
     -------------------------------------------------------
 
     nonconsuming choice DsoRules_ReceiveSvRewardCoupon : DsoRules_ReceiveSvRewardCouponResult
@@ -1131,8 +1129,8 @@ template DsoRules with
         return DsoRules_MergeMemberTrafficContractsResult with
           memberTraffic = result.mergedTrafficCid
 
-summarizeDSO : DsoRules -> DSOSummary
-summarizeDSO dsoRules = DSOSummary with
+summarizeDso : DsoRules -> DsoSummary
+summarizeDso dsoRules = DsoSummary with
     dsoDelegate = dsoRules.dsoDelegate
     numSvs
     requiredNumVotes =
@@ -1140,7 +1138,7 @@ summarizeDSO dsoRules = DSOSummary with
       --   For a vote with n svs and f = floor((n - 1) /3) byzantine svs, we want to have the following properties:
       --     *availability*: f operators abstaining, won’t stop the vote
       --        ⇒ numRequiredVotes <= n - f
-      --     *tolerate DsoDelegate selecting the votes*: the threshold must be independent of the number of votes cast
+      --     *tolerate DSO delegate selecting the votes*: the threshold must be independent of the number of votes cast
       --     *integrity*: f operators cannot boost their voting power for future votes by collaborating
       --        ⇒ implies f < threshold-for-accepting-an-action
       --     *result acceptance*: outcome is accepted by SV operators

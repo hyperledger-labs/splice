@@ -33,17 +33,17 @@ import Splice.Scripts.AnsRulesParameters
 bpsMultiplier : Int
 bpsMultiplier = 10000
 
-initMainNetDSO : Script (AmuletApp, Party, (Party, Party, Party, Party))
-initMainNetDSO = initDSO False
+initMainNet : Script (AmuletApp, Party, (Party, Party, Party, Party))
+initMainNet = initDecentralizedSynchronizer False
 
-initDevNetDSO : Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDevNetDSO = initDSO True
+initDevNet : Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDevNet = initDecentralizedSynchronizer True
 
-initDSO : Bool -> Script (AmuletApp, Party, (Party, Party, Party, Party))
-initDSO isDevNet = do
+initDecentralizedSynchronizer : Bool -> Script (AmuletApp, Party, (Party, Party, Party, Party))
+initDecentralizedSynchronizer isDevNet = do
   [sv1, sv2, sv3, sv4] <- forA ["sv1", "sv2", "sv3", "sv4"] allocateParty
 
-  dso <- allocateParty "DSO"
+  dso <- allocateParty "dso-party"
 
   let initialSynchronizerConfig = SynchronizerConfig with
         state = DS_Operational
@@ -200,8 +200,6 @@ runNextIssuanceD app amuletPrice = do
       confirmAWC_MiningRound_Archive app
       executeAllConfirmedActions app
 
-    -- TODO(#8101): collect DsoRewards via SvRewards into per-SV amulets
-
     -- close current issuing rounds if there are any
     now <- getTime
     imcs <- queryFilter @IssuingMiningRound app.dso (\r -> r.targetClosesAt <= now)
@@ -267,11 +265,10 @@ confirmAWC_MiningRound_Archive app = do
 
 executeAllConfirmedActions : AmuletApp -> Script ()
 executeAllConfirmedActions app = do
-  -- get rules and DSO summary
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   [(dsoRulesCid, rules)] <- query @DsoRules app.dso
-  let s = summarizeDSO rules
-  -- query all confirmations visible to dso
+  let s = summarizeDso rules
+  -- query all confirmations visible to DSO party
   confirmations0 <- query @Confirmation app.dso
   -- execute the actions for which there are enough confirmations
   let executableConfirmations =
@@ -285,11 +282,10 @@ executeAllConfirmedActions app = do
 
 executeAllDefinitiveVotes : AmuletApp -> Script ()
 executeAllDefinitiveVotes app = do
-  -- get rules and DSO summary
   [(amuletRulesCid, _)] <- query @AmuletRules app.dso
   [(dsoRulesCid, rules)] <- query @DsoRules app.dso
-  let s = summarizeDSO rules
-  -- query all voting requests visible to dso
+  let s = summarizeDso rules
+  -- query all voting requests visible to DSO party
   now <- getTime
   requests <- query @VoteRequest app.dso
   forA_ requests $ \(requestCid, request) -> do

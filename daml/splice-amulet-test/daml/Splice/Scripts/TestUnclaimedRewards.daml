@@ -21,7 +21,7 @@ testUnclaimedRewards_noActivity : Script ()
 testUnclaimedRewards_noActivity = do
   DefaultAppWithUsers{..} <- setupDefaultAppWithUsers
 
-  -- start issuing so the DSO has some amulets to invite users
+  -- start issuing
   runNextIssuance app
   runAmuletDepositBots app
 
@@ -71,7 +71,7 @@ testUnclaimedRewards_withCoupons = do
     round = Round 0
     weight = 10
 
-  -- -- start issuing so the DSO has some amulets to invite users
+  -- -- start issuing
   runNextIssuance app
   runAmuletDepositBots app
 

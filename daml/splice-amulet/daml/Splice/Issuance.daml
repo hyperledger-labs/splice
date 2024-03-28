@@ -91,19 +91,19 @@ computeIssuingRoundParameters tickDuration amuletPrice config summary =
       unclaimedSvRewards
       issuancePerValidatorFaucetCoupon = validatorFaucetIssuance.issuancePerCoupon
   where
-    amuletsToIssueToDso =
+    amuletsToIssueToSvs =
       amuletsToIssueInRound - validatorRewardIssuance.rewardsToIssue - unfeaturedAppIssuance.rewardsToIssue
 
     issuancePerSvRewardCoupon =
       if summary.totalSvRewardWeight == 0
-        then amuletsToIssueToDso -- signal what could be earned with one coupon in this round
-        else amuletsToIssueToDso / intToDecimal summary.totalSvRewardWeight
+        then amuletsToIssueToSvs -- signal what could be earned with one coupon in this round
+        else amuletsToIssueToSvs / intToDecimal summary.totalSvRewardWeight
 
     -- As noted in `computeIssuanceTranche` below, Decimal uses HalfEven rounding on division and multiplication,
-    -- which means that for a fully subscribed DSO issuance, there is a rounding error of up to 0.5e-10 * 2.4e6 = 0.00012.
+    -- which means that for a fully subscribed SV issuance, there is a rounding error of up to 0.5e-10 * 2.4e6 = 0.00012.
     -- This is 1.2 USD at the high price of 10k USD per amulet, which we accept as it does not meaningfully affect the tokenomics.
     unclaimedSvRewards =
-      max 0.0 $ amuletsToIssueToDso - issuancePerSvRewardCoupon * intToDecimal summary.totalSvRewardWeight
+      max 0.0 $ amuletsToIssueToSvs - issuancePerSvRewardCoupon * intToDecimal summary.totalSvRewardWeight
 
     roundsPerYear =
       intToDecimal (convertRelTimeToMicroseconds (days 365)) /

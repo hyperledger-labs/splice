@@ -60,7 +60,7 @@ paymentAmountToAmulet dso openMiningRound pq =
   case pq.unit of
     USDUnit ->
       do
-        require "DSO matches" (openMiningRound.dso == dso)
+        require "matching DSO party" (openMiningRound.dso == dso)
         pure (pq.amount / openMiningRound.amuletPrice)
     AmuletUnit ->
       pure pq.amount
@@ -82,7 +82,7 @@ template AppPaymentRequest
     sender : Party -- ^ The party that should pay.
     receiverAmounts : [ReceiverAmount] -- ^ Pairs of (party, amount) requesting to be paid.
     provider : Party -- ^ The app provider; receives usage rewards.
-    dso : Party -- ^ The issuer of Amulet that should be used to make the payment.
+    dso : Party -- ^ The DSO party of the amulet that should be used to make the payment.
     expiresAt : Time -- ^ When the payment request expires.
     description : Text -- ^ Human readable description of the reason / good for which the payment is requested.
   where

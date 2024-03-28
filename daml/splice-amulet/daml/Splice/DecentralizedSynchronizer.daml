@@ -16,7 +16,7 @@ import Splice.Util
 -- to a new synchronizer protocol version.
 data AmuletDecentralizedSynchronizerConfig = AmuletDecentralizedSynchronizerConfig with
     requiredSynchronizers : Set.Set Text -- ^ The synchronizer-ids of all synchronizers that Amulet and ANS users should be connected to.
-    activeSynchronizer : Text -- ^ The synchronizer-id of the synchronizer on which the DSO accepts transactions involving the
+    activeSynchronizer : Text -- ^ The synchronizer-id of the synchronizer on which the SVs accepts transactions involving the
                         -- AmuletRules and related contracts, which must be one of the `requiredSynchronizers`.
     fees : SynchronizerFeesConfig -- ^ The fees charged for using the decentralized synchronizer. We use the same fees across all active decentralized synchronizers.
   deriving (Eq, Show)
@@ -38,7 +38,7 @@ data SynchronizerFeesConfig = SynchronizerFeesConfig with
     -- as delivering the message incurs a cost as well, albeit usually a much
     -- smaller one than the cost of a write.
     minTopupAmount: Int -- ^ The minimum amount of extra traffic (in bytes) that must be bought when buying extra traffic.
-    -- This ensures that the DSO can amortize the cost of executing that transaction.
+    -- This ensures that the SVs can amortize the cost of executing that transaction.
   deriving (Eq, Show)
 
 

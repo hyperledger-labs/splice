@@ -95,8 +95,6 @@ template AnsRules
           requestCid = request
 
     -- Collect a user's initial payment for a ans entry allocation.
-    -- By collecting the initial payment, the DSO ultimately agrees to both
-    -- the creation of the ans entry and the establishment of subscription payments for renewing it.
     nonconsuming choice AnsRules_CollectInitialEntryPayment : AnsRules_CollectInitialEntryPaymentResult
       with
         user : Party
@@ -110,7 +108,7 @@ template AnsRules
         -- accept payment which creates the subscription
         collectResult <- exercise paymentCid SubscriptionInitialPayment_Collect with
           transferContext
-        -- burn the amulet created for the DSO (using fetchAndArchive for extra safety)
+        -- burn the amulet transferred to the DSO party (using fetchAndArchive for extra safety)
         void $ fetchAndArchive (ForOwner with dso; owner = dso) collectResult.amulet
         let subscriptionStateCid = collectResult.subscriptionState
         subscriptionState <- fetchUncheckedReferenceData subscriptionStateCid
@@ -147,7 +145,7 @@ template AnsRules
         result <- exercise paymentCid SubscriptionPayment_Collect with
           transferContext
         let (subscriptionStateCid, amuletCid) = (result.subscriptionState, result.amulet)
-        -- burn the amulet created for the DSO (using fetchAndArchive for extra safety)
+        -- burn the amulet transferred to the DSO party (using fetchAndArchive for extra safety)
         void $ fetchAndArchive (ForOwner with dso; owner = dso) amuletCid
         -- renew entry
         renewSummary <- exercise entryCid AnsEntry_Renew with
@@ -177,7 +175,7 @@ fetchAndValidateInitialPayment : ContractId SubscriptionInitialPayment -> Expect
 fetchAndValidateInitialPayment cid ExpectedPayment{..} = do
   payment <- fetchUncheckedButArchiveLater cid
   -- TODO(#9465): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
-  require "DSO matches" (dso == payment.subscriptionData.provider)
+  require "matching DSO party" (dso == payment.subscriptionData.provider)
   require "Sender matches" (sender == payment.subscriptionData.sender)
   pure payment
 
@@ -185,7 +183,7 @@ fetchAndValidatePayment : ContractId SubscriptionPayment -> ExpectedPayment -> U
 fetchAndValidatePayment cid ExpectedPayment{..} = do
   payment <- fetchUncheckedButArchiveLater cid
   -- TODO(#9465): get rid of this fetchButArchiveLater by replacing this function with the use of checked fetches
-  require "DSO matches" (dso == payment.subscriptionData.provider)
+  require "matching DSO party" (dso == payment.subscriptionData.provider)
   require "Sender matches" (sender == payment.subscriptionData.sender)
   pure payment
 
@@ -199,7 +197,7 @@ data ExpectedEntryContext = ExpectedEntryContext
 fetchAndValidateEntryContext : ContractId AnsEntryContext -> ExpectedEntryContext -> Update AnsEntryContext
 fetchAndValidateEntryContext cid ExpectedEntryContext{..} = do
   context <- fetchUncheckedReferenceData cid
-  require "DSO matches" (dso == context.dso)
+  require "matching DSO party" (dso == context.dso)
   require "User matches" (user == context.user)
   require "Subscription reference matches" (reference == context.reference)
   pure context

@@ -1,4 +1,4 @@
--- | Data structures and contracts related to the DSO's management of the decentralized synchronizer.
+-- | Data structures and contracts related managing the decentralized synchronizer.
 module Splice.DSO.DecentralizedSynchronizer where
 
 import qualified DA.Map as Map
@@ -21,7 +21,7 @@ data DsoDecentralizedSynchronizerConfig = DsoDecentralizedSynchronizerConfig wit
     lastSynchronizerId : Text
     -- ^ The last allocated synchronizer Id.
     activeSynchronizerId: Text
-    -- ^ The synchronizer to be used for managing all DSO and Amulet workflows.
+    -- ^ The synchronizer to be used for managing standard DSO and Amulet workflows.
   deriving (Eq, Show)
 
 -- | The DSO-level configuration of a synchronizer. This contains the shared parameters

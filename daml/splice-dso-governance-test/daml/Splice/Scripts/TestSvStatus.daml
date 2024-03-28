@@ -16,7 +16,7 @@ import Splice.DSO.SvState
 testStatusReportSubmission : Script ()
 testStatusReportSubmission = do
 
-  (_, dso, (sv1, sv2, _, _)) <- initMainNetDSO
+  (_, dso, (sv1, sv2, _, _)) <- initMainNet
 
   [(dsoRulesCid, _)] <- query @DsoRules dso
 

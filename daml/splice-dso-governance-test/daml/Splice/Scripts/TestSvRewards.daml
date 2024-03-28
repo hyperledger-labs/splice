@@ -20,7 +20,7 @@ import Splice.Util
 test_SvRewards : Script ()
 test_SvRewards = do
 
-    (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
+    (app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
 
     -- extra party to represent beneficiary
     extraBeneficiary <- allocateParty "beneficiary"

@@ -247,23 +247,32 @@ function commit_occurrences() {
 declare -A subcommand_whitelist
 
 
-subcommand_whitelist[internal_cleanup]='Format files and update lock files'
+subcommand_whitelist[cleanup_full]='Cleanup: run cn-clean, format all files, and update all lock files'
 
-function subcmd_internal_cleanup() {
-
-  _info "Creating cleanup changes"
+function subcmd_cleanup_full() {
 
   if [[ $SKIP_CN_CLEAN != 1 ]]; then
     sbt --client cn-clean
   fi
 
+  subcmd_cleanup_light
+
+  run_and_commit "cleanup: regenerate pulumi expected.json files" "make cluster/pulumi/update-expected"
+}
+
+subcommand_whitelist[cleanup_light]='Cleanup: format all files and update non-cluster lock files'
+
+function subcmd_cleanup_light() {
+
+  _info "Creating cleanup changes"
+
   run_and_commit "cleanup: regenerate .daml and .ts lock files" "sbt --client 'Test/compile; bundle; damlDarsLockFileUpdate'"
   run_and_commit "cleanup: format .scala files" "sbt --client format"
   run_and_commit "cleanup: format .ts files" "sbt --client npmFix"
-  run_and_commit "cleanup: regenerate pulumi expected.json files" "make cluster/pulumi/update-expected"
 
   git commit --no-verify --allow-empty -m"Mark this renaming change as a [breaking] change."
 }
+
 
 ### SVC
 
@@ -863,6 +872,9 @@ function subcmd_no_illegal_daml_references() {
     local illegal_words=(
       currency founder founding leader collective consortium
       coin cn whitepaper canton
+      domain global
+      DsoReward
+      'google'
       )
     for word in "${illegal_words[@]}"; do
         echo "Checking for occurences of '$word' (case-insensitive)"
@@ -876,6 +888,18 @@ function subcmd_no_illegal_daml_references() {
       '(?<![a-z])cc(?!(ept|essor|g[.]github))'
       CC
       '(?<!(Map|Set)[.])(?<!sequencer )member(?!(Id|.*[tT]raffic))'
+      # Allow only Dso as in DsoRules in comments
+      '[-][-] .*Dso(?!(Rules))'
+      # Disallow dso in comments other than dsoParty
+      '[-][-] .*dso'
+      # Allow only very specific mentions of DSO
+      '(?<!standard )DSO(?!([.]| party| rules| delegate| governance|-level))'
+      # No connection between DSO and issuance
+      '(dso|Dso|DSO).*ssue'
+      'ssue.*(dso|Dso|DSO)'
+      # No Github issue links
+      'github(?!.io/hashlink)'
+
       )
     for pattern in "${illegal_patterns[@]}"; do
         echo "Checking for occurences of '$pattern' (case sensitive, in code other than splitwell)"

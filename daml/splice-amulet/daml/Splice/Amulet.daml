@@ -64,7 +64,7 @@ data SvRewardCoupon_ArchiveAsBeneficiaryResult = SvRewardCoupon_ArchiveAsBenefic
 -- | A amulet, which can be locked and whose amount expires over time.
 --
 -- The expiry serves to charge an inactivity fee, and thereby ensures that the
--- DSO can reclaim all amulets at some point in the future.
+-- SVs can reclaim the corresponding storage space at some point in the future.
 template Amulet
   with
     dso : Party
@@ -77,7 +77,6 @@ template Amulet
     choice Amulet_Expire : Amulet_ExpireResult
       with
         roundCid : ContractId OpenMiningRound
-      -- For simplicity and to communicate this as the standard-case, we only allow the DSO to expire amulets (see #1789 for full context)
       controller dso
       do  requireAmuletExpiredForAllOpenRounds roundCid this
           let expireSum = AmuletExpireSummary with
@@ -124,7 +123,6 @@ template LockedAmulet
     choice LockedAmulet_ExpireAmulet : LockedAmulet_ExpireAmuletResult
       with
         roundCid : ContractId OpenMiningRound
-      -- For simplicity and to communicate this as the standard-case, we only allow the DSO to expire amulets (see #1789 for full context)
       controller amulet.dso
       do t <- getTime
          require "Lock is expired" (lock.expiresAt < t)
@@ -192,7 +190,7 @@ template AppRewardCoupon
     ensure amount > 0.0
 
     -- The provider is no signatory so their node's unavailability does not hold up the rewards issuance process.
-    -- They can rely on the DSO to only withdraw the coupon once it expired.
+    -- The coupon will be archived once it expired as part of standard DSO.
     observer provider
 
     choice AppRewardCoupon_DsoExpire : AppRewardCoupon_DsoExpireResult
@@ -219,7 +217,7 @@ template ValidatorRewardCoupon
     ensure amount > 0.0
 
     -- The user is no signatory so their node's unavailability does not hold up the rewards issuance process.
-    -- They can rely on the DSO to only withdraw the coupon once it expired.
+    -- The coupon will be archived once it expired as part of standard DSO.
     observer user
 
     choice ValidatorRewardCoupon_DsoExpire : ValidatorRewardCoupon_DsoExpireResult
@@ -243,13 +241,13 @@ template ValidatorRewardCoupon
         return ValidatorRewardCoupon_ArchiveAsValidatorResult
 
 
--- | A coupon for a beneficiary to receive part of the DSO issuance for a specific SV node and round.
+-- | A coupon for a beneficiary to receive part of the SV issuance for a specific SV node and round.
 template SvRewardCoupon with
     dso : Party
     sv : Party -- ^ The party identifying the SV node for which the reward is issued.
     beneficiary : Party -- ^ The beneficiary allowed to receive the reward.
     round : Round
-    weight : Int -- ^ Coupons receive a share of the DSO issuance proportional to their weight.
+    weight : Int -- ^ Coupons receive a share of the SV issuance proportional to their weight.
   where
     ensure weight > 0
 
@@ -312,7 +310,7 @@ instance HasCheckedFetch SvRewardCoupon ForOwner where
   contractGroupId SvRewardCoupon{..} = ForOwner with dso; owner = beneficiary
 
 -- This instance is slightly dangerous, as it could lead to a missed check of the validator.
--- We accept this, as at least the DSO check is done, and the remainder is careful coding.
+-- We accept this, as at least the DSO party check is done, and the remainder is careful coding.
 instance HasCheckedFetch ValidatorRewardCoupon ForDso where
   contractGroupId ValidatorRewardCoupon {..} = ForDso with dso
 

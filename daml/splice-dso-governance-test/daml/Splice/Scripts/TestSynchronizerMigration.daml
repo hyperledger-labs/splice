@@ -20,10 +20,10 @@ import Splice.Scripts.DsoTestUtils
 
 testSynchronizerMigration : Script ()
 testSynchronizerMigration = do
-  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNet
   let svs = [sv1, sv2, sv3, sv4]
 
-  -- DSO decides off-ledger to setup a second synchronizer
+  -- SVs decides off-ledger to setup a second synchronizer
   let newSynchronizerId = "new-synchronizer-id"
   executeDsoRulesConfigChange app $ \config ->
     let decentralizedSynchronizerConfig = config.decentralizedSynchronizer
@@ -51,7 +51,7 @@ testSynchronizerMigration = do
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
 
-  -- The DSO marks the synchronizer as operational
+  -- SVs mark the synchronizer as operational
   executeDsoRulesConfigChange app $ \config ->
     let decentralizedSynchronizerConfig = config.decentralizedSynchronizer
         newSynchronizerConfig = SynchronizerConfig with state = DS_Operational; cometBftGenesisJson = "<genesis-json-from-off-ledger-for-network-1"
@@ -61,7 +61,7 @@ testSynchronizerMigration = do
     in  config with
           decentralizedSynchronizer = newDecentralizedSynchronizerConfig
 
-  -- once the DSO is confident about the working of the new synchronizer it announces it to its users
+  -- once the SVs are confident about the working of the new synchronizer they announce it to their users
   -- choosing a 30 day headroom until the active synchronizer switches.
   now <- getTime
   executeAddAmuletConfigSchedule app $ \configSchedule ->
@@ -93,8 +93,7 @@ testSynchronizerMigration = do
   -- The new synchronizer becomes active, which implies that:
   -- 1. The SV apps change the synchronizer topology information to allow transferring all of its contracts.
   --    (once synchronizers support transfer permissions)
-  -- 2. The stakeholders of Amulet and DSO contracts transfer them to the new active synchronizer as described in
-  --    the design document: https://docs.google.com/document/d/1vjcq9iGBnqWl0Q-3sIBvXEV61U2TflolxDpuES97Kh4/edit#bookmark=id.9lc9od4yaflf
+  -- 2. The stakeholders of Amulet and DSO governance contracts transfer them to the new active synchronizer.
   pure ()
 
 executeDsoRulesConfigChange : AmuletApp -> (DsoRulesConfig -> DsoRulesConfig) -> Script ()

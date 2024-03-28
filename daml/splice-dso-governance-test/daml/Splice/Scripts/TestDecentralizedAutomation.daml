@@ -23,7 +23,7 @@ import Splice.Scripts.AnsRulesParameters
 import Splice.Wallet.Subscriptions
 
 
--- Automation DsoDelegate election
+-- Automation DSO delegate election
 -----------------------------
 
 unitTestDsoDelegateElectionVoting : Script ()
@@ -44,7 +44,7 @@ unitTestDsoDelegateElectionVoting = do
 testDsoDelegateElection : Script ()
 testDsoDelegateElection = do
 
-  (app, dso, (mallory, sv2, sv3, sv4)) <- initMainNetDSO
+  (app, dso, (mallory, sv2, sv3, sv4)) <- initMainNet
 
   -- run an issuance
   runNextIssuanceD app 1.0
@@ -86,11 +86,11 @@ testDsoDelegateElection = do
   trace openRounds $ return ()
 
 
--- | An example of an impersonation attack on the DsoDelegate election protected for
+-- | An example of an impersonation attack on the DSO delegate election protected for
 -- via checked fetches.
 testDsoDelegateElection_ImpersonationAttack : Script ()
 testDsoDelegateElection_ImpersonationAttack = do
-  (_app, dso, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
+  (_app, dso, (sv1, sv2, sv3, sv4)) <- initMainNet
 
   -- SV2 attempts to get himself elected w/o any action from the others
   -- by impersonating the DSO party
@@ -120,15 +120,10 @@ testDsoDelegateElection_ImpersonationAttack = do
     actor = sv2
     requestCids = [req1, req2, req3]
 
-  -- Before #2109 introduced checked fetches, this would have succeeded.
-  -- [(_, dsoRules)] <- query @DsoRules dso
-  -- require "Show that SV2 got elected (wrongfully!)" (dsoRules.DsoDelegate == sv2)
-
-
 
 testUnclaimedRewardsMerging : Script ()
 testUnclaimedRewardsMerging = do
-  (app, _, _) <- initDevNetDSO
+  (app, _, _) <- initDevNet
 
   -- onboard a validator
   validator1 <- setupValidator app "validator1"
@@ -155,7 +150,7 @@ testUnclaimedRewardsMerging = do
 
 testRequiredNumOfConfirmation : Script ()
 testRequiredNumOfConfirmation = do
-  (_, dso, (sv1, sv2, sv3, _)) <- initDevNetDSO
+  (_, dso, (sv1, sv2, sv3, _)) <- initDevNet
 
   [(amuletRulesCid, _)] <- query @AmuletRules dso
   [(dsoRulesCid, dsoRules)] <- query @DsoRules dso
@@ -197,7 +192,7 @@ testRequiredNumOfConfirmation = do
 
 testConfirmationExpiry : Script ()
 testConfirmationExpiry = do
-  (app, dso, (sv1, _, _, _)) <- initMainNetDSO
+  (app, dso, (sv1, _, _, _)) <- initMainNet
 
   -- a new sv prepares his participant
   svX <- allocateParty "svX"
@@ -215,14 +210,14 @@ testConfirmationExpiry = do
         newSvParticipantId = "svX-participant-id"
         joinedAsOfRound = (Round 3)
 
-  -- DsoDelegate tries to expire the confirmation, but it's too early
+  -- DSO delegate tries to expire the confirmation, but it's too early
   dsoDelegateSubmitsMustFail app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
 
   -- wait for the confirmation TTL to pass
   passTime (minutes 5)
 
-  -- DsoDelegate expires the confirmation
+  -- DSO delegate expires the confirmation
   dsoDelegateSubmits app $ \cid -> exerciseCmd cid $
     DsoRules_ExpireStaleConfirmation confirmationResult.confirmation
 
@@ -234,7 +229,7 @@ testConfirmationExpiry = do
 
 testDecentralizedAns : Script ()
 testDecentralizedAns = do
-  (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNetDSO
+  (app, dso, (sv1, sv2, sv3, sv4)) <- initDevNet
 
   alice <- setupUser app "alice" app.dso
 
@@ -256,7 +251,7 @@ testDecentralizedAns = do
     walletProvider = app.dso
   let initialPaymentCid = result.subscriptionPayment
 
-  -- SVs create confirmations for DSO to collect initial payment of the requested ans entry.
+  -- SVs create confirmations for collecting the initial payment of the requested ans entry.
   appContext <- getAppTransferContext app app.dsoUser
   let collectInitialPaymentAction = ARC_AnsEntryContext with
         ansEntryContextCid = ansSummary.entryCid
@@ -330,7 +325,7 @@ testDecentralizedAns = do
     walletProvider = app.dso
   let initialPaymentCid = result.subscriptionPayment
 
-  -- SVs create confirmations for DSO to reject initial payment of the requested ans entry.
+  -- SVs create confirmations for rejecting initial payment of the requested ans entry.
   appContext <- getAppTransferContext app app.dsoUser
   let rejectInitialPaymentAction = ARC_AnsEntryContext with
         ansEntryContextCid = rejectedSummary.entryCid
@@ -364,7 +359,7 @@ testDecentralizedAns = do
 
 terminatedSubscriptionCanBeCleanedUp : Script ()
 terminatedSubscriptionCanBeCleanedUp = script do
-  (app, dso, (sv1, _, _, _)) <- initDevNetDSO
+  (app, dso, (sv1, _, _, _)) <- initDevNet
 
   alice <- setupUser app "alice" app.dso
 

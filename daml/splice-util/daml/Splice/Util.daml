@@ -33,8 +33,7 @@ require : CanAssert m => Text -> Bool -> m ()
 require msg invariant =
   assertMsg ("The requirement '" <> msg <> "' was not met.") invariant
 
--- | Contracts typically come in groups. For example, all contracts issued by a specific DSO party,
--- or all contracts issued by the DSO and owned by a particular party.
+-- | Contracts typically come in groups. For example, all contracts managed by a specific DSO party.
 --
 -- We aim to always fetch with a specific contract group identifier to ensure that we do not mixup
 -- contracts from different groups.

@@ -1,6 +1,7 @@
 module Splice.Scripts.TestAmuletBurn where
 
 import DA.Assert
+import DA.List (sort)
 import Daml.Script
 
 import Splice.ValidatorLicense
@@ -16,7 +17,7 @@ testAmuletBurn = do
 
   advanceToNextRoundChange app
 
-  -- -- start issuing so the DSO has some amulets to invite users
+  -- -- start issuing
   runNextIssuance app
   runAmuletDepositBots app
 
@@ -31,11 +32,11 @@ testAmuletBurn = do
   -- there are two open rounds, draw on these coupons
   drawOnAllValidatorFaucets app
   coupons <- query @ValidatorFaucetCoupon app.dso
-  [3, 4] === map (._2.round.number) coupons
+  [3, 4] === sort (map (._2.round.number) coupons)
 
   runAmuletDepositBots app
 
-  -- dso transfers 20 amulet to user
+  -- user taps 20 amulet
   tap app user 20.0
   runAmuletDepositBots app
 

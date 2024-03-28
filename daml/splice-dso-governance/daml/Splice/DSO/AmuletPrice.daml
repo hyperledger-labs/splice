@@ -1,10 +1,10 @@
--- | Templates and code for the DSO to agree on a amulet price using median-based voting.
+-- | Templates and code for the SVs to agree on a amulet price using median-based voting.
 --
 -- Every sv can change its desired amulet price at any time they like provided they
 -- wait at least one tick duration (2.5 minutes by default) between changes.
 --
--- New `OpenMiningRounds` are always openened with the median of the amulet prices desired
--- by the svs of the DSO.
+-- New `OpenMiningRounds` are always openened with the median of the amulet prices voted for
+-- by the SVs.
 module Splice.DSO.AmuletPrice where
 
 import DA.List

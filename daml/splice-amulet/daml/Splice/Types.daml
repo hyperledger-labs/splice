@@ -10,7 +10,7 @@ isDefinedRound : Round -> Bool
 isDefinedRound round = round.number >= 0
 
 
--- | The group of contracts issued by the same DSO.
+-- | The group of contracts managed by the DSO party.
 --
 -- Used for checked fetches.
 data ForDso = ForDso with
@@ -18,7 +18,7 @@ data ForDso = ForDso with
   deriving (Eq, Show)
 
 
--- | The groupp of contracts issued by the DSO for a specific mining round.
+-- | The group of contracts managed by the DSO party for a specific mining round.
 --
 -- Used for checked fetches.
 data ForRound = ForRound with
@@ -26,7 +26,7 @@ data ForRound = ForRound with
     round : Round
   deriving (Eq, Show)
 
--- | The group of contracts issued by the DSO and owned by party.
+-- | The group of contracts managed by the DSO party and owned by a specific party.
 --
 -- Used for checked fetches.
 data ForOwner = ForOwner with

@@ -126,7 +126,7 @@ testExpireLockedAmulet = do
   roundCid <- advanceRound app (Round 3)
 
   -- Lock is not yet expired
-  -- dso fails to expire the amulet
+  -- DSO party fails to expire the amulet
   testChoiceFailed [app.dso] [app.dso] $
     exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
 
@@ -135,7 +135,7 @@ testExpireLockedAmulet = do
 
   -- Amulet is not yet expired
   -- 2 rounds before current round = 4 - 2 = 2 which is before round 3 when the amulet expires
-  -- dso fails to expire the amulet
+  -- DSO party fails to expire the amulet
   testChoiceFailed [app.dso] [app.dso] $
     exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
 
@@ -146,7 +146,7 @@ testExpireLockedAmulet = do
 
   -- Amulet is expired
   -- 2 rounds before current round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
-  -- dso expires the amulet
+  -- DSO party expires the amulet
   result <- testChoice [app.dso] [app.dso] $
     exerciseCmd cid (LockedAmulet_ExpireAmulet roundCid)
   let expireSummary = result.expireSum
@@ -180,7 +180,7 @@ testExpireAmulet = do
   latestActiveRoundCid <- advanceRound app (Round 3)
 
   -- 2 rounds before latest active round = 3 - 2 = 1 which is before round 3 when the amulet expires
-  -- dso fails to expire the amulet
+  -- DSO party fails to expire the amulet
   testChoiceFailed [app.dso] [app.dso] $
     exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
 
@@ -188,7 +188,7 @@ testExpireAmulet = do
   latestActiveRoundCid <- advanceRound app (Round 4)
 
   -- 2 rounds before current latest active round => 4 - 2 = 2 which is before round 3 when the amulet expires
-  -- dso fails to expire the amulet
+  -- DSO party fails to expire the amulet
   testChoiceFailed [app.dso] [app.dso] $
     exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
 
@@ -198,7 +198,7 @@ testExpireAmulet = do
   normalizedBalanceBeforeExpiry <- getNormalizedBalance app.dso
 
   -- 2 rounds before current latest active round => 5 - 2 = 3 which is equal to round 3 when the amulet expires
-  -- dso expires the amulet
+  -- DSO party expires the amulet
   result <- testChoice [app.dso] [app.dso] $
     exerciseCmd cid (Amulet_Expire latestActiveRoundCid)
   let expireSummary = result.expireSum

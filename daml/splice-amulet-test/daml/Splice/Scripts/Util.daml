@@ -52,16 +52,12 @@ genericSetupApp dsoPrefix = do
   -- use a time that is easy to reason about in script outputs
   setTime demoTime
 
-  -- In this model the DSO is not decentralized.
-  dso <- allocateParty (dsoPrefix <> "DSO")
-  dsoUser <- validateUserId (dsoPrefix <> "dso")
+  dso <- allocateParty (dsoPrefix <> "dso-party")
+  dsoUser <- validateUserId (dsoPrefix <> "dummy-dso-user")
   _ <- createUser (User dsoUser (Some dso)) []
   let app =  AmuletApp with dso, dsoUser = AmuletUser dsoUser dso
 
-  -- the DSO is its own validator
   recordValidatorOf app app.dso app.dso
-
-  -- TOOD: reintroduce the price oracle
 
   _ <- submit dso $ createCmd AmuletRules with
     configSchedule = defaultAmuletConfigSchedule
@@ -95,7 +91,7 @@ setupValidator' app name = do
     faucetState = None
 
   userId <- validateUserId name
-  -- TODO(#2957): remove read-as DSO.
+  -- TODO(#2957): remove read-as DSO party.
   createUser (User userId (Some validatorParty)) [CanActAs validatorParty, CanReadAs app.dso]
   recordValidatorOf app validatorParty validatorParty
   tap app (AmuletUser userId validatorParty) 1.0
@@ -114,7 +110,7 @@ setupUser : AmuletApp -> Text -> Party -> Script AmuletUser
 setupUser app name validator = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
-  -- TODO(#2957): remove read-as DSO.
+  -- TODO(#2957): remove read-as DSO party.
   createUser (User userId (Some user)) [CanActAs user, CanReadAs app.dso]
   recordValidatorOf app user validator
   let u = AmuletUser userId user
@@ -285,7 +281,7 @@ skipNRounds app n = do
 submitExerciseAmuletRulesByKey : Choice AmuletRules c r => AmuletApp -> [Party] -> [Party] -> c -> Script r
 submitExerciseAmuletRulesByKey app actors readers arg = do
   (rules, _) <- fetchAmuletRulesByKey app.dso
-  -- TODO(#2957): remove read-as DSO.
+  -- TODO(#2957): remove read-as DSO party.
   let adjustedReaders = (app.dso :: readers)
   submitMulti actors adjustedReaders $ exerciseCmd rules arg
 

@@ -208,7 +208,7 @@ trait SvTestUtil extends CNNodeTestCommon {
     domainUpgradeSchedule.toJava,
   )
 
-  def computeAmuletsToIssueToDso(
+  def computeAmuletsToIssueToSvs(
       config: IssuanceConfig,
       tickDuration: NonNegativeFiniteDuration,
   ): java.math.BigDecimal = {
@@ -231,7 +231,7 @@ trait SvTestUtil extends CNNodeTestCommon {
       tickDuration: NonNegativeFiniteDuration,
       dsoSize: Int,
   ): java.math.BigDecimal = {
-    computeAmuletsToIssueToDso(config, tickDuration)
+    computeAmuletsToIssueToSvs(config, tickDuration)
       .divide(BigDecimal(dsoSize).bigDecimal, RoundingMode.HALF_UP)
       .setScale(10, RoundingMode.HALF_UP)
   }

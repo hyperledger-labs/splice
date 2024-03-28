@@ -34,7 +34,7 @@ testWithSubscription = script do
 
   -- amulet wallet selects a large enough amulet
   amulet <- tap app alice 1.5
-  -- amulet wallet accepts subscription and first payment and locks amulet to dso
+  -- amulet wallet accepts subscription and first payment and locks amulet to DSO party
 
   paymentContext <- getPaymentTransferContext app alice
   result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
@@ -51,7 +51,7 @@ testWithSubscription = script do
     transferConfigAmulet.lockHolderFee.fee
   reward.featured === False
 
-  -- dso transactionally unlocks & transfer amulets and creates ans entry and a subscription in return.
+  -- DSO party is used to transactionally unlock & transfer amulets and creates ans entry and a subscription in return.
   appContext <- getAppTransferContext app app.dsoUser
   collectPaymentSummary <- submit app.dso $ exerciseCmd entryContext AnsEntryContext_CollectInitialEntryPayment with
     paymentCid = initialPaymentCid
@@ -90,7 +90,7 @@ testWithSubscription = script do
     walletProvider = app.dso
   let paymentCid = result.subscriptionPayment
 
-  -- dso transactionally unlocks & transfer amulets and renews directory entry in return
+  -- DSO party is used to transactionally unlock & transfer amulets and renews directory entry in return
   renewalSummary <- submit app.dso $ exerciseCmd entryContext AnsEntryContext_CollectEntryRenewalPayment with
     paymentCid
     entryCid = collectPaymentSummary.entryCid
@@ -116,7 +116,7 @@ testWithSubscription = script do
   paymentContext <- getPaymentTransferContext app alice
   appContext <- getAppTransferContext app app.dsoUser
 
-  -- amulet wallet and dso can repeat the "payment and collect" cycle indefinitely
+  -- amulet wallet and DSO party can repeat the "payment and collect" cycle indefinitely
   result <- submitMulti [alice.primaryParty, app.dso] [] $ exerciseCmd renewalSummary.subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputAmulet amulet]
     context = paymentContext
@@ -134,13 +134,13 @@ testWithSubscription = script do
 
   submitMustFail app.dso $ exerciseCmd renewalSummary.entryCid (AnsEntry_Expire app.dso)
 
-  -- dso can eventually expire an unfunded entry
+  -- DSO party can eventually expire an unfunded entry
   passTime (days 121)
   runNextIssuance app
   passTimeToRoundOpen app
   submit app.dso $ exerciseCmd renewalSummary.entryCid (AnsEntry_Expire app.dso)
 
-  -- dso can then also terminate the subscription
+  -- DSO party can then also terminate the subscription
   submit app.dso $ exerciseCmd renewalSummary.subscriptionStateCid (SubscriptionIdleState_ExpireSubscription app.dso)
 
   pure ()

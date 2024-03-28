@@ -12,7 +12,7 @@ import Splice.DecentralizedSynchronizer
 -- 1. allow for crash fault tolerant deduplication of traffic purchases
 -- 2. allow enforcing a rate limit to prevent the validator from spending too much on traffic purchases.
 template ValidatorTopUpState with
-    dso : Party -- ^ The DSO from which we are purchasing traffic
+    dso : Party
     validator : Party -- ^ The validator operator purchasing traffic for the given sequencer member
     memberId : Text -- ^ The id of the sequencer member (participant or mediator) for which traffic has been purchased
     synchronizerId : Text -- ^ The id of the synchronizer for which this contract tracks purchased extra traffic

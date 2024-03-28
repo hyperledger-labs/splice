@@ -12,7 +12,7 @@ import Splice.Scripts.DsoTestUtils
 
 testSynchronizerMigration : Script ()
 testSynchronizerMigration = do
-  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNetDSO
+  (app, _, (sv1, sv2, sv3, sv4)) <- initMainNet
   let svs = [sv1, sv2, sv3, sv4]
       synchronizerId = "synchronizer-id"
 
@@ -34,7 +34,7 @@ testSynchronizerMigration = do
       scan = Some ScanConfig with
         publicUrl = "https://" <> partyToText sv <> ".example.com"
 
-  -- sequencer info are published to dsoRules and amuletRules
+  -- sequencer info are published to DsoRules and AmuletRules
   forA_ svs $ \sv -> do
     (_, nodeState) <- getSvNodeState app sv
     let  Some synchronizerConfig = Map.lookup synchronizerId nodeState.state.synchronizerNodes
