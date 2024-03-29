@@ -43,7 +43,7 @@
       "Daml Finance CN Test App": ["20.250.62.34/32"],
       "Cumberland-Labs": [
         "52.220.114.41/32",
-	"3.1.152.127/32"
+        "3.1.152.127/32"
       ],
       "Canton Network Pilot": [
         "20.250.62.103/32",
@@ -51,7 +51,8 @@
         "20.250.127.247/32"
       ],
       "Canton Network Registry App": ["34.65.140.146/32"],
-      "Daml Hub DevNet Validator": ["35.193.111.3/32"]
+      "Daml Hub DevNet Validator": ["35.193.111.3/32"],
+      "Digital Asset Wallet Validator": ["34.70.233.135/32"]
     }
   },
   "testnet": {
