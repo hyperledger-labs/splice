@@ -61,7 +61,7 @@ if [ -n "${OVERRIDE_VERSION-}" ]; then
     fi
 fi
 
-prefix=$(<"${REPO_ROOT}"/VERSION)
+prefix=$(git show "$sha":VERSION)
 
 git_commit_message=$(git log -1 --pretty=format:%B)
 if [[ $git_commit_message == *"[release]"* ]]; then
