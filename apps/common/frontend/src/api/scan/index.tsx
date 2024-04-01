@@ -18,6 +18,7 @@ import useLookupAnsEntryByParty, {
 import useLookupFeaturedAppRight, {
   useLookupFeaturedAppRightBuilder,
 } from './useLookupFeaturedAppRight';
+import useOpenRounds from './useOpenRounds';
 import useTopAppProviders from './useTopAppProviders';
 import useTotalAmuletBalance from './useTotalAmuletBalance';
 import useTotalRewards from './useTotalRewards';
@@ -46,4 +47,5 @@ export {
   useLookupAnsEntryByNameFromResponse,
   useLookupAnsEntryByParty,
   useLookupAnsEntryByPartyFromResponse,
+  useOpenRounds,
 };

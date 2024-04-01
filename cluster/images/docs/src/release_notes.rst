@@ -3,6 +3,13 @@
 Release Notes
 =============
 
+0.1.2
+-----
+
+* The Scan frontend shows information about currently open mining rounds
+  in the current configuration box.
+
+
 2024-04-01
 ----------
 

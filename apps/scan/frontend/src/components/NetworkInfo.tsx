@@ -1,8 +1,8 @@
 import * as React from 'react';
 import BigNumber from 'bignumber.js';
-import { ErrorDisplay, getAmuletConfigurationAsOfNow, Loading } from 'common-frontend';
+import { DateDisplay, ErrorDisplay, getAmuletConfigurationAsOfNow, Loading } from 'common-frontend';
 import { microsecondsToMinutes } from 'common-frontend-utils';
-import { useGetAmuletRules } from 'common-frontend/scan-api';
+import { useGetAmuletRules, useOpenRounds } from 'common-frontend/scan-api';
 import { formatDistanceToNow } from 'date-fns';
 
 import {
@@ -13,6 +13,7 @@ import {
   TableBody,
   TableCell,
   TableContainer,
+  TableHead,
   TableRow,
   Typography,
 } from '@mui/material';
@@ -22,6 +23,52 @@ import { SteppedRate } from '@daml.js/splice-amulet/lib/Splice/Fees/module';
 
 const NetworkInfo: React.FC = () => {
   const getAmuletRulesQuery = useGetAmuletRules();
+  const openRoundsQuery = useOpenRounds();
+
+  let openRoundsDisplay: JSX.Element;
+  switch (openRoundsQuery.status) {
+    case 'loading':
+      openRoundsDisplay = <Loading />;
+      break;
+    case 'error':
+      openRoundsDisplay = <ErrorDisplay message="Failed to fetch open rounds" />;
+      break;
+    case 'success':
+      const sortedRounds = openRoundsQuery.data.sort(
+        (a, b) => parseInt(a.payload.round.number) - parseInt(b.payload.round.number)
+      );
+      openRoundsDisplay = (
+        <Table>
+          <TableHead>
+            <TableRow>
+              <TableCell>Round</TableCell>
+              <TableCell>Opens At</TableCell>
+              <TableCell>Target Closes At</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {sortedRounds.map(round => {
+              const {
+                round: { number },
+                opensAt,
+                targetClosesAt,
+              } = round.payload;
+              return (
+                <TableRow key={number} className="open-mining-round-row">
+                  <TableCell className="round-number">{number}</TableCell>
+                  <TableCell className="round-opens-at">
+                    <DateDisplay datetime={opensAt} />
+                  </TableCell>
+                  <TableCell className="round-target-closes-at">
+                    <DateDisplay datetime={targetClosesAt} />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      );
+  }
 
   switch (getAmuletRulesQuery.status) {
     case 'loading':
@@ -38,6 +85,10 @@ const NetworkInfo: React.FC = () => {
                 The amulet configuration details below are voted on by the Super Validators, and may
                 be updated over time.
               </Typography>
+              <Stack spacing={1}>
+                <Typography variant="h3">Open Rounds</Typography>
+                {openRoundsDisplay}
+              </Stack>
               <Stack spacing={1}>
                 <Typography variant="h3">Fees</Typography>
                 <Typography variant="body1">

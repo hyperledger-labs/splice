@@ -223,6 +223,37 @@ class ScanFrontendTimeBasedIntegrationTest
 
     }
 
+    "see open rounds" in { implicit env =>
+      def fmtTime(i: java.time.Instant) = {
+        import java.time.*
+        format.DateTimeFormatter
+          .ofPattern("MM/dd/yyyy HH:mm")
+          .format(LocalDateTime.ofInstant(i, ZoneOffset.UTC))
+      }
+
+      withFrontEnd("scan-ui") { implicit webDriver =>
+        actAndCheck("Go to Scan UI main page", go to s"http://localhost:${scanUIPort}")(
+          "Check that open rounds match scan backend",
+          _ => {
+            val openRounds = sv1ScanBackend
+              .getOpenAndIssuingMiningRounds()
+              ._1
+              .map(_.payload)
+              .sortBy(_.round.number)
+            openRounds should not be empty
+            val shownRounds = findAll(className("open-mining-round-row")).toList
+            shownRounds should have size openRounds.size.toLong
+            forEvery(shownRounds zip openRounds) { case (shownRound, openRound) =>
+              def rt(cn: String) = shownRound.childElement(className(cn)).text
+              rt("round-number") should matchText(openRound.round.number.toString)
+              rt("round-opens-at") should matchText(fmtTime(openRound.opensAt))
+              rt("round-target-closes-at") should matchText(fmtTime(openRound.targetClosesAt))
+            }
+          },
+        )
+      }
+    }
+
     "See expected domain fees leaderboard" in { implicit env =>
       waitForWalletUser(aliceValidatorWalletClient)
       waitForWalletUser(bobValidatorWalletClient)
