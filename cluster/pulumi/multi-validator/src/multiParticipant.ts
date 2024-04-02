@@ -44,7 +44,7 @@ export class MultiParticipant extends MultiNodeDeployment {
           resources: {
             requests: {
               cpu: '1',
-              memory: '4Gi',
+              memory: '6Gi',
             },
             limits: {
               cpu: '4',

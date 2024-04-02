@@ -1,6 +1,7 @@
 import * as k8s from '@pulumi/kubernetes';
 import * as pulumi from '@pulumi/pulumi';
 import { numNodesPerInstance, requireEnv } from 'cn-pulumi-common';
+import { ServiceMonitor } from 'cn-pulumi-common/src/metrics';
 import _ from 'lodash';
 
 export interface BaseMultiNodeArgs {
@@ -70,6 +71,10 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
                   }:${requireEnv('IMAGE_TAG')}`,
                   imagePullPolicy: 'Always',
                   ...args.container,
+                  ports: args.container.ports.concat({
+                    name: 'metrics',
+                    containerPort: 10013,
+                  }),
                   env: [
                     ...(args.container.env || []),
                     {
@@ -149,15 +154,39 @@ export class MultiNodeDeployment extends pulumi.ComponentResource {
             app: name,
           },
         },
-        spec: _.merge(args.serviceSpec, {
-          selector: {
-            app: name,
+        spec: {
+          ..._.merge(args.serviceSpec, {
+            selector: {
+              app: name,
+            },
+          }),
+          ...{
+            ports: pulumi
+              .all([
+                args.serviceSpec.ports,
+                {
+                  name: 'metrics',
+                  port: 10013,
+                },
+              ])
+              .apply(([ports, metricPort]) => (ports ? ports.concat(metricPort) : [metricPort])),
           },
-        }),
+        },
       },
       newOpts
     );
 
-    this.registerOutputs({ deployment: this.deployment, service: this.service });
+    const monitor = new ServiceMonitor(
+      `${name}-service-monitor`,
+      { app: name },
+      'metrics',
+      args.namespace.metadata.name,
+      newOpts
+    );
+    this.registerOutputs({
+      deployment: this.deployment,
+      service: this.service,
+      serviceMonitor: monitor,
+    });
   }
 }
