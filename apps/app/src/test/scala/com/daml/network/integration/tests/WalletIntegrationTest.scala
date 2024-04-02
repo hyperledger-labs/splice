@@ -1,11 +1,13 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.util.CNNodeUtil
 import org.apache.pekko.http.scaladsl.Http
 import org.apache.pekko.http.scaladsl.model.{HttpRequest, HttpResponse, StatusCodes}
 import org.apache.pekko.http.scaladsl.model.headers.{Authorization, OAuth2BearerToken}
 import com.digitalasset.canton.DomainAlias
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.splice.amulet as amuletCodegen
+import com.daml.network.codegen.java.splice.types.Round
 import com.daml.network.codegen.java.splice.wallet.payment as walletCodegen
 import com.daml.network.http.v0.definitions.TapRequest
 import com.daml.network.http.v0.wallet.WalletClient
@@ -55,6 +57,33 @@ class WalletIntegrationTest
   }
 
   "A wallet" should {
+
+    "tap stupid amount" in { implicit env =>
+      import com.daml.lf.data.Numeric
+      val aliceParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)
+      val round = sv1ScanBackend.getLatestOpenMiningRound(env.environment.clock.now)
+      val price = round.contract.payload.amuletPrice
+      val decimalScale = Numeric.Scale.assertFromInt(10)
+      // We subtract one to allow some slack in back/forth conversions from CC to USD. Otherwise,
+      // the command gets rejected by the participant and we test nothing.
+      val maxDecimal = Numeric
+        .subtract(Numeric.maxValue(decimalScale), Numeric.assertFromBigDecimal(decimalScale, 1))
+        .value
+      val maxUsd = Numeric
+        .multiply(decimalScale, maxDecimal, Numeric.assertFromBigDecimal(decimalScale, price))
+        .value
+      // Integration test that the tap goes through
+      aliceWalletClient.tap(maxUsd)
+      val amulet = aliceValidatorBackend.participantClientWithAdminToken.ledger_api_extensions.acs
+        .filterJava(amuletCodegen.Amulet.COMPANION)(aliceParty, _ => true)
+        .loneElement
+      // Unit test that expiry does the right thing
+      CNNodeUtil.amuletExpiresAt(amulet.data) shouldBe new Round(Long.MaxValue)
+      // Test that the USD/CC conversions get us to the max Decimal value ignoring decimal points
+      amulet.data.amount.initialAmount.setScale(0, java.math.RoundingMode.DOWN) shouldBe Numeric
+        .maxValue(decimalScale)
+        .setScale(0, java.math.RoundingMode.DOWN)
+    }
 
     "allow two wallet app users to connect to one wallet backend and tap" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWalletClient, aliceValidatorBackend)

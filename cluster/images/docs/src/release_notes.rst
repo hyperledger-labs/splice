@@ -3,12 +3,16 @@
 Release Notes
 =============
 
-0.1.2
------
+Upcoming
+--------
 
 * The Scan frontend shows information about currently open mining rounds
   in the current configuration box.
 
+0.1.2
+-----
+
+* Fixed a bug where coins with very large values broke ingestion in the SV and validator app due to an overflow.
 
 2024-04-01
 ----------
