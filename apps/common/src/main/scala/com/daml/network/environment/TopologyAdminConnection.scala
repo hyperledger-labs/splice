@@ -48,10 +48,11 @@ import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.topology.transaction.SignedTopologyTransactionX.GenericSignedTopologyTransactionX
 import com.digitalasset.canton.topology.transaction.TopologyMappingX
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
+import io.opentelemetry.api.trace.Tracer
 import io.grpc.{Status, StatusRuntimeException}
 
 import java.util.concurrent.atomic.AtomicReference
@@ -66,14 +67,15 @@ abstract class TopologyAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     override protected[this] val retryProvider: RetryProvider,
-)(implicit ec: ExecutionContextExecutor)
+)(implicit ec: ExecutionContextExecutor, tracer: Tracer)
     extends AppConnection(
       config,
       apiLoggingConfig,
       loggerFactory,
       grpcClientMetrics,
     )
-    with RetryProvider.Has {
+    with RetryProvider.Has
+    with Spanning {
   import TopologyAdminConnection.TopologyResult
   import TopologyAdminConnection.RecreateOnAuthorizedStateChange
 
@@ -626,60 +628,86 @@ abstract class TopologyAdminConnection(
       isProposal: Boolean = false,
       recreateOnAuthorizedStateChange: RecreateOnAuthorizedStateChange =
         RecreateOnAuthorizedStateChange.Recreate,
-  )(implicit traceContext: TraceContext): Future[TopologyResult[M]] =
-    retryProvider.retry(
-      retryFor,
-      "establish_topology_mapping",
-      description,
-      check.foldF(
-        { case TopologyResult(beforeEstablishedBaseResult, mapping) =>
-          (recreateOnAuthorizedStateChange match {
-            case RecreateOnAuthorizedStateChange.Abort(expectedSerial)
-                if expectedSerial != beforeEstablishedBaseResult.serial =>
-              Future.failed(AuthorizedStateChanged(beforeEstablishedBaseResult.serial))
-            case _ => Future.unit
-          })
-            .flatMap { _ =>
-              val updatedMapping = update(mapping)
-              proposeMapping(
-                store,
-                updatedMapping,
-                signedBy,
-                serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
-                isProposal = isProposal,
-              )
-            }
-            .flatMap { _ =>
-              retryProvider.retry(
-                retryFor,
-                "check_establish_topology_mapping",
-                s"check established $description",
-                check.leftMap { currentAuthorizedState =>
-                  if (currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial) {
-                    Status.FAILED_PRECONDITION
-                      .withDescription("Condition is not yet observed.")
-                      .asRuntimeException()
-                  } else {
-                    AuthorizedStateChanged(
-                      currentAuthorizedState.base.serial
+  )(implicit traceContext: TraceContext): Future[TopologyResult[M]] = {
+    withSpan("establish_topology_mapping") { implicit traceContext => _ =>
+      logger.info(s"Ensuring that $description")
+      retryProvider
+        .retry(
+          retryFor,
+          "establish_topology_mapping_retry",
+          description,
+          check.foldF(
+            { case TopologyResult(beforeEstablishedBaseResult, mapping) =>
+              (recreateOnAuthorizedStateChange match {
+                case RecreateOnAuthorizedStateChange.Abort(expectedSerial)
+                    if expectedSerial != beforeEstablishedBaseResult.serial =>
+                  Future.failed(AuthorizedStateChanged(beforeEstablishedBaseResult.serial))
+                case _ => Future.unit
+              })
+                .flatMap { _ =>
+                  val updatedMapping = update(mapping)
+                  proposeMapping(
+                    store,
+                    updatedMapping,
+                    signedBy,
+                    serial = beforeEstablishedBaseResult.serial + PositiveInt.one,
+                    isProposal = isProposal,
+                  )
+                }
+                .flatMap { _ =>
+                  logger.debug(
+                    s"Submitted proposal for $description, waiting until the proposal gets accepted"
+                  )
+                  retryProvider.retry(
+                    retryFor,
+                    "check_establish_topology_mapping",
+                    s"check established $description",
+                    check.leftMap { currentAuthorizedState =>
+                      if (
+                        currentAuthorizedState.base.serial == beforeEstablishedBaseResult.serial
+                      ) {
+                        Status.FAILED_PRECONDITION
+                          .withDescription("Condition is not yet observed.")
+                          .asRuntimeException()
+                      } else {
+                        AuthorizedStateChanged(
+                          currentAuthorizedState.base.serial
+                        )
+                      }
+                    }.rethrowT,
+                    logger,
+                  )
+                }
+                .recover {
+                  case ex: AuthorizedStateChanged
+                      if recreateOnAuthorizedStateChange.shouldRecreate =>
+                    logger.info(
+                      s"check $description failed and the base state has changed, re-establishing condition"
                     )
-                  }
-                }.rethrowT,
-                logger,
-              )
-            }
-            .recover {
-              case ex: AuthorizedStateChanged if recreateOnAuthorizedStateChange.shouldRecreate =>
-                logger.info(
-                  s"check $description failed and the base state has changed, re-establishing condition"
-                )
-                throw Status.FAILED_PRECONDITION.withDescription(ex.getMessage).asRuntimeException()
-            }
-        },
-        Future.successful,
-      ),
-      logger,
-    )
+                    throw Status.FAILED_PRECONDITION
+                      .withDescription(ex.getMessage)
+                      .asRuntimeException()
+                }
+            },
+            Future.successful,
+          ),
+          logger,
+        )
+        .transform(
+          result => {
+            logger.info(s"Success: $description")
+            result
+          },
+          exception => {
+            if (isClosing)
+              logger.info(s"Gave up ensuring $description, as we are shutting down")
+            else
+              logger.info(s"Gave up ensuring $description", exception)
+            exception
+          },
+        )
+    }
+  }
 
   def proposeInitialPartyToParticipant(
       store: TopologyStoreId,

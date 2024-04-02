@@ -21,6 +21,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.google.protobuf.ByteString
 import io.grpc.Status
+import io.opentelemetry.api.trace.Tracer
 
 import java.nio.file.{Files, Path}
 import java.time.Instant
@@ -38,7 +39,7 @@ class ParticipantAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
-)(implicit ec: ExecutionContextExecutor)
+)(implicit ec: ExecutionContextExecutor, tracer: Tracer)
     extends TopologyAdminConnection(
       config,
       apiLoggingConfig,

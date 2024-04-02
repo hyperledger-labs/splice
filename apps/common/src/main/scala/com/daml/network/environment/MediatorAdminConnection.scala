@@ -16,6 +16,7 @@ import com.digitalasset.canton.sequencing.{
 }
 import com.digitalasset.canton.topology.{DomainId, MediatorId, NodeIdentity}
 import com.digitalasset.canton.tracing.TraceContext
+import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -28,7 +29,7 @@ class MediatorAdminConnection(
     loggerFactory: NamedLoggerFactory,
     grpcClientMetrics: GrpcClientMetrics,
     retryProvider: RetryProvider,
-)(implicit ec: ExecutionContextExecutor)
+)(implicit ec: ExecutionContextExecutor, tracer: Tracer)
     extends TopologyAdminConnection(
       config,
       apiLoggingConfig,
